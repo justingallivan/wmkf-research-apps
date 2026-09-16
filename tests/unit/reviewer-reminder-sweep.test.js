@@ -257,16 +257,17 @@ describe('sweepRespondReminders', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('maxBatch bounds CLAIMS even when sends fail (no mass suppression)', async () => {
+  test('maxBatch bounds CLAIMS even when sends are unconfirmed (no mass suppression)', async () => {
     const rows = Array.from({ length: 5 }, (_, i) => respondCandidate({ wmkf_appreviewersuggestionid: `id-${i}`, _etag: `W/"${i}"` }));
     queryAllRecords.mockResolvedValue({ records: rows });
     installReads();
-    createAndSendEmail.mockRejectedValue(new Error('SMTP down')); // every send fails
+    createAndSendEmail.mockRejectedValue(new Error('SMTP down')); // every send is ambiguous
     const r = await sweepRespondReminders({ maxBatch: 2 });
     // Only 2 rows may be claimed despite all sends failing — the rest are deferred.
     // The claim now rides in the atomic mintAndStore PATCH, so it bounds the claims.
     expect(mintAndStore).toHaveBeenCalledTimes(2);
-    expect(r.sendFailed).toBe(2);
+    expect(r.sendFailed).toBe(0);
+    expect(r.sendUnconfirmed).toBe(2);
     expect(r.sent).toBe(0);
     expect(r.skipped).toBe(3);
   });
@@ -347,13 +348,14 @@ describe('sweepRespondReminders', () => {
     expect(updateRecord).not.toHaveBeenCalled();
   });
 
-  test('send fails after a successful atomic claim → at-most-once (sendFailed, marker stays)', async () => {
+  test('send is unconfirmed after a successful atomic claim → at-most-once (marker stays)', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
     createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
     const r = await sweepRespondReminders();
     expect(mintAndStore).toHaveBeenCalledTimes(1); // atomic marker+token PATCH landed
-    expect(r.sendFailed).toBe(1);
+    expect(r.sendFailed).toBe(0);
+    expect(r.sendUnconfirmed).toBe(1);
     expect(r.sent).toBe(0);
   });
 });

@@ -28,6 +28,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import EmailSendFeedback from '../EmailSendFeedback';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { loadEmailTemplates, EMPTY_TEMPLATES } from './email-template-store';
@@ -685,6 +686,15 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const confirmedSent = results.sent.filter((r) => !r.capturedEmail && r.inviteRecorded !== false);
   const unconfirmedSent = results.sent.filter((r) => !r.capturedEmail && r.inviteRecorded === false);
   const verifyBeforeRetry = [...results.unconfirmed, ...unconfirmedSent];
+  const confirmedResultCount = confirmedSent.length;
+  const issueCount = verifyBeforeRetry.length + results.failed.length + results.skipped.length;
+  const resultStatus = verifyBeforeRetry.length > 0
+    ? (confirmedResultCount > 0 ? 'partial' : 'uncertain')
+    : results.failed.length > 0
+      ? (confirmedResultCount > 0 ? 'partial' : 'failed')
+      : results.skipped.length > 0
+        ? 'partial'
+        : 'sent';
   // Quick-check recipients are sendable only after a deliberate staff check.
   // Research-only leads are removed from sendable by the render service and
   // cannot be promoted by this checkbox.
@@ -865,7 +875,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                           className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                       </label>
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-2">
+                    <p className="text-xs text-gray-400 mt-2">
                       Days to respond and reviews due are request-level campaign settings when saved. Proposal release is email-only copy for this invitation. A blank field omits its line.
                     </p>
                   </div>
@@ -1044,15 +1054,15 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                     : `✓ I verified ${d.candidateEmail} is correct`}
                                 </button>
                                 {verifyState[d.suggestionId]?.error && (
-                                  <p role="alert" className="mt-1 text-[11px] text-red-700">
+                                  <p role="alert" className="mt-1 text-xs text-red-700">
                                     {verifyState[d.suggestionId].error}
                                   </p>
                                 )}
-                                <p className="mt-1 text-[11px] text-amber-700">
+                                <p className="mt-1 text-xs text-amber-700">
                                   The app records the exact address, evidence link, staff actor, and request before making it sendable.
                                 </p>
                               </div>
-                              <p className="mt-1 text-[11px] text-amber-700">
+                              <p className="mt-1 text-xs text-amber-700">
                                 Copying sends nothing. After you send the message yourself, record it below so the
                                 app does not invite the reviewer again and can follow the normal reminder timeline.
                               </p>
@@ -1065,7 +1075,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                       aria-label={`Secure invitation link for ${d.candidateName || 'reviewer'}`}
                                       value={d.manualLink}
                                       onFocus={(e) => e.target.select()}
-                                      className="mt-1 w-full rounded border border-amber-300 bg-white px-2 py-1 font-mono text-[11px] text-gray-700"
+                                      className="mt-1 w-full rounded border border-amber-300 bg-white px-2 py-1 font-mono text-xs text-gray-700"
                                     />
                                   </label>
                                   <button
@@ -1076,14 +1086,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                     Copy secure invitation link
                                   </button>
                                   {manualLinkCopyState[d.suggestionId]?.copied && (
-                                    <p role="status" aria-live="polite" className="mt-1 text-[11px] text-amber-700">Copied to the clipboard.</p>
+                                    <p role="status" aria-live="polite" className="mt-1 text-xs text-amber-700">Copied to the clipboard.</p>
                                   )}
                                   {manualLinkCopyState[d.suggestionId]?.error && (
-                                    <p role="alert" className="mt-1 text-[11px] text-amber-700">
+                                    <p role="alert" className="mt-1 text-xs text-amber-700">
                                       {manualLinkCopyState[d.suggestionId].error} Select and copy the link from the field above.
                                     </p>
                                   )}
-                                  <p className="mt-2 text-[11px] text-amber-700">
+                                  <p className="mt-2 text-xs text-amber-700">
                                     If you reload or regenerate this preview before recording the send, copy the newest link.
                                   </p>
                                   <button
@@ -1095,7 +1105,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                     {manualLinkCopyState[d.suggestionId]?.marking ? 'Recording…' : 'I sent it — mark manually sent'}
                                   </button>
                                   {manualLinkCopyState[d.suggestionId]?.markError && (
-                                    <p role="alert" className="mt-1 text-[11px] text-red-700">
+                                    <p role="alert" className="mt-1 text-xs text-red-700">
                                       {manualLinkCopyState[d.suggestionId].markError}
                                     </p>
                                   )}
@@ -1171,7 +1181,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                     {verifyState[d.suggestionId]?.verifying ? 'Recording…' : 'Record verified address'}
                                   </button>
                                   {verifyState[d.suggestionId]?.error && (
-                                    <p role="alert" className="text-[11px] text-red-700">
+                                    <p role="alert" className="text-xs text-red-700">
                                       {verifyState[d.suggestionId].error}
                                     </p>
                                   )}
@@ -1190,13 +1200,13 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 {repairState[d.suggestionId]?.requesting ? 'Creating…' : 'Create repair request'}
                               </button>
                               {repairState[d.suggestionId]?.message && (
-                                <p className="mt-1 text-[11px]">
+                                <p className="mt-1 text-xs">
                                   {repairState[d.suggestionId].message}{' '}
                                   {repairState[d.suggestionId].adminUrl && <a className="underline" href={repairState[d.suggestionId].adminUrl}>View repair queue</a>}
                                 </p>
                               )}
                               {repairState[d.suggestionId]?.error && (
-                                <p role="alert" className="mt-1 text-[11px] text-red-700">{repairState[d.suggestionId].error}</p>
+                                <p role="alert" className="mt-1 text-xs text-red-700">{repairState[d.suggestionId].error}</p>
                               )}
                             </div>
                           )}
@@ -1291,22 +1301,25 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                   </p>
                 </div>
               ) : (
-                step !== 'error' && confirmedSent.length > 0 && (
-                  <p className="text-green-700">
-                    Sent {confirmedSent.length}: {confirmedSent.map((r) => r.candidateName || '?').join(', ')}
-                  </p>
+                (confirmedResultCount > 0 || issueCount > 0) && (
+                  <EmailSendFeedback
+                    status={step === 'error' && confirmedResultCount === 0 ? 'failed' : resultStatus}
+                    title={resultStatus === 'sent'
+                      ? `Sent ${confirmedResultCount} invitation${confirmedResultCount === 1 ? '' : 's'} for delivery.`
+                      : undefined}
+                    message={resultStatus === 'sent'
+                      ? `Dynamics accepted the email${confirmedResultCount === 1 ? '' : 's'} for ${confirmedSent.map((r) => r.candidateName || '?').join(', ')}.`
+                      : `${confirmedResultCount} sent for delivery; ${issueCount} need${issueCount === 1 ? 's' : ''} attention.`}
+                  />
                 )
               )}
               {verifyBeforeRetry.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
-                  <p className="font-medium">Possibly sent — verify before retrying</p>
-                  <p className="mt-1 text-xs text-amber-800">
-                    These emails may have already gone out. Check Dynamics before re-inviting to avoid a double-send.
-                  </p>
-                  <p className="mt-2 text-xs">
-                    {verifyBeforeRetry.map((r) => `${r.candidateName || '?'}${r.error ? ` (${r.error})` : ''}`).join(', ')}
-                  </p>
-                </div>
+                <EmailSendFeedback
+                  status="uncertain"
+                  title="Verify these invitations before retrying."
+                  message="They may already have been sent. Check Dynamics before re-inviting to avoid a duplicate."
+                  details={verifyBeforeRetry.map((r) => `${r.candidateName || '?'}${r.error ? ` — ${r.error}` : ''}`)}
+                />
               )}
               {capturedSent.length > 0 && (
                 <div className="space-y-2">

@@ -56,6 +56,7 @@ const REASON_STATUS = {
   conflict: 409,
   prepare_failed: 502,
   send_failed: 502,
+  send_unconfirmed: 202,
   invalid_preview: 400,
   recipient_changed: 409,
   sender_changed: 409,

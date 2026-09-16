@@ -28,6 +28,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RELEASE_REASONS } from '../../config/reviewerLifecycle';
+import EmailSendFeedback from '../EmailSendFeedback';
 
 const EXCLUDED_REASON = {
   not_found: 'No longer in this request',
@@ -40,6 +41,7 @@ const EXCLUDED_REASON = {
 
 const SEND_RESULT_REASON = {
   withdrawn_email_failed: 'The reviewer was released, but the email failed',
+  withdrawn_email_unconfirmed: 'The reviewer was released, but the email result could not be confirmed',
   withdrawn_email_skipped: 'The reviewer was released, but the email template was unavailable',
   withdrawn_no_email: 'The reviewer was released, but no email address was available',
   withdrawn_no_email_by_reason: 'The reviewer was released without an email by choice',
@@ -75,6 +77,8 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   const [loadError, setLoadError] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
+  const [sendFeedback, setSendFeedback] = useState(null);
+  const [completed, setCompleted] = useState(false);
   // No preselected reason (owner, 2026-09-09): the modal used to open on the
   // email editor before staff had said why they were releasing. Nothing loads
   // and nothing can be released until a reason is chosen.
@@ -167,6 +171,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     sendingRef.current = true;
     setSending(true);
     setSendError(null);
+    setSendFeedback(null);
     try {
       // Bind the send to the complete copy and recipient staff reviewed. The
       // server still re-derives recipient and sender and treats these values
@@ -214,22 +219,29 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
       const successStatus = releaseWithoutEmail ? 'withdrawn_no_email_by_reason' : 'withdrawn_emailed';
       const failed = outcomes.filter(({ result }) => result.status !== successStatus);
       if (failed.length > 0) {
-        setSendError(
-          `${releaseWithoutEmail ? `${outcomes.length - failed.length} recorded. ` : `${outcomes.length - failed.length} emailed. `}`
+        const detail = `${releaseWithoutEmail ? `${outcomes.length - failed.length} recorded. ` : `${outcomes.length - failed.length} accepted for delivery. `}`
           + `${failed.length} issue${failed.length === 1 ? '' : 's'}: `
           + failed.map(({ draft, result }) => (
             `${draft.name || draft.suggestionId} — ${SEND_RESULT_REASON[result.status] || result.status}`
-          )).join('; '),
-        );
+          )).join('; ');
+        const hasUnconfirmed = failed.some(({ result }) => result.status === 'withdrawn_email_unconfirmed');
+        setSendFeedback({ outcome: hasUnconfirmed ? 'uncertain' : 'partial', detail });
         if ((data.withdrawn || 0) > 0 && onReleased) onReleased(data.results || []);
+        setCompleted(true);
         return;
       }
       if (onReleased) onReleased(data.results || []);
-      sendingRef.current = false;
-      onClose();
+      if (releaseWithoutEmail) {
+        sendingRef.current = false;
+        onClose();
+        return;
+      }
+      setSendFeedback({ outcome: 'sent', detail: `Dynamics accepted ${outcomes.length} courtesy email${outcomes.length === 1 ? '' : 's'} for delivery.` });
+      setCompleted(true);
     } catch (err) {
       if (mountedRef.current && sendGeneration === sendGenerationRef.current) {
-        setSendError(`Network error: ${err.message}`);
+        setSendFeedback({ outcome: 'uncertain', detail: `The connection ended before the result could be confirmed. Check the recipients before sending again. (${err.message})` });
+        setCompleted(true);
       }
     } finally {
       if (mountedRef.current && sendGeneration === sendGenerationRef.current) {
@@ -357,6 +369,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             <p className="text-sm text-red-600">Subject and message cannot be empty.</p>
           )}
           {sendError && <p className="text-sm text-red-600">{sendError}</p>}
+          {sendFeedback && <EmailSendFeedback status={sendFeedback.outcome} title={sendFeedback.title} message={sendFeedback.detail} />}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -365,16 +378,16 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
               disabled={sending}
               className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Cancel
+              {completed ? 'Done' : 'Cancel'}
             </button>
-            <button
+            {!completed && <button
               type="button"
               onClick={handleSend}
               disabled={!reason || (showPreviews && (loading || drafts === null)) || sending || releaseableIds.length === 0 || blankEdit}
               className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
             >
               {sending ? 'Releasing…' : `Release (${releaseCount})`}
-            </button>
+            </button>}
           </div>
         </div>
       </div>

@@ -153,7 +153,7 @@ export const EVENT_DESCRIPTORS = [
 ];
 
 /** Timestamps that survive a failed send get this caveat in the drawer. */
-export const UNPROVEN_DELIVERY_NOTE = 'Recorded in the record; delivery not confirmed.';
+export const UNPROVEN_DELIVERY_NOTE = 'Recorded; send not confirmed.';
 
 /** Shown for a legacy receipt stamp fabricated by the former generic close-out. */
 export const SYNTHETIC_RECEIPT_NOTE = 'Recorded by close-out; no submitted review on record.';

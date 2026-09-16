@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import EmailSendFeedback from '../EmailSendFeedback';
 
 const ERROR_MESSAGE = {
   removed: 'This reviewer was removed from the proposal — restore them first.',
@@ -17,6 +18,7 @@ const ERROR_MESSAGE = {
   read_failed: "I couldn't verify this reviewer's latest status. No reminder was sent; try again.",
   prepare_failed: 'I could not prepare the reminder. No reminder was sent; try again.',
   send_failed: 'The reminder was prepared, but the email could not be sent.',
+  send_unconfirmed: 'Dynamics did not confirm the send. Check reviewer activity before trying again.',
   invalid_preview: 'The reviewed email is incomplete; reload the preview and try again.',
   recipient_changed: 'The reviewer’s email address changed after preview; reload and review the updated recipient.',
   sender_changed: 'The Program Director sender changed after preview; reload and review the updated sender.',
@@ -34,7 +36,7 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState(null);
+  const [sendFeedback, setSendFeedback] = useState(null);
   const mountedRef = useRef(true);
   const loadGenerationRef = useRef(0);
   const sendGenerationRef = useRef(0);
@@ -45,7 +47,7 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
     loadGenerationRef.current = generation;
     setLoading(true);
     setLoadError(null);
-    setSendError(null);
+    setSendFeedback(null);
     try {
       const resp = await fetch('/api/review-manager/send-review-reminder', {
         method: 'POST',
@@ -98,7 +100,7 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
     sendGenerationRef.current = generation;
     sendingRef.current = true;
     setSending(true);
-    setSendError(null);
+    setSendFeedback(null);
     try {
       const resp = await fetch('/api/review-manager/send-review-reminder', {
         method: 'POST',
@@ -120,16 +122,22 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
       const data = await resp.json().catch(() => ({}));
       if (!mountedRef.current || generation !== sendGenerationRef.current) return;
       if (!resp.ok || !data.ok) {
-        setSendError(responseError(data, 'Could not send the reminder. Refresh and try again.'));
+        setSendFeedback({
+          status: data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed',
+          message: responseError(data, 'Could not send the reminder. Refresh and try again.'),
+        });
         if (onStale && ['removed', 'revoked', 'not_found'].includes(data.reason)) onStale();
         return;
       }
       sendingRef.current = false;
       if (onSent) onSent();
-      onClose();
+      setSendFeedback({ status: 'sent', message: 'Dynamics accepted the reminder for delivery.' });
     } catch (error) {
       if (mountedRef.current && generation === sendGenerationRef.current) {
-        setSendError(`Network error sending reminder: ${error.message}`);
+        setSendFeedback({
+          status: 'uncertain',
+          message: 'The app could not confirm the result. Check reviewer activity before trying again.',
+        });
       }
     } finally {
       if (mountedRef.current && generation === sendGenerationRef.current) {
@@ -170,11 +178,11 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
               </div>
               <label className="block">
                 <span className="text-xs font-medium text-gray-600">Subject</span>
-                <input type="text" value={subject} onChange={(event) => setSubject(event.target.value)} disabled={sending} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100" />
+                <input type="text" value={subject} onChange={(event) => setSubject(event.target.value)} disabled={sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100" />
               </label>
               <label className="block">
                 <span className="text-xs font-medium text-gray-600">Message</span>
-                <textarea rows={12} value={bodyText} onChange={(event) => setBodyText(event.target.value)} disabled={sending} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono disabled:bg-gray-100" />
+                <textarea rows={12} value={bodyText} onChange={(event) => setBodyText(event.target.value)} disabled={sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono disabled:bg-gray-100" />
               </label>
               <p className="text-xs text-gray-500">
                 A fresh, secure “Accept or decline” button and fallback link are added by the server when you send.
@@ -183,13 +191,19 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
           )}
 
           {blankEdit && draft && <p className="text-sm text-red-600">Subject and message cannot be empty.</p>}
-          {sendError && <p className="text-sm text-red-600">{sendError}</p>}
+          {sendFeedback && (
+            <EmailSendFeedback status={sendFeedback.status} message={sendFeedback.message} />
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={requestClose} disabled={sending} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">Cancel</button>
-            <button type="button" onClick={handleSend} disabled={loading || sending || !draft || blankEdit} className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md">
-              {sending ? 'Sending…' : 'Send reminder'}
+            <button type="button" onClick={requestClose} disabled={sending} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">
+              {sendFeedback?.status === 'sent' ? 'Done' : 'Cancel'}
             </button>
+            {sendFeedback?.status !== 'sent' && (
+              <button type="button" onClick={handleSend} disabled={loading || sending || !draft || blankEdit || sendFeedback?.status === 'uncertain'} className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md">
+                {sending ? 'Sending…' : 'Send reminder'}
+              </button>
+            )}
           </div>
         </div>
       </div>

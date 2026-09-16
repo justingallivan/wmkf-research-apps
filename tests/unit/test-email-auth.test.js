@@ -92,7 +92,7 @@ describe('/api/test-email — superuser-only gate', () => {
       success: true,
       emailId: 'sent-email-id',
       status: 'sent',
-      message: 'Email sent successfully from user2@wmkeck.org to r@x.org',
+      message: 'Dynamics accepted the email from user2@wmkeck.org to r@x.org for delivery.',
     });
   });
 
@@ -105,13 +105,19 @@ describe('/api/test-email — superuser-only gate', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Missing required fields: to, subject, body' });
   });
 
-  it('service rejection → generic 500 without exposing the exception', async () => {
+  it('ambiguous send rejection → 202 unconfirmed without exposing the exception', async () => {
     mockAuthenticatedUser(2, [], { isSuperuser: true });
     createAndSendEmail.mockRejectedValueOnce(new Error('Dynamics unavailable'));
     const req = createMockReq({ method: 'POST', body: validBody({ sendMode: 'send' }) });
     const res = createMockRes();
     await handler(req, res);
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ success: false, error: 'Test email failed' });
+    expect(res.status).toHaveBeenCalledWith(202);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: 'Dynamics may have accepted the email, but the result could not be confirmed.',
+      outcome: 'uncertain',
+      retryable: false,
+      emailId: null,
+    });
   });
 });

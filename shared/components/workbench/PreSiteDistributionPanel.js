@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
+import EmailSendFeedback from '../EmailSendFeedback';
 import CuratedRecipientPicker from './CuratedRecipientPicker';
 import { deliberationSessionLine } from '../../utils/deliberation-stage';
 import {
@@ -329,6 +330,7 @@ export default function PreSiteDistributionPanel({
   const [history, setHistory] = useState([]);
   const [historyError, setHistoryError] = useState(null);
   const [error, setError] = useState(null);
+  const [sendFeedback, setSendFeedback] = useState(null);
   const [notice, setNotice] = useState(null);
   const [preparing, setPreparing] = useState(false);
   const [sending, setSending] = useState(false);
@@ -406,6 +408,7 @@ export default function PreSiteDistributionPanel({
     setPreview(null);
     setConfirmed(false);
     setError(null);
+    setSendFeedback(null);
     setNotice(null);
   };
 
@@ -436,6 +439,7 @@ export default function PreSiteDistributionPanel({
     controllerRef.current = controller;
     setPreparing(true);
     setError(null);
+    setSendFeedback(null);
     setNotice(null);
     setConfirmed(false);
     try {
@@ -523,6 +527,7 @@ export default function PreSiteDistributionPanel({
     controllerRef.current = controller;
     setSending(true);
     setError(null);
+    setSendFeedback(null);
     try {
       const response = await fetch('/api/workbench/pre-site-visit/distribution/send', {
         method: 'POST',
@@ -535,6 +540,14 @@ export default function PreSiteDistributionPanel({
         signal: controller.signal,
       });
       const body = await response.json().catch(() => ({}));
+      if (body.code === 'distribution_send_unconfirmed' && body.pendingSend) {
+        if (sequence.current === currentSequence && id === requestId) {
+          setPreview(body.pendingSend);
+          setConfirmed(false);
+          setSendFeedback({ status: 'uncertain', message: body.error });
+        }
+        return;
+      }
       if (body.inProgress) throw new Error(body.error || 'This exact send is already in progress.');
       if (!response.ok && STALE_PREVIEW_CODES.has(body.code)) {
         if (sequence.current === currentSequence && id === requestId) {
@@ -548,16 +561,31 @@ export default function PreSiteDistributionPanel({
         }
         return;
       }
-      if (!response.ok) throw new Error(body.error || `Send failed (${response.status})`);
+      if (!response.ok) {
+        const sendFailure = new Error(body.error || `Send failed (${response.status})`);
+        sendFailure.outcome = body.outcome || 'failed';
+        throw sendFailure;
+      }
       if (sequence.current !== currentSequence || id !== requestId) return;
       setPreview(body.attempt || preview);
       setConfirmed(false);
       setNotice(null);
-      await loadHistory(id, controller.signal, currentSequence);
+      try {
+        await loadHistory(id, controller.signal, currentSequence);
+      } catch (historyRefreshError) {
+        if (historyRefreshError?.name !== 'AbortError'
+          && sequence.current === currentSequence
+          && id === requestId) setHistoryError(historyRefreshError.message);
+      }
     } catch (sendError) {
       if (sendError?.name !== 'AbortError'
         && sequence.current === currentSequence
-        && id === requestId) setError(sendError.message);
+        && id === requestId) {
+        setSendFeedback({
+          status: sendError.outcome || 'uncertain',
+          message: sendError.message,
+        });
+      }
     } finally {
       if (sequence.current === currentSequence && id === requestId) {
         setSending(false);
@@ -573,6 +601,14 @@ export default function PreSiteDistributionPanel({
           <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
             {error}
           </div>
+        )}
+        {sendFeedback && (
+          <EmailSendFeedback
+            className="mt-4"
+            status={sendFeedback.status}
+            message={sendFeedback.message}
+            data-testid="distribution-send-feedback"
+          />
         )}
 
         {emailDefaultsStatus?.unavailable && (
@@ -739,9 +775,11 @@ export default function PreSiteDistributionPanel({
               )}
             </dl>
             {preview.transportAccepted ? (
-              <p className="mt-4 text-sm font-medium text-green-800">
-                Sent — Dynamics accepted this exact email for transport. This receipt does not assert inbox delivery.
-              </p>
+              <EmailSendFeedback
+                className="mt-4"
+                status="sent"
+                message="Dynamics accepted this exact email for delivery."
+              />
             ) : (
               <>
                 <label className="mt-4 flex items-start gap-2 text-sm text-gray-800">

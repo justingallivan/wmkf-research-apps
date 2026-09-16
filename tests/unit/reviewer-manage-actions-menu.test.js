@@ -375,7 +375,7 @@ describe('direct review follow-up action', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
-    expect(await screen.findByText('Reminder sent.')).toBeInTheDocument();
+    expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/send-review-reminder', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ requestId: 'P1', suggestionId: 'S1' }),
@@ -515,7 +515,7 @@ describe('direct review follow-up action', () => {
         await Promise.resolve();
       });
 
-      // Neither success ("Reminder sent.") nor a rejection's error copy may
+      // Neither success ("Sent for delivery.") nor a rejection's error copy may
       // reach a departed session: both render via the same role="status"
       // element, so a departed context must show none of it at all.
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -553,7 +553,7 @@ describe('direct review follow-up action', () => {
       await Promise.resolve();
     });
 
-    expect(await screen.findByText('Reminder sent.')).toBeInTheDocument();
+    expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
     expect(newOnSent).toHaveBeenCalledTimes(1);
     expect(oldOnSent).not.toHaveBeenCalled();
   });
@@ -563,7 +563,7 @@ describe('direct review follow-up action', () => {
     const onSent = jest.fn(() => { throw new Error('boom'); });
     render(<ReviewReminderAction requestId="P1" reviewer={reviewer} onSent={onSent} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
-    expect(await screen.findByText('Reminder sent.')).toBeInTheDocument();
+    expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -572,7 +572,7 @@ describe('direct review follow-up action', () => {
     const onSent = jest.fn(() => Promise.reject(new Error('refresh failed')));
     render(<ReviewReminderAction requestId="P1" reviewer={reviewer} onSent={onSent} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
-    expect(await screen.findByText('Reminder sent.')).toBeInTheDocument();
+    expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -585,7 +585,7 @@ describe('direct review follow-up action', () => {
     const onSent = jest.fn(() => new Promise(() => {})); // never settles
     render(<ReviewReminderAction requestId="P1" reviewer={reviewer} onSent={onSent} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
-    expect(await screen.findByText('Reminder sent.')).toBeInTheDocument();
+    expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
     // No timer advance, no additional awaiting of the never-resolving promise:
     // the lock must already be released and the button re-enabled.
     expect(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' })).toBeEnabled();
@@ -595,10 +595,10 @@ describe('direct review follow-up action', () => {
     global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
     const { rerender } = render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
-    expect(await screen.findByText('Reminder sent.')).toBeInTheDocument();
+    expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
 
     rerender(<ReviewReminderAction requestId="P1" reviewer={otherReviewer} />);
-    expect(screen.queryByText('Reminder sent.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sent for delivery.')).not.toBeInTheDocument();
   });
 
   test('a request switch clears a confirmed failure message from the departed session', async () => {
@@ -667,6 +667,6 @@ describe('reminder lifetime wiring through the panel (D4)', () => {
     });
 
     expect(onRefresh).not.toHaveBeenCalled();
-    expect(screen.queryByText('Reminder sent.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sent for delivery.')).not.toBeInTheDocument();
   });
 });

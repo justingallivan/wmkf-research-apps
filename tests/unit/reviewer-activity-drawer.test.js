@@ -122,7 +122,7 @@ describe('ReviewerActivityDrawer', () => {
     expect(items[items.length - 1]).toHaveTextContent('Invitation recorded');
 
     // Every event in this fixture is a staff-side send, so each carries the caveat.
-    expect(screen.getAllByText(/delivery not confirmed/i)).toHaveLength(items.length);
+    expect(screen.getAllByText(/send not confirmed/i)).toHaveLength(items.length);
   });
 
   it('states the operational-summary scope so staff do not read it as an audit trail', () => {

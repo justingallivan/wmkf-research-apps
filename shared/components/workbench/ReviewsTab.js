@@ -25,6 +25,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '../Layout';
+import EmailSendFeedback from '../EmailSendFeedback';
 import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/external/review-form-schema';
 import { deriveReviewMatrix } from '../../utils/review-matrix';
 import ManualReviewEntryForm from './ManualReviewEntryForm';
@@ -55,7 +56,7 @@ function RatingCell({ fieldKey, value }) {
   const label = labelForReviewRating(fieldKey, value);
   return (
     <div className="min-w-0">
-      <div className="text-[10px] uppercase tracking-wide text-gray-400">{reviewRatingShortLabels[fieldKey]}</div>
+      <div className="text-xs uppercase tracking-wide text-gray-400">{reviewRatingShortLabels[fieldKey]}</div>
       <div className={`text-sm ${label ? 'text-gray-900' : 'text-gray-400'}`}>{label || 'Not provided'}</div>
     </div>
   );
@@ -186,7 +187,7 @@ function CompareRatingsGrid({ matrix }) {
               <td className="py-2 pr-4 align-top sticky left-0 bg-white">
                 <div className="text-gray-900">{q.text}</div>
                 {q.retired && (
-                  <span className="inline-block mt-1 text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                  <span className="inline-block mt-1 text-xs uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                     Prior cycle
                   </span>
                 )}
@@ -267,7 +268,7 @@ function CompareNarrativeBrowser({ matrix }) {
           <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
             {q.text}
             {q.retired && (
-              <span className="text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+              <span className="text-xs uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                 Prior cycle
               </span>
             )}
@@ -577,7 +578,7 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated,
         <p className="text-sm font-semibold text-gray-900">AI Synthesis</p>
         <div className="flex items-center gap-2">
           {synthesis && (
-            <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-1 ${
+            <span className={`text-xs uppercase tracking-wide rounded-full px-2 py-1 ${
               state?.current
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-amber-50 text-amber-700'
@@ -779,14 +780,21 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewRea
           not_found: 'This reviewer is no longer available — refresh to update the list.',
           read_failed: "Couldn't verify this reviewer's latest status. No reminder was sent; try again.",
           prepare_failed: 'Could not prepare the reminder. No reminder was sent; try again.',
+          send_unconfirmed: 'Dynamics did not confirm the send. Check reviewer activity before trying again.',
         };
-        setFeedback({ ok: false, message: messages[data.reason] || 'Failed to send reminder.' });
+        setFeedback({
+          status: data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed',
+          message: messages[data.reason] || 'The reminder was not sent.',
+        });
         return;
       }
-      setFeedback({ ok: true, message: 'Reminder sent.' });
+      setFeedback({ status: 'sent', message: 'Dynamics accepted the reminder for delivery.' });
       if (onSent) onSent();
     } catch (e) {
-      setFeedback({ ok: false, message: e.message || 'Failed to send reminder.' });
+      setFeedback({
+        status: 'uncertain',
+        message: 'The app could not confirm the result. Check reviewer activity before trying again.',
+      });
     } finally {
       setSending(false);
     }
@@ -821,9 +829,12 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewRea
             : 'No reminders sent yet'}
         </p>
         {feedback && (
-          <p className={`mt-1 text-xs ${feedback.ok ? 'text-green-700' : 'text-amber-700'}`} role="status">
-            {feedback.message}
-          </p>
+          <EmailSendFeedback
+            compact
+            className="mt-2"
+            status={feedback.status}
+            message={feedback.message}
+          />
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2 lg:justify-start">

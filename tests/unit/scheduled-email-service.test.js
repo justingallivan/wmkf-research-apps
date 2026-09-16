@@ -131,6 +131,18 @@ test('a transient eligibility read failure keeps the row retryable instead of st
   expect(deps.sendEmail).not.toHaveBeenCalled();
 });
 
+test('an ambiguous send error keeps the durable send intent for reconciliation instead of marking retryable failure', async () => {
+  const deps = dependencies();
+  deps.sendEmail.mockRejectedValueOnce(new Error('connection ended during SendEmail'));
+
+  const error = await deliverScheduledEmail(message().id, {}, deps).catch((caught) => caught);
+
+  expect(error).toMatchObject({ emailOutcome: 'uncertain', retryable: false });
+  expect(deps.recordSendRequested).toHaveBeenCalledTimes(1);
+  expect(deps.recordFailure).not.toHaveBeenCalled();
+  expect(deps.recordSent).not.toHaveBeenCalled();
+});
+
 test('a confirmed-deleted source (404) is stopped, not retried', async () => {
   const deps = dependencies();
   const gone = Object.assign(new Error('dataverse failed (404)'), { status: 404 });

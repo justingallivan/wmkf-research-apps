@@ -63,6 +63,158 @@
         ],
         "createdAt": "2026-09-14T23:26:54.317886Z",
         "reason": "Agent: the only gray-on-color hit in this file is the shared/not-shared pill pair sharing one ternary class literal (`bg-green-100 text-green-800` vs `bg-gray-100 text-gray-700`); the detector pairs the neutral gray pill's text with its sibling's green background. Both pills reuse the Reviews tab / StatusTab pill pattern. Scoped to this file only."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#222222",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:44.915Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#5a6472",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:44.952Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#dbe4f0",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:44.986Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#333333",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:45.023Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#1f3a5f",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:45.068Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "15px",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:45.140Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "12px",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:45.173Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "1px",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:45.206Z"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "5px",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:45.240Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "15px",
+        "files": [
+          "lib/services/scheduled-email-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:53.656Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "13px",
+        "files": [
+          "lib/services/scheduled-email-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:53.691Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#1a4a7a",
+        "files": [
+          "lib/services/scheduled-email-service.js"
+        ],
+        "createdAt": "2026-09-15T23:49:53.726Z"
+      },
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "files": [
+          "shared/components/workbench/AwardeeTab.js"
+        ],
+        "createdAt": "2026-09-15T23:49:53.762Z"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "arial",
+        "files": [
+          "shared/components/workbench/AwardeeTab.js"
+        ],
+        "createdAt": "2026-09-15T23:49:53.828Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#111",
+        "files": [
+          "shared/components/workbench/AwardeeTab.js"
+        ],
+        "createdAt": "2026-09-15T23:49:53.870Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "13px",
+        "files": [
+          "shared/components/workbench/AwardeeTab.js"
+        ],
+        "createdAt": "2026-09-15T23:49:53.905Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#eee",
+        "files": [
+          "shared/components/workbench/AwardeeTab.js"
+        ],
+        "createdAt": "2026-09-15T23:49:53.939Z"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "roboto",
+        "files": [
+          "lib/services/notification-service.js"
+        ],
+        "createdAt": "2026-09-15T23:50:16.738Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "12px",
+        "files": [
+          "lib/services/notification-service.js"
+        ],
+        "createdAt": "2026-09-15T23:50:16.778Z"
       }
     ]
   }

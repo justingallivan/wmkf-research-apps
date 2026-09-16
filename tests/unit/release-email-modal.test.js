@@ -157,7 +157,7 @@ test('sends complete reviewed rows and names every non-allowlisted result', asyn
   });
   fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
 
-  await screen.findByText(/1 emailed\. 1 issue:/);
+  await screen.findByText(/1 accepted for delivery\. 1 issue:/);
   expect(screen.getByText(/Dr\. Failed Reviewer — The reviewer was released, but the email failed/))
     .toBeInTheDocument();
   const sendBody = JSON.parse(global.fetch.mock.calls[1][1].body);

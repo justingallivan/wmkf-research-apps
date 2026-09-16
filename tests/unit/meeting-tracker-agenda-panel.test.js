@@ -131,7 +131,7 @@ test('requires confirmation, sends the prepared operation, and renders the exact
     `/api/meeting-tracker/sessions/${SESSION_ID}/agenda`,
     expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ operationId: OPERATION_ID }) }),
   ));
-  expect(await screen.findByText(/Dynamics accepted this exact email for transport/)).toBeInTheDocument();
+  expect(await screen.findByText(/Dynamics accepted this exact agenda email for delivery/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Send agenda again…' })).toBeInTheDocument();
 });
 
@@ -212,7 +212,7 @@ test('a prepare-time unresolved conflict pins the existing operation', async () 
   expect(screen.getByText(pending.subject)).toBeInTheDocument();
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
-  expect(await screen.findByText(/Dynamics accepted this exact email for transport/)).toBeInTheDocument();
+  expect(await screen.findByText(/Dynamics accepted this exact agenda email for delivery/)).toBeInTheDocument();
   expect(screen.queryByLabelText('To')).not.toBeInTheDocument();
   const sendCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'PATCH');
   expect(JSON.parse(sendCall[1].body)).toEqual({ operationId: pending.operationId });
@@ -269,14 +269,14 @@ test('a 202 unconfirmed transport status stays recoverable on the same operation
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('has not confirmed transport acceptance');
-  expect(screen.queryByText(/Dynamics accepted this exact email for transport/)).not.toBeInTheDocument();
+  expect(await screen.findByTestId('agenda-send-feedback')).toHaveTextContent('has not confirmed transport acceptance');
+  expect(screen.queryByText(/Dynamics accepted this exact agenda email for delivery/)).not.toBeInTheDocument();
   fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
   fireEvent.click(screen.getByRole('button', { name: 'Review unresolved send…' }));
   expect(screen.queryByLabelText('To')).not.toBeInTheDocument();
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
-  expect(await screen.findByText(/Dynamics accepted this exact email for transport/)).toBeInTheDocument();
+  expect(await screen.findByText(/Dynamics accepted this exact agenda email for delivery/)).toBeInTheDocument();
   expect(screen.queryByLabelText('To')).not.toBeInTheDocument();
   const prepareCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'POST');
   const sendCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');

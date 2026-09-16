@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import { useProfile } from '../shared/context/ProfileContext';
+import EmailSendFeedback from '../shared/components/EmailSendFeedback';
 
 function formatWhen(value) {
   if (!value) return '—';
@@ -44,6 +45,7 @@ export default function ScheduledEmailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [actionFeedback, setActionFeedback] = useState(null);
   // Review posture: the coarse review-all override plus this PD's VIP flags.
   const [reviewAll, setReviewAll] = useState(null);
   const [savingReviewAll, setSavingReviewAll] = useState(false);
@@ -143,6 +145,7 @@ export default function ScheduledEmailsPage() {
   useEffect(() => {
     setSubject(selected?.subject || '');
     setBodyText(selected?.bodyText || '');
+    setActionFeedback(null);
   }, [selected?.id, selected?.version]);
 
   const chooseMessage = (id) => {
@@ -154,6 +157,7 @@ export default function ScheduledEmailsPage() {
     if (!selected) return;
     setSaving(true);
     setError(null);
+    setActionFeedback(null);
     try {
       const response = await fetch(`/api/scheduled-emails/${selected.id}`, {
         method: 'PATCH',
@@ -161,12 +165,33 @@ export default function ScheduledEmailsPage() {
         body: JSON.stringify({ action, version: selected.version, ...extra }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'The scheduled email could not be updated.');
+      if (data.outcome === 'uncertain') {
+        setActionFeedback({ status: 'uncertain', message: `${data.error} Check the recipient before trying again.` });
+        return;
+      }
+      if (!response.ok) {
+        const actionError = new Error(data.error || 'The scheduled email could not be updated.');
+        actionError.outcome = data.outcome || 'failed';
+        throw actionError;
+      }
       setMessages((current) => current.map((message) => (
         message.id === data.message.id ? data.message : message
       )));
+      if (action === 'send_now') {
+        setActionFeedback({ status: 'sent', message: 'Dynamics accepted this scheduled email for delivery.' });
+      }
     } catch (err) {
-      setError(err.message);
+      if (action === 'send_now') {
+        const status = err.outcome === 'failed' ? 'failed' : 'uncertain';
+        setActionFeedback({
+          status,
+          message: status === 'uncertain'
+            ? `The connection ended before the result could be confirmed. Check the recipient before trying again. (${err.message})`
+            : err.message,
+        });
+      } else {
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -186,6 +211,9 @@ export default function ScheduledEmailsPage() {
       <div className="py-8">
         {error && (
           <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        )}
+        {actionFeedback && (
+          <EmailSendFeedback className="mb-4" status={actionFeedback.status} message={actionFeedback.message} />
         )}
         {reviewAll !== null && (
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4">

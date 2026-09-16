@@ -193,12 +193,12 @@ test('reviewer accepts between guard-read and write (412) → changed_skipped, n
   expect(updateLifecycle).toHaveBeenCalledWith(SUG, expect.any(Object), expect.objectContaining({ ifMatch: expect.anything() }));
 });
 
-test('email-send failure still reports the reviewer as withdrawn (state already committed)', async () => {
+test('ambiguous email-send failure reports the reviewer as withdrawn with an unconfirmed email', async () => {
   findById.mockResolvedValue(pendingRow());
   createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
   const res = await run({ requestId: REQ, suggestionIds: [SUG] });
   expect(res._data.withdrawn).toBe(1);
-  expect(res._data.results[0].status).toBe('withdrawn_email_failed');
+  expect(res._data.results[0].status).toBe('withdrawn_email_unconfirmed');
 });
 
 test('reviewed body markup is escaped through renderPlainTextEmailHtml', async () => {

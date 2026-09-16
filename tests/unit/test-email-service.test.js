@@ -35,7 +35,7 @@ describe('sendTestEmail', () => {
     expect(DynamicsService.createEmailActivity).not.toHaveBeenCalled();
     expect(r).toEqual({
       success: true, emailId: 'sent-1', status: 'sent',
-      message: 'Email sent successfully from sender@wmkeck.org to r@x.org',
+      message: 'Dynamics accepted the email from sender@wmkeck.org to r@x.org for delivery.',
     });
   });
 

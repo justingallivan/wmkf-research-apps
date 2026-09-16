@@ -1,5 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { CheckCircle2, Minus, XCircle } from 'lucide-react';
 import { Button } from '../Layout';
+import EmailSendFeedback from '../EmailSendFeedback';
 import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 import { membershipKeyFor } from './reviewer-draft-keys';
@@ -42,7 +44,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
   const [step, setStep] = useState('compose'); // compose | preview | sending | sent
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
   const [drafts, setDrafts] = useState([]); // [{ suggestionId, candidateName, candidateEmail, requestNumber, subject, body, skipped? }]
-  const [sentResults, setSentResults] = useState({ sent: [], failed: [], skipped: [] });
+  const [sentResults, setSentResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
   const [error, setError] = useState(null);
   const [emailFields, setEmailFields] = useState({
     reviewDueDate: settings.reviewDueDate || '',
@@ -297,7 +299,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
           setStep('compose');
           setProgress({ current: 0, total: 0, message: '' });
           setDrafts([]);
-          setSentResults({ sent: [], failed: [], skipped: [] });
+          setSentResults({ sent: [], failed: [], skipped: [], unconfirmed: [] });
           setError(null);
           setPreviewFailed(false);
           setRendering(false);
@@ -703,7 +705,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     // (possibly stale/batched) React state. `finished` makes the attempt
     // terminal: once true, no further event (a duplicate complete, or a
     // trailing error/result in a later chunk) has any effect.
-    let results = { sent: [], failed: [], skipped: [] };
+    let results = { sent: [], failed: [], skipped: [], unconfirmed: [] };
     let finished = false;
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Starting...' });
@@ -790,11 +792,15 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
               } else if (currentEvent === 'email_failed') {
                 results = { ...results, failed: [...results.failed, data] };
                 setSentResults(results);
+              } else if (currentEvent === 'email_unconfirmed') {
+                results = { ...results, unconfirmed: [...results.unconfirmed, data] };
+                setSentResults(results);
               } else if (currentEvent === 'result') {
                 results = {
                   sent: data.sent || [],
                   failed: data.failed || [],
                   skipped: data.skipped || [],
+                  unconfirmed: data.unconfirmed || [],
                 };
                 setSentResults(results);
               } else if (currentEvent === 'complete') {
@@ -1157,16 +1163,21 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                 )}
                 <p className="text-sm text-gray-500">{progress.current} / {progress.total}</p>
               </div>
-              {(sentResults.sent.length > 0 || sentResults.failed.length > 0) && (
+              {(sentResults.sent.length > 0 || sentResults.failed.length > 0 || sentResults.unconfirmed.length > 0) && (
                 <div className="border-t border-gray-200 pt-3 space-y-1 max-h-48 overflow-y-auto">
                   {sentResults.sent.map(s => (
                     <div key={`s-${s.suggestionId}`} className="flex items-center gap-2 text-sm text-green-700">
-                      <span>✓</span><span>{s.candidateName}</span><span className="text-gray-400 text-xs">{s.candidateEmail}</span>
+                      <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" /><span>{s.candidateName}</span><span className="text-gray-400 text-xs">{s.candidateEmail}</span>
                     </div>
                   ))}
                   {sentResults.failed.map(f => (
                     <div key={`f-${f.suggestionId}`} className="flex items-center gap-2 text-sm text-red-700">
-                      <span>✗</span><span>{f.candidateName}</span><span className="text-red-500 text-xs">{f.error}</span>
+                      <XCircle aria-hidden="true" className="h-4 w-4 shrink-0" /><span>{f.candidateName}</span><span className="text-red-500 text-xs">{f.error}</span>
+                    </div>
+                  ))}
+                  {sentResults.unconfirmed.map(item => (
+                    <div key={`u-${item.suggestionId}`} className="flex items-center gap-2 text-sm text-amber-800">
+                      <Minus aria-hidden="true" className="h-4 w-4 shrink-0" /><span>{item.candidateName}</span><span className="text-amber-700 text-xs">verify before retrying</span>
                     </div>
                   ))}
                 </div>
@@ -1176,26 +1187,20 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
 
           {step === 'sent' && (
             <div className="space-y-4">
-              <div className="text-center py-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                  sentResults.failed.length === 0 ? 'bg-green-100' : 'bg-yellow-100'
-                  }`}>
-                  <svg className={`w-6 h-6 ${sentResults.failed.length === 0 ? 'text-green-600' : 'text-yellow-600'}`}
-                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <p className="text-lg font-medium text-gray-900">
-                  {sentResults.sent.length} sent
-                  {sentResults.failed.length > 0 && `, ${sentResults.failed.length} failed`}
-                  {sentResults.skipped.length > 0 && `, ${sentResults.skipped.length} skipped`}
-                </p>
-              </div>
+              <EmailSendFeedback
+                status={sentResults.unconfirmed.length > 0
+                  ? (sentResults.sent.length > 0 ? 'partial' : 'uncertain')
+                  : sentResults.failed.length > 0 || sentResults.skipped.length > 0
+                    ? (sentResults.sent.length > 0 ? 'partial' : 'failed')
+                    : 'sent'}
+                title={`${sentResults.sent.length} sent${sentResults.failed.length > 0 ? `, ${sentResults.failed.length} failed` : ''}${sentResults.unconfirmed.length > 0 ? `, ${sentResults.unconfirmed.length} uncertain` : ''}${sentResults.skipped.length > 0 ? `, ${sentResults.skipped.length} skipped` : ''}`}
+                message={`${sentResults.sent.length} sent for delivery${sentResults.failed.length > 0 ? `; ${sentResults.failed.length} not sent` : ''}${sentResults.unconfirmed.length > 0 ? `; ${sentResults.unconfirmed.length} uncertain` : ''}${sentResults.skipped.length > 0 ? `; ${sentResults.skipped.length} skipped` : ''}.`}
+              />
               <div className="space-y-1">
                 {sentResults.sent.map(s => (
                   <div key={`s-${s.suggestionId}`} className="flex items-center justify-between p-2 bg-green-50 rounded text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="text-green-600">✓</span>
+                      <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 text-green-700" />
                       <span className="font-medium text-gray-900">{s.candidateName}</span>
                       <span className="text-gray-500 text-xs">{s.candidateEmail}</span>
                     </div>
@@ -1205,7 +1210,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                 {sentResults.failed.map(f => (
                   <div key={`f-${f.suggestionId}`} className="p-2 bg-red-50 rounded text-sm">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-red-600">✗</span>
+                      <XCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-red-700" />
                       <span className="font-medium text-gray-900">{f.candidateName}</span>
                       <span className="text-gray-500 text-xs">{f.candidateEmail}</span>
                     </div>
@@ -1214,10 +1219,19 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                 ))}
                 {sentResults.skipped.map(s => (
                   <div key={`sk-${s.suggestionId}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm text-gray-600">
-                    <span>—</span>
+                    <Minus aria-hidden="true" className="h-4 w-4 shrink-0" />
                     <span className="font-medium">{s.candidateName}</span>
                     <span className="text-xs">skipped ({SEND_SKIP_REASON_LABEL[s.reason] || s.reason || 'not sent'})</span>
                   </div>
+                ))}
+                {sentResults.unconfirmed.map(item => (
+                  <EmailSendFeedback
+                    key={`u-${item.suggestionId}`}
+                    compact
+                    status="uncertain"
+                    title={item.candidateName || item.candidateEmail || 'Email status is uncertain.'}
+                    message={item.error || 'Check Dynamics before trying this recipient again.'}
+                  />
                 ))}
               </div>
             </div>

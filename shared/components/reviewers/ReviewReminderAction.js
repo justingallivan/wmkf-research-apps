@@ -1,4 +1,5 @@
 import { useState, useLayoutEffect, useRef } from 'react';
+import EmailSendFeedback from '../EmailSendFeedback';
 
 const REVIEW_REMINDER_ERROR_MESSAGE = {
   conflict: 'Already claimed by another send. Refresh and try again.',
@@ -14,6 +15,7 @@ const REVIEW_REMINDER_ERROR_MESSAGE = {
   read_failed: 'The latest reviewer status could not be verified. Nothing was sent.',
   prepare_failed: 'The reminder could not be prepared. Nothing was sent.',
   send_failed: 'The reminder was prepared, but the email could not be sent.',
+  send_unconfirmed: 'Dynamics did not confirm the send. Check reviewer activity before trying again.',
   misconfigured: 'The review reminder email template is missing or blank in Admin.',
   ineligible: 'This reviewer is no longer eligible for a reminder. Refresh the list.',
 };
@@ -110,12 +112,12 @@ export function ReviewReminderAction({
       if (generation !== generationRef.current || !isCurrent(epoch)) return;
       if (!response.ok || !data.ok) {
         setFeedback({
-          ok: false,
+          status: data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed',
           message: REVIEW_REMINDER_ERROR_MESSAGE[data.reason] || 'The reminder could not be sent.',
         });
         return;
       }
-      setFeedback({ ok: true, message: 'Reminder sent.' });
+      setFeedback({ status: 'sent', message: 'Dynamics accepted the reminder for delivery.' });
       // "Reminder sent." feedback is retained regardless of what the
       // callback does: a throw/rejection here is a refresh failure, not a
       // failed send, and must never relabel a confirmed mutation as failed
@@ -134,7 +136,10 @@ export function ReviewReminderAction({
       }
     } catch (error) {
       if (generation === generationRef.current && isCurrent(epoch)) {
-        setFeedback({ ok: false, message: error.message || 'The reminder could not be sent.' });
+        setFeedback({
+          status: 'uncertain',
+          message: 'The app could not confirm the result. Check reviewer activity before trying again.',
+        });
       }
     } finally {
       if (generation === generationRef.current) {
@@ -163,12 +168,12 @@ export function ReviewReminderAction({
         {sending ? 'Sending…' : 'Send reminder'}
       </button>
       {feedback && (
-        <span
-          className={`max-w-40 text-right text-xs leading-4 ${feedback.ok ? 'text-green-700' : 'text-amber-700'}`}
-          role="status"
-        >
-          {feedback.message}
-        </span>
+        <EmailSendFeedback
+          compact
+          className="max-w-xs"
+          status={feedback.status}
+          message={feedback.message}
+        />
       )}
     </div>
   );

@@ -88,6 +88,20 @@ test('send-now action cannot escape PD scope and uses the viewed version', async
   expect(res.body.message.status).toBe('sent');
 });
 
+test('an uncertain send-now result returns 202 and blocks blind retry language', async () => {
+  deliverScheduledEmail.mockRejectedValueOnce(Object.assign(new Error('connection ended'), {
+    emailOutcome: 'uncertain',
+    retryable: false,
+  }));
+  const res = mockRes();
+  await actionHandler({
+    method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 },
+  }, res);
+  expect(res.statusCode).toBe(202);
+  expect(res.body).toMatchObject({ outcome: 'uncertain', retryable: false });
+  expect(res.body.error).toMatch(/could not be confirmed/i);
+});
+
 test('a message outside the PD scope is indistinguishable from missing', async () => {
   store.getScheduledEmailForPd.mockResolvedValue(null);
   const res = mockRes();

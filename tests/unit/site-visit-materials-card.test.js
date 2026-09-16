@@ -29,7 +29,7 @@ test('before a collection exists the card offers Request materials and posts act
   ));
   render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Request materials' }));
-  await waitFor(() => expect(screen.getByText('Collection started and the invitation sent.')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('Collection started. Dynamics accepted the invitation for delivery.')).toBeInTheDocument());
   const [url, options] = global.fetch.mock.calls.find(([, o]) => o?.method === 'POST');
   expect(url).toBe(`/api/meeting-tracker/visits/${REQUEST_ID}/materials`);
   expect(JSON.parse(options.body)).toEqual({ action: 'create' });
@@ -52,7 +52,7 @@ test('a created collection whose invitation failed shows the failure and offers 
   });
   render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Request materials' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('invitation email could not be sent');
+  expect(await screen.findByRole('alert')).toHaveTextContent('invitation email was not sent');
   expect(screen.getByRole('button', { name: 'Send invitation' })).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole('button', { name: 'Waive' })[0]);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm the files open' })).toBeInTheDocument());

@@ -909,7 +909,7 @@ describe('send-emails — mid-stream failure sequence (real send-time exception,
     expect(events(res).find((e) => e.event === 'email_unconfirmed').data.error).toBe('transient Dynamics failure');
   });
 
-  test('a send-time exception for a non-invitation recipient still fires email_failed (unchanged)', async () => {
+  test('an ambiguous send-time exception for a non-invitation recipient fires email_unconfirmed', async () => {
     CYCLE_CODE = null;
     CYCLE_CONFIG = null;
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1, wmkf_accepted: true }) };
@@ -918,10 +918,10 @@ describe('send-emails — mid-stream failure sequence (real send-time exception,
     const res = await run({ drafts: [draft(SUG_1)], templateType: 'materials' });
     const seq = events(res).map((e) => e.event);
 
-    expect(seq).not.toContain('email_unconfirmed');
-    expect(seq).toContain('email_failed');
+    expect(seq).toContain('email_unconfirmed');
+    expect(seq).not.toContain('email_failed');
     const r = resultOf(res);
-    expect(r.stats).toMatchObject({ sent: 0, failed: 1, unconfirmed: 0 });
+    expect(r.stats).toMatchObject({ sent: 0, failed: 0, unconfirmed: 1 });
   });
 });
 

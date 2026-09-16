@@ -175,7 +175,7 @@ test('a send failure after the claim is counted and logged, not retried, and oth
     sendReminder: jest.fn(async ({ row: claimed }) => { if (claimed.id === 'c1') throw new Error('smtp down'); return 'email-2'; }),
   });
   const result = await sweepMaterialsReminders({}, d);
-  expect(result).toMatchObject({ scanned: 2, eligible: 2, sent: 1, sendFailed: 1, errors: [{ id: 'c1', error: 'smtp down' }] });
+  expect(result).toMatchObject({ scanned: 2, eligible: 2, sent: 1, sendFailed: 0, sendUnconfirmed: 1, errors: [{ id: 'c1', outcome: 'uncertain', error: 'smtp down' }] });
   expect(d.claim).toHaveBeenCalledTimes(2);
   expect(d.attachEmailId).toHaveBeenCalledTimes(1);
   expect(d.attachEmailId).toHaveBeenCalledWith('c2', 'email-2');

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { currentYmdInTimeZone, isYmd } from '../../../lib/utils/date-ymd';
+import EmailSendFeedback from '../EmailSendFeedback';
 
 function formatDate(value) {
   if (!isYmd(value)) return 'Not set';
@@ -40,6 +41,7 @@ function messageForReason(reason, fallback) {
     read_failed: 'I could not load the reviewer data. No deadline was changed. Try again, and contact an administrator if the problem continues.',
     save_failed: 'I could not save the extension. Reload the reviewer list and try again.',
     send_failed: 'I could not send the deadline email. Try the email again, and contact an administrator if the problem continues.',
+    send_unconfirmed: 'Dynamics did not confirm the deadline email. Check reviewer activity before trying again.',
     server_error: 'I could not complete the deadline update. Try again, and contact an administrator if the problem continues.',
   };
   return messages[reason] || fallback;
@@ -65,6 +67,9 @@ export default function ReviewerDueDateEditor({
   const [draft, setDraft] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState(null);
+  const [errorOutcome, setErrorOutcome] = useState('failed');
+  const [notificationRetryable, setNotificationRetryable] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [savedWithoutNotification, setSavedWithoutNotification] = useState(false);
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
@@ -84,6 +89,9 @@ export default function ReviewerDueDateEditor({
     setDraft(overrideDate || '');
     setWorking(false);
     setError(null);
+    setErrorOutcome('failed');
+    setNotificationRetryable(false);
+    setSuccessMessage(null);
     setSavedWithoutNotification(false);
     if (refresh && onSaved) onSaved();
   };
@@ -92,6 +100,9 @@ export default function ReviewerDueDateEditor({
     const generation = ++generationRef.current;
     setWorking(true);
     setError(null);
+    setErrorOutcome('failed');
+    setNotificationRetryable(false);
+    setSuccessMessage(null);
     try {
       const body = action === 'retry'
         ? { action, suggestionId }
@@ -105,19 +116,31 @@ export default function ReviewerDueDateEditor({
       if (!mountedRef.current || generation !== generationRef.current) return;
 
       if (data.saved === true && data.notified === false) {
+        const nextOutcome = data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed';
         setSavedWithoutNotification(true);
-        setError('The deadline was saved, but the reviewer notification was not sent.');
+        setNotificationRetryable(nextOutcome === 'failed' && data.retryable !== false);
+        setErrorOutcome(nextOutcome);
+        setError(data.reason === 'send_unconfirmed'
+          ? 'The deadline was saved, but Dynamics did not confirm the email. Check reviewer activity before trying again.'
+          : 'The deadline was saved, but the reviewer notification was not sent.');
         return;
       }
       if (!response.ok || !data.ok) {
-        throw new Error(messageForReason(data.reason, data.error || 'The extension could not be saved.'));
+        const requestFailure = new Error(messageForReason(data.reason, data.error || 'The extension could not be saved.'));
+        requestFailure.outcome = data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed';
+        requestFailure.retryable = requestFailure.outcome === 'failed' && data.retryable !== false;
+        throw requestFailure;
       }
-      setOpen(false);
       setSavedWithoutNotification(false);
+      setSuccessMessage(action === 'retry'
+        ? 'Dynamics accepted the deadline email for delivery.'
+        : 'The deadline was updated and Dynamics accepted the notification for delivery.');
       if (onSaved) onSaved();
     } catch (requestError) {
       if (!mountedRef.current || generation !== generationRef.current) return;
       const detail = requestError.message || 'I could not complete the deadline update.';
+      setErrorOutcome(requestError.outcome || 'uncertain');
+      if (savedWithoutNotification) setNotificationRetryable(requestError.retryable === true);
       setError(savedWithoutNotification ? `The deadline is still saved. ${detail}` : detail);
     } finally {
       if (mountedRef.current && generation === generationRef.current) setWorking(false);
@@ -127,6 +150,9 @@ export default function ReviewerDueDateEditor({
   const openModal = () => {
     setDraft(overrideDate || minimumDate);
     setError(null);
+    setErrorOutcome('failed');
+    setNotificationRetryable(false);
+    setSuccessMessage(null);
     setSavedWithoutNotification(false);
     setOpen(true);
   };
@@ -189,22 +215,25 @@ export default function ReviewerDueDateEditor({
               value={draft}
               min={minimumDate}
               onChange={(event) => setDraft(event.target.value)}
-              disabled={working || savedWithoutNotification}
+              disabled={working || savedWithoutNotification || Boolean(successMessage)}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
             <p className="mt-2 text-xs text-gray-500">
               Saving automatically emails the reviewer and attaches the updated calendar date.
             </p>
 
+            {successMessage && (
+              <EmailSendFeedback className="mt-4" status="sent" message={successMessage} />
+            )}
             {error && (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                <p>{error}</p>
-                {savedWithoutNotification && (
+              <div className="mt-4">
+                <EmailSendFeedback status={errorOutcome} message={error} />
+                {savedWithoutNotification && notificationRetryable && (
                   <button
                     type="button"
                     onClick={() => submit({ action: 'retry' })}
                     disabled={working}
-                    className="mt-2 font-medium underline disabled:opacity-50"
+                    className="mt-2 text-sm font-medium text-red-800 underline underline-offset-4 disabled:opacity-50"
                   >
                     {working ? 'Retrying…' : 'Retry email'}
                   </button>
@@ -213,7 +242,7 @@ export default function ReviewerDueDateEditor({
             )}
 
             <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
-              {overrideDate && !savedWithoutNotification && (
+              {overrideDate && !savedWithoutNotification && !successMessage && (
                 <button
                   type="button"
                   onClick={() => submit({ action: 'save', reviewDueDateOverride: null })}
@@ -223,7 +252,7 @@ export default function ReviewerDueDateEditor({
                   Restore original deadline
                 </button>
               )}
-              {overrideDate && !savedWithoutNotification && (
+              {overrideDate && !savedWithoutNotification && !successMessage && (
                 <button
                   type="button"
                   onClick={() => submit({ action: 'retry' })}
@@ -241,7 +270,7 @@ export default function ReviewerDueDateEditor({
               >
                 Close
               </button>
-              {!savedWithoutNotification && (
+              {!savedWithoutNotification && !successMessage && (
                 <button
                   type="button"
                   onClick={() => submit({ action: 'save', reviewDueDateOverride: draft })}

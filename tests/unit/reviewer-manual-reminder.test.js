@@ -203,7 +203,7 @@ describe('sendManualReviewDueReminder', () => {
 
   test('email failure after atomic persistence retains the marker and is not retryable', async () => {
     installReads();
-    createAndSendEmail.mockRejectedValueOnce(new Error('SMTP unavailable'));
+    createAndSendEmail.mockRejectedValueOnce(Object.assign(new Error('SMTP unavailable'), { dispatched: false }));
 
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
 

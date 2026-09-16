@@ -309,7 +309,7 @@ test('allows a pre-materials deadline extension when no token has been issued ye
 });
 
 test('keeps the saved deadline and returns retryable partial success when sending fails', async () => {
-  DynamicsService.createAndSendEmail.mockRejectedValueOnce(new Error('mail unavailable'));
+  DynamicsService.createAndSendEmail.mockRejectedValueOnce(Object.assign(new Error('mail unavailable'), { dispatched: false }));
 
   const result = await saveReviewerDueDateExtension({
     suggestionId: SUGGESTION_ID,
@@ -356,7 +356,7 @@ test('retry send failure reports no date write and remains retryable', async () 
   suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({
     wmkf_reviewduedateoverride: '2099-09-20',
   }));
-  DynamicsService.createAndSendEmail.mockRejectedValueOnce(new Error('mail unavailable'));
+  DynamicsService.createAndSendEmail.mockRejectedValueOnce(Object.assign(new Error('mail unavailable'), { dispatched: false }));
 
   const result = await retryReviewerDueDateNotification({ suggestionId: SUGGESTION_ID });
 

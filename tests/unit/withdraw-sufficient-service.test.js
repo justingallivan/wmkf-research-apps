@@ -263,7 +263,7 @@ test('non-412 write failure → write_failed without leaking upstream diagnostic
 
 test('email send failure → withdrawn_email_failed without leaking diagnostics, lifecycle write NOT rolled back (state-before-email)', async () => {
   findById.mockResolvedValue(pendingRow());
-  createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down for reviewer@example.org'));
+  createAndSendEmail.mockRejectedValueOnce(Object.assign(new Error('SMTP down for reviewer@example.org'), { dispatched: false }));
   const out = await withdrawSufficient(ARGS);
   expect(out.withdrawn).toBe(1);
   expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'withdrawn_email_failed', reason: 'no_longer_needed' });

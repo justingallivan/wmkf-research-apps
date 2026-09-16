@@ -234,7 +234,7 @@ test('manual reminder claims before sending (S507): claim order, 409 on a lost c
   const reminderCountBefore = d.__stored().reminder_count;
   d.sendEmail.mockImplementation(async () => { throw new Error('transport down'); });
   await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
-    .rejects.toThrow('transport down');
+    .rejects.toMatchObject({ code: 'site_visit_materials_send_unconfirmed', httpStatus: 202 });
   expect(d.attachReminderEmailId.mock.calls.length).toBe(attachCallsBefore);
   expect(d.__stored().reminder_count).toBe(reminderCountBefore + 1);
 });
@@ -310,7 +310,7 @@ test('blank required settings block both sends before invitation receipt or remi
   } });
   existingInvite.sendEmail.mockRejectedValue(new Error('transport down'));
   await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, existingInvite))
-    .rejects.toMatchObject({ code: 'site_visit_materials_send_failed', httpStatus: 502 });
+    .rejects.toMatchObject({ code: 'site_visit_materials_send_unconfirmed', httpStatus: 202 });
   expect(existingInvite.__stored()).toEqual(invitedBefore);
 
   const d = deps();
@@ -323,6 +323,19 @@ test('blank required settings block both sends before invitation receipt or remi
   expect(d.sendEmail).toHaveBeenCalledTimes(1);
   expect(d.__stored()).toEqual(before);
   log.mockRestore();
+});
+
+test('an invitation receipt failure preserves the accepted Dynamics activity id for reconciliation', async () => {
+  const d = deps();
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  d.recordInvitation.mockRejectedValue(new Error('receipt write failed'));
+
+  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+    .rejects.toMatchObject({
+      code: 'site_visit_materials_send_unconfirmed',
+      httpStatus: 202,
+      body: expect.objectContaining({ emailId: '55555555-5555-4555-8555-555555555555' }),
+    });
 });
 
 test('seed reminder retains singular grammar and excludes received items', () => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
+import EmailSendFeedback from '../shared/components/EmailSendFeedback';
 
 export default function TestEmail() {
   const { data: session } = useSession();
@@ -13,7 +14,6 @@ export default function TestEmail() {
   const [sendMode, setSendMode] = useState('draft');
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
 
   const senderEmail = sessionEmail || from;
 
@@ -21,7 +21,6 @@ export default function TestEmail() {
     e.preventDefault();
     setSending(true);
     setResult(null);
-    setError(null);
 
     try {
       const resp = await fetch('/api/test-email', {
@@ -30,13 +29,17 @@ export default function TestEmail() {
         body: JSON.stringify({ to, subject, body, sendMode, from: senderEmail }),
       });
       const data = await resp.json();
+      if (data.outcome === 'uncertain') {
+        setResult({ ...data, status: 'uncertain' });
+        return;
+      }
       if (!resp.ok) {
-        setError(data.error || `Request failed (${resp.status})`);
+        setResult({ ...data, status: data.outcome || 'failed', message: data.error || `Request failed (${resp.status})` });
       } else {
         setResult(data);
       }
     } catch (err) {
-      setError(err.message);
+      setResult({ status: 'uncertain', message: `The connection ended before the result could be confirmed. Check Dynamics before trying again. (${err.message})` });
     } finally {
       setSending(false);
     }
@@ -151,29 +154,13 @@ export default function TestEmail() {
         </form>
       </Card>
 
-      {error && (
-        <Card className="mt-4">
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <h3 className="text-red-800 font-medium mb-1">Error</h3>
-            <p className="text-red-700 text-sm font-mono whitespace-pre-wrap">{error}</p>
-          </div>
-        </Card>
-      )}
-
       {result && (
         <Card className="mt-4">
-          <div className={`border rounded-md p-4 ${result.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-            <h3 className={`font-medium mb-2 ${result.success ? 'text-green-800' : 'text-red-800'}`}>
-              {result.success ? 'Success' : 'Failed'}
-            </h3>
-            <p className="text-sm mb-2">{result.message}</p>
-            {result.emailId && (
-              <p className="text-xs text-gray-600 font-mono">Activity ID: {result.emailId}</p>
-            )}
-            {result.status && (
-              <p className="text-xs text-gray-600 mt-1">Status: {result.status}</p>
-            )}
-          </div>
+          <EmailSendFeedback
+            status={result.status === 'draft' ? 'draft' : result.status === 'sent' ? 'sent' : result.status || 'failed'}
+            message={result.message}
+            details={result.emailId ? [`Dynamics activity ID: ${result.emailId}`] : []}
+          />
         </Card>
       )}
     </Layout>

@@ -28,6 +28,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import EmailSendFeedback from '../EmailSendFeedback';
 import { GRANTEE_DELIVERABLE_LABEL, GRANTEE_DELIVERABLE_STATUS } from '../../config/granteeDeliverableStatus';
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
@@ -158,6 +159,7 @@ export default function AwardeeTab({ requestId, context }) {
   // need to fix. Mirrors the reviewer InviteEmailModal's preview→sending→sent
   // shape without pulling in its batch/per-candidate machinery.
   const [sendStep, setSendStep] = useState(null);
+  const [sendReceipt, setSendReceipt] = useState(null);
   const [recipients, setRecipients] = useState(null);
   // The signed-in PD's own per-contact VIP review flags ("flag them where you
   // see them"): flagged recipients make future automated mail wait for that
@@ -535,6 +537,7 @@ export default function AwardeeTab({ requestId, context }) {
 
   async function send() {
     setSendStep('sending');
+    setSendReceipt(null);
     setSending(true); setError(null);
     try {
       const res = await fetch('/api/workbench/grantee-deliverables/send-invite', {
@@ -543,19 +546,30 @@ export default function AwardeeTab({ requestId, context }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Could not send the invitation.');
-        setSendStep(null);
+        setSendReceipt({
+          status: data.outcome === 'uncertain' ? 'uncertain' : 'failed',
+          message: data.error || 'The invitation was not sent.',
+        });
+        setSendStep(data.outcome === 'uncertain' ? 'uncertain' : 'failed');
       } else {
         setStatus(data.status);
+        setSendReceipt({
+          status: data.statusPersisted === false ? 'partial' : 'sent',
+          message: data.statusPersisted === false
+            ? 'Dynamics accepted the invitation for delivery, but the invitation status could not be recorded. Check the request before sending again.'
+            : 'Dynamics accepted the invitation for delivery.',
+        });
+        setSendStep('sent');
         // Best-effort: the server records invitedAt on the first status flip.
         // loadAbstract handles its own failures, so a sent email stays successful.
         await loadAbstract();
-        // Only after the reload, so the receipt can quote the recorded date.
-        setSendStep('sent');
       }
     } catch {
-      setError('Could not send the invitation.');
-      setSendStep(null);
+      setSendReceipt({
+        status: 'uncertain',
+        message: 'The app could not confirm the result. Check the email activity before trying again.',
+      });
+      setSendStep('uncertain');
     }
     setSending(false);
   }
@@ -1256,7 +1270,7 @@ export default function AwardeeTab({ requestId, context }) {
           </button>
           <button
             type="button"
-            onClick={() => setSendStep('confirm')}
+            onClick={() => { setSendReceipt(null); setSendStep('confirm'); }}
             disabled={!canSend}
             className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
           >
@@ -1365,13 +1379,15 @@ export default function AwardeeTab({ requestId, context }) {
             className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-lg bg-white p-8 shadow-xl space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
-            {sendStep === 'sent' ? (
+            {['sent', 'failed', 'uncertain'].includes(sendStep) ? (
               <>
-                <h4 id="grantee-send-modal-title" className="text-lg font-semibold text-green-800">
-                  ✓ Invitation sent
-                </h4>
+                <h4 id="grantee-send-modal-title" className="text-lg font-semibold text-gray-900">Invitation status</h4>
+                <EmailSendFeedback
+                  status={sendReceipt?.status || (sendStep === 'sent' ? 'sent' : sendStep)}
+                  message={sendReceipt?.message}
+                />
                 <div className="text-sm text-gray-900">
-                  <p>Sent to {recipients?.pi?.name || 'the grantee'}</p>
+                  <p>{sendStep === 'sent' ? 'Sent to' : 'Recipient'} {recipients?.pi?.name || 'the grantee'}</p>
                   <p className="font-mono text-sm break-all text-gray-600">{toEmail}</p>
                   {ccEmail && <p className="font-mono text-sm break-all text-gray-600">cc {ccEmail}</p>}
                 </div>

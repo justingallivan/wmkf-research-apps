@@ -31,6 +31,7 @@ const REASON_STATUS = {
   notification_unavailable: 502,
   token_recovery_required: 409,
   send_failed: 502,
+  send_unconfirmed: 202,
 };
 
 export default async function handler(req, res) {

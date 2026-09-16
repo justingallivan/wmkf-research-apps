@@ -48,10 +48,11 @@ export default async function handler(req, res) {
 
     const errs = result.errors.length;
     if (result.sent || errs) {
-      console.log(`[cron:review-thankyous] sent=${result.sent} eligible=${result.eligible} scanned=${result.scanned} claimFail=${result.claimFailed} sendFail=${result.sendFailed} attachmentFail=${result.attachmentFailed} dryRun=${dryRun}`);
+      console.log(`[cron:review-thankyous] sent=${result.sent} eligible=${result.eligible} scanned=${result.scanned} claimFail=${result.claimFailed} sendFail=${result.sendFailed} sendUnconfirmed=${result.sendUnconfirmed} attachmentFail=${result.attachmentFailed} dryRun=${dryRun}`);
     }
 
     const operationalFailures = (result.sendFailed || 0)
+      + (result.sendUnconfirmed || 0)
       + (result.attachmentFailed || 0)
       + (result.skippedMisconfigured || 0);
     await MaintenanceService.completeRun(runId, {
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
       recordsDeleted: result.sent ?? 0,
       details: { maxBatch, dryRun, ...result },
       errorMessage: operationalFailures > 0
-        ? `${result.sendFailed || 0} send, ${result.attachmentFailed || 0} attachment, ${result.skippedMisconfigured || 0} configuration error(s)`
+        ? `${result.sendFailed || 0} send, ${result.sendUnconfirmed || 0} unconfirmed, ${result.attachmentFailed || 0} attachment, ${result.skippedMisconfigured || 0} configuration error(s)`
         : undefined,
     });
     return res.json({ ok: true, maxBatch, dryRun, ...result });

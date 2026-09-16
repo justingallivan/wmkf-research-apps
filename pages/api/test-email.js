@@ -19,6 +19,7 @@
 import { requireSuperuser, getSession } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { sendTestEmail } from '../../lib/services/admin/test-email-service';
+import { classifyEmailDispatchError } from '../../shared/utils/email-send-outcome';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -57,9 +58,15 @@ export default async function handler(req, res) {
       return res.json(result);
     } catch (error) {
       console.error('Test email error:', error);
-      return res.status(500).json({
+      const classification = sendMode === 'send'
+        ? classifyEmailDispatchError(error)
+        : { outcome: 'failed', retryable: true, emailId: null };
+      return res.status(classification.outcome === 'uncertain' ? 202 : 500).json({
         success: false,
-        error: 'Test email failed',
+        error: classification.outcome === 'uncertain'
+          ? 'Dynamics may have accepted the email, but the result could not be confirmed.'
+          : 'Test email failed',
+        ...classification,
       });
     }
   });

@@ -46,7 +46,7 @@ export default async function handler(req, res) {
 
     const errs = (result.respond.errors.length + result.reviewDue.errors.length);
     if (result.respond.sent || result.reviewDue.sent || errs) {
-      console.log(`[cron:reviewer-reminders] respond(sent=${result.respond.sent} eligible=${result.respond.eligible} scanned=${result.respond.scanned} claimFail=${result.respond.claimFailed} sendFail=${result.respond.sendFailed}) reviewDue(sent=${result.reviewDue.sent} eligible=${result.reviewDue.eligible} scanned=${result.reviewDue.scanned} claimFail=${result.reviewDue.claimFailed} sendFail=${result.reviewDue.sendFailed}) dryRun=${dryRun}`);
+      console.log(`[cron:reviewer-reminders] respond(sent=${result.respond.sent} eligible=${result.respond.eligible} scanned=${result.respond.scanned} claimFail=${result.respond.claimFailed} sendFail=${result.respond.sendFailed} sendUnconfirmed=${result.respond.sendUnconfirmed}) reviewDue(sent=${result.reviewDue.sent} eligible=${result.reviewDue.eligible} scanned=${result.reviewDue.scanned} claimFail=${result.reviewDue.claimFailed} sendFail=${result.reviewDue.sendFailed} sendUnconfirmed=${result.reviewDue.sendUnconfirmed}) dryRun=${dryRun}`);
     }
 
     await MaintenanceService.completeRun(runId, {

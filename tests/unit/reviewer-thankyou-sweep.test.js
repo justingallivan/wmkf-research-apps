@@ -174,13 +174,13 @@ describe('sweepReviewThankYous', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('send fails after a successful claim → at-most-once (sendFailed, marker NOT rolled back, no retry)', async () => {
+  test('an ambiguous send error after a successful claim is unconfirmed and not retried', async () => {
     queryAllRecords.mockResolvedValue({ records: [candidate()] });
     installReads();
     createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
     const r = await sweepReviewThankYous();
     expect(updateRecord).toHaveBeenCalledTimes(1); // claim landed, never rolled back
-    expect(r.sendFailed).toBe(1);
+    expect(r.sendUnconfirmed).toBe(1);
     expect(r.sent).toBe(0);
     expect(createAndSendEmail).toHaveBeenCalledTimes(1); // no retry
   });
@@ -248,7 +248,7 @@ describe('sweepReviewThankYous', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('maxBatch bounds CLAIMS even when sends fail (no mass suppression)', async () => {
+  test('maxBatch bounds CLAIMS even when sends are unconfirmed (no mass suppression)', async () => {
     const rows = Array.from({ length: 5 }, (_, i) => candidate({ wmkf_appreviewersuggestionid: `id-${i}`, _etag: `W/"${i}"` }));
     queryAllRecords.mockResolvedValue({ records: rows });
     installReads();
@@ -256,7 +256,7 @@ describe('sweepReviewThankYous', () => {
     createAndSendEmail.mockRejectedValue(new Error('SMTP down'));
     const r = await sweepReviewThankYous({ maxBatch: 2 });
     expect(updateRecord).toHaveBeenCalledTimes(2);
-    expect(r.sendFailed).toBe(2);
+    expect(r.sendUnconfirmed).toBe(2);
     expect(r.sent).toBe(0);
     expect(r.skipped).toBe(3);
   });

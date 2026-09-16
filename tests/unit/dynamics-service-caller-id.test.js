@@ -308,6 +308,7 @@ describe('MSCRMCallerID — composed helpers', () => {
       }).catch((e) => e);
       expect(err).toBeInstanceOf(Error);
       expect(err.dispatched).toBeUndefined();
+      expect(err.emailId).toBe('mail-1');
     });
   });
 });

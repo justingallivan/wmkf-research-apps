@@ -148,6 +148,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [EMAIL_SEND_FEEDBACK_AUDIT_2026-09-15.md](EMAIL_SEND_FEEDBACK_AUDIT_2026-09-15.md) | audit | active |  | System-wide outbound-email inventory and the implemented feedback contract for confirmed, failed, uncertain, partial, and draft outcomes. | 2026-09-15 |
 | [EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md](EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md) | plan | historical |  | Historical record of the completed July 2026 mustache-token migration; current template behavior lives in the resolver source and seed defaults. | 2026-07-02 |
 | [OUTBOUND_EMAIL_INVENTORY_2026-08-26.md](OUTBOUND_EMAIL_INVENTORY_2026-08-26.md) | audit | historical |  | Dated snapshot of all 18 outbound email types: trigger class, sender identity, recipients, controls, automation-notice and noFallback coverage. | 2026-08-26 |
 | [RESOLVED_PAGE_EMAIL_TIER_DESIGN.md](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md) | spec | active |  | Guarded page fetch plus deterministic mailbox ranking; only a unique grounded winner receives the invitation-ready institution_page source. | 2026-07-02 |

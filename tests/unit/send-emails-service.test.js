@@ -357,16 +357,16 @@ describe('send-emails-service — lifecycle-after-send ordering', () => {
     expect(r.stats).toMatchObject({ sent: 0, failed: 0, unconfirmed: 1 });
   });
 
-  test('a non-invitation send-time failure still lands in failed[] via email_failed (unchanged)', async () => {
+  test('a non-invitation ambiguous send-time failure lands in unconfirmed[]', async () => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
     createAndSendEmail.mockImplementationOnce(async () => { throw new Error('boom'); });
     const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
-    expect(names(emitted)).not.toContain('email_unconfirmed');
-    expect(names(emitted)).toContain('email_failed');
+    expect(names(emitted)).toContain('email_unconfirmed');
+    expect(names(emitted)).not.toContain('email_failed');
     const r = resultOf(emitted);
-    expect(r.unconfirmed).toEqual([]);
-    expect(r.failed).toHaveLength(1);
-    expect(r.failed[0]).toMatchObject({ suggestionId: SUG_OK, error: 'boom' });
+    expect(r.unconfirmed).toHaveLength(1);
+    expect(r.failed).toEqual([]);
+    expect(r.unconfirmed[0]).toMatchObject({ suggestionId: SUG_OK, error: 'boom' });
   });
 
   test('an invitation lifecycle-stamp failure after a successful send is non-terminal: sent[] carries inviteRecorded: false, no post-loop lifecycle pass', async () => {

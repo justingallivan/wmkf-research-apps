@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import EmailSendFeedback from '../EmailSendFeedback';
 
 const EMPTY_DEFAULTS = { subject: '', message: '', unavailable: false };
 
@@ -155,6 +156,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
+  const [sendFeedback, setSendFeedback] = useState(null);
   const [notice, setNotice] = useState(null);
   const sequence = useRef(0);
   const controllerRef = useRef(null);
@@ -196,7 +198,11 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
       setPreview(pendingSend);
       setConfirmed(false);
       setError(null);
-      setNotice('Dynamics has not confirmed this send. Review and retry the same agenda before creating another one.');
+      setSendFeedback({
+        status: 'uncertain',
+        message: 'Review and reconcile this exact agenda before trying again.',
+      });
+      setNotice(null);
       setDirectoryTarget(null);
       setComposerOpen(true);
       return;
@@ -210,6 +216,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setPreview(null);
     setConfirmed(false);
     setError(null);
+    setSendFeedback(null);
     setNotice(null);
     setDirectoryTarget(null);
     setComposerOpen(true);
@@ -226,6 +233,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setPreview(null);
     setConfirmed(false);
     setError(null);
+    setSendFeedback(null);
     setNotice(null);
   };
 
@@ -233,6 +241,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setForm((current) => appendEmail(current, target, email));
     setPreview(null);
     setConfirmed(false);
+    setError(null);
+    setSendFeedback(null);
     setNotice(null);
   };
 
@@ -244,6 +254,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     controllerRef.current = controller;
     setBusy('prepare');
     setError(null);
+    setSendFeedback(null);
     setNotice(null);
     setConfirmed(false);
     try {
@@ -286,6 +297,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     controllerRef.current = controller;
     setBusy('send');
     setError(null);
+    setSendFeedback(null);
     try {
       const response = await fetch(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
         method: 'PATCH',
@@ -342,9 +354,15 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
           setPendingSend(body.pendingSend);
           setPreview(body.pendingSend);
           setConfirmed(false);
+          setSendFeedback({ status: 'uncertain', message: body.error });
         }
+        return;
       }
-      if (!response.ok || body.error) throw new Error(body.error || 'The agenda could not be sent.');
+      if (!response.ok || body.error) {
+        const agendaFailure = new Error(body.error || 'The agenda could not be sent.');
+        agendaFailure.outcome = body.outcome || 'failed';
+        throw agendaFailure;
+      }
       if (sequence.current !== currentSequence) return;
       setPreview(body.agenda || preview);
       setLastAgenda(body.agenda || null);
@@ -354,7 +372,12 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
       setNotice(null);
     } catch (sendFailure) {
       if (sendFailure?.name !== 'AbortError' && sequence.current === currentSequence) {
-        setError(`${sendFailure.message} Please try again. If the problem continues, contact an administrator.`);
+        setSendFeedback({
+          status: sendFailure.outcome || 'uncertain',
+          message: sendFailure.outcome === 'failed'
+            ? `${sendFailure.message} Please try again. If the problem continues, contact an administrator.`
+            : 'The app could not confirm the result. Check the agenda history before trying again.',
+        });
       }
     } finally {
       if (sequence.current === currentSequence) {
@@ -436,7 +459,11 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
                   <div><dt className="font-medium">Exact email:</dt><dd className="mt-1 whitespace-pre-wrap rounded border border-gray-200 bg-white p-3">{preview.bodyText}</dd></div>
                 </dl>
                 {preview.transportAccepted ? (
-                  <p className="mt-4 text-sm font-medium text-green-800">Sent — Dynamics accepted this exact email for transport. This receipt does not assert inbox delivery.</p>
+                  <EmailSendFeedback
+                    className="mt-4"
+                    status="sent"
+                    message="Dynamics accepted this exact agenda email for delivery."
+                  />
                 ) : (
                   <>
                     <label className="mt-4 flex items-start gap-2 text-sm text-gray-800">
@@ -451,6 +478,14 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
               <p className="mt-2 text-sm text-gray-600">Create a fixed preview to review the exact recipients, message, and proposal times.</p>
             )}
           </div>
+          {sendFeedback && (
+            <EmailSendFeedback
+              className="mt-3"
+              status={sendFeedback.status}
+              message={sendFeedback.message}
+              data-testid="agenda-send-feedback"
+            />
+          )}
           {notice && <div role="status" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{notice}</div>}
           {!preview && <button type="button" onClick={prepare} disabled={Boolean(busy) || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()} className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{busy === 'prepare' ? 'Creating preview…' : 'Create preview'}</button>}
         </ComposerDialog>

@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../Layout';
+import EmailSendFeedback from '../EmailSendFeedback';
 
 function formatDate(iso) {
   const date = new Date(iso || '');
@@ -32,6 +33,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [emailFeedback, setEmailFeedback] = useState(null);
   const [unavailable, setUnavailable] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -58,6 +60,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
     setBusy(true);
     setError(null);
     setNotice(null);
+    setEmailFeedback(null);
     try {
       const res = await fetch(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, {
         method: 'POST',
@@ -65,15 +68,38 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
         body: JSON.stringify({ action, ...extra }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'The materials collection could not be updated.');
+      if (!res.ok) {
+        const actionError = new Error(body.error || 'The materials collection could not be updated.');
+        actionError.outcome = body.outcome || 'failed';
+        throw actionError;
+      }
+      if (body.outcome === 'uncertain') {
+        setEmailFeedback({ outcome: 'uncertain', detail: body.error });
+        await load();
+        return;
+      }
       setCollection(body.collection || null);
       if (action === 'create' && body.invitationSent === false) {
-        setError('The collection was created, but the invitation email could not be sent. Use "Send invitation again".');
+        setEmailFeedback(body.invitationOutcome === 'uncertain'
+          ? { outcome: 'uncertain', detail: 'The collection was created. Dynamics may have accepted the invitation, but the result could not be confirmed. Check the recipient before sending again.' }
+          : { outcome: 'failed', detail: 'The collection was created, but the invitation email was not sent. You can try Send invitation again.' });
+      } else if (action === 'create' || action === 'invite' || action === 'remind') {
+        setEmailFeedback({ outcome: 'sent', detail: successNotice || 'Dynamics accepted the email for delivery.' });
       } else if (successNotice) {
         setNotice(successNotice);
       }
     } catch (actionError) {
-      setError(`${actionError.message} Please try again. If the problem continues, contact an administrator.`);
+      if (['create', 'invite', 'remind'].includes(action)) {
+        const outcome = actionError.outcome === 'failed' ? 'failed' : 'uncertain';
+        setEmailFeedback({
+          outcome,
+          detail: outcome === 'uncertain'
+            ? `${actionError.message} Check the recipient before sending again.`
+            : `${actionError.message} Please try again. If the problem continues, contact an administrator.`,
+        });
+      } else {
+        setError(`${actionError.message} Please try again. If the problem continues, contact an administrator.`);
+      }
     } finally {
       setBusy(false);
     }
@@ -105,12 +131,13 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
           </p>
         </div>
         {!loading && !collection && (
-          <Button type="button" loading={busy} onClick={() => act('create', {}, 'Collection started and the invitation sent.')}>Request materials</Button>
+          <Button type="button" loading={busy} onClick={() => act('create', {}, 'Collection started. Dynamics accepted the invitation for delivery.')}>Request materials</Button>
         )}
       </div>
 
       {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">{notice}</div>}
+      {emailFeedback && <EmailSendFeedback className="mt-4" status={emailFeedback.outcome} message={emailFeedback.detail} />}
       {loading && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
 
       {collection && (
@@ -154,11 +181,11 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               {collection.contributorUrl && (
                 <button type="button" onClick={copyLink} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">{copied ? 'Copied' : 'Copy contributor link'}</button>
               )}
-              <button type="button" disabled={busy} onClick={() => act('invite', {}, 'Invitation sent.')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">
+              <button type="button" disabled={busy} onClick={() => act('invite', {}, 'Dynamics accepted the invitation for delivery.')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">
                 {collection.invitedAt ? 'Send invitation again' : 'Send invitation'}
               </button>
               {collection.state === 'missing' && (
-                <button type="button" disabled={busy} onClick={() => act('remind', {}, 'Reminder sent naming the missing items.')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">Send reminder</button>
+                <button type="button" disabled={busy} onClick={() => act('remind', {}, 'Dynamics accepted the reminder for delivery.')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">Send reminder</button>
               )}
               {collection.state === 'received' && (
                 <Button type="button" loading={busy} onClick={() => act('ready', {}, 'Marked ready.')}>Confirm the files open</Button>

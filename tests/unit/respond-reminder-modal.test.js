@@ -81,6 +81,9 @@ test('sends the edited copy with previewed identities as freshness guards', asyn
     },
   });
   await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
+  expect(onClose).not.toHaveBeenCalled();
+  expect(screen.getByText(/Sent for delivery/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Done' }));
   expect(onClose).toHaveBeenCalledTimes(1);
 });
 

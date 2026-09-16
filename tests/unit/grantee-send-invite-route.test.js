@@ -172,11 +172,12 @@ test('missing azureEmail (no sender) → 400', async () => {
   expect(res.statusCode).toBe(400);
 });
 
-test('send failure → 502, status not flipped', async () => {
+test('ambiguous send failure → 202 unconfirmed, status not flipped', async () => {
   DynamicsService.createAndSendEmail.mockRejectedValue(new Error('graph 500'));
   const res = mockRes();
   await handler(reqOf(body()), res);
-  expect(res.statusCode).toBe(502);
+  expect(res.statusCode).toBe(202);
+  expect(res.body).toMatchObject({ outcome: 'uncertain', retryable: false });
   expect(patchDeliverable).not.toHaveBeenCalled();
 });
 

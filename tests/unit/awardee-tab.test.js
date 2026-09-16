@@ -275,7 +275,7 @@ test('full flow: generate then send → status Invited + confirmation', async ()
   // The page button only opens the confirm step — nothing has been sent yet.
   expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(false);
   confirmSendInModal();
-  await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   expect(screen.getByText(/Status:/)).toHaveTextContent('Invited');
 
   // verify the send payload carried the confirmed To/Cc + subject
@@ -297,7 +297,7 @@ test('successful send reloads the recorded invite date into the status header', 
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
   confirmSendInModal();
 
-  await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   expect(screen.getByText(/Status:/)).toHaveTextContent('Invited');
   expect(screen.getByText(/Invited Aug 9, 2026/)).toBeInTheDocument();
   expect(screen.queryByText('Not yet invited')).not.toBeInTheDocument();
@@ -316,7 +316,7 @@ test('a failed post-send reload does not turn a successful send into an error', 
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
   confirmSendInModal();
 
-  await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   expect(screen.getByText(/Status:/)).toHaveTextContent('Invited');
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
@@ -337,7 +337,7 @@ test('resolves grantee invite subject tokens in compose state and send payload',
   // confirm is what actually goes out.
   expect(within(screen.getByRole('dialog')).getByText('Legacy Quantum Widgets')).toBeInTheDocument();
   confirmSendInModal();
-  await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
   expect(JSON.parse(sendCall[1].body).subject).toBe('Legacy Quantum Widgets');
 });
@@ -1457,7 +1457,7 @@ test('the sent receipt names the recipient and the estimated response date', asy
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
   confirmSendInModal();
 
-  await waitFor(() => expect(screen.getByText(/✓ Invitation sent/)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/)).toBeInTheDocument());
   const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByText(/Sent to Monika Raj/)).toBeInTheDocument();
   // +14d from the recorded invite date, and the day-12 reminder is stated.
@@ -1470,7 +1470,7 @@ test('the sent receipt names the recipient and the estimated response date', asy
   expect(screen.getByText(/Invited Aug 9, 2026/)).toBeInTheDocument();
 });
 
-test('a send failure closes the modal and surfaces the error inline, next to the fields', async () => {
+test('a send failure remains visible in the modal with the recipient', async () => {
   wireFetch({ abstract: ready(), sendOk: false });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
@@ -1479,8 +1479,8 @@ test('a send failure closes the modal and surfaces the error inline, next to the
   confirmSendInModal();
 
   await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(screen.getByRole('alert')).toHaveTextContent(/send failed/i);
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent(/send failed/i);
 });
 
 test('an already-invited award relabels the button and warns before re-sending', async () => {
@@ -1512,7 +1512,7 @@ test('the old top-of-pane sent banner is gone', async () => {
 
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
   confirmSendInModal();
-  await waitFor(() => expect(screen.getByText(/✓ Invitation sent/)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/)).toBeInTheDocument());
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /done/i }));
 
   // Dismissing the receipt leaves no stray inline banner behind.

@@ -99,7 +99,7 @@ test('happy path: server-minted link + signature injected; Drafted → Invited w
 });
 
 test('send failure → 502 typed, no status flip', async () => {
-  createAndSendEmail.mockRejectedValue(new Error('graph 500'));
+  createAndSendEmail.mockRejectedValue(Object.assign(new Error('graph 500'), { dispatched: false }));
   const err = await sendGranteeInvite(args()).catch((e) => e);
   expect(err.httpStatus).toBe(502);
   expect(patchDeliverable).not.toHaveBeenCalled();

@@ -92,7 +92,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ message: outcome.message });
       } catch (error) {
         console.error('[scheduled-email/send-now] failed:', error.message);
-        return res.status(502).json({ error: 'The message could not be sent. It remains available for retry.' });
+        const uncertain = error.emailOutcome === 'uncertain';
+        return res.status(uncertain ? 202 : 502).json({
+          error: uncertain
+            ? 'Dynamics may have accepted the message, but the result could not be confirmed.'
+            : 'The message could not be sent. It remains available for retry.',
+          outcome: uncertain ? 'uncertain' : 'failed',
+          retryable: !uncertain,
+        });
       }
     } else {
       return res.status(400).json({ error: 'Unknown scheduled email action.' });
