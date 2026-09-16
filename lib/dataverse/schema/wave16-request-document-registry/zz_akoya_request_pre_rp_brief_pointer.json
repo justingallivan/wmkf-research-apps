@@ -1,0 +1,15 @@
+{
+  "name": "akoya_request_pre_rp_brief_pointer",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_request_currentprerpbrief",
+      "referencedEntity": "wmkf_requestdocument",
+      "lookupSchemaName": "wmkf_CurrentPreRPBrief",
+      "lookupDisplayName": "Current Pre-Research Presentation Brief",
+      "lookupDescription": "Canonical governed Pre-Research Presentation Brief for this request. Updated atomically with Ready activation and prior-artifact supersession."
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe; Initial Assessment canonical pointer provisioned and count-probed 2026-07-30; capped legacy reviewer-slot context read verified in feature-branch source/tests 2026-08-21 (deployment pending); reviewer-reminder flags and hold exposure reconciled via read-only production probe 2026-09-01; organization-wide Reviewer Follow-up cycle projection and request-bound lead-PD/superuser authorization verified in source/tests, independently reviewed, deployed, and authenticated-read proved on D26/J26 in Production 2026-09-02; governed `review-synthesis.generate` v4 sole-current and seven-key source parity verified by read-only Production dry-run 2026-09-15
+**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe; Initial Assessment canonical pointer provisioned and count-probed 2026-07-30; capped legacy reviewer-slot context read verified in feature-branch source/tests 2026-08-21 (deployment pending); reviewer-reminder flags and hold exposure reconciled via read-only production probe 2026-09-01; organization-wide Reviewer Follow-up cycle projection and request-bound lead-PD/superuser authorization verified in source/tests, independently reviewed, deployed, and authenticated-read proved on D26/J26 in Production 2026-09-02; governed `review-synthesis.generate` v4 sole-current and seven-key source parity verified by read-only Production dry-run 2026-09-15; planned `wmkf_currentprerpbrief` pointer schema record added (not yet applied) 2026-09-16 via source inspection
 **Live row count:** **~25,561** (FetchXML aggregate, 2026-05-15). ⚠️ OData `/$count` returns **5,000** — Dataverse caps `$count` at 5,000; the "5,000" figure is the cap, not the total. Use FetchXML aggregate / RetrieveTotalRecordCount for the true count.
 **Entity set:** `akoya_requests`
 
@@ -73,6 +73,14 @@ Governed artifact pointers:
   pointer and row. The proposal source was later identified as an old Phase I
   document, so this proves pointer/idempotency mechanics but not approved
   Phase II semantics.
+- `wmkf_currentprerpbrief` (Lookup → `wmkf_requestdocument`; relationship
+  `wmkf_request_currentprerpbrief`) — **[PLANNED, not yet applied]**
+  schema-as-code record `zz_akoya_request_pre_rp_brief_pointer.json`
+  (`docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §3, §5
+  slice 1), shaped identically to `wmkf_currentinitialassessment` above. Will
+  be the canonical Pre-Research Presentation Brief pointer once the owner
+  runs `apply-dataverse-schema.js --wave=16-request-document-registry
+  --execute` in Production; nothing reads or writes it yet.
 
 WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` — v2 is archived, do not use):
 - `wmkf_ai_summary` (Memo) — Phase I summary text. **Field Set A: ready, live writeback active.**

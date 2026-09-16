@@ -6,9 +6,13 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
+  - lib/dataverse/schema/wave16-request-document-registry/zz_akoya_request_pre_rp_brief_pointer.json
+  - scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs
+  - shared/templates/pre-research-presentation-brief/brief-v1.docx
+  - lib/services/pre-rp-brief/docx-renderer.js
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/schema/wave22-final-writeup-transition/wmkf_requestdocument_final_writeup_transition.json
@@ -428,6 +432,55 @@ PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template v3 makes that
 label explicitly non-wrapping under another generation identity. Signed-in
 current-status, compact actions/download, and Word Online v3 proof remain open;
 this was never a registry consistency failure.
+
+## Pre-Research Presentation Brief contract (planned, slices 1-2)
+
+`[PLANNED — schema not yet applied to Production]`
+`docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §3, §5
+slices 1-2. Artifact type option `Pre-Research Presentation Brief =
+100000009` is added by the sibling script
+`scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs` (same
+dry-run-default/`--execute`/re-read-verify shape as the Consultant Feedback
+insert above; owner-run against Production; not yet executed as of this
+commit — dry-run output only). Mirrored in `shared/config/requestDocument.js`
+(`REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF` +
+`PRE_RP_BRIEF_CONTRACT`) and in the Wave 16 schema record
+(`lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json`).
+
+A second, independent Wave 16 schema-as-code record,
+`zz_akoya_request_pre_rp_brief_pointer.json`, adds
+`akoya_request.wmkf_CurrentPreRPBrief` (N:1 lookup to `wmkf_requestdocument`,
+relationship `wmkf_request_currentprerpbrief`) — the request-level canonical
+pointer for the brief, shaped exactly like
+`wmkf_currentinitialassessment`/`wmkf_request_currentinitialassessment`
+above. Both records are applied (still pending, owner-run) via
+`node scripts/apply-dataverse-schema.js --target=<target>
+--wave=16-request-document-registry --execute`, same as every other file in
+this directory.
+
+Once live, brief rows reuse the Pre-Site Visit registry's write-once
+`wmkf_presiteinputsnapshotjson` / `wmkf_inputfingerprint` fields (§ above) for
+their own self-describing envelope
+`{ schemaVersion: 1, artifactType: 'pre-rp-brief', request, reviews }` rather
+than adding a third Dataverse field — safe because every current raw-field
+reader of that snapshot column asserts/filters `PRE_SITE_VISIT` before
+parsing (plan §7 finding, `lib/services/pre-site-visit/artifact-service.js`).
+No canonical/pending pointer-resolution, generation, or distribution-source
+code exists yet; that is slices 3-4 of the same plan.
+
+The DOCX template — `shared/templates/pre-research-presentation-brief/brief-v1.docx`
+(tracked, six single-occurrence placeholders: `[[DV:InstitutionName]]`,
+`[[DV:ProjectTitle]]`, `[[DV:PrincipalInvestigator]]`, `[[DV:ProgramDirector]]`,
+`[[DV:Abstract]]`, `[[STAFF:RefereeSentences]]`, no header/footer parts per
+B6) — is derived reproducibly from the owner's untracked example file by
+`scripts/build-pre-rp-brief-template.mjs`. The renderer,
+`lib/services/pre-rp-brief/docx-renderer.js`, fills those placeholders and
+composes the referee paragraph from the same deterministic
+`composeScoreSentence`/`composeReviewerSentence` composers the Reviews tab and
+Pre-Site writeup use (`shared/utils/review-writeup-paragraphs.js`); it also
+exports `briefInputFingerprint`, a pure sha256-over-stable-keys function of
+that same envelope with reviews ordered by `compareReviewersByName`, for the
+future prepare-time drift gate (plan §3.4b).
 
 ## Retry and partial-success behavior
 

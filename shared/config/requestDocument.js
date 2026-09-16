@@ -17,6 +17,7 @@ export const REQUEST_DOCUMENT_ARTIFACT_TYPE = Object.freeze({
   TRANSCRIPT: 100000006,
   TRANSCRIPT_SUMMARY: 100000007,
   CONSULTANT_FEEDBACK: 100000008,
+  PRE_RESEARCH_PRESENTATION_BRIEF: 100000009,
 });
 
 export const REQUEST_DOCUMENT_ARTIFACT_LABEL = Object.freeze({
@@ -29,6 +30,7 @@ export const REQUEST_DOCUMENT_ARTIFACT_LABEL = Object.freeze({
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT]: 'Transcript',
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY]: 'Transcript Summary',
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.CONSULTANT_FEEDBACK]: 'Consultant Feedback',
+  [REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF]: 'Pre-Research Presentation Brief',
 });
 
 export const REQUEST_DOCUMENT_OPERATION_STATUS = Object.freeze({
@@ -124,6 +126,22 @@ export const FINAL_WRITEUP_CONTRACT = Object.freeze({
   version: '1',
   producer: 'request-workbench-final-writeup',
   contentType: PRE_SITE_VISIT_CONTRACT.contentType,
+});
+
+// docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md §3.4a.
+// `snapshotSchemaVersion` versions the frozen input-snapshot envelope
+// `{ schemaVersion, artifactType: 'pre-rp-brief', request, reviews }` stored
+// (reusing the Pre-Site fields) on the brief's registry row, independent of
+// `templateVersion`, which versions the DOCX template.
+export const PRE_RP_BRIEF_CONTRACT = Object.freeze({
+  artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF,
+  producer: 'request-workbench-pre-rp-brief',
+  contentType: PRE_SITE_VISIT_CONTRACT.contentType,
+  templateId: 'pre-research-presentation-brief-v1',
+  templateVersion: '1',
+  snapshotArtifactType: 'pre-rp-brief',
+  snapshotSchemaVersion: 1,
+  relativeFolder: 'Artifacts/Pre-Research Presentation Brief',
 });
 
 export function requestDocumentLabel(map, value) {
