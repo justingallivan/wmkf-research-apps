@@ -27,13 +27,23 @@ const REFEREE_TOKEN = '[[STAFF:RefereeSentences]]';
  * token gets its own paragraph with a single run, except
  * `projectTitleRuns`, which lets a test split that token's text node
  * across several runs in the same paragraph (finding 5a).
+ *
+ * `headerPart` and `headerReference` are independent (Round-2 finding 3):
+ * `headerPart` emits the `word/header1.xml` part (the parts guard fires on
+ * this alone), while `headerReference` emits only the `<w:headerReference>`
+ * element in `sectPr` with no corresponding part, isolating the second,
+ * otherwise-unreachable guard in renderBrief.
  */
-async function buildMinimalTemplate({ projectTitleRuns = null, headerPart = false } = {}) {
+async function buildMinimalTemplate({
+  projectTitleRuns = null,
+  headerPart = false,
+  headerReference = false,
+} = {}) {
   const zip = new JSZip();
   const projectTitleXml = projectTitleRuns
     ? projectTitleRuns.map((text) => `<w:r><w:t xml:space="preserve">${text}</w:t></w:r>`).join('')
     : `<w:r><w:t>${DV_TOKENS.projectTitle}</w:t></w:r>`;
-  const sectPr = headerPart
+  const sectPr = (headerPart || headerReference)
     ? '<w:sectPr><w:headerReference w:type="default" r:id="rId1"/></w:sectPr>'
     : '<w:sectPr/>';
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -128,6 +138,30 @@ describe('renderBrief', () => {
     const zip = await JSZip.loadAsync(docx);
     const documentXml = await zip.file('word/document.xml').async('string');
     expect(documentXml).not.toMatch(/<w:(?:header|footer)Reference\b/);
+  });
+
+  it('pins the tracked template package to have no SharePoint/Office metadata parts and blanked personal-name fields (Round-2 finding 1)', async () => {
+    // Discriminating: this reads the TRACKED template file directly (not a
+    // rebuild), so a checked-in regression — e.g. restoring the owner
+    // file's original bytes over brief-v1.docx — fails this test even
+    // though the build script's own assertions never ran. Asserted on both
+    // the template package and the rendered output package, and without
+    // depending on the untracked owner file or any personal name literal.
+    const templateBuffer = await fs.readFile(defaultPreRpBriefTemplatePath());
+    const { docx: renderedBuffer } = await renderBrief(envelope());
+
+    for (const buffer of [templateBuffer, renderedBuffer]) {
+      const zip = await JSZip.loadAsync(buffer);
+      const partNames = Object.keys(zip.files);
+      expect(partNames.some((name) => /^customXml\//.test(name))).toBe(false);
+      expect(partNames.includes('docProps/custom.xml')).toBe(false);
+      expect(partNames.includes('word/intelligence2.xml')).toBe(false);
+
+      const coreXml = await zip.file('docProps/core.xml').async('string');
+      expect(coreXml).toMatch(/<dc:creator><\/dc:creator>/);
+      expect(coreXml).toMatch(/<cp:lastModifiedBy><\/cp:lastModifiedBy>/);
+      expect(coreXml).not.toMatch(/<cp:lastPrinted>/);
+    }
   });
 
   it('renders one reviewer with the singular lead-in and no Oxford comma', async () => {
@@ -266,6 +300,15 @@ describe('renderBrief', () => {
     await expect(renderBrief(envelope(), { templateBuffer }))
       .rejects.toThrow(/must not contain header\/footer parts/);
   });
+
+  it('rejects a template whose sectPr still references a header/footer part with no corresponding part (Round-2 finding 3)', async () => {
+    // Isolates the second guard in renderBrief: no word/header*.xml part
+    // exists, so the parts-presence check cannot fire first, and only the
+    // sectPr headerReference/footerReference regex check can reject this.
+    const templateBuffer = await buildMinimalTemplate({ headerReference: true, headerPart: false });
+    await expect(renderBrief(envelope(), { templateBuffer }))
+      .rejects.toThrow(/must not reference a header\/footer part/);
+  });
 });
 
 describe('briefInputFingerprint', () => {
@@ -317,6 +360,19 @@ describe('briefInputFingerprint', () => {
       .toThrow(/reviews is not an array/);
   });
 
+  it('pins the exact REQUEST_FINGERPRINT_FIELDS list (Round-2 finding 2)', () => {
+    // Discriminating: the perturbation loop below iterates this exported
+    // array, so silently dropping a field from it would shrink the loop
+    // and leave the suite green. This literal-list assertion fails instead.
+    expect([...REQUEST_FINGERPRINT_FIELDS]).toEqual([
+      'institutionName',
+      'projectTitle',
+      'principalInvestigator',
+      'programDirector',
+      'abstract',
+    ]);
+  });
+
   it.each(REQUEST_FINGERPRINT_FIELDS)('moves the digest when request field %s changes', (field) => {
     const base = briefInputFingerprint(envelope());
     const changed = briefInputFingerprint(envelope({
@@ -334,6 +390,20 @@ describe('briefInputFingerprint', () => {
     reviewerAffiliation: 'Some Reviewer Affiliation',
     mainInstitution: 'A Different Institution',
     affiliation: 'Some Personal Affiliation',
+  });
+
+  it('pins the exact REVIEW_FINGERPRINT_FIELDS list (Round-2 finding 2)', () => {
+    // Discriminating: same rationale as the request-field pin above.
+    expect([...REVIEW_FINGERPRINT_FIELDS]).toEqual([
+      'suggestionId',
+      'reviewReceivedAt',
+      'name',
+      'academicRank',
+      'reviewerOverallAssessment',
+      'reviewerAffiliation',
+      'mainInstitution',
+      'affiliation',
+    ]);
   });
 
   it.each(REVIEW_FINGERPRINT_FIELDS)('moves the digest when review field %s changes', (field) => {
