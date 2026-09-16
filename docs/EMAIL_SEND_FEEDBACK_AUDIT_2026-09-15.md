@@ -104,6 +104,9 @@ design tokens.
   one ZZTEST proposal) rendered a green panel whose only text was **Sent for delivery.**,
   with no message line and no sender, recipient, or activity-id detail. Production was on
   the build created for `8c02b946`, after the concise-feedback commit `d6cfcfeb`.
+  Residue: the smoke session was set to Cancelled by the owner, and its single
+  `deliberation_agenda_sends` row was deleted after owner confirmation (table 11 → 10 rows).
+  The Dynamics email activity remains, per the test-residue policy.
 - **[OWNER-REPORTED 2026-09-16]** The owner received that agenda email in their inbox.
   Inbox delivery remains an external mail-system fact and is deliberately not claimed by
   any app success message; this report is evidence, not an app guarantee.
