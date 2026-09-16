@@ -611,7 +611,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     });
     await page.getByRole('button', { name: /send 1 email/i }).click();
 
-    await expect(page.getByText('1 sent')).toBeVisible();
+    await expect(page.getByText('Sent for delivery.')).toBeVisible();
     expect(renderBodies[0]).toMatchObject({
       templateType: 'materials',
       suggestionIds: [accepted.suggestionId],
@@ -715,7 +715,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     });
     await modal.getByRole('button', { name: /^release \(2\)$/i }).click();
 
-    await expect(modal.getByText(/1 emailed\. 1 issue:/i)).toBeVisible();
+    await expect(modal.getByText(/1 sent\. 1 issue:/i)).toBeVisible();
     await expect(modal.getByText(/Dr\. Failed Reviewer — The reviewer was released, but the email failed/i)).toBeVisible();
     await expect(modal).toBeVisible();
   });
