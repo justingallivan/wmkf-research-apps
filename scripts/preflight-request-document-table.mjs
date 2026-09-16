@@ -12,7 +12,7 @@
  *   node scripts/preflight-request-document-table.mjs --self-test
  */
 
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
 for (const envFile of ['.env', '.env.local']) {
@@ -54,11 +54,19 @@ const spec = JSON.parse(readFileSync(resolve(
   process.cwd(),
   'lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json',
 ), 'utf8'));
-const requestExtensionSpec = JSON.parse(readFileSync(resolve(
+// Every `zz_*.json` extensions-on-existing record in the wave directory
+// adds a request-level pointer to this registry (Initial Assessment,
+// Pre-Research Presentation Brief, ...); glob rather than hardcode a single
+// filename so a new pointer file is preflighted automatically (Round-1
+// review finding 9).
+const requestExtensionDir = resolve(
   process.cwd(),
-  'lib/dataverse/schema/wave16-request-document-registry/'
-    + 'zz_akoya_request_initial_assessment_pointer.json',
-), 'utf8'));
+  'lib/dataverse/schema/wave16-request-document-registry',
+);
+const requestExtensionSpecs = readdirSync(requestExtensionDir)
+  .filter((name) => name.startsWith('zz_') && name.endsWith('.json'))
+  .sort()
+  .map((name) => JSON.parse(readFileSync(resolve(requestExtensionDir, name), 'utf8')));
 const entity = spec.schemaName.toLowerCase();
 const expectedEntitySet = 'wmkf_requestdocuments';
 const CAST = {
@@ -301,15 +309,17 @@ async function main() {
       value: await probeRelationship(token, relationship),
     });
   }
-  for (const relationship of requestExtensionSpec.relationships || []) {
-    checks.push({
-      name: `relationship:${relationship.schemaName}`,
-      value: await probeRelationship(
-        token,
-        relationship,
-        requestExtensionSpec.entityLogicalName,
-      ),
-    });
+  for (const requestExtensionSpec of requestExtensionSpecs) {
+    for (const relationship of requestExtensionSpec.relationships || []) {
+      checks.push({
+        name: `relationship:${relationship.schemaName}`,
+        value: await probeRelationship(
+          token,
+          relationship,
+          requestExtensionSpec.entityLogicalName,
+        ),
+      });
+    }
   }
   for (const key of spec.alternateKeys) {
     checks.push({ name: `key:${key.schemaName}`, value: await probeKey(token, key) });

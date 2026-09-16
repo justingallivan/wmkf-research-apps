@@ -441,8 +441,15 @@ slices 1-2. Artifact type option `Pre-Research Presentation Brief =
 100000009` is added by the sibling script
 `scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs` (same
 dry-run-default/`--execute`/re-read-verify shape as the Consultant Feedback
-insert above; owner-run against Production; not yet executed as of this
-commit — dry-run output only). Mirrored in `shared/config/requestDocument.js`
+insert above; owner-run against Production). The picklist script's dry run
+was run once, 2026-09-16, as a read-only Production Dataverse metadata read
+(no `--execute`; confirmed value `100000009` free, no write made) — see
+`feedback-never-self-authorize-prod-dataverse-reads.md` on not repeating
+that read without asking first. The pointer record's own dry-run apply
+(`apply-dataverse-schema.js --wave=16-request-document-registry`) was not
+run; it goes through the target/write interlock, which correctly refused
+without `DATAVERSE_ALLOW_PROD_READS=yes`, and that flag was not set.
+Mirrored in `shared/config/requestDocument.js`
 (`REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF` +
 `PRE_RP_BRIEF_CONTRACT`) and in the Wave 16 schema record
 (`lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json`).
