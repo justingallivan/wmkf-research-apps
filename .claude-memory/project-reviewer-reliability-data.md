@@ -32,9 +32,10 @@ whether reviewers are on time and reliable — not just participation counts.
   withdrawal also corrects response state and removes the exact linked honorarium. The
   source-built sufficient-reviews release stamps `wmkf_withdrawnsufficientat`, retains and
   marks a safely open honorarium `Withdrawn`, and derives “Review not received” from the
-  guarded absence of receipt evidence. Promotion remains blocked until an explicitly
-  authorized settings write seeds and verifies `email.reviewer_release.subject` and
-  `email.reviewer_release.body`; the source build performed no live settings write.
+  guarded absence of receipt evidence. `[VERIFIED via an explicitly authorized,
+  narrowly scoped Production write plus exact read-back on 2026-09-16]`
+  `email.reviewer_release.subject` and `email.reviewer_release.body` now exist in
+  Production and match the committed seed values; runtime promotion remains pending.
 - `[VERIFIED via lib/services/reviewer-due-extension.js,
   lib/external/reviewer-due-date.js, and the Atlas]` A nullable suggestion-level
   `wmkf_reviewduedateoverride` is live for accepted reviewers. Its dedicated writer and

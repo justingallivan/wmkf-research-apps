@@ -942,14 +942,15 @@ honoraria therefore block before composition and again before the transition.
 This accepted-reviewer release expansion is source-built on 2026-09-16 and is
 not yet promoted; the older staff-withdrawal behavior remains production-live.
 
-**Promotion prerequisite:** before this runtime reaches an environment, an
-explicitly authorized settings write must seed
-`email.reviewer_release.subject` and `email.reviewer_release.body` through
-`scripts/seed-email-defaults.mjs --execute`, then verify both keys in that
-environment. The seed is initialization data, not a runtime fallback; without
-it, release remains fail-safe and available without email, but preview reports
-`defaults_unavailable` and records the missing-default operational alert. No
-live settings write was performed as part of the source build.
+**Promotion prerequisite:** Production was prepared on 2026-09-16 through an
+explicitly authorized, narrowly scoped settings write that created
+`email.reviewer_release.subject` and `email.reviewer_release.body`; an immediate
+read-back verified both values exactly match the committed seeds. Runtime
+promotion is still pending. Any other environment must seed and verify both
+keys before this runtime reaches it. The seed is initialization data, not a
+runtime fallback; without it, release remains fail-safe and available without
+email, but preview reports `defaults_unavailable` and records the
+missing-default operational alert.
 PD-recorded `withdrew` additionally performs the same lifecycle/financial
 correction as reviewer self-withdrawal: one Dataverse changeset writes
 `selected=false`, `accepted=false`, `declined=true`, declined response metadata,
