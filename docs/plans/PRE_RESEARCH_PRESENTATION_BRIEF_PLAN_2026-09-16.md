@@ -69,7 +69,9 @@ prior file remains in SharePoint.
 ## 2. Document contract
 
 Template source: the owner's `Staff Briefing Template.docx` (Letter, 0.75" margins, Times New
-Roman, no header/footer). `[VERIFIED]` by unzipping the file this session. Structure, in order:
+Roman; the example file carries a page-2 header that B6 removes). `[OWNER FILE, not tracked]`
+inspected by unzipping it this session; the tracked `brief-v1.docx` produced in slice 2 becomes
+the reproducible evidence, with a renderer test asserting no header/footer parts. Structure, in order:
 
 | # | Block | Source | Token |
 |---|---|---|---|
@@ -79,7 +81,7 @@ Roman, no header/footer). `[VERIFIED]` by unzipping the file this session. Struc
 | 4 | PD (centered) | `_wmkf_programdirector_value_formatted` | `[[DV:ProgramDirector]]` |
 | 5 | Rule | template | — |
 | 6 | **Abstract:** inline paragraph | `wmkf_abstract` (written in-app by the Reviews-tab abstract editor and the grantee abstract service) | `[[DV:Abstract]]` |
-| 7 | **Referee Comments:** (Heading 1) + paragraph | `composeScoreSentence` + `composeReviewerSentence` over `getWriteupRoster(requestId)` reviewers with `reviewReceivedAt` | `[[STAFF:RefereeSentences]]` |
+| 7 | **Referee Comments:** (Heading 1) + paragraph | `composeScoreSentence` + `composeReviewerSentence` over `getWriteupRoster({ requestId })` reviewers with `reviewReceivedAt` (`[VERIFIED via reviewers-service.js:580]` object parameter; the Pre-Site caller adapts it the same way at `proposal-core-service.js:96`) | `[[STAFF:RefereeSentences]]` |
 | 8 | **Issues to be Addressed at the Research Presentation:** | empty | — |
 
 `[VERIFIED]` `composeReviewerSentence` already renders "Name, a professor at Institution;
@@ -140,17 +142,41 @@ so a tab-side "at least one review" check would be bypassable. New service + rou
 `POST /api/workbench/pre-rp-brief/lock-for-share` (`lib/services/pre-rp-brief/share-lock-service.js`):
 
 1. resolves the current brief through the pointer (fail closed otherwise);
-2. reads `getWriteupRoster(requestId)` (`[VERIFIED via lib/services/review-manager/reviewers-service.js:580-623]`)
-   and refuses 409 `brief_reviews_required` when no reviewer has `reviewReceivedAt`;
+2. reads the brief row's **generation input snapshot** (§3.4a) and refuses 409
+   `brief_reviews_required` when that snapshot recorded zero received reviews — the gate proves
+   the *document* contains a Referee Comments section, not merely that reviews exist now;
+   then reads the live roster via `getWriteupRoster({ requestId })`
+   (`[VERIFIED via lib/services/review-manager/reviewers-service.js:580-623]`) and compares
+   received-review ids and the abstract hash to the snapshot: a difference returns 409
+   `brief_inputs_stale` with the delta, unless the body carries
+   `acknowledgeStaleInputs: true`, which the tab sends only after showing staff the delta
+   (regenerating would discard their Word edits, B9/B12, so the choice is theirs, but it is
+   explicit and server-recorded on the lock milestone);
 3. reads stable SharePoint drive/item/version before and after the byte read, as
-   `site-visit-transition-service.js` does for Pre-Site;
-4. ETag-fences Draft → Review on the brief row and records the milestone version/hash/time;
-5. is idempotent for an already-Review brief with the same milestone.
+   `site-visit-transition-service.js` does for Pre-Site, and hashes the bytes;
+4. ETag-fences the brief row: lifecycle Draft → Review on first lock, and on **every** lock
+   (including an already-Review row) records the milestone `wmkf_milestoneversionid`,
+   `wmkf_milestonecontenthash`, `wmkf_milestonecreatedat`, plus the stale-input acknowledgement.
+   Re-locking is how staff share an edited brief: Share's hook always locks first, so the
+   milestone always names the version staff just looked at.
 
-`preparePreSiteDistribution`'s `resolveSource` requires the brief row to be **Review** (it
-already requires Review for Pre-Site today, `[VERIFIED via distribution-service.js:641-654]`),
-so a client that skips the lock cannot prepare. Tests: direct-route calls with zero received
-reviews return 409 before any Dataverse/ledger write; one review locks the exact row.
+**§3.4a Input snapshot.** Generation stores, on the brief row, the same kind of frozen input
+snapshot the Pre-Site generator stores (`[VERIFIED via lib/services/pre-site-visit/artifact-service.js:1136-1140]`
+`buildPreSiteVisitInputSnapshot` → `inputSnapshotJson` on the row): request header fields,
+abstract hash, and the received-review roster (suggestion ids, names, ranks, ratings) that the
+Referee Comments sentences were composed from. It is the evidence the lock gate reads.
+
+**§3.4b Milestone binding at prepare and send (Codex round 2, finding 2).**
+`[VERIFIED via distribution-service.js:622-655, 697-730]` today `resolveSource` requires only
+Ready/Review and `captureCurrentSource` downloads whatever SharePoint version is current, never
+comparing it to the lifecycle milestone; the Pre-Site flow has the same gap. For the brief,
+`resolveSource` additionally requires the current SharePoint `versionId` to equal
+`wmkf_milestoneversionid` and the captured byte hash to equal `wmkf_milestonecontenthash`;
+otherwise 409 `brief_edited_after_lock` ("Share again to lock the edited version") before any
+ledger or snapshot write. `assertAttemptSourceCurrent` (send path) re-checks the same pair
+under the lease. So the pinned Board snapshot is always the bytes the lock recorded. Tests:
+lock V1 → edit to V2 → prepare fails closed; lock V1 → prepare → edit to V2 → send fails
+closed; re-lock V2 → prepare succeeds with V2.
 
 **Writer registration.** `scripts/check-request-document-writers.js` lists every
 `createDocument(` site; the new service is added to `WRITERS` (`[VERIFIED]` gate shape at
@@ -279,12 +305,14 @@ page, Final Writeup lineage, reopen service, gates.
   `source_document_id` is a Pre-Site row will fail closed with `distribution_stale_source`
   after deploy ("prepare a new exact preview"); sent attempts are unaffected (the briefing
   page reads ledger ids only). Add a test for that fall-through.
-- **LOW — "current brief" resolver must be an allowlist.** The distribution snapshot row will
-  also carry type 100000009 (lifecycle `BOARD_READY`, producer
-  `request-workbench-distribution-docx`). The resolver selects
-  `operationstatus = READY AND lifecycle IN (DRAFT, REVIEW) AND !isPreSiteDistributionSnapshot(row)`
-  and orders by `createdon desc`; anything else is not current. Test with a fixture that
-  contains a snapshot row newer than the editable row.
+- **LOW — "current brief" resolver validates the pointer target, never picks newest**
+  (superseded wording removed after Codex round 2, finding 3). The distribution snapshot row
+  will also carry type 100000009 (lifecycle `BOARD_READY`, producer
+  `request-workbench-distribution-docx`). Every reader loads the row named by
+  `wmkf_CurrentPreRPBrief` and requires same request, type 100000009, `operationstatus =
+  READY`, lifecycle in (DRAFT, REVIEW), and `!isPreSiteDistributionSnapshot(row)`; anything
+  else fails closed. Fixtures: pointer to the older of two editable rows (must resolve the
+  older one), pointer missing, pointer to a snapshot row, pointer to another request's row.
 - **LOW — new API route shifts counted surfaces.** `check:api-routes` needs the matrix row;
   `check:fact-consistency` may pin the route count in `CANONICAL_COUNTS` — run both after
   adding the route. `/api/workbench` is already a `ROUTE_NAMESPACE_LIFECYCLE` namespace
@@ -326,3 +354,15 @@ Verdict NO-SHIP, four findings. Each was re-verified in source before folding in
 
 Confirmed-holding claims from round 1: briefing page serves by ledger ids only; deterministic
 OOXML precedent; B11 constraint facts.
+
+### Codex adversarial review — round 2 (2026-09-16, gpt-5.6-sol, base `b36b101a`)
+
+Verdict NO-SHIP, four findings plus one unknown. Re-verified before folding in:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Lock-time roster check does not prove the generated document contains a review; inputs (roster, abstract) are mutable after generation | **Accepted with a product adjustment** → §3.4 step 2 + §3.4a: gate on the generation input snapshot (fail closed at zero), and treat later drift as an explicit, server-recorded staff acknowledgement rather than a forced regeneration, because regeneration discards Word edits (B9/B12). |
+| 2 | Lock milestone not bound to distributed bytes; prepare captures whatever version is current | **Accepted** → §3.4b: prepare and send require version + hash equality with the milestone; Share always re-locks first. |
+| 3 | §7 still carried a "newest by createdon" resolver instruction contradicting the pointer invariant | **Accepted** → wording replaced with pointer-target validation and fixtures. |
+| 4 | `getWriteupRoster(requestId)` is the wrong argument shape | **Accepted** → `getWriteupRoster({ requestId })` at both references; positive lock test uses the real signature. |
+| — | Owner template inspection not reproducible from the repo | **Accepted** → labelled `[OWNER FILE, not tracked]`; the tracked template plus a no-header renderer test become the evidence in slice 2. |
