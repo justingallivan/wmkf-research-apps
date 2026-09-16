@@ -1,6 +1,13 @@
 /**
  * POST /api/review-manager/terminal-transition
- *   { requestId, suggestionIds, terminalStatus: 'withdrew' | 'released' }
+ *   Preview accepted-reviewer release:
+ *     { requestId, suggestionIds, terminalStatus: 'released', preview: true }
+ *   Commit staff-recorded withdrawal:
+ *     { requestId, suggestionIds, terminalStatus: 'withdrew' }
+ *   Commit accepted-reviewer release:
+ *     { requestId, suggestionIds, terminalStatus: 'released',
+ *       releaseReason: 'sufficient_reviews_received', sendEmail, overrides,
+ *       internalNotes? }
  *
  * Thin authenticated shell around the ETag-guarded, per-row partial-success
  * terminal transition service. A whole request with no successful transition
