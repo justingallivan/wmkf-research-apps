@@ -558,3 +558,48 @@ the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFI
   claimed/reactivated row is not older than the current pointer target (or
   otherwise refuse to resurrect a row lifecycle-advanced past Draft), and
   apply the same fix to both.
+
+## 9. Build-loop handoff (paused 2026-09-16, Session 515)
+
+Owner-directed loop: Sonnet builds, Opus reviews (max 3 rounds per group, structured
+APPROVE/CHANGES verdicts, mutation-checked), controller reviews at the end, then Codex
+adversarial review. Paused at the owner's request after the slice-4 build report.
+
+| Group | State | Commits on `claude/pre-rp-brief` |
+|---|---|---|
+| Slices 1–2 | APPROVED (3 rounds; template metadata scrubbed, slice-2 commit replaced before any push) | `66cd2eb2`, `538388f2`, `c6f4a95c`, `eec8311d` |
+| Slice 3 | APPROVED (2 rounds) | `1b0eab56`, `8320d9ec`, `4bc38700` |
+| Slice 4 | BUILT, **awaiting Opus round 1** | `d08ae753` (code), `4dbef6d7` (docs) |
+| Slice 5 | not started | — |
+| Slice 6 | not started | — |
+
+Branch is unpushed. Working tree clean apart from a pre-existing hook edit to
+`.claude-memory/feedback-codex-delegation-review-vs-rescue-routing.md` (not part of this work).
+
+**Production schema: DONE 2026-09-16 (owner-run).** Picklist value `100000009` inserted and
+re-read; relationship `wmkf_request_currentprerpbrief` created under
+`DATAVERSE_PROD_WRITE_ACK`; preflight `--target=prod` reports 43 exact / 0 absent / 0 divergent.
+Atlas pages and plan §3 still say `[PLANNED]` — slice 6 reconciles that. Migration 052 is
+**not** applied to any database.
+
+**Resume steps:**
+1. `git checkout claude/pre-rp-brief`; confirm HEAD `4dbef6d7`.
+2. Spawn an Opus reviewer for slice 4 (`git diff 4bc38700..HEAD`), with the self-trace: prepare
+   gate ordering (resolveSource → live-input load → `assertBriefInputsReady` → any write),
+   fingerprint provenance (stored snapshot re-hash equals `wmkf_inputfingerprint`), hash
+   binding (`draftHash`/`previewHash` include both fingerprints, delta, acknowledgement),
+   migration 052 CHECK coherence vs. legacy rows, `staffAcknowledgedNewerInputs` timestamp-only
+   on the external context. Builder ran four hand mutations; a reviewer mutation pass is still due.
+3. Items carried for slice 4 review / slice 5: (a) builder flagged a PLAN-DEVIATION candidate —
+   delta compares received-state as boolean while the fingerprint still hashes the raw
+   `reviewReceivedAt` (a timestamp rewrite trips the gate but shows an empty delta); decide
+   whether `REVIEW_FINGERPRINT_FIELDS` should switch to a boolean; (b) no route test exists for
+   `distribution/prepare.js`'s new `acknowledgeStaleInputs` validation; (c) slice-3 reviewer's
+   queued fixture: claim-race guard should also prove the orphan IS deleted when the winner
+   adopted a different item.
+4. Then slices 5 (Staff Deliberations UI, Start Site Visit action, drift confirmation UI,
+   composite stage projection in both callers, cycle-list union) and 6 (docs reconcile via
+   `/sweep`, Atlas "applied 2026-09-16", `DATAVERSE_SHAREPOINT_FILE_MODEL.md`, wiki, work queue).
+5. Controller review: `/contract-reconcile` Mode B invariant table, full `/start` gate list
+   sequentially, full jest, lint, build; push; PR; then owner runs
+   `/codex:adversarial-review --wait --base 236d9219 --model gpt-5.6-sol …` with the receipt marker.

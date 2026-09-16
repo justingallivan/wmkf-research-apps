@@ -1,3 +1,10 @@
+> **Session 515 in progress — paused 2026-09-16.** Branch `claude/pre-rp-brief` (unpushed) holds
+> the Pre-Research Presentation Brief build: slices 1–3 approved, slice 4 built and awaiting Opus
+> round 1, slices 5–6 unstarted. Resume from
+> `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §9. Both Production Dataverse
+> schema writes are done; migration 052 is not applied. Email-feedback smoke (item 1 below) is
+> closed. `/start` will see HEAD off `main` — stay on the branch.
+
 # Session 515 Prompt: Close email-feedback proof and prepare the managed-repository decisions
 
 ## Session 514 Summary
