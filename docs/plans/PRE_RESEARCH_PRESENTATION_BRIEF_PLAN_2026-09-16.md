@@ -312,6 +312,8 @@ Pre-Site no brief; Final started while the brief stays Review; both rails (tab a
 
 ## 4. Surfaces
 
+[RECHECKED after lib/services/pre-rp-brief/docx-renderer.js change: slices 1-2 are built on `claude/pre-rp-brief` as `renderBrief` + `briefInputFingerprint` with reimplemented private helpers; the §2/§4 renderer rows describe it as built, addressed a Round-1 review, not yet merged]
+
 | Layer | Change |
 |---|---|
 | `shared/config/requestDocument.js` | new artifact type + label; brief contract constants (content type, template id/version, producer). |
