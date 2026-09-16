@@ -1517,11 +1517,23 @@ that resolves/rejects after content changed underneath it (a permission
 prompt outliving a request switch) can no longer paint a stale "Copied"/
 "Copy failed" label; the card is also a named export now, purely so a unit
 test can mount it directly without `ReviewsTab`'s own loading-gate unmount
-masking the regression. **[PRODUCTION-LIVE 2026-09-15 UTC]** PR #296 merged
-as `b9ad64eb` and deployment `wmkfresearchapps-adp2hh965` reached Ready; the
-owner then published governed `review-synthesis.generate` v4 as the sole-current
-seven-key row with a dated `DATAVERSE_PROD_WRITE_ACK`. The read paths remain
-backward-compatible with stored five-key syntheses. Same
+masking the regression. **[HISTORICAL PRODUCTION MILESTONE 2026-09-15 UTC]**
+PR #296 merged as `b9ad64eb` and deployment
+`wmkfresearchapps-adp2hh965` reached Ready; the owner then published governed
+`review-synthesis.generate` v4 as the sole-current seven-key row with a dated
+`DATAVERSE_PROD_WRITE_ACK`. **[CURRENT PRODUCTION STATE 2026-09-16 UTC]**
+Commit `c52cb7b0` temporarily disabled representative quotation generation:
+the tracked prompt, native schema, and validation schema omit
+`writeupQuotations`, and the regeneration hint promises themes only. After
+explicit owner authorization, guarded `--force` publication created
+sole-current v5 `d8b80702-29b2-f111-aaac-002248086b29`; independent readback
+confirmed exact system/body/variables/schema parity and exactly six required
+keys (`consensus`, `disagreements`, `keyConcerns`, `ratingSummaries`,
+`overall`, `writeupThemes`) with no quotation field in either schema.
+Publication did not invoke the model or generate a request synthesis. The read
+paths remain version-tolerant: five-key syntheses and seven-key v4 syntheses
+remain readable, and already-stored v4 quotations still pass through the
+existing provenance verification/rendering path. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
 submitted DTO, categorical matrix, and both then-present export renderers on
 2026-07-26; that historical smoke does not make PDF a current UI feature.
