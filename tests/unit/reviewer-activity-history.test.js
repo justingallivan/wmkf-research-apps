@@ -458,6 +458,22 @@ describe('undated terminal status summary', () => {
     expect(summary.dated).not.toBe(false);
   });
 
+  it('uses the dated sufficient-reviews release as the latest activity', () => {
+    const reviewer = {
+      suggestionId: 't-release',
+      reviewStatus: 'released',
+      withdrawnSufficientAt: '2026-09-16T17:00:00Z',
+      reminderSentAt: '2026-09-10T10:00:00Z',
+    };
+    const summary = latestActivitySummary(reviewer);
+    expect(summary).toMatchObject({
+      key: 'withdrawn_sufficient',
+      label: 'Released — sufficient reviews received',
+      at: '2026-09-16T17:00:00Z',
+      detail: 'Review not received; released by a Program Director.',
+    });
+  });
+
   it('does not let a dated-event preference regress released to a stale reminder', () => {
     // The rejected remedy -- "use the newest dated event whenever one exists" -- would
     // return the Aug 8 reminder here, which is the exact defect the header fixed.

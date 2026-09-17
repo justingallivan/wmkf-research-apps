@@ -450,11 +450,21 @@ arrays, plus the same verified themes/quotations) via the shared
 `composeWriteupParagraphs`, and `shared/utils/review-report-docx.js` renders
 it as a "Reviews (writeup)" section — underline on reviewer-name runs only,
 never on model strings; the PDF renderer is unchanged and ignores the section
-without erroring (W4: no PDF work). **Live row: governed `review-synthesis.generate` v4 (seven keys) became
-sole-current on 2026-09-15 UTC (owner-run `--force` republish with a dated
-`DATAVERSE_PROD_WRITE_ACK`, after PR #296 merged at b9ad64eb and production
-deployment `wmkfresearchapps-adp2hh965` was Ready). The tracked source and the
-live row match.**
+without erroring (W4: no PDF work). **Historical v4 publication:** governed
+`review-synthesis.generate` v4 (seven keys) became sole-current on 2026-09-15
+UTC through the owner-run, version-preserving publication path.
+
+**Temporary quotation suspension (2026-09-16):** commit `c52cb7b0` removes
+`writeupQuotations` from the generation instructions, native schema, and
+validation schema; the current regeneration hint promises themes only. The
+legacy read/verification/export path remains in place so already-stored v4
+quotations continue to work. After explicit owner authorization, guarded
+`--force` publication created sole-current `review-synthesis.generate` v5
+`d8b80702-29b2-f111-aaac-002248086b29`. Independent Production readback
+confirmed exact system/body/variables/schema parity and the six required keys
+`consensus`, `disagreements`, `keyConcerns`, `ratingSummaries`, `overall`, and
+`writeupThemes`; neither native nor validation schema contains a quotation
+field. Publication did not invoke the model or generate a request synthesis.**
 
 ## Verification per phase
 

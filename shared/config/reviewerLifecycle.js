@@ -23,6 +23,14 @@ export const RELEASE_REASONS = Object.freeze({
 
 export const RELEASE_REASON_VALUES = Object.freeze(Object.values(RELEASE_REASONS));
 
+export const ACCEPTED_RELEASE_REASONS = Object.freeze({
+  sufficient_reviews_received: 'sufficient_reviews_received',
+});
+
+export const ACCEPTED_RELEASE_REASON_VALUES = Object.freeze(
+  Object.values(ACCEPTED_RELEASE_REASONS),
+);
+
 export const REVIEW_STATUS_MAP = {
   accepted: 100000000,
   materials_sent: 100000001,

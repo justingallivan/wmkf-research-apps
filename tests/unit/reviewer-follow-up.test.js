@@ -44,7 +44,7 @@ jest.mock('../../shared/components/Layout', () => {
 
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => {
   const React = require('react');
-  return function MockReviewerManagePanel({ canManage, degraded, loading, onRefresh }) {
+  return function MockReviewerManagePanel({ canManage, degraded, loading, onRefresh, reviewers = [] }) {
     return React.createElement(
       'div',
       {
@@ -52,6 +52,7 @@ jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => {
         'data-can-manage': String(canManage),
         'data-degraded': degraded ? 'true' : 'false',
         'data-loading': loading ? 'true' : 'false',
+        'data-reviewer-statuses': reviewers.map((reviewer) => reviewer.reviewStatus).join(','),
       },
       React.createElement('button', { type: 'button', onClick: onRefresh }, 'Mock refresh'),
     );
@@ -327,6 +328,40 @@ describe('reviewer follow-up request scope', () => {
     fireEvent.click(screen.getByRole('button', { name: 'All (2)' }));
     expect(screen.getByText('South University')).toBeInTheDocument();
     expect(screen.queryByText(/PD: $/)).not.toBeInTheDocument();
+  });
+
+  test('keeps released reviewers in activity history without counting them as waiting progress', async () => {
+    const completedAndReleasedReviewers = [{
+      proposalId: 'request-a',
+      proposalTitle: 'Active proposal',
+      reviewers: [
+        { suggestionId: 'reviewer-1', name: 'Ada Reviewer', reviewStatus: 'complete' },
+        { suggestionId: 'reviewer-2', name: 'Bea Reviewer', reviewStatus: 'complete' },
+        { suggestionId: 'reviewer-3', name: 'Casey Reviewer', reviewStatus: 'complete' },
+        { suggestionId: 'reviewer-4', name: 'Drew Reviewer', reviewStatus: 'released' },
+      ],
+    }];
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => ({ cycles: [{ code: 'D26', label: 'December 2026' }], defaultCycleCode: 'D26' }) };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        return { ok: true, json: async () => ({ proposals: [dashboardProposals[0]] }) };
+      }
+      return { ok: true, json: async () => ({ proposals: completedAndReleasedReviewers }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    fireEvent.click(await screen.findByRole('button', { name: 'All (1)' }));
+
+    const summary = await screen.findByLabelText('Reviewer status: 3 received, 0 waiting, 0 late');
+    expect(summary.querySelector('.bg-green-500')).toHaveStyle({ width: '100%' });
+    expect(summary.querySelector('.bg-gray-400')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
+    expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute(
+      'data-reviewer-statuses',
+      'complete,complete,complete,released',
+    );
   });
 
   test('missing canManage projection fails closed in the rendered reviewer controls', async () => {

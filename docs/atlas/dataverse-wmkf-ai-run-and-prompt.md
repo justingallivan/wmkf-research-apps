@@ -1,7 +1,8 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-09-15 for sole-current `review-synthesis.generate` v4
-and seven-key tracked/live schema parity via a read-only Production dry-run;
+**Last verified:** 2026-09-16 for sole-current `review-synthesis.generate` v5
+and exact six-key tracked/live schema parity via an independent Production
+readback;
 2026-08-30 in source/tests for Executor-budget damaged-row
 recovery, reserved-revision concurrency, Dataverse paging/provenance, and Admin
 draft reconciliation (no production budget revision claimed); 2026-08-27 for sole-current
@@ -220,6 +221,17 @@ Migration plans touching either entity must preserve these foreign keys.
   forced publication would create v5 and printed the same seven-key tracked
   schema, confirming v4 remains sole-current and source-aligned. Existing
   five-key stored syntheses remain readable.
+- **`review-synthesis.generate` v5 publication (2026-09-16 UTC):** after
+  commit `c52cb7b0` reached `main`, the owner explicitly authorized the guarded
+  `--force` publication. Sole-current v5
+  `d8b80702-29b2-f111-aaac-002248086b29` exactly matches the tracked system
+  prompt, body, variables, output schema, model, and settings. Its native and
+  validation schemas require the six keys `consensus`, `disagreements`,
+  `keyConcerns`, `ratingSummaries`, `overall`, and `writeupThemes`;
+  `writeupQuotations` is intentionally absent while representative quotation
+  generation is suspended. Existing v4 syntheses and their verified quotation
+  data remain readable. Publication created/flipped only prompt rows; it did
+  not invoke the model or generate a request synthesis.
 - **Controlled automatic lifecycle proof (2026-07-28):** with
   `REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true` in Production, the bounded drain
   found exactly one eligible request, enqueued and completed job `2` in one

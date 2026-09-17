@@ -1,13 +1,15 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-08
+last_verified: 2026-09-16
 stale_after_days: 90
 owner: finance-ops
 source_files:
   - pages/api/review-manager/send-emails.js
   - pages/api/external/review/[token]/respond.js
   - lib/bill/honorarium-onboard-orchestrator.js
+  - lib/services/reviewer-engagement/terminal-transition.js
+  - lib/dataverse/adapters/reviewer-suggestion.js
   - scripts/probe-honorarium-link-population.js
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
@@ -131,6 +133,18 @@ re-checks after honorarium creation and compensates for a concurrent withdrawal,
 so a late worker cannot leave or recreate an honorarium for an unfulfilled
 review obligation. The staff-cleanup behavior shipped in merge `70f51f45`,
 production deployment `dpl_9r2FYkAXhRqSXiJVCwevrXFZ5SzH`, on 2026-07-24.
+
+Foundation-initiated **Release from assignment** is deliberately different.
+When sufficient reviews have already been received, the source-built release
+path retains the exact linked honorarium `akoya_request`, changes an open,
+unpaid, unauthorized `Pending` row to `Withdrawn`, and stamps
+`wmkf_datewithdrawalreceived` in the same ETag-guarded Dataverse changeset as
+the reviewer release. An honorarium that is paid, authorized, unreadable,
+non-versioned, or in another status blocks the reviewer transition; an already
+`Withdrawn` row is retained unchanged. Acceptance-job race compensation uses
+the same retain-and-withdraw rule. This path is source-built on 2026-09-16 and
+is not yet promoted; the two Production release-email defaults are seeded and
+verified, but no runtime deployment has occurred.
 
 The 2026-06-22 production lock was capture-only:
 `HONORARIUM_ONBOARDING_DEFERRED=true` with the discriminator GUIDs unset. Treat

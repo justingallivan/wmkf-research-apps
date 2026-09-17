@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -15,6 +15,7 @@ source_files:
   - shared/components/reviewers/ReviewersTab.js
   - shared/components/reviewers/ReviewerManagePanel.js
   - shared/components/reviewers/ReviewerCloseoutModal.js
+  - shared/components/reviewers/AcceptedReviewerReleaseModal.js
   - pages/api/review-manager/reviewers.js
   - lib/services/review-manager/reviewers-service.js
   - pages/api/workbench/decline-referrals.js
@@ -82,6 +83,8 @@ source_files:
   - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-campaign-timeline.js
   - lib/services/review-manager/terminal-transition-service.js
+  - lib/services/reviewer-engagement/terminal-transition.js
+  - scripts/seed-email-defaults.mjs
   - lib/external/token-lifecycle.js
   - lib/external/reviewer-token-state.js
   - lib/external/reviewer-token-ttl.js
@@ -928,7 +931,26 @@ Contact enrichment partial-timeout behavior is unchanged.
 `/api/review-manager/terminal-transition`. The service freshly reads each row,
 accepts only accepted/materials-sent/under-review rows with no
 declined/received/completed stamp, and uses that ETag so a concurrent submission
-wins. `released` writes only the terminal status plus token revocation.
+wins. The sufficient-reviews `released` command writes the terminal status,
+token revocation, dated `wmkf_withdrawnsufficientat`, and an optional guarded
+internal note; it retains and marks a safely open linked honorarium `Withdrawn`
+in the same changeset, then optionally sends reviewed thank-you copy. Its
+read-only preview runs the same honorarium-state classifier before showing the
+composer; the commit path independently re-reads the honorarium and remains
+authoritative. Paid, authorized, non-Pending, unreadable, or non-versioned
+honoraria therefore block before composition and again before the transition.
+This accepted-reviewer release expansion is source-built on 2026-09-16 and is
+not yet promoted; the older staff-withdrawal behavior remains production-live.
+
+**Promotion prerequisite:** Production was prepared on 2026-09-16 through an
+explicitly authorized, narrowly scoped settings write that created
+`email.reviewer_release.subject` and `email.reviewer_release.body`; an immediate
+read-back verified both values exactly match the committed seeds. Runtime
+promotion is still pending. Any other environment must seed and verify both
+keys before this runtime reaches it. The seed is initialization data, not a
+runtime fallback; without it, release remains fail-safe and available without
+email, but preview reports `defaults_unavailable` and records the
+missing-default operational alert.
 PD-recorded `withdrew` additionally performs the same lifecycle/financial
 correction as reviewer self-withdrawal: one Dataverse changeset writes
 `selected=false`, `accepted=false`, `declined=true`, declined response metadata,
@@ -1495,11 +1517,23 @@ that resolves/rejects after content changed underneath it (a permission
 prompt outliving a request switch) can no longer paint a stale "Copied"/
 "Copy failed" label; the card is also a named export now, purely so a unit
 test can mount it directly without `ReviewsTab`'s own loading-gate unmount
-masking the regression. **[PRODUCTION-LIVE 2026-09-15 UTC]** PR #296 merged
-as `b9ad64eb` and deployment `wmkfresearchapps-adp2hh965` reached Ready; the
-owner then published governed `review-synthesis.generate` v4 as the sole-current
-seven-key row with a dated `DATAVERSE_PROD_WRITE_ACK`. The read paths remain
-backward-compatible with stored five-key syntheses. Same
+masking the regression. **[HISTORICAL PRODUCTION MILESTONE 2026-09-15 UTC]**
+PR #296 merged as `b9ad64eb` and deployment
+`wmkfresearchapps-adp2hh965` reached Ready; the owner then published governed
+`review-synthesis.generate` v4 as the sole-current seven-key row with a dated
+`DATAVERSE_PROD_WRITE_ACK`. **[CURRENT PRODUCTION STATE 2026-09-16 UTC]**
+Commit `c52cb7b0` temporarily disabled representative quotation generation:
+the tracked prompt, native schema, and validation schema omit
+`writeupQuotations`, and the regeneration hint promises themes only. After
+explicit owner authorization, guarded `--force` publication created
+sole-current v5 `d8b80702-29b2-f111-aaac-002248086b29`; independent readback
+confirmed exact system/body/variables/schema parity and exactly six required
+keys (`consensus`, `disagreements`, `keyConcerns`, `ratingSummaries`,
+`overall`, `writeupThemes`) with no quotation field in either schema.
+Publication did not invoke the model or generate a request synthesis. The read
+paths remain version-tolerant: five-key syntheses and seven-key v4 syntheses
+remain readable, and already-stored v4 quotations still pass through the
+existing provenance verification/rendering path. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
 submitted DTO, categorical matrix, and both then-present export renderers on
 2026-07-26; that historical smoke does not make PDF a current UI feature.

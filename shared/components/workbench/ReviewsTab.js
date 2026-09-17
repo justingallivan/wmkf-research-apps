@@ -478,12 +478,12 @@ export function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }
         ))}
       </div>
       {/* Slice 2 (plan §4.3): a stored synthesis current for today's roster but
-          predating writeupThemes/writeupQuotations. Not an error, not a
+          predating writeupThemes. Not an error, not a
           staleness flag — points at the existing Regenerate control on the
           Synthesis card rather than adding a new action here. */}
       {synthesisCurrent === true && !themes && (
         <p className="mt-2 text-xs text-gray-500">
-          Regenerate synthesis to add themes and quotations.
+          Regenerate synthesis to add writeup themes.
         </p>
       )}
       {warnings.length > 0 && (

@@ -11,7 +11,9 @@ import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
   applyStage2aResponse,
   applyStaffReviewerWithdrawal,
+  applyStaffReviewerRelease,
   deleteLinkedHonorariumForDeclinedSuggestion,
+  withdrawLinkedHonorariumForReleasedSuggestion,
   RESPONSE_TYPE_MAP,
   REVIEW_STATUS_MAP,
 } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
@@ -154,6 +156,68 @@ describe('reviewer withdrawal changeset', () => {
     );
 
     updateSpy.mockRestore();
+  });
+
+  it('atomically releases the reviewer and marks the retained honorarium Withdrawn', async () => {
+    await applyStaffReviewerRelease(SUGGESTION_ID, {
+      ifMatch: 'W/"22"',
+      actingUserSystemId: 'staff-3',
+      releasedAt: '2026-09-16T17:00:00.000Z',
+      notes: 'Overdue after multiple reminders.',
+      cancelHonorarium: { id: HONORARIUM_ID, ifMatch: 'W/"31"' },
+    });
+
+    const [operations, options] = runChangeset.mock.calls[0];
+    expect(options).toEqual({ actingUserSystemId: 'staff-3' });
+    expect(operations).toEqual([
+      expect.objectContaining({
+        method: 'PATCH',
+        entitySet: 'wmkf_appreviewersuggestions',
+        key: SUGGESTION_ID,
+        ifMatch: 'W/"22"',
+        body: {
+          wmkf_reviewstatus: REVIEW_STATUS_MAP.released,
+          wmkf_externaltokenrevoked: true,
+          wmkf_withdrawnsufficientat: '2026-09-16T17:00:00.000Z',
+          wmkf_notes: 'Overdue after multiple reminders.',
+        },
+      }),
+      {
+        method: 'PATCH',
+        entitySet: 'akoya_requests',
+        key: HONORARIUM_ID,
+        ifMatch: 'W/"31"',
+        body: {
+          akoya_requeststatus: 'Withdrawn',
+          wmkf_datewithdrawalreceived: '2026-09-16T17:00:00.000Z',
+        },
+      },
+    ]);
+  });
+
+  it('race cleanup retains and withdraws a late released-reviewer honorarium', async () => {
+    await withdrawLinkedHonorariumForReleasedSuggestion(
+      SUGGESTION_ID,
+      HONORARIUM_ID,
+      {
+        ifMatch: 'W/"23"',
+        honorariumIfMatch: 'W/"32"',
+        withdrawnAt: '2026-09-16T18:00:00.000Z',
+      },
+    );
+    const [operations] = runChangeset.mock.calls[0];
+    expect(operations[0]).toMatchObject({
+      method: 'PATCH',
+      key: SUGGESTION_ID,
+      ifMatch: 'W/"23"',
+      body: { wmkf_reviewstatus: REVIEW_STATUS_MAP.released, wmkf_externaltokenrevoked: true },
+    });
+    expect(operations[1]).toMatchObject({
+      method: 'PATCH',
+      key: HONORARIUM_ID,
+      ifMatch: 'W/"32"',
+      body: { akoya_requeststatus: 'Withdrawn' },
+    });
   });
 
   it('re-selects a reviewer who changes a pre-materials decline back to accept', async () => {

@@ -507,20 +507,45 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
   });
 
   describe('terminal transition specifics', () => {
-    test('withdrew and released share one generation for the same row: a later release invalidates a pending withdrawal', async () => {
+    test('opening the release preview does not supersede a pending withdrawal or dispatch the release mutation', async () => {
       const withdrawJob = deferred();
-      const releaseJob = deferred();
-      terminalFetch.mockReturnValueOnce(withdrawJob.promise).mockReturnValueOnce(releaseJob.promise);
+      terminalFetch.mockImplementation((_url, options) => {
+        const body = JSON.parse(options.body);
+        if (body.preview === true) {
+          return Promise.resolve(response({
+            drafts: [{
+              suggestionId: reviewer.suggestionId,
+              status: 'ok',
+              expectedNotes: '',
+              existingNotes: '',
+              to: reviewer.email,
+              from: 'pd@example.org',
+              senderId: 'pd-1',
+              subject: 'Thank you',
+              bodyText: 'Thank you.',
+            }],
+          }));
+        }
+        return withdrawJob.promise;
+      });
       const onRefresh = jest.fn();
       renderPanel({ onRefresh });
       withdraw();
       release();
-      expect(terminalFetch).toHaveBeenCalledTimes(2);
+      await act(async () => {});
+      const requests = terminalFetch.mock.calls.map(([, options]) => JSON.parse(options.body));
+      expect(requests.filter((body) => body.preview === true).length).toBeGreaterThanOrEqual(1);
+      expect(requests.filter((body) => body.terminalStatus === 'released' && body.preview !== true)).toHaveLength(0);
       await act(async () => withdrawJob.resolve(response({ transitioned: 1 })));
-      // The superseded withdrawal must produce no feedback of its own.
-      expect(onRefresh).not.toHaveBeenCalled();
-      await act(async () => releaseJob.resolve(response({ transitioned: 1 })));
       expect(onRefresh.mock.calls).toEqual([[]]);
+    });
+
+    test('preview read-only context refuses to open or fetch the release dialog', async () => {
+      renderPanel({ previewReadOnly: true });
+      release();
+      await act(async () => {});
+      expect(terminalFetch).not.toHaveBeenCalled();
+      expect(screen.queryByRole('heading', { name: 'Release from assignment' })).not.toBeInTheDocument();
     });
 
     test('payload requestId is the request captured at click time; a post-dispatch request switch suppresses the refresh even on a success reply', async () => {
