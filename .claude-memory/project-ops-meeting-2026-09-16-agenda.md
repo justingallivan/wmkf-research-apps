@@ -5,7 +5,16 @@ metadata:
   type: project
   status: active
   created: 2026-09-11 (S507)
+  last_verified: 2026-09-17 via vercel.json crons, collection-service.js claimManualReminder call, and cycle-dossier-worker.js drainCycleDossiers (S518)
 ---
+
+## Recall Rule
+
+Read when a session touches the applicant-materials reminder cron schedule (`/api/cron/site-visit-materials-reminders`), or before restating any 2026-09-16 ops-meeting outcome.
+
+Do: treat item 1 (the reminder schedule) as the only open decision; record a future schedule in `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 and `vercel.json`, then close this memory.
+Do not: add that route to `vercel.json` without an owner decision; reopen items 2–6.
+Ground truth: `vercel.json` (crons), `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.6, `docs/CYCLE_DOSSIER_PILOT_DESIGN.md` (five-minute drain cadence).
 
 The original Monday 2026-09-14 meeting did not occur. The operations meeting
 was held on **Wednesday 2026-09-16**. Items 2–6 below are decided or recorded;
