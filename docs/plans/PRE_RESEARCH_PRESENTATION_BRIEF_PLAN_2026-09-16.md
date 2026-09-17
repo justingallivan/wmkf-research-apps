@@ -559,7 +559,30 @@ the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFI
   otherwise refuse to resurrect a row lifecycle-advanced past Draft), and
   apply the same fix to both.
 
-## 9. Build-loop handoff (paused 2026-09-16, Session 515)
+- **Carried from the slice 4–5 Opus reviews (Session 516, 2026-09-16):**
+  (i) `tests/unit/pre-site-distribution-service.test.js` "draftHash and previewHash
+  change when the bounded delta changes" relies on the delta/fingerprint asymmetry
+  (a non-received suggestion moves the delta but not the fingerprint); if the delta
+  is ever aligned to the fingerprint's received-only filter, that test's premise
+  disappears and it must be rewritten. (ii) `tests/unit/migration-052-*.test.js`
+  pins the acknowledged-drift CHECK tokens but not the legacy all-NULL branch.
+  (iii) `stale_inputs_acknowledged_by` renders as a raw system-user GUID in the
+  Workbench distribution history; a server-side actor-name projection is needed.
+  (iv) `FinalWriteupTab.js` still shows the generic `final_writeup_source_missing`
+  copy; the Site Visit prerequisite wording lives only on the Staff Deliberations
+  Pre-Site card. (v) The tab's `beyond` banner derives from the brief while the
+  Pre-Site card stays live. (vi) `PreSiteDistributionPanel.js` defaults-seeding
+  `setForm` bypasses the `staleInputs` reset (unreachable in practice).
+  (vii) A malformed brief snapshot disables Share with the "no received reviews"
+  reason, while the server would refuse with `brief_snapshot_invalid`; project a
+  tri-state or reword. (viii) The restored tab test "a late response for a prior
+  request cannot publish a stale Word link" guards React remount, not
+  `generate()`'s sequence guard; rename or add an unmount-mid-generate case.
+  (ix) Regenerate on a brief already **sent** to the Board is deliberately not
+  offered (slice 5 round 2); if the owner wants it, it needs the guarded-reopen
+  treatment (typed request number, reason, audit), not a menu item.
+
+## 9. Build-loop handoff (paused 2026-09-16, Session 515; resumed and completed Session 516)
 
 Owner-directed loop: Sonnet builds, Opus reviews (max 3 rounds per group, structured
 APPROVE/CHANGES verdicts, mutation-checked), controller reviews at the end, then Codex
@@ -569,18 +592,17 @@ adversarial review. Paused at the owner's request after the slice-4 build report
 |---|---|---|
 | Slices 1–2 | APPROVED (3 rounds; template metadata scrubbed, slice-2 commit replaced before any push) | `66cd2eb2`, `538388f2`, `c6f4a95c`, `eec8311d` |
 | Slice 3 | APPROVED (2 rounds) | `1b0eab56`, `8320d9ec`, `4bc38700` |
-| Slice 4 | BUILT, **awaiting Opus round 1** | `d08ae753` (code), `4dbef6d7` (docs) |
-| Slice 5 | not started | — |
-| Slice 6 | not started | — |
+| Slice 4 | APPROVED (2 rounds; round 1 found no code defect, six test-teeth gaps and the missing delta hash binding) | `d08ae753` (code), `4dbef6d7` (docs), `6a03389d` |
+| Slice 5 | APPROVED after 3 rounds (round 1: legacy-rail regression, missing Board notice, unmirrored B10 gate; round 2: Regenerate narrowed to shared-not-sent; round 3 verified by the controller with a mutation check) | `77e662b8`, `c3e8af10`, `89d92ccf` |
+| Slice 6 | DONE (docs reconcile, this commit) | see `git log` |
 
-Branch is unpushed. Working tree clean apart from a pre-existing hook edit to
-`.claude-memory/feedback-codex-delegation-review-vs-rescue-routing.md` (not part of this work).
+Branch was pushed at the pause; the Session 516 commits are pushed with the PR.
 
 **Production schema: DONE 2026-09-16 (owner-run).** Picklist value `100000009` inserted and
 re-read; relationship `wmkf_request_currentprerpbrief` created under
 `DATAVERSE_PROD_WRITE_ACK`; preflight `--target=prod` reports 43 exact / 0 absent / 0 divergent.
-Atlas pages and plan §3 still say `[PLANNED]` — slice 6 reconciles that. Migration 052 is
-**not** applied to any database.
+Atlas, matrix, file-model, briefing-plan, wiki, and work-queue restatements were reconciled
+in slice 6. Migration 052 is **not** applied to any database.
 
 **Resume steps:**
 1. `git checkout claude/pre-rp-brief`; confirm HEAD `4dbef6d7`.

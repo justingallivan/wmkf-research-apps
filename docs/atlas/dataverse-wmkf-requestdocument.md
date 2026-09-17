@@ -438,9 +438,9 @@ label explicitly non-wrapping under another generation identity. Signed-in
 current-status, compact actions/download, and Word Online v3 proof remain open;
 this was never a registry consistency failure.
 
-## Pre-Research Presentation Brief contract (planned, slices 1-3)
+## Pre-Research Presentation Brief contract (schema live; code built on `claude/pre-rp-brief`, slices 1-5)
 
-`[PLANNED — schema not yet applied to Production]`
+`[VERIFIED LIVE 2026-09-16 — owner-run insert and re-read; preflight --target=prod 43 exact / 0 absent / 0 divergent]`
 `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §3, §5
 slices 1-2. Artifact type option `Pre-Research Presentation Brief =
 100000009` is added by the sibling script
@@ -465,12 +465,12 @@ A second, independent Wave 16 schema-as-code record,
 relationship `wmkf_request_currentprerpbrief`) — the request-level canonical
 pointer for the brief, shaped exactly like
 `wmkf_currentinitialassessment`/`wmkf_request_currentinitialassessment`
-above. Both records are applied (still pending, owner-run) via
+above. Both records were applied to Production by the owner on 2026-09-16 (picklist value inserted and re-read; relationship created under `DATAVERSE_PROD_WRITE_ACK`) via
 `node scripts/apply-dataverse-schema.js --target=<target>
 --wave=16-request-document-registry --execute`, same as every other file in
 this directory.
 
-Once live, brief rows reuse the Pre-Site Visit registry's write-once
+Brief rows reuse the Pre-Site Visit registry's write-once
 `wmkf_presiteinputsnapshotjson` / `wmkf_inputfingerprint` fields (§ above) for
 their own self-describing envelope
 `{ schemaVersion: 1, artifactType: 'pre-rp-brief', request, reviews }` rather
@@ -478,7 +478,7 @@ than adding a third Dataverse field — safe because every current raw-field
 reader of that snapshot column asserts/filters `PRE_SITE_VISIT` before
 parsing (plan §7 finding, `lib/services/pre-site-visit/artifact-service.js`).
 Canonical/pending pointer-resolution and generation code is built on
-`claude/pre-rp-brief` (not deployed; the schema above is not yet live):
+`claude/pre-rp-brief` **[BUILT on claude/pre-rp-brief — not merged, not deployed]** (the schema above is live):
 `lib/services/pre-rp-brief/input-service.js` (request/roster -> envelope,
 fails closed with "Add the abstract on the Reviews tab first." when
 `wmkf_abstract` is empty), `lib/services/pre-rp-brief/artifact-service.js`
@@ -491,9 +491,23 @@ deterministic), and `lib/services/pre-rp-brief/share-lock-service.js`
 Draft-to-Review lock; no review gate — that is slice 4's prepare-time gate).
 Routes `pages/api/workbench/pre-rp-brief.js` (GET status, POST generate) and
 `pages/api/workbench/pre-rp-brief/lock-for-share.js` (POST) are registered
-in `docs/API_ROUTE_SECURITY_MATRIX.md` as `[PLANNED — not yet deployed]`.
-Distribution-source swap, the prepare-time review/drift gate, and migration
-052 remain slice 4.
+in `docs/API_ROUTE_SECURITY_MATRIX.md` as source-built, deployment pending.
+Slice 4 (built, same branch) swaps the distribution source to the current
+brief (`akoya_request._wmkf_currentprerpbrief_value`; distribution snapshot
+rows created by `ensureSnapshot` now carry artifact type `100000009`) and adds
+the prepare-time gate in `lib/services/pre-site-visit/distribution-service.js`:
+zero received reviews in the stored generation snapshot fails closed as
+`brief_reviews_required`; live-input drift returns 409 `brief_inputs_stale`
+with both fingerprints and a bounded delta, retryable only with
+`acknowledgeStaleInputs` equal to the returned live fingerprint; both
+fingerprints, the delta, and the acknowledgement are bound into `draftHash`
+and `previewHash`. The acknowledgement persists on the Postgres attempt row
+via migration `052_pre_site_distribution_brief_inputs.sql`
+**[PLANNED — file on branch, not applied to any database; apply via
+`node scripts/apply-migrations.js` after merge]**. Slice 5 (built, same
+branch) adds the brief card, explicit Start Site Visit action, composite stage
+projection, cycle-list union, drift-confirmation retry UI, and the timestamp-only
+Board notice on the briefing page.
 
 The DOCX template — `shared/templates/pre-research-presentation-brief/brief-v1.docx`
 (tracked, six single-occurrence placeholders: `[[DV:InstitutionName]]`,
@@ -507,7 +521,7 @@ composes the referee paragraph from the same deterministic
 Pre-Site writeup use (`shared/utils/review-writeup-paragraphs.js`); it also
 exports `briefInputFingerprint`, a pure sha256-over-stable-keys function of
 that same envelope with reviews ordered by `compareReviewersByName`, for the
-future prepare-time drift gate (plan §3.4b).
+prepare-time drift gate (plan §3.4b).
 
 ## Retry and partial-success behavior
 

@@ -458,7 +458,7 @@ document inventory, and individual implementation plans do not establish priorit
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
 - Frozen Pre-Site distribution (**owner-decided and Production-proved
-  2026-08-24 on Request `1002379`**): the send is explicit and
+  2026-08-24 on Request `1002379`**; since Pre-RP Brief slice 4, **[BUILT on `claude/pre-rp-brief` — not merged, not deployed]**, the distributed document is the Pre-Research Presentation Brief, not the Pre-Site writeup — `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`): the send is explicit and
   informational, never a handoff side effect. It first retains an exact Word
   snapshot, optionally derives PDF from that immutable item, and lets staff
   attach DOCX, PDF, or both. Recipients are known staff/consultants entered by

@@ -270,7 +270,20 @@ manual cleanup resolves the overflow.
 ### Writeup lineage and distribution
 
 The three governed writeup documents are Initial Assessment, Pre Site Visit,
-and Final. There is no separate Site Visit Writeup. During the visit stage, the
+and Final, joined by a fourth governed artifact that is not a writeup: the
+Pre-Research Presentation Brief (artifact type `100000009`, request pointer
+`akoya_request.wmkf_CurrentPreRPBrief`; schema live in Production 2026-09-16,
+code **[BUILT on `claude/pre-rp-brief` — not merged, not deployed]**, plan
+`docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`). The brief is
+rendered deterministically from the tracked template
+`shared/templates/pre-research-presentation-brief/brief-v1.docx` with no prompt
+or model call, stores its generation input snapshot and fingerprint on the row,
+takes a one-time Draft→Review lock when staff first Share, and is superseded —
+never edited in place — by Regenerate. It is the document the Board
+distribution and the deliberation briefing page serve; the Pre-Site writeup
+remains the PD's Word workspace and the sole source of the Final Writeup, and
+the Site Visit transition is an explicit staff action on the Pre-Site card
+rather than a side effect of Share. There is no separate Site Visit Writeup. During the visit stage, the
 Pre-Site Word document remains the PD's workspace and site observations are
 entered directly into it; SharePoint preserves those edits as native versions.
 The Final Writeup is created from the exact current Pre-Site version available
