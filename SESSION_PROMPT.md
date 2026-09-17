@@ -6,8 +6,9 @@
 > (17 suites / 439 tests green) and a CI-only fixture timeout in `review-bundle-service.test.js`
 > was fixed in `8f8cfc1b`. **Smoke run 2026-09-17 (S517) on ZZTEST-03:** generate, lock, share, briefing page,
 > email link, drift detection, and guarded regeneration passed; the post-share resend and the Board's
-> Staff Brief download fail with a snapshot hash mismatch (P1, plan §12 Finding A). Remaining:
-> Finding A, the owner decisions below.
+> Staff Brief download failed with a snapshot hash mismatch (P1, plan §12 Finding A), **fixed the
+> same day: PR #313 merged `b5af962b`, deployed, and smoked on ZZTEST-03.** Remaining: the owner
+> decisions below.
 
 ## Session 516 Summary
 
@@ -96,23 +97,18 @@ the orchestrator built Step A directly and fixed builder gaps itself.
    share with bundle, briefing page + bundle PDF, email link (owner confirmed), drift
    detection, guarded regeneration. Not run: bundle rebuild after a new review.
    Failed: post-share resend and Board Staff Brief download (item 5).
-5. **P1 — retained Word snapshot fails its identity check on reuse.** Evidence: plan §12
-   Finding A. `validateReadySnapshot` in `lib/services/pre-site-visit/distribution-service.js`
-   409s on every second prepare for the same Word version, and the briefing page's
-   `writeup-docx` member 409s `snapshot_mismatch`, so the Board cannot download the brief.
-   Source unchanged (generation key matched); the retained SharePoint copy differs from the
-   uploaded bytes because SharePoint rewrites Office packages on upload (wiki
-   `dataverse-dynamics.md`). Discriminator [VERIFIED]: 1002903's brief-based share works and
-   was at SharePoint version 3.0 (edited in Word before sharing); both failing ZZTEST-03
-   shares were at version 1.0, raw renderer output. Only briefs shared without a Word save
-   break (plan §12). The byte-hash checks in `validateReadySnapshot` and
-   `resolveBriefingMember` now compare the governed content hash. Branch
-   `claude/pre-rp-brief-snapshot-hash` (5 commits over `eece40b0`) is pushed as PR #313
-   against `main` after three Codex adversarial rounds (plan §12). Until it merges and
-   deploys, staff must open and save the brief in Word before sharing. After deploy, smoke
-   ZZTEST-03's Staff Brief link and "Send the deliberation email again" (no data change).
-4. **DONE 2026-09-17 — `docs/CURRENT_WORK_QUEUE.md` row 12** re-edited after the merges
-   and the smoke; it now gates on plan §12 Finding A and the email-link check.
+5. **DONE 2026-09-17 — P1 retained Word snapshot identity fixed, shipped, smoked.** Cause:
+   SharePoint rewrites a generated `.docx` after upload, so the pinned package byte hash
+   stopped matching and every brief shared without a Word save failed resend, the Board's
+   Staff Brief download, and docx-attached sends (1002903 worked because it was Word-saved,
+   version 3.0). Fix: governed content hash (`hashGovernedDocxContent`, hardened with full
+   OPC traversal) replaces byte identity in snapshot reuse, recovery, re-capture, send
+   attachments, and the ledger-bound briefing download. PR #313 merged `b5af962b` after
+   three Codex adversarial rounds and one Codex build; deployment
+   `dpl_4DVSPjkWg8cp693qyw4gvrG7m7VQ` Ready; ZZTEST-03's Staff Brief download and
+   same-version re-preview pass with no data change. Full record: plan §12.
+4. **DONE 2026-09-17 — `docs/CURRENT_WORK_QUEUE.md` row 12** re-edited after the merges,
+   the smoke, and the Finding A fix; row 12 is now met.
 
 ### Owner Decision Needed
 

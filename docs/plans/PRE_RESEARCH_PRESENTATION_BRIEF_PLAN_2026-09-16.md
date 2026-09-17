@@ -1349,6 +1349,13 @@ abstract edit and authorized the send and the download.
   and the retry re-captures and finalizes self-consistently. Tests: store SQL parameters;
   harness double models the fence; an interleaving test where B's capture lands after A's
   (A fails closed, retry succeeds). All three fail on the prior code.
+  **Shipped and smoked (2026-09-17).** PR #313 merged as `b5af962b`; Production deployment
+  `dpl_4DVSPjkWg8cp693qyw4gvrG7m7VQ` Ready and confirmed against the merge commit via the
+  GitHub deployments API. Post-deploy smoke on ZZTEST-03 with no data change: the briefing
+  page's Staff Brief download served (30,823-byte `.docx`, previously 409
+  `snapshot_mismatch`), and a second Create preview on the same Word version 1.0 returned 200
+  with the preview rendered (previously 409 `distribution_word_snapshot_hash_mismatch`); no
+  email was sent. The interim "save in Word before sharing" rule is lifted.
   Post-upload byte re-reading was rejected because the rewrite lands after
   prepare's metadata read (`stableUploadedMetadata` requires the uploaded size), so a
   pinned served hash would go stale minutes later.
