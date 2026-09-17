@@ -4,6 +4,16 @@
  * Node environment: the service now imports the deliberation briefing link
  * service, whose token primitive resolves `jose` to its Node build.
  */
+// Plan §11 (Step C1): wrap the real `assembleReviewBundle` in a jest.fn so
+// tests can assert call count/arguments while every other test in this
+// suite still exercises the real assembly logic end to end.
+jest.mock('../../lib/services/pre-site-visit/review-bundle-service.js', () => {
+  const actual = jest.requireActual('../../lib/services/pre-site-visit/review-bundle-service.js');
+  return {
+    ...actual,
+    assembleReviewBundle: jest.fn(actual.assembleReviewBundle),
+  };
+});
 import {
   BRIEFING_LINK_PLACEHOLDER,
   distributionBodyHtml,
@@ -14,6 +24,8 @@ import {
   projectDistributionAttempt,
   sendPreSiteDistribution,
 } from '../../lib/services/pre-site-visit/distribution-service';
+import { assembleReviewBundle } from '../../lib/services/pre-site-visit/review-bundle-service.js';
+import { PRE_SITE_DISTRIBUTION_CONTRACT as REVIEW_BUNDLE_PRODUCER_CONTRACT } from '../../shared/config/requestDocument.js';
 import {
   PRE_RP_BRIEF_CONTRACT,
   PRE_SITE_VISIT_CONTRACT,
@@ -24,6 +36,18 @@ import {
 } from '../../shared/config/requestDocument.js';
 import { DELIBERATION_SHARE_SEED_BRIEFING_COPY } from '../../shared/config/deliberationShareEmail.js';
 import { briefInputFingerprint } from '../../lib/services/pre-rp-brief/docx-renderer.js';
+import { PDFDocument } from 'pdf-lib';
+
+// A real, parseable one-page PDF (plan §11, Step C1): `assembleReviewBundle`
+// calls `PDFDocument.load` on every part, so the magic-byte-only fixture
+// used elsewhere in this suite (`Buffer.from('%PDF-frozen-bytes')`) is not
+// sufficient for the review bundle's default happy path.
+let REVIEW_PART_PDF;
+beforeAll(async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([200, 200]);
+  REVIEW_PART_PDF = Buffer.from(await doc.save());
+});
 
 // A minimal, valid Pre-RP Brief input envelope (plan §3.4a shape) with one
 // received review, used as the "generated" snapshot stored on a source row
@@ -52,6 +76,12 @@ function briefEnvelope(overrides = {}) {
         reviewerAffiliation: 'Test University',
         mainInstitution: 'Test University',
         affiliation: 'Test University',
+        // Plan §11 (Step C1): a retained review file, so the review bundle
+        // gate's happy path (assembleReviewBundle needs at least one
+        // received review with a file) holds for every test that doesn't
+        // deliberately override it.
+        reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_1',
+        reviewFilename: 'review-1.pdf',
       },
     ],
     ...overrides,
@@ -309,6 +339,12 @@ function createPrepareHarness({
   let uuidSequence = 6;
   let settledWordVersion = settledWordVersionId;
   let settledWordETag = 'word-etag';
+  // Plan §11 (Step C1): the review bundle's assembled bytes, tracked by
+  // itemId so getFileMetadataById/downloadFile can serve back exactly what
+  // was uploaded (its size varies with the review set, unlike the fixed
+  // sourceBytes/pdfBytes used for the word/pdf snapshots).
+  let uploadedBundleBytes = null;
+  let uploadedBundleFilename = 'bundle.pdf';
 
   const metadata = (itemId, versionId, eTag, size, name) => ({
     siteId: 'snapshot-site',
@@ -422,11 +458,21 @@ function createPrepareHarness({
     }),
     ensureFolderPath: jest.fn(async () => undefined),
     getFileMetadataByPath: jest.fn(async () => null),
-    uploadFile: jest.fn(async (_library, _folder, filename, buffer, contentType) => (
-      contentType === PRE_SITE_VISIT_CONTRACT.contentType
-        ? metadata('word-snapshot', 'ctag-provisional', provisionalWordETag, buffer.length, filename)
-        : metadata('pdf-snapshot', 'ctag-pdf', 'pdf-etag', buffer.length, filename)
-    )),
+    // Plan §11 (Step C1): the default review file is `review-1.pdf`
+    // (briefEnvelope's default review), so assembleReviewBundle's happy
+    // path downloads it directly rather than converting via Graph.
+    downloadFileByPath: jest.fn(async () => ({ buffer: REVIEW_PART_PDF })),
+    uploadFile: jest.fn(async (_library, _folder, filename, buffer, contentType) => {
+      if (contentType === PRE_SITE_VISIT_CONTRACT.contentType) {
+        return metadata('word-snapshot', 'ctag-provisional', provisionalWordETag, buffer.length, filename);
+      }
+      if (/ - Reviews - /.test(filename)) {
+        uploadedBundleBytes = buffer;
+        uploadedBundleFilename = filename;
+        return metadata('bundle-snapshot', 'ctag-bundle', 'bundle-etag', buffer.length, filename);
+      }
+      return metadata('pdf-snapshot', 'ctag-pdf', 'pdf-etag', buffer.length, filename);
+    }),
     getFileMetadataById: jest.fn(async (driveId, itemId) => {
       if (driveId === 'source-drive' && itemId === 'source-item') {
         return {
@@ -449,9 +495,16 @@ function createPrepareHarness({
       if (itemId === 'pdf-snapshot') {
         return metadata(itemId, '1.0', 'pdf-etag', pdfBytes.length, 'snapshot.pdf');
       }
+      if (itemId === 'bundle-snapshot') {
+        return metadata(itemId, '1.0', 'bundle-etag', uploadedBundleBytes ? uploadedBundleBytes.length : 0, uploadedBundleFilename);
+      }
       return null;
     }),
-    downloadFile: jest.fn(async () => ({ buffer: sourceBytes, filename: sourceRow.wmkf_filename })),
+    downloadFile: jest.fn(async (_driveId, itemId) => (
+      itemId === 'bundle-snapshot'
+        ? { buffer: uploadedBundleBytes, filename: uploadedBundleFilename }
+        : { buffer: sourceBytes, filename: sourceRow.wmkf_filename }
+    )),
     downloadFileVersion: jest.fn(),
     downloadFileAsPdf: jest.fn(async () => pdfBytes),
     hashDocx: jest.fn(async () => sourceHash),
@@ -480,6 +533,15 @@ function createPrepareHarness({
         calendar_content_type: prepared.calendar?.contentType || null,
         calendar_byte_hash: prepared.calendar?.byteHash || null,
         calendar_size: prepared.calendar?.size || null,
+        review_bundle_document_id: prepared.reviewBundle?.documentId || null,
+        review_bundle_drive_id: prepared.reviewBundle?.driveId || null,
+        review_bundle_item_id: prepared.reviewBundle?.itemId || null,
+        review_bundle_version_id: prepared.reviewBundle?.versionId || null,
+        review_bundle_filename: prepared.reviewBundle?.filename || null,
+        review_bundle_size: prepared.reviewBundle?.size || null,
+        review_bundle_byte_hash: prepared.reviewBundle?.byteHash || null,
+        review_bundle_set_fingerprint: prepared.reviewBundle?.setFingerprint || null,
+        review_bundle_review_count: prepared.reviewBundle?.reviewCount || null,
       };
       if (dedupeAttempts) attemptsByOperationId.set(attempt.operation_id, attempt);
       return attempt;
@@ -643,9 +705,10 @@ describe('prepare-time review/drift gate (plan §3.4b)', () => {
     );
     expect(second.reused).toBe(true);
     expect(second.attempt.attemptId).toBe(first.attempt.attemptId);
-    // Only the first call built new snapshot documents; the retry recovered
-    // the prepared attempt without doing that file work again.
-    expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(2);
+    // Only the first call built new snapshot documents (docx, pdf, and the
+    // review bundle); the retry recovered the prepared attempt without
+    // doing that file work again.
+    expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(3);
   });
 
   test('the same operation id with a different acknowledgement conflicts instead of silently reusing the prior attempt', async () => {
@@ -818,9 +881,9 @@ test('prepare persists native Graph publication versions instead of provisional 
   expect(result.attempt.state).toBe('prepared');
   expect(result.attempt.attachments).toEqual([]);
   const pinned = harness.dependencies.recordPrepared.mock.calls[0][1];
-  expect([pinned.docx.versionId, pinned.pdf.versionId]).toEqual(['1.0', '1.0']);
+  expect([pinned.docx.versionId, pinned.pdf.versionId, pinned.reviewBundle.versionId]).toEqual(['1.0', '1.0', '1.0']);
   expect(harness.snapshots.map((row) => row.wmkf_sharepointversionid))
-    .toEqual(['1.0', '1.0']);
+    .toEqual(['1.0', '1.0', '1.0']);
 });
 
 test('prepare accepts the settled stable-ID eTag when the upload response eTag is provisional', async () => {
@@ -2280,4 +2343,138 @@ test('a retry of a send-requested attempt reconciles an accepted Dynamics send b
   expect(result.reused).toBe(true);
   expect(dependencies.getLiveBriefingLink).not.toHaveBeenCalled();
   expect(dependencies.sendEmail).not.toHaveBeenCalled();
+});
+
+async function onePagePdfBuffer(label) {
+  const { PDFDocument: LocalPDFDocument } = await import('pdf-lib');
+  const doc = await LocalPDFDocument.create();
+  const page = doc.addPage([200, 200]);
+  page.drawText(label, { x: 10, y: 10, size: 10 });
+  return Buffer.from(await doc.save());
+}
+
+describe('review bundle (plan §11, Step C1)', () => {
+  beforeEach(() => {
+    assembleReviewBundle.mockClear();
+  });
+
+  test('prepare calls assembleReviewBundle exactly once with the live received reviews, creates the bundle registry row with the institution-led filename (no request number), and persists the nine columns', async () => {
+    const harness = createPrepareHarness();
+    const result = await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+
+    expect(assembleReviewBundle).toHaveBeenCalledTimes(1);
+    const [callArgs] = assembleReviewBundle.mock.calls[0];
+    expect(callArgs.reviews).toEqual(briefEnvelope().reviews);
+    expect(callArgs.institutionName).toBe('Test Institution');
+
+    const bundleDoc = harness.dependencies.createDocument.mock.calls
+      .map((call) => call[0])
+      .find((payload) => payload.wmkf_producer === `${REVIEW_BUNDLE_PRODUCER_CONTRACT.producerPrefix}-review-bundle`);
+    expect(bundleDoc).toBeDefined();
+    expect(bundleDoc.wmkf_templateid).toBe('pdf-lib-review-bundle');
+    expect(bundleDoc.wmkf_name).toBe('1002379 frozen review bundle');
+    expect(bundleDoc.wmkf_filename).toMatch(/^Test Institution - Reviews - [0-9a-f]{8}\.pdf$/);
+    expect(bundleDoc.wmkf_filename).not.toContain('1002379');
+
+    const persisted = harness.dependencies.recordPrepared.mock.calls[0][1];
+    expect(persisted.reviewBundle).toMatchObject({
+      documentId: expect.any(String),
+      driveId: 'snapshot-drive',
+      itemId: 'bundle-snapshot',
+      versionId: '1.0',
+      filename: bundleDoc.wmkf_filename,
+      size: expect.any(Number),
+      byteHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      setFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+      reviewCount: 1,
+    });
+    expect(result.attempt.reviewBundle).toMatchObject({
+      filename: bundleDoc.wmkf_filename,
+      reviewCount: 1,
+      setFingerprint: persisted.reviewBundle.setFingerprint,
+    });
+    // No drive/item ids to the client.
+    expect(JSON.stringify(result.attempt.reviewBundle)).not.toMatch(/drive|item/i);
+  });
+
+  test('draftHash and previewHash both change when the review set changes, isolated from the brief input fingerprint (same reviewer identity, only the retained file changes)', async () => {
+    const base = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput(), base.dependencies);
+    const baseDraftHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+    const basePreviewHash = base.dependencies.recordPrepared.mock.calls[0][1].previewHash;
+
+    // Only `reviewFilename` changes; every REVIEW_FINGERPRINT_FIELDS field
+    // (suggestionId, name, academicRank, ...) is identical, so
+    // briefInputFingerprint (and therefore every other draftHash/previewHash
+    // input) is unchanged — the review-set identity is the only thing that
+    // can move either hash here.
+    const [baseReview] = briefEnvelope().reviews;
+    const movedFileEnvelope = briefEnvelope({
+      reviews: [{ ...baseReview, reviewFilename: 'review-1-v2.pdf' }],
+    });
+    expect(briefInputFingerprint(movedFileEnvelope)).toBe(briefInputFingerprint(briefEnvelope()));
+    const moved = createPrepareHarness({
+      briefGate: briefGateFixture({ generated: movedFileEnvelope, live: movedFileEnvelope }),
+    });
+    await preparePreSiteDistribution(
+      prepareInput({ operationId: '55555555-5555-4555-8555-555555555555' }),
+      moved.dependencies,
+    );
+    const movedDraftHash = moved.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+    const movedPreviewHash = moved.dependencies.recordPrepared.mock.calls[0][1].previewHash;
+
+    expect(movedDraftHash).not.toBe(baseDraftHash);
+    expect(movedPreviewHash).not.toBe(basePreviewHash);
+  });
+
+  test('previewHash changes when only the bundle byte hash changes (same review set, different bytes at the same path)', async () => {
+    const base = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput(), base.dependencies);
+    const baseDraftHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+    const basePreviewHash = base.dependencies.recordPrepared.mock.calls[0][1].previewHash;
+
+    const changedBytes = createPrepareHarness();
+    const differentPdf = await onePagePdfBuffer('different-content');
+    changedBytes.dependencies.downloadFileByPath = jest.fn(async () => ({ buffer: differentPdf }));
+    await preparePreSiteDistribution(
+      prepareInput({ operationId: '66666666-6666-4666-8666-666666666666' }),
+      changedBytes.dependencies,
+    );
+    const changedDraftHash = changedBytes.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+    const changedPreviewHash = changedBytes.dependencies.recordPrepared.mock.calls[0][1].previewHash;
+
+    // The review SET (paths/filenames) is unchanged, so draftHash (which
+    // binds only the set fingerprint) is unaffected; previewHash binds the
+    // exact bundle byte hash, so it changes.
+    expect(changedDraftHash).toBe(baseDraftHash);
+    expect(changedPreviewHash).not.toBe(basePreviewHash);
+  });
+
+  test('a bundle failure (Graph unavailable) leaves the attempt un-prepared and surfaces the bundle error code', async () => {
+    const harness = createPrepareHarness();
+    harness.dependencies.downloadFileByPath = jest.fn(async () => { throw new Error('Graph is down'); });
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({ code: 'review_bundle_unavailable', httpStatus: 502 });
+    expect(harness.dependencies.recordPrepared).not.toHaveBeenCalled();
+    expect(harness.dependencies.createOrGetAttempt).toHaveBeenCalled();
+  });
+
+  test('a bundle failure (no received review has a file) leaves the attempt un-prepared and surfaces review_bundle_empty', async () => {
+    const noFileEnvelope = briefEnvelope({
+      reviews: [{
+        suggestionId: 'reviewer-1',
+        reviewReceivedAt: '2026-09-01T00:00:00Z',
+        name: 'Reviewer One',
+        affiliation: 'Test University',
+        reviewSharePointFolder: null,
+        reviewFilename: null,
+      }],
+    });
+    const harness = createPrepareHarness({
+      briefGate: briefGateFixture({ generated: noFileEnvelope, live: noFileEnvelope }),
+    });
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({ code: 'review_bundle_empty', httpStatus: 409 });
+    expect(harness.dependencies.recordPrepared).not.toHaveBeenCalled();
+  });
 });

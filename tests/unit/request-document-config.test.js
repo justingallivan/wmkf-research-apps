@@ -47,6 +47,9 @@ it('recognizes only the exact frozen-distribution producer namespace', () => {
   expect(isPreSiteDistributionSnapshot({
     wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-pdf`,
   })).toBe(true);
+  expect(isPreSiteDistributionSnapshot({
+    wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-review-bundle`,
+  })).toBe(true);
   expect(isPreSiteDistributionSnapshot({ wmkf_producer: PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix }))
     .toBe(false);
   expect(isPreSiteDistributionSnapshot({

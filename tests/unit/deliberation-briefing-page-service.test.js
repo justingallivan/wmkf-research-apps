@@ -5,6 +5,7 @@
  * @jest-environment node
  */
 import { buildBriefingContext, resolveBriefingMember } from '../../lib/services/deliberation-briefing/briefing-page-service';
+import { PRE_SITE_DISTRIBUTION_CONTRACT } from '../../shared/config/requestDocument.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RECEIVED_ID = '22222222-2222-4222-8222-222222222222';
@@ -15,16 +16,20 @@ const SLIDES_ID = '55555555-5555-4555-8555-555555555555';
 const RECORDING_ID = '66666666-6666-4666-8666-666666666666';
 const WRITEUP_ROW_ID = '77777777-7777-4777-8777-777777777777';
 const FOREIGN_MATERIAL_ID = '88888888-8888-4888-8888-888888888888';
+const REVIEW_BUNDLE_ROW_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 // Registry rows: one servable deck, one oversize recording (listed, not
-// served), the writeup row itself (never a material), and a foreign request's
-// slides (never in this request's set).
+// served), the writeup row itself (never a material), a foreign request's
+// slides (never in this request's set), and a review-bundle snapshot row
+// that (defense-in-depth) shares a materials-eligible artifact type but
+// must still be excluded by `isPreSiteDistributionSnapshot`.
 function materialRows() {
   return [
     { wmkf_requestdocumentid: SLIDES_ID, _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: 100000003, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Applicant Slides.pdf', wmkf_filesize: 2048, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'slides-item' },
     { wmkf_requestdocumentid: RECORDING_ID, _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: 100000005, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Visit.mp4', wmkf_filesize: 900 * 1024 * 1024, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'recording-item' },
     { wmkf_requestdocumentid: WRITEUP_ROW_ID, _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: 100000001, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Writeup.docx', wmkf_filesize: 100, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'writeup-item' },
     { wmkf_requestdocumentid: FOREIGN_MATERIAL_ID, _wmkf_request_value: FOREIGN_ID, wmkf_artifacttype: 100000003, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Other.pdf', wmkf_filesize: 100, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'other-item' },
+    { wmkf_requestdocumentid: REVIEW_BUNDLE_ROW_ID, _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: 100000003, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Test Institution - Reviews - aaaaaaaa.pdf', wmkf_filesize: 4096, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'bundle-item', wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-review-bundle` },
   ];
 }
 
@@ -279,10 +284,18 @@ test('materials: the context lists this request\'s Ready applicant/visit files b
     { member: `material:${SLIDES_ID}`, label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true, inline: true },
     { member: `material:${RECORDING_ID}`, label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false, inline: false },
   ]);
-  expect(JSON.stringify(context.materials)).not.toMatch(/drive|item|sharepoint|Writeup\.docx|Other\.pdf/i);
+  expect(JSON.stringify(context.materials)).not.toMatch(/drive|item|sharepoint|Writeup\.docx|Other\.pdf|Reviews - aaaaaaaa/i);
   // A registry failure leaves the section empty rather than failing the page.
   const broken = deps({ findDocuments: jest.fn(async () => { throw new Error('dataverse down'); }) });
   expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, broken)).materials).toEqual([]);
+});
+
+test('materials: a review-bundle snapshot row is excluded even when its artifact type would otherwise be eligible', async () => {
+  const d = deps();
+  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
+  expect(context.materials.map((material) => material.member)).not.toContain(`material:${REVIEW_BUNDLE_ROW_ID}`);
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `material:${REVIEW_BUNDLE_ROW_ID}` }, deps()))
+    .rejects.toMatchObject({ httpStatus: 404 });
 });
 
 test('materials: a member in the eligible set downloads the registry row\'s file; writeup, foreign, oversize, and unknown ids are 404 before any Graph call', async () => {

@@ -23,6 +23,10 @@ const briefInputsMigration = fs.readFileSync(
   path.join(ROOT, 'lib/db/migrations/052_pre_site_distribution_brief_inputs.sql'),
   'utf8',
 );
+const reviewBundleMigration = fs.readFileSync(
+  path.join(ROOT, 'lib/db/migrations/053_pre_site_distribution_review_bundle.sql'),
+  'utf8',
+);
 
 const CONSTRAINT_NAMES = [
   'pre_site_distribution_mode_check',
@@ -116,6 +120,31 @@ test('migration 052 and fresh install declare the same Pre-RP Brief prepare-gate
   }
 });
 
+test('migration 053 and fresh install declare the same review bundle retention columns and constraints', () => {
+  for (const column of [
+    'review_bundle_document_id',
+    'review_bundle_drive_id',
+    'review_bundle_item_id',
+    'review_bundle_version_id',
+    'review_bundle_filename',
+    'review_bundle_size',
+    'review_bundle_byte_hash',
+    'review_bundle_set_fingerprint',
+    'review_bundle_review_count',
+    'review_bundle_rebuilt_at',
+  ]) {
+    expect(reviewBundleMigration).toContain(column);
+    expect(setup).toContain(column);
+  }
+  for (const name of [
+    'pre_site_distribution_review_bundle_shape',
+    'pre_site_distribution_review_bundle_coherence',
+  ]) {
+    expect(reviewBundleMigration).toContain(`CONSTRAINT ${name}`);
+    expect(setup).toContain(`CONSTRAINT ${name}`);
+  }
+});
+
 function extractCheckBody(source, constraintName) {
   const marker = `CONSTRAINT ${constraintName} CHECK (`;
   const start = source.indexOf(marker);
@@ -149,6 +178,17 @@ test('migration 052 and fresh install declare byte-identical CHECK predicates fo
     'pre_site_distribution_brief_inputs_coherence',
   ]) {
     const migrationBody = normalizeSql(extractCheckBody(briefInputsMigration, name));
+    const setupBody = normalizeSql(extractCheckBody(setup, name));
+    expect(setupBody).toEqual(migrationBody);
+  }
+});
+
+test('migration 053 and fresh install declare byte-identical CHECK predicates for the review bundle constraints', () => {
+  for (const name of [
+    'pre_site_distribution_review_bundle_shape',
+    'pre_site_distribution_review_bundle_coherence',
+  ]) {
+    const migrationBody = normalizeSql(extractCheckBody(reviewBundleMigration, name));
     const setupBody = normalizeSql(extractCheckBody(setup, name));
     expect(setupBody).toEqual(migrationBody);
   }
