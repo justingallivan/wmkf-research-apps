@@ -169,7 +169,11 @@ const defaultFor = {
   briefLock: () => response({ success: true, artifact: briefArtifact(REVIEW), reused: false }),
   startSiteVisit: () => response({ success: true, artifact: preSiteArtifact(REVIEW) }),
   reopen: () => response({ success: true, artifact: preSiteArtifact(DRAFT), reused: false }),
-  briefGet: () => statusResponse(),
+  // NEW-5 (Opus round 2): the default brief GET reports no brief rows at
+  // all, so Pre-Site-only tests exercise the production
+  // no-brief-rows-at-all branch (H1/§3.5) rather than an ambiguous
+  // "briefGet defaults were never queued" state.
+  briefGet: () => statusResponse({ hasBriefRows: false }),
   briefPost: () => response({ success: true, artifact: briefArtifact(DRAFT) }),
   presiteGet: () => statusResponse(),
   presitePost: () => response({ success: true, artifact: preSiteArtifact(DRAFT) }),
@@ -263,6 +267,29 @@ test('M4: Start Site Visit requires the Pre-Site row to be Draft (not offered on
   await screen.findByRole('link', { name: 'Open working document' });
   expect(screen.queryByRole('button', { name: 'Start Site Visit' })).not.toBeInTheDocument();
   expect(calls('startSiteVisit')).toHaveLength(0);
+});
+
+test('NEW-2: Start Site Visit is disabled while a Pre-Site regeneration is in flight', async () => {
+  let resolvePost;
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'presitePost') return new Promise((resolve) => { resolvePost = resolve; });
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('button', { name: 'Start Site Visit' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'More writeup actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Regenerate' }));
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Start Site Visit' })).toBeDisabled());
+
+  await act(async () => { resolvePost(response({ success: true, artifact: preSiteArtifact(DRAFT) })); });
 });
 
 test('Pre-Site card: regenerate opens a confirmation dialog scoped to the writeup', async () => {
@@ -431,15 +458,28 @@ test('H3a/B10: Share is enabled once at least one review is received', async () 
   expect(screen.queryByText(/Share is blocked until at least one review is received/)).not.toBeInTheDocument();
 });
 
-test('H3b/B12: Regenerate Brief is offered while the brief is in Review (shared)', async () => {
+test('H3b/B12/NEW-1: Regenerate Brief is offered while the brief is shared but not yet sent, with replacement copy', async () => {
+  distributionHistoryFeed = { attempts: [], currentSourceEverSent: false };
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
   fireEvent.click(await screen.findByRole('button', { name: 'More brief actions' }));
   expect(screen.getByRole('menuitem', { name: 'Regenerate Brief' })).toBeEnabled();
   fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Brief' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Regenerate' }));
+  const dialog = screen.getByRole('dialog', { name: 'Regenerate this brief?' });
+  expect(dialog).toHaveTextContent('replaces the brief currently shared for this deliberation');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Regenerate' }));
   await waitFor(() => expect(calls('briefPost')).toHaveLength(1));
+});
+
+test('NEW-1: Regenerate Brief is not offered once the shared brief has already been sent to the Board', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate Brief' })).not.toBeInTheDocument();
 });
 
 test('Brief card: regenerate opens a brief-scoped confirmation dialog', async () => {

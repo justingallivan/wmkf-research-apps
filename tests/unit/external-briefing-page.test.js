@@ -51,6 +51,7 @@ test('renders the placeholder states before any share, review, or schedule exist
   expect(screen.getByText(/No completed reviews yet/)).toBeInTheDocument();
   expect(screen.getByText(/The proposal is not available/)).toBeInTheDocument();
   expect(screen.queryByText('Join meeting')).toBeNull();
+  expect(screen.queryByText(/acknowledged newer inputs/i)).toBeNull();
 });
 
 test('B14/H2: shows the non-sensitive staff-acknowledged-newer-inputs notice when present', async () => {

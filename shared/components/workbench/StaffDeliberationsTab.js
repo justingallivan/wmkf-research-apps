@@ -792,9 +792,13 @@ export default function StaffDeliberationsTab({
       },
       body: (
         <p>
-          Regenerating creates a new brief from the latest proposal and review data.
-          Edits in the current Word file will not be carried into the new brief, and the
-          prior file remains in SharePoint.
+          {briefShared
+            ? 'Regenerating replaces the brief currently shared for this deliberation with a new one '
+              + 'from the latest proposal and review data. Edits in the current Word file will not be '
+              + 'carried into the new brief, and the prior file remains in SharePoint.'
+            : 'Regenerating creates a new brief from the latest proposal and review data. '
+              + 'Edits in the current Word file will not be carried into the new brief, and the '
+              + 'prior file remains in SharePoint.'}
         </p>
       ),
     }
@@ -842,7 +846,11 @@ export default function StaffDeliberationsTab({
     briefReadyFile && !beyondDeliberations && {
       key: 'download', label: 'Download', href: briefDownloadUrl, download: briefReadyFile.name || true, title: briefReadyFile.name || undefined,
     },
-    briefReadyFile && !beyondDeliberations && (briefDraftReady || briefShared) && {
+    // NEW-1 (Opus round 2): a brief already sent to the Board (briefShared &&
+    // everSent) is not offered Regenerate — only a shared-but-not-yet-sent
+    // brief (still recoverable before anyone outside staff has seen it) or a
+    // plain Draft brief.
+    briefReadyFile && !beyondDeliberations && (briefDraftReady || (briefShared && !everSent)) && {
       key: 'regenerate', label: 'Regenerate Brief', onSelect: () => setConfirmDialog({ kind: 'brief' }), disabled: briefGenerating || briefUnchangedRetryBlocked,
     },
     briefReadyFile && briefShared && everSent && {
