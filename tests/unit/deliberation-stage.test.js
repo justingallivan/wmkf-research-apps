@@ -35,27 +35,34 @@ it('every derivable stage key has a text key and a default label', () => {
 
 describe('deriveDeliberationStage: lifecycle x visit x everSent', () => {
   const cases = [
-    // [label, lifecycle, visitIso, everSent, expectedStage, expectedSubstate, expectedVisitStatus]
-    ['no artifact -> draft/none', null, null, false, 'draft', 'none', 'not-scheduled'],
-    ['DRAFT, no visit -> draft/ready', REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, null, false, 'draft', 'ready', 'not-scheduled'],
-    ['DRAFT, future visit -> still draft (visit ignored pre-share)', REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, FUTURE, false, 'draft', 'ready', 'scheduled'],
-    ['DRAFT, past visit -> still draft (lifecycle gates the stage)', REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, PAST, false, 'draft', 'ready', 'visited'],
-    ['REVIEW, no visit, not sent -> shared/not-sent', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, null, false, 'shared', 'not-sent', 'not-scheduled'],
-    ['REVIEW, no visit, sent -> shared/sent', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, null, true, 'shared', 'sent', 'not-scheduled'],
-    ['REVIEW, future visit, not sent -> shared/not-sent (not visited yet)', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, FUTURE, false, 'shared', 'not-sent', 'scheduled'],
-    ['REVIEW, future visit, sent -> shared/sent', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, FUTURE, true, 'shared', 'sent', 'scheduled'],
-    ['REVIEW, past visit -> visit/awaiting-observations regardless of everSent', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, PAST, false, 'visit', 'awaiting-observations', 'visited'],
-    ['REVIEW, past visit, sent -> visit/awaiting-observations', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, PAST, true, 'visit', 'awaiting-observations', 'visited'],
-    ['FINAL, no visit -> final/moved', REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL, null, false, 'final', 'moved', 'not-scheduled'],
-    ['FINAL, past visit -> final/moved (visit line is independent)', REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL, PAST, true, 'final', 'moved', 'visited'],
-    ['BOARD_READY -> beyond/unknown-lifecycle, not silently "draft"', REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY, null, false, 'beyond', 'unknown-lifecycle', 'not-scheduled'],
-    ['SUPERSEDED -> beyond/unknown-lifecycle', REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED, PAST, false, 'beyond', 'unknown-lifecycle', 'visited'],
-    ['unknown numeric lifecycle -> beyond/unknown-lifecycle (fails closed, not "draft")', 999999999, null, false, 'beyond', 'unknown-lifecycle', 'not-scheduled'],
+    // [label, lifecycle, visitIso, everSent, finalReached, expectedStage, expectedSubstate, expectedVisitStatus]
+    ['no artifact -> draft/none', null, null, false, false, 'draft', 'none', 'not-scheduled'],
+    ['DRAFT, no visit -> draft/ready', REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, null, false, false, 'draft', 'ready', 'not-scheduled'],
+    ['DRAFT, future visit -> still draft (visit ignored pre-share)', REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, FUTURE, false, false, 'draft', 'ready', 'scheduled'],
+    ['DRAFT, past visit -> still draft (lifecycle gates the stage)', REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, PAST, false, false, 'draft', 'ready', 'visited'],
+    ['REVIEW, no visit, not sent -> shared/not-sent', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, null, false, false, 'shared', 'not-sent', 'not-scheduled'],
+    ['REVIEW, no visit, sent -> shared/sent', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, null, true, false, 'shared', 'sent', 'not-scheduled'],
+    ['REVIEW, future visit, not sent -> shared/not-sent (not visited yet)', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, FUTURE, false, false, 'shared', 'not-sent', 'scheduled'],
+    ['REVIEW, future visit, sent -> shared/sent', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, FUTURE, true, false, 'shared', 'sent', 'scheduled'],
+    ['REVIEW, past visit -> visit/awaiting-observations regardless of everSent', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, PAST, false, false, 'visit', 'awaiting-observations', 'visited'],
+    ['REVIEW, past visit, sent -> visit/awaiting-observations', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, PAST, true, false, 'visit', 'awaiting-observations', 'visited'],
+    // §3.5: `finalReached` is a separate signal from the stage artifact's own
+    // lifecycle and takes first precedence. A FINAL lifecycle on the stage
+    // artifact itself, without finalReached, is unreachable in practice and
+    // fails closed to 'beyond' rather than being inferred as Final.
+    ['finalReached with no stage artifact -> final/moved', null, null, false, true, 'final', 'moved', 'not-scheduled'],
+    ['finalReached with a DRAFT stage artifact -> final/moved (finalReached wins)', REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, null, false, true, 'final', 'moved', 'not-scheduled'],
+    ['finalReached, past visit -> final/moved (visit line is independent)', null, PAST, true, true, 'final', 'moved', 'visited'],
+    ['FINAL lifecycle without finalReached -> beyond/unknown-lifecycle (fails closed)', REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL, null, false, false, 'beyond', 'unknown-lifecycle', 'not-scheduled'],
+    ['BOARD_READY -> beyond/unknown-lifecycle, not silently "draft"', REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY, null, false, false, 'beyond', 'unknown-lifecycle', 'not-scheduled'],
+    ['SUPERSEDED -> beyond/unknown-lifecycle', REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED, PAST, false, false, 'beyond', 'unknown-lifecycle', 'visited'],
+    ['unknown numeric lifecycle -> beyond/unknown-lifecycle (fails closed, not "draft")', 999999999, null, false, false, 'beyond', 'unknown-lifecycle', 'not-scheduled'],
   ];
 
-  it.each(cases)('%s', (_label, lifecycle, visitIso, everSent, expectedStage, expectedSubstate, expectedVisitStatus) => {
+  it.each(cases)('%s', (_label, lifecycle, visitIso, everSent, finalReached, expectedStage, expectedSubstate, expectedVisitStatus) => {
     const result = deriveDeliberationStage({
-      currentArtifact: artifact(lifecycle),
+      stageArtifact: artifact(lifecycle),
+      finalReached,
       siteVisitStartIso: visitIso,
       everSent,
       now: NOW,
@@ -70,7 +77,7 @@ describe('deriveDeliberationStage: lifecycle x visit x everSent', () => {
 describe('draft substates', () => {
   it('generating', () => {
     const result = deriveDeliberationStage({
-      currentArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING, null),
+      stageArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING, null),
       now: NOW,
     });
     expect(result).toMatchObject({ stage: 'draft', substate: 'generating' });
@@ -78,7 +85,7 @@ describe('draft substates', () => {
 
   it('failed', () => {
     const result = deriveDeliberationStage({
-      currentArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, REQUEST_DOCUMENT_OPERATION_STATUS.FAILED, null),
+      stageArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, REQUEST_DOCUMENT_OPERATION_STATUS.FAILED, null),
       now: NOW,
     });
     expect(result).toMatchObject({ stage: 'draft', substate: 'failed' });
@@ -86,7 +93,7 @@ describe('draft substates', () => {
 
   it('ready file missing on a READY row falls back to none', () => {
     const result = deriveDeliberationStage({
-      currentArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, REQUEST_DOCUMENT_OPERATION_STATUS.READY, null),
+      stageArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, REQUEST_DOCUMENT_OPERATION_STATUS.READY, null),
       now: NOW,
     });
     expect(result).toMatchObject({ stage: 'draft', substate: 'none' });
@@ -95,7 +102,7 @@ describe('draft substates', () => {
 
 it('D7 "in the past" is strict: a visit scheduled for exactly now is scheduled, not visited', () => {
   const result = deriveDeliberationStage({
-    currentArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW),
+    stageArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW),
     siteVisitStartIso: NOW.toISOString(),
     now: NOW,
   });
@@ -104,7 +111,7 @@ it('D7 "in the past" is strict: a visit scheduled for exactly now is scheduled, 
 
   const oneMsLater = new Date(NOW.getTime() + 1);
   const pastByOneMs = deriveDeliberationStage({
-    currentArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW),
+    stageArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW),
     siteVisitStartIso: NOW.toISOString(),
     now: oneMsLater,
   });
@@ -114,7 +121,7 @@ it('D7 "in the past" is strict: a visit scheduled for exactly now is scheduled, 
 
 it('malformed siteVisitStartIso is treated as not-scheduled', () => {
   const result = deriveDeliberationStage({
-    currentArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW),
+    stageArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW),
     siteVisitStartIso: 'not-a-date',
     now: NOW,
   });

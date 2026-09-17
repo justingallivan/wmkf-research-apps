@@ -18,6 +18,7 @@ import { getDeliberationScheduleByRequests } from '../../lib/services/meeting-tr
 import { getMaterialsSummaryByRequests } from '../../lib/services/site-visit-materials/summary-reader.js';
 import { listPreSiteVisitDrafts } from '../../lib/services/pre-site-visit/cycle-list-service';
 import {
+  PRE_RP_BRIEF_CONTRACT,
   PRE_SITE_VISIT_CONTRACT,
   PRE_SITE_DISTRIBUTION_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
@@ -47,6 +48,32 @@ function row(overrides) {
     wmkf_filename: 'doc.docx',
     ...overrides,
   };
+}
+
+function briefRow(overrides) {
+  return {
+    wmkf_requestdocumentid: 'brief-doc',
+    _wmkf_request_value: R1,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF,
+    wmkf_contenttype: WORD,
+    wmkf_producer: PRE_RP_BRIEF_CONTRACT.producer,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    createdon: '2026-09-01T00:00:00Z',
+    wmkf_sharepointitemid: 'brief-item',
+    wmkf_sharepointweburl: 'https://sp/brief.docx',
+    wmkf_filename: 'brief.docx',
+    ...overrides,
+  };
+}
+
+// Splits a single findByCycle mock into brief/Pre-Site result sets keyed by
+// the artifactType each call is made with, since the two artifact-type reads
+// happen in parallel against the same mocked adapter function.
+function mockByArtifactType({ preSite = [], brief = [] } = {}) {
+  requestDocumentAdapter.findByCycle.mockImplementation(async (_code, { artifactType }) => ({
+    records: artifactType === REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF ? brief : preSite,
+  }));
 }
 
 function request(id, overrides = {}) {
@@ -282,4 +309,129 @@ it('joins the applicant-materials summary per request through the cycle read (re
   getMaterialsSummaryByRequests.mockRejectedValueOnce(new Error('pg down'));
   const degraded = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
   expect(degraded.artifacts.map((a) => a.materials)).toEqual([null, null]);
+});
+
+// docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md §3.5: the
+// cycle list unions the brief and Pre-Site artifact-type reads and picks a
+// per-request stage source, preferring the brief.
+describe('brief union (plan §3.5)', () => {
+  beforeEach(() => {
+    grantRequestAdapter.findByIds.mockImplementation(async (ids) => ({
+      records: ids.map((id) => request(id, {
+        _wmkf_currentpresitevisit_value: null,
+        _wmkf_currentprerpbrief_value: null,
+      })),
+    }));
+  });
+
+  it('brief-only Draft: a request with no Pre-Site rows at all is still listed', async () => {
+    grantRequestAdapter.findByIds.mockResolvedValue({
+      records: [request(R1, { _wmkf_currentpresitevisit_value: null, _wmkf_currentprerpbrief_value: 'brief-doc' })],
+    });
+    mockByArtifactType({ preSite: [], brief: [briefRow()] });
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0]).toMatchObject({
+      artifactId: 'brief-doc', requestId: R1, stage: 'draft', substate: 'ready', isCurrent: true,
+    });
+  });
+
+  it('brief-only Review, sent: the brief pointer resolves and everSent is keyed to the brief id', async () => {
+    grantRequestAdapter.findByIds.mockResolvedValue({
+      records: [request(R1, { _wmkf_currentpresitevisit_value: null, _wmkf_currentprerpbrief_value: 'brief-doc' })],
+    });
+    mockByArtifactType({
+      preSite: [],
+      brief: [briefRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW })],
+    });
+    sentSourceDocumentIds.mockResolvedValue(new Set(['brief-doc']));
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts[0]).toMatchObject({
+      artifactId: 'brief-doc', isCurrent: true, stage: 'shared', substate: 'sent', everSent: true,
+    });
+    expect(sentSourceDocumentIds).toHaveBeenCalledWith(['brief-doc']);
+  });
+
+  it('generating/failed brief before any pointer exists: newest non-Ready brief wins', async () => {
+    mockByArtifactType({
+      preSite: [],
+      brief: [
+        briefRow({
+          wmkf_requestdocumentid: 'brief-failed',
+          createdon: '2026-09-01T00:00:00Z',
+          wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+          wmkf_sharepointitemid: null,
+        }),
+        briefRow({
+          wmkf_requestdocumentid: 'brief-generating',
+          createdon: '2026-09-05T00:00:00Z',
+          wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+          wmkf_sharepointitemid: null,
+        }),
+      ],
+    });
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    // No pointer and no orphaned Ready row: the newest non-Ready/non-superseded
+    // row is the pending stage source per §3.5.
+    expect(result.artifacts[0]).toMatchObject({ artifactId: 'brief-generating', stage: 'draft', substate: 'generating' });
+  });
+
+  it('invalid/missing brief pointer with a Ready brief: reconciliation row, never the Ready row picked by recency', async () => {
+    mockByArtifactType({
+      preSite: [],
+      brief: [briefRow({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY })],
+    });
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts[0]).toMatchObject({
+      artifactId: 'brief-doc', needsReconciliation: true, stage: 'beyond', substate: 'pointer-invalid',
+    });
+
+    // A pointer that is set but does not resolve among the brief rows is the
+    // same fault, not a silent fallback to the newest Ready row.
+    grantRequestAdapter.findByIds.mockResolvedValue({
+      records: [request(R1, { _wmkf_currentpresitevisit_value: null, _wmkf_currentprerpbrief_value: 'missing-id' })],
+    });
+    const withBadPointer = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(withBadPointer.artifacts[0]).toMatchObject({ needsReconciliation: true, stage: 'beyond', substate: 'pointer-invalid' });
+  });
+
+  it('legacy Pre-Site, no brief: unchanged pointer-or-newest derivation', async () => {
+    mockByArtifactType({
+      preSite: [row({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW })],
+      brief: [],
+    });
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts[0]).toMatchObject({ artifactId: 'doc', stage: 'shared', needsReconciliation: false });
+  });
+
+  it('Final started while the brief stays Review: finalReached comes from the Pre-Site row, not the brief', async () => {
+    grantRequestAdapter.findByIds.mockResolvedValue({
+      records: [request(R1, { _wmkf_currentpresitevisit_value: 'presite-final', _wmkf_currentprerpbrief_value: 'brief-doc' })],
+    });
+    mockByArtifactType({
+      preSite: [row({
+        wmkf_requestdocumentid: 'presite-final',
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL,
+        wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      })],
+      brief: [briefRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW })],
+    });
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    // The brief stays the stage source (Review lifecycle), but finalReached
+    // from the Pre-Site row wins per §3.5.
+    expect(result.artifacts[0]).toMatchObject({ artifactId: 'brief-doc', stage: 'final', substate: 'moved' });
+  });
+
+  it('both rails present: the brief pointer wins over the legacy Pre-Site row', async () => {
+    grantRequestAdapter.findByIds.mockResolvedValue({
+      records: [request(R1, { _wmkf_currentpresitevisit_value: 'presite-doc', _wmkf_currentprerpbrief_value: 'brief-doc' })],
+    });
+    mockByArtifactType({
+      preSite: [row({ wmkf_requestdocumentid: 'presite-doc', wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW })],
+      brief: [briefRow()],
+    });
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0]).toMatchObject({ artifactId: 'brief-doc', isCurrent: true, stage: 'draft' });
+  });
 });

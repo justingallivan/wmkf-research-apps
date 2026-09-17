@@ -82,24 +82,39 @@ function deriveVisit(siteVisitStartIso, now) {
 }
 
 /**
+ * §3.5 (plan PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md, revised
+ * after Codex round 1 finding 4): `finalReached` is a separate signal from
+ * the supplied artifact's own lifecycle, because Final activation marks the
+ * canonical **Pre-Site** row FINAL while a brief source would stay in
+ * Review (`lib/services/final-writeup/transition-service.js:653-669`). It
+ * takes first precedence over every other rule below; a stage artifact whose
+ * OWN lifecycle happens to read FINAL without `finalReached` being true
+ * falls through to the "any other lifecycle" bucket (`beyond`), fail closed,
+ * rather than being inferred as Final.
+ *
  * @param {object} args
- * @param {object|null} args.currentArtifact - the current governed request-document row/status
- *   ({ lifecycleState, operationStatus, file } shape from getPreSiteVisitArtifactStatus).
+ * @param {object|null} args.stageArtifact - the governed request-document row/status this
+ *   request's rail is keyed to ({ lifecycleState, operationStatus, file } shape from the
+ *   status projection) — the brief when one exists, else the legacy Pre-Site artifact.
+ * @param {boolean} [args.finalReached] - whether the canonical Pre-Site source row has
+ *   reached lifecycle FINAL (Final Writeup activation). Independent of `stageArtifact`'s
+ *   own lifecycle; takes precedence over it.
  * @param {string|null} [args.siteVisitStartIso] - the wmkf_sitevisit Activity's scheduledstart.
  * @param {boolean} [args.everSent] - whether the shared document has ever been sent (substate only).
  * @param {Date} [args.now]
  * @returns {{ stage: 'draft'|'shared'|'visit'|'final'|'beyond', substate: string, visit: { status: string, startIso: string|null } }}
  */
 export function deriveDeliberationStage({
-  currentArtifact = null,
+  stageArtifact = null,
+  finalReached = false,
   siteVisitStartIso = null,
   everSent = false,
   now = new Date(),
 }) {
-  const lifecycleState = currentArtifact?.lifecycleState ?? null;
+  const lifecycleState = stageArtifact?.lifecycleState ?? null;
   const visit = deriveVisit(siteVisitStartIso, now);
 
-  if (lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL) {
+  if (finalReached) {
     return { stage: 'final', substate: 'moved', visit };
   }
 
@@ -111,15 +126,17 @@ export function deriveDeliberationStage({
   }
 
   if (lifecycleState === null || lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT) {
-    return { stage: 'draft', substate: draftSubstate(currentArtifact), visit };
+    return { stage: 'draft', substate: draftSubstate(stageArtifact), visit };
   }
 
-  // Board Ready / Superseded / any other numeric value not among the four
-  // keyed stops. Never produced for the *current* artifact in practice (Board
-  // Ready is only used on separate frozen distribution-snapshot rows), but
-  // fails closed to an explicit out-of-band stage rather than silently
-  // relabeling it "draft". Not in DELIBERATION_STAGE_KEYS — callers that
-  // group/count by stage key must treat this as its own bucket.
+  // FINAL (without finalReached) / Board Ready / Superseded / any other
+  // numeric value not among the four keyed stops. Board Ready is only used on
+  // separate frozen distribution-snapshot rows, and a stage artifact's own
+  // FINAL lifecycle without the finalReached signal is unreachable in
+  // practice, but this fails closed to an explicit out-of-band stage rather
+  // than silently relabeling it "draft" or "final". Not in
+  // DELIBERATION_STAGE_KEYS — callers that group/count by stage key must
+  // treat this as its own bucket.
   return { stage: 'beyond', substate: 'unknown-lifecycle', visit };
 }
 
