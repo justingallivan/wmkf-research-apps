@@ -1030,3 +1030,96 @@ activates" — proves the `FAILED` case is unaffected. Mutation check:
 setting `briefRegenerationPending` to a hardcoded `false` makes the 202
 test fail on the composer-force-close assertion (the exact bug) — pasted in
 the build report.
+
+### 10.4 Round 5: Codex adversarial review findings (2026-09-17), fixed on the same branch on top of `04db470d`
+
+Two server-side findings: the UI-only suppressions in §10.3 protected the
+tab, but nothing on the server stopped the predecessor from actually being
+distributed while its successor was generating, and an abandoned (expired
+claim lease) regeneration could permanently strand the current brief's own
+Share/send affordances.
+
+**Finding 1 [high] — server still permitted predecessor distribution while
+its successor is generating.** `resolveCurrentPreRpBriefForDistribution`
+(`lib/services/pre-rp-brief/artifact-service.js:447`) resolves the pointer
+row and checks its own eligibility, but a guarded regeneration's successor
+claims a brand-new row under a *different* generation key while the
+pointer still names the predecessor — so those checks alone never see it.
+Both `pages/api/workbench/pre-site-visit/distribution/prepare.js` and the
+send-time freshness recheck (`assertAttemptSourceCurrent` in
+`lib/services/pre-site-visit/distribution-service.js`, called from
+`pages/api/workbench/pre-site-visit/distribution/send.js`) call this same
+resolver via `resolveSource`, so fixing it here closes both ends. Fix: after
+resolving the pointer row, look across `briefRows` (already returned by
+`resolveCanonicalPreRpBriefRow`) for any other non-superseded row that is
+GENERATING with an active claim lease — `generatingLeaseActive` (line 505),
+the exact same 15-minute `GENERATING_LEASE_MS` window `claimExisting`
+uses — and refuse 409 `brief_regeneration_in_progress` ("A replacement
+brief is being generated; sharing is paused until it is ready.") (line
+480-489). An ordinary request with no other brief row, or only an
+abandoned (expired-lease) one, is unaffected. Combined with the existing
+in-flight-attempt refusal at reopen claim time
+(`assertCurrentBriefReplaceable`), a predecessor send cannot start or
+complete while a guarded regeneration is live, and a guarded regeneration
+cannot claim while a predecessor send is in flight — **except for a
+residual sub-second window between the send's freshness recheck and the
+reopen's claim `createDocument` insert**, where both could observe "clear"
+before the other's write lands. Recorded here rather than closed with a
+new lock: both operations write through Dataverse ETags/alternate keys
+that fail closed on a genuine conflict (the reopen's generation-key insert,
+the send's own row ETags), so the realistic failure mode of this window is
+one side's write being rejected and needing a retry, not silent data
+corruption; a dedicated cross-resource lock was judged disproportionate to
+a sub-second, self-correcting race. The panel maps the new code to named
+copy in both `prepare()` and `send()`
+(`shared/components/workbench/PreSiteDistributionPanel.js`), mirroring the
+existing `brief_reviews_required` branch: "A replacement brief is being
+generated; sharing is paused until it is ready." — `send()`'s branch keeps
+the existing (still valid) prepared preview rather than discarding it, since
+nothing about the preview itself is stale.
+
+Tests: `tests/unit/pre-rp-brief-artifact-service.test.js` (resolver-level:
+refuses with an active-leased other row, proceeds with an expired-leased
+one, proceeds with no other row at all); `tests/unit/pre-site-distribution-service.test.js`
+(`preparePreSiteDistribution`/`sendPreSiteDistribution`-level: same
+refuse/proceed pair, wired through the real call sites — `createOrGetAttempt`/
+`createEmailActivity` are asserted not called on refusal); `tests/unit/pre-site-distribution-panel.test.js`
+(named copy for both `prepare` and `send`, mirroring the existing
+`brief_reviews_required` test).
+
+**Finding 2 [high] — an expired GENERATING lease stranded the sent
+brief.** The tab's `briefRegenerationPending` (round 4, §10.3) suppressed
+Share/send-again for ANY `GENERATING` pending artifact, with no way to
+recover if that attempt's claim lease had actually expired (an abandoned
+attempt — the claiming session crashed, lost network, or was otherwise
+never going to finish) short of a page reload racing the exact right
+status payload. Fix: the pending-artifact projection is now lease-aware.
+`projectPreRpBriefArtifact` (`artifact-service.js:327`) adds
+`leaseActive: generatingLeaseActive(row)` — `false` for any non-GENERATING
+row (the concept doesn't apply) or a GENERATING row whose lease has
+expired, `true` only for an actively-claimed one — using the exact same
+window as finding 1's server-side refusal, so the UI signal and the
+server's own refusal agree. The tab
+(`shared/components/workbench/StaffDeliberationsTab.js:590-596`) now
+computes `briefRegenerationPending = pending?.operationStatus === GENERATING
+&& pending.leaseActive !== false` (`!== false` rather than `=== true`, so
+an older status payload without the field, or any other non-`false` value,
+still fails safe as "still pending" rather than silently un-suppressing).
+Once the lease expires, suppression lifts — the guarded-reopen item and
+Share/resend return — and a retry of the guarded-reopen dialog reclaims the
+abandoned row via the existing expired-lease path in `claimExisting`
+(unchanged).
+
+Tests: `tests/unit/pre-rp-brief-artifact-service.test.js` (a
+clock-controlled status test: a GENERATING row with `modifiedon` 1 minute
+old projects `leaseActive: true`; 16 minutes old projects `leaseActive:
+false`); `tests/unit/staff-deliberations-tab.test.js` ("suppression lifts
+once the pending artifact reports leaseActive: false, even while still
+GENERATING" — Share/send-again return with a GENERATING pending artifact
+whose `leaseActive` is `false`).
+
+Mutation checks (both restored after, pasted in the build report): (i)
+dropping the GENERATING/lease check in the resolver (replacing the
+`regenerating` condition with `false`) made the new prepare-refusal test
+fail; (ii) hardcoding `leaseActive: true` in the projector made the new
+clock-controlled status test fail.

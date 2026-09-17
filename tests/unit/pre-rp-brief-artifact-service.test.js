@@ -129,6 +129,34 @@ describe('getPreRpBriefStatus', () => {
     expect(status.pendingArtifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING);
   });
 
+  // Codex adversarial review (2026-09-17, round 5 finding 2): the pending
+  // artifact's `leaseActive` must reflect the same 15-minute window
+  // `claimExisting`/`generatingLeaseActive` use, so a stale (abandoned)
+  // attempt never permanently strands the current brief's own affordances.
+  it('projects the pending artifact\'s leaseActive from the same 15-minute GENERATING window', async () => {
+    const activeLease = briefRow({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      modifiedon: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
+    });
+    const dependencies = statusDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: null },
+      rows: [activeLease],
+    });
+    const active = await getPreRpBriefStatus({ requestId: REQUEST_ID }, dependencies);
+    expect(active.pendingArtifact.leaseActive).toBe(true);
+
+    const expiredLease = briefRow({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      modifiedon: new Date(Date.now() - 16 * 60 * 1000).toISOString(),
+    });
+    const expiredDependencies = statusDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: null },
+      rows: [expiredLease],
+    });
+    const expired = await getPreRpBriefStatus({ requestId: REQUEST_ID }, expiredDependencies);
+    expect(expired.pendingArtifact.leaseActive).toBe(false);
+  });
+
   it('surfaces a failed first attempt as pending when there is no pointer yet', async () => {
     const failed = briefRow({
       wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
@@ -894,6 +922,70 @@ describe('resolveCurrentPreRpBriefForDistribution', () => {
     });
     await expect(resolveCurrentPreRpBriefForDistribution(REQUEST_ID, ARTIFACT_ID, dependencies))
       .rejects.toMatchObject({ code: 'brief_pointer_invalid' });
+  });
+
+  // Codex adversarial review (2026-09-17, round 5 finding 1): a guarded
+  // regeneration claims its successor under a different generation key
+  // while the pointer still names the predecessor, so the checks above
+  // alone never see it. Shared by both distribution/prepare and the
+  // send-time freshness recheck, since both call this resolver.
+  it('fails closed as brief_regeneration_in_progress when another (non-pointer) brief row is actively GENERATING', async () => {
+    const pointerRow = briefRow({
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_sharepointdriveid: 'drive-id',
+      wmkf_sharepointitemid: 'item-id',
+      wmkf_sharepointfolderpath: 'Requests/1002379/Artifacts/Pre-Research Presentation Brief',
+    });
+    const regeneratingRow = briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      wmkf_generationkey: 'reopen-generation-key',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      modifiedon: new Date().toISOString(),
+    });
+    const dependencies = distDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: ARTIFACT_ID },
+      rows: [pointerRow, regeneratingRow],
+    });
+    await expect(resolveCurrentPreRpBriefForDistribution(REQUEST_ID, ARTIFACT_ID, dependencies))
+      .rejects.toMatchObject({ code: 'brief_regeneration_in_progress', httpStatus: 409 });
+  });
+
+  it('proceeds when the only other brief row is GENERATING but its claim lease has expired (an abandoned attempt)', async () => {
+    const pointerRow = briefRow({
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_sharepointdriveid: 'drive-id',
+      wmkf_sharepointitemid: 'item-id',
+      wmkf_sharepointfolderpath: 'Requests/1002379/Artifacts/Pre-Research Presentation Brief',
+    });
+    const abandonedRow = briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      wmkf_generationkey: 'abandoned-generation-key',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      modifiedon: new Date(Date.now() - 16 * 60 * 1000).toISOString(),
+    });
+    const dependencies = distDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: ARTIFACT_ID },
+      rows: [pointerRow, abandonedRow],
+    });
+    const { row: resolved } = await resolveCurrentPreRpBriefForDistribution(REQUEST_ID, ARTIFACT_ID, dependencies);
+    expect(resolved.wmkf_requestdocumentid).toBe(ARTIFACT_ID);
+  });
+
+  it('proceeds for an ordinary (non-regenerating) request with no other brief row at all', async () => {
+    const pointerRow = briefRow({
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_sharepointdriveid: 'drive-id',
+      wmkf_sharepointitemid: 'item-id',
+      wmkf_sharepointfolderpath: 'Requests/1002379/Artifacts/Pre-Research Presentation Brief',
+    });
+    const dependencies = distDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: ARTIFACT_ID },
+      rows: [pointerRow],
+    });
+    const { row: resolved } = await resolveCurrentPreRpBriefForDistribution(REQUEST_ID, ARTIFACT_ID, dependencies);
+    expect(resolved.wmkf_requestdocumentid).toBe(ARTIFACT_ID);
   });
 });
 

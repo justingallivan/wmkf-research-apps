@@ -582,8 +582,14 @@ export default function StaffDeliberationsTab({
   // eventually sends, and a guarded reopen's own 202 leaves the predecessor
   // fully current (still Review/sent) with nothing else marking it unsafe
   // to resend.
+  // Round 5 finding 2: lease-aware. `leaseActive` is `false` (never
+  // undefined) for a GENERATING row whose 15-minute claim lease has expired
+  // (an abandoned attempt) — `!== false` rather than `=== true` so an older
+  // status payload without the field (or any other truthy/nullish value)
+  // still fails safe as "still pending" rather than silently un-suppressing.
   const briefRegenerationPending = briefPendingArtifact?.operationStatus
-    === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING;
+    === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING
+    && briefPendingArtifact.leaseActive !== false;
   // A regeneration can start (or be discovered, via the periodic/mount
   // status fetch) while the composer is already open from an earlier click;
   // force it closed rather than leave a stale, still-sendable dialog open

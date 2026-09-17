@@ -785,6 +785,29 @@ test('suppression lifts once a pending regeneration attempt FAILS, not just once
   expect(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' })).toBeInTheDocument();
 });
 
+// Codex adversarial review (2026-09-17, round 5 finding 2): a GENERATING row
+// whose claim lease has expired (an abandoned attempt, `leaseActive: false`
+// from the server) must not permanently strand the current brief's own
+// affordances.
+test('suppression lifts once the pending artifact reports leaseActive: false, even while still GENERATING', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(REVIEW),
+    pendingArtifact: {
+      ...briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }),
+      operationStatus: GENERATING,
+      leaseActive: false,
+    },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  expect(screen.queryByText(/sharing is paused until it is ready/i)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Send the deliberation email again…' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' })).toBeInTheDocument();
+});
+
 test('Brief card: regenerate opens a brief-scoped confirmation dialog', async () => {
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
