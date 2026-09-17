@@ -4,8 +4,10 @@
 > #312 `7f776e36`), migration 053 is applied and read back exact, and the production deployment for
 > `7f776e36` reached Ready. The sibling conflict between #311 and #312 was resolved in `dcc9c796`
 > (17 suites / 439 tests green) and a CI-only fixture timeout in `review-bundle-service.test.js`
-> was fixed in `8f8cfc1b`. Remaining: the ZZTEST Production smoke (Verified Open 3) and the owner
-> decisions below.
+> was fixed in `8f8cfc1b`. **Smoke run 2026-09-17 (S517) on ZZTEST-03:** generate, lock, share, briefing page,
+> email link, drift detection, and guarded regeneration passed; the post-share resend and the Board's
+> Staff Brief download fail with a snapshot hash mismatch (P1, plan §12 Finding A). Remaining:
+> Finding A, the owner decisions below.
 
 ## Session 516 Summary
 
@@ -90,12 +92,24 @@ the orchestrator built Step A directly and fixed builder gaps itself.
    `node scripts/apply-migrations.js`, then read back the ten `review_bundle_*` columns and
    the two CHECK constraints (`pre_site_distribution_review_bundle_shape`, `_coherence`) and
    update the `[PLANNED]` label in `docs/atlas/postgres-infra-tables.md` to VERIFIED LIVE.
-3. **ZZTEST Production smoke after the merges**: generate, lock, share (bundle assembled),
-   briefing page serves the brief and the review-bundle link, email link resolves, drift
-   acknowledgement path, guarded regeneration by a superuser, bundle rebuild after a new
-   review arrives.
-4. **`docs/CURRENT_WORK_QUEUE.md` row 12** was updated this handoff to the shipped state;
-   re-edit it after the merges and smoke.
+3. **DONE 2026-09-17 — ZZTEST Production smoke** (plan §12). Passed: generate, lock,
+   share with bundle, briefing page + bundle PDF, email link (owner confirmed), drift
+   detection, guarded regeneration. Not run: bundle rebuild after a new review.
+   Failed: post-share resend and Board Staff Brief download (item 5).
+5. **P1 — retained Word snapshot fails its identity check on reuse.** Evidence: plan §12
+   Finding A. `validateReadySnapshot` in `lib/services/pre-site-visit/distribution-service.js`
+   409s on every second prepare for the same Word version, and the briefing page's
+   `writeup-docx` member 409s `snapshot_mismatch`, so the Board cannot download the brief.
+   Source unchanged (generation key matched); the retained SharePoint copy differs from the
+   uploaded bytes because SharePoint rewrites Office packages on upload (wiki
+   `dataverse-dynamics.md`). Discriminator [VERIFIED]: 1002903's brief-based share works and
+   was at SharePoint version 3.0 (edited in Word before sharing); both failing ZZTEST-03
+   shares were at version 1.0, raw renderer output. Only briefs shared without a Word save
+   break (plan §12). The byte-hash checks in `validateReadySnapshot` and
+   `resolveBriefingMember` must become structural/semantic. Fix on a branch with Codex
+   review. Until then, staff must open and save the brief in Word before sharing.
+4. **DONE 2026-09-17 — `docs/CURRENT_WORK_QUEUE.md` row 12** re-edited after the merges
+   and the smoke; it now gates on plan §12 Finding A and the email-link check.
 
 ### Owner Decision Needed
 

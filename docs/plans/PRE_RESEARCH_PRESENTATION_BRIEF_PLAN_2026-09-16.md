@@ -1194,3 +1194,90 @@ by the same request; the next read repairs it. Recorded in the security matrix r
 1b. Separator-page text uses the standard WinAnsi (Helvetica) font, which cannot encode non-Latin reviewer names/affiliations (e.g. CJK); unencodable characters are replaced with `?` so assembly never throws. A Unicode-capable font requires adding the `@pdf-lib/fontkit` dependency plus a bundled Unicode TTF — neither exists in the repo today; owner call on whether to add them.
 2. The bundle includes reviewer names and affiliations on separator pages, matching what the page already shows to the Board.
 3. The bundle bounds (`MAX_REVIEW_COUNT` 25, `MAX_SOURCE_BYTES` 100 MB, `MAX_OUTPUT_BYTES` 50 MB in `lib/services/pre-site-visit/review-bundle-service.js`) are code literals. The owner rule of 2026-08-28 (mutable parameters live in admin-editable settings, code holds bounds and fallbacks) may apply if staff ever need to raise them. They are safety ceilings, not workload tunables, so they were left in code for this build; say if they should move behind `wmkf_appsystemsettings`.
+
+## 12. Production smoke (2026-09-17, Session 517, ZZTEST-03 / request #1003222)
+
+Driven in Chrome by the agent with the owner signed in; the owner made the Dynamics
+abstract edit and authorized the send and the download.
+
+| Step | Result | Evidence |
+|---|---|---|
+| Generate | PASS | `POST /api/workbench/pre-rp-brief` 200; `Pre-RP-Brief_1003222_e0b455e9.docx`, 30 KB, SharePoint version 1.0 |
+| Lock for share | PASS | `lock-for-share` 200; stage Shared; briefing link issued, live until 2026-12-17 |
+| Share (prepare + send) | PASS | prepare 200 (after the recipient fix in note 1); send 200; panel rendered only **Sent for delivery.**; history row 9:20:09 AM to the owner |
+| Briefing page | PASS | brief, proposal, two presentation materials, Reviews (2); review-bundle PDF opened inline with two reviews |
+| Email link | PASS | owner opened the 9:20 AM email and confirmed the link opens the ZZTEST-03 briefing page |
+| Drift detection | PASS | after the abstract edit, prepare 409 with "Changed fields: abstract" and "Reviews: 2 at generation → 2 now" |
+| Drift acknowledgement | ACCEPTED, then prepare FAILED | the acknowledged retry passed the drift gate and failed later with Finding A |
+| Guarded regeneration | PASS | `pre-rp-brief/reopen` 200; stage back to AI draft ready; new Draft successor with Edit in Word / Share |
+| Bundle rebuild after a new review | NOT RUN | no third review submitted |
+
+### Finding A (P1) — retained Word snapshot fails its own identity check on reuse
+
+- **Symptom.** Any second prepare for an already-shared brief on the same Word version
+  returns 409 "The retained Word snapshot no longer matches its frozen identity."
+  Reproduced three times: twice with the drift acknowledged, once with the abstract
+  reverted so no drift alert appeared. "Send the deliberation email again…" is therefore
+  unusable for an unchanged brief.
+- **Board impact.** `GET …/document?member=writeup-docx` returned 409
+  `{"ok":false,"reason":"snapshot_mismatch"}`; the "Staff Brief 1003222.docx" link on the
+  briefing page does not serve. The review-bundle PDF link was verified; the proposal and
+  presentation-material links were not exercised.
+- **Localization.** `validateReadySnapshot` (`lib/services/pre-site-visit/distribution-service.js`
+  ~897) re-downloads the retained snapshot and requires its semantic and byte hashes to equal
+  the source's. That reuse path is reached only when the generation key (source versionId +
+  content hash + byte hash) still matches, so the source is unchanged and the retained copy
+  differs from the bytes that were uploaded [INFERRED from the generation-key match; the
+  snapshot bytes were not read directly]. The first-time path (~1095–1160) records hashes
+  of the pre-upload buffer and never re-downloads, so the first prepare passes and every later
+  read fails. `resolveBriefingMember` pins `docx_byte_hash` from the same projection.
+  **Cause is already documented:** SharePoint Online rewrites Office packages on upload
+  (property promotion adds `customXml/`, edits `docProps/` and `[Content_Types].xml`), so
+  Graph never serves back byte-identical bytes; PDFs are stored verbatim, which is why the
+  bundle PDF member works. Observed on the Cycle Dossier smoke 2026-09-12 and recorded in
+  `docs/agent-wiki/topics/dataverse-dynamics.md` ("SharePoint Online rewrites Office
+  packages on upload"), with the structural-comparison approach used by
+  `lib/services/cycle-dossier-worker.js`. The frozen-distribution DOCX reuse and the
+  briefing `writeup-docx` member still compare package SHA-256 and must move to a
+  structural or semantic-hash comparison.
+- **Not universal — discriminator found [VERIFIED via Workbench read of 1002903].** The
+  owner downloaded the Staff Brief `.docx` from request 1002903's briefing page the same
+  morning and it served. That share was brief-based (sent 2026-09-16 10:06 PM, after PR #307
+  deployed at ~9:15 PM) at **SharePoint version 3.0**: the owner edited and saved the brief in
+  Word before sharing. Both failing ZZTEST-03 shares were at **version 1.0**, the renderer's raw
+  output never opened in Word. A Word save rewrites the package with the properties SharePoint
+  promotes, so the later snapshot upload is a byte no-op; the raw renderer package is not, so
+  SharePoint rewrites the snapshot copy and the pinned hash never matches.
+  **Operational rule until fixed:** a brief shared without first being opened and saved in
+  Word has a dead Staff Brief link and cannot be resent. The tab's own guidance ("Review and
+  edit the AI draft in Word, then share") makes the working path the common one.
+- **Timing ruled out.** The regenerated ZZTEST-03 brief (`Pre-RP-Brief_1003222_8ea9a963.docx`)
+  was locked and previewed well after generation; the second preview 409'd the same way and
+  its `writeup-docx` member returned `snapshot_mismatch`. No email was sent for that share.
+- **Template lead [VERIFIED locally via `unzip -l`].** The Pre-Site template
+  `shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx` already contains
+  SharePoint's property-promotion parts (`customXml/item1-3.xml` + props/rels and
+  `docProps/custom.xml`), so a re-upload has nothing to add. The brief template
+  `shared/templates/pre-research-presentation-brief/brief-v1.docx` has no `customXml/` and no
+  `docProps/custom.xml`, so SharePoint promotes it on every upload and the bytes change.
+  Consistent with the version-1.0 vs 3.0 discriminator above: the Pre-Site template never
+  needs a Word save to be stable. The durable fix is a structural/semantic comparison in
+  `validateReadySnapshot` and `resolveBriefingMember`; shipping a brief template that already
+  carries the promoted parts, or re-reading the snapshot after upload before pinning its
+  hash, are narrower alternatives.
+- **Age.** The check dates from `8a240e77` (original frozen distribution).
+- **Disposition.** Not fixed this session. Needs a branch with Codex review. Any real
+  request shared since PR #307 shipped may have a dead Staff Brief link on its briefing
+  page; verify before the next deliberation.
+
+### Notes
+
+1. The composer seeds default staff recipients asynchronously; a caret placed in the To
+   field before the seed lands splices typed text into the list, and prepare rejects it
+   with 400 "Every recipient must be a valid email address." UI sharp edge, not a server bug.
+2. After the mismatch 409 the dialog stacks the stale drift alert above the new error.
+3. The Administration "Guarded reopen attempts" list shows Pre-Site attempts only; the
+   brief's regeneration audit tuple lives on the successor row and is not surfaced in the UI.
+4. ZZTEST-03 residue: the regenerated brief is locked and previewed (not sent) as the
+   current share; the 9:20 sent row and the shared briefing link remain; the abstract was
+   restored to its original text by the owner.
