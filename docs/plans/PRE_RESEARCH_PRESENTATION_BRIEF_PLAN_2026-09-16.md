@@ -1161,7 +1161,7 @@ request number.
 - **C2 (consumers):** `review-bundle` member in `resolveBriefingMember` (latest sent attempt; re-hash; inline PDF; institution-led filename); on read, if `reviewSetFingerprint(live received reviews)` differs from the pinned set fingerprint, rebuild through the same assembly + `ensureSnapshot`, update the attempt's family and `review_bundle_rebuilt_at`, then serve; `buildBriefingContext` gains `reviewBundle { member, filename, size, reviewCount, rebuiltAt }`; the page renders "Download all reviews (PDF)" in the Reviews section; the email body gains a second placeholder href resolved at send time to the document route with `member=review-bundle`, with copy key `email.deliberation_share.review_bundle_link_text` registered alongside the existing keys.
 - **Behavior change to note:** DOCX-origin reviews, hidden on the page today, appear in the bundle as converted PDF pages.
 
-**Deployment protocol (same as migration 052):** merge auto-deploys code that names the new `review_bundle_*` columns, so migration 053 must be applied to the shared Production/Preview database (`node scripts/apply-migrations.js`) before this branch merges — prepare must not run in an environment where migration 053 is absent.
+**Deployment protocol (same as migration 052) — done: 053 applied 2026-09-17T13:57:15Z, readback exact (ten columns, two CHECKs, 17 legacy rows pass), before PR #312 merged.** merge auto-deploys code that names the new `review_bundle_*` columns, so migration 053 must be applied to the shared Production/Preview database (`node scripts/apply-migrations.js`) before this branch merges — prepare must not run in an environment where migration 053 is absent.
 
 ### Codex adversarial review round 2 (Step C) — disposition 2026-09-17
 

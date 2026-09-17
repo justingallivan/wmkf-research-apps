@@ -207,8 +207,7 @@ delta, and both acknowledgement fields). Mirrored byte-for-byte in
 Written by `distribution-service.js` prepare when staff acknowledge drift; read
 by `briefing-page-service.js` as the timestamp-only `staffAcknowledgedNewerInputs`.
 
-**[PLANNED — file on branch `claude/pre-rp-brief-review-bundle`, not applied to
-any database; apply via `node scripts/apply-migrations.js` after merge]**
+**[VERIFIED LIVE 2026-09-17 — migration 053 applied to the shared Production/Preview database by the owner-authorized `node scripts/apply-migrations.js` run (tracker `applied_at` 2026-09-17T13:57:15Z); readback exact: ten nullable columns, both CHECK constraints, 17 pre-existing attempt rows all satisfy the constraints]**
 Migration `053_pre_site_distribution_review_bundle.sql` (plan §11, Step C1)
 adds ten nullable columns retaining the "every review" PDF bundle assembled at
 Share (prepare) time — `review_bundle_document_id TEXT`,
