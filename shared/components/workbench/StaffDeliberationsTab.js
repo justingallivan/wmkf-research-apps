@@ -573,6 +573,30 @@ export default function StaffDeliberationsTab({
   const briefUnchangedRetryBlocked = briefPendingArtifact?.operationStatus
     === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED
     && briefPendingArtifact.retryable === false;
+  // Codex adversarial review (2026-09-17, round 4): while ANY brief
+  // regeneration is pending — from this session's own ordinary Regenerate,
+  // its own guarded reopen, or another staff member's concurrent action
+  // (picked up by the periodic/mount status fetch) — the CURRENT brief must
+  // not be sharable. A send that completes before the pending regeneration
+  // activates would be a duplicate Board email once the successor also
+  // eventually sends, and a guarded reopen's own 202 leaves the predecessor
+  // fully current (still Review/sent) with nothing else marking it unsafe
+  // to resend.
+  const briefRegenerationPending = briefPendingArtifact?.operationStatus
+    === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING;
+  // A regeneration can start (or be discovered, via the periodic/mount
+  // status fetch) while the composer is already open from an earlier click;
+  // force it closed rather than leave a stale, still-sendable dialog open
+  // over a source that just became unsafe to send. This is a genuine
+  // one-way "close and stay closed until the user reopens it" transition
+  // (not derivable purely during render, since `composerOpen` must not
+  // silently reopen once the regeneration finishes) — a legitimate use of
+  // an effect; eslint's generic set-state-in-effect warning is expected
+  // here (its own disable directive is reported unused by a different
+  // underlying check, so none is added).
+  useEffect(() => {
+    if (briefRegenerationPending && composerOpen) setComposerOpen(false);
+  }, [briefRegenerationPending, composerOpen]);
   const briefShared = briefArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const briefDraftReady = briefArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const briefDownloadUrl = downloadUrlFor(briefReadyFile);
@@ -970,12 +994,19 @@ export default function StaffDeliberationsTab({
     briefReadyFile && !beyondDeliberations && (briefDraftReady || (briefShared && !everSent)) && {
       key: 'regenerate', label: 'Regenerate Brief', onSelect: () => setConfirmDialog({ kind: 'brief' }), disabled: briefGenerating || briefUnchangedRetryBlocked,
     },
-    briefReadyFile && briefShared && everSent && {
+    // Codex adversarial review (2026-09-17, round 4): suppressed while a
+    // regeneration is pending (see briefRegenerationPending above) — a send
+    // that completed before that regeneration activates risks a duplicate
+    // Board email.
+    briefReadyFile && briefShared && everSent && !briefRegenerationPending && {
       key: 'send-again', label: 'Send the deliberation email again…', onSelect: openComposer,
     },
     // Guarded regeneration of a brief already sent to the Board (owner
     // decision 2026-09-16, plan §10): superuser-only, never shown otherwise.
-    briefReadyFile && briefShared && everSent && isSuperuser && !beyondDeliberations && {
+    // Also suppressed while a regeneration is already pending (round 4) —
+    // one at a time.
+    briefReadyFile && briefShared && everSent && isSuperuser && !beyondDeliberations
+      && !briefRegenerationPending && {
       key: 'reopen-sent', label: 'Regenerate sent brief…', onSelect: openBriefReopenDialog, disabled: briefGenerating,
     },
   ].filter(Boolean);
@@ -1081,9 +1112,10 @@ export default function StaffDeliberationsTab({
               {checkingBriefStatus && !briefArtifact && !briefPendingArtifact && (
                 <p className="mt-2 text-sm text-gray-600">Checking for an existing brief…</p>
               )}
-              {briefPendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING && briefReadyFile && (
+              {briefRegenerationPending && briefReadyFile && (
                 <p className="mt-2 text-sm text-amber-800">
-                  A new brief is being generated. The current link stays available until it finishes.
+                  A new brief is being generated; sharing is paused until it is ready. The
+                  current link stays available until it finishes.
                 </p>
               )}
               {briefUnchangedRetryBlocked && (
@@ -1127,32 +1159,39 @@ export default function StaffDeliberationsTab({
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Edit in Word
                 </a>
-                <button
-                  type="button"
-                  onClick={openComposer}
-                  disabled={briefGenerating || briefShareBlocked}
-                  title={briefShareBlocked ? briefShareBlockedReason : undefined}
-                  className={secondaryClass}
-                >
-                  Share…
-                </button>
-                {briefShareBlocked && (
+                {/* Codex adversarial review (2026-09-17, round 4): suppressed
+                    while a regeneration is pending — see briefRegenerationPending
+                    above and the amber note that replaces this affordance. */}
+                {!briefRegenerationPending && (
+                  <button
+                    type="button"
+                    onClick={openComposer}
+                    disabled={briefGenerating || briefShareBlocked}
+                    title={briefShareBlocked ? briefShareBlockedReason : undefined}
+                    className={secondaryClass}
+                  >
+                    Share…
+                  </button>
+                )}
+                {briefShareBlocked && !briefRegenerationPending && (
                   <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
                 )}
               </>
             )}
             {briefReadyFile && briefShared && stage === 'shared' && substate === 'not-sent' && (
               <>
-                <button
-                  type="button"
-                  onClick={openComposer}
-                  disabled={briefShareBlocked}
-                  title={briefShareBlocked ? briefShareBlockedReason : undefined}
-                  className={primaryClass}
-                >
-                  {latestSendFailure ? 'Resend' : 'Share…'}
-                </button>
-                {briefShareBlocked && (
+                {!briefRegenerationPending && (
+                  <button
+                    type="button"
+                    onClick={openComposer}
+                    disabled={briefShareBlocked}
+                    title={briefShareBlocked ? briefShareBlockedReason : undefined}
+                    className={primaryClass}
+                  >
+                    {latestSendFailure ? 'Resend' : 'Share…'}
+                  </button>
+                )}
+                {briefShareBlocked && !briefRegenerationPending && (
                   <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
                 )}
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
@@ -1165,7 +1204,7 @@ export default function StaffDeliberationsTab({
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Open working document
                 </a>
-                {latestSendFailure && (
+                {latestSendFailure && !briefRegenerationPending && (
                   <button type="button" onClick={openComposer} className={secondaryClass}>
                     Resend
                   </button>

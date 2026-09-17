@@ -966,3 +966,67 @@ flips to ordinary `Regenerate Brief` / no `Send again`, matching §10.1's
 existing success-path test. Mutation check: reverting `successorActivated`
 to an unconditional `true` makes phase 1 fail on the `Share…` assertion
 (the exact bug) — pasted in the build report.
+
+### 10.3 Round 4: Codex adversarial review finding (2026-09-17), fixed on the same branch on top of `4da99916`
+
+**Finding [high] — round 3 only protected `everSent`, not the Share/send-again/
+resend affordances themselves.** After a 202, the predecessor correctly stays
+current with `everSent: true` (round 3), so `briefMoreItems`
+(`StaffDeliberationsTab.js:1001-1011`, pre-fix) still offered "Send the
+deliberation email again…" for it. Once the guarded-reopen dialog was
+cancelled (nothing else re-checks status), staff could resend the
+predecessor while `briefPendingArtifact` was still `GENERATING`; a resend
+completing before the successor activated would send a duplicate Board
+email once the successor itself eventually sent.
+
+**Fix.** A new derived flag, `briefRegenerationPending` (line 585,
+`briefPendingArtifact?.operationStatus === GENERATING`), is sourced from
+`briefPendingArtifact` — not from any one action's own local flag (like
+`briefGenerating`, which only ever reflects THIS session's own ordinary
+Generate/Regenerate call) — so it is true regardless of which action
+started the pending regeneration (ordinary Regenerate, this session's own
+guarded reopen, or another staff member's concurrent action discovered via
+the periodic/mount status fetch). Every Share/send-again/resend surface is
+now gated on `!briefRegenerationPending`:
+- the Draft-brief "Share…" button (line 1165) and its blocked-reason note
+  (line 1176);
+- the shared-not-sent "Share…"/"Resend" button (line 1183) and its
+  blocked-reason note (line 1194);
+- the shared-sent "Resend" button (line 1207);
+- the overflow menu's "Send the deliberation email again…" (line 1002) and
+  "Regenerate sent brief…" (line 1010) items.
+
+The composer itself is force-closed if it was already open when a
+regeneration is discovered pending: a `useEffect` (line 597) watching
+`briefRegenerationPending`/`composerOpen` calls `setComposerOpen(false)`.
+This is a genuine one-way "close and stay closed" transition (not a pure
+render-time derivation, since `composerOpen` must not silently reopen once
+the pending regeneration finishes), so it legitimately needs an effect
+despite eslint's generic `react-hooks/set-state-in-effect` warning
+(0 errors either way — `npx eslint` still exits 0). The existing "A new
+brief is being generated…" note (line ~1116, shown whenever
+`briefRegenerationPending && briefReadyFile`) now leads with "sharing is
+paused until it is ready" — it already occupies the exact place the
+suppressed actions would otherwise be.
+
+Suppression is scoped to `GENERATING` only: a `FAILED` pending attempt
+(the regeneration did not succeed, so the predecessor was never actually at
+risk) leaves Share/send-again available, matching the pre-existing failure
+UX (`briefUnchangedRetryBlocked`, unaffected by this change).
+
+**Tests** (`tests/unit/staff-deliberations-tab.test.js`): the round-3 202
+regression test is replaced by "a 202 (still-generating) guarded
+regeneration suppresses every Share/send-again/resend path and closes the
+composer; both lift once the successor activates" — opens the composer via
+"Send the deliberation email again…" first (to exercise the force-close),
+then starts the guarded reopen, asserts the 202 reply force-closes the
+composer and hides all three actions (asserted with the overflow menu
+opened, after cancelling the dialog — not merely retrying it), then
+remounts the tab (`rerender` with a new `key`, simulating a later revisit)
+to observe the successor activate, history remount for the new artifact
+id, and ordinary `Regenerate Brief` return. A second, new test — "suppression
+lifts once a pending regeneration attempt FAILS, not just once it
+activates" — proves the `FAILED` case is unaffected. Mutation check:
+setting `briefRegenerationPending` to a hardcoded `false` makes the 202
+test fail on the composer-force-close assertion (the exact bug) — pasted in
+the build report.
