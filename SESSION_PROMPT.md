@@ -1,136 +1,160 @@
-# Session 516 Prompt: Resume the Pre-Research Presentation Brief build loop
+# Session 517 Prompt: Decide the three Pre-RP Brief PR merges, then apply 053 and smoke
 
-> **Branch note.** The build lives on `claude/pre-rp-brief` (pushed, upstream set, HEAD
-> `4446ce13`). `main` has only the plan and this handoff. On any machine: `git fetch`,
-> `git checkout claude/pre-rp-brief`, then `/start` and answer "stay on the branch".
-> Resume from `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §9.
+> **Nothing is merged from the overnight run.** Owner's last word (S516): "We can decide on
+> merges in the morning." Three PRs are open and stacked: **#310** (base `main`), **#311**
+> and **#312** (base `claude/pre-rp-brief-followups`, the #310 branch). Merge order and
+> the migration-053 precondition are in **Verified Open** below. `main` and this checkout
+> are clean; the builder worktrees were removed.
 
-## Session 515 Summary
+## Session 516 Summary
 
-Session 515 closed the email-feedback Production proof, pivoted on user feedback about the
-Pre-Site distribution, planned a new governed document (the Pre-Research Presentation
-Brief) through four Codex adversarial rounds, applied both Production Dataverse schema
-writes, and ran an owner-directed Sonnet-build / Opus-review loop through four of six
-slices before pausing at the owner's request.
+Session 516 finished the Pre-Research Presentation Brief build loop and shipped it to
+Production (PR #307, then hotfix #308 and CI repair #309), applied migration 052, and then
+ran an owner-directed overnight orchestration of eleven follow-ups in three steps, each
+taken through Codex adversarial review (gpt-5.6-sol) until approve or an explicit
+disposition. Sonnet builders worked in worktrees against enumerated acceptance briefs;
+the orchestrator built Step A directly and fixed builder gaps itself.
 
 ### What Was Completed
 
-1. **Email-feedback operational proof closed.** Owner-driven Production smoke of a
-   ledger-backed Meeting Tracker agenda send rendered exactly **Sent for delivery.**; the
-   owner received the email. Smoke session cancelled; three test rows removed from
-   `deliberation_agenda_sends` after owner confirmation (11 → 8). Work-queue item 10 closed.
-2. **Pre-Research Presentation Brief planned.** Fourteen owner decisions (B1–B14) settled:
-   fourth governed artifact type `100000009` with request pointer `wmkf_CurrentPreRPBrief`,
-   deterministic OOXML render from a tracked template (no prompt), one-time lock (lifecycle
-   only), review gate + drift fingerprint + fingerprint-bound acknowledgement at prepare
-   persisted via Postgres migration 052, brief replaces the Pre-Site writeup on the briefing
-   page, Share decoupled from the Site Visit transition (explicit Start Site Visit action),
-   staff edits trusted (no content validation), drift acknowledgement visible in staff
-   history and as a timestamp-only Board notice. Plan §7 records all four Codex rounds
-   (three review-only, one rescue) with dispositions.
-3. **Production schema applied (owner-run, 2026-09-16).** Picklist value `100000009`
-   "Pre-Research Presentation Brief" inserted and re-read; relationship
-   `wmkf_request_currentprerpbrief` created under `DATAVERSE_PROD_WRITE_ACK`; preflight
-   `--target=prod` = 43 exact / 0 absent / 0 divergent. Migration 052 is **not** applied.
-4. **Build loop (branch `claude/pre-rp-brief`).** Slices 1–2 approved after three Opus
-   rounds (template metadata carrying staff names was scrubbed and the slice-2 commit
-   replaced before any push); slice 3 approved after two rounds (a roster return-shape bug
-   that would have failed every generation in Production was caught by the reviewer and
-   fixed with a real-module composition test); slice 4 built and awaiting Opus round 1.
-   Slices 5–6 not started. 268 tests pass across the affected suites.
+1. **Pre-RP Brief shipped** (`f1cf8fe3` merge of PR #307; `9ab5fe71` PR #308 select
+   hotfix; `de349928` PR #309 CI repair). Migration 052 applied by the owner and read back
+   (`docs/atlas/postgres-infra-tables.md` line ~197). The owner exercised generate and
+   share in Production during the session (the select hotfix came from that); the full
+   ZZTEST smoke list below is not recorded as complete.
+2. **Step A — PR #310 `claude/pre-rp-brief-followups` @ `bef9cbb9`** (base `main`).
+   Items 2–10: Pre-Site replay-guard parity (older FAILED/expired rows refused, fail-closed
+   on unreadable dates), observed-pointer activation fences on both artifact services
+   (`brief_pointer_changed` / `pre_site_visit_pointer_changed`), own-claim-only upload
+   cleanup, `renderVersion: '2'` bound into the generation key, tri-state
+   `receivedReviewCount` with fingerprint re-hash and a distinct malformed-snapshot Share
+   reason, actor-name resolution for drift acknowledgements, Final Writeup prerequisite copy
+   keyed on `code`, beyond-deliberations banner wording, migration-052 legacy all-NULL test,
+   panel `applyFormPatch` + explicit `autoOwnedRef` seed ownership, `PI: ` / `PD: ` prefixes
+   in the brief. Codex: 4 rounds, rounds 1–3 findings all fixed, round 4 approve (plan §7).
+3. **Step B — PR #311 `claude/pre-rp-brief-guarded-regen` @ `46641760`** (base #310).
+   Superuser-only regeneration of a brief already sent to the Board, mirroring the Pre-Site
+   guarded reopen: route `pages/api/workbench/pre-rp-brief/reopen.js`, service
+   `lib/services/pre-rp-brief/reopen-service.js`, audit tuple on the successor row, server
+   mutual exclusion (`brief_regeneration_in_progress` while a lease-active GENERATING row
+   exists), tab/panel gating. Codex: 5 rounds, rounds 1–4 fixed, round 5 approve (plan §10).
+   Residual: a sub-second send/claim window recorded in plan §10.4.
+4. **Step C — PR #312 `claude/pre-rp-brief-review-bundle` @ `73279502`** (base #310).
+   One PDF of every received review assembled at Share (pdf-lib, separator pages,
+   fail-closed on any missing/unconvertible part, 25 reviews / 100 MB source / 50 MB
+   output bounds), retained as a `review-bundle` snapshot, pinned by migration
+   `053_pre_site_distribution_review_bundle.sql` (mirrored in `setup-database.js`
+   `v54Statements`), served on the briefing page ("Download all reviews (PDF)") and via the
+   email placeholder `wmkf-briefing-link://review-bundle`, with an on-demand attributed
+   rebuild guarded by a CAS on the set fingerprint. Codex: 3 rounds; rounds 1–2 fixed
+   (fingerprint completeness, WinAnsi, bounds, roster pointers, CAS recheck); round 3's
+   linearizability demand dispositioned as the stated last-observed-snapshot contract,
+   the same contract the inline reviews already use (plan §11).
+5. **Verification at each PR head:** full jest (A 949 suites / 13,908; B 951 / 13,956;
+   C 951 / 13,984), lint, and the full `/start` gate list green (`gates.log` in the
+   session scratchpad; all PASS). Two full-run single-suite failures were chased:
+   `reviewer-suggestion-bulk-update-importers` (contention flake, green on rerun) and
+   `reviewer-engagement-census` (real; the new caller was recorded).
 
 ### Commits (main)
+- `f1cf8fe3` - Merge PR #307 (Pre-RP Brief slices 1–6)
+- `9ab5fe71` - Merge PR #308 (select base lookups, not formatted names)
+- `de349928` - Merge PR #309 (two CI Jest suites left red on main)
 
-> Also on `main` (concurrent session, not covered by this summary): six commits `1abc097a`..`c52cb7b0`
-> adding the accepted-reviewer release workflow and related fixes; they merged cleanly under this handoff.
-
-- `1e0ae48a` — Record email feedback Production smoke proof
-- `01afb0cd` — Record email feedback smoke residue cleanup
-- `b36b101a` — Record deletion of Session 514 agenda test rows
-- `83c6ef47` — Plan the Pre-Research Presentation Brief
-- `bc8270ab`, `e2f306f1`, `3883ece2`, `236d9219` — Plan revisions after Codex rounds 1–4
-
-### Commits (claude/pre-rp-brief, on top of `236d9219`)
-
-- `66cd2eb2` slice 1 plumbing · `538388f2` slice 2 template + renderer · `c6f4a95c`,
-  `eec8311d` slice 1–2 review fixes · `1b0eab56`, `8320d9ec`, `4bc38700` slice 3 ·
-  `d08ae753`, `4dbef6d7` slice 4 · `4446ce13` pause handoff
+### Commits (branches, all pushed)
+- `bef9cbb9` - head of PR #310 (5 commits over `main`)
+- `46641760` - head of PR #311 (over #310)
+- `73279502` - head of PR #312 (over #310; last commit is the §11 bounds note)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Resume the build loop at slice 4 review.**
-   Evidence: plan §9 (resume steps, reviewer self-trace, three carried items).
-   Spawn an Opus reviewer for `git diff 4bc38700..HEAD`; on APPROVE, Sonnet builds slice 5
-   (Staff Deliberations UI, Start Site Visit action, drift confirmation UI, composite stage
-   projection in both callers, cycle-list union), then slice 6 (docs reconcile via `/sweep`:
-   Atlas "applied 2026-09-16", `DATAVERSE_SHAREPOINT_FILE_MODEL.md`, wiki, work queue).
-2. **Controller review, PR, Codex adversarial review.**
-   Evidence: owner directive 2026-09-16 ("when they are done, you review the build … then
-   send to codex for an adversarial review").
-   `/contract-reconcile` Mode B invariant table, full `/start` gate list sequentially, full
-   jest, lint, build; open the PR; owner runs
-   `/codex:adversarial-review --wait --base 236d9219 --model gpt-5.6-sol …` with
-   `[ADVERSARIAL-REVIEW-RECEIPT: docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md]`.
-3. **Production smoke after merge** on a ZZTEST request: generate, lock, share, briefing
-   page serves the brief, drift acknowledgement path.
+1. **Decide and execute the merges, in this order.**
+   Evidence: `gh pr list` shows #310 → `main`, #311 and #312 → `claude/pre-rp-brief-followups`;
+   `git merge-tree --write-tree claude/pre-rp-brief-guarded-regen claude/pre-rp-brief-review-bundle`
+   reports four content conflicts between the two siblings:
+   `docs/API_ROUTE_SECURITY_MATRIX.md`, `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`,
+   `shared/components/workbench/PreSiteDistributionPanel.js`, `tests/unit/pre-site-distribution-panel.test.js`.
+   Order: merge #310 into `main`; retarget #311 to `main` and merge; merge `main` into
+   `claude/pre-rp-brief-review-bundle`, resolve the four files (plan: keep both §10 and §11;
+   panel: keep both error-copy branches), rerun `npx jest tests/unit/pre-site-distribution*
+   tests/unit/staff-deliberations* tests/unit/deliberation-briefing* --silent`, retarget
+   #312 to `main`, merge. Each merge auto-deploys.
+2. **Apply migration 053 before #312 merges** (blocker, not a footnote: prepare writes the
+   `review_bundle_*` columns unconditionally).
+   Evidence: `lib/db/migrations/053_pre_site_distribution_review_bundle.sql` on the #312
+   branch; not in `schema_migrations`. Columns are nullable with CHECKs that accept the
+   all-NULL legacy row, so applying early is harmless:
+   `node scripts/apply-migrations.js`, then read back the ten `review_bundle_*` columns and
+   the two CHECK constraints (`pre_site_distribution_review_bundle_shape`, `_coherence`) and
+   update the `[PLANNED]` label in `docs/atlas/postgres-infra-tables.md` to VERIFIED LIVE.
+3. **ZZTEST Production smoke after the merges**: generate, lock, share (bundle assembled),
+   briefing page serves the brief and the review-bundle link, email link resolves, drift
+   acknowledgement path, guarded regeneration by a superuser, bundle rebuild after a new
+   review arrives.
+4. **`docs/CURRENT_WORK_QUEUE.md` row 12** was updated this handoff to the shipped state;
+   re-edit it after the merges and smoke.
 
 ### Owner Decision Needed
 
-1. **Managed private-repository migration gates** (unchanged from S514).
-   Evidence: `docs/MANAGED_PRIVATE_GITHUB_REPOSITORY_MIGRATION_PLAN.md` § Mandatory decision gates.
-2. **Ops-meeting decisions (2026-09-16 meeting).**
-   Evidence: `.claude-memory/project-ops-meeting-2026-09-16-agenda.md` still active. Record
-   the applicant-materials reminder schedule, PC manual-reminder race, and Cycle Dossier
-   worker cadence decisions, then close the memory.
+1. **Plan §11 "Open for owner" (PR #312):** (1) unconvertible review fails Share closed vs a
+   placeholder page; (1b) Unicode reviewer names need `@pdf-lib/fontkit` + a bundled TTF,
+   today replaced with `?`; (2) separator pages carry reviewer name and affiliation; (3) the
+   three bundle bounds are code literals, kept as safety ceilings; move behind
+   `wmkf_appsystemsettings` if staff must tune them (memory
+   `feedback-mutable-parameters-not-in-code`).
+2. **Plan §10.4 residual (PR #311):** sub-second window between a send and a guarded
+   reopen claim; accepted as-is by the orchestrator, owner may want a stronger lock.
+3. **Managed private-repository migration gates** (unchanged from S514).
+   Evidence: `docs/MANAGED_PRIVATE_GITHUB_REPOSITORY_MIGRATION_PLAN.md`.
+4. **Ops-meeting decisions (2026-09-16 meeting).** Evidence: memory
+   `project-ops-meeting-2026-09-16-agenda.md` still `status: active`.
 
 ### Parked
 
-1. **Plan §8 follow-ups**: replayed `clientOperationId` can resurrect a superseded row
-   (both brief and Pre-Site services; decide once); received-state boolean vs raw
-   `reviewReceivedAt` in `REVIEW_FINGERPRINT_FIELDS`; deprecating the Pre-Site prerequisite
-   for Final Writeup.
-2. Five protected historical branches; reviewer-institution Phase 3 flags (unchanged).
+1. Plan §8 (vi): the panel defaults-seed-through-stale-reset case is structural (seed
+   requires an untouched composer, prepare requires a recipient edit); no test, recorded.
+2. Plan §8 remaining: received-state boolean vs raw `reviewReceivedAt` in
+   `REVIEW_FINGERPRINT_FIELDS`; deprecating the Pre-Site prerequisite for Final Writeup.
+3. Five protected historical branches; reviewer-institution Phase 3 flags (unchanged).
+4. Memory router at 8239 B (over the 8192 B routine-audit trigger); diet per
+   `docs/MEMORY_HYGIENE_RUNBOOK.md` §10 not run this session.
 
 ### Verify Before Acting
 
-1. Slice-4 code is **unreviewed**. Do not merge or smoke it before Opus round 1 and the
-   controller review.
-2. Migration 052 exists on the branch only; apply via `node scripts/apply-migrations.js`
-   after merge, never `setup-database.js`.
-3. A Codex rescue agent (round 4) ran with write access to the main checkout; an
-   unauthored rewrite of `.claude-memory/feedback-codex-delegation-review-vs-rescue-routing.md`
-   appeared and was **reverted** at the owner's direction. If Codex rescue is used again,
-   check `git status` for memory edits before committing.
+1. #311 and #312 are **siblings**, not a chain: neither contains the other. Do not merge
+   #312 without first taking #311 (or `main` after #311) into it and rerunning the suites.
+2. Codex approvals are at the recorded heads; any conflict resolution in #312 is unreviewed
+   code until the suites rerun.
 
 ### Do Not Reopen Without New Decision
 
-1. Owner decisions B1–B14 in the plan.
+1. Owner decisions B1–B14 in the plan; the review-bundle consistency contract
+   (last-observed snapshot, plan §11 and the matrix row).
 2. Email feedback: confirmed sends render only **Sent for delivery.**
-3. The removed agenda-send test rows and cancelled test sessions.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` | Plan, decisions B1–B14, four Codex rounds (§7), follow-ups (§8), build-loop handoff (§9) |
-| `lib/services/pre-rp-brief/` | Renderer, input service, artifact service, share-lock service (branch) |
-| `lib/services/pre-site-visit/distribution-service.js` | Brief-sourced distribution + prepare gate (branch, slice 4) |
-| `lib/db/migrations/052_pre_site_distribution_brief_inputs.sql` | Drift-acknowledgement audit columns (branch, unapplied) |
-| `shared/templates/pre-research-presentation-brief/brief-v1.docx` | Tracked, metadata-scrubbed template |
-| `scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs` | Picklist insert (executed in Production 2026-09-16) |
-| `docs/EMAIL_SEND_FEEDBACK_AUDIT_2026-09-15.md` | Closed proof + residue record |
+| `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` | §7 Codex rounds, §8 follow-ups, §10 guarded regeneration (#311), §11 review bundle (#312) |
+| `lib/services/pre-rp-brief/artifact-service.js` | Generation key, activation fence, reopen option, regeneration-in-progress refusal |
+| `lib/services/pre-rp-brief/reopen-service.js` | Guarded regeneration service (#311) |
+| `lib/services/pre-site-visit/review-bundle-service.js` | Bundle assembly, fingerprint, bounds (#312) |
+| `lib/services/pre-site-visit/distribution-service.js` | Prepare gate, bundle retention, actor names, email hrefs |
+| `lib/services/deliberation-briefing/briefing-page-service.js` | `review-bundle` member, attributed rebuild with CAS |
+| `lib/db/migrations/053_pre_site_distribution_review_bundle.sql` | Bundle pin columns (branch, **unapplied**) |
+| `shared/components/workbench/StaffDeliberationsTab.js` / `PreSiteDistributionPanel.js` | Tri-state share reasons, regeneration pending, error copy |
 
 ## Testing
 
 ```bash
 npm test -- --runInBand --silent
-npm run build
 npm run lint
-npx jest tests/unit/pre-rp-brief* tests/unit/pre-site-distribution* tests/unit/deliberation-briefing* tests/unit/external-briefing* --silent
+npx jest tests/unit/pre-rp-brief* tests/unit/pre-site-distribution* tests/unit/deliberation-briefing* tests/unit/external-briefing* tests/unit/staff-deliberations* tests/unit/review-bundle* --silent
 ```
 
-Session 515: on the branch, 268 tests across the affected suites pass; the full suite, build,
-and lint were not run at the pause. `report:claim-evidence-pilot -- --current` recorded one
-advisory (fired to a builder subagent); a bounded row was added to the pilot directive.
+Session 516: full jest, lint, and all `check:*` gates green at each of the three PR heads.
+`report:claim-evidence-pilot -- --current` recorded no eligible plan/design edit for this
+session key; no observation row added.

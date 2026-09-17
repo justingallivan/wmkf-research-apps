@@ -714,6 +714,422 @@ merge auto-deploys code naming the new columns.
    sequentially, full jest, lint, build; push; PR; then owner runs
    `/codex:adversarial-review --wait --base 236d9219 --model gpt-5.6-sol …` with the receipt marker.
 
+## 10. Guarded regeneration of a sent brief (owner decision 2026-09-16)
+
+Closes §8 item (ix): the owner asked that Regenerate on a brief already sent to
+the Board, instead of staying permanently unavailable, become available only
+through a guarded, superuser-only, audited path mirroring the Pre-Site guarded
+reopen (`pages/api/workbench/pre-site-visit/reopen.js`,
+`lib/services/pre-site-visit/reopen-service.js`). Built on
+`claude/pre-rp-brief-guarded-regen` off `claude/pre-rp-brief-followups` @
+`694863d5`; file:line below are from that branch.
+
+**Design.** Unlike Pre-Site's reopen, the brief never copies bytes — it always
+re-renders deterministically from the frozen input snapshot — so this feature
+validates the guarded-reopen preconditions and then delegates to the ordinary
+claim/render/upload/activate lineage in `generatePreRpBrief`
+(`lib/services/pre-rp-brief/artifact-service.js:658`) via a new internal
+`reopen` option, rather than re-implementing that lineage.
+
+1. **Service** `lib/services/pre-rp-brief/reopen-service.js`, export
+   `reopenSentPreRpBrief(input, { actingUserSystemId }, dependencies)`. All
+   steps below are read-only; the only write is the delegated
+   `generatePreRpBrief` call in the last step.
+   a. `validateInput` (line 77) mirrors, rather than imports, Pre-Site's
+      `validateInput` (`lib/services/pre-site-visit/reopen-service.js:532`,
+      exported): the same six fields and the same reason/note rules
+      (`PRE_SITE_REOPEN_REASON`, `PRE_SITE_REOPEN_CONTRACT` min/max, reused),
+      but `brief_reopen_*` error codes instead of `pre_site_reopen_*`, since
+      the two features validate different artifact identities and the
+      acceptance contract wants brief-specific codes.
+   b. 503 `brief_reopen_schema_not_ready` unless `isGuardedReopenSchemaReady()`.
+   c. Resolves the current brief via `resolveCanonicalPreRpBriefRow`
+      (artifact-service.js:299), fed a custom `{ getRequest, findByRequest }`
+      pair (reopen-service.js:55-56) so the request select can add
+      `akoya_requestnum`, which the artifact service's own lineage select
+      omits (ordinary generation never needs it).
+      **Deviation from the literal step order for idempotent retry
+      (reopen-service.js:141):** before the stale/not-shared checks, if the
+      current row's `wmkf_reopencycleid` already equals the typed
+      `clientOperationId`, the call returns `{ artifact, reused: true }`
+      immediately. Without this, an exact retry's `expectedArtifactId` names
+      the pre-reopen row, which the first call already superseded, so every
+      retry would be refused as stale instead of replaying — this mirrors
+      Pre-Site's own audit-row replay (`findAuditRow`/`committedResult` in
+      `lib/services/pre-site-visit/reopen-service.js`).
+      Otherwise: 409 `brief_reopen_stale` if `expectedArtifactId` is not the
+      current row; 409 `brief_reopen_not_shared` unless lifecycle is REVIEW
+      and operation status is READY.
+   d. 409 `brief_reopen_request_number_mismatch` unless the typed
+      `requestNumber` exactly matches `akoya_requestnum`.
+   e. 409 `brief_reopen_not_sent` unless `hasSentAttemptForSource` reports a
+      sent attempt for the current row.
+   f. 409 `brief_reopen_in_flight` (this feature's own pick — not named in
+      the original design brief) if any distribution attempt is in flight for
+      the source, using the exact same test as `attemptIsInFlight`
+      (artifact-service.js:118, exported so this file reuses it exactly
+      rather than risking a second copy drifting from the original); 503
+      `brief_distribution_state_unavailable` on a reader failure, a
+      non-array result, or a full (>=100-row) distribution page — same
+      reasoning as `assertCurrentBriefReplaceable`.
+   g. Calls `generatePreRpBrief({ requestId, clientOperationId,
+      actingUserSystemId, reopen: { cycleId: clientOperationId, reasonCode,
+      reasonNote } }, dependencies)`.
+2. **Generate option** `reopen` on `generatePreRpBrief`
+   (artifact-service.js:658) is internal-only; the public route
+   (`pages/api/workbench/pre-rp-brief.js`) still rejects any body key other
+   than `requestId`/`clientOperationId` (unchanged). `assertCurrentBriefReplaceable`
+   (artifact-service.js:131) gained an `{ allowSent }` option: when `reopen`
+   is present it skips only the "already sent" half of the gate — an
+   in-flight attempt still blocks unconditionally, both before generation
+   (line 699) and at the `commitReadyLineage` activation fence (line 557,
+   threaded through a new `reopen` field on that function's options object).
+   The new row's `createDocument` payload (line ~730) adds
+   `wmkf_reopencycleid`/`wmkf_reopenreasoncode`/`wmkf_reopenreasonnote` only
+   when `reopen` is present; the prior row is superseded and the pointer
+   moves exactly as ordinary regeneration. An exact retry with the same
+   `clientOperationId` reuses the row (`reused: true`) via the reopen-service
+   replay above, without a second `generatePreRpBrief` call.
+3. **Route** `pages/api/workbench/pre-rp-brief/reopen.js`, copied from
+   `pages/api/workbench/pre-site-visit/reopen.js` line for line except: the
+   service import (`reopenSentPreRpBrief`), the DAL context name
+   (`workbench-pre-rp-brief-reopen`), the 503 code
+   (`brief_reopen_schema_not_ready`), the 500 fallback code
+   (`brief_reopen_failed`), and — beyond the brief's exception list — the
+   `console.error` label and the 500 body message, reworded for the brief
+   rather than left as Pre-Site's literal text. `BODY_KEYS` is identical
+   (six fields).
+4. **Tab** (`shared/components/workbench/StaffDeliberationsTab.js`):
+   `briefMoreItems` (line ~958) adds `Regenerate sent brief…` when
+   `briefReadyFile && briefShared && everSent && isSuperuser &&
+   !beyondDeliberations`, calling `openBriefReopenDialog`. The dialog
+   (mirrors the Pre-Site reopen dialog: reason select from
+   `PRE_SITE_REOPEN_REASON_LABEL`, note, typed request number, submit
+   disabled until valid) posts the six fields to the new route and, on
+   success, re-fetches brief status (`readBriefStatus`) so `briefArtifact`
+   moves to the new row. **Revised in round 2 below**: moving `briefArtifact`
+   alone is not sufficient to refresh distribution history — the panel's
+   `key` and an eager local reset now do that work.
+5. **Docs**: this section; `docs/API_ROUTE_SECURITY_MATRIX.md` row for
+   `/api/workbench/pre-rp-brief/reopen`; one sentence added to
+   `docs/atlas/dataverse-wmkf-requestdocument.md`'s Pre-RP Brief section
+   noting that a reopen-regenerated row carries the three reopen audit
+   fields.
+
+**Tests** (all green on `claude/pre-rp-brief-guarded-regen`):
+`tests/unit/pre-rp-brief-reopen-service.test.js` (new, 16 tests: one
+refusal per step a-f plus a success and an idempotent-retry test),
+`tests/unit/pre-rp-brief-artifact-service.test.js` (4 tests added inside
+`describe('generatePreRpBrief')`'s new `describe('the reopen option')`, no
+removals), `tests/unit/workbench-reopen-pre-rp-brief-route.test.js` (new, 7
+tests mirroring the Pre-Site route test one for one),
+`tests/unit/workbench-pre-rp-brief-route.test.js` (one row added to the
+existing `test.each` rejecting a `reopen` body key), and
+`tests/unit/staff-deliberations-tab.test.js` (5 tests added, no removals).
+
+### 10.1 Round 2: Codex adversarial review findings (2026-09-16), fixed on the same branch after merging `claude/pre-rp-brief-followups` (merge `da3955ae`, which added `expectedPointerId` to `commitReadyLineage` and own-claim-only upload cleanup)
+
+**Finding 1 [high] — source identity not bound across the delegation.**
+The reopen-service validated a specific current-row identity
+(`currentRow.wmkf_requestdocumentid`, confirmed equal to
+`input.expectedArtifactId`) before ever calling `generatePreRpBrief`, but
+`generatePreRpBrief` then did its own independent pointer read — a rival
+generation (another guarded reopen, or an ordinary regenerate) could move
+the pointer in between, and `generatePreRpBrief` would supersede whatever it
+found instead of what was authorized. Fix: `reopenSentPreRpBrief`
+(reopen-service.js:242) now passes `reopen.sourceArtifactId =
+currentRow.wmkf_requestdocumentid`. `generatePreRpBrief`
+(artifact-service.js:774) re-checks, immediately after its own
+`resolveCanonicalPreRpBriefRow` call and before any claim, that the row it
+resolved equals `reopen.sourceArtifactId`; a mismatch throws 409
+`brief_reopen_stale` (`reopenSourceStaleError`, artifact-service.js:120).
+`expectedPointerId` (artifact-service.js:778, threaded into
+`commitReadyLineage`'s activation fence, merged in from
+`claude/pre-rp-brief-followups`) is set to `reopen.sourceArtifactId` when
+`reopen` is present, rather than merely whatever the (now re-verified)
+`currentRow` happens to be — defense in depth, since `commitReadyLineage`
+already has its own `brief_pointer_changed` fence for a race that opens
+later, during render/upload. Test:
+`tests/unit/pre-rp-brief-reopen-service.test.js` "fails closed
+(brief_reopen_stale) when a rival brief takes the pointer between
+reopen-service validation and generatePreRpBrief's own pointer read" —
+mutates the request pointer inside the `loadInputs` mock (which runs before
+`generatePreRpBrief`'s own pointer read) to simulate the race, and asserts
+`createDocument`/`uploadFile` were never called.
+
+**Finding 2 [high] — idempotency not bound to the audit payload; generation
+key collision with ordinary rows.**
+(a) `buildPreRpBriefGenerationKey` (artifact-service.js:709) gained an
+optional `reopen: { cycleId, sourceArtifactId, reasonCode, reasonNote }`
+argument, bound into the hashed key only when present, so a guarded
+generation's key can never collide with an ordinary row that happens to
+share the same `clientOperationId` (asserted by a new key test in
+`tests/unit/pre-rp-brief-artifact-service.test.js`: omitting `reopen`, or
+passing it as `null`, produces the byte-identical key as before this option
+existed). (b) `generatePreRpBrief` (artifact-service.js:763) fails closed
+409 `brief_reopen_audit_mismatch` (`reopenAuditMismatchError`,
+artifact-service.js:134) if the row resolved by the (now reopen-bound) key
+carries different `wmkf_reopencycleid`/`reasoncode`/`reasonnote` than the
+tuple — defense in depth, since (a) already makes this practically
+unreachable. (c) The reopen-service's own idempotent-retry short-circuit
+(reopen-service.js:148) previously matched on `wmkf_reopencycleid` alone;
+it now also requires the reason code, reason note, and the superseded
+source to match exactly, else 409 `brief_reopen_audit_mismatch`. The
+superseded source is now recorded: `wmkf_SourceDocument` — the same
+generic lookup Pre-Site's own reopen (`'wmkf_SourceDocument@odata.bind'`,
+`lib/services/pre-site-visit/reopen-service.js:690`) and the distribution
+snapshots (`lib/services/pre-site-visit/distribution-service.js:968`)
+already use on this entity — is available and is now written on the
+brief's successor row too (artifact-service.js:830), and the replay
+compares it against `input.expectedArtifactId`
+(`currentRow._wmkf_sourcedocument_value`, reopen-service.js:151). Tests:
+"refuses (brief_reopen_audit_mismatch) a retry whose reason/note differ
+from the first, sharing the same clientOperationId"; "does not claim a
+pre-existing ordinary FAILED row that shares the same clientOperationId
+(guarded and ordinary keys differ)" (asserts the ordinary row is never
+touched); "is idempotent: an exact retry…" (pre-existing, still green) and
+the new key test above cover the exact-replay and key-collision cases.
+
+**Finding 3 [medium] — successful regeneration left distribution history
+keyed to the superseded source.**
+`PreSiteDistributionPanel`'s own history-load effect
+(`shared/components/workbench/PreSiteDistributionPanel.js:409-426`) only
+re-runs on a `requestId` change (`loadHistory`'s deps are `requestId`,
+`requestNumber`, `onHistory` — never `sourceArtifact`), so moving
+`briefArtifact` to the successor row alone left the panel showing the
+predecessor's cached "already sent" history until an unrelated remount.
+Fix, in `StaffDeliberationsTab.js`: (i) the panel's `key` (line ~1266) is
+now `` `distribution-${requestId}:${briefArtifact?.artifactId || ''}` ``
+(picked over adding the artifact id to the panel's own effect deps, to
+avoid touching `PreSiteDistributionPanel.js`, which is outside this
+feature's file list, and because a full remount also clears the panel's
+own composer-touched/seeded-defaults state, which should not survive onto
+an unrelated new document either); (ii) `submitBriefReopen` now also calls
+`setCurrentSourceEverSent(false)` and `setLatestSendFailure(null)`
+eagerly, right when `briefArtifact` moves to the successor, so there is no
+render in between where the UI could show the brand-new (never sent) row
+as already sent while the remounted panel's own history fetch is still in
+flight. Test (replacing the prior mock-only assertion): the mock panel in
+`tests/unit/staff-deliberations-tab.test.js` now records
+`sourceArtifact.artifactId` on every genuine mount (an effect with empty
+deps, mirroring the real effect's `requestId`-only trigger) into
+`mountedSourceArtifactIds`; the new test proves a second, distinct-artifact
+mount happened (not just a re-render with updated props), then shares the
+new Draft again and asserts `Regenerate Brief` is offered and `Send the
+deliberation email again…` is not — the exact menu state a stale "already
+sent" signal would have gotten wrong.
+
+### 10.2 Round 3: Codex adversarial review finding (2026-09-17), fixed on the same branch on top of `7ef55e67`
+
+**Finding [high] — the round-2 eager sent-state reset ran unconditionally,
+including on a 202 replay.** `submitBriefReopen`'s reset of
+`currentSourceEverSent`/`latestSendFailure` (round 2, §10.1) ran regardless
+of what the refreshed status actually reported. On a 202 reply (the
+operation still `GENERATING`, e.g. a concurrent claim elsewhere), the
+refreshed status's `currentArtifact` is still the PREDECESSOR — the pointer
+has not moved yet, so that row is still READY/REVIEW and fully live, its own
+composer/Share binding intact. Resetting `currentSourceEverSent` to `false`
+regardless meant the UI could momentarily treat that still-current,
+already-sent predecessor as never-sent, exposing a `Share…` control (and
+misrepresenting the overflow menu's Regenerate/Send-again state) for a
+document that had, in fact, already gone to the Board — a duplicate-send
+risk.
+
+Fix (`shared/components/workbench/StaffDeliberationsTab.js:858-876`):
+the reset now runs only when the refreshed status's current artifact id
+differs from `expectedArtifactId` (the pre-reopen row) —
+`successorActivated = Boolean(nextArtifact) && nextArtifact.artifactId !==
+expectedArtifactId`. On a 202/still-GENERATING reply (or any reply where
+the current artifact id is unchanged), the predecessor's sent state is left
+untouched; the dialog stays open with its existing "already in progress,
+retry" message (unchanged UX, matching Pre-Site's own reopen, which also
+does not auto-poll on 202), and the SAME `clientOperationId` on a later
+manual retry re-checks status and only resets once the successor is
+actually confirmed current.
+
+Test: `tests/unit/staff-deliberations-tab.test.js` "a 202 (still-generating)
+guarded regeneration reply never resets the still-current predecessor's
+sent state; only the completed successor does" (new). It nulls
+`distributionHistoryFeed` before the in-progress submit — the mocked
+panel's `onHistory` effect otherwise fires on every re-render (an
+intentional simplification for other tests exercising a genuine data
+change, unlike the real panel, which only refires on a `requestId`
+change) and would keep re-asserting the pre-reopen "sent" feed regardless
+of what the tab's own state did, masking the bug either way; nulling it
+isolates the assertions to the tab's own `currentSourceEverSent` state.
+Phase 1 (202): asserts no `Share…` button, `Send the deliberation email
+again…` still offered, `Regenerate Brief` not offered, and no panel
+remount (`mountedSourceArtifactIds` unchanged) — the exact predecessor
+state as before the reopen attempt. Phase 2 (successor activates on
+retry): asserts the panel remounts for the new artifact id and the menu
+flips to ordinary `Regenerate Brief` / no `Send again`, matching §10.1's
+existing success-path test. Mutation check: reverting `successorActivated`
+to an unconditional `true` makes phase 1 fail on the `Share…` assertion
+(the exact bug) — pasted in the build report.
+
+### 10.3 Round 4: Codex adversarial review finding (2026-09-17), fixed on the same branch on top of `4da99916`
+
+**Finding [high] — round 3 only protected `everSent`, not the Share/send-again/
+resend affordances themselves.** After a 202, the predecessor correctly stays
+current with `everSent: true` (round 3), so `briefMoreItems`
+(`StaffDeliberationsTab.js:1001-1011`, pre-fix) still offered "Send the
+deliberation email again…" for it. Once the guarded-reopen dialog was
+cancelled (nothing else re-checks status), staff could resend the
+predecessor while `briefPendingArtifact` was still `GENERATING`; a resend
+completing before the successor activated would send a duplicate Board
+email once the successor itself eventually sent.
+
+**Fix.** A new derived flag, `briefRegenerationPending` (line 585,
+`briefPendingArtifact?.operationStatus === GENERATING`), is sourced from
+`briefPendingArtifact` — not from any one action's own local flag (like
+`briefGenerating`, which only ever reflects THIS session's own ordinary
+Generate/Regenerate call) — so it is true regardless of which action
+started the pending regeneration (ordinary Regenerate, this session's own
+guarded reopen, or another staff member's concurrent action discovered via
+the periodic/mount status fetch). Every Share/send-again/resend surface is
+now gated on `!briefRegenerationPending`:
+- the Draft-brief "Share…" button (line 1165) and its blocked-reason note
+  (line 1176);
+- the shared-not-sent "Share…"/"Resend" button (line 1183) and its
+  blocked-reason note (line 1194);
+- the shared-sent "Resend" button (line 1207);
+- the overflow menu's "Send the deliberation email again…" (line 1002) and
+  "Regenerate sent brief…" (line 1010) items.
+
+The composer itself is force-closed if it was already open when a
+regeneration is discovered pending: a `useEffect` (line 597) watching
+`briefRegenerationPending`/`composerOpen` calls `setComposerOpen(false)`.
+This is a genuine one-way "close and stay closed" transition (not a pure
+render-time derivation, since `composerOpen` must not silently reopen once
+the pending regeneration finishes), so it legitimately needs an effect
+despite eslint's generic `react-hooks/set-state-in-effect` warning
+(0 errors either way — `npx eslint` still exits 0). The existing "A new
+brief is being generated…" note (line ~1116, shown whenever
+`briefRegenerationPending && briefReadyFile`) now leads with "sharing is
+paused until it is ready" — it already occupies the exact place the
+suppressed actions would otherwise be.
+
+Suppression is scoped to `GENERATING` only: a `FAILED` pending attempt
+(the regeneration did not succeed, so the predecessor was never actually at
+risk) leaves Share/send-again available, matching the pre-existing failure
+UX (`briefUnchangedRetryBlocked`, unaffected by this change).
+
+**Tests** (`tests/unit/staff-deliberations-tab.test.js`): the round-3 202
+regression test is replaced by "a 202 (still-generating) guarded
+regeneration suppresses every Share/send-again/resend path and closes the
+composer; both lift once the successor activates" — opens the composer via
+"Send the deliberation email again…" first (to exercise the force-close),
+then starts the guarded reopen, asserts the 202 reply force-closes the
+composer and hides all three actions (asserted with the overflow menu
+opened, after cancelling the dialog — not merely retrying it), then
+remounts the tab (`rerender` with a new `key`, simulating a later revisit)
+to observe the successor activate, history remount for the new artifact
+id, and ordinary `Regenerate Brief` return. A second, new test — "suppression
+lifts once a pending regeneration attempt FAILS, not just once it
+activates" — proves the `FAILED` case is unaffected. Mutation check:
+setting `briefRegenerationPending` to a hardcoded `false` makes the 202
+test fail on the composer-force-close assertion (the exact bug) — pasted in
+the build report.
+
+### 10.4 Round 5: Codex adversarial review findings (2026-09-17), fixed on the same branch on top of `04db470d`
+
+Two server-side findings: the UI-only suppressions in §10.3 protected the
+tab, but nothing on the server stopped the predecessor from actually being
+distributed while its successor was generating, and an abandoned (expired
+claim lease) regeneration could permanently strand the current brief's own
+Share/send affordances.
+
+**Finding 1 [high] — server still permitted predecessor distribution while
+its successor is generating.** `resolveCurrentPreRpBriefForDistribution`
+(`lib/services/pre-rp-brief/artifact-service.js:447`) resolves the pointer
+row and checks its own eligibility, but a guarded regeneration's successor
+claims a brand-new row under a *different* generation key while the
+pointer still names the predecessor — so those checks alone never see it.
+Both `pages/api/workbench/pre-site-visit/distribution/prepare.js` and the
+send-time freshness recheck (`assertAttemptSourceCurrent` in
+`lib/services/pre-site-visit/distribution-service.js`, called from
+`pages/api/workbench/pre-site-visit/distribution/send.js`) call this same
+resolver via `resolveSource`, so fixing it here closes both ends. Fix: after
+resolving the pointer row, look across `briefRows` (already returned by
+`resolveCanonicalPreRpBriefRow`) for any other non-superseded row that is
+GENERATING with an active claim lease — `generatingLeaseActive` (line 505),
+the exact same 15-minute `GENERATING_LEASE_MS` window `claimExisting`
+uses — and refuse 409 `brief_regeneration_in_progress` ("A replacement
+brief is being generated; sharing is paused until it is ready.") (line
+480-489). An ordinary request with no other brief row, or only an
+abandoned (expired-lease) one, is unaffected. Combined with the existing
+in-flight-attempt refusal at reopen claim time
+(`assertCurrentBriefReplaceable`), a predecessor send cannot start or
+complete while a guarded regeneration is live, and a guarded regeneration
+cannot claim while a predecessor send is in flight — **except for a
+residual sub-second window between the send's freshness recheck and the
+reopen's claim `createDocument` insert**, where both could observe "clear"
+before the other's write lands. Recorded here rather than closed with a
+new lock: both operations write through Dataverse ETags/alternate keys
+that fail closed on a genuine conflict (the reopen's generation-key insert,
+the send's own row ETags), so the realistic failure mode of this window is
+one side's write being rejected and needing a retry, not silent data
+corruption; a dedicated cross-resource lock was judged disproportionate to
+a sub-second, self-correcting race. The panel maps the new code to named
+copy in both `prepare()` and `send()`
+(`shared/components/workbench/PreSiteDistributionPanel.js`), mirroring the
+existing `brief_reviews_required` branch: "A replacement brief is being
+generated; sharing is paused until it is ready." — `send()`'s branch keeps
+the existing (still valid) prepared preview rather than discarding it, since
+nothing about the preview itself is stale.
+
+Tests: `tests/unit/pre-rp-brief-artifact-service.test.js` (resolver-level:
+refuses with an active-leased other row, proceeds with an expired-leased
+one, proceeds with no other row at all); `tests/unit/pre-site-distribution-service.test.js`
+(`preparePreSiteDistribution`/`sendPreSiteDistribution`-level: same
+refuse/proceed pair, wired through the real call sites — `createOrGetAttempt`/
+`createEmailActivity` are asserted not called on refusal); `tests/unit/pre-site-distribution-panel.test.js`
+(named copy for both `prepare` and `send`, mirroring the existing
+`brief_reviews_required` test).
+
+**Finding 2 [high] — an expired GENERATING lease stranded the sent
+brief.** The tab's `briefRegenerationPending` (round 4, §10.3) suppressed
+Share/send-again for ANY `GENERATING` pending artifact, with no way to
+recover if that attempt's claim lease had actually expired (an abandoned
+attempt — the claiming session crashed, lost network, or was otherwise
+never going to finish) short of a page reload racing the exact right
+status payload. Fix: the pending-artifact projection is now lease-aware.
+`projectPreRpBriefArtifact` (`artifact-service.js:327`) adds
+`leaseActive: generatingLeaseActive(row)` — `false` for any non-GENERATING
+row (the concept doesn't apply) or a GENERATING row whose lease has
+expired, `true` only for an actively-claimed one — using the exact same
+window as finding 1's server-side refusal, so the UI signal and the
+server's own refusal agree. The tab
+(`shared/components/workbench/StaffDeliberationsTab.js:590-596`) now
+computes `briefRegenerationPending = pending?.operationStatus === GENERATING
+&& pending.leaseActive !== false` (`!== false` rather than `=== true`, so
+an older status payload without the field, or any other non-`false` value,
+still fails safe as "still pending" rather than silently un-suppressing).
+Once the lease expires, suppression lifts — the guarded-reopen item and
+Share/resend return — and a retry of the guarded-reopen dialog reclaims the
+abandoned row via the existing expired-lease path in `claimExisting`
+(unchanged).
+
+Tests: `tests/unit/pre-rp-brief-artifact-service.test.js` (a
+clock-controlled status test: a GENERATING row with `modifiedon` 1 minute
+old projects `leaseActive: true`; 16 minutes old projects `leaseActive:
+false`); `tests/unit/staff-deliberations-tab.test.js` ("suppression lifts
+once the pending artifact reports leaseActive: false, even while still
+GENERATING" — Share/send-again return with a GENERATING pending artifact
+whose `leaseActive` is `false`).
+
+Mutation checks (both restored after, pasted in the build report): (i)
+dropping the GENERATING/lease check in the resolver (replacing the
+`regenerating` condition with `false`) made the new prepare-refusal test
+fail; (ii) hardcoding `leaseActive: true` in the projector made the new
+clock-controlled status test fail.
+
+### 10.5 Codex round 5 (2026-09-17, gpt-5.6-sol, verification only)
+
+**Verdict: approve, no material findings.** Codex confirmed prepare and both send-time
+checks use the lease-aware resolver, the pending projection and tab suppression share the same
+15-minute lease semantics, and expired claims remain reclaimable through the guarded dialog.
+
 ## 11. Review bundle PDF (owner request 2026-09-16; Step C on `claude/pre-rp-brief-review-bundle`)
 
 **Ask.** A Board member asked to download every review shown inline on the deliberation

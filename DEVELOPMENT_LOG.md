@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Pre-Research Presentation Brief shipped as the Board distribution source (Session 516)
+
+**Milestone:** A fourth governed request document, rendered deterministically from a tracked DOCX template with no prompt, now replaces the Pre-Site writeup as what the deliberation briefing page and Share email deliver to the Board; Share fails closed on zero received reviews and on input drift unless staff acknowledge the live fingerprint.
+**Sessions:** 515 (plan, four Codex rounds, Dataverse schema), 516 (build slices 1–6, Codex rescue, merge, hotfix, migration 052). PRs #307, #308, #309.
+**Ship state:** Picklist `100000009` and pointer `wmkf_currentprerpbrief` live in Production; migration 052 applied; the owner generated and shared a brief in Production (select hotfix followed). Follow-ups (activation fences, guarded regeneration of a sent brief, a single review-bundle PDF with migration 053) are built and Codex-reviewed on PRs #310–#312, unmerged.
+**Why it matters:** The Board receives a stable, staff-locked brief whose inputs are fingerprinted and audited, instead of a live PD workspace document that could drift after Share.
+**Pointers:** `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`, `docs/atlas/dataverse-wmkf-requestdocument.md`, `lib/services/pre-rp-brief/`; merges `f1cf8fe3`, `9ab5fe71`, `de349928`.
+
 ## September 2026 — Review writeup synthesis and Contact-linked expertise roster shipped; reviewer-institution storage reconciled dormant (Session 513)
 
 **Milestone:** Phase II review material now composes directly in the Reviews tab and exports into panel-prep Word and newly generated Pre-Site drafts; the expertise roster can bind members to active Dataverse Contacts so attendee flows resolve current email without stale fallback.

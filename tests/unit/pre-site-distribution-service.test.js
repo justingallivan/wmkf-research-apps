@@ -308,6 +308,87 @@ test('send refuses when the deliberation session moved, appeared, or was removed
   }
 });
 
+// Codex adversarial review (2026-09-17, round 5 finding 1): the send-time
+// freshness recheck (`assertAttemptSourceCurrent` -> `resolveSource` ->
+// `resolveCurrentPreRpBriefForDistribution`) must also refuse while a
+// guarded regeneration is live for this request's brief, using the same
+// active-lease window `claimExisting`/`generatingLeaseActive` use.
+test('send refuses with brief_regeneration_in_progress when a guarded regeneration is live; does not refuse with that code once its lease has expired', async () => {
+  const input = {
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64), fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  };
+  const row = attemptFixture();
+  const regeneratingRow = (ageMs) => ({
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
+    wmkf_contenttype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    modifiedon: new Date(Date.now() - ageMs).toISOString(),
+  });
+  const deps = (extraRow) => {
+    const base = currentSourceDependencies(row);
+    return {
+      ...base,
+      findDocumentsByRequest: jest.fn(async () => {
+        const original = await base.findDocumentsByRequest();
+        return { records: [...original.records, extraRow] };
+      }),
+      getAttempt: jest.fn(async () => row),
+      claimSend: jest.fn(async () => ({ ...row, lease_token: '77777777-7777-4777-8777-777777777777' })),
+      findEmailByCorrelation: jest.fn(async () => []),
+      createEmailActivity: jest.fn(),
+      recordFailure: jest.fn(async () => row),
+    };
+  };
+
+  const active = deps(regeneratingRow(1 * 60 * 1000));
+  await expect(sendPreSiteDistribution(input, active))
+    .rejects.toMatchObject({ code: 'brief_regeneration_in_progress', httpStatus: 409 });
+  expect(active.createEmailActivity).not.toHaveBeenCalled();
+
+  const expired = deps(regeneratingRow(16 * 60 * 1000));
+  await expect(sendPreSiteDistribution(input, expired))
+    .rejects.not.toMatchObject({ code: 'brief_regeneration_in_progress' });
+});
+
+// Codex adversarial review (2026-09-17, round 5 finding 1): the pointer
+// still names the predecessor while a guarded regeneration claims its
+// successor under a different generation key, so prepare must also refuse
+// -- before any persistence or file work -- while that successor's claim
+// lease is active, and proceed once it has expired (an abandoned attempt).
+test('prepare refuses with brief_regeneration_in_progress when a guarded regeneration is live, before any persistence or file work; proceeds once its lease has expired', async () => {
+  const regeneratingRow = (ageMs) => ({
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
+    wmkf_contenttype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    modifiedon: new Date(Date.now() - ageMs).toISOString(),
+  });
+
+  const active = createPrepareHarness();
+  const originalFindDocumentsByRequest = active.dependencies.findDocumentsByRequest;
+  active.dependencies.findDocumentsByRequest = jest.fn(async () => {
+    const original = await originalFindDocumentsByRequest();
+    return { records: [...original.records, regeneratingRow(1 * 60 * 1000)] };
+  });
+  await expect(preparePreSiteDistribution(prepareInput(), active.dependencies))
+    .rejects.toMatchObject({ code: 'brief_regeneration_in_progress', httpStatus: 409 });
+  expect(active.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+
+  const expired = createPrepareHarness();
+  const originalFindDocumentsByRequestExpired = expired.dependencies.findDocumentsByRequest;
+  expired.dependencies.findDocumentsByRequest = jest.fn(async () => {
+    const original = await originalFindDocumentsByRequestExpired();
+    return { records: [...original.records, regeneratingRow(16 * 60 * 1000)] };
+  });
+  const result = await preparePreSiteDistribution(prepareInput(), expired.dependencies);
+  expect(result.attempt).toBeTruthy();
+});
+
 test('prepare refuses when the briefing page is not enabled, before any persistence or file work', async () => {
   const off = createPrepareHarness();
   off.dependencies.briefingReady = () => false;

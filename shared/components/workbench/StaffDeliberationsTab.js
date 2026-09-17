@@ -211,6 +211,12 @@ export default function StaffDeliberationsTab({
   const [noBriefRowsAtAll, setNoBriefRowsAtAll] = useState(false);
   const briefSequence = useRef(0);
   const briefController = useRef(null);
+  // Guarded regeneration of a brief already sent to the Board (owner decision
+  // 2026-09-16, plan §10) — superuser-only; mirrors the Pre-Site reopen
+  // state above but targets the brief's own artifact/status.
+  const [briefReopeningRequestId, setBriefReopeningRequestId] = useState(null);
+  const [briefReopenForm, setBriefReopenForm] = useState(null);
+  const [briefReopenError, setBriefReopenError] = useState(null);
 
   // Shared composer/dialog state.
   const [composerOpen, setComposerOpen] = useState(false);
@@ -567,6 +573,36 @@ export default function StaffDeliberationsTab({
   const briefUnchangedRetryBlocked = briefPendingArtifact?.operationStatus
     === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED
     && briefPendingArtifact.retryable === false;
+  // Codex adversarial review (2026-09-17, round 4): while ANY brief
+  // regeneration is pending — from this session's own ordinary Regenerate,
+  // its own guarded reopen, or another staff member's concurrent action
+  // (picked up by the periodic/mount status fetch) — the CURRENT brief must
+  // not be sharable. A send that completes before the pending regeneration
+  // activates would be a duplicate Board email once the successor also
+  // eventually sends, and a guarded reopen's own 202 leaves the predecessor
+  // fully current (still Review/sent) with nothing else marking it unsafe
+  // to resend.
+  // Round 5 finding 2: lease-aware. `leaseActive` is `false` (never
+  // undefined) for a GENERATING row whose 15-minute claim lease has expired
+  // (an abandoned attempt) — `!== false` rather than `=== true` so an older
+  // status payload without the field (or any other truthy/nullish value)
+  // still fails safe as "still pending" rather than silently un-suppressing.
+  const briefRegenerationPending = briefPendingArtifact?.operationStatus
+    === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING
+    && briefPendingArtifact.leaseActive !== false;
+  // A regeneration can start (or be discovered, via the periodic/mount
+  // status fetch) while the composer is already open from an earlier click;
+  // force it closed rather than leave a stale, still-sendable dialog open
+  // over a source that just became unsafe to send. This is a genuine
+  // one-way "close and stay closed until the user reopens it" transition
+  // (not derivable purely during render, since `composerOpen` must not
+  // silently reopen once the regeneration finishes) — a legitimate use of
+  // an effect; eslint's generic set-state-in-effect warning is expected
+  // here (its own disable directive is reported unused by a different
+  // underlying check, so none is added).
+  useEffect(() => {
+    if (briefRegenerationPending && composerOpen) setComposerOpen(false);
+  }, [briefRegenerationPending, composerOpen]);
   const briefShared = briefArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const briefDraftReady = briefArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const briefDownloadUrl = downloadUrlFor(briefReadyFile);
@@ -789,6 +825,109 @@ export default function StaffDeliberationsTab({
     }
   };
 
+  const briefReopening = briefReopeningRequestId === requestId;
+  const briefReopenFormValid = Boolean(
+    briefReopenForm
+      && requestNumber
+      && Object.prototype.hasOwnProperty.call(PRE_SITE_REOPEN_REASON_LABEL, briefReopenForm.reasonCode)
+      && briefReopenForm.reasonNote.trim().length >= PRE_SITE_REOPEN_CONTRACT.minimumReasonNoteLength
+      && briefReopenForm.reasonNote.trim().length <= PRE_SITE_REOPEN_CONTRACT.maximumReasonNoteLength
+      && briefReopenForm.typedRequestNumber === requestNumber,
+  );
+
+  const openBriefReopenDialog = () => {
+    if (!briefShared || !everSent || !isSuperuser || briefReopeningRequestId === requestId
+      || !requestNumber || !briefArtifact) return;
+    setBriefReopenError(null);
+    setBriefReopenForm({
+      reasonCode: '',
+      reasonNote: '',
+      typedRequestNumber: '',
+      clientOperationId: newClientOperationId(),
+      submitted: false,
+    });
+  };
+
+  const submitBriefReopen = async (event) => {
+    event.preventDefault();
+    if (!briefReopenFormValid || briefReopening || !briefShared || !requestId || !briefArtifact) return;
+
+    const id = requestId;
+    const expectedArtifactId = briefArtifact.artifactId;
+    const sequence = ++briefSequence.current;
+    briefController.current?.abort();
+    const controller = new AbortController();
+    briefController.current = controller;
+    setBriefReopeningRequestId(id);
+    setBriefReopenError(null);
+    setBriefReopenForm((current) => (current ? { ...current, submitted: true } : current));
+    try {
+      const response = await fetch('/api/workbench/pre-rp-brief/reopen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: id,
+          expectedArtifactId,
+          clientOperationId: briefReopenForm.clientOperationId,
+          requestNumber: briefReopenForm.typedRequestNumber,
+          reasonCode: briefReopenForm.reasonCode,
+          reasonNote: briefReopenForm.reasonNote.trim(),
+        }),
+        signal: controller.signal,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `Guarded brief regeneration failed (${response.status})`);
+      if (briefSequence.current !== sequence || id !== requestId) return;
+
+      // Refreshes brief status (the new artifact) and, by updating the
+      // distribution panel's sourceArtifact-keyed remount below, its
+      // distribution history — `everSent` re-derives against the new
+      // (never-sent) row.
+      const refreshed = await readBriefStatus(id, controller.signal);
+      if (briefSequence.current !== sequence || id !== requestId) return;
+      const nextArtifact = refreshed.currentArtifact || body.artifact || null;
+      setBriefArtifact(nextArtifact);
+      setBriefPendingArtifact(refreshed.pendingArtifact || null);
+      // Codex adversarial review (2026-09-17, round 3 follow-up to round 2
+      // finding 3): only reset once the refreshed status confirms the
+      // CURRENT artifact is actually the completed successor (a different
+      // artifact id from the pre-reopen row) — never speculatively. On a
+      // 202 / still-GENERATING reply (or any reply where the current
+      // artifact id is unchanged, e.g. a concurrent claim elsewhere), the
+      // predecessor row is still READY/REVIEW and fully live — its own
+      // Share/composer binding and its own correct "already sent" state —
+      // until activation actually completes. Resetting here regardless of
+      // that would let the UI briefly offer a duplicate Board send against
+      // the still-current predecessor. Retrying this same dialog (its
+      // clientOperationId is stable across retries) re-checks status again
+      // once the successor has activated, and only then resets.
+      const successorActivated = Boolean(nextArtifact) && nextArtifact.artifactId !== expectedArtifactId;
+      if (successorActivated) {
+        setCurrentSourceEverSent(false);
+        setLatestSendFailure(null);
+      }
+      if (response.status === 202
+        || body.artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
+        setBriefReopenError(
+          'This guarded regeneration is already in progress. Keep this dialog open and retry to check the same operation.',
+        );
+        return;
+      }
+      setBriefReopenForm(null);
+    } catch (submitError) {
+      if (submitError?.name !== 'AbortError'
+        && briefSequence.current === sequence
+        && id === requestId) {
+        setBriefReopenError(submitError.message);
+      }
+    } finally {
+      if (briefSequence.current === sequence && id === requestId) {
+        if (briefController.current === controller) briefController.current = null;
+        setBriefReopeningRequestId(null);
+      }
+    }
+  };
+
   const confirmDialogContent = confirmDialog?.kind === 'brief'
     ? {
       title: 'Regenerate this brief?',
@@ -861,8 +1000,20 @@ export default function StaffDeliberationsTab({
     briefReadyFile && !beyondDeliberations && (briefDraftReady || (briefShared && !everSent)) && {
       key: 'regenerate', label: 'Regenerate Brief', onSelect: () => setConfirmDialog({ kind: 'brief' }), disabled: briefGenerating || briefUnchangedRetryBlocked,
     },
-    briefReadyFile && briefShared && everSent && {
+    // Codex adversarial review (2026-09-17, round 4): suppressed while a
+    // regeneration is pending (see briefRegenerationPending above) — a send
+    // that completed before that regeneration activates risks a duplicate
+    // Board email.
+    briefReadyFile && briefShared && everSent && !briefRegenerationPending && {
       key: 'send-again', label: 'Send the deliberation email again…', onSelect: openComposer,
+    },
+    // Guarded regeneration of a brief already sent to the Board (owner
+    // decision 2026-09-16, plan §10): superuser-only, never shown otherwise.
+    // Also suppressed while a regeneration is already pending (round 4) —
+    // one at a time.
+    briefReadyFile && briefShared && everSent && isSuperuser && !beyondDeliberations
+      && !briefRegenerationPending && {
+      key: 'reopen-sent', label: 'Regenerate sent brief…', onSelect: openBriefReopenDialog, disabled: briefGenerating,
     },
   ].filter(Boolean);
 
@@ -967,9 +1118,10 @@ export default function StaffDeliberationsTab({
               {checkingBriefStatus && !briefArtifact && !briefPendingArtifact && (
                 <p className="mt-2 text-sm text-gray-600">Checking for an existing brief…</p>
               )}
-              {briefPendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING && briefReadyFile && (
+              {briefRegenerationPending && briefReadyFile && (
                 <p className="mt-2 text-sm text-amber-800">
-                  A new brief is being generated. The current link stays available until it finishes.
+                  A new brief is being generated; sharing is paused until it is ready. The
+                  current link stays available until it finishes.
                 </p>
               )}
               {briefUnchangedRetryBlocked && (
@@ -1013,32 +1165,39 @@ export default function StaffDeliberationsTab({
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Edit in Word
                 </a>
-                <button
-                  type="button"
-                  onClick={openComposer}
-                  disabled={briefGenerating || briefShareBlocked}
-                  title={briefShareBlocked ? briefShareBlockedReason : undefined}
-                  className={secondaryClass}
-                >
-                  Share…
-                </button>
-                {briefShareBlocked && (
+                {/* Codex adversarial review (2026-09-17, round 4): suppressed
+                    while a regeneration is pending — see briefRegenerationPending
+                    above and the amber note that replaces this affordance. */}
+                {!briefRegenerationPending && (
+                  <button
+                    type="button"
+                    onClick={openComposer}
+                    disabled={briefGenerating || briefShareBlocked}
+                    title={briefShareBlocked ? briefShareBlockedReason : undefined}
+                    className={secondaryClass}
+                  >
+                    Share…
+                  </button>
+                )}
+                {briefShareBlocked && !briefRegenerationPending && (
                   <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
                 )}
               </>
             )}
             {briefReadyFile && briefShared && stage === 'shared' && substate === 'not-sent' && (
               <>
-                <button
-                  type="button"
-                  onClick={openComposer}
-                  disabled={briefShareBlocked}
-                  title={briefShareBlocked ? briefShareBlockedReason : undefined}
-                  className={primaryClass}
-                >
-                  {latestSendFailure ? 'Resend' : 'Share…'}
-                </button>
-                {briefShareBlocked && (
+                {!briefRegenerationPending && (
+                  <button
+                    type="button"
+                    onClick={openComposer}
+                    disabled={briefShareBlocked}
+                    title={briefShareBlocked ? briefShareBlockedReason : undefined}
+                    className={primaryClass}
+                  >
+                    {latestSendFailure ? 'Resend' : 'Share…'}
+                  </button>
+                )}
+                {briefShareBlocked && !briefRegenerationPending && (
                   <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
                 )}
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
@@ -1051,7 +1210,7 @@ export default function StaffDeliberationsTab({
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Open working document
                 </a>
-                {latestSendFailure && (
+                {latestSendFailure && !briefRegenerationPending && (
                   <button type="button" onClick={openComposer} className={secondaryClass}>
                     Resend
                   </button>
@@ -1169,7 +1328,14 @@ export default function StaffDeliberationsTab({
 
       {briefReadyFile && (briefDraftReady || briefShared) && (
         <PreSiteDistributionPanel
-          key={`distribution-${requestId}`}
+          // Codex adversarial review finding 3 (2026-09-16 round 2): the
+          // panel's own history-load effect only re-runs on a `requestId`
+          // change, never on `sourceArtifact` alone, so a guarded
+          // regeneration's successor artifact id must be part of this key —
+          // forcing a full remount (a fresh history load from scratch for
+          // the new source) rather than silently keeping the predecessor's
+          // cached "already sent" state.
+          key={`distribution-${requestId}:${briefArtifact?.artifactId || ''}`}
           requestId={requestId}
           requestNumber={requestNumber}
           sourceArtifact={briefArtifact}
@@ -1393,6 +1559,109 @@ export default function StaffDeliberationsTab({
                   className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 >
                   {reopening ? 'Reopening…' : 'Create Draft Successor'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {briefReopenForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="brief-reopen-title"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h3 id="brief-reopen-title" className="text-lg font-semibold text-gray-900">
+              Regenerate a brief the Board already received?
+            </h3>
+            <p className="mt-2 text-sm text-gray-700">
+              The Board already received this brief. A new Draft brief will replace it for staff.
+              The deliberation briefing page keeps serving the version already sent until you share again.
+            </p>
+            {briefReopenError && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+                {briefReopenError}
+              </div>
+            )}
+            <form className="mt-4 space-y-4" onSubmit={submitBriefReopen}>
+              <div>
+                <label htmlFor="brief-reopen-reason" className="block text-sm font-medium text-gray-800">
+                  Reason
+                </label>
+                <select
+                  id="brief-reopen-reason"
+                  value={briefReopenForm.reasonCode}
+                  onChange={(event) => setBriefReopenForm((current) => ({
+                    ...current,
+                    reasonCode: event.target.value,
+                  }))}
+                  disabled={briefReopening || briefReopenForm.submitted}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Select a reason</option>
+                  {Object.entries(PRE_SITE_REOPEN_REASON_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="brief-reopen-note" className="block text-sm font-medium text-gray-800">
+                  Correction note
+                </label>
+                <textarea
+                  id="brief-reopen-note"
+                  value={briefReopenForm.reasonNote}
+                  onChange={(event) => setBriefReopenForm((current) => ({
+                    ...current,
+                    reasonNote: event.target.value,
+                  }))}
+                  minLength={PRE_SITE_REOPEN_CONTRACT.minimumReasonNoteLength}
+                  maxLength={PRE_SITE_REOPEN_CONTRACT.maximumReasonNoteLength}
+                  rows={4}
+                  disabled={briefReopening || briefReopenForm.submitted}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {PRE_SITE_REOPEN_CONTRACT.minimumReasonNoteLength}–{PRE_SITE_REOPEN_CONTRACT.maximumReasonNoteLength} characters.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="brief-reopen-confirmation" className="block text-sm font-medium text-gray-800">
+                  Type request number {requestNumber} to confirm
+                </label>
+                <input
+                  id="brief-reopen-confirmation"
+                  value={briefReopenForm.typedRequestNumber}
+                  onChange={(event) => setBriefReopenForm((current) => ({ ...current, typedRequestNumber: event.target.value }))}
+                  autoComplete="off"
+                  disabled={briefReopening || briefReopenForm.submitted}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+                {briefReopenForm.submitted && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    This operation keeps its original reason and confirmation for safe retry.
+                    Cancel and reopen the dialog to start a different operation.
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setBriefReopenForm(null); setBriefReopenError(null); }}
+                  disabled={briefReopening}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!briefReopenFormValid || briefReopening}
+                  className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {briefReopening ? 'Regenerating…' : 'Regenerate Sent Brief'}
                 </button>
               </div>
             </form>
