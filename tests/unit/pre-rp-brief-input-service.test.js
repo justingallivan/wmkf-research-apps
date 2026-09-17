@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { loadPreRpBriefInputs } from '../../lib/services/pre-rp-brief/input-service.js';
+import { REQUEST_SELECT, loadPreRpBriefInputs } from '../../lib/services/pre-rp-brief/input-service.js';
 import { briefInputFingerprint, renderBrief } from '../../lib/services/pre-rp-brief/docx-renderer.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -168,5 +168,18 @@ describe('loadPreRpBriefInputs', () => {
     });
     await expect(loadPreRpBriefInputs({ requestId: REQUEST_ID }, dependencies))
       .rejects.toThrow('The request could not be resolved.');
+  });
+});
+
+describe('REQUEST_SELECT', () => {
+  // Production 2026-09-16: Dataverse returned 400 0x80060888 because the
+  // select named `_akoya_applicantid_value_formatted` as a property. Formatted
+  // values are annotations, never selectable columns.
+  it('selects base lookups only and never a `_formatted` annotation name', () => {
+    const fields = REQUEST_SELECT.split(',');
+    expect(fields.some((f) => f.endsWith('_formatted'))).toBe(false);
+    expect(fields).toEqual(expect.arrayContaining([
+      '_akoya_applicantid_value', '_wmkf_projectleader_value', '_wmkf_programdirector_value',
+    ]));
   });
 });
