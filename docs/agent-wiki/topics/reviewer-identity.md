@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-21
+last_verified: 2026-09-17
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
@@ -196,6 +196,7 @@ Build considerations: the identity resolution pipeline crosses OpenAlex, ORCID, 
 - Contact enrichment: `project-reviewer-contact-enrichment-anchoring`, `project-serpapi-budget-latency`, `project-serpapi-capability-erosion`.
 - Structured PI and COI: `project-reviewer-pi-identity-structured`, `project-reviewer-coi-rely-on-self-disclosure`, `project-reviewer-coi-concern-surfacing`.
 - Matching and institution contacts: `project-reviewer-institution-match`, `project-contact-promotion-permission`, `project-institution-foundation-liaison`.
+- Reviewer product decisions (routed here from the memory router 2026-09-17): `feedback-prioritize-contact-recall-over-identity-precision`, `feedback-manual-affiliation-edit-no-coi-recheck`, `project-institution-identity-cost-calibration`.
 
 ## `reviewer_email_reconcile_needs_merge` Alerts — Read Before Acting
 

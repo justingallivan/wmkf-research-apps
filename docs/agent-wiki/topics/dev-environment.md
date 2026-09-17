@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-08
+last_verified: 2026-09-17
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -50,6 +50,9 @@ Claude config sync, and environment-specific operating notes.
 - Local Jest/build/git operating notes: `local-jest-build-environment`, `env-broken-git-autogc`.
 - Returning-machine sync and install safety: `feedback-returning-machine-sync-before-install`.
 - Decision log: `decision-module-typeless-warning-accept`.
+- Vercel env and deploy verification (routed here from the memory router 2026-09-17): `feedback-verify-vercel-env-with-env-ls`, `feedback-deployment-monitoring-use-inspect`, `feedback-verify-deploy-is-the-merge-build`, `feedback-no-vercel-cli-update-reminders`, `reference-vercel-sensitive-env-unreadable`, `reference-vercel-logs-filtering`.
+- Delegated Codex work (routed here from the memory router 2026-09-17; contract in `docs/AGENT_COLLABORATION_PLAN.md`): `feedback-codex-worktree-owner-runs-it`, `feedback-codex-delegation-review-vs-rescue-routing`, `reference-codex-review-needs-a-committed-diff`, `feedback-codex-model-gpt56-sol`.
+- Vercel Node 22 runtime cannot `require(esm)`; sanitize-html/jsdom pins: `project-vercel-node22-no-require-esm`, `project-jsdom-serverless-esm-incompat`.
 
 ## Operating Notes
 

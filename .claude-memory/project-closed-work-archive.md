@@ -5,7 +5,7 @@ metadata:
   type: reference
   status: closed
   scope: docs
-  last_verified: 2026-07-29 via memory-router semantic reconciliation
+  last_verified: 2026-09-17 via memory-router diet
 ---
 
 ## Recall Rule
@@ -40,6 +40,10 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **Spec-audit docs recovery** (RESOLVED S350-S352) — design docs were recovered, accept-fast-response verified, and quota/PD-email behavior built. [[project-spec-audit-docs-recovery-parked]].
 
 - **Reviewer lifecycle elective + boundary program** (SHIPPED S489, 2026-09-06) — Stages 2, 3A–3K, 5, 6C, 6D, 7 merged as PRs #152–#168; LAW gate `check:reviewer-engagement-boundary` live; `bulkUpdateByRequest` deleted. Owner decisions D0–D5 remain open in the Stage 7 plan. [[project-reviewer-lifecycle-autonomy-directive-2026-09-05]], `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`.
+- **Site Visit materials / applicant additional materials / briefing room** (collection SHIPPED S503; PR 3 merged S507 as PR #252 with the reminder cron built but unscheduled; briefing page live S502) — [[project-site-visit-materials-planning-handoff]], `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`. Cron schedule remains an ops decision ([[project-ops-meeting-2026-09-16-agenda]]).
+- **PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail** (D1–D25 decided; live in prod S503) — `docs/PC_MEETING_TRACKER_PLAN.md`; build briefs `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`, `docs/plans/REVIEWER_RELEASE_REASON_CODEX_BRIEF_2026-09-09.md`.
+- **Reviewer Find latency / warm reconciliation incident (Request 1002903, 2026-08-03)** — `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`; lesson lives in [[feedback-latency-plan-scope-accretion-postmortem]].
+- **Reviewer workflow stabilization assessment (Request 1002912)** — point-in-time Fable assessment `outputs/reviewer-workflow-stabilization-fable-assessment.md`; directive `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md`.
 
 ## Point-in-time status snapshots (superseded by live SESSION_PROMPT handoffs)
 - **Intake pilot decisions 2026-05-06** — six-decision walkthrough; items 1C+1D superseded by the 2026-05-13 Track-1 decisions (still in index). [[project-intake-portal-pilot-decisions-2026-05-06]].

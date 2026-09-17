@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -781,6 +781,7 @@ invitation stating a different date than the portal and reminders use.
 - Find roster and dedup: `project-reviewer-find-roster`.
 - Data model/migration: `project-reviewer-finder-dataverse-entry-path`, `project-appresearcher-collapse-post-pilot`. Historical S136 migration rationale is in closed memory `project-reviewer-postgres-to-dataverse-migration`.
 - Count/history/excluded invariants: `project-reviewer-count-invariant`, `project-reviewer-history-data-quality`, `project-excluded-reviewers-often-in-pool`.
+- Closeout, reliability, transient states, local invite testing (routed here from the memory router 2026-09-17): `project-reviewer-closeout-payability`, `project-reviewer-reliability-data`, `project-accepted-awaiting-materials-is-transient`, `reviewer-invite-capture-mode-not-full-sandbox`, `project-workbench-consolidation-rollout`.
 
 ## Applicant-Suggested Reviewer Flow (S263/S264)
 
