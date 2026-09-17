@@ -385,13 +385,12 @@ test('H3c/B10: a brief_reviews_required prepare failure shows named, non-generic
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
-test('review bundle (plan §11): a review_bundle_incomplete prepare failure shows the server-named reviewer copy', async () => {
+test('review bundle (plan §11): a review_bundle_incomplete prepare failure shows named copy, not the generic failure', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
-    .mockResolvedValueOnce(response({
-      code: 'review_bundle_incomplete',
-      error: "The review from Ada Lovelace has no retained file yet. Try again once its document is filed, or regenerate it from the reviewer's record.",
-    }, 409));
+    // No `error` string (discriminating: the generic fallback would show
+    // "Preview preparation failed (409)", so passing requires the dedicated branch).
+    .mockResolvedValueOnce(response({ code: 'review_bundle_incomplete' }, 409));
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
@@ -404,7 +403,7 @@ test('review bundle (plan §11): a review_bundle_incomplete prepare failure show
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/Ada Lovelace has no retained file yet/i);
+  expect(alert).toHaveTextContent(/has no retained file yet/i);
   expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
 });
 
@@ -450,13 +449,11 @@ test('review bundle (plan §11): a review_bundle_unavailable prepare failure sho
   expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
 });
 
-test('review bundle (plan §11): a review_bundle_too_large prepare failure shows the server-named limit copy', async () => {
+test('review bundle (plan §11): a review_bundle_too_large prepare failure shows named copy, not the generic failure', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
-    .mockResolvedValueOnce(response({
-      code: 'review_bundle_too_large',
-      error: 'This request has 30 received reviews, over the review-bundle limit of 25. Reduce the review set or contact an administrator to raise the limit.',
-    }, 409));
+    // No `error` string (discriminating, see above).
+    .mockResolvedValueOnce(response({ code: 'review_bundle_too_large' }, 409));
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
@@ -469,7 +466,7 @@ test('review bundle (plan §11): a review_bundle_too_large prepare failure shows
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/over the review-bundle limit of 25/i);
+  expect(alert).toHaveTextContent(/too large to assemble/i);
   expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
 });
 
