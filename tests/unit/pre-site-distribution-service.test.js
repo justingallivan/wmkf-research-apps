@@ -14,6 +14,29 @@ jest.mock('../../lib/services/pre-site-visit/review-bundle-service.js', () => {
     assembleReviewBundle: jest.fn(actual.assembleReviewBundle),
   };
 });
+// Codex adversarial review round 2 (Step C finding 1): the producer-to-
+// prepare contract test below calls the REAL `getWriteupRoster`
+// (reviewers-service.js) and REAL `loadPreRpBriefInputs` (input-service.js)
+// end to end, rather than a hand-built envelope — this is the only way to
+// catch a roster-projection field that `assembleReviewBundle` needs but the
+// roster never carried. Everything ELSE that suite still touches (prepare
+// itself, Graph, DV writes) stays mocked via the existing `createPrepareHarness`.
+// Only `getWriteupRoster`'s own I/O boundaries are mocked here — the adapter
+// layer, not the projection logic.
+const rosterFindByRequest = jest.fn();
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  findByRequest: (...a) => rosterFindByRequest(...a),
+}));
+const rosterQueryReviewers = jest.fn();
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
+  queryReviewers: (...a) => rosterQueryReviewers(...a),
+}));
+const rosterFetchAnswersBySuggestion = jest.fn();
+jest.mock('../../lib/services/review-answers', () => ({
+  fetchAnswersBySuggestion: (...a) => rosterFetchAnswersBySuggestion(...a),
+}));
+import { getWriteupRoster } from '../../lib/services/review-manager/reviewers-service.js';
+import { loadPreRpBriefInputs } from '../../lib/services/pre-rp-brief/input-service.js';
 import {
   BRIEFING_LINK_PLACEHOLDER,
   REVIEW_BUNDLE_LINK_PLACEHOLDER,
@@ -2536,5 +2559,114 @@ describe('review bundle (plan §11, Step C1)', () => {
         message: expect.stringContaining('Reviewer One'),
       });
     expect(harness.dependencies.recordPrepared).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Producer-to-prepare contract (Codex adversarial review round 2, Step C
+// finding 1): `assembleReviewBundle` requires `reviewSharePointFolder`/
+// `reviewFilename` on every received review (fail-closed, Step C round 1
+// finding 2). Every OTHER test above proves that requirement against a
+// hand-built `briefEnvelope()` fixture that already carries those fields —
+// which does NOT prove the REAL producer (`getWriteupRoster` ->
+// `loadPreRpBriefInputs`) actually supplies them. This block calls the real
+// projection end to end (only its own adapter I/O mocked) and feeds the
+// result into the real `preparePreSiteDistribution`.
+// ---------------------------------------------------------------------------
+describe('producer-to-prepare contract: the real roster projection through prepare (Codex adversarial review round 2, Step C finding 1)', () => {
+  beforeEach(() => {
+    rosterFindByRequest.mockReset();
+    rosterQueryReviewers.mockReset();
+    rosterFetchAnswersBySuggestion.mockReset();
+  });
+
+  function realLoadPreRpBriefInputs({ requestId }) {
+    return loadPreRpBriefInputs({ requestId }, {
+      getRequest: async () => ({
+        akoya_requestid: requestId,
+        akoya_requestnum: '1002379',
+        akoya_title: 'Test Project',
+        _akoya_applicantid_value: null,
+        _akoya_applicantid_value_formatted: 'Test Institution',
+        _wmkf_projectleader_value_formatted: 'Dr. PI',
+        _wmkf_programdirector_value_formatted: 'Dr. PD',
+        wmkf_abstract: 'A test abstract.',
+        wmkf_meetingdate: '2026-12-01',
+      }),
+      getAccount: async () => null,
+      // The real getWriteupRoster projection — only ITS OWN adapter calls
+      // (findByRequest / queryReviewers / fetchAnswersBySuggestion) are mocked.
+      getWriteupRoster: (rid) => getWriteupRoster({ requestId: rid }),
+    });
+  }
+
+  test('a received review from the REAL roster carries reviewSharePointFolder/reviewFilename, so prepare assembles the bundle (not review_bundle_incomplete)', async () => {
+    rosterFindByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: 'reviewer-1',
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: 'person-a',
+      wmkf_selected: true,
+      wmkf_invited: true,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: '2026-09-01T00:00:00Z',
+      wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_1',
+      wmkf_reviewfilename: 'review-1.pdf',
+    }]);
+    rosterQueryReviewers.mockResolvedValue({
+      records: [{
+        wmkf_potentialreviewersid: 'person-a',
+        wmkf_name: 'Reviewer One',
+        wmkf_primaryaffiliation: 'Test University',
+      }],
+    });
+    rosterFetchAnswersBySuggestion.mockResolvedValue({});
+
+    // Real end-to-end producer read: getWriteupRoster (mocked adapters only)
+    // -> loadPreRpBriefInputs (real). Assert the pointers arrive BEFORE
+    // feeding this into prepare, so a future regression here fails at the
+    // most specific line, not just "prepare threw".
+    const { envelope: generatedEnvelope } = await realLoadPreRpBriefInputs({ requestId: REQUEST_ID });
+    expect(generatedEnvelope.reviews).toHaveLength(1);
+    expect(generatedEnvelope.reviews[0]).toMatchObject({
+      suggestionId: 'reviewer-1',
+      reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_1',
+      reviewFilename: 'review-1.pdf',
+    });
+
+    // Use the SAME real envelope as both "generated" (the stored snapshot)
+    // and "live" (no input drift) — the ordinary happy path when the brief
+    // was generated from the same live inputs it is now being shared from.
+    const gate = briefGateFixture({ generated: generatedEnvelope, live: generatedEnvelope });
+    gate.loadPreRpBriefInputs = jest.fn(realLoadPreRpBriefInputs);
+    const harness = createPrepareHarness({ briefGate: gate });
+
+    const result = await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+    expect(result.attempt.reviewBundle.reviewCount).toBe(1);
+    expect(harness.dependencies.recordPrepared).toHaveBeenCalledTimes(1);
+  });
+
+  test('a received review missing the SharePoint pointers from the real roster still fails closed with review_bundle_incomplete (proves this contract test would have caught the round-1 regression)', async () => {
+    rosterFindByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: 'reviewer-1',
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: 'person-a',
+      wmkf_selected: true,
+      wmkf_invited: true,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: '2026-09-01T00:00:00Z',
+      // No wmkf_reviewsharepointfolder/wmkf_reviewfilename on this row.
+    }]);
+    rosterQueryReviewers.mockResolvedValue({
+      records: [{ wmkf_potentialreviewersid: 'person-a', wmkf_name: 'Reviewer One' }],
+    });
+    rosterFetchAnswersBySuggestion.mockResolvedValue({});
+
+    const { envelope: generatedEnvelope } = await realLoadPreRpBriefInputs({ requestId: REQUEST_ID });
+    const gate = briefGateFixture({ generated: generatedEnvelope, live: generatedEnvelope });
+    gate.loadPreRpBriefInputs = jest.fn(realLoadPreRpBriefInputs);
+    const harness = createPrepareHarness({ briefGate: gate });
+
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({ code: 'review_bundle_incomplete', httpStatus: 409 });
   });
 });
