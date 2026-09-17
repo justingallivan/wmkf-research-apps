@@ -1,12 +1,17 @@
 /**
- * Review bundle assembly (plan §11, Step C1).
+ * Review bundle assembly (plan §11, Step C1/C2/C-followups).
  *
  * @jest-environment node
  */
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import crypto from 'node:crypto';
 import {
   assembleReviewBundle,
   reviewSetFingerprint,
+  sanitizeForWinAnsi,
+  MAX_REVIEW_COUNT,
+  MAX_SOURCE_BYTES,
+  MAX_OUTPUT_BYTES,
 } from '../../lib/services/pre-site-visit/review-bundle-service.js';
 
 async function onePagePdf(label = 'part') {
@@ -23,6 +28,29 @@ async function twoPagePdf(label = 'part') {
   return Buffer.from(await doc.save());
 }
 
+/**
+ * A PDF whose saved size is just over `totalMB` megabytes: many pages of
+ * random (near-incompressible) printable-WinAnsi text, so pdf-lib's default
+ * stream compression cannot collapse it back down. Used only to prove the
+ * MAX_OUTPUT_BYTES bound is enforced on a real assembled document.
+ */
+async function oversizedPdf(totalMB, perPageChars = 20000) {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const totalBytes = totalMB * 1024 * 1024;
+  const pages = Math.ceil(totalBytes / perPageChars);
+  for (let p = 0; p < pages; p += 1) {
+    const buf = Buffer.alloc(perPageChars);
+    crypto.randomFillSync(buf);
+    for (let i = 0; i < perPageChars; i += 1) buf[i] = 33 + (buf[i] % 94);
+    const page = doc.addPage([200, 200]);
+    page.drawText(buf.toString('latin1'), {
+      x: 0, y: 0, size: 1, font, lineHeight: 1, maxWidth: 1000000,
+    });
+  }
+  return Buffer.from(await doc.save());
+}
+
 function review(overrides = {}) {
   return {
     suggestionId: 'reviewer-1',
@@ -33,6 +61,14 @@ function review(overrides = {}) {
     reviewFilename: 'review-1.pdf',
     ...overrides,
   };
+}
+
+function metadataStub({ size = 1024 } = {}) {
+  return jest.fn(async (folder, filename) => ({
+    id: `${filename}-item`,
+    driveId: `${filename}-drive`,
+    size,
+  }));
 }
 
 describe('reviewSetFingerprint', () => {
@@ -49,14 +85,37 @@ describe('reviewSetFingerprint', () => {
     expect(reviewSetFingerprint([review({ suggestionId: 'reviewer-2' })])).not.toBe(base);
   });
 
-  test('ignores every other review field', () => {
+  test('changes when the reviewer name changes (rendered on the separator page)', () => {
+    const base = reviewSetFingerprint([review()]);
+    expect(reviewSetFingerprint([review({ name: 'Someone Else' })])).not.toBe(base);
+  });
+
+  test('changes when the affiliation changes (rendered on the separator page)', () => {
+    const base = reviewSetFingerprint([review()]);
+    expect(reviewSetFingerprint([review({ affiliation: 'Different University' })])).not.toBe(base);
+  });
+
+  test('changes when reviewerAffiliation changes even if affiliation is unchanged (reviewerAffiliationOf prefers it)', () => {
+    const base = reviewSetFingerprint([review({ reviewerAffiliation: 'Accepted University' })]);
+    expect(reviewSetFingerprint([review({ reviewerAffiliation: 'Different Accepted University' })])).not.toBe(base);
+  });
+
+  test('changes when the received date changes (rendered on the separator page)', () => {
+    const base = reviewSetFingerprint([review()]);
+    expect(reviewSetFingerprint([review({ reviewReceivedAt: '2026-09-15T00:00:00Z' })])).not.toBe(base);
+  });
+
+  test('name/affiliation normalization: trim and NFC-normalize before hashing, so equivalent representations do not create a spurious mismatch', () => {
+    // 'é' as a single codepoint vs. 'e' + combining acute accent (NFC-equivalent).
+    const nfc = reviewSetFingerprint([review({ name: 'Renée', affiliation: '  Test University  ' })]);
+    const decomposed = reviewSetFingerprint([review({ name: 'Renée', affiliation: 'Test University' })]);
+    expect(nfc).toBe(decomposed);
+  });
+
+  test('ignores review fields the separator pages do not render', () => {
     const base = reviewSetFingerprint([review()]);
     const changedEverythingElse = reviewSetFingerprint([review({
-      name: 'Someone Else',
-      affiliation: 'Different University',
-      reviewerAffiliation: 'Different University',
       mainInstitution: 'Different University',
-      reviewReceivedAt: '2026-09-15T00:00:00Z',
       academicRank: 'Associate Professor',
       reviewerOverallAssessment: 'Weak',
     })]);
@@ -66,6 +125,31 @@ describe('reviewSetFingerprint', () => {
   test('excludes non-received reviews from the fingerprint', () => {
     const withPending = reviewSetFingerprint([review(), review({ suggestionId: 'pending', reviewReceivedAt: null })]);
     expect(withPending).toBe(reviewSetFingerprint([review()]));
+  });
+});
+
+describe('sanitizeForWinAnsi', () => {
+  test('replaces non-Latin-1 characters with "?", leaving WinAnsi-representable text intact', () => {
+    expect(sanitizeForWinAnsi('李明')).toBe('??');
+    expect(sanitizeForWinAnsi('Jane Doe')).toBe('Jane Doe');
+  });
+
+  test('replaces a combining character (outside Latin-1) with "?"', () => {
+    // 'e' + combining acute accent (U+0301) — the base 'e' survives, the
+    // combining mark (codepoint > 0xFF) is replaced.
+    expect(sanitizeForWinAnsi('Renée')).toBe('Rene?e');
+  });
+
+  test('handles a long (300-char) affiliation without throwing, preserving length', () => {
+    const long = '李'.repeat(300);
+    const sanitized = sanitizeForWinAnsi(long);
+    expect(sanitized).toHaveLength(300);
+    expect(sanitized).toBe('?'.repeat(300));
+  });
+
+  test('handles null/undefined without throwing', () => {
+    expect(sanitizeForWinAnsi(null)).toBe('');
+    expect(sanitizeForWinAnsi(undefined)).toBe('');
   });
 });
 
@@ -98,11 +182,13 @@ describe('assembleReviewBundle', () => {
       if (filename === 'review-bravo.pdf') return { buffer: pdfPartB };
       throw new Error(`unexpected downloadFileByPath(${filename})`);
     });
-    const getFileMetadataByPath = jest.fn(async (folder, filename) => (
-      filename === 'review-charlie.docx' ? { id: 'charlie-item', driveId: 'charlie-drive' } : null
-    ));
+    const getFileMetadataByPath = jest.fn(async (folder, filename) => ({
+      id: `${filename}-item`,
+      driveId: `${filename}-drive`,
+      size: 2048,
+    }));
     const downloadFileAsPdf = jest.fn(async (driveId, itemId) => (
-      driveId === 'charlie-drive' && itemId === 'charlie-item' ? docxPartPdf : null
+      driveId === 'review-charlie.docx-drive' && itemId === 'review-charlie.docx-item' ? docxPartPdf : null
     ));
 
     const result = await assembleReviewBundle({
@@ -120,18 +206,23 @@ describe('assembleReviewBundle', () => {
     expect(result.parts.map((part) => part.suggestionId)).toEqual(['alpha', 'bravo', 'charlie']);
     expect(result.parts.map((part) => part.converted)).toEqual([false, false, true]);
     expect(result.reviewCount).toBe(3);
-    expect(result.skipped).toEqual([]);
+    expect(result.skipped).toBeUndefined();
     expect(typeof result.byteHash).toBe('string');
     expect(result.byteHash).toMatch(/^[0-9a-f]{64}$/);
+
+    // Metadata is fetched once per review (preflight), not re-fetched for
+    // the DOCX conversion pass.
+    expect(getFileMetadataByPath).toHaveBeenCalledTimes(3);
   });
 
   test('a %PDF- magic-byte failure throws review_bundle_part_invalid (502)', async () => {
     const downloadFileByPath = jest.fn(async () => ({ buffer: Buffer.from('not a pdf') }));
+    const getFileMetadataByPath = metadataStub();
     await expect(assembleReviewBundle({
       reviews: [review()],
       requestNumber: '1002379',
       institutionName: 'Test Institution',
-    }, { downloadFileByPath })).rejects.toMatchObject({
+    }, { downloadFileByPath, getFileMetadataByPath })).rejects.toMatchObject({
       code: 'review_bundle_part_invalid',
       httpStatus: 502,
     });
@@ -139,11 +230,12 @@ describe('assembleReviewBundle', () => {
 
   test('a corrupt-but-magic-matching PDF part throws review_bundle_part_invalid (502)', async () => {
     const downloadFileByPath = jest.fn(async () => ({ buffer: Buffer.from('%PDF-not-really-a-pdf') }));
+    const getFileMetadataByPath = metadataStub();
     await expect(assembleReviewBundle({
       reviews: [review()],
       requestNumber: '1002379',
       institutionName: 'Test Institution',
-    }, { downloadFileByPath })).rejects.toMatchObject({
+    }, { downloadFileByPath, getFileMetadataByPath })).rejects.toMatchObject({
       code: 'review_bundle_part_invalid',
       httpStatus: 502,
     });
@@ -153,11 +245,12 @@ describe('assembleReviewBundle', () => {
     const validPdf = await onePagePdf('shifted');
     const shifted = Buffer.concat([Buffer.from('X'), validPdf]);
     const downloadFileByPath = jest.fn(async () => ({ buffer: shifted }));
+    const getFileMetadataByPath = metadataStub();
     await expect(assembleReviewBundle({
       reviews: [review()],
       requestNumber: '1002379',
       institutionName: 'Test Institution',
-    }, { downloadFileByPath })).rejects.toMatchObject({
+    }, { downloadFileByPath, getFileMetadataByPath })).rejects.toMatchObject({
       code: 'review_bundle_part_invalid',
       httpStatus: 502,
     });
@@ -165,18 +258,31 @@ describe('assembleReviewBundle', () => {
 
   test('a Graph rejection throws review_bundle_unavailable (502)', async () => {
     const downloadFileByPath = jest.fn(async () => { throw new Error('Graph is down'); });
+    const getFileMetadataByPath = metadataStub();
     await expect(assembleReviewBundle({
       reviews: [review()],
       requestNumber: '1002379',
       institutionName: 'Test Institution',
-    }, { downloadFileByPath })).rejects.toMatchObject({
+    }, { downloadFileByPath, getFileMetadataByPath })).rejects.toMatchObject({
+      code: 'review_bundle_unavailable',
+      httpStatus: 502,
+    });
+  });
+
+  test('a Graph metadata-lookup failure (preflight) throws review_bundle_unavailable (502)', async () => {
+    const getFileMetadataByPath = jest.fn(async () => { throw new Error('Graph is down'); });
+    await expect(assembleReviewBundle({
+      reviews: [review()],
+      requestNumber: '1002379',
+      institutionName: 'Test Institution',
+    }, { getFileMetadataByPath })).rejects.toMatchObject({
       code: 'review_bundle_unavailable',
       httpStatus: 502,
     });
   });
 
   test('a Graph rejection converting a DOCX review throws review_bundle_unavailable (502)', async () => {
-    const getFileMetadataByPath = jest.fn(async () => ({ id: 'item', driveId: 'drive' }));
+    const getFileMetadataByPath = jest.fn(async () => ({ id: 'item', driveId: 'drive', size: 1024 }));
     const downloadFileAsPdf = jest.fn(async () => { throw new Error('conversion failed'); });
     await expect(assembleReviewBundle({
       reviews: [review({ reviewFilename: 'review.docx' })],
@@ -188,9 +294,9 @@ describe('assembleReviewBundle', () => {
     });
   });
 
-  test('no file on any received review throws review_bundle_empty (409)', async () => {
+  test('no received review at all throws review_bundle_empty (409)', async () => {
     await expect(assembleReviewBundle({
-      reviews: [review({ reviewSharePointFolder: null, reviewFilename: null })],
+      reviews: [review({ reviewReceivedAt: null })],
       requestNumber: '1002379',
       institutionName: 'Test Institution',
     }, {})).rejects.toMatchObject({
@@ -199,20 +305,100 @@ describe('assembleReviewBundle', () => {
     });
   });
 
-  test('a received review without a file is skipped, not fatal, and reported in `skipped`', async () => {
+  test('a received review without a retained file fails closed with review_bundle_incomplete (409) naming the reviewer', async () => {
     const withFilePdf = await onePagePdf('has-file');
     const downloadFileByPath = jest.fn(async () => ({ buffer: withFilePdf }));
+    const getFileMetadataByPath = metadataStub();
 
-    const result = await assembleReviewBundle({
+    await expect(assembleReviewBundle({
       reviews: [
         review({ suggestionId: 'has-file' }),
-        review({ suggestionId: 'no-file', reviewSharePointFolder: null, reviewFilename: null }),
+        review({
+          suggestionId: 'no-file',
+          name: 'Nadia Filer',
+          reviewSharePointFolder: null,
+          reviewFilename: null,
+        }),
       ],
       requestNumber: '1002379',
       institutionName: 'Test Institution',
-    }, { downloadFileByPath });
+    }, { downloadFileByPath, getFileMetadataByPath })).rejects.toMatchObject({
+      code: 'review_bundle_incomplete',
+      httpStatus: 409,
+      message: expect.stringContaining('Nadia Filer'),
+    });
 
-    expect(result.reviewCount).toBe(1);
-    expect(result.skipped).toEqual(['no-file']);
+    // No downloads should have been attempted once any review is incomplete.
+    expect(downloadFileByPath).not.toHaveBeenCalled();
   });
+
+  test('multiple received reviews without a retained file are all named in the review_bundle_incomplete message', async () => {
+    await expect(assembleReviewBundle({
+      reviews: [
+        review({ suggestionId: 'a', name: 'Ann Author', reviewSharePointFolder: null, reviewFilename: null }),
+        review({ suggestionId: 'b', name: 'Bo Bishop', reviewSharePointFolder: null, reviewFilename: null }),
+      ],
+      requestNumber: '1002379',
+      institutionName: 'Test Institution',
+    }, {})).rejects.toMatchObject({
+      code: 'review_bundle_incomplete',
+      httpStatus: 409,
+      message: expect.stringMatching(/Ann Author.*Bo Bishop|Bo Bishop.*Ann Author/),
+    });
+  });
+
+  test('more than MAX_REVIEW_COUNT received reviews throws review_bundle_too_large (409) without any Graph call', async () => {
+    const reviews = Array.from({ length: MAX_REVIEW_COUNT + 1 }, (_, i) => review({
+      suggestionId: `reviewer-${i}`,
+      reviewFilename: `review-${i}.pdf`,
+    }));
+    const getFileMetadataByPath = jest.fn(async () => ({ id: 'x', driveId: 'y', size: 1 }));
+    await expect(assembleReviewBundle({
+      reviews,
+      requestNumber: '1002379',
+      institutionName: 'Test Institution',
+    }, { getFileMetadataByPath })).rejects.toMatchObject({
+      code: 'review_bundle_too_large',
+      httpStatus: 409,
+    });
+    expect(getFileMetadataByPath).not.toHaveBeenCalled();
+  });
+
+  test('source files whose total size exceeds MAX_SOURCE_BYTES throws review_bundle_too_large (409) before any download', async () => {
+    const reviews = [
+      review({ suggestionId: 'a', reviewFilename: 'a.pdf' }),
+      review({ suggestionId: 'b', reviewFilename: 'b.pdf' }),
+    ];
+    const getFileMetadataByPath = jest.fn(async () => ({
+      id: 'x',
+      driveId: 'y',
+      size: Math.ceil(MAX_SOURCE_BYTES / 2) + 1,
+    }));
+    const downloadFileByPath = jest.fn();
+    await expect(assembleReviewBundle({
+      reviews,
+      requestNumber: '1002379',
+      institutionName: 'Test Institution',
+    }, { getFileMetadataByPath, downloadFileByPath })).rejects.toMatchObject({
+      code: 'review_bundle_too_large',
+      httpStatus: 409,
+    });
+    expect(downloadFileByPath).not.toHaveBeenCalled();
+  });
+
+  test('assembled output exceeding MAX_OUTPUT_BYTES throws review_bundle_too_large (409), after assembly completes', async () => {
+    const oversized = await oversizedPdf(Math.ceil(MAX_OUTPUT_BYTES / (1024 * 1024)) + 2);
+    expect(oversized.length).toBeGreaterThan(MAX_OUTPUT_BYTES);
+    const downloadFileByPath = jest.fn(async () => ({ buffer: oversized }));
+    const getFileMetadataByPath = metadataStub();
+
+    await expect(assembleReviewBundle({
+      reviews: [review()],
+      requestNumber: '1002379',
+      institutionName: 'Test Institution',
+    }, { downloadFileByPath, getFileMetadataByPath })).rejects.toMatchObject({
+      code: 'review_bundle_too_large',
+      httpStatus: 409,
+    });
+  }, 30000);
 });

@@ -532,6 +532,34 @@ export default function PreSiteDistributionPanel({
         }
         return;
       }
+      // Review bundle assembly (plan §11, Step C1): prepare fails closed
+      // rather than silently omitting a review from the bundle or serving
+      // an unbounded one. Named so staff see the actionable reason, not a
+      // bare "Preview preparation failed".
+      if (!response.ok && body.code === 'review_bundle_incomplete') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError(body.error || 'A received review has no retained file yet, so the review bundle could not be assembled.');
+        }
+        return;
+      }
+      if (!response.ok && body.code === 'review_bundle_part_invalid') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError('One of the retained reviews is not a valid PDF, so the review bundle could not be assembled. Check the review file and try again.');
+        }
+        return;
+      }
+      if (!response.ok && body.code === 'review_bundle_unavailable') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError('The review bundle could not be assembled from SharePoint right now. Try again shortly.');
+        }
+        return;
+      }
+      if (!response.ok && body.code === 'review_bundle_too_large') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError(body.error || 'The review bundle is too large to assemble. Reduce the review set or re-upload smaller review files.');
+        }
+        return;
+      }
       if (!response.ok) throw new Error(body.error || `Preview preparation failed (${response.status})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setPreview(body.attempt || null);

@@ -745,7 +745,11 @@ request number.
 - **C2 (consumers):** `review-bundle` member in `resolveBriefingMember` (latest sent attempt; re-hash; inline PDF; institution-led filename); on read, if `reviewSetFingerprint(live received reviews)` differs from the pinned set fingerprint, rebuild through the same assembly + `ensureSnapshot`, update the attempt's family and `review_bundle_rebuilt_at`, then serve; `buildBriefingContext` gains `reviewBundle { member, filename, size, reviewCount, rebuiltAt }`; the page renders "Download all reviews (PDF)" in the Reviews section; the email body gains a second placeholder href resolved at send time to the document route with `member=review-bundle`, with copy key `email.deliberation_share.review_bundle_link_text` registered alongside the existing keys.
 - **Behavior change to note:** DOCX-origin reviews, hidden on the page today, appear in the bundle as converted PDF pages.
 
+**Deployment protocol (same as migration 052):** merge auto-deploys code that names the new `review_bundle_*` columns, so migration 053 must be applied to the shared Production/Preview database (`node scripts/apply-migrations.js`) before this branch merges — prepare must not run in an environment where migration 053 is absent.
+
 ### Open for owner (2026-09-16)
 
 1. A review file that cannot be converted blocks Share (fail closed) rather than being skipped with a placeholder page. Conservative default chosen; say if a placeholder page is preferred.
+1a. Codex adversarial review (Step C): a review missing its retained file also fails closed now (`review_bundle_incomplete`, 409, names the reviewer), matching (1) — no silent per-review skip.
+1b. Separator-page text uses the standard WinAnsi (Helvetica) font, which cannot encode non-Latin reviewer names/affiliations (e.g. CJK); unencodable characters are replaced with `?` so assembly never throws. A Unicode-capable font requires adding the `@pdf-lib/fontkit` dependency plus a bundled Unicode TTF — neither exists in the repo today; owner call on whether to add them.
 2. The bundle includes reviewer names and affiliations on separator pages, matching what the page already shows to the Board.

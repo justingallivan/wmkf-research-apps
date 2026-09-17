@@ -459,7 +459,15 @@ function createPrepareHarness({
       Object.assign(row, patch, { _etag: `${row._etag}-next` });
     }),
     ensureFolderPath: jest.fn(async () => undefined),
-    getFileMetadataByPath: jest.fn(async () => null),
+    // `assembleReviewBundle`'s resource-bound preflight (Codex adversarial
+    // review, Step C finding 4) fetches metadata for EVERY received review
+    // before downloading any bytes, so review filenames must resolve here
+    // too, not just non-review lookups (which stay null by default).
+    getFileMetadataByPath: jest.fn(async (library, folder, filename) => (
+      /^review-.*\.(pdf|docx)$/i.test(filename || '')
+        ? { id: `${filename}-item`, driveId: `${filename}-drive`, size: 2048 }
+        : null
+    )),
     // Plan §11 (Step C1): the default review file is `review-1.pdf`
     // (briefEnvelope's default review), so assembleReviewBundle's happy
     // path downloads it directly rather than converting via Graph.
@@ -2507,7 +2515,7 @@ describe('review bundle (plan §11, Step C1)', () => {
     expect(harness.dependencies.createOrGetAttempt).toHaveBeenCalled();
   });
 
-  test('a bundle failure (no received review has a file) leaves the attempt un-prepared and surfaces review_bundle_empty', async () => {
+  test('a received review with no retained file leaves the attempt un-prepared and fails closed with review_bundle_incomplete (Codex adversarial review, Step C finding 2 — no silent skip)', async () => {
     const noFileEnvelope = briefEnvelope({
       reviews: [{
         suggestionId: 'reviewer-1',
@@ -2522,7 +2530,11 @@ describe('review bundle (plan §11, Step C1)', () => {
       briefGate: briefGateFixture({ generated: noFileEnvelope, live: noFileEnvelope }),
     });
     await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
-      .rejects.toMatchObject({ code: 'review_bundle_empty', httpStatus: 409 });
+      .rejects.toMatchObject({
+        code: 'review_bundle_incomplete',
+        httpStatus: 409,
+        message: expect.stringContaining('Reviewer One'),
+      });
     expect(harness.dependencies.recordPrepared).not.toHaveBeenCalled();
   });
 });

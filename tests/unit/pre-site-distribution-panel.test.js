@@ -385,6 +385,94 @@ test('H3c/B10: a brief_reviews_required prepare failure shows named, non-generic
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
+test('review bundle (plan §11): a review_bundle_incomplete prepare failure shows the server-named reviewer copy', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({
+      code: 'review_bundle_incomplete',
+      error: "The review from Ada Lovelace has no retained file yet. Try again once its document is filed, or regenerate it from the reviewer's record.",
+    }, 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/Ada Lovelace has no retained file yet/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+});
+
+test('review bundle (plan §11): a review_bundle_part_invalid prepare failure shows named, non-generic copy', async () => {
+  // No `error` string in the body — discriminating: the generic fallback
+  // would show "Preview preparation failed (409)".
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ code: 'review_bundle_part_invalid' }, 502));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/not a valid PDF/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+});
+
+test('review bundle (plan §11): a review_bundle_unavailable prepare failure shows named, non-generic copy', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ code: 'review_bundle_unavailable' }, 502));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/could not be assembled from SharePoint/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+});
+
+test('review bundle (plan §11): a review_bundle_too_large prepare failure shows the server-named limit copy', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({
+      code: 'review_bundle_too_large',
+      error: 'This request has 30 received reviews, over the review-bundle limit of 25. Reduce the review set or contact an administrator to raise the limit.',
+    }, 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/over the review-bundle limit of 25/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+});
+
 test('a late recipient suggestion that seeds a blank field invalidates the prepared preview and its confirmation', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))

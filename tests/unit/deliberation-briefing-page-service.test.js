@@ -464,11 +464,16 @@ describe('feedback: member (slice 2 attachment)', () => {
 
 // Matches exactly what resolveBriefingMember computes from the default
 // `suggestions()` fixture's received (RECEIVED_ID) row: reviewSetFingerprint
-// filters on `reviewReceivedAt` truthiness, so it must be present here too.
+// filters on `reviewReceivedAt` truthiness and also covers the separator
+// pages' rendered name/affiliation/received-date (Codex adversarial review,
+// Step C finding 1), so all three must be present here too, matching
+// `personName`/`personAffiliation`'s reduction of that row.
 const PINNED_SET_FINGERPRINT = reviewSetFingerprint([{
   suggestionId: RECEIVED_ID,
   reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_x',
   reviewFilename: 'review.pdf',
+  name: 'Ada Lovelace',
+  affiliation: 'Analytical Engines Ltd',
   reviewReceivedAt: '2026-09-01T10:00:00.000Z',
 }]);
 const BUNDLE_BYTES = Buffer.from('%PDF-pinned-bundle-bytes');
@@ -606,7 +611,7 @@ describe('resolveBriefingMember: review-bundle (plan §11, Step C2)', () => {
     })]);
 
     expect(d.recordReviewBundleRebuilt).toHaveBeenCalledTimes(1);
-    const [operationIdArg, rebuiltArg] = d.recordReviewBundleRebuilt.mock.calls[0];
+    const [operationIdArg, rebuiltArg, expectedPriorFingerprintArg] = d.recordReviewBundleRebuilt.mock.calls[0];
     expect(operationIdArg).toBe('op-bundle-1');
     expect(rebuiltArg).toMatchObject({
       documentId: 'bundle-doc-2',
@@ -615,6 +620,10 @@ describe('resolveBriefingMember: review-bundle (plan §11, Step C2)', () => {
       byteHash: rebuiltHash,
       reviewCount: 1,
     });
+    // Compare-and-swap (Codex adversarial review, Step C): the write is
+    // pinned to the fingerprint the rebuild started from, so a concurrent
+    // rebuild that lands first is never clobbered.
+    expect(expectedPriorFingerprintArg).toBe(PINNED_SET_FINGERPRINT);
 
     expect(file.buffer).toEqual(rebuiltBytes);
     expect(file.filename).toBe('Example University - Reviews - bbbbbbbb.pdf');
@@ -697,6 +706,112 @@ describe('resolveBriefingMember: review-bundle (plan §11, Step C2)', () => {
     });
     await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
       .rejects.toMatchObject({ httpStatus: 503, body: { reason: 'review_bundle_unavailable' } });
+  });
+
+  test('interleaved rebuilds: the slower writer loses the CAS and serves the winner\'s bytes instead of its own', async () => {
+    // Both A (this call) and a concurrent B raced to rebuild the same live
+    // set. B's write landed first (recordReviewBundleRebuilt returns null
+    // for A's attempt), so A must re-read the current attempt and, because
+    // the winner's pinned fingerprint matches the live set A also built for,
+    // serve B's bytes rather than clobbering or discarding them.
+    const changedSuggestions = () => ([{
+      wmkf_appreviewersuggestionid: RECEIVED_ID,
+      wmkf_reviewreceivedat: '2026-09-01T10:00:00Z',
+      wmkf_reviewerfirstname: 'Ada',
+      wmkf_reviewerlastname: 'Lovelace',
+      wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_y',
+      wmkf_reviewfilename: 'review-v2.pdf',
+    }]);
+    const changedSetFingerprint = reviewSetFingerprint([{
+      suggestionId: RECEIVED_ID,
+      reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_y',
+      reviewFilename: 'review-v2.pdf',
+      name: 'Ada Lovelace',
+      affiliation: null,
+      reviewReceivedAt: '2026-09-01T10:00:00.000Z',
+    }]);
+    const winnerBytes = Buffer.from('%PDF-winner-b-bundle-bytes');
+    const winnerHash = require('crypto').createHash('sha256').update(winnerBytes).digest('hex');
+
+    const getLatestAttempt = jest.fn()
+      .mockResolvedValueOnce(bundleAttemptFixture())
+      .mockResolvedValueOnce(bundleAttemptFixture({
+        review_bundle_set_fingerprint: changedSetFingerprint,
+        review_bundle_drive_id: 'winner-drive',
+        review_bundle_item_id: 'winner-item',
+        review_bundle_byte_hash: winnerHash,
+        review_bundle_filename: 'winner-b.pdf',
+      }));
+
+    const d = deps({
+      findSuggestions: jest.fn(async () => changedSuggestions()),
+      getLatestAttempt,
+      findDocumentById: jest.fn(async () => ({ records: [sourceRowFixture()] })),
+      retainReviewBundle: jest.fn(async () => ({
+        snapshot: { documentId: 'a-doc', driveId: 'a-drive', itemId: 'a-item', versionId: '1.0', filename: 'a-loser.pdf', size: 1, byteHash: 'a'.repeat(64) },
+        assembly: { reviewCount: 1 },
+        setFingerprint: changedSetFingerprint,
+      })),
+      recordReviewBundleRebuilt: jest.fn(async () => null),
+      downloadFile: jest.fn(async (driveId, itemId) => (
+        driveId === 'winner-drive' && itemId === 'winner-item'
+          ? { buffer: winnerBytes, mimeType: 'application/pdf', filename: 'winner-b.pdf', size: winnerBytes.length }
+          : { buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 }
+      )),
+    });
+
+    const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d);
+
+    expect(d.retainReviewBundle).toHaveBeenCalledTimes(1);
+    expect(d.recordReviewBundleRebuilt).toHaveBeenCalledTimes(1);
+    expect(getLatestAttempt).toHaveBeenCalledTimes(2);
+    expect(file.buffer).toEqual(winnerBytes);
+    expect(file.filename).toBe('winner-b.pdf');
+  });
+
+  test('post-assembly drift: the live set changes again while the (slow) rebuild was running, so the new bundle is never persisted', async () => {
+    // First loadLiveReviewsForBundle read triggers the rebuild (differs from
+    // the pinned set); by the time assembly finishes, a SECOND read (the
+    // post-assembly recheck) shows the live set has drifted again — the
+    // rebuild must not be persisted against a set it no longer represents.
+    const firstRead = () => ([{
+      wmkf_appreviewersuggestionid: RECEIVED_ID,
+      wmkf_reviewreceivedat: '2026-09-01T10:00:00Z',
+      wmkf_reviewerfirstname: 'Ada',
+      wmkf_reviewerlastname: 'Lovelace',
+      wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_y',
+      wmkf_reviewfilename: 'review-v2.pdf',
+    }]);
+    const secondRead = () => ([{
+      wmkf_appreviewersuggestionid: RECEIVED_ID,
+      wmkf_reviewreceivedat: '2026-09-01T10:00:00Z',
+      wmkf_reviewerfirstname: 'Ada',
+      wmkf_reviewerlastname: 'Lovelace',
+      // Drifted again since the first read: yet another folder/filename.
+      wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_z',
+      wmkf_reviewfilename: 'review-v3.pdf',
+    }]);
+    const findSuggestions = jest.fn()
+      .mockResolvedValueOnce(firstRead())
+      .mockResolvedValueOnce(secondRead());
+
+    const d = deps({
+      findSuggestions,
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture()),
+      findDocumentById: jest.fn(async () => ({ records: [sourceRowFixture()] })),
+      retainReviewBundle: jest.fn(async () => ({
+        snapshot: { documentId: 'd', driveId: 'dr', itemId: 'it', versionId: '1.0', filename: 'f.pdf', size: 1, byteHash: 'a'.repeat(64) },
+        assembly: { reviewCount: 1 },
+        setFingerprint: 'b'.repeat(64),
+      })),
+    });
+
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
+      .rejects.toMatchObject({ httpStatus: 503, body: { reason: 'review_bundle_unavailable' } });
+
+    expect(d.retainReviewBundle).toHaveBeenCalledTimes(1);
+    expect(d.recordReviewBundleRebuilt).not.toHaveBeenCalled();
+    expect(findSuggestions).toHaveBeenCalledTimes(2);
   });
 
   test('404 for a pre-bundle (legacy) attempt', async () => {
