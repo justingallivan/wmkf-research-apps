@@ -97,7 +97,7 @@ function preSiteArtifact(lifecycleState = DRAFT) {
   };
 }
 
-function briefArtifact(lifecycleState = DRAFT) {
+function briefArtifact(lifecycleState = DRAFT, { receivedReviewCount = 1 } = {}) {
   return {
     artifactId: BRIEF_ARTIFACT_ID,
     operationStatus: READY,
@@ -111,6 +111,7 @@ function briefArtifact(lifecycleState = DRAFT) {
       contentHash: 'gdc1:brief-lock',
       createdAt: '2026-09-01T15:00:00Z',
     } : null,
+    receivedReviewCount,
   };
 }
 
@@ -130,6 +131,7 @@ function statusResponse({
   materials = null,
   session = null,
   sessionAttendees = null,
+  hasBriefRows = undefined,
 } = {}) {
   return response({
     success: true,
@@ -140,6 +142,7 @@ function statusResponse({
     ...(materials ? { materials } : {}),
     ...(session ? { session } : {}),
     ...(sessionAttendees ? { sessionAttendees } : {}),
+    ...(hasBriefRows === undefined ? {} : { hasBriefRows }),
   });
 }
 
@@ -202,6 +205,19 @@ afterEach(() => {
 // ── Pre-Site Visit Writeup card (generate/regenerate/download; independent
 // of the brief) ──────────────────────────────────────────────────────────
 
+test('M2: loads existing Ready actions without another generation request', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  const link = await screen.findByRole('link', { name: 'Edit in Word' });
+  expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  fireEvent.click(screen.getByRole('button', { name: 'More writeup actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Download' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' })).toBeInTheDocument();
+  expect(calls('presitePost')).toHaveLength(0);
+  expect(calls('presiteGet')).toHaveLength(1);
+});
+
 test('Pre-Site card: Generate, then Edit in Word plus Start Site Visit; Download/Regenerate under More', async () => {
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
@@ -240,6 +256,15 @@ test('Pre-Site card: Start Site Visit calls start-site-visit and moves the Pre-S
   expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
 });
 
+test('M4: Start Site Visit requires the Pre-Site row to be Draft (not offered once shared)', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  expect(screen.queryByRole('button', { name: 'Start Site Visit' })).not.toBeInTheDocument();
+  expect(calls('startSiteVisit')).toHaveLength(0);
+});
+
 test('Pre-Site card: regenerate opens a confirmation dialog scoped to the writeup', async () => {
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
@@ -264,6 +289,90 @@ test('Pre-Site card: a server error on generate shows an alert without creating 
 
   fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('No usable AI proposal narrative was found.');
+});
+
+test('M2: recovers a Ready Word link after the generation connection is interrupted', async () => {
+  let getCount = 0;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'presitePost') throw new TypeError('Failed to fetch');
+    if (route?.key === 'presiteGet') {
+      getCount += 1;
+      return getCount === 1 ? statusResponse() : statusResponse({ currentArtifact: preSiteArtifact(DRAFT) });
+    }
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
+
+  const link = await screen.findByRole('link', { name: 'Edit in Word' });
+  expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(calls('presitePost')).toHaveLength(1);
+  expect(calls('presiteGet')).toHaveLength(2);
+});
+
+test('M2: a late response for a prior request cannot publish a stale Word link', async () => {
+  let resolveFirst;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'presitePost') return new Promise((resolve) => { resolveFirst = resolve; });
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  const { rerender } = render(<StaffDeliberationsTab key={REQUEST_ID} requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
+  // The workbench keys the tab by requestId; mirror that so the switch remounts.
+  rerender(<StaffDeliberationsTab key={OTHER_REQUEST_ID} requestId={OTHER_REQUEST_ID} />);
+  await act(async () => { resolveFirst(response({ success: true, artifact: preSiteArtifact(DRAFT) })); });
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Generate Word Draft' })).toBeEnabled());
+  expect(screen.queryByRole('link', { name: 'Edit in Word' })).not.toBeInTheDocument();
+});
+
+test('M2: refreshes durable failure state once and shows its support reference', async () => {
+  let getCount = 0;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'presitePost') {
+      return response({ error: 'Pre-Site Visit generation did not complete.', runId: 'run-from-post' }, 502);
+    }
+    if (route?.key === 'presiteGet') {
+      getCount += 1;
+      return getCount === 1 ? statusResponse() : statusResponse({
+        pendingArtifact: {
+          artifactId: 'failed-artifact',
+          operationStatus: FAILED,
+          retryable: false,
+          lastError: { message: 'The governed output was invalid.', supportReference: 'durable-run-id' },
+        },
+      });
+    }
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('The governed output was invalid.');
+  expect(screen.getByRole('alert')).toHaveTextContent('Support reference: durable-run-id');
+  expect(screen.getByText(/needs a prompt or application change/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Generate Word Draft' })).toBeDisabled();
+  expect(calls('presitePost')).toHaveLength(1);
+  expect(calls('presiteGet')).toHaveLength(2);
 });
 
 test('Pre-Site card: shows durable Ready warnings beside the Word link', async () => {
@@ -298,6 +407,39 @@ test('Brief card: Generate, then Edit in Word plus Share…; Download/Regenerate
   expect(screen.getByRole('menuitem', { name: 'Download' }))
     .toHaveAttribute('href', 'https://sharepoint.test/brief.docx?download=1');
   expect(screen.getByRole('menuitem', { name: 'Regenerate Brief' })).toBeEnabled();
+});
+
+test('H3a/B10: Share is disabled with a reason when the brief has zero received reviews', async () => {
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(DRAFT, { receivedReviewCount: 0 }),
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  const shareButton = await screen.findByRole('button', { name: 'Share…' });
+  expect(shareButton).toBeDisabled();
+  expect(screen.getByText(/Share is blocked until at least one review is received/)).toBeInTheDocument();
+});
+
+test('H3a/B10: Share is enabled once at least one review is received', async () => {
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(DRAFT, { receivedReviewCount: 1 }),
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  const shareButton = await screen.findByRole('button', { name: 'Share…' });
+  expect(shareButton).toBeEnabled();
+  expect(screen.queryByText(/Share is blocked until at least one review is received/)).not.toBeInTheDocument();
+});
+
+test('H3b/B12: Regenerate Brief is offered while the brief is in Review (shared)', async () => {
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Brief' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Brief' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Regenerate' }));
+  await waitFor(() => expect(calls('briefPost')).toHaveLength(1));
 });
 
 test('Brief card: regenerate opens a brief-scoped confirmation dialog', async () => {
@@ -436,6 +578,44 @@ test('sends recorded against a superseded brief document do not set the current 
   expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Send the deliberation email when you are ready.');
 });
 
+test('M2: a Final document offers one action, Open Final Writeup, and no More menu', async () => {
+  const onSelectTab = jest.fn();
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(FINAL) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
+
+  await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('This proposal moved to Final Writeup.'));
+  fireEvent.click(screen.getByRole('button', { name: 'Open Final Writeup' }));
+  expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
+  expect(screen.queryByRole('button', { name: 'More brief actions' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'More writeup actions' })).not.toBeInTheDocument();
+  expect(screen.queryByTestId('deliberations-session-line')).not.toBeInTheDocument();
+});
+
+test('M2: a failed latest send shows a red line and a Resend action that opens the composer', async () => {
+  distributionHistoryFeed = {
+    attempts: [{ operationId: 'op-2', transportAccepted: false, lastError: 'Dynamics refused the send.' }],
+    currentSourceEverSent: true,
+    latestSendFailure: { operationId: 'op-2', message: 'Dynamics refused the send.' },
+  };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
+
+  expect(await screen.findByTestId('deliberations-send-failure'))
+    .toHaveTextContent('The last send failed: Dynamics refused the send.');
+  fireEvent.click(screen.getByRole('button', { name: 'Resend' }));
+  expect(screen.getByText(/Distribution panel: dialog \(record\)/)).toBeInTheDocument();
+});
+
+test('M2: a failed generation with no current draft reads Draft failed on the first stop', async () => {
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: null,
+    pendingArtifact: { artifactId: 'failed-artifact', operationStatus: FAILED, retryable: true },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Draft failed'));
+});
+
 test('Final Writeup activation marks the Pre-Site row FINAL while the brief stays Review: the rail reads Final', async () => {
   const onSelectTab = jest.fn();
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(FINAL) }));
@@ -474,6 +654,29 @@ test('at the visit stage with the Pre-Site row already Review, Continue in Final
   expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
 });
 
+test('H1/§3.5: no brief rows at all falls back to the legacy Pre-Site rail (past visit, Review row reads Visit stage)', async () => {
+  const onSelectTab = jest.fn();
+  siteVisitContextFeed = { siteVisit: { startIso: '2020-01-01T00:00:00Z' } };
+  queueRoute('briefGet', statusResponse({ currentArtifact: null, pendingArtifact: null, hasBriefRows: false }));
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
+
+  await waitFor(() => expect(screen.getAllByText('Working document:').length).toBeGreaterThan(0));
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Visit');
+  fireEvent.click(screen.getByRole('button', { name: 'Continue in Final Writeup' }));
+  expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
+});
+
+test('H1: a brief status fetch error never falls back to the legacy rail (renders an error state instead)', async () => {
+  queueRoute('briefGet', response({ error: 'Brief status check failed.' }, 500));
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByTestId('deliberations-stage-error'))
+    .toHaveTextContent('Brief status check failed.');
+  expect(screen.queryByTestId('stage-rail')).not.toBeInTheDocument();
+});
+
 // ── Fail-closed states ────────────────────────────────────────────────────
 
 test.each([
@@ -486,6 +689,38 @@ test.each([
 
   expect(await screen.findByRole('heading', { name: 'Staff Deliberations is read-only' })).toBeInTheDocument();
   expect(screen.getByText(/cannot be edited, downloaded, or regenerated from this tab/i)).toBeInTheDocument();
+  // L3: no Edit/Download/Regenerate affordances render alongside the read-only panel.
+  expect(screen.queryByRole('link', { name: 'Edit in Word' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Open working document' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'More brief actions' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Regenerate/ })).not.toBeInTheDocument();
+});
+
+test('M1: a shared brief without a current Word URL fails closed with an explanation', async () => {
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: { ...briefArtifact(REVIEW), file: { name: '1002379 Pre-RP Brief.docx', webUrl: null } },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('heading', { name: 'Pre-Research Presentation Brief is read-only' }))
+    .toBeInTheDocument();
+  expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Open working document' })).not.toBeInTheDocument();
+});
+
+test('M1: a shared Pre-Site writeup without a current Word URL fails closed with an explanation', async () => {
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: { ...preSiteArtifact(REVIEW), file: { name: '1002379 Pre-Site Visit.docx', webUrl: null } },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('heading', { name: 'Pre-Site Visit Writeup is read-only' }))
+    .toBeInTheDocument();
+  expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Open working document' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Start Site Visit' })).not.toBeInTheDocument();
 });
 
 // ── Guarded reopen (Pre-Site scoped; unaffected by the brief) ────────────
@@ -539,6 +774,35 @@ test('validates confirmation and submits one guarded reopen, returning the write
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Guarded reopen' })).not.toBeInTheDocument());
   expect(await screen.findByRole('button', { name: 'Start Site Visit' })).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('reopened');
+});
+
+test('M2: a failed submit keeps one operation id and immutable audit inputs for safe retry', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
+  queueRoute('reopen', response({ error: 'The first attempt failed.', code: 'pre_site_reopen_copy_verification_failed' }, 409));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByText(/Administration — guarded reopen/));
+  fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The handoff was started too early.' } });
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create Draft Successor' }));
+  expect(await screen.findByText('The first attempt failed.')).toBeInTheDocument();
+
+  const firstCall = calls('reopen')[0];
+  const firstOperationId = JSON.parse(firstCall[1].body).clientOperationId;
+  expect(screen.getByLabelText('Reason')).toBeDisabled();
+  expect(screen.getByLabelText('Correction note')).toBeDisabled();
+  expect(screen.getByLabelText('Type request number 1002379 to confirm')).toBeDisabled();
+  expect(screen.getByText(/keeps its original reason and confirmation/i)).toBeInTheDocument();
+
+  queueRoute('reopen', response({ success: true, artifact: preSiteArtifact(DRAFT), reused: false, recovered: false, inProgress: false }));
+  fireEvent.click(screen.getByRole('button', { name: 'Create Draft Successor' }));
+
+  await waitFor(() => expect(calls('reopen')).toHaveLength(2));
+  const secondCall = calls('reopen')[1];
+  expect(JSON.parse(secondCall[1].body).clientOperationId).toBe(firstOperationId);
 });
 
 test('renders append-only guarded reopen history from the status contract', async () => {

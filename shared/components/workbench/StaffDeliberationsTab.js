@@ -205,6 +205,10 @@ export default function StaffDeliberationsTab({
   const [briefPendingArtifact, setBriefPendingArtifact] = useState(null);
   const [checkingBriefStatus, setCheckingBriefStatus] = useState(Boolean(requestId));
   const [briefRecoveryMessage, setBriefRecoveryMessage] = useState(null);
+  // §3.5/H1: set true only by a SUCCESSFUL brief status fetch reporting no
+  // brief rows at all (never inferred from a failed fetch), so the legacy
+  // Pre-Site rail fallback below cannot fire on a `briefError`.
+  const [noBriefRowsAtAll, setNoBriefRowsAtAll] = useState(false);
   const briefSequence = useRef(0);
   const briefController = useRef(null);
 
@@ -277,6 +281,7 @@ export default function StaffDeliberationsTab({
           if (briefSequence.current !== sequence || id !== requestId) return;
           setBriefArtifact(status.currentArtifact || null);
           setBriefPendingArtifact(status.pendingArtifact || null);
+          setNoBriefRowsAtAll(status.hasBriefRows === false);
           if (status.pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
             setBriefError(failureMessage(
               status.pendingArtifact,
@@ -289,7 +294,11 @@ export default function StaffDeliberationsTab({
             && briefSequence.current === sequence
             && id === requestId) {
             // A registry fault (e.g. brief_pointer_invalid) is reported, not
-            // thrown — the Pre-Site card must stay usable regardless.
+            // thrown — the Pre-Site card must stay usable regardless. It
+            // must also NOT be treated as "no brief rows": that would
+            // silently fall back to the legacy Pre-Site rail and hide a
+            // real fault behind a stage that looks fine.
+            setNoBriefRowsAtAll(false);
             setBriefError(statusError.message);
           }
         })
@@ -561,6 +570,12 @@ export default function StaffDeliberationsTab({
   const briefShared = briefArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const briefDraftReady = briefArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const briefDownloadUrl = downloadUrlFor(briefReadyFile);
+  // H3a/B10 client mirror: the server gate (`assertBriefInputsReady`,
+  // `brief_reviews_required`) is authoritative; this only disables the
+  // affordance early with a reason, using the same received-review count
+  // captured in the brief's own generation-input snapshot.
+  const briefReviewsRequired = Boolean(briefArtifact) && (briefArtifact.receivedReviewCount ?? 0) === 0;
+  const briefReviewsRequiredReason = 'The brief has no received reviews yet. Share is blocked until at least one review is received.';
 
   // Server-derived (uncapped EXISTS, scoped to the CURRENT brief document) so
   // a superseded document's sends never promote its reopen successor and the
@@ -579,13 +594,20 @@ export default function StaffDeliberationsTab({
   const siteVisitContext = useSiteVisitContext(requestId);
   const siteVisitStartIso = siteVisitContext?.siteVisit?.startIso || null;
 
-  // Plan §3.5: the composite stage projection reads the BRIEF as the stage
-  // artifact (or its pending attempt while none exists yet); `finalReached`
-  // is a separate signal from the canonical Pre-Site row's own lifecycle
-  // reaching FINAL, because Final Writeup activation marks the Pre-Site row
-  // while the brief stays in Review (B11).
+  // Plan §3.5 / H1: the composite stage projection reads the BRIEF as the
+  // stage artifact (or its pending attempt while none exists yet); a request
+  // with NO brief rows at all (confirmed by a successful status fetch, never
+  // inferred from a failed one — see `noBriefRowsAtAll`) falls back to the
+  // legacy Pre-Site artifact so a request that predates the brief still
+  // shows its true stage. `finalReached` is a separate signal from the
+  // canonical Pre-Site row's own lifecycle reaching FINAL, because Final
+  // Writeup activation marks the Pre-Site row while the brief stays in
+  // Review (B11).
+  const stageFetchFailed = Boolean(briefError) && !briefArtifact && !briefPendingArtifact && !noBriefRowsAtAll;
   const { stage, substate, visit } = deriveDeliberationStage({
-    stageArtifact: briefArtifact || briefPendingArtifact,
+    stageArtifact: briefArtifact
+      || briefPendingArtifact
+      || (noBriefRowsAtAll ? (artifact || pendingArtifact) : null),
     finalReached: preSiteFinal,
     siteVisitStartIso,
     everSent,
@@ -642,8 +664,11 @@ export default function StaffDeliberationsTab({
   // workspace (unchanged route). Independent of Share — available whenever a
   // Ready/Draft Pre-Site row exists.
   const startSiteVisitAction = async () => {
-    if (!requestId || !readyFile || !preSiteDraftReady) return;
-    if (startingSiteVisit) throw new Error('The Site Visit is already being started. Wait a moment and try again.');
+    // M4: a plain early return, never a throw — this runs as a fire-and-
+    // forget promise from the button's onClick, so throwing here (even
+    // though the button is also disabled while startingSiteVisit) risks an
+    // unhandled promise rejection rather than a caught, displayed error.
+    if (!requestId || !readyFile || !preSiteDraftReady || startingSiteVisit) return;
     const id = requestId;
     const expectedArtifactId = artifact.artifactId;
     const sequence = ++generationSequence.current;
@@ -817,7 +842,7 @@ export default function StaffDeliberationsTab({
     briefReadyFile && !beyondDeliberations && {
       key: 'download', label: 'Download', href: briefDownloadUrl, download: briefReadyFile.name || true, title: briefReadyFile.name || undefined,
     },
-    briefReadyFile && briefDraftReady && {
+    briefReadyFile && !beyondDeliberations && (briefDraftReady || briefShared) && {
       key: 'regenerate', label: 'Regenerate Brief', onSelect: () => setConfirmDialog({ kind: 'brief' }), disabled: briefGenerating || briefUnchangedRetryBlocked,
     },
     briefReadyFile && briefShared && everSent && {
@@ -850,7 +875,12 @@ export default function StaffDeliberationsTab({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
-            {!unknownLifecycle && (
+            {stageFetchFailed && (
+              <p className="mt-2 max-w-2xl text-sm text-red-800" data-testid="deliberations-stage-error">
+                The deliberation stage could not be determined: {briefError}
+              </p>
+            )}
+            {!stageFetchFailed && !unknownLifecycle && (
               <>
                 <DeliberationStageRail
                   stage={stage}
@@ -966,16 +996,34 @@ export default function StaffDeliberationsTab({
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Edit in Word
                 </a>
-                <button type="button" onClick={openComposer} disabled={briefGenerating} className={secondaryClass}>
+                <button
+                  type="button"
+                  onClick={openComposer}
+                  disabled={briefGenerating || briefReviewsRequired}
+                  title={briefReviewsRequired ? briefReviewsRequiredReason : undefined}
+                  className={secondaryClass}
+                >
                   Share…
                 </button>
+                {briefReviewsRequired && (
+                  <p className="mt-1 basis-full text-xs text-gray-600">{briefReviewsRequiredReason}</p>
+                )}
               </>
             )}
             {briefReadyFile && briefShared && stage === 'shared' && substate === 'not-sent' && (
               <>
-                <button type="button" onClick={openComposer} className={primaryClass}>
+                <button
+                  type="button"
+                  onClick={openComposer}
+                  disabled={briefReviewsRequired}
+                  title={briefReviewsRequired ? briefReviewsRequiredReason : undefined}
+                  className={primaryClass}
+                >
                   {latestSendFailure ? 'Resend' : 'Share…'}
                 </button>
+                {briefReviewsRequired && (
+                  <p className="mt-1 basis-full text-xs text-gray-600">{briefReviewsRequiredReason}</p>
+                )}
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
                   Open working document
                 </a>
@@ -996,6 +1044,15 @@ export default function StaffDeliberationsTab({
             {briefMoreItems.length > 0 && <OverflowMenu label="More brief actions" items={briefMoreItems} />}
           </div>
         </div>
+        {briefShared && !briefReadyFile && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            <h3 className="font-semibold">Pre-Research Presentation Brief is read-only</h3>
+            <p className="mt-1">
+              No current Word link was returned for this record, so working controls are not
+              available. Reload to retry, or contact an administrator if this persists.
+            </p>
+          </div>
+        )}
       </Card>
 
       <Card hover={false}>
@@ -1064,7 +1121,7 @@ export default function StaffDeliberationsTab({
                 <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Edit in Word
                 </a>
-                <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit} className={secondaryClass}>
+                <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
                   {startingSiteVisit ? 'Starting…' : 'Start Site Visit'}
                 </button>
               </>
@@ -1082,6 +1139,15 @@ export default function StaffDeliberationsTab({
             {preSiteMoreItems.length > 0 && <OverflowMenu label="More writeup actions" items={preSiteMoreItems} />}
           </div>
         </div>
+        {(preSiteShared || preSiteFinal) && !readyFile && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            <h3 className="font-semibold">Pre-Site Visit Writeup is read-only</h3>
+            <p className="mt-1">
+              No current Word link was returned for this record, so working controls are not
+              available. Reload to retry, or contact an administrator if this persists.
+            </p>
+          </div>
+        )}
       </Card>
 
       {briefReadyFile && (briefDraftReady || briefShared) && (

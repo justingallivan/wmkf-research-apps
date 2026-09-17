@@ -497,6 +497,18 @@ export default function PreSiteDistributionPanel({
         }
         return;
       }
+      // H3c/B10: the server's zero-review gate (`assertBriefInputsReady`,
+      // `lib/services/pre-site-visit/distribution-service.js`) fires here
+      // when the client-side mirror in the tab was stale or bypassed. Named
+      // separately from the generic failure below so staff see why, not a
+      // bare "Preview preparation failed" — and Regenerate Brief (allowed
+      // while Review, B12) is the recovery path, not a stuck brief.
+      if (!response.ok && body.code === 'brief_reviews_required') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError('This brief has no received reviews yet, so it cannot be shared. Wait for at least one review to come in, or regenerate the brief once one has.');
+        }
+        return;
+      }
       if (!response.ok) throw new Error(body.error || `Preview preparation failed (${response.status})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setPreview(body.attempt || null);

@@ -361,6 +361,30 @@ test('surfaces an in-progress prepare response instead of accepting it as a prev
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
+test('H3c/B10: a brief_reviews_required prepare failure shows named, non-generic copy', async () => {
+  // No `error` string in the body (discriminating: the generic `!response.ok`
+  // path would fall back to "Preview preparation failed (409)" with no body
+  // text to borrow from, so passing requires the dedicated code branch).
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ code: 'brief_reviews_required' }, 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/has no received reviews yet/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
 test('turns a stale material response into a recoverable notice and requires a fresh confirmation', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))

@@ -187,6 +187,27 @@ describe('getPreRpBriefStatus', () => {
     await expect(getPreRpBriefStatus({ requestId: 'not-a-guid' }, statusDependencies({ request: null, rows: [] })))
       .rejects.toMatchObject({ code: 'invalid_request_id' });
   });
+
+  it('reports hasBriefRows: false when the request has no brief rows at all (H1/§3.5)', async () => {
+    const dependencies = statusDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: null },
+      rows: [],
+    });
+    const status = await getPreRpBriefStatus({ requestId: REQUEST_ID }, dependencies);
+    expect(status.hasBriefRows).toBe(false);
+  });
+
+  it('reports hasBriefRows: true when a brief row exists, even if it is only pending', async () => {
+    const generating = briefRow({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    });
+    const dependencies = statusDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: null },
+      rows: [generating],
+    });
+    const status = await getPreRpBriefStatus({ requestId: REQUEST_ID }, dependencies);
+    expect(status.hasBriefRows).toBe(true);
+  });
 });
 
 describe('generatePreRpBrief', () => {
@@ -590,5 +611,24 @@ describe('projectPreRpBriefArtifact', () => {
   it('rejects a row that is not a governed Pre-RP Brief document', () => {
     expect(() => projectPreRpBriefArtifact(briefRow({ wmkf_contenttype: 'application/pdf' })))
       .toThrow(/not a governed Pre-RP Brief document/);
+  });
+
+  it('counts only received reviews from the stored input snapshot (H3a/B10 client mirror)', () => {
+    const snapshot = JSON.stringify({
+      reviews: [
+        { reviewReceivedAt: '2026-09-01T00:00:00Z' },
+        { reviewReceivedAt: null },
+        { reviewReceivedAt: '2026-09-02T00:00:00Z' },
+      ],
+    });
+    const artifact = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: snapshot }));
+    expect(artifact.receivedReviewCount).toBe(2);
+  });
+
+  it('reads zero received reviews when the snapshot is missing or malformed', () => {
+    const missing = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: null }));
+    expect(missing.receivedReviewCount).toBe(0);
+    const malformed = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: '{not json' }));
+    expect(malformed.receivedReviewCount).toBe(0);
   });
 });

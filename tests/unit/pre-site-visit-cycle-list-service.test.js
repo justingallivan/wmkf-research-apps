@@ -233,6 +233,27 @@ describe('everSent join', () => {
     const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
     expect(result.artifacts[0]).toMatchObject({ everSent: true, substate: 'sent' });
   });
+
+  it('M5: everSent is keyed to the selected source id — a sent id belonging to a different row reads false', async () => {
+    // Discriminating: replacing the per-document `sentIds.has(id)` check with
+    // `sentIds.size > 0` would make every row read everSent: true as soon as
+    // ANY document in the cycle had been sent, even one belonging to another
+    // request entirely.
+    requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [
+      row({ wmkf_requestdocumentid: 'r1-doc', _wmkf_request_value: R1, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW }),
+      row({ wmkf_requestdocumentid: 'r2-doc', _wmkf_request_value: R2, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW }),
+    ] });
+    grantRequestAdapter.findByIds.mockResolvedValue({ records: [
+      request(R1, { _wmkf_currentpresitevisit_value: null }),
+      request(R2, { _wmkf_currentpresitevisit_value: null }),
+    ] });
+    // Only r2-doc was ever sent.
+    sentSourceDocumentIds.mockResolvedValue(new Set(['r2-doc']));
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    const byRequest = Object.fromEntries(result.artifacts.map((a) => [a.requestId, a]));
+    expect(byRequest[R1]).toMatchObject({ everSent: false, substate: 'not-sent' });
+    expect(byRequest[R2]).toMatchObject({ everSent: true, substate: 'sent' });
+  });
 });
 
 describe('projected row shape', () => {
