@@ -532,6 +532,16 @@ export default function PreSiteDistributionPanel({
         }
         return;
       }
+      // Codex adversarial review (2026-09-17, round 5 finding 1): a guarded
+      // regeneration is live for this request's brief (`resolveCurrentPreRpBriefForDistribution`,
+      // lib/services/pre-rp-brief/artifact-service.js). Named, not the
+      // generic failure below, so staff know to wait rather than retry.
+      if (!response.ok && body.code === 'brief_regeneration_in_progress') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError('A replacement brief is being generated; sharing is paused until it is ready.');
+        }
+        return;
+      }
       if (!response.ok) throw new Error(body.error || `Preview preparation failed (${response.status})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setPreview(body.attempt || null);
@@ -630,6 +640,17 @@ export default function PreSiteDistributionPanel({
             : body.code === 'distribution_session_stale'
               ? 'The deliberation session changed after this preview. Create a new preview, review it, and then send.'
               : 'This preview is out of date because the visit details or materials changed. Create a new preview, review it, and then send.');
+        }
+        return;
+      }
+      // Codex adversarial review (2026-09-17, round 5 finding 1): the same
+      // freshness recheck prepare uses also runs at send time, so a guarded
+      // regeneration that started after this preview was prepared blocks
+      // completion here too. Named, and the existing (still valid) preview
+      // is kept rather than discarded, since nothing about it is stale.
+      if (!response.ok && body.code === 'brief_regeneration_in_progress') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError('A replacement brief is being generated; sharing is paused until it is ready.');
         }
         return;
       }

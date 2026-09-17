@@ -94,6 +94,14 @@ test.each([
   [{ requestId: REQUEST_ID, clientOperationId: 'op-1', extra: 'field' }, 'extra field'],
   [{ requestId: 'not-a-guid', clientOperationId: 'op-1' }, 'invalid request id'],
   [{ requestId: REQUEST_ID, clientOperationId: '' }, 'empty clientOperationId'],
+  // Guarded regeneration (plan §10) is internal-only: generatePreRpBrief's
+  // `reopen` option is set exclusively by
+  // lib/services/pre-rp-brief/reopen-service.js, never by this public route.
+  [{
+    requestId: REQUEST_ID,
+    clientOperationId: 'op-1',
+    reopen: { cycleId: 'op-1', reasonCode: 'accidental_handoff', reasonNote: 'note' },
+  }, 'a reopen key'],
 ])('rejects %s (%s) before generation', async (body) => {
   const res = mockRes();
   await handler(post(body), res);

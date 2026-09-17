@@ -385,6 +385,31 @@ test('H3c/B10: a brief_reviews_required prepare failure shows named, non-generic
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
+// Codex adversarial review (2026-09-17, round 5 finding 1): mirrors the
+// brief_reviews_required test above for the new 409
+// brief_regeneration_in_progress code (a guarded regeneration is live for
+// this request's brief).
+test('a brief_regeneration_in_progress prepare failure shows named, non-generic copy', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ code: 'brief_regeneration_in_progress' }, 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/replacement brief is being generated/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
 test('a late recipient suggestion that seeds a blank field invalidates the prepared preview and its confirmation', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
@@ -747,6 +772,36 @@ test('keeps non-stale send failures as errors', async () => {
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/could not be found/i);
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+// Codex adversarial review (2026-09-17, round 5 finding 1): the same
+// freshness recheck runs at send time, so this named copy must also appear
+// there, and the still-valid preview must not be discarded (unlike the
+// STALE_PREVIEW_CODES branch).
+test('a brief_regeneration_in_progress send failure shows named copy and keeps the existing preview', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('pdf') }))
+    .mockResolvedValueOnce(response({ code: 'brief_regeneration_in_progress' }, 409));
+
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await screen.findByText('Email preview');
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/replacement brief is being generated/i);
+  expect(screen.getByText('Email preview')).toBeInTheDocument();
 });
 
 test('an unreadable briefing link still offers Issue new link but never Copy', async () => {

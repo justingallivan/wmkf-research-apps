@@ -19,12 +19,26 @@ jest.mock('../../shared/components/Layout', () => ({
 
 let distributionHistoryFeed = null;
 let lastDistributionProps = null;
+// Codex adversarial review finding 3 (2026-09-16 round 2): records the
+// sourceArtifact id seen on each MOUNT (empty deps -- a real component
+// mount, not merely a re-render with new props) of the mocked panel. The
+// real panel's own history-load effect only re-runs on `requestId` change
+// (never on `sourceArtifact` alone -- lib/services is not in play here, this
+// mirrors PreSiteDistributionPanel.js's own effect dependency array), so
+// proving the tab actually forces a fresh mount for a new brief artifact id
+// (via the `key` on <PreSiteDistributionPanel>) is what proves history gets
+// reloaded rather than silently keeping the predecessor's cached state.
+let mountedSourceArtifactIds = [];
 jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
   const { useEffect } = require('react');
   const { useState } = require('react');
   function MockDistributionPanel(props) {
     const [lockError, setLockError] = useState(null);
     lastDistributionProps = props;
+    useEffect(() => {
+      mountedSourceArtifactIds.push(props.sourceArtifact?.artifactId || 'none');
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     useEffect(() => {
       if (distributionHistoryFeed) props.onHistory?.(distributionHistoryFeed);
     }, [props]);
@@ -72,6 +86,7 @@ const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 const PRESITE_ARTIFACT_ID = '22222222-2222-4222-8222-222222222222';
 const BRIEF_ARTIFACT_ID = '44444444-4444-4444-8444-444444444444';
+const REOPENED_BRIEF_ARTIFACT_ID = '66666666-6666-4666-8666-666666666666';
 
 const DRAFT = 100000000;
 const REVIEW = 100000001;
@@ -97,9 +112,9 @@ function preSiteArtifact(lifecycleState = DRAFT) {
   };
 }
 
-function briefArtifact(lifecycleState = DRAFT, { receivedReviewCount = 1 } = {}) {
+function briefArtifact(lifecycleState = DRAFT, { receivedReviewCount = 1, artifactId = BRIEF_ARTIFACT_ID } = {}) {
   return {
-    artifactId: BRIEF_ARTIFACT_ID,
+    artifactId,
     operationStatus: READY,
     lifecycleState,
     file: {
@@ -152,6 +167,7 @@ function statusResponse({
 // the responses they care about.
 const ROUTE_DEFS = [
   { key: 'briefLock', test: (u, m) => m === 'POST' && u.includes('/pre-rp-brief/lock-for-share') },
+  { key: 'briefReopen', test: (u, m) => m === 'POST' && u.includes('/pre-rp-brief/reopen') },
   { key: 'startSiteVisit', test: (u, m) => m === 'POST' && u.includes('/pre-site-visit/start-site-visit') },
   { key: 'reopen', test: (u, m) => m === 'POST' && u.includes('/pre-site-visit/reopen') },
   { key: 'briefGet', test: (u, m) => m === 'GET' && u.includes('/pre-rp-brief') },
@@ -167,6 +183,7 @@ function queueRoute(key, resp) {
 
 const defaultFor = {
   briefLock: () => response({ success: true, artifact: briefArtifact(REVIEW), reused: false }),
+  briefReopen: () => response({ success: true, artifact: briefArtifact(DRAFT), reused: false }),
   startSiteVisit: () => response({ success: true, artifact: preSiteArtifact(REVIEW) }),
   reopen: () => response({ success: true, artifact: preSiteArtifact(DRAFT), reused: false }),
   // NEW-5 (Opus round 2): the default brief GET reports no brief rows at
@@ -190,6 +207,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   distributionHistoryFeed = null;
   lastDistributionProps = null;
+  mountedSourceArtifactIds = [];
   siteVisitContextFeed = null;
   visitExpectedFeed = true;
   queues = Object.fromEntries(ROUTE_DEFS.map((r) => [r.key, []]));
@@ -521,6 +539,273 @@ test('NEW-1: Regenerate Brief is not offered once the shared brief has already b
   await screen.findByRole('link', { name: 'Open working document' });
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.queryByRole('menuitem', { name: 'Regenerate Brief' })).not.toBeInTheDocument();
+});
+
+// ── Guarded regeneration of a brief already sent to the Board (owner
+// decision 2026-09-16, plan §10) ─────────────────────────────────────────
+
+test('Regenerate sent brief… is hidden for a non-superuser even once the brief has been sent', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser={false} />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate sent brief…' })).not.toBeInTheDocument();
+});
+
+test('Regenerate sent brief… is shown for a superuser once sent, and hidden while not yet sent', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' })).toBeInTheDocument();
+});
+
+test('Regenerate sent brief… is hidden for a superuser while the shared brief has not yet been sent', async () => {
+  distributionHistoryFeed = { attempts: [], currentSourceEverSent: false };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate sent brief…' })).not.toBeInTheDocument();
+});
+
+test('the guarded brief-reopen dialog stays disabled until reason, a valid note, and the exact request number are given, then submits exactly six fields', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
+
+  const dialog = screen.getByRole('dialog', { name: 'Regenerate a brief the Board already received?' });
+  const submit = within(dialog).getByRole('button', { name: 'Regenerate Sent Brief' });
+  expect(submit).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'short' } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The Board received an incomplete draft.' } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: 'wrong-number' } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  expect(submit).toBeEnabled();
+
+  fireEvent.click(submit);
+
+  await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
+  const sentBody = JSON.parse(calls('briefReopen')[0][1].body);
+  expect(Object.keys(sentBody).sort()).toEqual([
+    'clientOperationId',
+    'expectedArtifactId',
+    'reasonCode',
+    'reasonNote',
+    'requestId',
+    'requestNumber',
+  ]);
+  expect(sentBody).toMatchObject({
+    requestId: REQUEST_ID,
+    expectedArtifactId: BRIEF_ARTIFACT_ID,
+    requestNumber: '1002379',
+    reasonCode: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF,
+    reasonNote: 'The Board received an incomplete draft.',
+  });
+});
+
+test('a successful guarded brief regeneration remounts distribution history for the new artifact id, so a later Share never reads the predecessor\'s "already sent" state', async () => {
+  // Codex adversarial review finding 3 (2026-09-16 round 2): the mocked
+  // panel's history-load effect only fires on a genuine mount (empty deps),
+  // mirroring the real PreSiteDistributionPanel's own effect, which only
+  // re-runs on a `requestId` change, never on `sourceArtifact` alone. So
+  // `mountedSourceArtifactIds` below only grows if the tab's `key` on
+  // <PreSiteDistributionPanel> actually changed, proving a real remount
+  // (and therefore a fresh history load) happened for the new artifact id.
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  queueRoute('briefReopen', response({
+    success: true,
+    artifact: briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }),
+    reused: false,
+  }));
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }) }));
+  queueRoute('briefLock', response({
+    success: true,
+    artifact: briefArtifact(REVIEW, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }),
+    reused: false,
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID]);
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The Board received an incomplete draft.' } });
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  // The predecessor's history feed stays "sent" here; the successor's fresh
+  // (post-remount) history load must report never-sent instead.
+  distributionHistoryFeed = { attempts: [], currentSourceEverSent: false };
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate Sent Brief' }));
+
+  await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Regenerate a brief the Board already received?' })).not.toBeInTheDocument());
+  expect(await screen.findByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
+  // Proves an actual remount happened for the new artifact id (a second,
+  // fresh history load) rather than the mock merely re-rendering with
+  // updated props under a stale, already-mounted history load.
+  await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID, REOPENED_BRIEF_ARTIFACT_ID]));
+
+  // Share the new Draft again, reaching the exact state where a stale
+  // "already sent" signal from the superseded source would previously have
+  // hidden Regenerate Brief and wrongly offered Send again.
+  fireEvent.click(screen.getByRole('button', { name: 'Share…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'mock-prepare' }));
+  await waitFor(() => expect(calls('briefLock')).toHaveLength(1));
+
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Brief' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: 'Send the deliberation email again…' })).not.toBeInTheDocument();
+});
+
+// Codex adversarial review (2026-09-17, round 3 follow-up to round 2
+// finding 3): the eager reset above ran unconditionally, including on a 202
+// reply where the successor is still GENERATING and the refreshed status
+// still reports the already-sent predecessor as current — wrongly clearing
+// the predecessor's own correct "already sent" signal while it is still the
+// fully live, current document. Round 4: that alone was not enough — while
+// still-current and still (correctly) marked sent, the predecessor's Share /
+// send-again / resend paths (and the guarded-reopen entry itself) must ALSO
+// be suppressed while ANY regeneration is pending, or staff could resend the
+// predecessor after cancelling the dialog, racing the successor's own
+// eventual send into a duplicate Board email.
+test('a 202 (still-generating) guarded regeneration suppresses every Share/send-again/resend path and closes the composer; both lift once the successor activates', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  // First submit: the operation is claimed elsewhere and still GENERATING,
+  // so the route returns 202. The refreshed status right after still
+  // reports the PREDECESSOR (unchanged id) as current, with the successor
+  // only pending.
+  queueRoute('briefReopen', response({
+    success: true,
+    artifact: { ...briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }), operationStatus: GENERATING },
+    reused: true,
+  }, 202));
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(REVIEW),
+    pendingArtifact: { ...briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }), operationStatus: GENERATING },
+  }));
+  const { rerender } = render(<StaffDeliberationsTab key="mount-1" requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  // The mocked panel's onHistory effect fires on every re-render (an
+  // intentional simplification for tests exercising an actual data change,
+  // per its own comment above), unlike the real panel, which only refires on
+  // mount/requestId change. Left non-null here, it would keep re-asserting
+  // the true feed on every render and silently mask a wrongly-reset
+  // `currentSourceEverSent` regardless of what submitBriefReopen itself did.
+  // Nulling it now isolates the assertions below to the tab's OWN state.
+  distributionHistoryFeed = null;
+
+  // Open the composer first (via the still-correct, still-sent predecessor's
+  // "Send the deliberation email again…"), to prove it gets force-closed
+  // once the pending regeneration is discovered. OverflowMenu closes itself
+  // on every item selection (OverflowMenu.js: `onClick={() => { setOpen(false); item.onSelect?.(); }}`),
+  // so each menu action below needs its own opening click.
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Send the deliberation email again…' }));
+  expect(screen.getByText('Distribution panel: dialog (record)')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The Board received an incomplete draft.' } });
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate Sent Brief' }));
+
+  await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
+  expect(await screen.findByText(/already in progress/i)).toBeInTheDocument();
+  // The still-open composer from before is now force-closed.
+  expect(screen.queryByText('Distribution panel: dialog (record)')).not.toBeInTheDocument();
+  expect(screen.getByText('Distribution panel: hidden (record)')).toBeInTheDocument();
+  // The predecessor's artifact id is unchanged, so no remount happened —
+  // proving the fix did not treat this as "the successor is now current".
+  expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID]);
+  // The amber "sharing is paused" note replaces the suppressed actions.
+  expect(screen.getByText(/sharing is paused until it is ready/i)).toBeInTheDocument();
+
+  // Cancel out of the guarded-reopen dialog rather than retry it.
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Regenerate a brief the Board already received?' })).not.toBeInTheDocument());
+
+  // None of the three Share / send-again / resend paths are available while
+  // the regeneration is still pending, even after cancelling the dialog.
+  expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.queryByRole('menuitem', { name: 'Send the deliberation email again…' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate sent brief…' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate Brief' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' })); // close the menu
+
+  // The successor activates — discovered on a later status refresh (e.g. the
+  // tab being revisited/remounted), not via a retry of the cancelled dialog.
+  distributionHistoryFeed = { attempts: [], currentSourceEverSent: false };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }) }));
+  rerender(<StaffDeliberationsTab key="mount-2" requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  expect(await screen.findByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
+  // Only now — once the successor is confirmed current — does history
+  // remount for the new artifact id.
+  await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID, REOPENED_BRIEF_ARTIFACT_ID]));
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Brief' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: 'Send the deliberation email again…' })).not.toBeInTheDocument();
+});
+
+// Codex adversarial review (2026-09-17, round 4): suppression must be scoped
+// to a GENERATING pending attempt only — a FAILED one (the regeneration did
+// not succeed; the predecessor was never at risk) must not permanently block
+// Share / send-again.
+test('suppression lifts once a pending regeneration attempt FAILS, not just once it activates', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(REVIEW),
+    pendingArtifact: { ...briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }), operationStatus: FAILED, retryable: true },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Send the deliberation email again…' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' })).toBeInTheDocument();
+});
+
+// Codex adversarial review (2026-09-17, round 5 finding 2): a GENERATING row
+// whose claim lease has expired (an abandoned attempt, `leaseActive: false`
+// from the server) must not permanently strand the current brief's own
+// affordances.
+test('suppression lifts once the pending artifact reports leaseActive: false, even while still GENERATING', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(REVIEW),
+    pendingArtifact: {
+      ...briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }),
+      operationStatus: GENERATING,
+      leaseActive: false,
+    },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  expect(screen.queryByText(/sharing is paused until it is ready/i)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Send the deliberation email again…' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' })).toBeInTheDocument();
 });
 
 test('Brief card: regenerate opens a brief-scoped confirmation dialog', async () => {
