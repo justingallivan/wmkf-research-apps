@@ -574,8 +574,16 @@ export default function StaffDeliberationsTab({
   // `brief_reviews_required`) is authoritative; this only disables the
   // affordance early with a reason, using the same received-review count
   // captured in the brief's own generation-input snapshot.
-  const briefReviewsRequired = Boolean(briefArtifact) && (briefArtifact.receivedReviewCount ?? 0) === 0;
-  const briefReviewsRequiredReason = 'The brief has no received reviews yet. Share is blocked until at least one review is received.';
+  // `receivedReviewCount` is tri-state (null = the stored snapshot could not
+  // be read; the server refuses that as `brief_snapshot_invalid`), so the two
+  // blocked reasons stay distinct here as they are on the server.
+  const briefSnapshotInvalid = Boolean(briefArtifact) && briefArtifact.receivedReviewCount === null;
+  const briefReviewsRequired = Boolean(briefArtifact) && !briefSnapshotInvalid
+    && (briefArtifact.receivedReviewCount ?? 0) === 0;
+  const briefShareBlocked = briefSnapshotInvalid || briefReviewsRequired;
+  const briefShareBlockedReason = briefSnapshotInvalid
+    ? 'The brief\'s stored input record could not be read, so it cannot be shared. Regenerate the brief first.'
+    : 'The brief has no received reviews yet. Share is blocked until at least one review is received.';
 
   // Server-derived (uncapped EXISTS, scoped to the CURRENT brief document) so
   // a superseded document's sends never promote its reopen successor and the
@@ -932,8 +940,9 @@ export default function StaffDeliberationsTab({
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
             <h3 className="font-semibold">Staff Deliberations is read-only</h3>
             <p className="mt-1">
-              This document has moved beyond the deliberation stages. It cannot be edited,
-              downloaded, or regenerated from this tab.
+              The Pre-Research Presentation Brief has moved beyond the deliberation stages.
+              It cannot be downloaded or regenerated from this tab. The Site Visit writeup
+              below keeps its own actions.
             </p>
           </div>
         )}
@@ -1007,14 +1016,14 @@ export default function StaffDeliberationsTab({
                 <button
                   type="button"
                   onClick={openComposer}
-                  disabled={briefGenerating || briefReviewsRequired}
-                  title={briefReviewsRequired ? briefReviewsRequiredReason : undefined}
+                  disabled={briefGenerating || briefShareBlocked}
+                  title={briefShareBlocked ? briefShareBlockedReason : undefined}
                   className={secondaryClass}
                 >
                   Share…
                 </button>
-                {briefReviewsRequired && (
-                  <p className="mt-1 basis-full text-xs text-gray-600">{briefReviewsRequiredReason}</p>
+                {briefShareBlocked && (
+                  <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
                 )}
               </>
             )}
@@ -1023,14 +1032,14 @@ export default function StaffDeliberationsTab({
                 <button
                   type="button"
                   onClick={openComposer}
-                  disabled={briefReviewsRequired}
-                  title={briefReviewsRequired ? briefReviewsRequiredReason : undefined}
+                  disabled={briefShareBlocked}
+                  title={briefShareBlocked ? briefShareBlockedReason : undefined}
                   className={primaryClass}
                 >
                   {latestSendFailure ? 'Resend' : 'Share…'}
                 </button>
-                {briefReviewsRequired && (
-                  <p className="mt-1 basis-full text-xs text-gray-600">{briefReviewsRequiredReason}</p>
+                {briefShareBlocked && (
+                  <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
                 )}
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
                   Open working document

@@ -541,8 +541,8 @@ the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFI
 
 ## 8. Follow-ups (not required for this pass)
 
-- **Pre-RP replay closed; Pre-Site parity remains parked (2026-09-16).**
-  `generatePreRpBrief` now refuses 409 `brief_generation_replay_stale` when
+- **Pre-RP replay closed; Pre-Site parity ported (Session 516 follow-ups, 2026-09-16).**
+  `generatePreRpBrief` refuses 409 `brief_generation_replay_stale` when
   the recomputed generation key resolves to a Superseded row or to a Ready
   row that is not the current request-pointer target; an exact retry of the
   current Ready row remains read-only/idempotent. Regeneration also enforces
@@ -550,38 +550,51 @@ the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFI
   for the current brief refuses 409
   `brief_regeneration_distribution_started`, with the distribution state
   checked before generation side effects and again at pointer activation to
-  cover a concurrent send. The analogous replay behavior in
-  `lib/services/pre-site-visit/artifact-service.js` is deliberately unchanged
-  in this fix and remains a parity follow-up; do not infer that the Pre-Site
-  service now has the brief-specific guard.
+  cover a concurrent send. **Ported to Pre-Site** on branch
+  `claude/pre-rp-brief-followups`: `generatePreSiteVisitArtifact` now refuses
+  409 `pre_site_visit_generation_replay_stale` for a Superseded generation-key
+  row or a Ready row that is not the current pointer target
+  (`lib/services/pre-site-visit/artifact-service.js`, before the Ready-reuse
+  path; covered by `tests/unit/pre-site-visit-artifact-service.test.js`).
 
-- **Carried from the slice 4–5 Opus reviews (Session 516, 2026-09-16):**
+- **Carried from the slice 4–5 Opus reviews (Session 516, 2026-09-16); items
+  (ii)–(viii) closed on `claude/pre-rp-brief-followups` the same day:**
   (i) **Resolved 2026-09-16:** the delta and fingerprint now consume the same
   canonical received-only form. Non-received suggestions move neither; received
   reviews retain the raw fingerprint fields, so a `reviewReceivedAt` timestamp
   rewrite moves both the fingerprint and the changed-reviewer delta. The former
   asymmetry-based hash test now asserts equal delta/hash identity for a pending
   suggestion and a separate regression covers the raw timestamp change.
-  (ii) `tests/unit/migration-052-*.test.js`
-  pins the acknowledged-drift CHECK tokens but not the legacy all-NULL branch.
-  (iii) `stale_inputs_acknowledged_by` renders as a raw system-user GUID in the
-  Workbench distribution history; a server-side actor-name projection is needed.
-  (iv) `FinalWriteupTab.js` still shows the generic `final_writeup_source_missing`
-  copy; the Site Visit prerequisite wording lives only on the Staff Deliberations
-  Pre-Site card. (v) The tab's `beyond` banner derives from the brief while the
-  Pre-Site card stays live. (vi) `PreSiteDistributionPanel.js` defaults-seeding
-  `setForm` bypasses the `staleInputs` reset (unreachable in practice).
-  (vii) A malformed brief snapshot disables Share with the "no received reviews"
-  reason, while the server would refuse with `brief_snapshot_invalid`; project a
-  tri-state or reword. (viii) The restored tab test "a late response for a prior
-  request cannot publish a stale Word link" guards React remount, not
-  `generate()`'s sequence guard; rename or add an unmount-mid-generate case.
+  (ii) **Closed:** the migration-052 test now pins the legacy all-NULL CHECK
+  branch tokens as well as the acknowledged-drift branch.
+  (iii) **Closed:** `getPreSiteDistributionHistory` resolves each distinct
+  `stale_inputs_acknowledged_by` GUID once through the system-user adapter
+  (`systemuserid,fullname`) and projects `acknowledgedByName`; the panel shows
+  "by <name>" and never the GUID; send-time projections and the external
+  briefing context carry no name. Lookup failures log and leave the name null.
+  (iv) **Closed:** `FinalWriteupTab.js` maps `final_writeup_source_missing` to
+  Site Visit prerequisite wording pointing at Staff Deliberations.
+  (v) **Closed:** the `beyond` banner now names the brief and no longer claims
+  editing is locked, since the Pre-Site card keeps its own actions.
+  (vi) **Closed structurally:** the defaults seed and `edit()` share
+  `applyFormPatch`, which clears preview/confirmation/`staleInputs`. The
+  sequence is unreachable in practice (the seed requires an untouched composer;
+  preparing requires a recipient edit), so there is no behavioral test for it.
+  (vii) **Closed:** `receivedReviewCount` is tri-state (`null` = snapshot
+  missing/malformed/foreign envelope, mirroring the server's malformed test);
+  the tab and the panel show a distinct "stored input record could not be read"
+  reason matching the server's `brief_snapshot_invalid`.
+  (viii) **Closed:** the tab test is renamed to say it guards the remount, and
+  a new case asserts unmount-mid-generate aborts the in-flight controller.
   (ix) **Closed 2026-09-16:** Regenerate on a brief already **sent** to the
   Board remains deliberately unavailable and is now enforced in the service,
   not only hidden in the UI. A send that is already in flight also blocks
-  replacement. If the owner wants to reopen either state, it still needs the
-  guarded-reopen treatment (typed request number, reason, audit), not a menu
-  item.
+  replacement. The owner has since asked for the guarded-reopen treatment
+  (typed request number, reason, audit); see §10.
+
+- **PI/PD role labels (owner request 2026-09-16, closed same day):** the
+  renderer prefixes the two people tokens at fill time ("PI: <name>",
+  "PD: <name>"); the canonical input state and fingerprint carry the raw names.
 
 ## 9. Build-loop handoff (paused 2026-09-16, Session 515; resumed and completed Session 516)
 

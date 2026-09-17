@@ -729,6 +729,8 @@ describe('projectPreRpBriefArtifact', () => {
 
   it('counts only received reviews from the stored input snapshot (H3a/B10 client mirror)', () => {
     const snapshot = JSON.stringify({
+      schemaVersion: PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion,
+      artifactType: PRE_RP_BRIEF_CONTRACT.snapshotArtifactType,
       reviews: [
         { reviewReceivedAt: '2026-09-01T00:00:00Z' },
         { reviewReceivedAt: null },
@@ -739,10 +741,22 @@ describe('projectPreRpBriefArtifact', () => {
     expect(artifact.receivedReviewCount).toBe(2);
   });
 
-  it('reads zero received reviews when the snapshot is missing or malformed', () => {
+  it('reads null (unreadable, distinct from zero) when the snapshot is missing, malformed, or of another envelope', () => {
     const missing = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: null }));
-    expect(missing.receivedReviewCount).toBe(0);
+    expect(missing.receivedReviewCount).toBeNull();
     const malformed = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: '{not json' }));
-    expect(malformed.receivedReviewCount).toBe(0);
+    expect(malformed.receivedReviewCount).toBeNull();
+    const foreign = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify({ schemaVersion: 99, reviews: [{ reviewReceivedAt: '2026-09-01T00:00:00Z' }] }),
+    }));
+    expect(foreign.receivedReviewCount).toBeNull();
+    const empty = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify({
+        schemaVersion: PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion,
+        artifactType: PRE_RP_BRIEF_CONTRACT.snapshotArtifactType,
+        reviews: [],
+      }),
+    }));
+    expect(empty.receivedReviewCount).toBe(0);
   });
 });

@@ -605,6 +605,34 @@ test('identical Ready retry does not rerun Claude, render, or upload', async () 
   expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
 });
 
+test('refuses a replayed generation whose key resolves to a non-current Ready row or a superseded row', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const firstRow = { ...harness.row };
+  const uploads = harness.dependencies.uploadFile.mock.calls.length;
+
+  // A newer draft became current; the same generation key still resolves to
+  // the first row, which must not be reactivated over the newer lineage.
+  const newer = {
+    ...firstRow,
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    wmkf_generationkey: 'newer-generation-key',
+  };
+  harness.request._wmkf_currentpresitevisit_value = newer.wmkf_requestdocumentid;
+  harness.dependencies.findByRequest.mockImplementation(async () => ({
+    records: [{ ...harness.row }, { ...newer }],
+  }));
+  await expect(generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies))
+    .rejects.toMatchObject({ code: 'pre_site_visit_generation_replay_stale', httpStatus: 409 });
+
+  harness.setRow({ ...firstRow, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED });
+  await expect(generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies))
+    .rejects.toMatchObject({ code: 'pre_site_visit_generation_replay_stale', httpStatus: 409 });
+
+  expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(uploads);
+  expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
+});
+
 test('read-only status returns the current Ready artifact without generation side effects', async () => {
   const harness = createHarness();
   await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);

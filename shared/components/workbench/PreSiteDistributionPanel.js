@@ -332,6 +332,15 @@ export default function PreSiteDistributionPanel({
   // before retrying with `acknowledgeStaleInputs` bound to the exact live
   // fingerprint just returned.
   const [staleInputs, setStaleInputs] = useState(null);
+  // Every form change — a staff edit and the one-time admin-defaults seed
+  // alike — goes through here, so a prepared preview, its confirmation, and
+  // any stale-inputs acknowledgement bound to the old form never outlive it.
+  const applyFormPatch = (patch) => {
+    setForm((current) => ({ ...current, ...patch }));
+    setPreview(null);
+    setConfirmed(false);
+    setStaleInputs(null);
+  };
   const [history, setHistory] = useState([]);
   const [historyError, setHistoryError] = useState(null);
   const [error, setError] = useState(null);
@@ -367,11 +376,10 @@ export default function PreSiteDistributionPanel({
         unavailable: body.emailDefaults.unavailable === true,
       });
       if (!composerTouchedRef.current) {
-        setForm((current) => ({
-          ...current,
+        applyFormPatch({
           subject: renderDeliberationShareSubject(body.emailDefaults.subjectTemplate, requestNumber),
           bodyText: String(body.emailDefaults.bodyTemplate || ''),
-        }));
+        });
       }
     }
     const attempts = body.attempts || [];
@@ -421,10 +429,7 @@ export default function PreSiteDistributionPanel({
 
   const edit = (patch) => {
     composerTouchedRef.current = true;
-    setForm((current) => ({ ...current, ...patch }));
-    setPreview(null);
-    setConfirmed(false);
-    setStaleInputs(null);
+    applyFormPatch(patch);
     setError(null);
     setSendFeedback(null);
     setNotice(null);
@@ -503,6 +508,12 @@ export default function PreSiteDistributionPanel({
       // separately from the generic failure below so staff see why, not a
       // bare "Preview preparation failed" — and Regenerate Brief (allowed
       // while Review, B12) is the recovery path, not a stuck brief.
+      if (!response.ok && body.code === 'brief_snapshot_invalid') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError('The brief\'s stored input record could not be read, so it cannot be shared. Regenerate the brief and try again.');
+        }
+        return;
+      }
       if (!response.ok && body.code === 'brief_reviews_required') {
         if (sequence.current === currentSequence && id === requestId) {
           setError('This brief has no received reviews yet, so it cannot be shared. Wait for at least one review to come in, or regenerate the brief once one has.');
@@ -1003,7 +1014,7 @@ export default function PreSiteDistributionPanel({
                           <div className="mt-1 text-xs text-amber-800" data-testid="stale-inputs-acknowledged">
                             <p className="font-medium">
                               Staff acknowledged newer inputs at {new Date(attempt.staleInputsAcknowledged.acknowledgedAt).toLocaleString()}
-                              {attempt.staleInputsAcknowledged.acknowledgedBy ? ` (${attempt.staleInputsAcknowledged.acknowledgedBy})` : ''}.
+                              {attempt.staleInputsAcknowledged.acknowledgedByName ? ` by ${attempt.staleInputsAcknowledged.acknowledgedByName}` : ''}.
                             </p>
                             {attempt.staleInputsAcknowledged.delta?.changedRequestFields?.length > 0 && (
                               <p>Changed fields: {attempt.staleInputsAcknowledged.delta.changedRequestFields.join(', ')}</p>
