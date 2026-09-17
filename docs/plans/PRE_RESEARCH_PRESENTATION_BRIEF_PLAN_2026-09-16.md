@@ -569,6 +569,47 @@ Verdict needs-attention, five findings, all accepted and fixed in the next commi
    `templateVersion` are unchanged. Consequence: a pre-deploy READY brief keeps its identity;
    any new generation after deploy is a new lineage.
 
+### Codex adversarial review — follow-ups round 2 (2026-09-16, gpt-5.6-sol, commit `694863d5`)
+
+Findings 3 and 4 of round 1 confirmed closed. Three new findings, all fixed in the next commit:
+
+1. **[high] Brief activation was last-finisher-wins.** Fixed: `generatePreRpBrief` records the
+   pointer observed before any claim and `commitReadyLineage` refuses 409
+   `brief_pointer_changed` when the pointer no longer equals it (and is not this row); the
+   refused upload is deleted best-effort. Test: rival activation during upload. The "staged
+   rollout / drain interval" recommendation is not adopted: the fence itself makes a late
+   pre-deploy invocation lose, which is the required outcome.
+2. **[high] A second automatic recipient seed could not displace the first.** Fixed: the panel
+   remembers its last automatic seed per field; a field is replaceable when blank or still equal
+   to that seed, staff edits are preserved, and any change invalidates the prepared preview and
+   confirmation. Test: fallback seed → prepared/confirmed → attendee seed replaces To, keeps
+   the edited Cc, clears the preview.
+3. **[medium] The Pre-Site fence stranded the refused upload.** Fixed: `pre_site_visit_pointer_changed`
+   now takes the same cleanup path as `claim_lost` (delete, else record cleanup with reason
+   `<code>_delete_failed`). Test asserts the delete with the uploaded drive/item ids.
+
+### Codex adversarial review — follow-ups round 3 (2026-09-16, gpt-5.6-sol, commit `b55157f3`)
+
+Pre-Site cleanup fix confirmed sound. Two findings, both fixed in the next commit:
+
+1. **[high] Deterministic-path delete could remove a reclaiming winner's file.** Fixed: after an
+   activation refusal the brief service re-reads its row and deletes the upload only while its own
+   claim token still owns a GENERATING row; on `claim_lost` it never deletes (the next owner's
+   upload replaces the file at the same path). The earlier item-id heuristic is removed; the
+   claim-lost test now asserts no delete.
+2. **[medium] Seed ownership inferred from value equality.** Fixed: explicit per-field
+   auto-ownership set only when the component writes its seed and cleared by every staff edit of
+   that field. Tests: A → staff B → seed B → seed C keeps B; a staff edit equal to the previous
+   seed survives the next seed.
+
+### Codex adversarial review — follow-ups round 4 (2026-09-16, gpt-5.6-sol, verification only)
+
+**Verdict: approve, no material findings.** Codex confirmed: cleanup deletes only for an
+observed same-token GENERATING claim (the 15-minute lease exceeds the route's 5-minute maximum,
+so a same-row reclaimer cannot enter the deletion window); retained files are invisible until a
+later upload replaces them; recipient ownership clears per field on every staff edit and
+request-keyed remounts reset the ref.
+
 ## 8. Follow-ups (not required for this pass)
 
 - **Pre-RP replay closed; Pre-Site parity ported (Session 516 follow-ups, 2026-09-16).**
