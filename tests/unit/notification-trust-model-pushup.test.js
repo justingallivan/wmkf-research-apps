@@ -64,6 +64,10 @@ const mockValidateIntakeAttachment = jest.fn();
 const mockSniffFileType = jest.fn();
 const mockResolveProgramDirectorEmailForRequest = jest.fn();
 const mockReviewerSuggestionAdapter = {
+  // The drain's accepted-reviewer release guard (1abc097a) reads the picklist
+  // map through the adapter namespace; expose the real values so the guard
+  // evaluates instead of throwing on an undefined map.
+  REVIEW_STATUS_MAP: jest.requireActual('../../shared/config/reviewerLifecycle').REVIEW_STATUS_MAP,
   getForExternalVerification: jest.fn(),
   patchReviewReceipt: jest.fn(),
   queryAllSuggestions: jest.fn(),
