@@ -1,10 +1,11 @@
 # Session 517 Prompt: Decide the three Pre-RP Brief PR merges, then apply 053 and smoke
 
-> **Nothing is merged from the overnight run.** Owner's last word (S516): "We can decide on
-> merges in the morning." Three PRs are open and stacked: **#310** (base `main`), **#311**
-> and **#312** (base `claude/pre-rp-brief-followups`, the #310 branch). Merge order and
-> the migration-053 precondition are in **Verified Open** below. `main` and this checkout
-> are clean; the builder worktrees were removed.
+> **Update 2026-09-17 morning:** all three PRs are merged in order (#310 `0eba7358`, #311 `248233c7`,
+> #312 `7f776e36`), migration 053 is applied and read back exact, and the production deployment for
+> `7f776e36` reached Ready. The sibling conflict between #311 and #312 was resolved in `dcc9c796`
+> (17 suites / 439 tests green) and a CI-only fixture timeout in `review-bundle-service.test.js`
+> was fixed in `8f8cfc1b`. Remaining: the ZZTEST Production smoke (Verified Open 3) and the owner
+> decisions below.
 
 ## Session 516 Summary
 
@@ -70,7 +71,7 @@ the orchestrator built Step A directly and fixed builder gaps itself.
 
 ### Verified Open
 
-1. **Decide and execute the merges, in this order.**
+1. **DONE 2026-09-17 — merges executed in this order** (kept for the record).
    Evidence: `gh pr list` shows #310 → `main`, #311 and #312 → `claude/pre-rp-brief-followups`;
    `git merge-tree --write-tree claude/pre-rp-brief-guarded-regen claude/pre-rp-brief-review-bundle`
    reports four content conflicts between the two siblings:
@@ -81,7 +82,7 @@ the orchestrator built Step A directly and fixed builder gaps itself.
    panel: keep both error-copy branches), rerun `npx jest tests/unit/pre-site-distribution*
    tests/unit/staff-deliberations* tests/unit/deliberation-briefing* --silent`, retarget
    #312 to `main`, merge. Each merge auto-deploys.
-2. **Apply migration 053 before #312 merges** (blocker, not a footnote: prepare writes the
+2. **DONE 2026-09-17 — migration 053 applied** (was: apply before #312 merges; prepare writes the
    `review_bundle_*` columns unconditionally).
    Evidence: `lib/db/migrations/053_pre_site_distribution_review_bundle.sql` on the #312
    branch; not in `schema_migrations`. Columns are nullable with CHECKs that accept the
@@ -123,10 +124,9 @@ the orchestrator built Step A directly and fixed builder gaps itself.
 
 ### Verify Before Acting
 
-1. #311 and #312 are **siblings**, not a chain: neither contains the other. Do not merge
-   #312 without first taking #311 (or `main` after #311) into it and rerunning the suites.
-2. Codex approvals are at the recorded heads; any conflict resolution in #312 is unreviewed
-   code until the suites rerun.
+1. The #311/#312 conflict resolution (`dcc9c796`) and the fixture fix (`8f8cfc1b`) landed after
+   the Codex approvals; both are test-verified (17 suites / 439 tests; full CI green) but not
+   Codex-reviewed. Include them in the next adversarial pass if one is run.
 
 ### Do Not Reopen Without New Decision
 
@@ -144,7 +144,7 @@ the orchestrator built Step A directly and fixed builder gaps itself.
 | `lib/services/pre-site-visit/review-bundle-service.js` | Bundle assembly, fingerprint, bounds (#312) |
 | `lib/services/pre-site-visit/distribution-service.js` | Prepare gate, bundle retention, actor names, email hrefs |
 | `lib/services/deliberation-briefing/briefing-page-service.js` | `review-bundle` member, attributed rebuild with CAS |
-| `lib/db/migrations/053_pre_site_distribution_review_bundle.sql` | Bundle pin columns (branch, **unapplied**) |
+| `lib/db/migrations/053_pre_site_distribution_review_bundle.sql` | Bundle pin columns (applied 2026-09-17, readback exact) |
 | `shared/components/workbench/StaffDeliberationsTab.js` / `PreSiteDistributionPanel.js` | Tri-state share reasons, regeneration pending, error copy |
 
 ## Testing
