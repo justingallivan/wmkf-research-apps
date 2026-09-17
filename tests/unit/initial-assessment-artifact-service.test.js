@@ -111,7 +111,7 @@ async function buildDocx({
     `<?xml version="1.0"?><Relationships>${relationships.join('')}</Relationships>`,
   );
   archive.file('[Content_Types].xml', sharePointMetadata
-    ? '<Types><Override PartName="/customXml/item1.xml"/></Types>'
+    ? '<Types><Override PartName="/customXml/item1.xml" ContentType="application/xml"/></Types>'
     : '<Types/>');
   return archive.generateAsync({ type: 'nodebuffer' });
 }
@@ -329,6 +329,62 @@ it('rejects a governed document relationship that reaches outside word/, but tol
   await expect(hashGovernedDocxContent(hyperlink)).resolves.toMatch(/^gdc1:/);
 });
 
+it('walks transitive relationships and rejects a nested part that reaches outside word/', async () => {
+  const outside = await buildDocx({
+    extraRelationships: ['<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'],
+    extraParts: {
+      'word/header1.xml': '<w:hdr/>',
+      'word/_rels/header1.xml.rels': '<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../outside/banner.png"/></Relationships>',
+      'outside/banner.png': Buffer.from('png'),
+    },
+  });
+
+  await expect(hashGovernedDocxContent(outside)).rejects.toThrow(/outside word\/|unresolved part/);
+});
+
+it('accepts a transitively reachable image under word/media using case-insensitive OPC part names', async () => {
+  const withHeaderImage = await buildDocx({
+    extraRelationships: ['<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="./HEADER1.XML#section"/>'],
+    extraParts: {
+      'word/header1.xml': '<w:hdr/>',
+      'word/_rels/header1.xml.rels': '<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="./MEDIA/IMAGE1.PNG#preview"/></Relationships>',
+      'word/media/image1.png': Buffer.from('png'),
+    },
+  });
+
+  await expect(hashGovernedDocxContent(withHeaderImage)).resolves.toMatch(/^gdc1:/);
+});
+
+it.each([
+  '%2e%2e/outside/banner.png',
+  '../OUTSIDE/banner.png',
+])('rejects an encoded or differently-cased relationship target that escapes word/: %s', async (target) => {
+  const outside = await buildDocx({
+    extraRelationships: [`<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${target}"/>`],
+    extraParts: { 'outside/banner.png': Buffer.from('png') },
+  });
+
+  await expect(hashGovernedDocxContent(outside)).rejects.toThrow(/outside word\/|unresolved part/);
+});
+
+it('rejects an unsupported content-type Override for a reachable word part', async () => {
+  const archive = await JSZip.loadAsync(await buildDocx({
+    extraRelationships: ['<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'],
+    extraParts: { 'word/header1.xml': '<w:hdr/>' },
+  }));
+  archive.file(
+    '[Content_Types].xml',
+    '<Types>'
+      + '<Override PartName="/word/header1.xml" ContentType="text/plain"/>'
+      + '<Override PartName="/customXml/item1.xml" ContentType="text/plain"/>'
+      + '<Override PartName="/docProps/custom.xml" ContentType="text/plain"/>'
+      + '</Types>',
+  );
+
+  await expect(hashGovernedDocxContent(await archive.generateAsync({ type: 'nodebuffer' })))
+    .rejects.toThrow(/unsupported content type/);
+});
+
 it('the shipped Word templates open word/document.xml and pass the governed package validation', async () => {
   const fs = await import('node:fs');
   const path = await import('node:path');
@@ -349,7 +405,10 @@ it('rejects a package with no package relationships part', async () => {
 });
 
 it('changes the governed DOCX hash when a non-SharePoint document relationship changes', async () => {
-  const edited = await buildDocx({ commentsTarget: 'comments-edited.xml' });
+  const edited = await buildDocx({
+    commentsTarget: 'comments-edited.xml',
+    extraParts: { 'word/comments-edited.xml': '<w:comments/>' },
+  });
 
   await expect(hashGovernedDocxContent(edited))
     .resolves.not.toBe(await hashGovernedDocxContent(DOCX));

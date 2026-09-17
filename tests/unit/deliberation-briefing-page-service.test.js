@@ -1150,6 +1150,7 @@ describe('buildBriefingContext: reviewBundle projection (plan §11, Step C2)', (
 
 describe('writeup-docx verifies the governed content hash from the snapshot registry row (plan §12 Finding A)', () => {
   const SNAPSHOT_ID = '77777777-7777-4777-8777-777777777777';
+  const SOURCE_DOCUMENT_ID = '88888888-8888-4888-8888-888888888888';
   const GOVERNED = 'gdc1:governed-content-hash';
   // Bytes SharePoint serves after its post-upload rewrite: NOT the pinned
   // docx_byte_hash, so the legacy byte comparison would refuse them.
@@ -1163,10 +1164,15 @@ describe('writeup-docx verifies the governed content hash from the snapshot regi
     wmkf_sharepointdriveid: 'd',
     wmkf_sharepointitemid: 'i',
     wmkf_contenthash: GOVERNED,
+    _wmkf_sourcedocument_value: SOURCE_DOCUMENT_ID,
     ...overrides,
   });
   const pinned = (overrides = {}) => deps({
-    getLatestAttempt: jest.fn(async () => sentAttempt({ docx_snapshot_document_id: SNAPSHOT_ID })),
+    getLatestAttempt: jest.fn(async () => sentAttempt({
+      docx_snapshot_document_id: SNAPSHOT_ID,
+      source_document_id: SOURCE_DOCUMENT_ID,
+      source_content_hash: GOVERNED,
+    })),
     downloadFile: jest.fn(async () => ({ buffer: SERVED, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'x.docx', size: SERVED.length })),
     findDocumentById: jest.fn(async () => ({ records: [snapshotRow()] })),
     hashDocx: jest.fn(async () => GOVERNED),
@@ -1185,6 +1191,36 @@ describe('writeup-docx verifies the governed content hash from the snapshot regi
 
   test('refuses when the governed content differs from the registry row', async () => {
     await refuse(pinned({ hashDocx: jest.fn(async () => 'gdc1:someone-edited-it') }));
+  });
+
+  test('refuses when the registry and served file agree on hash B but the sent attempt is pinned to hash A', async () => {
+    const d = pinned({
+      getLatestAttempt: jest.fn(async () => sentAttempt({
+        docx_snapshot_document_id: SNAPSHOT_ID,
+        source_document_id: SOURCE_DOCUMENT_ID,
+        source_content_hash: 'gdc1:pinned-hash-a',
+      })),
+      findDocumentById: jest.fn(async () => ({
+        records: [snapshotRow({ wmkf_contenthash: 'gdc1:registry-and-file-hash-b' })],
+      })),
+      hashDocx: jest.fn(async () => 'gdc1:registry-and-file-hash-b'),
+    });
+    await refuse(d);
+    expect(d.downloadFile).not.toHaveBeenCalled();
+    expect(d.hashDocx).not.toHaveBeenCalled();
+  });
+
+  test('refuses a snapshot whose source document differs from the sent ledger before any Graph read', async () => {
+    const d = pinned({
+      findDocumentById: jest.fn(async () => ({
+        records: [snapshotRow({
+          _wmkf_sourcedocument_value: '99999999-9999-4999-8999-999999999999',
+        })],
+      })),
+    });
+    await refuse(d);
+    expect(d.downloadFile).not.toHaveBeenCalled();
+    expect(d.hashDocx).not.toHaveBeenCalled();
   });
 
   test('refuses an unparseable package as a mismatch, not a server error', async () => {

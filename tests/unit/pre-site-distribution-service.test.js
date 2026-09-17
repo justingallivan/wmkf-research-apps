@@ -523,6 +523,15 @@ function createPrepareHarness({
       return attempt;
     }),
     recordSource: jest.fn(async (_operationId, captured) => {
+      const identityFields = [
+        ['source_drive_id', captured.driveId],
+        ['source_item_id', captured.itemId],
+        ['source_version_id', captured.versionId],
+        ['source_content_hash', captured.contentHash],
+      ];
+      const isFirstCapture = identityFields.every(([field]) => attempt[field] == null);
+      const isSameCapture = identityFields.every(([field, value]) => attempt[field] === value);
+      if (attempt.state !== 'preparing' || (!isFirstCapture && !isSameCapture)) return null;
       attempt = {
         ...attempt,
         source_drive_id: captured.driveId,
