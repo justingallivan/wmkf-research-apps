@@ -443,6 +443,24 @@ test('a later automatic seed replaces the earlier automatic seed and invalidates
   expect(screen.queryByRole('button', { name: 'Send email' })).not.toBeInTheDocument();
 });
 
+test('a staff-typed recipient is never displaced by later seeds, even when a seed passes through the same value', async () => {
+  global.fetch.mockResolvedValueOnce(response({ success: true, attempts: [] }));
+  const props = { requestId: REQUEST_ID, requestNumber: '1002379', sourceArtifact: { artifactId: ARTIFACT_ID } };
+  const { rerender } = render(<PreSiteDistributionPanel {...props} suggestedTo={['a@example.org']} />);
+  await screen.findByText(/No email previews/);
+  expect(screen.getByLabelText('To')).toHaveValue('a@example.org');
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'b@example.org' } });
+  // Seed B equals the staff value: ownership must stay with staff.
+  rerender(<PreSiteDistributionPanel {...props} suggestedTo={['b@example.org']} />);
+  expect(screen.getByLabelText('To')).toHaveValue('b@example.org');
+  rerender(<PreSiteDistributionPanel {...props} suggestedTo={['c@example.org']} />);
+  expect(screen.getByLabelText('To')).toHaveValue('b@example.org');
+  // A staff edit that equals the previous automatic seed is still a staff edit.
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'a@example.org' } });
+  rerender(<PreSiteDistributionPanel {...props} suggestedTo={['d@example.org']} />);
+  expect(screen.getByLabelText('To')).toHaveValue('a@example.org');
+});
+
 test('a brief_snapshot_invalid prepare failure shows its own copy, distinct from the zero-review reason', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))

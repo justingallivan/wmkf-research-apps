@@ -433,6 +433,34 @@ describe('generatePreRpBrief', () => {
     expect(harness.dependencies.deleteFile).toHaveBeenCalledTimes(1);
   });
 
+  it('does not delete the deterministic-path upload when the claim was reclaimed between activation checks', async () => {
+    const harness = createHarness();
+    const rival = briefRow({ wmkf_requestdocumentid: NEWER_ARTIFACT_ID, wmkf_generationkey: 'rival-generation-key' });
+    const originalUpload = harness.dependencies.uploadFile.getMockImplementation();
+    const originalGetRequest = harness.dependencies.getRequest.getMockImplementation();
+    harness.dependencies.uploadFile.mockImplementation(async (...args) => {
+      harness.request._wmkf_currentprerpbrief_value = rival.wmkf_requestdocumentid;
+      const priorFind = harness.dependencies.findByRequest.getMockImplementation();
+      harness.dependencies.findByRequest.mockImplementation(async (...findArgs) => {
+        const result = await priorFind(...findArgs);
+        return { ...result, records: [...(result?.records || []), { ...rival }] };
+      });
+      // After the activation pass verified this claim, an expired-lease
+      // winner reclaims the row (and will replace the same-path file).
+      harness.dependencies.getRequest.mockImplementation(async (...requestArgs) => {
+        harness.row.wmkf_claimtoken = 'winner-claim';
+        return originalGetRequest(...requestArgs);
+      });
+      return originalUpload(...args);
+    });
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'late-op' },
+      harness.dependencies,
+    )).rejects.toMatchObject({ code: 'brief_pointer_changed', httpStatus: 409 });
+    expect(harness.dependencies.deleteFile).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['SUPERSEDED row', briefRow({
       wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
@@ -659,8 +687,9 @@ describe('generatePreRpBrief', () => {
       { requestId: REQUEST_ID, clientOperationId: 'op-1' },
       dependencies,
     )).rejects.toMatchObject({ code: 'claim_lost' });
-    expect(dependencies.deleteFile).toHaveBeenCalledTimes(1);
-    expect(dependencies.deleteFile).toHaveBeenCalledWith('drive-id', UPLOADED_ITEM_ID);
+    // Ownership passed to the winner: the item at the deterministic path may
+    // be the winner's (or about to be replaced by it), so it is never deleted.
+    expect(dependencies.deleteFile).not.toHaveBeenCalled();
   });
 
   it('fails closed on an invalid requestId before loading inputs', async () => {
