@@ -410,8 +410,9 @@ retirement enhancement. **[VERIFIED via owner decision 2026-09-08]**
 
 ### Slice 3 — post-pilot improvements **[PLANNED]**
 
-- Automated reminder cadence, richer package update notifications, large/resumable uploads if
-  measured need justifies them, and practical recovery/admin tools.
+- Richer package update notifications, large/resumable uploads if measured need justifies them,
+  and practical recovery/admin tools. (An automated reminder cadence was on this list until
+  2026-09-17, when the owner retired it in favour of manual monitoring; §16.6 item 1.)
 - Reuse the collection capability for staff-requested non-Site-Visit additional materials.
 - Add calendar invitation integration and retire Site Visit dependence on Dropbox/Datto only after
   the new path is exercised and the remaining Datto scope is inventoried.
@@ -496,7 +497,7 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 | M2 | Due date: **two business days before the site visit starts**, computed in the visit's IANA zone (`lib/utils/business-days.js`, weekends only; no holiday calendar this cycle). Contributor access closes seven days after the visit ends. This is independent of briefing-link expiry, which is 60 days from issuance under deliberation-briefing decision D17 revised 2026-09-15. |
 | M3 | Upload size cap: an **admin-editable setting** `site_visit_materials.upload_max_mb` (Admin › Site visits), **default 100 MB**. The briefing page serves files up to 50 MB and lists larger ones with a note (D19). |
 | M4 | SharePoint layout: **flat request-relative folders** `Site Visit - Slides`, `Site Visit - Participant Bios`, `Site Visit - Other`; no nested `Site Visit/Applicant Materials/…` form. Canonical filenames per §7.3. |
-| M5 | **Go for this cycle.** Reminders are PC-triggered in the first release; an automated reminder cron is a follow-up the owner has flagged to remember. |
+| M5 | **Go for this cycle.** Reminders are PC-triggered in the first release; an automated reminder cron is a follow-up the owner has flagged to remember. *Follow-up closed 2026-09-17: the automatic cron is retired; staff monitor arrivals manually (§16.6 item 1).* |
 
 ### 16.1 Reuse map [VERIFIED 2026-09-10 via source]
 
@@ -585,7 +586,8 @@ merged and production-smoked (ZZTEST-03, 2026-09-10). PR 3 was built 2026-09-11 
   site-visit read all resolve before the claim, and a delivered email whose receipt fails to attach
   is counted as `receiptFailed`, not as a transport failure), sent from the creating PC's mailbox to
   the collection's contacts, `?dryRun=1` supported. **Built but not scheduled**: the `vercel.json` entry
-  is the owner's decision (M5). **Staff signal for `replay_ambiguous`:** the contributor finalize
+  was the owner's decision (M5); on 2026-09-17 the owner retired the automatic cron in favour of
+  manual monitoring by staff (§16.6 item 1). **Staff signal for `replay_ambiguous`:** the contributor finalize
   records one durable operational event (`site_visit_material_replay_ambiguous`, error, keyed on the
   staging id) when it holds a staged upload, so staff see the hold in Admin operational events.
 
@@ -624,8 +626,12 @@ state: `missingRequiredItems` reads only checklist items, and `other` is never a
 
 Ops recorded the following outcomes for the Site Visit Materials workflow:
 
-1. The schedule for `/api/cron/site-visit-materials-reminders` remains **open** pending further
-   team discussion. The route stays absent from `vercel.json`; no cadence is decided here.
+1. The schedule for `/api/cron/site-visit-materials-reminders` remained **open** at the meeting
+   pending further team discussion. **Decided 2026-09-17 (owner, S519): retired.** The staff member
+   who monitors whether materials arrive will do that follow-up manually, so no automatic reminder
+   cron will be scheduled. The route and `reminder-sweep.js` stay in the tree, callable with
+   `CRON_SECRET` (`?dryRun=1` supported), but they are deliberately absent from `vercel.json` and
+   nothing calls them on a schedule. Reopening needs a new owner decision.
 2. The automatic reminder effects need no new decision beyond the behavior already documented in
    `lib/services/site-visit-materials/reminder-sweep.js`: one due reminder for an open collection
    that still has required material missing, subject to the recorded recipient, link, and sender

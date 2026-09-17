@@ -675,7 +675,8 @@ auto-close step (`MaintenanceService.closeExpiredSiteVisitMaterialCollections` â
 `closeExpiredCollections`) sets `status = 'closed'` on every `open` or `ready` row past
 `closes_at` (reads already projected a past `closes_at` as closed; the sweep makes it durable and
 frees the partial unique index). The automatic reminder sweep (`reminder-sweep.js`, cron route
-`/api/cron/site-visit-materials-reminders`, built but unscheduled) claims by stamping
+`/api/cron/site-visit-materials-reminders`, built but deliberately unscheduled: the owner retired the
+automatic cron 2026-09-17 in favour of manual monitoring) claims by stamping
 `last_reminder_at` and incrementing `reminder_count` with `last_reminder_email_id = NULL` before the
 send, then attaches the email id; every other precondition (missing items, recipients, sender,
 readable link, the optional site-visit read) resolves before the claim. A reminder row with a null

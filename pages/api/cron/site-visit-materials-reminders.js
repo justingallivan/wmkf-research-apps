@@ -7,9 +7,10 @@
  * due date; claim-before-send. Policy and sender live in
  * lib/services/site-visit-materials/reminder-sweep.js.
  *
- * Built but NOT scheduled: the route is callable with CRON_SECRET; adding it
- * to vercel.json is the owner's decision (M5 flagged the cadence as a
- * follow-up).
+ * Built but NOT scheduled: the route is callable with CRON_SECRET. The owner
+ * retired the automatic cron on 2026-09-17 (plan §16.6 item 1): staff monitor
+ * materials arrivals manually, so do not add this route to vercel.json without
+ * a new owner decision.
  *
  *   ?maxBatch=N   Cap sends per run (default 100).
  *   ?dryRun=1     Report eligibility without claiming or sending.

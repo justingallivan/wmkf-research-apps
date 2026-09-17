@@ -1,9 +1,10 @@
 ---
 name: project-ops-meeting-2026-09-16-agenda
-description: Outcome record for the owner's Wednesday 2026-09-16 operations meeting; the applicant-materials reminder-cron schedule remains the sole open item.
+description: Closed outcome record for the owner's Wednesday 2026-09-16 operations meeting; the last open item, the applicant-materials reminder cron, was retired 2026-09-17 in favour of manual monitoring.
 metadata:
   type: project
-  status: active
+  status: closed
+  closed: 2026-09-17 (S519) — owner retired the automatic reminder cron; staff monitor arrivals manually
   created: 2026-09-11 (S507)
   last_verified: 2026-09-17 via vercel.json crons, collection-service.js claimManualReminder call, and cycle-dossier-worker.js drainCycleDossiers (S518)
 ---
@@ -12,30 +13,31 @@ metadata:
 
 Read when a session touches the applicant-materials reminder cron schedule (`/api/cron/site-visit-materials-reminders`), or before restating any 2026-09-16 ops-meeting outcome.
 
-Do: treat item 1 (the reminder schedule) as the only open decision; record a future schedule in `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 and `vercel.json`, then close this memory.
-Do not: add that route to `vercel.json` without an owner decision; reopen items 2–6.
+Do: treat every item as decided; the automatic reminder cron is retired (owner, 2026-09-17) because the staff member monitoring materials arrivals does that follow-up manually.
+Do not: add `/api/cron/site-visit-materials-reminders` to `vercel.json` or reopen items 1–6 without a new owner decision.
 Ground truth: `vercel.json` (crons), `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.6, `docs/CYCLE_DOSSIER_PILOT_DESIGN.md` (five-minute drain cadence).
 
 The original Monday 2026-09-14 meeting did not occur. The operations meeting
-was held on **Wednesday 2026-09-16**. Items 2–6 below are decided or recorded;
-the applicant-materials reminder-cron schedule in item 1 is the only open line,
-so this memory remains `status: active`.
+was held on **Wednesday 2026-09-16**. Items 2–6 below were decided or recorded
+at the meeting; item 1 was decided on 2026-09-17, so this memory is `status: closed`.
 
 **Why:** the cron route (`/api/cron/site-visit-materials-reminders`, PR #252,
 merged 2026-09-11) is live and callable in production but deliberately has no
 `vercel.json` schedule (owner M5). Ops owns the cadence and the downstream
 effects on applicants and PCs, so the decision is theirs, not an agent's.
 
-**How to apply:** do not close this memory until item 1 is decided. Record that
-future schedule decision in `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16
-and `vercel.json` if it adds a schedule; then mark this memory `status: closed`.
+**How to apply:** history only. The decision is recorded in
+`docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.6 item 1; the route stays in the
+tree, unscheduled.
 
 ## Outcomes
 
-1. **OPEN — cron schedule.** The owner still needs to talk with the team. Do not
-   add `/api/cron/site-visit-materials-reminders` to `vercel.json` or change its
-   documented schedule posture. Dry run verified in prod 2026-09-11 (HTTP 200,
-   0 scanned). Evidence: `pages/api/cron/site-visit-materials-reminders.js`.
+1. **DECIDED 2026-09-17 — cron retired.** The staff member who monitors whether
+   materials came in will do that follow-up manually, so no automatic reminder
+   cron is scheduled. `/api/cron/site-visit-materials-reminders` stays built and
+   callable with `CRON_SECRET` but absent from `vercel.json`. Dry run verified in
+   prod 2026-09-11 (HTTP 200, 0 scanned). Evidence:
+   `pages/api/cron/site-visit-materials-reminders.js` header; plan §16.6 item 1.
 2. **RECORDED — define the effects.** No additional decision is needed beyond
    the existing contract: one automatic reminder per collection, on the first
    run after `due_at` with a required item missing and no reminder (PC or
