@@ -691,3 +691,39 @@ merge auto-deploys code naming the new columns.
 5. Controller review: `/contract-reconcile` Mode B invariant table, full `/start` gate list
    sequentially, full jest, lint, build; push; PR; then owner runs
    `/codex:adversarial-review --wait --base 236d9219 --model gpt-5.6-sol …` with the receipt marker.
+
+## 11. Review bundle PDF (owner request 2026-09-16; Step C on `claude/pre-rp-brief-review-bundle`)
+
+**Ask.** A Board member asked to download every review shown inline on the deliberation
+briefing page as one PDF. Owner decision 2026-09-16 (option 2): assemble the bundle when staff
+Share (prepare) so the latency lands on staff, retain it as a governed request document beside
+the brief distribution snapshot, pin its identity on the attempt, serve it as a token-verified
+briefing-page member and as a link in the briefing email, and rebuild it once on demand when the
+live review set differs from the pinned set. Board-facing filename is institution-led with no
+request number.
+
+### Contract-reconcile (Mode A, 2026-09-16, S516; evidence from the Explore pass on `694863d5`)
+
+| Layer | Fact | Evidence |
+|---|---|---|
+| Caller | Prepare already loads live brief inputs (received reviews with `reviewSharePointFolder`/`reviewFilename`) for the drift gate, then creates the DOCX and PDF snapshots through `ensureSnapshot` before `previewHash` and `recordPrepared`. | `[VERIFIED via lib/services/pre-site-visit/distribution-service.js:1305-1336,1506-1555,1570-1615]` |
+| Conversion | DOCX→PDF is `GraphService.downloadFileAsPdf(driveId, itemId)`; review files are path-addressed, so drive/item ids come from `getFileMetadataByPath` (the `locateProposal` pattern). | `[VERIFIED via lib/services/graph-service.js:903-916,921,950; lib/services/deliberation-briefing/briefing-page-service.js:259-279]` |
+| Review identity | `wmkf_appreviewersuggestion.wmkf_reviewsharepointfolder` + `wmkf_reviewfilename`; no drive/item/version/hash exists, so the pinned "review set" is path-keyed and byte identity is known only after download. | `[VERIFIED via lib/services/review-upload.js:267-268; lib/services/review-manager/download-review-service.js:56-82]` |
+| Persistence | `pre_site_distribution_attempts` `pdf_*` family is the column template; migration 053 adds a `review_bundle_*` family (ten columns, two CHECKs) mirrored in `scripts/setup-database.js` `v54Statements` and pinned by the parity test. | `[VERIFIED via lib/services/pre-site-visit/distribution-store.js:12-52,131-165; scripts/setup-database.js:1176-1237,2310-2325; tests/unit/pre-site-distribution-schema-parity.test.js:27-79]` |
+| Registry | Snapshot rows reuse the brief artifact type with producer `request-workbench-distribution-<format>`; `isPreSiteDistributionSnapshot` matches only `-docx`/`-pdf`, so a third suffix must be added or the bundle row leaks into the materials lists. | `[VERIFIED via shared/config/requestDocument.js:97-106; lib/services/deliberation-briefing/briefing-page-service.js:192-200; lib/services/pre-site-visit/distribution-service.js:518]` |
+| Consumer (page) | Members are bounded ids resolved by `resolveBriefingMember`; `writeup-docx` re-reads the latest sent attempt, downloads by pinned drive/item, and re-hashes against `docx_byte_hash` (409 on drift). Reviews render live; non-PDF review files are hidden today (`isPdfFilename`). | `[VERIFIED via lib/services/deliberation-briefing/briefing-page-service.js:67-73,239-252,327-352,128,186; pages/external/briefing/[token].js:85,200-230]` |
+| Consumer (email) | The briefing link is a placeholder href substituted at send time; copy comes from `email.deliberation_share.*` settings registered in three places and pinned by three tests. | `[VERIFIED via lib/services/pre-site-visit/distribution-service.js:351-356,419-450; shared/config/deliberationShareEmail.js:7-15; shared/config/editableTextDefaults.js:295-315]` |
+| Library | `pdf-lib` ^1.17.1 is already a dependency (split direction only today). No new dependency. | `[VERIFIED via package.json:141-142; lib/utils/pdf-page-splitter.js:27]` |
+| Partial success | Prepare fails closed if any part cannot be fetched or converted; no attempt reaches `prepared` without a bundle. The on-demand rebuild is idempotent through the registry generation key (review-set fingerprint) so two concurrent Board reads converge on one row/file. | design |
+| Stale async | Send-time checks (`assertAttemptSourceCurrent`, `assertAttemptExtensionsCurrent`) do not recheck the review set; drift after prepare is handled by the on-demand rebuild on read, not at send. | `[VERIFIED via lib/services/pre-site-visit/distribution-service.js:1752-1800]` |
+
+### Design
+
+- **C1 (server):** `lib/services/pre-site-visit/review-bundle-service.js` (`reviewSetFingerprint`, `assembleReviewBundle` with pdf-lib separator pages), retention through `ensureSnapshot` format `review-bundle` (producer suffix added to `isPreSiteDistributionSnapshot`), migration 053 + fresh-install mirror + parity/mirror tests, `draftHash` binds the review-set fingerprint, `previewHash` binds the bundle identity, `recordPrepared` persists the family, `projectDistributionAttempt` exposes `reviewBundle` (no drive/item ids).
+- **C2 (consumers):** `review-bundle` member in `resolveBriefingMember` (latest sent attempt; re-hash; inline PDF; institution-led filename); on read, if `reviewSetFingerprint(live received reviews)` differs from the pinned set fingerprint, rebuild through the same assembly + `ensureSnapshot`, update the attempt's family and `review_bundle_rebuilt_at`, then serve; `buildBriefingContext` gains `reviewBundle { member, filename, size, reviewCount, rebuiltAt }`; the page renders "Download all reviews (PDF)" in the Reviews section; the email body gains a second placeholder href resolved at send time to the document route with `member=review-bundle`, with copy key `email.deliberation_share.review_bundle_link_text` registered alongside the existing keys.
+- **Behavior change to note:** DOCX-origin reviews, hidden on the page today, appear in the bundle as converted PDF pages.
+
+### Open for owner (2026-09-16)
+
+1. A review file that cannot be converted blocks Share (fail closed) rather than being skipped with a placeholder page. Conservative default chosen; say if a placeholder page is preferred.
+2. The bundle includes reviewer names and affiliations on separator pages, matching what the page already shows to the Board.
