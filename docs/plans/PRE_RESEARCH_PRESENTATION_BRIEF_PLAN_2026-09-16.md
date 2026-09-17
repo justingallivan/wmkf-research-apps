@@ -918,3 +918,51 @@ mount happened (not just a re-render with updated props), then shares the
 new Draft again and asserts `Regenerate Brief` is offered and `Send the
 deliberation email again…` is not — the exact menu state a stale "already
 sent" signal would have gotten wrong.
+
+### 10.2 Round 3: Codex adversarial review finding (2026-09-17), fixed on the same branch on top of `7ef55e67`
+
+**Finding [high] — the round-2 eager sent-state reset ran unconditionally,
+including on a 202 replay.** `submitBriefReopen`'s reset of
+`currentSourceEverSent`/`latestSendFailure` (round 2, §10.1) ran regardless
+of what the refreshed status actually reported. On a 202 reply (the
+operation still `GENERATING`, e.g. a concurrent claim elsewhere), the
+refreshed status's `currentArtifact` is still the PREDECESSOR — the pointer
+has not moved yet, so that row is still READY/REVIEW and fully live, its own
+composer/Share binding intact. Resetting `currentSourceEverSent` to `false`
+regardless meant the UI could momentarily treat that still-current,
+already-sent predecessor as never-sent, exposing a `Share…` control (and
+misrepresenting the overflow menu's Regenerate/Send-again state) for a
+document that had, in fact, already gone to the Board — a duplicate-send
+risk.
+
+Fix (`shared/components/workbench/StaffDeliberationsTab.js:858-876`):
+the reset now runs only when the refreshed status's current artifact id
+differs from `expectedArtifactId` (the pre-reopen row) —
+`successorActivated = Boolean(nextArtifact) && nextArtifact.artifactId !==
+expectedArtifactId`. On a 202/still-GENERATING reply (or any reply where
+the current artifact id is unchanged), the predecessor's sent state is left
+untouched; the dialog stays open with its existing "already in progress,
+retry" message (unchanged UX, matching Pre-Site's own reopen, which also
+does not auto-poll on 202), and the SAME `clientOperationId` on a later
+manual retry re-checks status and only resets once the successor is
+actually confirmed current.
+
+Test: `tests/unit/staff-deliberations-tab.test.js` "a 202 (still-generating)
+guarded regeneration reply never resets the still-current predecessor's
+sent state; only the completed successor does" (new). It nulls
+`distributionHistoryFeed` before the in-progress submit — the mocked
+panel's `onHistory` effect otherwise fires on every re-render (an
+intentional simplification for other tests exercising a genuine data
+change, unlike the real panel, which only refires on a `requestId`
+change) and would keep re-asserting the pre-reopen "sent" feed regardless
+of what the tab's own state did, masking the bug either way; nulling it
+isolates the assertions to the tab's own `currentSourceEverSent` state.
+Phase 1 (202): asserts no `Share…` button, `Send the deliberation email
+again…` still offered, `Regenerate Brief` not offered, and no panel
+remount (`mountedSourceArtifactIds` unchanged) — the exact predecessor
+state as before the reopen attempt. Phase 2 (successor activates on
+retry): asserts the panel remounts for the new artifact id and the menu
+flips to ordinary `Regenerate Brief` / no `Send again`, matching §10.1's
+existing success-path test. Mutation check: reverting `successorActivated`
+to an unconditional `true` makes phase 1 fail on the `Share…` assertion
+(the exact bug) — pasted in the build report.

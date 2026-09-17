@@ -674,6 +674,85 @@ test('a successful guarded brief regeneration remounts distribution history for 
   expect(screen.queryByRole('menuitem', { name: 'Send the deliberation email again…' })).not.toBeInTheDocument();
 });
 
+// Codex adversarial review (2026-09-17, round 3 follow-up to round 2
+// finding 3): the eager reset above ran unconditionally, including on a 202
+// reply where the successor is still GENERATING and the refreshed status
+// still reports the already-sent predecessor as current — wrongly clearing
+// the predecessor's own correct "already sent" signal while it is still the
+// fully live, current document.
+test('a 202 (still-generating) guarded regeneration reply never resets the still-current predecessor\'s sent state; only the completed successor does', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  // First submit: the operation is claimed elsewhere and still GENERATING,
+  // so the route returns 202. The refreshed status right after still
+  // reports the PREDECESSOR (unchanged id) as current, with the successor
+  // only pending.
+  queueRoute('briefReopen', response({
+    success: true,
+    artifact: { ...briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }), operationStatus: GENERATING },
+    reused: true,
+  }, 202));
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(REVIEW),
+    pendingArtifact: { ...briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }), operationStatus: GENERATING },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  // The mocked panel's onHistory effect fires on every re-render (an
+  // intentional simplification for tests exercising an actual data change,
+  // per its own comment above), unlike the real panel, which only refires on
+  // mount/requestId change. Left non-null here, it would keep re-asserting
+  // the true feed on every render and silently mask a wrongly-reset
+  // `currentSourceEverSent` regardless of what submitBriefReopen itself did.
+  // Nulling it now isolates the assertions below to the tab's OWN state.
+  distributionHistoryFeed = null;
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The Board received an incomplete draft.' } });
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate Sent Brief' }));
+
+  await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
+  // Still in progress: the dialog stays open rather than closing.
+  expect(await screen.findByText(/already in progress/i)).toBeInTheDocument();
+  // The predecessor's artifact id is unchanged, so no remount happened —
+  // proving the fix did not treat this as "the successor is now current".
+  expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID]);
+  // The predecessor is still current and still sent: no duplicate Share
+  // path, and the overflow menu still reflects its true (sent) state
+  // rather than a wrongly-cleared one.
+  expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Send the deliberation email again…' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate Brief' })).not.toBeInTheDocument();
+  // OverflowMenu only toggles on its own button (no auto-close on item
+  // select); close it before reopening later, below.
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+
+  // The successor activates: retrying the same (still-open) dialog re-checks
+  // status, this time finding the successor current and Ready.
+  distributionHistoryFeed = { attempts: [], currentSourceEverSent: false };
+  queueRoute('briefReopen', response({
+    success: true,
+    artifact: briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }),
+    reused: true,
+  }));
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }) }));
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate Sent Brief' }));
+
+  await waitFor(() => expect(calls('briefReopen')).toHaveLength(2));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Regenerate a brief the Board already received?' })).not.toBeInTheDocument());
+  expect(await screen.findByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
+  // Only now — once the successor is confirmed current — does history
+  // remount for the new artifact id.
+  await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID, REOPENED_BRIEF_ARTIFACT_ID]));
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Brief' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: 'Send the deliberation email again…' })).not.toBeInTheDocument();
+});
+
 test('Brief card: regenerate opens a brief-scoped confirmation dialog', async () => {
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);

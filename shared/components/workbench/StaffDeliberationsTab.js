@@ -855,16 +855,27 @@ export default function StaffDeliberationsTab({
       // (never-sent) row.
       const refreshed = await readBriefStatus(id, controller.signal);
       if (briefSequence.current !== sequence || id !== requestId) return;
-      setBriefArtifact(refreshed.currentArtifact || body.artifact || null);
+      const nextArtifact = refreshed.currentArtifact || body.artifact || null;
+      setBriefArtifact(nextArtifact);
       setBriefPendingArtifact(refreshed.pendingArtifact || null);
-      // Codex adversarial review finding 3 (2026-09-16 round 2): reset
-      // eagerly rather than wait for the distribution panel's own
-      // remount+refetch (forced by the artifact id now included in its key,
-      // above) to land — the successor is, by construction, a brand-new row
-      // that has never been sent, so the UI must never show it as sent even
-      // for the moment before that refetch resolves.
-      setCurrentSourceEverSent(false);
-      setLatestSendFailure(null);
+      // Codex adversarial review (2026-09-17, round 3 follow-up to round 2
+      // finding 3): only reset once the refreshed status confirms the
+      // CURRENT artifact is actually the completed successor (a different
+      // artifact id from the pre-reopen row) — never speculatively. On a
+      // 202 / still-GENERATING reply (or any reply where the current
+      // artifact id is unchanged, e.g. a concurrent claim elsewhere), the
+      // predecessor row is still READY/REVIEW and fully live — its own
+      // Share/composer binding and its own correct "already sent" state —
+      // until activation actually completes. Resetting here regardless of
+      // that would let the UI briefly offer a duplicate Board send against
+      // the still-current predecessor. Retrying this same dialog (its
+      // clientOperationId is stable across retries) re-checks status again
+      // once the successor has activated, and only then resets.
+      const successorActivated = Boolean(nextArtifact) && nextArtifact.artifactId !== expectedArtifactId;
+      if (successorActivated) {
+        setCurrentSourceEverSent(false);
+        setLatestSendFailure(null);
+      }
       if (response.status === 202
         || body.artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
         setBriefReopenError(
