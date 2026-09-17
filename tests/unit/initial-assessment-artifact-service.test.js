@@ -367,6 +367,20 @@ it.each([
   await expect(hashGovernedDocxContent(outside)).rejects.toThrow(/outside word\/|unresolved part/);
 });
 
+it('accepts a reachable binary part declared by a content-type Override (media, fonts, embeddings)', async () => {
+  const archive = await JSZip.loadAsync(await buildDocx({
+    extraRelationships: ['<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>'],
+    extraParts: { 'word/media/image1.png': Buffer.from('png') },
+  }));
+  archive.file(
+    '[Content_Types].xml',
+    '<Types><Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/word/media/image1.png" ContentType="image/png"/></Types>',
+  );
+  const byOverride = await archive.generateAsync({ type: 'nodebuffer' });
+  await expect(hashGovernedDocxContent(byOverride)).resolves.toMatch(/^gdc1:/);
+});
+
 it('rejects an unsupported content-type Override for a reachable word part', async () => {
   const archive = await JSZip.loadAsync(await buildDocx({
     extraRelationships: ['<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'],

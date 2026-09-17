@@ -1308,6 +1308,28 @@ abstract edit and authorized the send and the download.
   same-operation retry threw before creating anything. The source is now identified by
   version plus governed hash on re-capture and its byte hash recomputed from the served
   bytes (tests: rewritten source re-captures; edited content still refuses).
+  **Codex adversarial review round 2 (2026-09-17, gpt-5.6-sol, base `eece40b0`): needs-attention,
+  three findings, built by Codex rescue (`1e5cfee5`) and reviewed by Claude.** (1) *high* —
+  transitive relationships (document → header → `../outside/banner.png`) bypassed the
+  root/document-rels validation. Fixed: the hasher now walks the full internal OPC graph from
+  `word/document.xml` through every reachable part's own `.rels`, resolving targets OPC-style
+  (percent-decoding, `./`/`../`, fragments, case-insensitive part names) and requiring every
+  internal target to exist under `word/`; `[Content_Types].xml` must exist and an Override may
+  not relabel a reachable `.xml` part as non-XML. Digest unchanged. Claude's review narrowed
+  Codex's Override rule from "any reachable part" to XML parts only: a probe showed a legitimate
+  package declaring an image by `Override` (`image/png`) was refused, and binary parts are
+  already identified by their bytes in the digest (test: image by Override hashes; XML part
+  relabelled `text/plain` still refuses). (2) *medium* — `recordDistributionSource` COALESCEd
+  and equality-checked `source_byte_hash`, so the same-operation re-capture that round 1
+  enabled would have failed `distribution_source_persist_failed` in Production. Fixed: a
+  preparing attempt refreshes byte hash and filename when drive/item/version/governed hash
+  match (store test asserts the SQL parameters; the prepare harness double now models the
+  contract). (3) *medium* — the Board download trusted the registry row's mutable
+  `wmkf_contenthash`. Fixed: the row must carry the attempt's `source_document_id` and
+  `source_content_hash`, and the served bytes are compared to the attempt's hash (test:
+  registry and file agree on B while the ledger pins A → 409 before any Graph read).
+  Residual accepted: a relationship whose target part is missing now fails the hash where it
+  previously passed; Word does not produce those.
   Post-upload byte re-reading was rejected because the rewrite lands after
   prepare's metadata read (`stableUploadedMetadata` requires the uploaded size), so a
   pinned served hash would go stale minutes later.
