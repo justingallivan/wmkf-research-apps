@@ -6,7 +6,7 @@ status: active
 summary: "Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room."
 canonical: true
 cataloged: 2026-09-08
-last_verified: 2026-09-15
+last_verified: 2026-09-17
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -620,7 +620,26 @@ mint refuses `slot=other` (400, no staging row), and `finalizeMaterialUpload` re
 built; §6.2 item 7 describes the re-enabled behaviour. The reminder cron is unaffected in either
 state: `missingRequiredItems` reads only checklist items, and `other` is never a checklist key.
 
-### 16.6 2026-09-11 (S507): PC manual reminder claims before sending
+### 16.6 2026-09-16 ops meeting
+
+Ops recorded the following outcomes for the Site Visit Materials workflow:
+
+1. The schedule for `/api/cron/site-visit-materials-reminders` remains **open** pending further
+   team discussion. The route stays absent from `vercel.json`; no cadence is decided here.
+2. The automatic reminder effects need no new decision beyond the behavior already documented in
+   `lib/services/site-visit-materials/reminder-sweep.js`: one due reminder for an open collection
+   that still has required material missing, subject to the recorded recipient, link, and sender
+   checks.
+3. Ops chose to guard the PC manual-reminder race. That guard was already built in commit
+   `90641978` (S507): `remindMaterialsContributors` resolves the send inputs, calls
+   `claimManualReminder`, sends only after a successful claim, and then attaches the email id.
+4. Ops confirmed that the optional Other uploader remains hidden for this cycle under the §16.5
+   contract; no implementation change is needed.
+5. The per-user Dataverse email-create role gap is recorded with no ops action. The separate
+   onboarding/role work remains externally owned, and the affected colleague will not send system
+   emails until that onboarding is complete.
+
+### 16.7 2026-09-11 (S507): PC manual reminder claims before sending
 
 Owner decision: the PC's "Send reminder" (`remindMaterialsContributors`) now claims before sending,
 the same shape as the automatic sweep — resolve everything the send needs, claim, send, attach the
@@ -633,7 +652,7 @@ reminder (manual or automatic) was stamped in the last 60 seconds; a lost claim 
 cron run so a click during the daily sweep can never produce two reminder emails. `recordReminder`
 is removed; nothing else referenced it.
 
-### 16.7 2026-09-12: configurable applicant email copy [SOURCE-BUILT ON FEATURE BRANCH]
+### 16.8 2026-09-12: configurable applicant email copy [SOURCE-BUILT ON FEATURE BRANCH]
 
 Branch `codex/email-templates-configurable` moves the invitation and reminder subjects/bodies to
 Admin → Email defaults under `email.site_visit_materials_invite.subject` / `.body` and

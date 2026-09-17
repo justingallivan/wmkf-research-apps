@@ -6,7 +6,7 @@ status: proposal
 summary: "What the original VRP did, which of its uploads the platform now supplies internally, and a proposed admin-only rebuild on the Cycle Dossier scaffolding. Decisions D1–D6 were made 2026-09-12; see the Phase A build plan, which supersedes §3, §5 and §6 here."
 cataloged: 2026-09-12
 owner: product-engineering
-last_verified: 2026-09-12
+last_verified: 2026-09-17
 related:
   - docs/VIRTUAL_REVIEW_PANEL.md
   - docs/CYCLE_DOSSIER_PILOT_DESIGN.md
@@ -99,7 +99,8 @@ Stage 0/1 and Perplexity dependence. Same cost profile as a dossier entry (~$0.0
 operator stop, request allowlist, smoke→pilot), governed prompt seeds with `snapshotConfiguration`
 pinning prompt rows + budgets + pricing per run, `executePrompt` with `promptSnapshot`,
 `requireNoPersistence`, `deadlineMs`, `signal`; A7 boundary on every proposal variable; worker lease +
-per-minute drain cron with per-stage checkpoints; entry-timeout budget in the executor-budgets
+drain cron with per-stage checkpoints (the dossier cadence changed from per-minute to every five
+minutes in the 2026-09-16 ops decision); entry-timeout budget in the executor-budgets
 registry; per-call `api_usage_log`; cost estimate + optional cap; plain-language failure copy;
 superuser gate via `requireAppAccess` + a service-level actor assertion. New tables mirror
 `cycle_dossier_*` (`vrp_panels`, `vrp_runs`, `vrp_reviews`, `vrp_control`) with per-request revision

@@ -6,7 +6,7 @@ status: proposal
 summary: "Phase A build plan for the request-scoped, admin-only Virtual Review Panel: an opt-in Executor provider seam (A0) so GPT seats run governed beside Claude seats, then the panel foundation with a per-seat attempt ledger. Records the owner's 2026-09-12 decisions D1–D8 and the Codex adversarial review revision."
 cataloged: 2026-09-12
 owner: product-engineering
-last_verified: 2026-09-12
+last_verified: 2026-09-17
 related:
   - docs/plans/VIRTUAL_REVIEW_PANEL_REVIVAL_SURVEY_2026-09-12.md
   - docs/VIRTUAL_REVIEW_PANEL.md
@@ -325,9 +325,10 @@ attempt and re-runs the chair. Each call uses `promptSnapshot`, `requireNoPersis
 `err.usage` (A0.4) **before** the attempt row is marked terminal. Executor budgets `review-panel.seat`
 and `review-panel.chair` registered in `executorBudgets.js` with admin-tunable envelopes.
 
-**A.6 Worker and cron.** Clone `cycle-dossier-worker.js`: single global lease, per-minute drain cron
-under strict `CRON_SECRET`, stop re-read before every paid call, `describeEntryFailure`-style plain
-copy. Cron entry in `vercel.json` only when the owner enables it (dossier precedent).
+**A.6 Worker and cron.** Clone `cycle-dossier-worker.js`: single global lease, stop re-read before
+every paid call, and `describeEntryFailure`-style plain copy. The Review Panel drain remains
+per-minute; the Cycle Dossier precedent changed to every five minutes by the 2026-09-16 ops
+decision. In both cases the cron entry belongs in `vercel.json` only when the owner enables it.
 
 **A.7 Editions.** Private Blob DOCX + PDF per entry in the **dedicated panel store (D11)** with SHA-256/size/path refs, structural DOCX
 verification, download route with `Cache-Control: private, no-store` and `X-Frame-Options: SAMEORIGIN`
