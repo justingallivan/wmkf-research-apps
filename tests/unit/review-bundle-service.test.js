@@ -3,7 +3,7 @@
  *
  * @jest-environment node
  */
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFName } from 'pdf-lib';
 import crypto from 'node:crypto';
 import {
   assembleReviewBundle,
@@ -29,24 +29,21 @@ async function twoPagePdf(label = 'part') {
 }
 
 /**
- * A PDF whose saved size is just over `totalMB` megabytes: many pages of
- * random (near-incompressible) printable-WinAnsi text, so pdf-lib's default
- * stream compression cannot collapse it back down. Used only to prove the
- * MAX_OUTPUT_BYTES bound is enforced on a real assembled document.
+ * A PDF whose saved size is just over `totalMB` megabytes: a few pages whose
+ * content streams are raw random (incompressible) bytes, so the size survives
+ * pdf-lib's save and `copyPages`. Used only to prove the MAX_OUTPUT_BYTES
+ * bound is enforced on a real assembled document.
  */
-async function oversizedPdf(totalMB, perPageChars = 20000) {
+async function oversizedPdf(totalMB, perPageMB = 5) {
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const totalBytes = totalMB * 1024 * 1024;
-  const pages = Math.ceil(totalBytes / perPageChars);
+  const pages = Math.ceil(totalMB / perPageMB);
   for (let p = 0; p < pages; p += 1) {
-    const buf = Buffer.alloc(perPageChars);
-    crypto.randomFillSync(buf);
-    for (let i = 0; i < perPageChars; i += 1) buf[i] = 33 + (buf[i] % 94);
+    // Random bytes as the page's raw content stream: incompressible, copied
+    // verbatim by `copyPages`, and built in milliseconds. Drawing the same
+    // volume as text took ~12s per fixture and timed out the CI runner.
     const page = doc.addPage([200, 200]);
-    page.drawText(buf.toString('latin1'), {
-      x: 0, y: 0, size: 1, font, lineHeight: 1, maxWidth: 1000000,
-    });
+    const ref = doc.context.register(doc.context.stream(crypto.randomBytes(perPageMB * 1024 * 1024)));
+    page.node.set(PDFName.of('Contents'), ref);
   }
   return Buffer.from(await doc.save());
 }
