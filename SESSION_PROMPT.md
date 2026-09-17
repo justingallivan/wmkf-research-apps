@@ -106,8 +106,9 @@ the orchestrator built Step A directly and fixed builder gaps itself.
    was at SharePoint version 3.0 (edited in Word before sharing); both failing ZZTEST-03
    shares were at version 1.0, raw renderer output. Only briefs shared without a Word save
    break (plan §12). The byte-hash checks in `validateReadySnapshot` and
-   `resolveBriefingMember` must become structural/semantic. Fix on a branch with Codex
-   review. Until then, staff must open and save the brief in Word before sharing.
+   `resolveBriefingMember` now compare the governed content hash (branch
+   `claude/pre-rp-brief-snapshot-hash`, S517; plan §12 disposition). Until it deploys,
+   staff must open and save the brief in Word before sharing.
 4. **DONE 2026-09-17 — `docs/CURRENT_WORK_QUEUE.md` row 12** re-edited after the merges
    and the smoke; it now gates on plan §12 Finding A and the email-link check.
 

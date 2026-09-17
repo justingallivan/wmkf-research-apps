@@ -1657,6 +1657,9 @@ test('send accepts an unchanged linked material after PostgreSQL JSONB reorders 
   // Match fixture hashes to the exact downloaded buffers.
   const crypto = await import('node:crypto');
   row.docx_byte_hash = crypto.createHash('sha256').update('word-bytes').digest('hex');
+  // A frozen Word attachment is identified by its governed content hash (plan §12 Finding A).
+  row.source_content_hash = 'gdc1:word-bytes';
+  dependencies.hashDocx = jest.fn(async () => 'gdc1:word-bytes');
   row.pdf_byte_hash = crypto.createHash('sha256').update('pdf-bytes').digest('hex');
 
   const result = await sendPreSiteDistribution({
@@ -2459,6 +2462,9 @@ test('send renders the live link into the activity body only at creation, and a 
   };
   const crypto = await import('node:crypto');
   row.docx_byte_hash = crypto.createHash('sha256').update('word-bytes').digest('hex');
+  // A frozen Word attachment is identified by its governed content hash (plan §12 Finding A).
+  row.source_content_hash = 'gdc1:word-bytes';
+  dependencies.hashDocx = jest.fn(async () => 'gdc1:word-bytes');
 
   await expect(sendPreSiteDistribution({
     requestId: REQUEST_ID,
@@ -2749,5 +2755,173 @@ describe('producer-to-prepare contract: the real roster projection through prepa
 
     await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
       .rejects.toMatchObject({ code: 'review_bundle_incomplete', httpStatus: 409 });
+  });
+});
+
+describe('retained Word snapshot identity is the governed content hash (plan §12 Finding A)', () => {
+  const sha256 = (buffer) => require('node:crypto').createHash('sha256').update(buffer).digest('hex');
+  const REWRITTEN = Buffer.from('governed-word-bytes+customXml+docProps-repacked-by-sharepoint');
+
+  // SharePoint's post-upload rewrite: the snapshot item now serves different
+  // bytes with a new version/eTag/size, but every `word/` part is intact.
+  function rewriteWordSnapshot(harness, { governedHash }) {
+    const { dependencies } = harness;
+    const download = dependencies.downloadFile;
+    const metadata = dependencies.getFileMetadataById;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      itemId === 'word-snapshot'
+        ? { buffer: REWRITTEN, filename: 'snapshot.docx' }
+        : download(driveId, itemId)
+    ));
+    dependencies.getFileMetadataById = jest.fn(async (driveId, itemId, options) => {
+      const base = await metadata(driveId, itemId, options);
+      return itemId === 'word-snapshot'
+        ? { ...base, versionId: '2.0', eTag: 'word-etag-rewritten', size: REWRITTEN.length }
+        : base;
+    });
+    dependencies.hashDocx = jest.fn(async (buffer) => (
+      buffer.equals(REWRITTEN) ? governedHash(buffer) : 'gdc1:source-hash'
+    ));
+  }
+
+  test('a rewritten snapshot package whose governed content still matches is reusable and projects the served bytes', async () => {
+    const harness = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), harness.dependencies);
+    rewriteWordSnapshot(harness, { governedHash: () => 'gdc1:source-hash' });
+
+    const result = await preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), harness.dependencies);
+
+    expect(result.attempt.attachments).toEqual([]);
+    const projected = harness.dependencies.recordPrepared.mock.calls[1][1].docx;
+    expect(projected).toMatchObject({ versionId: '2.0', byteHash: sha256(REWRITTEN), size: REWRITTEN.length });
+    expect(harness.snapshots[0]).toMatchObject({
+      wmkf_sharepointversionid: '2.0',
+      wmkf_sharepointetag: 'word-etag-rewritten',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    });
+  });
+
+  test('a rewritten snapshot package whose governed content differs is refused (distribution_word_snapshot_hash_mismatch)', async () => {
+    const harness = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), harness.dependencies);
+    rewriteWordSnapshot(harness, { governedHash: () => 'gdc1:someone-edited-word-document-xml' });
+
+    await expect(preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), harness.dependencies)).rejects.toMatchObject({ code: 'distribution_word_snapshot_hash_mismatch', httpStatus: 409 });
+    expect(harness.dependencies.recordPrepared).toHaveBeenCalledTimes(1);
+  });
+
+  test('an unparseable retained snapshot package is a mismatch, not a server error', async () => {
+    const harness = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), harness.dependencies);
+    rewriteWordSnapshot(harness, { governedHash: () => { throw new Error('not a zip'); } });
+
+    await expect(preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), harness.dependencies)).rejects.toMatchObject({ code: 'distribution_word_snapshot_hash_mismatch', httpStatus: 409 });
+  });
+});
+
+describe('send identifies a frozen Word attachment by its governed content hash (plan §12 Finding A)', () => {
+  const sha256 = (value) => require('node:crypto').createHash('sha256').update(value).digest('hex');
+  const UPLOADED = Buffer.from('word-bytes-as-uploaded');
+  const SERVED = Buffer.from('word-bytes+customXml+docProps-repacked-by-sharepoint');
+
+  function docxSend({ hashDocx, found = [] }) {
+    let row = attemptFixture({
+      attachment_mode: 'docx',
+      dynamics_email_id: '88888888-8888-4888-8888-888888888888',
+      state: 'activity_created',
+      docx_byte_hash: sha256(UPLOADED),
+      docx_size: UPLOADED.length,
+      source_content_hash: 'gdc1:word-bytes',
+    });
+    const dependencies = {
+      ...currentSourceDependencies(row),
+      getAttempt: jest.fn(async () => row),
+      claimSend: jest.fn(async () => {
+        row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' };
+        return row;
+      }),
+      getEmailActivity: jest.fn()
+        .mockImplementationOnce(async () => emailFixture(row))
+        .mockResolvedValueOnce({ activityid: row.dynamics_email_id, subject: row.subject, statuscode: 6 }),
+      recordEmailActivity: jest.fn(async (attempt) => attempt),
+      findEmailAttachments: jest.fn(async () => found),
+      getEmailAttachmentContent: jest.fn(async () => ({
+        activitymimeattachmentid: 'attachment-1',
+        filename: row.docx_filename,
+        mimetype: row.docx_content_type,
+        filesize: SERVED.length,
+        body: SERVED.toString('base64'),
+      })),
+      downloadFile: jest.fn(async () => ({ buffer: SERVED })),
+      hashDocx: jest.fn(hashDocx),
+      addEmailAttachment: jest.fn(async () => {}),
+      recordAttachment: jest.fn(async (attempt) => {
+        row = { ...attempt, docx_attached_at: new Date(), state: 'attachments_added' };
+        return row;
+      }),
+      recordSendRequested: jest.fn(async (attempt) => { row = { ...attempt, state: 'send_requested', send_requested_at: new Date() }; return row; }),
+      renewSendLease: jest.fn(async (attempt) => attempt),
+      sendEmail: jest.fn(async () => {}),
+      recordSent: jest.fn(async (attempt, status) => {
+        row = { ...attempt, ...status, state: 'sent', sent_at: new Date(), lease_token: null };
+        return row;
+      }),
+      recordFailure: jest.fn(async () => row),
+    };
+    const send = () => sendPreSiteDistribution({
+      requestId: REQUEST_ID,
+      operationId: OPERATION_ID,
+      previewHash: 'a'.repeat(64),
+      fromEmail: 'sender@example.org',
+      actingUserSystemId: ACTOR_ID,
+    }, dependencies);
+    return { send, dependencies };
+  }
+
+  test('attaches a SharePoint-rewritten Word snapshot whose governed content matches, even though its bytes no longer hash to docx_byte_hash', async () => {
+    const { send, dependencies } = docxSend({ hashDocx: async (buffer) => (buffer.equals(SERVED) ? 'gdc1:word-bytes' : 'gdc1:other') });
+    await send();
+    expect(dependencies.addEmailAttachment).toHaveBeenCalledTimes(1);
+    expect(dependencies.addEmailAttachment.mock.calls[0][1]).toMatchObject({ filename: 'frozen.docx' });
+    expect(dependencies.hashDocx).toHaveBeenCalledWith(SERVED);
+    expect(dependencies.recordFailure).not.toHaveBeenCalled();
+  });
+
+  test('refuses a Word snapshot whose governed content differs from the captured source (distribution_attachment_hash_mismatch)', async () => {
+    const { send, dependencies } = docxSend({ hashDocx: async () => 'gdc1:someone-edited-word-document-xml' });
+    await expect(send()).rejects.toMatchObject({ code: 'distribution_attachment_hash_mismatch' });
+    expect(dependencies.addEmailAttachment).not.toHaveBeenCalled();
+  });
+
+  test('an unparseable Word snapshot is a mismatch, not a server error', async () => {
+    const { send } = docxSend({ hashDocx: async () => { throw new Error('not a zip'); } });
+    await expect(send()).rejects.toMatchObject({ code: 'distribution_attachment_hash_mismatch', httpStatus: 409 });
+  });
+
+  test('recovers an already-added Word attachment by governed content, ignoring its rewritten size and bytes', async () => {
+    const { send, dependencies } = docxSend({
+      hashDocx: async (buffer) => (buffer.equals(SERVED) ? 'gdc1:word-bytes' : 'gdc1:other'),
+      found: [{ activitymimeattachmentid: 'attachment-1' }],
+    });
+    await send();
+    expect(dependencies.addEmailAttachment).not.toHaveBeenCalled();
+    expect(dependencies.getEmailAttachmentContent).toHaveBeenCalledWith('attachment-1');
+  });
+
+  test('a recovered Word attachment with differing governed content is a recovery mismatch', async () => {
+    const { send } = docxSend({
+      hashDocx: async () => 'gdc1:not-the-source',
+      found: [{ activitymimeattachmentid: 'attachment-1' }],
+    });
+    await expect(send()).rejects.toMatchObject({ code: 'distribution_attachment_recovery_mismatch' });
   });
 });

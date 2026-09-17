@@ -1147,3 +1147,61 @@ describe('buildBriefingContext: reviewBundle projection (plan §11, Step C2)', (
     expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, none)).reviewBundle).toBeNull();
   });
 });
+
+describe('writeup-docx verifies the governed content hash from the snapshot registry row (plan §12 Finding A)', () => {
+  const SNAPSHOT_ID = '77777777-7777-4777-8777-777777777777';
+  const GOVERNED = 'gdc1:governed-content-hash';
+  // Bytes SharePoint serves after its post-upload rewrite: NOT the pinned
+  // docx_byte_hash, so the legacy byte comparison would refuse them.
+  const SERVED = Buffer.from('docx+customXml+docProps-repacked');
+  const snapshotRow = (overrides = {}) => ({
+    wmkf_requestdocumentid: SNAPSHOT_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_operationstatus: 100000001, // READY
+    wmkf_contenthash: GOVERNED,
+    ...overrides,
+  });
+  const pinned = (overrides = {}) => deps({
+    getLatestAttempt: jest.fn(async () => sentAttempt({ docx_snapshot_document_id: SNAPSHOT_ID })),
+    downloadFile: jest.fn(async () => ({ buffer: SERVED, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'x.docx', size: SERVED.length })),
+    findDocumentById: jest.fn(async () => ({ records: [snapshotRow()] })),
+    hashDocx: jest.fn(async () => GOVERNED),
+    ...overrides,
+  });
+  const refuse = (d) => expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, d))
+    .rejects.toMatchObject({ httpStatus: 409, body: { ok: false, reason: 'snapshot_mismatch' } });
+
+  test('serves a rewritten package whose governed content matches the registry row, ignoring the stale byte hash', async () => {
+    const d = pinned();
+    const docx = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, d);
+    expect(docx).toMatchObject({ filename: 'PreSite_1002379.docx', inline: false, size: SERVED.length });
+    expect(d.findDocumentById).toHaveBeenCalledWith(SNAPSHOT_ID);
+    expect(d.hashDocx).toHaveBeenCalledWith(SERVED);
+  });
+
+  test('refuses when the governed content differs from the registry row', async () => {
+    await refuse(pinned({ hashDocx: jest.fn(async () => 'gdc1:someone-edited-it') }));
+  });
+
+  test('refuses an unparseable package as a mismatch, not a server error', async () => {
+    await refuse(pinned({ hashDocx: jest.fn(async () => { throw new Error('not a zip'); }) }));
+  });
+
+  test('refuses when the registry row is missing, not Ready, bound to another request, or has no content hash', async () => {
+    await refuse(pinned({ findDocumentById: jest.fn(async () => ({ records: [] })) }));
+    await refuse(pinned({ findDocumentById: jest.fn(async () => ({ records: [snapshotRow({ wmkf_operationstatus: 100000000 })] })) }));
+    await refuse(pinned({ findDocumentById: jest.fn(async () => ({ records: [snapshotRow({ _wmkf_request_value: '99999999-9999-4999-8999-999999999999' })] })) }));
+    await refuse(pinned({ findDocumentById: jest.fn(async () => ({ records: [snapshotRow({ wmkf_contenthash: null })] })) }));
+  });
+
+  test('an attempt with no registry pointer keeps the byte-hash identity (legacy rows)', async () => {
+    const legacy = deps({
+      getLatestAttempt: jest.fn(async () => sentAttempt()),
+      downloadFile: jest.fn(async () => ({ buffer: SERVED, mimeType: 'application/octet-stream', filename: 'x.docx', size: SERVED.length })),
+      hashDocx: jest.fn(async () => GOVERNED),
+    });
+    await refuse(legacy);
+    expect(legacy.findDocumentById).not.toHaveBeenCalled();
+    expect(legacy.hashDocx).not.toHaveBeenCalled();
+  });
+});

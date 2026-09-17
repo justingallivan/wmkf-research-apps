@@ -1266,9 +1266,33 @@ abstract edit and authorized the send and the download.
   carries the promoted parts, or re-reading the snapshot after upload before pinning its
   hash, are narrower alternatives.
 - **Age.** The check dates from `8a240e77` (original frozen distribution).
-- **Disposition.** Not fixed this session. Needs a branch with Codex review. Any real
-  request shared since PR #307 shipped may have a dead Staff Brief link on its briefing
-  page; verify before the next deliberation.
+- **Disposition — fixed on `claude/pre-rp-brief-snapshot-hash` (2026-09-17, S517).**
+  `validateReadySnapshot` compares a retained Word snapshot by its governed content hash
+  only (`hashGovernedDocxContent`: every `word/` part, relationships canonicalised) and
+  treats an unparseable package as a mismatch; the byte hash is still computed for the
+  projection (`docx_byte_hash`, now the served bytes) but no longer gates reuse. The
+  briefing `writeup-docx` member reads the retained snapshot's registry row
+  (`docx_snapshot_document_id` → `wmkf_contenthash`, the same producer's value written at
+  upload), requires it Ready and bound to the request, and compares the served bytes'
+  governed hash; attempts with no registry pointer keep the byte-hash identity. No schema
+  change: existing raw-output shares (including ZZTEST-03's) serve again as soon as the
+  fix deploys. **Sibling swept in the same pass:** the send path's `ensureEmailAttachment`
+  re-downloaded the Word snapshot (and re-read a previously added Dynamics attachment) and
+  required a byte match, so a `docx`/`both` attachment-mode send of a raw brief would have
+  failed `distribution_attachment_hash_mismatch` / `_recovery_mismatch`; it now compares the
+  governed hash against the attempt's `source_content_hash` (the Word snapshot inherits the
+  captured source's content hash at prepare) and skips the size equality for Word only. PDF
+  and calendar attachments keep the byte identity. **Left as is:** `loadCapturedSource`
+  (prepare-only, re-prepare of the same operation) still compares the *source* by byte hash;
+  the source is read after its own rewrite settles in every observed flow, and a mismatch
+  there produces a fresh snapshot rather than a dead link. Discriminating tests: a rewritten package with matching governed content is
+  reusable/servable (fails on the old code), a differing governed hash or unparseable
+  package is refused, and the registry-row guards (missing, not Ready, other request, no
+  hash) refuse; on the send path a rewritten Word attachment with matching governed content
+  attaches and recovers (fails on the old code) while a differing or unparseable one refuses.
+  Post-upload byte re-reading was rejected because the rewrite lands after
+  prepare's metadata read (`stableUploadedMetadata` requires the uploaded size), so a
+  pinned served hash would go stale minutes later.
 
 ### Notes
 
