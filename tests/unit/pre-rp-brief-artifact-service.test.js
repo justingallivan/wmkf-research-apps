@@ -244,6 +244,8 @@ describe('generatePreRpBrief', () => {
       findByRequest: jest.fn().mockImplementation(async () => ({
         records: [...(row ? [{ ...row }] : []), ...(prior ? [{ ...prior }] : [])],
       })),
+      hasSentAttemptForSource: jest.fn().mockResolvedValue(false),
+      listDistributionAttempts: jest.fn().mockResolvedValue([]),
       createDocument: jest.fn().mockImplementation(async (payload) => {
         row = {
           ...payload,
@@ -347,6 +349,118 @@ describe('generatePreRpBrief', () => {
     expect(result.artifact.artifactId).toBe(ARTIFACT_ID);
     expect(harness.prior.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED);
     expect(harness.request._wmkf_currentprerpbrief_value).toBe(ARTIFACT_ID);
+  });
+
+  it.each([
+    ['sent', true, []],
+    ['in-flight', false, [{
+      source_document_id: OLDER_ARTIFACT_ID,
+      state: 'send_requested',
+      lease_token: 'send-lease',
+    }]],
+  ])('refuses regeneration when the current shared brief has a %s distribution attempt', async (
+    _kind,
+    hasSent,
+    attempts,
+  ) => {
+    const prior = briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      wmkf_generationkey: 'prior-generation-key',
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    });
+    const harness = createHarness({ currentPointerRow: prior });
+    harness.dependencies.hasSentAttemptForSource.mockResolvedValue(hasSent);
+    harness.dependencies.listDistributionAttempts.mockResolvedValue(attempts);
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'replacement-op' },
+      harness.dependencies,
+    )).rejects.toMatchObject({
+      code: 'brief_regeneration_distribution_started',
+      httpStatus: 409,
+    });
+    expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(harness.prior.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+  });
+
+  it('fails closed before generation when distribution state cannot be read', async () => {
+    const prior = briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    });
+    const harness = createHarness({ currentPointerRow: prior });
+    harness.dependencies.listDistributionAttempts.mockRejectedValue(new Error('postgres unavailable'));
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'replacement-op' },
+      harness.dependencies,
+    )).rejects.toMatchObject({
+      code: 'brief_distribution_state_unavailable',
+      httpStatus: 503,
+    });
+    expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['SUPERSEDED row', briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+    })],
+    ['non-current READY row', briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    })],
+  ])('refuses a replayed clientOperationId whose generation key resolves to a %s', async (
+    _kind,
+    replayed,
+  ) => {
+    const current = briefRow({
+      wmkf_requestdocumentid: NEWER_ARTIFACT_ID,
+      wmkf_generationkey: 'current-generation-key',
+    });
+    const harness = createHarness({ currentPointerRow: current });
+    harness.dependencies.findByGenerationKey.mockResolvedValue({ records: [replayed] });
+    harness.dependencies.findByRequest.mockResolvedValue({ records: [current, replayed] });
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'replayed-op' },
+      harness.dependencies,
+    )).rejects.toMatchObject({
+      code: 'brief_generation_replay_stale',
+      httpStatus: 409,
+    });
+    expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+    expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('refuses activation when a send becomes in-flight while regeneration is rendering', async () => {
+    const prior = briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      wmkf_generationkey: 'prior-generation-key',
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    });
+    const harness = createHarness({ currentPointerRow: prior });
+    harness.dependencies.listDistributionAttempts
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        source_document_id: OLDER_ARTIFACT_ID,
+        state: 'prepared',
+        lease_token: 'send-lease',
+      }]);
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'racing-replacement-op' },
+      harness.dependencies,
+    )).rejects.toMatchObject({
+      code: 'brief_regeneration_distribution_started',
+      httpStatus: 409,
+    });
+    expect(harness.dependencies.listDistributionAttempts).toHaveBeenCalledTimes(2);
+    expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+    expect(harness.request._wmkf_currentprerpbrief_value).toBe(OLDER_ARTIFACT_ID);
+    expect(harness.prior.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+    expect(harness.dependencies.deleteFile).toHaveBeenCalledWith('drive-id', 'uploaded-item');
   });
 
   it('reuses without rendering when a GENERATING lease is still active', async () => {

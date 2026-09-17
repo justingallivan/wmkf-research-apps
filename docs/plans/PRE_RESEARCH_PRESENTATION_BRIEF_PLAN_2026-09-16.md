@@ -541,30 +541,28 @@ the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFI
 
 ## 8. Follow-ups (not required for this pass)
 
-- **Replayed `clientOperationId` can resurrect a superseded generation
-  identity.** Slice 3 round 1 review (2026-09-16): in both
-  `lib/services/pre-rp-brief/artifact-service.js` (`generatePreRpBrief`) and
-  its Pre-Site precedent
-  (`lib/services/pre-site-visit/artifact-service.js`), the generation key is
-  derived from `requestId + inputFingerprint + clientOperationId` (plus, for
-  Pre-Site, prompt/template identity). If a caller replays an *older*
-  `clientOperationId` whose inputs still hash to a fingerprint matching a
-  now-Superseded row, the exact same generation key is recomputed, and that
-  Superseded row can be reclaimed and reactivated — potentially superseding
-  a row that has since moved to Review (locked for Share) or beyond. This
-  is identical, pre-existing behavior in the Pre-Site lineage, not a
-  regression introduced by the brief; it stays as-is for this pass. Decide
-  once, for both services, whether generation should also check that the
-  claimed/reactivated row is not older than the current pointer target (or
-  otherwise refuse to resurrect a row lifecycle-advanced past Draft), and
-  apply the same fix to both.
+- **Pre-RP replay closed; Pre-Site parity remains parked (2026-09-16).**
+  `generatePreRpBrief` now refuses 409 `brief_generation_replay_stale` when
+  the recomputed generation key resolves to a Superseded row or to a Ready
+  row that is not the current request-pointer target; an exact retry of the
+  current Ready row remains read-only/idempotent. Regeneration also enforces
+  the shared-not-sent rule server-side: a sent or in-flight distribution row
+  for the current brief refuses 409
+  `brief_regeneration_distribution_started`, with the distribution state
+  checked before generation side effects and again at pointer activation to
+  cover a concurrent send. The analogous replay behavior in
+  `lib/services/pre-site-visit/artifact-service.js` is deliberately unchanged
+  in this fix and remains a parity follow-up; do not infer that the Pre-Site
+  service now has the brief-specific guard.
 
 - **Carried from the slice 4–5 Opus reviews (Session 516, 2026-09-16):**
-  (i) `tests/unit/pre-site-distribution-service.test.js` "draftHash and previewHash
-  change when the bounded delta changes" relies on the delta/fingerprint asymmetry
-  (a non-received suggestion moves the delta but not the fingerprint); if the delta
-  is ever aligned to the fingerprint's received-only filter, that test's premise
-  disappears and it must be rewritten. (ii) `tests/unit/migration-052-*.test.js`
+  (i) **Resolved 2026-09-16:** the delta and fingerprint now consume the same
+  canonical received-only form. Non-received suggestions move neither; received
+  reviews retain the raw fingerprint fields, so a `reviewReceivedAt` timestamp
+  rewrite moves both the fingerprint and the changed-reviewer delta. The former
+  asymmetry-based hash test now asserts equal delta/hash identity for a pending
+  suggestion and a separate regression covers the raw timestamp change.
+  (ii) `tests/unit/migration-052-*.test.js`
   pins the acknowledged-drift CHECK tokens but not the legacy all-NULL branch.
   (iii) `stale_inputs_acknowledged_by` renders as a raw system-user GUID in the
   Workbench distribution history; a server-side actor-name projection is needed.
@@ -578,9 +576,12 @@ the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFI
   tri-state or reword. (viii) The restored tab test "a late response for a prior
   request cannot publish a stale Word link" guards React remount, not
   `generate()`'s sequence guard; rename or add an unmount-mid-generate case.
-  (ix) Regenerate on a brief already **sent** to the Board is deliberately not
-  offered (slice 5 round 2); if the owner wants it, it needs the guarded-reopen
-  treatment (typed request number, reason, audit), not a menu item.
+  (ix) **Closed 2026-09-16:** Regenerate on a brief already **sent** to the
+  Board remains deliberately unavailable and is now enforced in the service,
+  not only hidden in the UI. A send that is already in flight also blocks
+  replacement. If the owner wants to reopen either state, it still needs the
+  guarded-reopen treatment (typed request number, reason, audit), not a menu
+  item.
 
 ## 9. Build-loop handoff (paused 2026-09-16, Session 515; resumed and completed Session 516)
 
@@ -612,10 +613,11 @@ in slice 6. Migration 052 is **not** applied to any database.
    binding (`draftHash`/`previewHash` include both fingerprints, delta, acknowledgement),
    migration 052 CHECK coherence vs. legacy rows, `staffAcknowledgedNewerInputs` timestamp-only
    on the external context. Builder ran four hand mutations; a reviewer mutation pass is still due.
-3. Items carried for slice 4 review / slice 5: (a) builder flagged a PLAN-DEVIATION candidate —
-   delta compares received-state as boolean while the fingerprint still hashes the raw
-   `reviewReceivedAt` (a timestamp rewrite trips the gate but shows an empty delta); decide
-   whether `REVIEW_FINGERPRINT_FIELDS` should switch to a boolean; (b) no route test exists for
+3. Items carried for slice 4 review / slice 5: (a) **resolved 2026-09-16** — keep raw
+   `reviewReceivedAt` in `REVIEW_FINGERPRINT_FIELDS` and make the delta consume the same
+   received-only canonical form and raw fields; a timestamp rewrite now appears in the
+   changed-reviewer delta, while non-received suggestions affect neither representation;
+   (b) no route test exists for
    `distribution/prepare.js`'s new `acknowledgeStaleInputs` validation; (c) slice-3 reviewer's
    queued fixture: claim-race guard should also prove the orphan IS deleted when the winner
    adopted a different item.

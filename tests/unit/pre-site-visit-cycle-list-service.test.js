@@ -443,6 +443,38 @@ describe('brief union (plan §3.5)', () => {
     expect(result.artifacts[0]).toMatchObject({ artifactId: 'brief-doc', stage: 'final', substate: 'moved' });
   });
 
+  it('a FINAL Pre-Site pointer remains the finalReached source when a newer failed Pre-Site row exists', async () => {
+    grantRequestAdapter.findByIds.mockResolvedValue({
+      records: [request(R1, { _wmkf_currentpresitevisit_value: 'presite-final', _wmkf_currentprerpbrief_value: 'brief-doc' })],
+    });
+    mockByArtifactType({
+      preSite: [
+        row({
+          wmkf_requestdocumentid: 'presite-failed-newer',
+          createdon: '2026-09-16T12:00:00Z',
+          wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+          wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+          wmkf_sharepointitemid: null,
+        }),
+        row({
+          wmkf_requestdocumentid: 'presite-final',
+          createdon: '2026-09-10T12:00:00Z',
+          wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+          wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL,
+        }),
+      ],
+      brief: [briefRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW })],
+    });
+
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+
+    expect(result.artifacts[0]).toMatchObject({
+      artifactId: 'brief-doc',
+      stage: 'final',
+      substate: 'moved',
+    });
+  });
+
   it('both rails present: the brief pointer wins over the legacy Pre-Site row', async () => {
     grantRequestAdapter.findByIds.mockResolvedValue({
       records: [request(R1, { _wmkf_currentpresitevisit_value: 'presite-doc', _wmkf_currentprerpbrief_value: 'brief-doc' })],
