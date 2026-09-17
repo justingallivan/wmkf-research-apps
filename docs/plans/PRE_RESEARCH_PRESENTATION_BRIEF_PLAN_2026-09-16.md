@@ -1330,6 +1330,25 @@ abstract edit and authorized the send and the download.
   registry and file agree on B while the ledger pins A → 409 before any Graph read).
   Residual accepted: a relationship whose target part is missing now fails the hash where it
   previously passed; Word does not produce those.
+  **Codex adversarial review round 3 (2026-09-17, gpt-5.6-sol, base `eece40b0`): needs-attention,
+  two findings; one fixed, one declined with reasons.** (1) *high, declined as an accepted
+  residual* — External relationships are skipped regardless of type and `[Content_Types].xml`
+  is outside the digest. Reasoning: relationship parts (including `TargetMode`) are in the
+  digest, so a linked image cannot be introduced or retargeted without changing the hash, and
+  the renderer never emits external links; the byte identity never covered a URL's content
+  either. Word selects part handlers by relationship type, which is hashed, and every reachable
+  part's bytes are hashed, so a Default/Override change can at most make Word refuse or repair
+  the file, not display substituted content; binding effective content types into the digest
+  would be a new hash version invalidating every stored governed hash across ten services,
+  and SharePoint itself rewrites `[Content_Types].xml` on upload. (2) *medium, fixed* — with
+  `source_byte_hash` out of the re-capture predicate, two prepares racing on one operation
+  could both record a capture and the first finalizer could pin capture A's snapshots and
+  preview hash beside capture B's byte hash. `recordDistributionPrepared` now fences on the
+  caller's captured identity (drive, item, version, governed hash, byte hash) and the service
+  passes it; a mismatch returns null and prepare fails `distribution_preview_persist_failed`,
+  and the retry re-captures and finalizes self-consistently. Tests: store SQL parameters;
+  harness double models the fence; an interleaving test where B's capture lands after A's
+  (A fails closed, retry succeeds). All three fail on the prior code.
   Post-upload byte re-reading was rejected because the rewrite lands after
   prepare's metadata read (`stableUploadedMetadata` requires the uploaded size), so a
   pinned served hash would go stale minutes later.

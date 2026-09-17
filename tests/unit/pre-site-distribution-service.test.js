@@ -632,6 +632,16 @@ function createPrepareHarness({
     downloadFileAsPdf: jest.fn(async () => pdfBytes),
     hashDocx: jest.fn(async () => sourceHash),
     recordPrepared: jest.fn(async (_operationId, prepared) => {
+      // Real store semantics: the finalizing UPDATE fences on the captured
+      // source identity (drive/item/version/content hash/byte hash).
+      const fenced = [
+        ['source_drive_id', prepared.source?.driveId],
+        ['source_item_id', prepared.source?.itemId],
+        ['source_version_id', prepared.source?.versionId],
+        ['source_content_hash', prepared.source?.contentHash],
+        ['source_byte_hash', prepared.source?.byteHash],
+      ];
+      if (attempt.state !== 'preparing' || fenced.some(([field, value]) => !value || attempt[field] !== value)) return null;
       attempt = {
         ...attempt,
         state: 'prepared',
@@ -3066,5 +3076,54 @@ describe('partial-failure retries survive the SharePoint rewrite (Codex adversar
     dependencies.hashDocx = jest.fn(async () => 'gdc1:edited-after-capture');
     await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
       .rejects.toMatchObject({ code: 'distribution_source_hash_mismatch' });
+  });
+});
+
+describe('two prepares racing on one operation cannot finalize an inconsistent ledger (Codex adversarial review round 3)', () => {
+  const sha256 = (buffer) => require('node:crypto').createHash('sha256').update(buffer).digest('hex');
+  const REWRITTEN = Buffer.from('governed-word-bytes+customXml+docProps-repacked-by-sharepoint');
+
+  test('the first finalizer fails closed when a second capture re-pinned the source bytes underneath it; the retry finalizes self-consistently', async () => {
+    const harness = createPrepareHarness({ dedupeAttempts: true });
+    const { dependencies } = harness;
+    dependencies.hashDocx = jest.fn(async () => 'gdc1:source-hash');
+
+    // Interleave: right after prepare A records its capture (bytes A), the
+    // racing prepare B's capture of the rewritten package (bytes B, same
+    // governed hash) lands on the same row.
+    const recordSource = dependencies.recordSource;
+    let interleaved = false;
+    dependencies.recordSource = jest.fn(async (operationId, captured) => {
+      const row = await recordSource(operationId, captured);
+      if (!interleaved) {
+        interleaved = true;
+        await recordSource(operationId, { ...captured, byteHash: sha256(REWRITTEN) });
+      }
+      return row;
+    });
+
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
+      .rejects.toMatchObject({ code: 'distribution_preview_persist_failed' });
+    expect(dependencies.recordPrepared).toHaveBeenCalledTimes(1);
+    expect(dependencies.recordPrepared.mock.calls[0][1].source.byteHash).not.toBe(sha256(REWRITTEN));
+
+    // Retry on the same operation now serves the rewritten bytes end to end.
+    dependencies.recordSource = recordSource;
+    const download = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      driveId === 'source-drive' && itemId === 'source-item'
+        ? { buffer: REWRITTEN, filename: 'source.docx' }
+        : download(driveId, itemId)
+    ));
+    const metadataById = dependencies.getFileMetadataById;
+    dependencies.getFileMetadataById = jest.fn(async (driveId, itemId, options) => {
+      const base = await metadataById(driveId, itemId, options);
+      return (driveId === 'source-drive' && itemId === 'source-item') || itemId === 'word-snapshot'
+        ? { ...base, size: REWRITTEN.length }
+        : base;
+    });
+    const result = await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies);
+    expect(result.attempt.attachments).toEqual([]);
+    expect(dependencies.recordPrepared.mock.calls[1][1].source.byteHash).toBe(sha256(REWRITTEN));
   });
 });
