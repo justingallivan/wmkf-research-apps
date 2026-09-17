@@ -755,6 +755,22 @@ request number.
 
 Side effect of (2)/(3): the review-bundle document route now reads `getWriteupRoster` twice on the unchanged-fast-path (was once) and up to three times per rebuild attempt (up to six across a full 2-attempt retry) — each read is `findByRequest` + a chunked `queryReviewers` + `fetchAnswersBySuggestion` (Dataverse only, no Graph). Acceptable added latency for a page-view-triggered read; flag if it becomes measurable.
 
+### Codex adversarial review round 3 (Step C) — disposition 2026-09-17
+
+Codex confirmed the roster projection, the shared producer, the DAL context, and the documented
+read bound. One finding remains and is **dispositioned as a contract statement, not a code
+change**: the final post-download recheck compares the selected bundle against one roster
+snapshot, and that snapshot is assembled across sequential Dataverse reads, so a mutation landing
+between the suggestion read and the response is invisible to it. A return-time fence would need a
+request-scoped revision/lease held through response completion across Dataverse, which no read
+path in this application has; the briefing page's own inline reviews are served with the same
+last-observed-snapshot semantics (`loadReviews` reads suggestions then hydrates). **Contract:**
+the review bundle is consistent with the review set *as last observed during delivery*
+(pinned-set comparison before selection, one final recheck after download, at most two attempts);
+it is not a linearizable guarantee against concurrent Dataverse edits. A review deselected during
+the delivery window can appear in that one response exactly as it can in the inline list served
+by the same request; the next read repairs it. Recorded in the security matrix row.
+
 ### Open for owner (2026-09-16)
 
 1. A review file that cannot be converted blocks Share (fail closed) rather than being skipped with a placeholder page. Conservative default chosen; say if a placeholder page is preferred.
