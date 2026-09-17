@@ -850,12 +850,21 @@ export default function StaffDeliberationsTab({
       if (briefSequence.current !== sequence || id !== requestId) return;
 
       // Refreshes brief status (the new artifact) and, by updating the
-      // distribution panel's sourceArtifact prop below, its distribution
-      // history — `everSent` re-derives against the new (never-sent) row.
+      // distribution panel's sourceArtifact-keyed remount below, its
+      // distribution history — `everSent` re-derives against the new
+      // (never-sent) row.
       const refreshed = await readBriefStatus(id, controller.signal);
       if (briefSequence.current !== sequence || id !== requestId) return;
       setBriefArtifact(refreshed.currentArtifact || body.artifact || null);
       setBriefPendingArtifact(refreshed.pendingArtifact || null);
+      // Codex adversarial review finding 3 (2026-09-16 round 2): reset
+      // eagerly rather than wait for the distribution panel's own
+      // remount+refetch (forced by the artifact id now included in its key,
+      // above) to land — the successor is, by construction, a brand-new row
+      // that has never been sent, so the UI must never show it as sent even
+      // for the moment before that refetch resolves.
+      setCurrentSourceEverSent(false);
+      setLatestSendFailure(null);
       if (response.status === 202
         || body.artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
         setBriefReopenError(
@@ -1263,7 +1272,14 @@ export default function StaffDeliberationsTab({
 
       {briefReadyFile && (briefDraftReady || briefShared) && (
         <PreSiteDistributionPanel
-          key={`distribution-${requestId}`}
+          // Codex adversarial review finding 3 (2026-09-16 round 2): the
+          // panel's own history-load effect only re-runs on a `requestId`
+          // change, never on `sourceArtifact` alone, so a guarded
+          // regeneration's successor artifact id must be part of this key —
+          // forcing a full remount (a fresh history load from scratch for
+          // the new source) rather than silently keeping the predecessor's
+          // cached "already sent" state.
+          key={`distribution-${requestId}:${briefArtifact?.artifactId || ''}`}
           requestId={requestId}
           requestNumber={requestNumber}
           sourceArtifact={briefArtifact}

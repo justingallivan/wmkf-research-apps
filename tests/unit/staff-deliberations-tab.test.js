@@ -19,12 +19,26 @@ jest.mock('../../shared/components/Layout', () => ({
 
 let distributionHistoryFeed = null;
 let lastDistributionProps = null;
+// Codex adversarial review finding 3 (2026-09-16 round 2): records the
+// sourceArtifact id seen on each MOUNT (empty deps -- a real component
+// mount, not merely a re-render with new props) of the mocked panel. The
+// real panel's own history-load effect only re-runs on `requestId` change
+// (never on `sourceArtifact` alone -- lib/services is not in play here, this
+// mirrors PreSiteDistributionPanel.js's own effect dependency array), so
+// proving the tab actually forces a fresh mount for a new brief artifact id
+// (via the `key` on <PreSiteDistributionPanel>) is what proves history gets
+// reloaded rather than silently keeping the predecessor's cached state.
+let mountedSourceArtifactIds = [];
 jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
   const { useEffect } = require('react');
   const { useState } = require('react');
   function MockDistributionPanel(props) {
     const [lockError, setLockError] = useState(null);
     lastDistributionProps = props;
+    useEffect(() => {
+      mountedSourceArtifactIds.push(props.sourceArtifact?.artifactId || 'none');
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     useEffect(() => {
       if (distributionHistoryFeed) props.onHistory?.(distributionHistoryFeed);
     }, [props]);
@@ -72,6 +86,7 @@ const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 const PRESITE_ARTIFACT_ID = '22222222-2222-4222-8222-222222222222';
 const BRIEF_ARTIFACT_ID = '44444444-4444-4444-8444-444444444444';
+const REOPENED_BRIEF_ARTIFACT_ID = '66666666-6666-4666-8666-666666666666';
 
 const DRAFT = 100000000;
 const REVIEW = 100000001;
@@ -97,9 +112,9 @@ function preSiteArtifact(lifecycleState = DRAFT) {
   };
 }
 
-function briefArtifact(lifecycleState = DRAFT, { receivedReviewCount = 1 } = {}) {
+function briefArtifact(lifecycleState = DRAFT, { receivedReviewCount = 1, artifactId = BRIEF_ARTIFACT_ID } = {}) {
   return {
-    artifactId: BRIEF_ARTIFACT_ID,
+    artifactId,
     operationStatus: READY,
     lifecycleState,
     file: {
@@ -192,6 +207,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   distributionHistoryFeed = null;
   lastDistributionProps = null;
+  mountedSourceArtifactIds = [];
   siteVisitContextFeed = null;
   visitExpectedFeed = true;
   queues = Object.fromEntries(ROUTE_DEFS.map((r) => [r.key, []]));
@@ -603,29 +619,59 @@ test('the guarded brief-reopen dialog stays disabled until reason, a valid note,
   });
 });
 
-test('a successful guarded brief regeneration refreshes brief status and distribution history', async () => {
+test('a successful guarded brief regeneration remounts distribution history for the new artifact id, so a later Share never reads the predecessor\'s "already sent" state', async () => {
+  // Codex adversarial review finding 3 (2026-09-16 round 2): the mocked
+  // panel's history-load effect only fires on a genuine mount (empty deps),
+  // mirroring the real PreSiteDistributionPanel's own effect, which only
+  // re-runs on a `requestId` change, never on `sourceArtifact` alone. So
+  // `mountedSourceArtifactIds` below only grows if the tab's `key` on
+  // <PreSiteDistributionPanel> actually changed, proving a real remount
+  // (and therefore a fresh history load) happened for the new artifact id.
   distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
-  queueRoute('briefReopen', response({ success: true, artifact: briefArtifact(DRAFT), reused: false }));
-  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT) }));
+  queueRoute('briefReopen', response({
+    success: true,
+    artifact: briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }),
+    reused: false,
+  }));
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }) }));
+  queueRoute('briefLock', response({
+    success: true,
+    artifact: briefArtifact(REVIEW, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }),
+    reused: false,
+  }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
   await screen.findByRole('link', { name: 'Open working document' });
+  expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID]);
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
   fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The Board received an incomplete draft.' } });
   fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  // The predecessor's history feed stays "sent" here; the successor's fresh
+  // (post-remount) history load must report never-sent instead.
+  distributionHistoryFeed = { attempts: [], currentSourceEverSent: false };
   fireEvent.click(screen.getByRole('button', { name: 'Regenerate Sent Brief' }));
 
   await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
-  // The status GET is re-fetched (brief status refresh); the distribution
-  // panel's sourceArtifact prop moves to the new row, which is how its own
-  // history (everSent) re-derives against that new, never-sent row.
-  await waitFor(() => expect(calls('briefGet').length).toBeGreaterThanOrEqual(2));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Regenerate a brief the Board already received?' })).not.toBeInTheDocument());
   expect(await screen.findByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Share…' })).toBeInTheDocument();
+  // Proves an actual remount happened for the new artifact id (a second,
+  // fresh history load) rather than the mock merely re-rendering with
+  // updated props under a stale, already-mounted history load.
+  await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID, REOPENED_BRIEF_ARTIFACT_ID]));
+
+  // Share the new Draft again, reaching the exact state where a stale
+  // "already sent" signal from the superseded source would previously have
+  // hidden Regenerate Brief and wrongly offered Send again.
+  fireEvent.click(screen.getByRole('button', { name: 'Share…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'mock-prepare' }));
+  await waitFor(() => expect(calls('briefLock')).toHaveLength(1));
+
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Brief' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: 'Send the deliberation email again…' })).not.toBeInTheDocument();
 });
 
 test('Brief card: regenerate opens a brief-scoped confirmation dialog', async () => {

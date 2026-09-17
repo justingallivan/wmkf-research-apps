@@ -718,6 +718,10 @@ describe('generatePreRpBrief', () => {
   describe('the reopen option', () => {
     const REOPEN = Object.freeze({
       cycleId: '88888888-8888-4888-8888-888888888888',
+      // Matches the `prior` row's id in every test below: generatePreRpBrief
+      // now re-verifies this against its own pointer read before any claim
+      // (Codex adversarial review finding 1).
+      sourceArtifactId: OLDER_ARTIFACT_ID,
       reasonCode: 'accidental_handoff',
       reasonNote: 'The Board received an incomplete draft and it must be corrected.',
     });
@@ -946,6 +950,28 @@ describe('projectPreRpBriefArtifact', () => {
     })).digest('hex');
     expect(PRE_RP_BRIEF_CONTRACT.renderVersion).toBe('2');
     expect(key).toBe(expected);
+  });
+
+  // Codex adversarial review finding 2a (2026-09-16 round 2): `reopen`
+  // (guarded regeneration) is bound into the key so it can never collide
+  // with an ordinary row sharing the same clientOperationId, but omitting it
+  // (or passing null, the default) must leave ordinary keys byte-identical
+  // to before this option existed.
+  it('binding the reopen tuple into the generation key leaves ordinary keys unchanged but produces a distinct key', () => {
+    const base = { requestId: REQUEST_ID, inputFingerprint: 'a'.repeat(64), clientOperationId: 'op-1' };
+    const withoutReopenArg = buildPreRpBriefGenerationKey(base);
+    const withNullReopen = buildPreRpBriefGenerationKey({ ...base, reopen: null });
+    const withReopen = buildPreRpBriefGenerationKey({
+      ...base,
+      reopen: {
+        cycleId: 'cycle-1',
+        sourceArtifactId: OLDER_ARTIFACT_ID,
+        reasonCode: 'accidental_handoff',
+        reasonNote: 'note',
+      },
+    });
+    expect(withNullReopen).toBe(withoutReopenArg);
+    expect(withReopen).not.toBe(withoutReopenArg);
   });
 
   it('reads null (unreadable, distinct from zero) when the snapshot is missing, malformed, or of another envelope', () => {

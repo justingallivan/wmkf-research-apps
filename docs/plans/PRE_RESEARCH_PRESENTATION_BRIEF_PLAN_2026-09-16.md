@@ -807,9 +807,9 @@ claim/render/upload/activate lineage in `generatePreRpBrief`
    `PRE_SITE_REOPEN_REASON_LABEL`, note, typed request number, submit
    disabled until valid) posts the six fields to the new route and, on
    success, re-fetches brief status (`readBriefStatus`) so `briefArtifact`
-   moves to the new row — which in turn moves the distribution panel's
-   `sourceArtifact` prop, letting `everSent` re-derive against that new,
-   never-sent row.
+   moves to the new row. **Revised in round 2 below**: moving `briefArtifact`
+   alone is not sufficient to refresh distribution history — the panel's
+   `key` and an eager local reset now do that work.
 5. **Docs**: this section; `docs/API_ROUTE_SECURITY_MATRIX.md` row for
    `/api/workbench/pre-rp-brief/reopen`; one sentence added to
    `docs/atlas/dataverse-wmkf-requestdocument.md`'s Pre-RP Brief section
@@ -826,3 +826,95 @@ tests mirroring the Pre-Site route test one for one),
 `tests/unit/workbench-pre-rp-brief-route.test.js` (one row added to the
 existing `test.each` rejecting a `reopen` body key), and
 `tests/unit/staff-deliberations-tab.test.js` (5 tests added, no removals).
+
+### 10.1 Round 2: Codex adversarial review findings (2026-09-16), fixed on the same branch after merging `claude/pre-rp-brief-followups` (merge `da3955ae`, which added `expectedPointerId` to `commitReadyLineage` and own-claim-only upload cleanup)
+
+**Finding 1 [high] — source identity not bound across the delegation.**
+The reopen-service validated a specific current-row identity
+(`currentRow.wmkf_requestdocumentid`, confirmed equal to
+`input.expectedArtifactId`) before ever calling `generatePreRpBrief`, but
+`generatePreRpBrief` then did its own independent pointer read — a rival
+generation (another guarded reopen, or an ordinary regenerate) could move
+the pointer in between, and `generatePreRpBrief` would supersede whatever it
+found instead of what was authorized. Fix: `reopenSentPreRpBrief`
+(reopen-service.js:242) now passes `reopen.sourceArtifactId =
+currentRow.wmkf_requestdocumentid`. `generatePreRpBrief`
+(artifact-service.js:774) re-checks, immediately after its own
+`resolveCanonicalPreRpBriefRow` call and before any claim, that the row it
+resolved equals `reopen.sourceArtifactId`; a mismatch throws 409
+`brief_reopen_stale` (`reopenSourceStaleError`, artifact-service.js:120).
+`expectedPointerId` (artifact-service.js:778, threaded into
+`commitReadyLineage`'s activation fence, merged in from
+`claude/pre-rp-brief-followups`) is set to `reopen.sourceArtifactId` when
+`reopen` is present, rather than merely whatever the (now re-verified)
+`currentRow` happens to be — defense in depth, since `commitReadyLineage`
+already has its own `brief_pointer_changed` fence for a race that opens
+later, during render/upload. Test:
+`tests/unit/pre-rp-brief-reopen-service.test.js` "fails closed
+(brief_reopen_stale) when a rival brief takes the pointer between
+reopen-service validation and generatePreRpBrief's own pointer read" —
+mutates the request pointer inside the `loadInputs` mock (which runs before
+`generatePreRpBrief`'s own pointer read) to simulate the race, and asserts
+`createDocument`/`uploadFile` were never called.
+
+**Finding 2 [high] — idempotency not bound to the audit payload; generation
+key collision with ordinary rows.**
+(a) `buildPreRpBriefGenerationKey` (artifact-service.js:709) gained an
+optional `reopen: { cycleId, sourceArtifactId, reasonCode, reasonNote }`
+argument, bound into the hashed key only when present, so a guarded
+generation's key can never collide with an ordinary row that happens to
+share the same `clientOperationId` (asserted by a new key test in
+`tests/unit/pre-rp-brief-artifact-service.test.js`: omitting `reopen`, or
+passing it as `null`, produces the byte-identical key as before this option
+existed). (b) `generatePreRpBrief` (artifact-service.js:763) fails closed
+409 `brief_reopen_audit_mismatch` (`reopenAuditMismatchError`,
+artifact-service.js:134) if the row resolved by the (now reopen-bound) key
+carries different `wmkf_reopencycleid`/`reasoncode`/`reasonnote` than the
+tuple — defense in depth, since (a) already makes this practically
+unreachable. (c) The reopen-service's own idempotent-retry short-circuit
+(reopen-service.js:148) previously matched on `wmkf_reopencycleid` alone;
+it now also requires the reason code, reason note, and the superseded
+source to match exactly, else 409 `brief_reopen_audit_mismatch`. The
+superseded source is now recorded: `wmkf_SourceDocument` — the same
+generic lookup Pre-Site's own reopen (`'wmkf_SourceDocument@odata.bind'`,
+`lib/services/pre-site-visit/reopen-service.js:690`) and the distribution
+snapshots (`lib/services/pre-site-visit/distribution-service.js:968`)
+already use on this entity — is available and is now written on the
+brief's successor row too (artifact-service.js:830), and the replay
+compares it against `input.expectedArtifactId`
+(`currentRow._wmkf_sourcedocument_value`, reopen-service.js:151). Tests:
+"refuses (brief_reopen_audit_mismatch) a retry whose reason/note differ
+from the first, sharing the same clientOperationId"; "does not claim a
+pre-existing ordinary FAILED row that shares the same clientOperationId
+(guarded and ordinary keys differ)" (asserts the ordinary row is never
+touched); "is idempotent: an exact retry…" (pre-existing, still green) and
+the new key test above cover the exact-replay and key-collision cases.
+
+**Finding 3 [medium] — successful regeneration left distribution history
+keyed to the superseded source.**
+`PreSiteDistributionPanel`'s own history-load effect
+(`shared/components/workbench/PreSiteDistributionPanel.js:409-426`) only
+re-runs on a `requestId` change (`loadHistory`'s deps are `requestId`,
+`requestNumber`, `onHistory` — never `sourceArtifact`), so moving
+`briefArtifact` to the successor row alone left the panel showing the
+predecessor's cached "already sent" history until an unrelated remount.
+Fix, in `StaffDeliberationsTab.js`: (i) the panel's `key` (line ~1266) is
+now `` `distribution-${requestId}:${briefArtifact?.artifactId || ''}` ``
+(picked over adding the artifact id to the panel's own effect deps, to
+avoid touching `PreSiteDistributionPanel.js`, which is outside this
+feature's file list, and because a full remount also clears the panel's
+own composer-touched/seeded-defaults state, which should not survive onto
+an unrelated new document either); (ii) `submitBriefReopen` now also calls
+`setCurrentSourceEverSent(false)` and `setLatestSendFailure(null)`
+eagerly, right when `briefArtifact` moves to the successor, so there is no
+render in between where the UI could show the brand-new (never sent) row
+as already sent while the remounted panel's own history fetch is still in
+flight. Test (replacing the prior mock-only assertion): the mock panel in
+`tests/unit/staff-deliberations-tab.test.js` now records
+`sourceArtifact.artifactId` on every genuine mount (an effect with empty
+deps, mirroring the real effect's `requestId`-only trigger) into
+`mountedSourceArtifactIds`; the new test proves a second, distinct-artifact
+mount happened (not just a re-render with updated props), then shares the
+new Draft again and asserts `Regenerate Brief` is offered and `Send the
+deliberation email again…` is not — the exact menu state a stale "already
+sent" signal would have gotten wrong.

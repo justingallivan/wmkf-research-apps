@@ -1,7 +1,9 @@
 import {
+  buildPreRpBriefGenerationKey,
   generatePreRpBrief,
   projectPreRpBriefArtifact,
 } from '../../lib/services/pre-rp-brief/artifact-service.js';
+import { briefInputFingerprint } from '../../lib/services/pre-rp-brief/docx-renderer.js';
 import { reopenSentPreRpBrief } from '../../lib/services/pre-rp-brief/reopen-service.js';
 import {
   PRE_RP_BRIEF_CONTRACT,
@@ -269,6 +271,11 @@ describe('reopenSentPreRpBrief — success and idempotent retry', () => {
           ...payload,
           wmkf_requestdocumentid: 'new-row-id',
           _wmkf_request_value: REQUEST_ID,
+          // Mirrors how the real adapter projects an @odata.bind into its
+          // read-model lookup field, so the replay's SourceDocument check
+          // (reopen-service.js) can be exercised against this fake store.
+          _wmkf_sourcedocument_value: payload['wmkf_SourceDocument@odata.bind']
+            ?.match(/\(([^)]+)\)/)?.[1] || null,
           _etag: `row-${etag}`,
           createdon: new Date().toISOString(),
           modifiedon: new Date().toISOString(),
@@ -350,6 +357,9 @@ describe('reopenSentPreRpBrief — success and idempotent retry', () => {
     expect(harness.request._wmkf_currentprerpbrief_value).toBe(harness.row.wmkf_requestdocumentid);
     expect(harness.reopenDependencies.hasSentAttemptForSource)
       .toHaveBeenCalledWith(REQUEST_ID, ARTIFACT_ID);
+    // Codex adversarial review finding 2c: the superseded source is recorded
+    // on the successor row itself via the SourceDocument lookup.
+    expect(harness.row._wmkf_sourcedocument_value).toBe(ARTIFACT_ID);
   });
 
   it('is idempotent: an exact retry with the same clientOperationId reuses the row without a second upload', async () => {
@@ -363,5 +373,105 @@ describe('reopenSentPreRpBrief — success and idempotent retry', () => {
     expect(retry.artifact.artifactId).toBe(projectPreRpBriefArtifact(harness.row).artifactId);
     expect(harness.artifactDependencies.uploadFile).toHaveBeenCalledTimes(1);
     expect(harness.reopenDependencies.generatePreRpBrief).toHaveBeenCalledTimes(1);
+  });
+
+  // Codex adversarial review finding 2 (2026-09-16 round 2).
+  it('refuses (brief_reopen_audit_mismatch) a retry whose reason/note differ from the first, sharing the same clientOperationId', async () => {
+    const harness = createHarness();
+    const first = await reopenSentPreRpBrief(validBody(), { actingUserSystemId: 'user-1' }, harness.reopenDependencies);
+    expect(first.reused).toBe(false);
+
+    await expect(reopenSentPreRpBrief(
+      validBody({ reasonNote: 'A completely different corrective note for this retry attempt.' }),
+      { actingUserSystemId: 'user-1' },
+      harness.reopenDependencies,
+    )).rejects.toMatchObject({ code: 'brief_reopen_audit_mismatch', httpStatus: 409 });
+    // The mismatched retry never re-delegates to generatePreRpBrief at all —
+    // the reopen-service's own replay check catches it first.
+    expect(harness.artifactDependencies.uploadFile).toHaveBeenCalledTimes(1);
+    expect(harness.reopenDependencies.generatePreRpBrief).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not claim a pre-existing ordinary FAILED row that shares the same clientOperationId (guarded and ordinary keys differ)', async () => {
+    const harness = createHarness();
+    const ordinaryKey = buildPreRpBriefGenerationKey({
+      requestId: REQUEST_ID,
+      inputFingerprint: briefInputFingerprint(ENVELOPE),
+      clientOperationId: OPERATION_ID,
+    });
+    const ordinaryFailedRow = {
+      wmkf_requestdocumentid: 'ordinary-failed-row-id',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
+      wmkf_contenttype: PRE_RP_BRIEF_CONTRACT.contentType,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      wmkf_producer: PRE_RP_BRIEF_CONTRACT.producer,
+      wmkf_generationkey: ordinaryKey,
+      wmkf_claimtoken: null,
+      createdon: '2026-09-01T00:00:00Z',
+      modifiedon: '2026-09-01T00:00:00Z',
+      _etag: 'ordinary-failed-row-1',
+    };
+    harness.artifactDependencies.findByGenerationKey = jest.fn().mockImplementation(async (key) => {
+      if (key === ordinaryKey) return { records: [ordinaryFailedRow] };
+      return { records: harness.row ? [{ ...harness.row }] : [] };
+    });
+
+    const result = await reopenSentPreRpBrief(validBody(), { actingUserSystemId: 'user-1' }, harness.reopenDependencies);
+
+    expect(result.reused).toBe(false);
+    expect(result.artifact.artifactId).not.toBe('ordinary-failed-row-id');
+    expect(harness.artifactDependencies.updateDocument).not.toHaveBeenCalledWith(
+      'ordinary-failed-row-id',
+      expect.anything(),
+      expect.anything(),
+    );
+    // The unrelated ordinary row is untouched: still Failed, still unclaimed.
+    expect(ordinaryFailedRow.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
+    expect(ordinaryFailedRow.wmkf_claimtoken).toBeNull();
+  });
+
+  // Codex adversarial review finding 1 (2026-09-16 round 2): integrated race
+  // across the reopen-service -> generatePreRpBrief delegation boundary.
+  it('fails closed (brief_reopen_stale) when a rival brief takes the pointer between reopen-service validation and generatePreRpBrief\'s own pointer read', async () => {
+    const harness = createHarness();
+    const rivalRow = {
+      wmkf_requestdocumentid: 'rival-row-id',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
+      wmkf_contenttype: PRE_RP_BRIEF_CONTRACT.contentType,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      wmkf_producer: PRE_RP_BRIEF_CONTRACT.producer,
+      wmkf_generationkey: 'rival-generation-key',
+      createdon: '2026-09-16T00:00:00Z',
+      modifiedon: '2026-09-16T00:00:00Z',
+      _etag: 'rival-row-1',
+    };
+    const originalLoadInputs = harness.artifactDependencies.loadInputs;
+    const originalFindByRequest = harness.artifactDependencies.findByRequest;
+    let raced = false;
+    harness.artifactDependencies.loadInputs = jest.fn().mockImplementation(async (...args) => {
+      if (!raced) {
+        raced = true;
+        // Simulates a rival generation (another guarded reopen, or an
+        // ordinary regenerate) activating and moving the pointer AFTER the
+        // reopen-service's own validation above already read the OLD
+        // pointer, but BEFORE generatePreRpBrief (called moments later, in
+        // the same request) does its own pointer read.
+        harness.request._wmkf_currentprerpbrief_value = rivalRow.wmkf_requestdocumentid;
+      }
+      return originalLoadInputs(...args);
+    });
+    harness.artifactDependencies.findByRequest = jest.fn().mockImplementation(async (...args) => {
+      const result = await originalFindByRequest(...args);
+      return { records: [...result.records, rivalRow] };
+    });
+
+    await expect(reopenSentPreRpBrief(validBody(), { actingUserSystemId: 'user-1' }, harness.reopenDependencies))
+      .rejects.toMatchObject({ code: 'brief_reopen_stale', httpStatus: 409 });
+    expect(harness.artifactDependencies.createDocument).not.toHaveBeenCalled();
+    expect(harness.artifactDependencies.uploadFile).not.toHaveBeenCalled();
   });
 });
