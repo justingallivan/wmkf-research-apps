@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Frozen Word snapshots re-identified by governed content hash after a SharePoint rewrite incident (Session 517)
+
+**Milestone:** The first full Production smoke of the Pre-RP Brief exposed that every brief shared without a Word save could not be resent and its Board download returned 409: SharePoint rewrites a generated `.docx` after upload, so the frozen distribution's package byte hash never matched what Graph served. Retained Word snapshots are now identified by the governed content hash (every `word/` part, full OPC traversal, digest unchanged) across snapshot reuse, recovery, re-capture, send attachments, and the ledger-bound Board download.
+**Sessions:** 517 (smoke, root cause via the 1002903 version-3.0 discriminator, three Codex adversarial rounds, one Codex rescue build). PR #313.
+**Ship state:** Merged `b5af962b`, deployment `dpl_4DVSPjkWg8cp693qyw4gvrG7m7VQ` Ready; ZZTEST-03's Staff Brief download and same-version re-preview pass with no data change; no schema change; the interim "save in Word before sharing" rule is lifted.
+**Why it matters:** The Board-facing brief and the staff resend no longer depend on package bytes SharePoint does not preserve, and the identity check now proves the package opens the hashed subtree.
+**Pointers:** `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §12, `docs/agent-wiki/topics/dataverse-dynamics.md`, `lib/services/initial-assessment/artifact-service.js`; commits `fe6ba417`, `1e5cfee5`, `ccb0d3fc`.
+
 ## September 2026 — Pre-Research Presentation Brief shipped as the Board distribution source (Session 516)
 
 **Milestone:** A fourth governed request document, rendered deterministically from a tracked DOCX template with no prompt, now replaces the Pre-Site writeup as what the deliberation briefing page and Share email deliver to the Board; Share fails closed on zero received reviews and on input drift unless staff acknowledge the live fingerprint.
