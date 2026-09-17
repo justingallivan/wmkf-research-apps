@@ -99,13 +99,14 @@ Demotion: none. Justification: of five sampled leaves, one had a stale ground-tr
 ## Fixes applied
 
 - `c39e43ed` — router diet (router, archive, three wiki Durable Memory sections).
-- This commit — 11 recall rules added; `feedback-red-gates-are-p0` ground truth re-pointed; `feedback-codex-model-gpt56-sol` config-default sentence corrected; audit note and §18 row.
+- Third commit — `project-reviewer-apps-redesign-direction` split 59,150 → 11,473 B (dated checkpoints, S194–S206 chronology, slice definitions, and build sequence moved verbatim to closed leaf `project-reviewer-apps-redesign-history`, 49 KB); `project-j27-doc-capture-evolution` split 11,747 → 7,891 B (pilot record, pilot-environment decision, and retired hold step moved verbatim to closed leaf `project-j27-doc-capture-history`, 5 KB, with a live-invariant pointer left in place). Line-multiset check: 0 non-blank lines lost in either split. Both closed leaves indexed in the archive.
+- Second commit — 11 recall rules added; `feedback-red-gates-are-p0` ground truth re-pointed; `feedback-codex-model-gpt56-sol` config-default sentence corrected; audit note and §18 row.
 
 ## Unknowns and owner decisions
 
 - The ops-meeting agenda leaf's two flags wait for `codex/ops-meeting-2026-09-16`.
 - The committed memory-drift report is flagged stale by the read-only checker; `npm run refresh:memory-drift` is an authorized live refresh, not run here.
-- Deep-audit queue: split `project-reviewer-apps-redesign-direction` (59 KB) and `project-j27-doc-capture-evolution`; shrink `project-site-visit-materials-planning-handoff` once the ops-meeting branch lands.
+- Deep-audit queue: `project-site-visit-materials-planning-handoff` can shrink once the ops-meeting branch lands. (The two splits below were done in a third commit the same session.)
 - Router landing point is 6.9 KiB / 52 leaves against the §10 target of ~6 KiB / ~45; the remaining leaf lists are Working Norms feedback entries with no natural wiki hub.
 
 ## Metrics row

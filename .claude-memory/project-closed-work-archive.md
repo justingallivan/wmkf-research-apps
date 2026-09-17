@@ -44,6 +44,8 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail** (D1–D25 decided; live in prod S503) — `docs/PC_MEETING_TRACKER_PLAN.md`; build briefs `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`, `docs/plans/REVIEWER_RELEASE_REASON_CODEX_BRIEF_2026-09-09.md`.
 - **Reviewer Find latency / warm reconciliation incident (Request 1002903, 2026-08-03)** — `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`; lesson lives in [[feedback-latency-plan-scope-accretion-postmortem]].
 - **Reviewer workflow stabilization assessment (Request 1002912)** — point-in-time Fable assessment `outputs/reviewer-workflow-stabilization-fable-assessment.md`; directive `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md`.
+- **Request Workbench redesign history** (split 2026-09-17) — dated checkpoints, S194–S206 chronology, Workbench-v1 slice and build sequence. [[project-reviewer-apps-redesign-history]]; live direction stays in [[project-reviewer-apps-redesign-direction]].
+- **Initial Assessment governed-artifact pilot record** (split 2026-09-17) — Request 1002788/1003109 rehearsals, recovery fixes, pilot-environment decision, retired hold step. [[project-j27-doc-capture-history]]; live invariants stay in [[project-j27-doc-capture-evolution]].
 
 ## Point-in-time status snapshots (superseded by live SESSION_PROMPT handoffs)
 - **Intake pilot decisions 2026-05-06** — six-decision walkthrough; items 1C+1D superseded by the 2026-05-13 Track-1 decisions (still in index). [[project-intake-portal-pilot-decisions-2026-05-06]].
