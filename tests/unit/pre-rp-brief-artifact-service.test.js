@@ -659,8 +659,9 @@ describe('generatePreRpBrief', () => {
       { requestId: REQUEST_ID, clientOperationId: 'op-1' },
       dependencies,
     )).rejects.toMatchObject({ code: 'claim_lost' });
-    expect(dependencies.deleteFile).toHaveBeenCalledTimes(1);
-    expect(dependencies.deleteFile).toHaveBeenCalledWith('drive-id', UPLOADED_ITEM_ID);
+    // Ownership passed to the winner: the item at the deterministic path may
+    // be the winner's (or about to be replaced by it), so it is never deleted.
+    expect(dependencies.deleteFile).not.toHaveBeenCalled();
   });
 
   it('fails closed on an invalid requestId before loading inputs', async () => {

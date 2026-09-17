@@ -317,7 +317,9 @@ export default function PreSiteDistributionPanel({
   const seedCc = suggestedCc.join(', ');
   const seed = `${seedTo}|${seedCc}`;
   const [seenSeed, setSeenSeed] = useState(null);
-  const lastAutoSeedRef = useRef({ to: '', cc: '' });
+  // Explicit per-field ownership: true only after this component wrote its
+  // own seed into the field; cleared by every staff edit of that field.
+  const autoOwnedRef = useRef({ to: false, cc: false });
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   // Plan §3.4b step 3: a dedicated confirmation state for the prepare-time
@@ -336,14 +338,17 @@ export default function PreSiteDistributionPanel({
   };
   if (seenSeed !== seed) {
     setSeenSeed(seed);
-    // A field is replaceable when it is blank or still holds the component's
-    // own previous automatic seed; a staff-edited value is preserved. When the
+    // A field is replaceable when it is blank or auto-owned (the component
+    // wrote its own seed there and staff have not edited it since). When the
     // seed changes the form, the prepared preview and its confirmation are
     // invalidated so a confirmed preview can never go to an obsolete set.
-    const previous = lastAutoSeedRef.current;
-    const nextTo = !form.to.trim() || form.to === previous.to ? seedTo : form.to;
-    const nextCc = !form.cc.trim() || form.cc === previous.cc ? seedCc : form.cc;
-    lastAutoSeedRef.current = { to: seedTo, cc: seedCc };
+    const owned = autoOwnedRef.current;
+    const replaceTo = !form.to.trim() || owned.to;
+    const replaceCc = !form.cc.trim() || owned.cc;
+    const nextTo = replaceTo ? seedTo : form.to;
+    const nextCc = replaceCc ? seedCc : form.cc;
+    if (replaceTo && seedTo) owned.to = true;
+    if (replaceCc && seedCc) owned.cc = true;
     if (nextTo !== form.to || nextCc !== form.cc) applyFormPatch({ to: nextTo, cc: nextCc });
   }
   const [history, setHistory] = useState([]);
@@ -434,6 +439,8 @@ export default function PreSiteDistributionPanel({
 
   const edit = (patch) => {
     composerTouchedRef.current = true;
+    if ('to' in patch) autoOwnedRef.current.to = false;
+    if ('cc' in patch) autoOwnedRef.current.cc = false;
     applyFormPatch(patch);
     setError(null);
     setSendFeedback(null);

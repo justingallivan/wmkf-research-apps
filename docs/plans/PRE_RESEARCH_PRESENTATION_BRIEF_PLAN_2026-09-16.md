@@ -588,6 +588,20 @@ Findings 3 and 4 of round 1 confirmed closed. Three new findings, all fixed in t
    now takes the same cleanup path as `claim_lost` (delete, else record cleanup with reason
    `<code>_delete_failed`). Test asserts the delete with the uploaded drive/item ids.
 
+### Codex adversarial review — follow-ups round 3 (2026-09-16, gpt-5.6-sol, commit `b55157f3`)
+
+Pre-Site cleanup fix confirmed sound. Two findings, both fixed in the next commit:
+
+1. **[high] Deterministic-path delete could remove a reclaiming winner's file.** Fixed: after an
+   activation refusal the brief service re-reads its row and deletes the upload only while its own
+   claim token still owns a GENERATING row; on `claim_lost` it never deletes (the next owner's
+   upload replaces the file at the same path). The earlier item-id heuristic is removed; the
+   claim-lost test now asserts no delete.
+2. **[medium] Seed ownership inferred from value equality.** Fixed: explicit per-field
+   auto-ownership set only when the component writes its seed and cleared by every staff edit of
+   that field. Tests: A → staff B → seed B → seed C keeps B; a staff edit equal to the previous
+   seed survives the next seed.
+
 ## 8. Follow-ups (not required for this pass)
 
 - **Pre-RP replay closed; Pre-Site parity ported (Session 516 follow-ups, 2026-09-16).**
