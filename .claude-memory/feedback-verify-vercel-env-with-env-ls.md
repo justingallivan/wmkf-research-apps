@@ -7,6 +7,14 @@ metadata:
   scope: dev-environment
   last_verified: S508, 2026-09-12
 ---
+
+## Recall Rule
+Read before repeating a claim that a Vercel env var is set, and before trusting a preflight or rollout gate that reads `process.env`.
+
+Do: run `vercel env ls <environment> | grep <NAME>` (read-only).
+Do not: cite a handoff, a shell export, or a `process.env` preflight as platform evidence.
+Ground truth: `vercel env ls`; the env contract in `docs/CREDENTIALS_RUNBOOK.md`. Sensitive values stay unreadable: [[reference-vercel-sensitive-env-unreadable]].
+
 On 2026-09-12 the Cycle Dossier page showed "The dossier pilot request cohort is not
 configured" because `CYCLE_DOSSIER_REQUEST_ALLOWLIST` had never been saved in Vercel in any
 environment, although the S507 handoff listed it among five vars "set in Production" and the

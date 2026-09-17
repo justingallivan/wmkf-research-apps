@@ -8,6 +8,13 @@ metadata:
   last_verified: 2026-08-28 (S467) — Request 1002379 cleanup
 ---
 
+## Recall Rule
+Read before proposing or scoping cleanup of production smoke residue on a real Request.
+
+Do: inventory read-only across every surface first; prioritise structured rows and pointers; present a line-by-line list for confirmation.
+Do not: request delete privileges the runtime lacks; chase unrelated email or activity records, or files in clearly-new folders.
+Ground truth: `docs/audits/request-1002379-test-mutation-inventory-2026-08-28.md`; Atlas page `docs/atlas/dataverse-wmkf-requestdocument.md`.
+
 When production Requests are used as smoke vehicles (1002379 in Aug 2026),
 the owner's cleanup goal is **future data mining**: structured state the app
 writes (`wmkf_requestdocument` rows, request pointers, Postgres distribution

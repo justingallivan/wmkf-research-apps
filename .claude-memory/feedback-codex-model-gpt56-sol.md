@@ -9,9 +9,16 @@ metadata:
   modified: 2026-09-08T15:42:51.670Z
 ---
 
+## Recall Rule
+Read before composing any Codex companion invocation (`adversarial-review`, `review`, `task`) or writing a brief that names a Codex model.
+
+Do: pass `--model gpt-5.6-sol`; run from the branch worktree (`-C`/`--cwd <worktree> --base origin/main`).
+Do not: substitute another catalog model when Sol is refused (stop and show the catalog); edit `~/.codex/config.toml`.
+Ground truth: `~/.codex/models_cache.json` (catalog), `~/.codex/config.toml` (default), `codex doctor` (auth mode). Not covered: Claude-side model choice.
+
 Owner directive (2026-09-08, Session 496): pass `--model gpt-5.6-sol` on every
 Codex companion invocation (`adversarial-review`, `review`, `task`). Do **not**
-use `gpt-6-astra`, even though `~/.codex/config.toml` pins it as the default;
+use `gpt-6-astra`. At the time `~/.codex/config.toml` pinned it as the default (as of 2026-09-17 the file pins `gpt-5.6-sol`, so the flag is belt-and-braces, still pass it);
 the owner said "I don't want you to use that model."
 
 **Why:** the account is ChatGPT-token auth (`codex doctor`: stored auth mode

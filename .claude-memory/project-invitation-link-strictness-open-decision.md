@@ -6,6 +6,13 @@ metadata:
   type: project
 ---
 
+## Recall Rule
+Read when the reviewer cycle closes, and before editing `lib/utils/invitation-link-validator.js` or its tests.
+
+Do: surface the `docs/CURRENT_WORK_QUEUE.md` entry "Post-reviewer-cycle: decide invitation-link strictness deliberately" and get an owner decision.
+Do not: tighten or ratify the duplicate-link and trailing-punctuation tolerance silently.
+Ground truth: `lib/utils/invitation-link-validator.js`, `tests/unit/invitation-link-validator.test.js`, `tests/unit/send-emails-service.test.js`.
+
 The unified invitation-link validator (`lib/utils/invitation-link-validator.js`,
 branch `feature/reviewer-invite-vip`, commit `ff156f3d`, 2026-08-26) tolerates
 two legacy inputs on purpose: repeated IDENTICAL reviewer-JWT links (dedupe →

@@ -9,6 +9,13 @@ metadata:
   modified: 2026-09-09T13:03:57.052Z
 ---
 
+## Recall Rule
+Read before committing `SESSION_PROMPT.md`, `DEVELOPMENT_LOG.md`, `docs/CURRENT_WORK_QUEUE.md`, or any `.claude-memory/*.md` file.
+
+Do: run `check:harness-framing` together with `check:doc-symbol-refs`, `check:build-claim-freshness`, `check:docs-catalog`, and `check:memory-router` first.
+Do not: chain the commit after a gate loop that printed a failure.
+Ground truth: `.github/workflows/test.yml` (runs the gate on every push), `scripts/check-harness-framing.js` (the matched wording).
+
 `npm run check:harness-framing` scans `SESSION_PROMPT.md` and other active harness text, and it runs inside the `Tests` workflow on every push to `main`. It matches words, not intent: a technical adjective in a handoff sentence is rejected the same way as self-directed wording, and the whole `main` run turns red (first seen 2026-09-09 on a sentence about an on-demand mount).
 
 **Why:** a red `main` run right after a production merge looks like a broken deploy until someone opens the log, and the fix commit then has to chase the merge.

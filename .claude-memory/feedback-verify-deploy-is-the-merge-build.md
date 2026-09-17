@@ -6,6 +6,13 @@ metadata:
 status: active
 ---
 
+## Recall Rule
+Read after any push or merge to `main`, before telling the owner something is live or launching a cron or run that must execute the new code.
+
+Do: `vercel ls`, take the newest `target production` deployment, confirm its `created` time is after the merge commit and its status is Ready.
+Do not: treat `vercel inspect <alias>` reporting Ready as proof the merge deployed.
+Ground truth: `vercel ls`; the GitHub deployments API for the merge commit.
+
 `vercel inspect <production alias>` answers "is the alias Ready", not "is the merge deployed".
 In S510 the alias reported Ready one minute after a merge, but that was the previous deployment;
 the new build finished later, and a cron tick in between ran the old report template on a

@@ -6,6 +6,13 @@ metadata:
   type: feedback
 ---
 
+## Recall Rule
+Read when recommending "accept and record" for an adversarial-review finding in a chain where a sibling finding of the same class was already fixed.
+
+Do: check whether the same argument was rejected for a sibling finding; set the chain's stopping boundary up front.
+Do not: cite "the user previewed it" or rarity as the reason to accept.
+Ground truth: the finding-disposition table in the owning plan for that chain. This is a reasoning rule, not a state claim.
+
 Session 487 (2026-09-05): after fixing stale signature/deadline in the materials-modal
 session key, I recommended recording the stale-recipient-name finding as an accepted
 limit ("the PD previewed the body", "needs a concurrent Dataverse edit"). The owner

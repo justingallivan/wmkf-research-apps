@@ -6,6 +6,13 @@ metadata:
   status: active
 ---
 
+## Recall Rule
+Read when planning reviewer dashboard counts, the release-materials modal smoke, or the materials-on-acceptance automation.
+
+Do: treat `reviewStatus === 'accepted'` without materials as transient by design; plan the automated send before the J27 invitations go out in 2027.
+Do not: propose an "awaiting materials" sub-count or a Preview seeding exercise for the manual modal.
+Ground truth: manual path is `shared/components/reviewers/ReleaseMaterialsModal.js` plus the send-emails `materials` template; no automated send existed as of S490. Hub: `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
+
 On 2026-09-05 (Session 489) the owner said that from the next cycle onward the
 proposal materials will be in hand when reviewers accept, so materials are sent
 immediately on acceptance. The `reviewStatus === 'accepted'` (no materials yet)

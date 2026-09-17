@@ -5,7 +5,7 @@ type: feedback
 originSessionId: 0e402398-f829-45ec-a781-e624832c86e6
 status: active
 scope: docs
-last_verified: 2026-07-27 via CLAUDE.md and .claude/skills/start/SKILL.md
+last_verified: 2026-09-17 via CLAUDE.md Universal Operating Rule 4 and .claude/skills/start/SKILL.md Step 2
 ---
 
 ## Recall Rule
@@ -20,7 +20,7 @@ Do not:
 - Ask "did I cause this?" — ask "is the rubric being violated?"; "pre-existing"/"out of scope"/"side-note" are not valid reasons to proceed.
 - Reach for `ALLOWED_UNDOCUMENTED_*` without written justification (last resort, not default).
 
-Ground truth: CLAUDE.md "Ground-truth requirement" / "Red gates are P0 blockers"; `docs/CLAUDE_REMEDIATION_PLAN.md`; `/start` skill Step 2.
+Ground truth: `CLAUDE.md` Universal Operating Rule 4 ("Relevant red gates block completion"); `docs/CI_GATES_REFERENCE.md`; `.claude/skills/start/SKILL.md` Step 2. (The older "Ground-truth requirement" heading no longer exists in `CLAUDE.md`; re-pointed 2026-09-17.)
 
 [VERIFIED via the current `CLAUDE.md` Universal Operating Rules and
 `.claude/skills/start/SKILL.md` Step 2.] The old entity incident below is

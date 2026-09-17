@@ -8,6 +8,13 @@ metadata:
   last_verified: 2026-09-07 (S493) — first durable revision executor.budgets.v000001 published in Production
 ---
 
+## Recall Rule
+Read before adding or changing an operational tunable (LLM output budget, timeout, batch bound, retry count) as a literal in tracked code or `shared/config/*`.
+
+Do: persist it as an admin-editable durable setting (`executor.budgets.vNNNNNN` through `lib/services/executor-budget-service.js`, or the owning Dataverse row); keep only bounds and a seed default in code.
+Do not: land a staff-tunable literal; treat reviewed external snapshots (the model registry) as tunables.
+Ground truth: `lib/services/executor-budget-service.js`, `pages/api/admin/executor-budgets.js`, `shared/config/executorBudgets.js`.
+
 Owner directive, S467 (2026-08-28), on seeing the pre-site writeup's
 `maxTokensOverride: 32 768` / `timeoutMsOverride: 240 000` surfaced from
 `shared/config/executorBudgets.js`: "we can't be setting mutable parameters in

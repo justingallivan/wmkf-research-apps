@@ -9,6 +9,13 @@ metadata:
   modified: 2026-08-26T20:21:07.017Z
 ---
 
+## Recall Rule
+Read when the Stop hook keeps flagging a doc after you added a `[RECHECKED after … change:` or `[STALE-ACCEPTED:` marker.
+
+Do: put the full changed path and the marker on one line; verify with the `hasStalenessAck` one-liner below.
+Do not: let the marker wrap across lines.
+Ground truth: `.claude/hooks/lib/document-guards.js` `hasStalenessAck`.
+
 `.claude/hooks/lib/document-guards.js` `hasStalenessAck` matches per-line: a
 line must contain BOTH the full relative changed path AND
 `[RECHECKED after ... change:` (or `[STALE-ACCEPTED:`). A marker wrapped

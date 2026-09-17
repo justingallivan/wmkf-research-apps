@@ -8,6 +8,13 @@ metadata:
   last_verified: S498 via vercel logs --status-code/--level/--query pulls, 2026-09-08
 ---
 
+## Recall Rule
+Read when locating a specific production request or error in Vercel runtime logs.
+
+Do: filter server-side with `--query`, `--status-code`, `--level`, and `--since`, with `--json`; check `lsof -nP -iTCP:3000 -sTCP:LISTEN` before assuming a "production" failure reached Vercel.
+Do not: pull an unfiltered `--limit 5000` window.
+Ground truth: `vercel logs --help` (CLI 59.x); the local-run interlock in `lib/dataverse/core/interlock.js` and `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`.
+
 `vercel logs` (CLI 59.x) accepts server-side filters: `--query "<text>"` (matches
 path and message), `--status-code 500` (or `4xx`), `--level error`, `--since`/`--until`,
 and `--json`. Use them; an unfiltered `--limit 5000` pull is swamped by
