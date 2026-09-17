@@ -1147,3 +1147,121 @@ describe('buildBriefingContext: reviewBundle projection (plan §11, Step C2)', (
     expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, none)).reviewBundle).toBeNull();
   });
 });
+
+describe('writeup-docx verifies the governed content hash from the snapshot registry row (plan §12 Finding A)', () => {
+  const SNAPSHOT_ID = '77777777-7777-4777-8777-777777777777';
+  const SOURCE_DOCUMENT_ID = '88888888-8888-4888-8888-888888888888';
+  const GOVERNED = 'gdc1:governed-content-hash';
+  // Bytes SharePoint serves after its post-upload rewrite: NOT the pinned
+  // docx_byte_hash, so the legacy byte comparison would refuse them.
+  const SERVED = Buffer.from('docx+customXml+docProps-repacked');
+  const snapshotRow = (overrides = {}) => ({
+    wmkf_requestdocumentid: SNAPSHOT_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_producer: 'request-workbench-distribution-docx',
+    wmkf_operationstatus: 100000001, // READY
+    wmkf_lifecyclestate: 100000002, // BOARD_READY
+    wmkf_sharepointdriveid: 'd',
+    wmkf_sharepointitemid: 'i',
+    wmkf_contenthash: GOVERNED,
+    _wmkf_sourcedocument_value: SOURCE_DOCUMENT_ID,
+    ...overrides,
+  });
+  const pinned = (overrides = {}) => deps({
+    getLatestAttempt: jest.fn(async () => sentAttempt({
+      docx_snapshot_document_id: SNAPSHOT_ID,
+      source_document_id: SOURCE_DOCUMENT_ID,
+      source_content_hash: GOVERNED,
+    })),
+    downloadFile: jest.fn(async () => ({ buffer: SERVED, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'x.docx', size: SERVED.length })),
+    findDocumentById: jest.fn(async () => ({ records: [snapshotRow()] })),
+    hashDocx: jest.fn(async () => GOVERNED),
+    ...overrides,
+  });
+  const refuse = (d) => expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, d))
+    .rejects.toMatchObject({ httpStatus: 409, body: { ok: false, reason: 'snapshot_mismatch' } });
+
+  test('serves a rewritten package whose governed content matches the registry row, ignoring the stale byte hash', async () => {
+    const d = pinned();
+    const docx = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, d);
+    expect(docx).toMatchObject({ filename: 'PreSite_1002379.docx', inline: false, size: SERVED.length });
+    expect(d.findDocumentById).toHaveBeenCalledWith(SNAPSHOT_ID);
+    expect(d.hashDocx).toHaveBeenCalledWith(SERVED);
+  });
+
+  test('refuses when the governed content differs from the registry row', async () => {
+    await refuse(pinned({ hashDocx: jest.fn(async () => 'gdc1:someone-edited-it') }));
+  });
+
+  test('refuses when the registry and served file agree on hash B but the sent attempt is pinned to hash A', async () => {
+    const d = pinned({
+      getLatestAttempt: jest.fn(async () => sentAttempt({
+        docx_snapshot_document_id: SNAPSHOT_ID,
+        source_document_id: SOURCE_DOCUMENT_ID,
+        source_content_hash: 'gdc1:pinned-hash-a',
+      })),
+      findDocumentById: jest.fn(async () => ({
+        records: [snapshotRow({ wmkf_contenthash: 'gdc1:registry-and-file-hash-b' })],
+      })),
+      hashDocx: jest.fn(async () => 'gdc1:registry-and-file-hash-b'),
+    });
+    await refuse(d);
+    expect(d.downloadFile).not.toHaveBeenCalled();
+    expect(d.hashDocx).not.toHaveBeenCalled();
+  });
+
+  test('refuses a snapshot whose source document differs from the sent ledger before any Graph read', async () => {
+    const d = pinned({
+      findDocumentById: jest.fn(async () => ({
+        records: [snapshotRow({
+          _wmkf_sourcedocument_value: '99999999-9999-4999-8999-999999999999',
+        })],
+      })),
+    });
+    await refuse(d);
+    expect(d.downloadFile).not.toHaveBeenCalled();
+    expect(d.hashDocx).not.toHaveBeenCalled();
+  });
+
+  test('refuses an unparseable package as a mismatch, not a server error', async () => {
+    await refuse(pinned({ hashDocx: jest.fn(async () => { throw new Error('not a zip'); }) }));
+  });
+
+  test('refuses, before any Graph read, a registry row that is missing, not Ready, superseded, another request\'s, another producer\'s, another drive/item, or has no content hash', async () => {
+    const rows = [
+      [],
+      [snapshotRow({ wmkf_operationstatus: 100000000 })],
+      [snapshotRow({ wmkf_lifecyclestate: 100000003 })],
+      [snapshotRow({ _wmkf_request_value: '99999999-9999-4999-8999-999999999999' })],
+      [snapshotRow({ wmkf_producer: 'request-workbench' })],
+      [snapshotRow({ wmkf_producer: 'request-workbench-distribution-pdf' })],
+      [snapshotRow({ wmkf_sharepointdriveid: 'other-drive' })],
+      [snapshotRow({ wmkf_sharepointitemid: 'other-item' })],
+      [snapshotRow({ wmkf_contenthash: null })],
+      [snapshotRow(), snapshotRow()],
+    ];
+    for (const records of rows) {
+      const d = pinned({ findDocumentById: jest.fn(async () => ({ records })) });
+      await refuse(d);
+      expect(d.downloadFile).not.toHaveBeenCalled();
+      expect(d.hashDocx).not.toHaveBeenCalled();
+    }
+  });
+
+  test('serves only when the row is the docx distribution snapshot bound to the pinned drive/item', async () => {
+    const d = pinned();
+    await resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, d);
+    expect(d.downloadFile).toHaveBeenCalledWith('d', 'i');
+  });
+
+  test('an attempt with no registry pointer keeps the byte-hash identity (legacy rows)', async () => {
+    const legacy = deps({
+      getLatestAttempt: jest.fn(async () => sentAttempt()),
+      downloadFile: jest.fn(async () => ({ buffer: SERVED, mimeType: 'application/octet-stream', filename: 'x.docx', size: SERVED.length })),
+      hashDocx: jest.fn(async () => GOVERNED),
+    });
+    await refuse(legacy);
+    expect(legacy.findDocumentById).not.toHaveBeenCalled();
+    expect(legacy.hashDocx).not.toHaveBeenCalled();
+  });
+});

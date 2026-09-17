@@ -523,6 +523,15 @@ function createPrepareHarness({
       return attempt;
     }),
     recordSource: jest.fn(async (_operationId, captured) => {
+      const identityFields = [
+        ['source_drive_id', captured.driveId],
+        ['source_item_id', captured.itemId],
+        ['source_version_id', captured.versionId],
+        ['source_content_hash', captured.contentHash],
+      ];
+      const isFirstCapture = identityFields.every(([field]) => attempt[field] == null);
+      const isSameCapture = identityFields.every(([field, value]) => attempt[field] === value);
+      if (attempt.state !== 'preparing' || (!isFirstCapture && !isSameCapture)) return null;
       attempt = {
         ...attempt,
         source_drive_id: captured.driveId,
@@ -623,6 +632,16 @@ function createPrepareHarness({
     downloadFileAsPdf: jest.fn(async () => pdfBytes),
     hashDocx: jest.fn(async () => sourceHash),
     recordPrepared: jest.fn(async (_operationId, prepared) => {
+      // Real store semantics: the finalizing UPDATE fences on the captured
+      // source identity (drive/item/version/content hash/byte hash).
+      const fenced = [
+        ['source_drive_id', prepared.source?.driveId],
+        ['source_item_id', prepared.source?.itemId],
+        ['source_version_id', prepared.source?.versionId],
+        ['source_content_hash', prepared.source?.contentHash],
+        ['source_byte_hash', prepared.source?.byteHash],
+      ];
+      if (attempt.state !== 'preparing' || fenced.some(([field, value]) => !value || attempt[field] !== value)) return null;
       attempt = {
         ...attempt,
         state: 'prepared',
@@ -1657,6 +1676,9 @@ test('send accepts an unchanged linked material after PostgreSQL JSONB reorders 
   // Match fixture hashes to the exact downloaded buffers.
   const crypto = await import('node:crypto');
   row.docx_byte_hash = crypto.createHash('sha256').update('word-bytes').digest('hex');
+  // A frozen Word attachment is identified by its governed content hash (plan §12 Finding A).
+  row.source_content_hash = 'gdc1:word-bytes';
+  dependencies.hashDocx = jest.fn(async () => 'gdc1:word-bytes');
   row.pdf_byte_hash = crypto.createHash('sha256').update('pdf-bytes').digest('hex');
 
   const result = await sendPreSiteDistribution({
@@ -2459,6 +2481,9 @@ test('send renders the live link into the activity body only at creation, and a 
   };
   const crypto = await import('node:crypto');
   row.docx_byte_hash = crypto.createHash('sha256').update('word-bytes').digest('hex');
+  // A frozen Word attachment is identified by its governed content hash (plan §12 Finding A).
+  row.source_content_hash = 'gdc1:word-bytes';
+  dependencies.hashDocx = jest.fn(async () => 'gdc1:word-bytes');
 
   await expect(sendPreSiteDistribution({
     requestId: REQUEST_ID,
@@ -2749,5 +2774,356 @@ describe('producer-to-prepare contract: the real roster projection through prepa
 
     await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
       .rejects.toMatchObject({ code: 'review_bundle_incomplete', httpStatus: 409 });
+  });
+});
+
+describe('retained Word snapshot identity is the governed content hash (plan §12 Finding A)', () => {
+  const sha256 = (buffer) => require('node:crypto').createHash('sha256').update(buffer).digest('hex');
+  const REWRITTEN = Buffer.from('governed-word-bytes+customXml+docProps-repacked-by-sharepoint');
+
+  // SharePoint's post-upload rewrite: the snapshot item now serves different
+  // bytes with a new version/eTag/size, but every `word/` part is intact.
+  function rewriteWordSnapshot(harness, { governedHash }) {
+    const { dependencies } = harness;
+    const download = dependencies.downloadFile;
+    const metadata = dependencies.getFileMetadataById;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      itemId === 'word-snapshot'
+        ? { buffer: REWRITTEN, filename: 'snapshot.docx' }
+        : download(driveId, itemId)
+    ));
+    dependencies.getFileMetadataById = jest.fn(async (driveId, itemId, options) => {
+      const base = await metadata(driveId, itemId, options);
+      return itemId === 'word-snapshot'
+        ? { ...base, versionId: '2.0', eTag: 'word-etag-rewritten', size: REWRITTEN.length }
+        : base;
+    });
+    dependencies.hashDocx = jest.fn(async (buffer) => (
+      buffer.equals(REWRITTEN) ? governedHash(buffer) : 'gdc1:source-hash'
+    ));
+  }
+
+  test('a rewritten snapshot package whose governed content still matches is reusable and projects the served bytes', async () => {
+    const harness = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), harness.dependencies);
+    rewriteWordSnapshot(harness, { governedHash: () => 'gdc1:source-hash' });
+
+    const result = await preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), harness.dependencies);
+
+    expect(result.attempt.attachments).toEqual([]);
+    const projected = harness.dependencies.recordPrepared.mock.calls[1][1].docx;
+    expect(projected).toMatchObject({ versionId: '2.0', byteHash: sha256(REWRITTEN), size: REWRITTEN.length });
+    expect(harness.snapshots[0]).toMatchObject({
+      wmkf_sharepointversionid: '2.0',
+      wmkf_sharepointetag: 'word-etag-rewritten',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    });
+  });
+
+  test('a rewritten snapshot package whose governed content differs is refused (distribution_word_snapshot_hash_mismatch)', async () => {
+    const harness = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), harness.dependencies);
+    rewriteWordSnapshot(harness, { governedHash: () => 'gdc1:someone-edited-word-document-xml' });
+
+    await expect(preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), harness.dependencies)).rejects.toMatchObject({ code: 'distribution_word_snapshot_hash_mismatch', httpStatus: 409 });
+    expect(harness.dependencies.recordPrepared).toHaveBeenCalledTimes(1);
+  });
+
+  test('an unparseable retained snapshot package is a mismatch, not a server error', async () => {
+    const harness = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), harness.dependencies);
+    rewriteWordSnapshot(harness, { governedHash: () => { throw new Error('not a zip'); } });
+
+    await expect(preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), harness.dependencies)).rejects.toMatchObject({ code: 'distribution_word_snapshot_hash_mismatch', httpStatus: 409 });
+  });
+});
+
+describe('send identifies a frozen Word attachment by its governed content hash (plan §12 Finding A)', () => {
+  const sha256 = (value) => require('node:crypto').createHash('sha256').update(value).digest('hex');
+  const UPLOADED = Buffer.from('word-bytes-as-uploaded');
+  const SERVED = Buffer.from('word-bytes+customXml+docProps-repacked-by-sharepoint');
+
+  function docxSend({ hashDocx, found = [] }) {
+    let row = attemptFixture({
+      attachment_mode: 'docx',
+      dynamics_email_id: '88888888-8888-4888-8888-888888888888',
+      state: 'activity_created',
+      docx_byte_hash: sha256(UPLOADED),
+      docx_size: UPLOADED.length,
+      source_content_hash: 'gdc1:word-bytes',
+    });
+    const dependencies = {
+      ...currentSourceDependencies(row),
+      getAttempt: jest.fn(async () => row),
+      claimSend: jest.fn(async () => {
+        row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' };
+        return row;
+      }),
+      getEmailActivity: jest.fn()
+        .mockImplementationOnce(async () => emailFixture(row))
+        .mockResolvedValueOnce({ activityid: row.dynamics_email_id, subject: row.subject, statuscode: 6 }),
+      recordEmailActivity: jest.fn(async (attempt) => attempt),
+      findEmailAttachments: jest.fn(async () => found),
+      getEmailAttachmentContent: jest.fn(async () => ({
+        activitymimeattachmentid: 'attachment-1',
+        filename: row.docx_filename,
+        mimetype: row.docx_content_type,
+        filesize: SERVED.length,
+        body: SERVED.toString('base64'),
+      })),
+      downloadFile: jest.fn(async () => ({ buffer: SERVED })),
+      hashDocx: jest.fn(hashDocx),
+      addEmailAttachment: jest.fn(async () => {}),
+      recordAttachment: jest.fn(async (attempt) => {
+        row = { ...attempt, docx_attached_at: new Date(), state: 'attachments_added' };
+        return row;
+      }),
+      recordSendRequested: jest.fn(async (attempt) => { row = { ...attempt, state: 'send_requested', send_requested_at: new Date() }; return row; }),
+      renewSendLease: jest.fn(async (attempt) => attempt),
+      sendEmail: jest.fn(async () => {}),
+      recordSent: jest.fn(async (attempt, status) => {
+        row = { ...attempt, ...status, state: 'sent', sent_at: new Date(), lease_token: null };
+        return row;
+      }),
+      recordFailure: jest.fn(async () => row),
+    };
+    const send = () => sendPreSiteDistribution({
+      requestId: REQUEST_ID,
+      operationId: OPERATION_ID,
+      previewHash: 'a'.repeat(64),
+      fromEmail: 'sender@example.org',
+      actingUserSystemId: ACTOR_ID,
+    }, dependencies);
+    return { send, dependencies };
+  }
+
+  test('attaches a SharePoint-rewritten Word snapshot whose governed content matches, even though its bytes no longer hash to docx_byte_hash', async () => {
+    const { send, dependencies } = docxSend({ hashDocx: async (buffer) => (buffer.equals(SERVED) ? 'gdc1:word-bytes' : 'gdc1:other') });
+    await send();
+    expect(dependencies.addEmailAttachment).toHaveBeenCalledTimes(1);
+    expect(dependencies.addEmailAttachment.mock.calls[0][1]).toMatchObject({ filename: 'frozen.docx' });
+    expect(dependencies.hashDocx).toHaveBeenCalledWith(SERVED);
+    expect(dependencies.recordFailure).not.toHaveBeenCalled();
+  });
+
+  test('refuses a Word snapshot whose governed content differs from the captured source (distribution_attachment_hash_mismatch)', async () => {
+    const { send, dependencies } = docxSend({ hashDocx: async () => 'gdc1:someone-edited-word-document-xml' });
+    await expect(send()).rejects.toMatchObject({ code: 'distribution_attachment_hash_mismatch' });
+    expect(dependencies.addEmailAttachment).not.toHaveBeenCalled();
+  });
+
+  test('an unparseable Word snapshot is a mismatch, not a server error', async () => {
+    const { send } = docxSend({ hashDocx: async () => { throw new Error('not a zip'); } });
+    await expect(send()).rejects.toMatchObject({ code: 'distribution_attachment_hash_mismatch', httpStatus: 409 });
+  });
+
+  test('recovers an already-added Word attachment by governed content, ignoring its rewritten size and bytes', async () => {
+    const { send, dependencies } = docxSend({
+      hashDocx: async (buffer) => (buffer.equals(SERVED) ? 'gdc1:word-bytes' : 'gdc1:other'),
+      found: [{ activitymimeattachmentid: 'attachment-1' }],
+    });
+    await send();
+    expect(dependencies.addEmailAttachment).not.toHaveBeenCalled();
+    expect(dependencies.getEmailAttachmentContent).toHaveBeenCalledWith('attachment-1');
+  });
+
+  test('a recovered Word attachment with differing governed content is a recovery mismatch', async () => {
+    const { send } = docxSend({
+      hashDocx: async () => 'gdc1:not-the-source',
+      found: [{ activitymimeattachmentid: 'attachment-1' }],
+    });
+    await expect(send()).rejects.toMatchObject({ code: 'distribution_attachment_recovery_mismatch' });
+  });
+});
+
+describe('partial-failure retries survive the SharePoint rewrite (Codex adversarial review, plan §12)', () => {
+  const sha256 = (buffer) => require('node:crypto').createHash('sha256').update(buffer).digest('hex');
+  const REWRITTEN = Buffer.from('governed-word-bytes+customXml+docProps-repacked-by-sharepoint');
+
+  test('lost finalize: an uploaded-but-never-Ready Word snapshot is recovered by governed content after SharePoint rewrote it, and the served bytes are pinned', async () => {
+    const harness = createPrepareHarness();
+    const { dependencies } = harness;
+    // First prepare: upload succeeds, the Ready update never commits.
+    const update = dependencies.updateDocument;
+    dependencies.updateDocument = jest.fn(async (id, patch, options) => {
+      if (patch.wmkf_operationstatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY && patch.wmkf_contenthash) {
+        throw new Error('gateway timeout after upload');
+      }
+      return update(id, patch, options);
+    });
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
+      .rejects.toThrow('gateway timeout after upload');
+    expect(dependencies.uploadFile).toHaveBeenCalledTimes(1);
+    const uploadedName = dependencies.uploadFile.mock.calls[0][2];
+
+    // Retry: the path is occupied by the rewritten file; the registry row is not Ready.
+    dependencies.updateDocument = update;
+    const metadataByPath = dependencies.getFileMetadataByPath;
+    dependencies.getFileMetadataByPath = jest.fn(async (library, folder, filename) => (
+      filename === uploadedName
+        ? { id: 'word-snapshot', driveId: 'snapshot-drive', versionId: '2.0', eTag: 'word-etag-rewritten', size: REWRITTEN.length, name: filename }
+        : metadataByPath(library, folder, filename)
+    ));
+    const download = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      itemId === 'word-snapshot' ? { buffer: REWRITTEN, filename: uploadedName } : download(driveId, itemId)
+    ));
+    const metadataById = dependencies.getFileMetadataById;
+    dependencies.getFileMetadataById = jest.fn(async (driveId, itemId, options) => {
+      const base = await metadataById(driveId, itemId, options);
+      return itemId === 'word-snapshot'
+        ? { ...base, driveId: 'snapshot-drive', versionId: '2.0', eTag: 'word-etag-rewritten', size: REWRITTEN.length }
+        : base;
+    });
+    dependencies.hashDocx = jest.fn(async () => 'gdc1:source-hash');
+
+    const result = await preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), dependencies);
+
+    expect(result.attempt.attachments).toEqual([]);
+    // The Word snapshot was recovered, never re-uploaded (the retry still builds the PDF and bundle snapshots).
+    const wordUploads = dependencies.uploadFile.mock.calls.filter(([, , , , contentType]) => contentType === PRE_SITE_VISIT_CONTRACT.contentType);
+    expect(wordUploads).toHaveLength(1);
+    const projected = dependencies.recordPrepared.mock.calls[0][1].docx;
+    expect(projected).toMatchObject({ byteHash: sha256(REWRITTEN), size: REWRITTEN.length, versionId: '2.0' });
+    expect(harness.snapshots[0]).toMatchObject({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY });
+  });
+
+  test('lost finalize: a different governed document at the snapshot path is still a path conflict', async () => {
+    const harness = createPrepareHarness();
+    const { dependencies } = harness;
+    const update = dependencies.updateDocument;
+    dependencies.updateDocument = jest.fn(async (id, patch, options) => {
+      if (patch.wmkf_operationstatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY && patch.wmkf_contenthash) {
+        throw new Error('gateway timeout after upload');
+      }
+      return update(id, patch, options);
+    });
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies)).rejects.toThrow();
+    const uploadedName = dependencies.uploadFile.mock.calls[0][2];
+    dependencies.updateDocument = update;
+    const metadataByPath = dependencies.getFileMetadataByPath;
+    dependencies.getFileMetadataByPath = jest.fn(async (library, folder, filename) => (
+      filename === uploadedName
+        ? { id: 'word-snapshot', driveId: 'snapshot-drive', versionId: '2.0', eTag: 'e', size: REWRITTEN.length, name: filename }
+        : metadataByPath(library, folder, filename)
+    ));
+    const download = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      itemId === 'word-snapshot' ? { buffer: REWRITTEN, filename: uploadedName } : download(driveId, itemId)
+    ));
+    dependencies.hashDocx = jest.fn(async (buffer) => (buffer.equals(REWRITTEN) ? 'gdc1:someone-elses-document' : 'gdc1:source-hash'));
+
+    await expect(preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), dependencies)).rejects.toMatchObject({ code: 'distribution_snapshot_path_conflict' });
+  });
+
+  test('same-operation retry: a source whose package SharePoint rewrote after the first capture still re-captures by version and governed content', async () => {
+    const harness = createPrepareHarness({ dedupeAttempts: true });
+    const { dependencies } = harness;
+    // First prepare fails after the source was recorded but before the snapshot was prepared.
+    const recordPrepared = dependencies.recordPrepared;
+    dependencies.recordPrepared = jest.fn(async () => { throw new Error('ledger unavailable'); });
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
+      .rejects.toThrow('ledger unavailable');
+    expect(dependencies.recordSource).toHaveBeenCalledTimes(1);
+    const firstCapture = dependencies.recordSource.mock.calls[0][1];
+
+    // The working document's bytes were rewritten in place (same version).
+    dependencies.recordPrepared = recordPrepared;
+    const download = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      driveId === 'source-drive' && itemId === 'source-item'
+        ? { buffer: REWRITTEN, filename: 'source.docx' }
+        : download(driveId, itemId)
+    ));
+    const metadataById = dependencies.getFileMetadataById;
+    dependencies.getFileMetadataById = jest.fn(async (driveId, itemId, options) => {
+      const base = await metadataById(driveId, itemId, options);
+      // Both the rewritten source and the snapshot copied from it now carry the rewritten length.
+      return (driveId === 'source-drive' && itemId === 'source-item') || itemId === 'word-snapshot'
+        ? { ...base, size: REWRITTEN.length }
+        : base;
+    });
+    dependencies.hashDocx = jest.fn(async () => 'gdc1:source-hash');
+
+    const result = await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies);
+    expect(result.attempt.attachments).toEqual([]);
+    const secondCapture = dependencies.recordSource.mock.calls[1][1];
+    expect(secondCapture.contentHash).toBe(firstCapture.contentHash);
+    expect(secondCapture.byteHash).toBe(sha256(REWRITTEN));
+    expect(secondCapture.byteHash).not.toBe(firstCapture.byteHash);
+  });
+
+  test('same-operation retry: a source whose governed content changed is refused (distribution_source_hash_mismatch)', async () => {
+    const harness = createPrepareHarness({ dedupeAttempts: true });
+    const { dependencies } = harness;
+    dependencies.recordPrepared = jest.fn(async () => { throw new Error('ledger unavailable'); });
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies)).rejects.toThrow();
+    dependencies.hashDocx = jest.fn(async () => 'gdc1:edited-after-capture');
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
+      .rejects.toMatchObject({ code: 'distribution_source_hash_mismatch' });
+  });
+});
+
+describe('two prepares racing on one operation cannot finalize an inconsistent ledger (Codex adversarial review round 3)', () => {
+  const sha256 = (buffer) => require('node:crypto').createHash('sha256').update(buffer).digest('hex');
+  const REWRITTEN = Buffer.from('governed-word-bytes+customXml+docProps-repacked-by-sharepoint');
+
+  test('the first finalizer fails closed when a second capture re-pinned the source bytes underneath it; the retry finalizes self-consistently', async () => {
+    const harness = createPrepareHarness({ dedupeAttempts: true });
+    const { dependencies } = harness;
+    dependencies.hashDocx = jest.fn(async () => 'gdc1:source-hash');
+
+    // Interleave: right after prepare A records its capture (bytes A), the
+    // racing prepare B's capture of the rewritten package (bytes B, same
+    // governed hash) lands on the same row.
+    const recordSource = dependencies.recordSource;
+    let interleaved = false;
+    dependencies.recordSource = jest.fn(async (operationId, captured) => {
+      const row = await recordSource(operationId, captured);
+      if (!interleaved) {
+        interleaved = true;
+        await recordSource(operationId, { ...captured, byteHash: sha256(REWRITTEN) });
+      }
+      return row;
+    });
+
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
+      .rejects.toMatchObject({ code: 'distribution_preview_persist_failed' });
+    expect(dependencies.recordPrepared).toHaveBeenCalledTimes(1);
+    expect(dependencies.recordPrepared.mock.calls[0][1].source.byteHash).not.toBe(sha256(REWRITTEN));
+
+    // Retry on the same operation now serves the rewritten bytes end to end.
+    dependencies.recordSource = recordSource;
+    const download = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      driveId === 'source-drive' && itemId === 'source-item'
+        ? { buffer: REWRITTEN, filename: 'source.docx' }
+        : download(driveId, itemId)
+    ));
+    const metadataById = dependencies.getFileMetadataById;
+    dependencies.getFileMetadataById = jest.fn(async (driveId, itemId, options) => {
+      const base = await metadataById(driveId, itemId, options);
+      return (driveId === 'source-drive' && itemId === 'source-item') || itemId === 'word-snapshot'
+        ? { ...base, size: REWRITTEN.length }
+        : base;
+    });
+    const result = await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies);
+    expect(result.attempt.attachments).toEqual([]);
+    expect(dependencies.recordPrepared.mock.calls[1][1].source.byteHash).toBe(sha256(REWRITTEN));
   });
 });

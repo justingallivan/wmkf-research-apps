@@ -1266,9 +1266,92 @@ abstract edit and authorized the send and the download.
   carries the promoted parts, or re-reading the snapshot after upload before pinning its
   hash, are narrower alternatives.
 - **Age.** The check dates from `8a240e77` (original frozen distribution).
-- **Disposition.** Not fixed this session. Needs a branch with Codex review. Any real
-  request shared since PR #307 shipped may have a dead Staff Brief link on its briefing
-  page; verify before the next deliberation.
+- **Disposition — fixed on `claude/pre-rp-brief-snapshot-hash` (2026-09-17, S517).**
+  `validateReadySnapshot` compares a retained Word snapshot by its governed content hash
+  only (`hashGovernedDocxContent`: every `word/` part, relationships canonicalised) and
+  treats an unparseable package as a mismatch; the byte hash is still computed for the
+  projection (`docx_byte_hash`, now the served bytes) but no longer gates reuse. The
+  briefing `writeup-docx` member reads the retained snapshot's registry row
+  (`docx_snapshot_document_id` → `wmkf_contenthash`, the same producer's value written at
+  upload), requires it Ready and bound to the request, and compares the served bytes'
+  governed hash; attempts with no registry pointer keep the byte-hash identity. No schema
+  change: existing raw-output shares (including ZZTEST-03's) serve again as soon as the
+  fix deploys. **Sibling swept in the same pass:** the send path's `ensureEmailAttachment`
+  re-downloaded the Word snapshot (and re-read a previously added Dynamics attachment) and
+  required a byte match, so a `docx`/`both` attachment-mode send of a raw brief would have
+  failed `distribution_attachment_hash_mismatch` / `_recovery_mismatch`; it now compares the
+  governed hash against the attempt's `source_content_hash` (the Word snapshot inherits the
+  captured source's content hash at prepare) and skips the size equality for Word only. PDF
+  and calendar attachments keep the byte identity. Discriminating tests: a rewritten package with matching governed content is
+  reusable/servable (fails on the old code), a differing governed hash or unparseable
+  package is refused, and the registry-row guards (missing, not Ready, other request, no
+  hash) refuse; on the send path a rewritten Word attachment with matching governed content
+  attaches and recovers (fails on the old code) while a differing or unparseable one refuses.
+  **Codex adversarial review round 1 (2026-09-17, gpt-5.6-sol, base `eece40b0`): needs-attention,
+  four findings, all fixed on the branch.** (1) *high* — the governed hash covered only
+  `word/`, so a substituted package could keep that subtree while its root relationship
+  opened another main part or a document relationship reached outside `word/`. Fixed as
+  validation without changing the digest (stored `gdc1:` hashes stay valid):
+  `hashGovernedDocxContent` now requires `_rels/.rels` with exactly one officeDocument
+  relationship resolving to `word/document.xml` and every non-customXml, non-External
+  document relationship to resolve under `word/` (regression packages: substituted root,
+  out-of-tree image, missing root rels; an External hyperlink still hashes). (2) *high* — the
+  briefing route used the registry row only for its hash. It now loads and binds the row
+  before any Graph read: this request, producer `request-workbench-distribution-docx`,
+  Ready, not Superseded, and drive/item equal to the ledger's pointers; tests assert no
+  download happens when any of those fail. (3) *high* — lost-finalize recovery (upload
+  committed, Ready never recorded) still required byte equality at the snapshot path and
+  would loop on `distribution_snapshot_path_conflict`; Word now recovers by governed hash and
+  re-pins the served bytes' hash and size (test: rewritten file recovered, no second Word
+  upload; a different governed document is still a path conflict). (4) *medium* — my earlier
+  claim that a `loadCapturedSource` mismatch "produces a fresh snapshot" was wrong: a
+  same-operation retry threw before creating anything. The source is now identified by
+  version plus governed hash on re-capture and its byte hash recomputed from the served
+  bytes (tests: rewritten source re-captures; edited content still refuses).
+  **Codex adversarial review round 2 (2026-09-17, gpt-5.6-sol, base `eece40b0`): needs-attention,
+  three findings, built by Codex rescue (`1e5cfee5`) and reviewed by Claude.** (1) *high* —
+  transitive relationships (document → header → `../outside/banner.png`) bypassed the
+  root/document-rels validation. Fixed: the hasher now walks the full internal OPC graph from
+  `word/document.xml` through every reachable part's own `.rels`, resolving targets OPC-style
+  (percent-decoding, `./`/`../`, fragments, case-insensitive part names) and requiring every
+  internal target to exist under `word/`; `[Content_Types].xml` must exist and an Override may
+  not relabel a reachable `.xml` part as non-XML. Digest unchanged. Claude's review narrowed
+  Codex's Override rule from "any reachable part" to XML parts only: a probe showed a legitimate
+  package declaring an image by `Override` (`image/png`) was refused, and binary parts are
+  already identified by their bytes in the digest (test: image by Override hashes; XML part
+  relabelled `text/plain` still refuses). (2) *medium* — `recordDistributionSource` COALESCEd
+  and equality-checked `source_byte_hash`, so the same-operation re-capture that round 1
+  enabled would have failed `distribution_source_persist_failed` in Production. Fixed: a
+  preparing attempt refreshes byte hash and filename when drive/item/version/governed hash
+  match (store test asserts the SQL parameters; the prepare harness double now models the
+  contract). (3) *medium* — the Board download trusted the registry row's mutable
+  `wmkf_contenthash`. Fixed: the row must carry the attempt's `source_document_id` and
+  `source_content_hash`, and the served bytes are compared to the attempt's hash (test:
+  registry and file agree on B while the ledger pins A → 409 before any Graph read).
+  Residual accepted: a relationship whose target part is missing now fails the hash where it
+  previously passed; Word does not produce those.
+  **Codex adversarial review round 3 (2026-09-17, gpt-5.6-sol, base `eece40b0`): needs-attention,
+  two findings; one fixed, one declined with reasons.** (1) *high, declined as an accepted
+  residual* — External relationships are skipped regardless of type and `[Content_Types].xml`
+  is outside the digest. Reasoning: relationship parts (including `TargetMode`) are in the
+  digest, so a linked image cannot be introduced or retargeted without changing the hash, and
+  the renderer never emits external links; the byte identity never covered a URL's content
+  either. Word selects part handlers by relationship type, which is hashed, and every reachable
+  part's bytes are hashed, so a Default/Override change can at most make Word refuse or repair
+  the file, not display substituted content; binding effective content types into the digest
+  would be a new hash version invalidating every stored governed hash across ten services,
+  and SharePoint itself rewrites `[Content_Types].xml` on upload. (2) *medium, fixed* — with
+  `source_byte_hash` out of the re-capture predicate, two prepares racing on one operation
+  could both record a capture and the first finalizer could pin capture A's snapshots and
+  preview hash beside capture B's byte hash. `recordDistributionPrepared` now fences on the
+  caller's captured identity (drive, item, version, governed hash, byte hash) and the service
+  passes it; a mismatch returns null and prepare fails `distribution_preview_persist_failed`,
+  and the retry re-captures and finalizes self-consistently. Tests: store SQL parameters;
+  harness double models the fence; an interleaving test where B's capture lands after A's
+  (A fails closed, retry succeeds). All three fail on the prior code.
+  Post-upload byte re-reading was rejected because the rewrite lands after
+  prepare's metadata read (`stableUploadedMetadata` requires the uploaded size), so a
+  pinned served hash would go stale minutes later.
 
 ### Notes
 
