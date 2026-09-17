@@ -422,6 +422,81 @@ describe('generatePreRpBrief', () => {
     expect(dependencies.deleteFile).not.toHaveBeenCalled();
   });
 
+  it('deletes the orphaned SharePoint item when a stale claim loses the activation race and the winner adopted a different item', async () => {
+    // Same shape as the round-2 fixture above, except the reclaiming winner
+    // uploaded to a DIFFERENT item id (e.g. a different generation cycle),
+    // so this attempt's own upload is a genuine orphan that must be cleaned up.
+    const UPLOADED_ITEM_ID = 'uploaded-item';
+    const WINNER_ITEM_ID = 'winner-item';
+    let row = null;
+    let etag = 1;
+    const request = { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: null, _etag: 'request-1' };
+
+    const dependencies = {
+      loadInputs: jest.fn().mockResolvedValue(inputsFixture()),
+      renderDocx: jest.fn().mockResolvedValue({ docx: Buffer.from('rendered-docx') }),
+      hashDocx: jest.fn().mockResolvedValue('gdc1:governed-hash'),
+      getRequest: jest.fn().mockImplementation(async () => ({ ...request })),
+      getBuckets: jest.fn().mockResolvedValue([{
+        source: 'dynamics',
+        library: 'akoya_request',
+        folder: 'Requests/1002379',
+      }]),
+      findByGenerationKey: jest.fn().mockImplementation(async () => ({ records: row ? [{ ...row }] : [] })),
+      findByRequest: jest.fn().mockImplementation(async () => ({ records: row ? [{ ...row }] : [] })),
+      createDocument: jest.fn().mockImplementation(async (payload) => {
+        row = {
+          ...payload,
+          wmkf_requestdocumentid: ARTIFACT_ID,
+          _wmkf_request_value: REQUEST_ID,
+          _etag: `row-${etag}`,
+          createdon: new Date().toISOString(),
+          modifiedon: new Date().toISOString(),
+        };
+        delete row['wmkf_Request@odata.bind'];
+        return ARTIFACT_ID;
+      }),
+      updateDocument: jest.fn().mockImplementation(async (id, patch, options) => {
+        if (id !== row.wmkf_requestdocumentid) throw new Error('unexpected id');
+        if (options?.ifMatch && options.ifMatch !== row._etag) {
+          const conflict = new Error('ETag mismatch');
+          conflict.status = 412;
+          throw conflict;
+        }
+        Object.assign(row, patch);
+        row._etag = `row-${++etag}`;
+      }),
+      commitChangeset: jest.fn(),
+      ensureFolderPath: jest.fn().mockResolvedValue(undefined),
+      uploadFile: jest.fn().mockImplementation(async () => {
+        // Simulate a winner reclaiming the row and adopting a DIFFERENT
+        // item before this attempt's activation reads the row back.
+        row.wmkf_claimtoken = 'claim-B';
+        row.wmkf_sharepointitemid = WINNER_ITEM_ID;
+        row._etag = `row-${++etag}`;
+        return {
+          siteId: 'site-id',
+          driveId: 'drive-id',
+          id: UPLOADED_ITEM_ID,
+          webUrl: 'https://sharepoint.test/brief.docx',
+          versionId: '1.0',
+          eTag: 'file-etag',
+          size: 1234,
+          lastModified: '2026-09-16T12:00:00Z',
+        };
+      }),
+      deleteFile: jest.fn().mockResolvedValue(undefined),
+      newClaimToken: jest.fn().mockReturnValue('claim-A'),
+    };
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'op-1' },
+      dependencies,
+    )).rejects.toMatchObject({ code: 'claim_lost' });
+    expect(dependencies.deleteFile).toHaveBeenCalledTimes(1);
+    expect(dependencies.deleteFile).toHaveBeenCalledWith('drive-id', UPLOADED_ITEM_ID);
+  });
+
   it('fails closed on an invalid requestId before loading inputs', async () => {
     const harness = createHarness();
     await expect(generatePreRpBrief(
@@ -475,7 +550,12 @@ describe('resolveCurrentPreRpBriefForDistribution', () => {
   });
 
   it('fails closed as distribution_source_ineligible when the pointer target is still Draft (not locked for Share)', async () => {
-    const row = briefRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT });
+    const row = briefRow({
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      wmkf_sharepointdriveid: 'drive-id',
+      wmkf_sharepointitemid: 'item-id',
+      wmkf_sharepointfolderpath: 'Requests/1002379/Artifacts/Pre-Research Presentation Brief',
+    });
     const dependencies = distDependencies({
       request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: ARTIFACT_ID },
       rows: [row],

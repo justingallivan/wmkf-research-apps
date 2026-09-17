@@ -137,6 +137,11 @@ test('an absent or empty attachment mode means none: both snapshots are pinned, 
     const prepared = harness.dependencies.recordPrepared.mock.calls[0][1];
     expect(prepared.docx?.documentId).toBeTruthy();
     expect(prepared.pdf?.documentId).toBeTruthy();
+    // Slice 4: the pinned snapshot rows carry the brief's artifact type,
+    // since the source is now the brief (type 100000009), not Pre-Site.
+    for (const call of harness.dependencies.createDocument.mock.calls) {
+      expect(call[0].wmkf_artifacttype).toBe(PRE_RP_BRIEF_CONTRACT.artifactType);
+    }
   }
 });
 
@@ -681,6 +686,61 @@ describe('prepare-time review/drift gate (plan §3.4b)', () => {
 
     expect(driftedHash).not.toBe(noDriftHash);
     expect(driftedResult.attempt.previewHash).not.toBe(noDriftResult.attempt.previewHash);
+  });
+
+  test('draftHash and previewHash change when the bounded delta changes even though both fingerprints and the acknowledgement stay the same', async () => {
+    // briefInputFingerprint only folds in RECEIVED reviews (submittedReviewsOf),
+    // but computeStaleInputsDelta reports added/removed suggestion ids over
+    // ALL reviews. So a non-received reviewer suggestion added to the live
+    // inputs between the 409 and the acknowledged retry changes the delta
+    // (addedReviewerSuggestionIds) without moving the live fingerprint at
+    // all — the fingerprint-bound identity alone cannot distinguish the two
+    // attempts; only binding the delta itself can (plan §3.4b step 4).
+    const generated = briefEnvelope();
+    const liveD1 = briefEnvelope({ request: { ...generated.request, abstract: 'Updated abstract D1.' } });
+    const liveD1WithPendingReviewer = briefEnvelope({
+      request: { ...generated.request, abstract: 'Updated abstract D1.' },
+      reviews: [
+        ...liveD1.reviews,
+        {
+          suggestionId: 'reviewer-pending',
+          reviewReceivedAt: null,
+          name: 'Reviewer Pending',
+          academicRank: 'Associate Professor',
+          reviewerOverallAssessment: null,
+          reviewerAffiliation: 'Another University',
+          mainInstitution: 'Another University',
+          affiliation: 'Another University',
+        },
+      ],
+    });
+    const fingerprintD1 = briefInputFingerprint(liveD1);
+    // The pending (non-received) reviewer does not change the fingerprint.
+    expect(briefInputFingerprint(liveD1WithPendingReviewer)).toBe(fingerprintD1);
+
+    const withoutPending = createPrepareHarness({ briefGate: briefGateFixture({ generated, live: liveD1 }) });
+    const withoutPendingResult = await preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: fingerprintD1 }),
+      withoutPending.dependencies,
+    );
+    const withoutPendingHash = withoutPending.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+    const withPending = createPrepareHarness({
+      briefGate: briefGateFixture({ generated, live: liveD1WithPendingReviewer }),
+    });
+    const withPendingResult = await preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: fingerprintD1 }),
+      withPending.dependencies,
+    );
+    const withPendingHash = withPending.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+    // Same generated/live/acknowledged fingerprints in both attempts...
+    expect(withPending.dependencies.createOrGetAttempt.mock.calls[0][0].inputFingerprintLive).toBe(
+      withoutPending.dependencies.createOrGetAttempt.mock.calls[0][0].inputFingerprintLive,
+    );
+    // ...but the delta (and therefore both hashes) still differ.
+    expect(withPendingHash).not.toBe(withoutPendingHash);
+    expect(withPendingResult.attempt.previewHash).not.toBe(withoutPendingResult.attempt.previewHash);
   });
 
   test('send fails closed as distribution_stale_source for a pre-existing unsent attempt sourced from a legacy Pre-Site row', async () => {

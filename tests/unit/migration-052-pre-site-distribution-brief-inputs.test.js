@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 /**
  * Migration 052 (lib/db/migrations/052_pre_site_distribution_brief_inputs.sql)
  * adds a CHECK constraint enforced by live Postgres, not application code.
@@ -111,5 +114,25 @@ describe('migration 052 CHECK constraints (pure-JS mirror)', () => {
       ackAt: NOW,
       ackBy: ACTOR,
     })).toBe(false);
+  });
+});
+
+describe('migration 052 real SQL contains the load-bearing predicates the pure-JS mirror assumes', () => {
+  const migration = fs.readFileSync(
+    path.join(process.cwd(), 'lib/db/migrations/052_pre_site_distribution_brief_inputs.sql'),
+    'utf8',
+  );
+
+  it('uses <> (not =) to detect drift between the two fingerprints', () => {
+    expect(migration).toContain('input_fingerprint_generated <> input_fingerprint_live');
+  });
+
+  it('requires the delta to be a JSON object', () => {
+    expect(migration).toContain("jsonb_typeof(stale_inputs_delta) = 'object'");
+  });
+
+  it('requires both acknowledgement fields in the acknowledged-drift branch', () => {
+    const acknowledgedBranch = migration.slice(migration.indexOf('Acknowledged drift'));
+    expect(acknowledgedBranch).toMatch(/AND stale_inputs_acknowledged_at IS NOT NULL\s*\n\s*AND stale_inputs_acknowledged_by IS NOT NULL/);
   });
 });
