@@ -7,7 +7,7 @@ summary: "D26 private Cycle Dossier pilot design and branch-local implementation
 canonical: true
 cataloged: 2026-09-07
 owner: product-engineering
-last_verified: 2026-09-14
+last_verified: 2026-09-17
 related:
   - docs/atlas/postgres-cycle-dossiers.md
   - docs/EXECUTOR_CONTRACT.md
@@ -60,7 +60,16 @@ The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md.
 
 ## Controlled rollout remaining
 
-The preflight, the single controlled request (1002852, 2026-09-12), and the enable in production are done; the worker runs in smoke mode with literal `CYCLE_DOSSIER_ENABLED=true`. Remaining, all owner decisions: when to widen from smoke mode (one request, operator profile 2) to the full D26 roster and other superusers, with the S509 hardening slice as the suggested gate; the drain-cron cadence (ops meeting rescheduled from 2026-09-14 to 2026-09-16); and the preview/Blob retention policy (open since S494). A user still launches each dossier after reviewing their inclusion list and budget.
+The preflight, the single controlled request (1002852, 2026-09-12), and the enable in production are done; the worker runs in smoke mode with literal `CYCLE_DOSSIER_ENABLED=true`. Remaining owner decisions are when to widen from smoke mode (one request, operator profile 2) to the full D26 roster and other superusers, with the S509 hardening slice as the suggested gate, and the preview/Blob retention policy (open since S494). The drain-cron cadence is decided below. A user still launches each dossier after reviewing their inclusion list and budget.
+
+## 2026-09-16 ops decision: five-minute drain cadence
+
+Ops set `/api/cron/drain-cycle-dossiers` to every five minutes (`*/5 * * * *` in `vercel.json`).
+This is an active smoke-mode worker, not an idle-while-disabled optimization:
+`CYCLE_DOSSIER_ENABLED=true` is live in Production. Each tick claims at most one run, and
+`drainCycleDossiers` advances at most three queued entries in that run. The slower cadence therefore
+lengthens a dossier's wall-clock completion time as well as its initial pickup delay; that tradeoff
+is accepted for the pilot.
 
 ## Operator stop inside in-flight work
 

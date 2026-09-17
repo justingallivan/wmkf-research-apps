@@ -26,7 +26,7 @@
     }
   },
   "crons": [
-    { "path": "/api/cron/drain-cycle-dossiers", "schedule": "* * * * *" },
+    { "path": "/api/cron/drain-cycle-dossiers", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/drain-review-panels", "schedule": "* * * * *" },
     {
       "path": "/api/cron/maintenance",
