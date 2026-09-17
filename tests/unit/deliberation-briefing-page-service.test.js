@@ -6,6 +6,7 @@
  */
 import { buildBriefingContext, resolveBriefingMember } from '../../lib/services/deliberation-briefing/briefing-page-service';
 import { PRE_SITE_DISTRIBUTION_CONTRACT } from '../../shared/config/requestDocument.js';
+import { reviewSetFingerprint } from '../../lib/services/pre-site-visit/review-bundle-service.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RECEIVED_ID = '22222222-2222-4222-8222-222222222222';
@@ -97,6 +98,11 @@ function deps(overrides = {}) {
     loadConsultantFeedback: jest.fn(async () => ({ status: 'ok', items: [] })),
     isFeedbackAttachment: jest.fn(async () => false),
     findDocumentById: jest.fn(async () => ({ records: [] })),
+    // Plan §11 (Step C2): review-bundle on-demand rebuild. Fail-closed
+    // defaults (no rebuild, no persisted rebuild) — review-bundle tests
+    // override both explicitly.
+    retainReviewBundle: jest.fn(async () => { throw new Error('retainReviewBundle not mocked for this test'); }),
+    recordReviewBundleRebuilt: jest.fn(async () => null),
     ...overrides,
   };
 }
@@ -447,5 +453,253 @@ describe('feedback: member (slice 2 attachment)', () => {
     await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'feedback:not-a-guid' }, d))
       .rejects.toMatchObject({ httpStatus: 404 });
     expect(d.isFeedbackAttachment).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// review-bundle member (plan §11, Step C2): pinned-identity serve, drift
+// detection (fingerprint-only, no Graph reads), on-demand rebuild through
+// the shared `retainReviewBundle` helper, and the context projection.
+// ---------------------------------------------------------------------------
+
+// Matches exactly what resolveBriefingMember computes from the default
+// `suggestions()` fixture's received (RECEIVED_ID) row: reviewSetFingerprint
+// filters on `reviewReceivedAt` truthiness, so it must be present here too.
+const PINNED_SET_FINGERPRINT = reviewSetFingerprint([{
+  suggestionId: RECEIVED_ID,
+  reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_x',
+  reviewFilename: 'review.pdf',
+  reviewReceivedAt: '2026-09-01T10:00:00.000Z',
+}]);
+const BUNDLE_BYTES = Buffer.from('%PDF-pinned-bundle-bytes');
+const BUNDLE_BYTE_HASH = require('crypto').createHash('sha256').update(BUNDLE_BYTES).digest('hex');
+
+function bundleAttemptFixture(overrides = {}) {
+  return {
+    operation_id: 'op-bundle-1',
+    state: 'sent',
+    source_document_id: 'source-doc-1',
+    review_bundle_document_id: 'bundle-doc-1',
+    review_bundle_drive_id: 'bundle-drive',
+    review_bundle_item_id: 'bundle-item',
+    review_bundle_version_id: '1.0',
+    review_bundle_filename: 'Example University - Reviews - aaaaaaaa.pdf',
+    review_bundle_size: BUNDLE_BYTES.length,
+    review_bundle_byte_hash: BUNDLE_BYTE_HASH,
+    review_bundle_set_fingerprint: PINNED_SET_FINGERPRINT,
+    review_bundle_review_count: 1,
+    review_bundle_rebuilt_at: null,
+    ...overrides,
+  };
+}
+
+function sourceRowFixture(overrides = {}) {
+  return {
+    wmkf_requestdocumentid: 'source-doc-1',
+    wmkf_sharepointfolderpath: 'Requests/1002379',
+    wmkf_cyclecode: 'D26',
+    ...overrides,
+  };
+}
+
+describe('resolveBriefingMember: review-bundle (plan §11, Step C2)', () => {
+  test('serves the pinned bundle when the live review set is unchanged, without any retainReviewBundle call', async () => {
+    const d = deps({
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture()),
+      downloadFile: jest.fn(async (driveId, itemId) => (
+        driveId === 'bundle-drive' && itemId === 'bundle-item'
+          ? { buffer: BUNDLE_BYTES, mimeType: 'application/pdf', filename: 'bundle.pdf', size: BUNDLE_BYTES.length }
+          : { buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 }
+      )),
+    });
+    const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d);
+    expect(file.buffer).toEqual(BUNDLE_BYTES);
+    expect(file.mimeType).toBe('application/pdf');
+    expect(file.filename).toBe('Example University - Reviews - aaaaaaaa.pdf');
+    expect(file.inline).toBe(true);
+    expect(d.retainReviewBundle).not.toHaveBeenCalled();
+    expect(d.recordReviewBundleRebuilt).not.toHaveBeenCalled();
+    // Fingerprint-only comparison: no SharePoint/Graph metadata lookup for
+    // review parts (only the one download of the pinned bundle itself).
+    expect(d.getFileMetadataByPath).not.toHaveBeenCalled();
+  });
+
+  test('409 snapshot_mismatch when the set is unchanged but the pinned bytes no longer hash to review_bundle_byte_hash', async () => {
+    const d = deps({
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture()),
+      downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-different-bytes'), mimeType: 'application/pdf', filename: 'bundle.pdf', size: 10 })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
+      .rejects.toMatchObject({ httpStatus: 409, body: { reason: 'snapshot_mismatch' } });
+    expect(d.retainReviewBundle).not.toHaveBeenCalled();
+  });
+
+  test('rebuilds once through retainReviewBundle when the live set differs, persists the new identity, and serves the new bytes', async () => {
+    const rebuiltBytes = Buffer.from('%PDF-rebuilt-bundle-bytes');
+    const rebuiltHash = require('crypto').createHash('sha256').update(rebuiltBytes).digest('hex');
+    const newSuggestions = () => ([
+      {
+        wmkf_appreviewersuggestionid: RECEIVED_ID,
+        wmkf_reviewreceivedat: '2026-09-01T10:00:00Z',
+        wmkf_reviewerfirstname: 'Ada',
+        wmkf_reviewerlastname: 'Lovelace',
+        wmkf_revieweraffiliation: 'Analytical Engines Ltd',
+        // The live folder/filename differ from the pinned identity's
+        // fingerprint source, so the fingerprints diverge.
+        wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_y',
+        wmkf_reviewfilename: 'review-v2.pdf',
+        _wmkf_potentialreviewer_value: 'person-1',
+      },
+    ]);
+    const d = deps({
+      findSuggestions: jest.fn(async () => newSuggestions()),
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture()),
+      findDocumentById: jest.fn(async (id) => (
+        id === 'source-doc-1' ? { records: [sourceRowFixture()] } : { records: [] }
+      )),
+      retainReviewBundle: jest.fn(async () => ({
+        snapshot: {
+          documentId: 'bundle-doc-2', driveId: 'bundle-drive-2', itemId: 'bundle-item-2',
+          versionId: '2.0', filename: 'Example University - Reviews - bbbbbbbb.pdf',
+          size: rebuiltBytes.length, byteHash: rebuiltHash,
+        },
+        assembly: { reviewCount: 1 },
+        setFingerprint: 'c'.repeat(64),
+      })),
+      recordReviewBundleRebuilt: jest.fn(async (operationId, rebuilt) => ({
+        operation_id: operationId,
+        state: 'sent',
+        review_bundle_document_id: rebuilt.documentId,
+        review_bundle_drive_id: rebuilt.driveId,
+        review_bundle_item_id: rebuilt.itemId,
+        review_bundle_version_id: rebuilt.versionId,
+        review_bundle_filename: rebuilt.filename,
+        review_bundle_size: rebuilt.size,
+        review_bundle_byte_hash: rebuilt.byteHash,
+        review_bundle_set_fingerprint: rebuilt.setFingerprint,
+        review_bundle_review_count: rebuilt.reviewCount,
+        review_bundle_rebuilt_at: '2026-09-17T12:00:00Z',
+      })),
+      downloadFile: jest.fn(async (driveId, itemId) => (
+        driveId === 'bundle-drive-2' && itemId === 'bundle-item-2'
+          ? { buffer: rebuiltBytes, mimeType: 'application/pdf', filename: 'rebuilt.pdf', size: rebuiltBytes.length }
+          : { buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 }
+      )),
+    });
+
+    const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d);
+
+    expect(d.retainReviewBundle).toHaveBeenCalledTimes(1);
+    const [rebuildArgs] = d.retainReviewBundle.mock.calls[0];
+    expect(rebuildArgs.sourceDocumentId).toBe('source-doc-1');
+    expect(rebuildArgs.folderPath).toBe('Requests/1002379/Distribution Snapshots');
+    expect(rebuildArgs.cycleCode).toBe('D26');
+    expect(rebuildArgs.reviews).toEqual([expect.objectContaining({
+      suggestionId: RECEIVED_ID,
+      reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_y',
+      reviewFilename: 'review-v2.pdf',
+    })]);
+
+    expect(d.recordReviewBundleRebuilt).toHaveBeenCalledTimes(1);
+    const [operationIdArg, rebuiltArg] = d.recordReviewBundleRebuilt.mock.calls[0];
+    expect(operationIdArg).toBe('op-bundle-1');
+    expect(rebuiltArg).toMatchObject({
+      documentId: 'bundle-doc-2',
+      driveId: 'bundle-drive-2',
+      itemId: 'bundle-item-2',
+      byteHash: rebuiltHash,
+      reviewCount: 1,
+    });
+
+    expect(file.buffer).toEqual(rebuiltBytes);
+    expect(file.filename).toBe('Example University - Reviews - bbbbbbbb.pdf');
+  });
+
+  test('a rebuild failure serves 503 review_bundle_unavailable and never writes the store', async () => {
+    const d = deps({
+      findSuggestions: jest.fn(async () => ([{
+        wmkf_appreviewersuggestionid: RECEIVED_ID,
+        wmkf_reviewreceivedat: '2026-09-01T10:00:00Z',
+        wmkf_reviewerfirstname: 'Ada',
+        wmkf_reviewerlastname: 'Lovelace',
+        wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_y',
+        wmkf_reviewfilename: 'review-v2.pdf',
+      }])),
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture()),
+      findDocumentById: jest.fn(async () => ({ records: [sourceRowFixture()] })),
+      retainReviewBundle: jest.fn(async () => { throw new Error('Graph is down'); }),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
+      .rejects.toMatchObject({ httpStatus: 503, body: { reason: 'review_bundle_unavailable' } });
+    expect(d.recordReviewBundleRebuilt).not.toHaveBeenCalled();
+  });
+
+  test('a lost-write rebuild (recordReviewBundleRebuilt returns null, e.g. attempt no longer sent) also serves 503', async () => {
+    const d = deps({
+      findSuggestions: jest.fn(async () => ([{
+        wmkf_appreviewersuggestionid: RECEIVED_ID,
+        wmkf_reviewreceivedat: '2026-09-01T10:00:00Z',
+        wmkf_reviewerfirstname: 'Ada',
+        wmkf_reviewerlastname: 'Lovelace',
+        wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_y',
+        wmkf_reviewfilename: 'review-v2.pdf',
+      }])),
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture()),
+      findDocumentById: jest.fn(async () => ({ records: [sourceRowFixture()] })),
+      retainReviewBundle: jest.fn(async () => ({
+        snapshot: { documentId: 'd', driveId: 'dr', itemId: 'it', versionId: '1.0', filename: 'f.pdf', size: 1, byteHash: 'a'.repeat(64) },
+        assembly: { reviewCount: 1 },
+        setFingerprint: 'b'.repeat(64),
+      })),
+      recordReviewBundleRebuilt: jest.fn(async () => null),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
+      .rejects.toMatchObject({ httpStatus: 503, body: { reason: 'review_bundle_unavailable' } });
+  });
+
+  test('404 for a pre-bundle (legacy) attempt', async () => {
+    const d = deps({
+      getLatestAttempt: jest.fn(async () => ({ ...bundleAttemptFixture(), review_bundle_drive_id: null, review_bundle_item_id: null })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.findSuggestions).not.toHaveBeenCalled();
+  });
+
+  test('404 when there is no sent attempt yet', async () => {
+    const d = deps({ getLatestAttempt: jest.fn(async () => null) });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+  });
+});
+
+describe('buildBriefingContext: reviewBundle projection (plan §11, Step C2)', () => {
+  test('exposes filename/size/reviewCount/rebuiltAt for a bundled sent attempt', async () => {
+    const d = deps({
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture({ review_bundle_rebuilt_at: '2026-09-17T12:00:00Z' })),
+    });
+    const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
+    expect(context.reviewBundle).toEqual({
+      member: 'review-bundle',
+      filename: 'Example University - Reviews - aaaaaaaa.pdf',
+      size: BUNDLE_BYTES.length,
+      reviewCount: 1,
+      rebuiltAt: '2026-09-17T12:00:00.000Z',
+    });
+    // Never drive/item ids, byte hashes, or set fingerprints.
+    const serialized = JSON.stringify(context.reviewBundle);
+    expect(serialized).not.toMatch(/drive|item/i);
+    expect(serialized).not.toContain(BUNDLE_BYTE_HASH);
+    expect(serialized).not.toContain(PINNED_SET_FINGERPRINT);
+  });
+
+  test('is null for a legacy (pre-bundle) attempt and when there is no sent attempt yet', async () => {
+    const legacy = deps({
+      getLatestAttempt: jest.fn(async () => ({ ...bundleAttemptFixture(), review_bundle_drive_id: null, review_bundle_item_id: null })),
+    });
+    expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, legacy)).reviewBundle).toBeNull();
+
+    const none = deps({ getLatestAttempt: jest.fn(async () => null) });
+    expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, none)).reviewBundle).toBeNull();
   });
 });

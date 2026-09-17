@@ -39,6 +39,7 @@ const FIELD_LABEL_BY_SUFFIX = {
   briefing_link_text: 'Briefing link text',
   briefing_description: 'Briefing description',
   briefing_expiry_lead_in: 'Briefing expiration wording',
+  review_bundle_link_text: 'Review bundle link text',
 };
 
 function fieldLabel(entry) {

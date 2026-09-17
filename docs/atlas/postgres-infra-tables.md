@@ -227,9 +227,19 @@ parity test compares the real CHECK bodies. The bundle sits beside the brief
 PDF snapshot as a governed `wmkf_requestdocument` row
 (producer `request-workbench-distribution-review-bundle`), created through
 `ensureSnapshot` and retained via
-`lib/services/pre-site-visit/review-bundle-service.js`. Written by
-`distribution-service.js` prepare; `review_bundle_rebuilt_at` is reserved for
-the later on-demand rebuild step and is never set at prepare.
+`lib/services/pre-site-visit/review-bundle-service.js`/`retainReviewBundle`
+(`distribution-service.js`). The nine identity columns are written by
+`distribution-service.js` prepare (`recordDistributionPrepared`) at Share
+time; `review_bundle_rebuilt_at` stays NULL there. **[SOURCE-BUILT
+2026-09-16 on `claude/pre-rp-brief-review-bundle`; deployment pending; plan
+§11, Step C2]** The same nine columns plus `review_bundle_rebuilt_at` are
+rewritten by `recordReviewBundleRebuilt` (`distribution-store.js`, guarded
+`WHERE state = 'sent'`), called from `briefing-page-service.js`
+`resolveBriefingMember`'s `review-bundle` member on read, only when a
+fingerprint over the live received review set no longer matches
+`review_bundle_set_fingerprint` [VERIFIED via
+lib/services/deliberation-briefing/briefing-page-service.js and
+lib/services/pre-site-visit/distribution-store.js `recordReviewBundleRebuilt`].
 
 One client operation UUID binds one Request, exact editable source Word
 identity/version/governed hash/raw byte hash, attachment mode (`none` for every

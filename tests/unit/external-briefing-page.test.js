@@ -125,6 +125,39 @@ test('links every member through the document route and only renders an https me
   await waitFor(() => expect(screen.getByText(/Reviews \(1\)/)).toBeInTheDocument());
 });
 
+test('review bundle: a "Download all reviews (PDF)" link with the review count renders when reviewBundle is present', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null,
+    siteVisit: null,
+    writeup: { docx: null, sharedAt: null },
+    reviews: [],
+    reviewBundle: { member: 'review-bundle', filename: 'Example University - Reviews - abc12345.pdf', size: 4096, reviewCount: 3, rebuiltAt: null },
+    proposal: null,
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('Download all reviews (PDF)');
+  expect(screen.getByText('Download all reviews (PDF)').closest('a'))
+    .toHaveAttribute('href', '/api/external/briefing/tok/document?member=review-bundle');
+  expect(screen.getByText('Download all reviews (PDF)').closest('a')).toHaveAttribute('target', '_blank');
+  expect(screen.getByText(/\(3 reviews\)/)).toBeInTheDocument();
+});
+
+test('review bundle: no link renders when reviewBundle is absent (legacy attempt or none yet sent)', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null,
+    siteVisit: null,
+    writeup: { docx: null, sharedAt: null },
+    reviews: [],
+    reviewBundle: null,
+    proposal: null,
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('No completed reviews yet. New reviews appear here as they arrive.');
+  expect(screen.queryByText('Download all reviews (PDF)')).not.toBeInTheDocument();
+});
+
 test('research presentation materials list by label; oversize files show without a link', async () => {
   global.fetch = jest.fn().mockResolvedValue(response({
     ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,

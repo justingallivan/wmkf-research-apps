@@ -96,6 +96,7 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.deliberation_share.briefing_link_text': DELIBERATION_SHARE_SEED_BRIEFING_COPY.linkText,
   'email.deliberation_share.briefing_description': DELIBERATION_SHARE_SEED_BRIEFING_COPY.description,
   'email.deliberation_share.briefing_expiry_lead_in': DELIBERATION_SHARE_SEED_BRIEFING_COPY.expiryLeadIn,
+  'email.deliberation_share.review_bundle_link_text': DELIBERATION_SHARE_SEED_BRIEFING_COPY.reviewBundleLinkText,
   'email.deliberation_agenda.subject': DELIBERATION_AGENDA_SEED_SUBJECT,
   'email.deliberation_agenda.body': DELIBERATION_AGENDA_SEED_BODY,
 });

@@ -140,6 +140,18 @@ const defaults = [
     unavailable: false,
   },
   {
+    key: 'email.deliberation_share.review_bundle_link_text',
+    label: 'Share for deliberation review bundle link text',
+    description: 'Review bundle link text',
+    multiline: false,
+    placeholders: [],
+    group: 'internal',
+    emailKey: 'email.deliberation_share',
+    emailLabel: 'Share for deliberation',
+    value: 'Download all reviews (PDF)',
+    unavailable: false,
+  },
+  {
     key: 'email.deliberation_agenda.subject',
     label: 'Deliberation agenda subject',
     description: 'Agenda subject copy',
@@ -242,10 +254,12 @@ test('renders Share for deliberation as its own internal email card beside the a
   expect(within(shareCard).getByLabelText('Share for deliberation briefing link text')).toHaveValue('Open the deliberation briefing');
   expect(within(shareCard).getByLabelText('Share for deliberation briefing description')).toHaveValue('the writeup and review materials, no login required.');
   expect(within(shareCard).getByLabelText('Share for deliberation briefing expiry wording')).toHaveValue('The link expires on');
+  expect(within(shareCard).getByLabelText('Share for deliberation review bundle link text')).toHaveValue('Download all reviews (PDF)');
   expect(within(shareCard).getByText('Briefing heading', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).getByText('Briefing link text', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).getByText('Briefing description', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).getByText('Briefing expiration wording', { selector: 'label' })).toBeInTheDocument();
+  expect(within(shareCard).getByText('Review bundle link text', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).queryByLabelText('Deliberation agenda subject')).toBeNull();
 });
 

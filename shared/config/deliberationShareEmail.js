@@ -9,6 +9,8 @@ export const DELIBERATION_SHARE_BRIEFING_HEADING_KEY = 'email.deliberation_share
 export const DELIBERATION_SHARE_BRIEFING_LINK_TEXT_KEY = 'email.deliberation_share.briefing_link_text';
 export const DELIBERATION_SHARE_BRIEFING_DESCRIPTION_KEY = 'email.deliberation_share.briefing_description';
 export const DELIBERATION_SHARE_BRIEFING_EXPIRY_LEAD_IN_KEY = 'email.deliberation_share.briefing_expiry_lead_in';
+// Plan §11 (Step C2): the review-bundle link line under the briefing link.
+export const DELIBERATION_SHARE_REVIEW_BUNDLE_LINK_TEXT_KEY = 'email.deliberation_share.review_bundle_link_text';
 
 export const DELIBERATION_SHARE_SEED_SUBJECT = 'Site Visit materials — {{requestNumber}}';
 export const DELIBERATION_SHARE_SEED_BODY = 'The deliberation briefing page linked below has the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials.';
@@ -17,6 +19,7 @@ export const DELIBERATION_SHARE_SEED_BRIEFING_COPY = Object.freeze({
   linkText: 'Open the deliberation briefing',
   description: 'the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials, no login required.',
   expiryLeadIn: 'The link expires on',
+  reviewBundleLinkText: 'Download all reviews (PDF)',
 });
 
 export function renderDeliberationShareSubject(template, requestNumber) {

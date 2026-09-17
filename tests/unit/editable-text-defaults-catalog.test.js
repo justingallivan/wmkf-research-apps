@@ -69,6 +69,7 @@ describe('editableTextDefaults catalog grouping metadata', () => {
       'email.deliberation_share.briefing_link_text',
       'email.deliberation_share.briefing_description',
       'email.deliberation_share.briefing_expiry_lead_in',
+      'email.deliberation_share.review_bundle_link_text',
     ];
     const briefingEntries = briefingKeys.map((key) => EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === key));
     expect(subject).toMatchObject({
@@ -100,6 +101,7 @@ describe('editableTextDefaults catalog grouping metadata', () => {
       linkText: 'Open the deliberation briefing',
       description: expect.stringContaining('research presentation materials'),
       expiryLeadIn: 'The link expires on',
+      reviewBundleLinkText: 'Download all reviews (PDF)',
     });
   });
 

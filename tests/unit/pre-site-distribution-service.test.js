@@ -16,9 +16,11 @@ jest.mock('../../lib/services/pre-site-visit/review-bundle-service.js', () => {
 });
 import {
   BRIEFING_LINK_PLACEHOLDER,
+  REVIEW_BUNDLE_LINK_PLACEHOLDER,
   distributionBodyHtml,
   getPreSiteDistributionHistory,
   renderBriefingBody,
+  reviewBundleDocumentUrl,
   normalizeDistributionRecipients,
   preparePreSiteDistribution,
   projectDistributionAttempt,
@@ -1312,6 +1314,7 @@ test('history returns configured Share defaults and preserves built-in fallbacks
   expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_link_text');
   expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_description');
   expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_expiry_lead_in');
+  expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.review_bundle_link_text');
 });
 
 test('history marks Share defaults configured only when every stored value is non-blank', async () => {
@@ -1322,6 +1325,7 @@ test('history marks Share defaults configured only when every stored value is no
     'email.deliberation_share.briefing_link_text': 'Open the packet',
     'email.deliberation_share.briefing_description': 'background and review materials.',
     'email.deliberation_share.briefing_expiry_lead_in': 'Available until',
+    'email.deliberation_share.review_bundle_link_text': 'Get every review',
   };
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => []),
@@ -1339,6 +1343,7 @@ test('history marks Share defaults configured only when every stored value is no
       linkText: 'Open the packet',
       description: 'background and review materials.',
       expiryLeadIn: 'Available until',
+      reviewBundleLinkText: 'Get every review',
     },
     configured: true,
     unavailable: false,
@@ -1362,7 +1367,7 @@ test('history reports unavailable Share defaults while retaining built-in wordin
     configured: false,
     unavailable: true,
   });
-  expect(consoleSpy).toHaveBeenCalledTimes(6);
+  expect(consoleSpy).toHaveBeenCalledTimes(7);
   consoleSpy.mockRestore();
 });
 
@@ -2112,6 +2117,26 @@ test('body html carries the briefing section only when a link was minted', () =>
   expect(withLink.indexOf('Briefing page')).toBeLessThan(withLink.indexOf('wmkf-pre-site-distribution'));
 });
 
+test('body html carries the review-bundle placeholder alongside the briefing link; renderBriefingBody resolves both hrefs from the one token', () => {
+  const link = { id: 'l', url: 'https://apps.test/external/briefing/abc123', expiresAt: '2026-10-08T20:00:00Z' };
+  const withLink = distributionBodyHtml('Hello', OPERATION_ID, [], link);
+  expect(withLink).toContain(`href="${REVIEW_BUNDLE_LINK_PLACEHOLDER}"`);
+  expect(withLink).toContain('Download all reviews (PDF)');
+  // Never a second token, or the token embedded anywhere in the stored body.
+  expect(withLink).not.toContain('apps.test');
+
+  const rendered = renderBriefingBody(withLink, link.url);
+  expect(rendered).toContain('href="https://apps.test/external/briefing/abc123"');
+  expect(rendered).toContain('href="https://apps.test/api/external/briefing/abc123/document?member=review-bundle"');
+  expect(rendered).not.toContain(BRIEFING_LINK_PLACEHOLDER);
+  expect(rendered).not.toContain(REVIEW_BUNDLE_LINK_PLACEHOLDER);
+
+  expect(reviewBundleDocumentUrl(link.url))
+    .toBe('https://apps.test/api/external/briefing/abc123/document?member=review-bundle');
+  expect(reviewBundleDocumentUrl(null)).toBeNull();
+  expect(reviewBundleDocumentUrl('not a url')).toBeNull();
+});
+
 test('body html uses Admin briefing wording while keeping the bound URL and expiration date server-owned', () => {
   const link = {
     id: 'l',
@@ -2163,6 +2188,29 @@ test('prepare freezes the Admin briefing wording into the stored body and previe
   }));
   const secondResult = await preparePreSiteDistribution(prepareInput(), second.dependencies);
   expect(secondResult.attempt.previewHash).not.toBe(firstResult.attempt.previewHash);
+});
+
+test('draftHash and previewHash both bind the review-bundle link-text copy key (discriminating: change only that key)', async () => {
+  const base = createPrepareHarness();
+  const baseResult = await preparePreSiteDistribution(prepareInput(), base.dependencies);
+  const baseDraftHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+  const changed = createPrepareHarness();
+  changed.dependencies.getSettingStrict = jest.fn(async (key) => (
+    key === 'email.deliberation_share.review_bundle_link_text'
+      ? { found: true, value: 'Get every review' }
+      : { found: false, value: null }
+  ));
+  const changedResult = await preparePreSiteDistribution(
+    prepareInput({ operationId: '77777777-7777-4777-8777-777777777779' }),
+    changed.dependencies,
+  );
+  const changedDraftHash = changed.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+  expect(changedDraftHash).not.toBe(baseDraftHash);
+  expect(changedResult.attempt.previewHash).not.toBe(baseResult.attempt.previewHash);
+  const stored = changed.dependencies.createOrGetAttempt.mock.calls[0][0].bodyHtml;
+  expect(stored).toContain('>Get every review</a>');
 });
 
 test('prepare mints the briefing link, binds it to the attempt, and folds it into the preview hash', async () => {
