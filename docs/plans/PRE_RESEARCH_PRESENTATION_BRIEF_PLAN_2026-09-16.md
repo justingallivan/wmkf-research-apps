@@ -603,7 +603,9 @@ Branch was pushed at the pause; the Session 516 commits are pushed with the PR.
 re-read; relationship `wmkf_request_currentprerpbrief` created under
 `DATAVERSE_PROD_WRITE_ACK`; preflight `--target=prod` reports 43 exact / 0 absent / 0 divergent.
 Atlas, matrix, file-model, briefing-plan, wiki, and work-queue restatements were reconciled
-in slice 6. Migration 052 is **not** applied to any database.
+in slice 6. Migration 052 was applied to the shared Production/Preview database by the
+owner on 2026-09-16 (readback exact) before merge, per the Codex adversarial finding that
+merge auto-deploys code naming the new columns.
 
 **Resume steps:**
 1. `git checkout claude/pre-rp-brief`; confirm HEAD `4dbef6d7`.

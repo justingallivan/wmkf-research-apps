@@ -503,8 +503,8 @@ with both fingerprints and a bounded delta, retryable only with
 fingerprints, the delta, and the acknowledgement are bound into `draftHash`
 and `previewHash`. The acknowledgement persists on the Postgres attempt row
 via migration `052_pre_site_distribution_brief_inputs.sql`
-**[PLANNED — file on branch, not applied to any database; apply via
-`node scripts/apply-migrations.js` after merge]**. Slice 5 (built, same
+**[VERIFIED LIVE 2026-09-16 — applied to the shared Production/Preview
+database by the owner via `node scripts/apply-migrations.js`; readback exact]**. Slice 5 (built, same
 branch) adds the brief card, explicit Start Site Visit action, composite stage
 projection, cycle-list union, drift-confirmation retry UI, and the timestamp-only
 Board notice on the briefing page.

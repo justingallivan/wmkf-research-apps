@@ -194,7 +194,7 @@ calendar/hash/material constraints and columns read back exact.
 SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
 Dynamics remains email-activity/transport authority.
 
-**[PLANNED — migration 052 file on branch, not applied to any database; apply via `node scripts/apply-migrations.js` after merge]** Migration
+**[VERIFIED LIVE 2026-09-16 — migration 052 applied to the shared Production/Preview database by the owner via `node scripts/apply-migrations.js` (tracker `applied_at` 2026-09-17T03:59:31Z); readback exact: five nullable columns, both CHECK constraints, 14 pre-existing attempt rows all satisfy the constraints]** Migration
 `052_pre_site_distribution_brief_inputs.sql` (Pre-RP Brief plan §3.4b, slice 4)
 adds five nullable audit columns — `input_fingerprint_generated CHAR(64)`,
 `input_fingerprint_live CHAR(64)`, `stale_inputs_delta JSONB`,
