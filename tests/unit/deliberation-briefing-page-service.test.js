@@ -1157,7 +1157,11 @@ describe('writeup-docx verifies the governed content hash from the snapshot regi
   const snapshotRow = (overrides = {}) => ({
     wmkf_requestdocumentid: SNAPSHOT_ID,
     _wmkf_request_value: REQUEST_ID,
+    wmkf_producer: 'request-workbench-distribution-docx',
     wmkf_operationstatus: 100000001, // READY
+    wmkf_lifecyclestate: 100000002, // BOARD_READY
+    wmkf_sharepointdriveid: 'd',
+    wmkf_sharepointitemid: 'i',
     wmkf_contenthash: GOVERNED,
     ...overrides,
   });
@@ -1187,11 +1191,31 @@ describe('writeup-docx verifies the governed content hash from the snapshot regi
     await refuse(pinned({ hashDocx: jest.fn(async () => { throw new Error('not a zip'); }) }));
   });
 
-  test('refuses when the registry row is missing, not Ready, bound to another request, or has no content hash', async () => {
-    await refuse(pinned({ findDocumentById: jest.fn(async () => ({ records: [] })) }));
-    await refuse(pinned({ findDocumentById: jest.fn(async () => ({ records: [snapshotRow({ wmkf_operationstatus: 100000000 })] })) }));
-    await refuse(pinned({ findDocumentById: jest.fn(async () => ({ records: [snapshotRow({ _wmkf_request_value: '99999999-9999-4999-8999-999999999999' })] })) }));
-    await refuse(pinned({ findDocumentById: jest.fn(async () => ({ records: [snapshotRow({ wmkf_contenthash: null })] })) }));
+  test('refuses, before any Graph read, a registry row that is missing, not Ready, superseded, another request\'s, another producer\'s, another drive/item, or has no content hash', async () => {
+    const rows = [
+      [],
+      [snapshotRow({ wmkf_operationstatus: 100000000 })],
+      [snapshotRow({ wmkf_lifecyclestate: 100000003 })],
+      [snapshotRow({ _wmkf_request_value: '99999999-9999-4999-8999-999999999999' })],
+      [snapshotRow({ wmkf_producer: 'request-workbench' })],
+      [snapshotRow({ wmkf_producer: 'request-workbench-distribution-pdf' })],
+      [snapshotRow({ wmkf_sharepointdriveid: 'other-drive' })],
+      [snapshotRow({ wmkf_sharepointitemid: 'other-item' })],
+      [snapshotRow({ wmkf_contenthash: null })],
+      [snapshotRow(), snapshotRow()],
+    ];
+    for (const records of rows) {
+      const d = pinned({ findDocumentById: jest.fn(async () => ({ records })) });
+      await refuse(d);
+      expect(d.downloadFile).not.toHaveBeenCalled();
+      expect(d.hashDocx).not.toHaveBeenCalled();
+    }
+  });
+
+  test('serves only when the row is the docx distribution snapshot bound to the pinned drive/item', async () => {
+    const d = pinned();
+    await resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, d);
+    expect(d.downloadFile).toHaveBeenCalledWith('d', 'i');
   });
 
   test('an attempt with no registry pointer keeps the byte-hash identity (legacy rows)', async () => {

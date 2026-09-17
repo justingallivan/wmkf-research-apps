@@ -76,14 +76,26 @@ async function buildDocx({
   documentXml = '<w:document><w:body><w:p>Governed content</w:p></w:body></w:document>',
   commentsTarget = 'comments.xml',
   sharePointMetadata = false,
+  rootTarget = 'word/document.xml',
+  extraRelationships = [],
+  extraParts = {},
 } = {}) {
   const archive = new JSZip();
+  archive.file(
+    '_rels/.rels',
+    '<?xml version="1.0"?><Relationships>'
+    + `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="${rootTarget}"/>`
+    + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+    + '</Relationships>',
+  );
+  for (const [name, content] of Object.entries(extraParts)) archive.file(name, content);
   archive.file('word/document.xml', documentXml);
   archive.file('word/styles.xml', '<w:styles><w:style w:styleId="Normal"/></w:styles>');
   archive.file('word/comments.xml', '<w:comments/>');
   const relationships = [
     '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
     `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="${commentsTarget}"/>`,
+    ...extraRelationships,
   ];
   if (sharePointMetadata) {
     relationships.reverse();
@@ -292,6 +304,48 @@ it('changes the governed DOCX hash when Word content changes', async () => {
 
   await expect(hashGovernedDocxContent(edited))
     .resolves.not.toBe(await hashGovernedDocxContent(DOCX));
+});
+
+it('rejects a package whose root relationship opens a main part other than word/document.xml (substitution)', async () => {
+  // The hashed `word/` subtree is untouched; Word would render the other part.
+  const substituted = await buildDocx({
+    rootTarget: 'other/document.xml',
+    extraParts: { 'other/document.xml': '<w:document><w:body><w:p>Substituted</w:p></w:body></w:document>' },
+  });
+  await expect(hashGovernedDocxContent(substituted)).rejects.toThrow(/does not open word\/document\.xml/);
+  await expect(hashGovernedDocxContent(await buildDocx({ rootTarget: '/word/document.xml' })))
+    .resolves.toBe(await hashGovernedDocxContent(DOCX));
+});
+
+it('rejects a governed document relationship that reaches outside word/, but tolerates external hyperlinks', async () => {
+  const outside = await buildDocx({
+    extraRelationships: ['<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/swapped.png"/>'],
+    extraParts: { 'media/swapped.png': Buffer.from('png') },
+  });
+  await expect(hashGovernedDocxContent(outside)).rejects.toThrow(/outside word\//);
+  const hyperlink = await buildDocx({
+    extraRelationships: ['<Relationship Id="rId8" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.org/" TargetMode="External"/>'],
+  });
+  await expect(hashGovernedDocxContent(hyperlink)).resolves.toMatch(/^gdc1:/);
+});
+
+it('the shipped Word templates open word/document.xml and pass the governed package validation', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  for (const relativePath of [
+    'shared/templates/pre-research-presentation-brief/brief-v1.docx',
+    'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx',
+  ]) {
+    const template = fs.readFileSync(path.join(process.cwd(), relativePath));
+    await expect(hashGovernedDocxContent(template)).resolves.toMatch(/^gdc1:/);
+  }
+});
+
+it('rejects a package with no package relationships part', async () => {
+  const archive = new JSZip();
+  archive.file('word/document.xml', '<w:document/>');
+  await expect(hashGovernedDocxContent(await archive.generateAsync({ type: 'nodebuffer' })))
+    .rejects.toThrow(/package relationships/);
 });
 
 it('changes the governed DOCX hash when a non-SharePoint document relationship changes', async () => {

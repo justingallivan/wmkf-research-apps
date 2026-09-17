@@ -2925,3 +2925,137 @@ describe('send identifies a frozen Word attachment by its governed content hash 
     await expect(send()).rejects.toMatchObject({ code: 'distribution_attachment_recovery_mismatch' });
   });
 });
+
+describe('partial-failure retries survive the SharePoint rewrite (Codex adversarial review, plan §12)', () => {
+  const sha256 = (buffer) => require('node:crypto').createHash('sha256').update(buffer).digest('hex');
+  const REWRITTEN = Buffer.from('governed-word-bytes+customXml+docProps-repacked-by-sharepoint');
+
+  test('lost finalize: an uploaded-but-never-Ready Word snapshot is recovered by governed content after SharePoint rewrote it, and the served bytes are pinned', async () => {
+    const harness = createPrepareHarness();
+    const { dependencies } = harness;
+    // First prepare: upload succeeds, the Ready update never commits.
+    const update = dependencies.updateDocument;
+    dependencies.updateDocument = jest.fn(async (id, patch, options) => {
+      if (patch.wmkf_operationstatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY && patch.wmkf_contenthash) {
+        throw new Error('gateway timeout after upload');
+      }
+      return update(id, patch, options);
+    });
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
+      .rejects.toThrow('gateway timeout after upload');
+    expect(dependencies.uploadFile).toHaveBeenCalledTimes(1);
+    const uploadedName = dependencies.uploadFile.mock.calls[0][2];
+
+    // Retry: the path is occupied by the rewritten file; the registry row is not Ready.
+    dependencies.updateDocument = update;
+    const metadataByPath = dependencies.getFileMetadataByPath;
+    dependencies.getFileMetadataByPath = jest.fn(async (library, folder, filename) => (
+      filename === uploadedName
+        ? { id: 'word-snapshot', driveId: 'snapshot-drive', versionId: '2.0', eTag: 'word-etag-rewritten', size: REWRITTEN.length, name: filename }
+        : metadataByPath(library, folder, filename)
+    ));
+    const download = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      itemId === 'word-snapshot' ? { buffer: REWRITTEN, filename: uploadedName } : download(driveId, itemId)
+    ));
+    const metadataById = dependencies.getFileMetadataById;
+    dependencies.getFileMetadataById = jest.fn(async (driveId, itemId, options) => {
+      const base = await metadataById(driveId, itemId, options);
+      return itemId === 'word-snapshot'
+        ? { ...base, driveId: 'snapshot-drive', versionId: '2.0', eTag: 'word-etag-rewritten', size: REWRITTEN.length }
+        : base;
+    });
+    dependencies.hashDocx = jest.fn(async () => 'gdc1:source-hash');
+
+    const result = await preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), dependencies);
+
+    expect(result.attempt.attachments).toEqual([]);
+    // The Word snapshot was recovered, never re-uploaded (the retry still builds the PDF and bundle snapshots).
+    const wordUploads = dependencies.uploadFile.mock.calls.filter(([, , , , contentType]) => contentType === PRE_SITE_VISIT_CONTRACT.contentType);
+    expect(wordUploads).toHaveLength(1);
+    const projected = dependencies.recordPrepared.mock.calls[0][1].docx;
+    expect(projected).toMatchObject({ byteHash: sha256(REWRITTEN), size: REWRITTEN.length, versionId: '2.0' });
+    expect(harness.snapshots[0]).toMatchObject({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY });
+  });
+
+  test('lost finalize: a different governed document at the snapshot path is still a path conflict', async () => {
+    const harness = createPrepareHarness();
+    const { dependencies } = harness;
+    const update = dependencies.updateDocument;
+    dependencies.updateDocument = jest.fn(async (id, patch, options) => {
+      if (patch.wmkf_operationstatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY && patch.wmkf_contenthash) {
+        throw new Error('gateway timeout after upload');
+      }
+      return update(id, patch, options);
+    });
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies)).rejects.toThrow();
+    const uploadedName = dependencies.uploadFile.mock.calls[0][2];
+    dependencies.updateDocument = update;
+    const metadataByPath = dependencies.getFileMetadataByPath;
+    dependencies.getFileMetadataByPath = jest.fn(async (library, folder, filename) => (
+      filename === uploadedName
+        ? { id: 'word-snapshot', driveId: 'snapshot-drive', versionId: '2.0', eTag: 'e', size: REWRITTEN.length, name: filename }
+        : metadataByPath(library, folder, filename)
+    ));
+    const download = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      itemId === 'word-snapshot' ? { buffer: REWRITTEN, filename: uploadedName } : download(driveId, itemId)
+    ));
+    dependencies.hashDocx = jest.fn(async (buffer) => (buffer.equals(REWRITTEN) ? 'gdc1:someone-elses-document' : 'gdc1:source-hash'));
+
+    await expect(preparePreSiteDistribution(prepareInput({
+      operationId: '99999999-9999-4999-8999-999999999999',
+      attachmentMode: 'none',
+    }), dependencies)).rejects.toMatchObject({ code: 'distribution_snapshot_path_conflict' });
+  });
+
+  test('same-operation retry: a source whose package SharePoint rewrote after the first capture still re-captures by version and governed content', async () => {
+    const harness = createPrepareHarness({ dedupeAttempts: true });
+    const { dependencies } = harness;
+    // First prepare fails after the source was recorded but before the snapshot was prepared.
+    const recordPrepared = dependencies.recordPrepared;
+    dependencies.recordPrepared = jest.fn(async () => { throw new Error('ledger unavailable'); });
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
+      .rejects.toThrow('ledger unavailable');
+    expect(dependencies.recordSource).toHaveBeenCalledTimes(1);
+    const firstCapture = dependencies.recordSource.mock.calls[0][1];
+
+    // The working document's bytes were rewritten in place (same version).
+    dependencies.recordPrepared = recordPrepared;
+    const download = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      driveId === 'source-drive' && itemId === 'source-item'
+        ? { buffer: REWRITTEN, filename: 'source.docx' }
+        : download(driveId, itemId)
+    ));
+    const metadataById = dependencies.getFileMetadataById;
+    dependencies.getFileMetadataById = jest.fn(async (driveId, itemId, options) => {
+      const base = await metadataById(driveId, itemId, options);
+      // Both the rewritten source and the snapshot copied from it now carry the rewritten length.
+      return (driveId === 'source-drive' && itemId === 'source-item') || itemId === 'word-snapshot'
+        ? { ...base, size: REWRITTEN.length }
+        : base;
+    });
+    dependencies.hashDocx = jest.fn(async () => 'gdc1:source-hash');
+
+    const result = await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies);
+    expect(result.attempt.attachments).toEqual([]);
+    const secondCapture = dependencies.recordSource.mock.calls[1][1];
+    expect(secondCapture.contentHash).toBe(firstCapture.contentHash);
+    expect(secondCapture.byteHash).toBe(sha256(REWRITTEN));
+    expect(secondCapture.byteHash).not.toBe(firstCapture.byteHash);
+  });
+
+  test('same-operation retry: a source whose governed content changed is refused (distribution_source_hash_mismatch)', async () => {
+    const harness = createPrepareHarness({ dedupeAttempts: true });
+    const { dependencies } = harness;
+    dependencies.recordPrepared = jest.fn(async () => { throw new Error('ledger unavailable'); });
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies)).rejects.toThrow();
+    dependencies.hashDocx = jest.fn(async () => 'gdc1:edited-after-capture');
+    await expect(preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), dependencies))
+      .rejects.toMatchObject({ code: 'distribution_source_hash_mismatch' });
+  });
+});

@@ -1282,14 +1282,32 @@ abstract edit and authorized the send and the download.
   failed `distribution_attachment_hash_mismatch` / `_recovery_mismatch`; it now compares the
   governed hash against the attempt's `source_content_hash` (the Word snapshot inherits the
   captured source's content hash at prepare) and skips the size equality for Word only. PDF
-  and calendar attachments keep the byte identity. **Left as is:** `loadCapturedSource`
-  (prepare-only, re-prepare of the same operation) still compares the *source* by byte hash;
-  the source is read after its own rewrite settles in every observed flow, and a mismatch
-  there produces a fresh snapshot rather than a dead link. Discriminating tests: a rewritten package with matching governed content is
+  and calendar attachments keep the byte identity. Discriminating tests: a rewritten package with matching governed content is
   reusable/servable (fails on the old code), a differing governed hash or unparseable
   package is refused, and the registry-row guards (missing, not Ready, other request, no
   hash) refuse; on the send path a rewritten Word attachment with matching governed content
   attaches and recovers (fails on the old code) while a differing or unparseable one refuses.
+  **Codex adversarial review round 1 (2026-09-17, gpt-5.6-sol, base `eece40b0`): needs-attention,
+  four findings, all fixed on the branch.** (1) *high* — the governed hash covered only
+  `word/`, so a substituted package could keep that subtree while its root relationship
+  opened another main part or a document relationship reached outside `word/`. Fixed as
+  validation without changing the digest (stored `gdc1:` hashes stay valid):
+  `hashGovernedDocxContent` now requires `_rels/.rels` with exactly one officeDocument
+  relationship resolving to `word/document.xml` and every non-customXml, non-External
+  document relationship to resolve under `word/` (regression packages: substituted root,
+  out-of-tree image, missing root rels; an External hyperlink still hashes). (2) *high* — the
+  briefing route used the registry row only for its hash. It now loads and binds the row
+  before any Graph read: this request, producer `request-workbench-distribution-docx`,
+  Ready, not Superseded, and drive/item equal to the ledger's pointers; tests assert no
+  download happens when any of those fail. (3) *high* — lost-finalize recovery (upload
+  committed, Ready never recorded) still required byte equality at the snapshot path and
+  would loop on `distribution_snapshot_path_conflict`; Word now recovers by governed hash and
+  re-pins the served bytes' hash and size (test: rewritten file recovered, no second Word
+  upload; a different governed document is still a path conflict). (4) *medium* — my earlier
+  claim that a `loadCapturedSource` mismatch "produces a fresh snapshot" was wrong: a
+  same-operation retry threw before creating anything. The source is now identified by
+  version plus governed hash on re-capture and its byte hash recomputed from the served
+  bytes (tests: rewritten source re-captures; edited content still refuses).
   Post-upload byte re-reading was rejected because the rewrite lands after
   prepare's metadata read (`stableUploadedMetadata` requires the uploaded size), so a
   pinned served hash would go stale minutes later.
