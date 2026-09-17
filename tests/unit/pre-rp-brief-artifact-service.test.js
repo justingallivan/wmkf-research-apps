@@ -405,6 +405,34 @@ describe('generatePreRpBrief', () => {
     expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
   });
 
+  it('refuses activation when a rival generation moved the pointer first, and deletes its own upload (activation fence)', async () => {
+    const harness = createHarness();
+    const rival = briefRow({
+      wmkf_requestdocumentid: NEWER_ARTIFACT_ID,
+      wmkf_generationkey: 'rival-generation-key',
+    });
+    const originalUpload = harness.dependencies.uploadFile.getMockImplementation();
+    harness.dependencies.uploadFile.mockImplementation(async (...args) => {
+      // A newer generation (e.g. a later render version) activates while this
+      // one is uploading.
+      harness.request._wmkf_currentprerpbrief_value = rival.wmkf_requestdocumentid;
+      const priorFind = harness.dependencies.findByRequest.getMockImplementation();
+      harness.dependencies.findByRequest.mockImplementation(async (...findArgs) => {
+        const result = await priorFind(...findArgs);
+        return { ...result, records: [...(result?.records || []), { ...rival }] };
+      });
+      return originalUpload(...args);
+    });
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'late-op' },
+      harness.dependencies,
+    )).rejects.toMatchObject({ code: 'brief_pointer_changed', httpStatus: 409 });
+    expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+    expect(harness.request._wmkf_currentprerpbrief_value).toBe(rival.wmkf_requestdocumentid);
+    expect(harness.dependencies.deleteFile).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ['SUPERSEDED row', briefRow({
       wmkf_requestdocumentid: OLDER_ARTIFACT_ID,

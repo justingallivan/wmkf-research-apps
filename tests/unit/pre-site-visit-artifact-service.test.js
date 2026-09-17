@@ -695,6 +695,11 @@ test('activation refuses when a concurrent generation moved the pointer first (a
     .rejects.toMatchObject({ code: 'pre_site_visit_pointer_changed', httpStatus: 409 });
   expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
   expect(harness.request._wmkf_currentpresitevisit_value).toBe(rival.wmkf_requestdocumentid);
+  // The refused generation's upload is not left orphaned in SharePoint.
+  expect(harness.dependencies.deleteFile).toHaveBeenCalledTimes(1);
+  const [deletedDrive, deletedItem] = harness.dependencies.deleteFile.mock.calls[0];
+  expect(deletedDrive).toBe(harness.uploaded.driveId);
+  expect(deletedItem).toBe(harness.uploaded.id);
 });
 
 test('read-only status returns the current Ready artifact without generation side effects', async () => {

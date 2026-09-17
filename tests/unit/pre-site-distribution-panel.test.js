@@ -417,6 +417,32 @@ test('a late recipient suggestion that seeds a blank field invalidates the prepa
   expect(screen.queryByRole('button', { name: 'Send email' })).not.toBeInTheDocument();
 });
 
+test('a later automatic seed replaces the earlier automatic seed and invalidates a confirmed preview, but never a staff edit', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }));
+  const props = { requestId: REQUEST_ID, requestNumber: '1002379', sourceArtifact: { artifactId: ARTIFACT_ID } };
+  const { rerender } = render(
+    <PreSiteDistributionPanel {...props} suggestedTo={['fallback@example.org']} suggestedCc={['first-cc@example.org']} />,
+  );
+  await screen.findByText(/No email previews/);
+  expect(screen.getByLabelText('To')).toHaveValue('fallback@example.org');
+  // Staff edit Cc only; To keeps the automatic seed.
+  fireEvent.change(screen.getByLabelText('Cc'), { target: { value: 'edited-cc@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  expect(screen.getByRole('button', { name: 'Send email' })).toBeEnabled();
+
+  rerender(
+    <PreSiteDistributionPanel {...props} suggestedTo={['attendee@example.org']} suggestedCc={['second-cc@example.org']} />,
+  );
+  expect(screen.getByLabelText('To')).toHaveValue('attendee@example.org');
+  expect(screen.getByLabelText('Cc')).toHaveValue('edited-cc@example.org');
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Send email' })).not.toBeInTheDocument();
+});
+
 test('a brief_snapshot_invalid prepare failure shows its own copy, distinct from the zero-review reason', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
