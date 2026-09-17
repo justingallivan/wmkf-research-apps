@@ -211,6 +211,12 @@ export default function StaffDeliberationsTab({
   const [noBriefRowsAtAll, setNoBriefRowsAtAll] = useState(false);
   const briefSequence = useRef(0);
   const briefController = useRef(null);
+  // Guarded regeneration of a brief already sent to the Board (owner decision
+  // 2026-09-16, plan §10) — superuser-only; mirrors the Pre-Site reopen
+  // state above but targets the brief's own artifact/status.
+  const [briefReopeningRequestId, setBriefReopeningRequestId] = useState(null);
+  const [briefReopenForm, setBriefReopenForm] = useState(null);
+  const [briefReopenError, setBriefReopenError] = useState(null);
 
   // Shared composer/dialog state.
   const [composerOpen, setComposerOpen] = useState(false);
@@ -789,6 +795,89 @@ export default function StaffDeliberationsTab({
     }
   };
 
+  const briefReopening = briefReopeningRequestId === requestId;
+  const briefReopenFormValid = Boolean(
+    briefReopenForm
+      && requestNumber
+      && Object.prototype.hasOwnProperty.call(PRE_SITE_REOPEN_REASON_LABEL, briefReopenForm.reasonCode)
+      && briefReopenForm.reasonNote.trim().length >= PRE_SITE_REOPEN_CONTRACT.minimumReasonNoteLength
+      && briefReopenForm.reasonNote.trim().length <= PRE_SITE_REOPEN_CONTRACT.maximumReasonNoteLength
+      && briefReopenForm.typedRequestNumber === requestNumber,
+  );
+
+  const openBriefReopenDialog = () => {
+    if (!briefShared || !everSent || !isSuperuser || briefReopeningRequestId === requestId
+      || !requestNumber || !briefArtifact) return;
+    setBriefReopenError(null);
+    setBriefReopenForm({
+      reasonCode: '',
+      reasonNote: '',
+      typedRequestNumber: '',
+      clientOperationId: newClientOperationId(),
+      submitted: false,
+    });
+  };
+
+  const submitBriefReopen = async (event) => {
+    event.preventDefault();
+    if (!briefReopenFormValid || briefReopening || !briefShared || !requestId || !briefArtifact) return;
+
+    const id = requestId;
+    const expectedArtifactId = briefArtifact.artifactId;
+    const sequence = ++briefSequence.current;
+    briefController.current?.abort();
+    const controller = new AbortController();
+    briefController.current = controller;
+    setBriefReopeningRequestId(id);
+    setBriefReopenError(null);
+    setBriefReopenForm((current) => (current ? { ...current, submitted: true } : current));
+    try {
+      const response = await fetch('/api/workbench/pre-rp-brief/reopen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: id,
+          expectedArtifactId,
+          clientOperationId: briefReopenForm.clientOperationId,
+          requestNumber: briefReopenForm.typedRequestNumber,
+          reasonCode: briefReopenForm.reasonCode,
+          reasonNote: briefReopenForm.reasonNote.trim(),
+        }),
+        signal: controller.signal,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `Guarded brief regeneration failed (${response.status})`);
+      if (briefSequence.current !== sequence || id !== requestId) return;
+
+      // Refreshes brief status (the new artifact) and, by updating the
+      // distribution panel's sourceArtifact prop below, its distribution
+      // history — `everSent` re-derives against the new (never-sent) row.
+      const refreshed = await readBriefStatus(id, controller.signal);
+      if (briefSequence.current !== sequence || id !== requestId) return;
+      setBriefArtifact(refreshed.currentArtifact || body.artifact || null);
+      setBriefPendingArtifact(refreshed.pendingArtifact || null);
+      if (response.status === 202
+        || body.artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
+        setBriefReopenError(
+          'This guarded regeneration is already in progress. Keep this dialog open and retry to check the same operation.',
+        );
+        return;
+      }
+      setBriefReopenForm(null);
+    } catch (submitError) {
+      if (submitError?.name !== 'AbortError'
+        && briefSequence.current === sequence
+        && id === requestId) {
+        setBriefReopenError(submitError.message);
+      }
+    } finally {
+      if (briefSequence.current === sequence && id === requestId) {
+        if (briefController.current === controller) briefController.current = null;
+        setBriefReopeningRequestId(null);
+      }
+    }
+  };
+
   const confirmDialogContent = confirmDialog?.kind === 'brief'
     ? {
       title: 'Regenerate this brief?',
@@ -863,6 +952,11 @@ export default function StaffDeliberationsTab({
     },
     briefReadyFile && briefShared && everSent && {
       key: 'send-again', label: 'Send the deliberation email again…', onSelect: openComposer,
+    },
+    // Guarded regeneration of a brief already sent to the Board (owner
+    // decision 2026-09-16, plan §10): superuser-only, never shown otherwise.
+    briefReadyFile && briefShared && everSent && isSuperuser && !beyondDeliberations && {
+      key: 'reopen-sent', label: 'Regenerate sent brief…', onSelect: openBriefReopenDialog, disabled: briefGenerating,
     },
   ].filter(Boolean);
 
@@ -1393,6 +1487,109 @@ export default function StaffDeliberationsTab({
                   className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 >
                   {reopening ? 'Reopening…' : 'Create Draft Successor'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {briefReopenForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="brief-reopen-title"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h3 id="brief-reopen-title" className="text-lg font-semibold text-gray-900">
+              Regenerate a brief the Board already received?
+            </h3>
+            <p className="mt-2 text-sm text-gray-700">
+              The Board already received this brief. A new Draft brief will replace it for staff.
+              The deliberation briefing page keeps serving the version already sent until you share again.
+            </p>
+            {briefReopenError && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+                {briefReopenError}
+              </div>
+            )}
+            <form className="mt-4 space-y-4" onSubmit={submitBriefReopen}>
+              <div>
+                <label htmlFor="brief-reopen-reason" className="block text-sm font-medium text-gray-800">
+                  Reason
+                </label>
+                <select
+                  id="brief-reopen-reason"
+                  value={briefReopenForm.reasonCode}
+                  onChange={(event) => setBriefReopenForm((current) => ({
+                    ...current,
+                    reasonCode: event.target.value,
+                  }))}
+                  disabled={briefReopening || briefReopenForm.submitted}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Select a reason</option>
+                  {Object.entries(PRE_SITE_REOPEN_REASON_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="brief-reopen-note" className="block text-sm font-medium text-gray-800">
+                  Correction note
+                </label>
+                <textarea
+                  id="brief-reopen-note"
+                  value={briefReopenForm.reasonNote}
+                  onChange={(event) => setBriefReopenForm((current) => ({
+                    ...current,
+                    reasonNote: event.target.value,
+                  }))}
+                  minLength={PRE_SITE_REOPEN_CONTRACT.minimumReasonNoteLength}
+                  maxLength={PRE_SITE_REOPEN_CONTRACT.maximumReasonNoteLength}
+                  rows={4}
+                  disabled={briefReopening || briefReopenForm.submitted}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {PRE_SITE_REOPEN_CONTRACT.minimumReasonNoteLength}–{PRE_SITE_REOPEN_CONTRACT.maximumReasonNoteLength} characters.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="brief-reopen-confirmation" className="block text-sm font-medium text-gray-800">
+                  Type request number {requestNumber} to confirm
+                </label>
+                <input
+                  id="brief-reopen-confirmation"
+                  value={briefReopenForm.typedRequestNumber}
+                  onChange={(event) => setBriefReopenForm((current) => ({ ...current, typedRequestNumber: event.target.value }))}
+                  autoComplete="off"
+                  disabled={briefReopening || briefReopenForm.submitted}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+                {briefReopenForm.submitted && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    This operation keeps its original reason and confirmation for safe retry.
+                    Cancel and reopen the dialog to start a different operation.
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setBriefReopenForm(null); setBriefReopenError(null); }}
+                  disabled={briefReopening}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!briefReopenFormValid || briefReopening}
+                  className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {briefReopening ? 'Regenerating…' : 'Regenerate Sent Brief'}
                 </button>
               </div>
             </form>

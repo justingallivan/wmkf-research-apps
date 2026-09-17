@@ -152,6 +152,7 @@ function statusResponse({
 // the responses they care about.
 const ROUTE_DEFS = [
   { key: 'briefLock', test: (u, m) => m === 'POST' && u.includes('/pre-rp-brief/lock-for-share') },
+  { key: 'briefReopen', test: (u, m) => m === 'POST' && u.includes('/pre-rp-brief/reopen') },
   { key: 'startSiteVisit', test: (u, m) => m === 'POST' && u.includes('/pre-site-visit/start-site-visit') },
   { key: 'reopen', test: (u, m) => m === 'POST' && u.includes('/pre-site-visit/reopen') },
   { key: 'briefGet', test: (u, m) => m === 'GET' && u.includes('/pre-rp-brief') },
@@ -167,6 +168,7 @@ function queueRoute(key, resp) {
 
 const defaultFor = {
   briefLock: () => response({ success: true, artifact: briefArtifact(REVIEW), reused: false }),
+  briefReopen: () => response({ success: true, artifact: briefArtifact(DRAFT), reused: false }),
   startSiteVisit: () => response({ success: true, artifact: preSiteArtifact(REVIEW) }),
   reopen: () => response({ success: true, artifact: preSiteArtifact(DRAFT), reused: false }),
   // NEW-5 (Opus round 2): the default brief GET reports no brief rows at
@@ -521,6 +523,109 @@ test('NEW-1: Regenerate Brief is not offered once the shared brief has already b
   await screen.findByRole('link', { name: 'Open working document' });
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.queryByRole('menuitem', { name: 'Regenerate Brief' })).not.toBeInTheDocument();
+});
+
+// ── Guarded regeneration of a brief already sent to the Board (owner
+// decision 2026-09-16, plan §10) ─────────────────────────────────────────
+
+test('Regenerate sent brief… is hidden for a non-superuser even once the brief has been sent', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser={false} />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate sent brief…' })).not.toBeInTheDocument();
+});
+
+test('Regenerate sent brief… is shown for a superuser once sent, and hidden while not yet sent', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' })).toBeInTheDocument();
+});
+
+test('Regenerate sent brief… is hidden for a superuser while the shared brief has not yet been sent', async () => {
+  distributionHistoryFeed = { attempts: [], currentSourceEverSent: false };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate sent brief…' })).not.toBeInTheDocument();
+});
+
+test('the guarded brief-reopen dialog stays disabled until reason, a valid note, and the exact request number are given, then submits exactly six fields', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
+
+  const dialog = screen.getByRole('dialog', { name: 'Regenerate a brief the Board already received?' });
+  const submit = within(dialog).getByRole('button', { name: 'Regenerate Sent Brief' });
+  expect(submit).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'short' } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The Board received an incomplete draft.' } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: 'wrong-number' } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  expect(submit).toBeEnabled();
+
+  fireEvent.click(submit);
+
+  await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
+  const sentBody = JSON.parse(calls('briefReopen')[0][1].body);
+  expect(Object.keys(sentBody).sort()).toEqual([
+    'clientOperationId',
+    'expectedArtifactId',
+    'reasonCode',
+    'reasonNote',
+    'requestId',
+    'requestNumber',
+  ]);
+  expect(sentBody).toMatchObject({
+    requestId: REQUEST_ID,
+    expectedArtifactId: BRIEF_ARTIFACT_ID,
+    requestNumber: '1002379',
+    reasonCode: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF,
+    reasonNote: 'The Board received an incomplete draft.',
+  });
+});
+
+test('a successful guarded brief regeneration refreshes brief status and distribution history', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  queueRoute('briefReopen', response({ success: true, artifact: briefArtifact(DRAFT), reused: false }));
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The Board received an incomplete draft.' } });
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate Sent Brief' }));
+
+  await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
+  // The status GET is re-fetched (brief status refresh); the distribution
+  // panel's sourceArtifact prop moves to the new row, which is how its own
+  // history (everSent) re-derives against that new, never-sent row.
+  await waitFor(() => expect(calls('briefGet').length).toBeGreaterThanOrEqual(2));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Regenerate a brief the Board already received?' })).not.toBeInTheDocument());
+  expect(await screen.findByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Share…' })).toBeInTheDocument();
 });
 
 test('Brief card: regenerate opens a brief-scoped confirmation dialog', async () => {

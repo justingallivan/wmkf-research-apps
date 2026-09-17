@@ -672,3 +672,116 @@ merge auto-deploys code naming the new columns.
 5. Controller review: `/contract-reconcile` Mode B invariant table, full `/start` gate list
    sequentially, full jest, lint, build; push; PR; then owner runs
    `/codex:adversarial-review --wait --base 236d9219 --model gpt-5.6-sol …` with the receipt marker.
+
+## 10. Guarded regeneration of a sent brief (owner decision 2026-09-16)
+
+Closes §8 item (ix): the owner asked that Regenerate on a brief already sent to
+the Board, instead of staying permanently unavailable, become available only
+through a guarded, superuser-only, audited path mirroring the Pre-Site guarded
+reopen (`pages/api/workbench/pre-site-visit/reopen.js`,
+`lib/services/pre-site-visit/reopen-service.js`). Built on
+`claude/pre-rp-brief-guarded-regen` off `claude/pre-rp-brief-followups` @
+`694863d5`; file:line below are from that branch.
+
+**Design.** Unlike Pre-Site's reopen, the brief never copies bytes — it always
+re-renders deterministically from the frozen input snapshot — so this feature
+validates the guarded-reopen preconditions and then delegates to the ordinary
+claim/render/upload/activate lineage in `generatePreRpBrief`
+(`lib/services/pre-rp-brief/artifact-service.js:658`) via a new internal
+`reopen` option, rather than re-implementing that lineage.
+
+1. **Service** `lib/services/pre-rp-brief/reopen-service.js`, export
+   `reopenSentPreRpBrief(input, { actingUserSystemId }, dependencies)`. All
+   steps below are read-only; the only write is the delegated
+   `generatePreRpBrief` call in the last step.
+   a. `validateInput` (line 77) mirrors, rather than imports, Pre-Site's
+      `validateInput` (`lib/services/pre-site-visit/reopen-service.js:532`,
+      exported): the same six fields and the same reason/note rules
+      (`PRE_SITE_REOPEN_REASON`, `PRE_SITE_REOPEN_CONTRACT` min/max, reused),
+      but `brief_reopen_*` error codes instead of `pre_site_reopen_*`, since
+      the two features validate different artifact identities and the
+      acceptance contract wants brief-specific codes.
+   b. 503 `brief_reopen_schema_not_ready` unless `isGuardedReopenSchemaReady()`.
+   c. Resolves the current brief via `resolveCanonicalPreRpBriefRow`
+      (artifact-service.js:299), fed a custom `{ getRequest, findByRequest }`
+      pair (reopen-service.js:55-56) so the request select can add
+      `akoya_requestnum`, which the artifact service's own lineage select
+      omits (ordinary generation never needs it).
+      **Deviation from the literal step order for idempotent retry
+      (reopen-service.js:141):** before the stale/not-shared checks, if the
+      current row's `wmkf_reopencycleid` already equals the typed
+      `clientOperationId`, the call returns `{ artifact, reused: true }`
+      immediately. Without this, an exact retry's `expectedArtifactId` names
+      the pre-reopen row, which the first call already superseded, so every
+      retry would be refused as stale instead of replaying — this mirrors
+      Pre-Site's own audit-row replay (`findAuditRow`/`committedResult` in
+      `lib/services/pre-site-visit/reopen-service.js`).
+      Otherwise: 409 `brief_reopen_stale` if `expectedArtifactId` is not the
+      current row; 409 `brief_reopen_not_shared` unless lifecycle is REVIEW
+      and operation status is READY.
+   d. 409 `brief_reopen_request_number_mismatch` unless the typed
+      `requestNumber` exactly matches `akoya_requestnum`.
+   e. 409 `brief_reopen_not_sent` unless `hasSentAttemptForSource` reports a
+      sent attempt for the current row.
+   f. 409 `brief_reopen_in_flight` (this feature's own pick — not named in
+      the original design brief) if any distribution attempt is in flight for
+      the source, using the exact same test as `attemptIsInFlight`
+      (artifact-service.js:118, exported so this file reuses it exactly
+      rather than risking a second copy drifting from the original); 503
+      `brief_distribution_state_unavailable` on a reader failure, a
+      non-array result, or a full (>=100-row) distribution page — same
+      reasoning as `assertCurrentBriefReplaceable`.
+   g. Calls `generatePreRpBrief({ requestId, clientOperationId,
+      actingUserSystemId, reopen: { cycleId: clientOperationId, reasonCode,
+      reasonNote } }, dependencies)`.
+2. **Generate option** `reopen` on `generatePreRpBrief`
+   (artifact-service.js:658) is internal-only; the public route
+   (`pages/api/workbench/pre-rp-brief.js`) still rejects any body key other
+   than `requestId`/`clientOperationId` (unchanged). `assertCurrentBriefReplaceable`
+   (artifact-service.js:131) gained an `{ allowSent }` option: when `reopen`
+   is present it skips only the "already sent" half of the gate — an
+   in-flight attempt still blocks unconditionally, both before generation
+   (line 699) and at the `commitReadyLineage` activation fence (line 557,
+   threaded through a new `reopen` field on that function's options object).
+   The new row's `createDocument` payload (line ~730) adds
+   `wmkf_reopencycleid`/`wmkf_reopenreasoncode`/`wmkf_reopenreasonnote` only
+   when `reopen` is present; the prior row is superseded and the pointer
+   moves exactly as ordinary regeneration. An exact retry with the same
+   `clientOperationId` reuses the row (`reused: true`) via the reopen-service
+   replay above, without a second `generatePreRpBrief` call.
+3. **Route** `pages/api/workbench/pre-rp-brief/reopen.js`, copied from
+   `pages/api/workbench/pre-site-visit/reopen.js` line for line except: the
+   service import (`reopenSentPreRpBrief`), the DAL context name
+   (`workbench-pre-rp-brief-reopen`), the 503 code
+   (`brief_reopen_schema_not_ready`), the 500 fallback code
+   (`brief_reopen_failed`), and — beyond the brief's exception list — the
+   `console.error` label and the 500 body message, reworded for the brief
+   rather than left as Pre-Site's literal text. `BODY_KEYS` is identical
+   (six fields).
+4. **Tab** (`shared/components/workbench/StaffDeliberationsTab.js`):
+   `briefMoreItems` (line ~958) adds `Regenerate sent brief…` when
+   `briefReadyFile && briefShared && everSent && isSuperuser &&
+   !beyondDeliberations`, calling `openBriefReopenDialog`. The dialog
+   (mirrors the Pre-Site reopen dialog: reason select from
+   `PRE_SITE_REOPEN_REASON_LABEL`, note, typed request number, submit
+   disabled until valid) posts the six fields to the new route and, on
+   success, re-fetches brief status (`readBriefStatus`) so `briefArtifact`
+   moves to the new row — which in turn moves the distribution panel's
+   `sourceArtifact` prop, letting `everSent` re-derive against that new,
+   never-sent row.
+5. **Docs**: this section; `docs/API_ROUTE_SECURITY_MATRIX.md` row for
+   `/api/workbench/pre-rp-brief/reopen`; one sentence added to
+   `docs/atlas/dataverse-wmkf-requestdocument.md`'s Pre-RP Brief section
+   noting that a reopen-regenerated row carries the three reopen audit
+   fields.
+
+**Tests** (all green on `claude/pre-rp-brief-guarded-regen`):
+`tests/unit/pre-rp-brief-reopen-service.test.js` (new, 16 tests: one
+refusal per step a-f plus a success and an idempotent-retry test),
+`tests/unit/pre-rp-brief-artifact-service.test.js` (4 tests added inside
+`describe('generatePreRpBrief')`'s new `describe('the reopen option')`, no
+removals), `tests/unit/workbench-reopen-pre-rp-brief-route.test.js` (new, 7
+tests mirroring the Pre-Site route test one for one),
+`tests/unit/workbench-pre-rp-brief-route.test.js` (one row added to the
+existing `test.each` rejecting a `reopen` body key), and
+`tests/unit/staff-deliberations-tab.test.js` (5 tests added, no removals).

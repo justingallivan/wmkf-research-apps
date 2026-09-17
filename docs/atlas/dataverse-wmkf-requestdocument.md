@@ -507,7 +507,11 @@ via migration `052_pre_site_distribution_brief_inputs.sql`
 database by the owner via `node scripts/apply-migrations.js`; readback exact]**. Slice 5 (built, same
 branch) adds the brief card, explicit Start Site Visit action, composite stage
 projection, cycle-list union, drift-confirmation retry UI, and the timestamp-only
-Board notice on the briefing page.
+Board notice on the briefing page. Guarded regeneration of a brief already sent
+to the Board (owner decision 2026-09-16, plan §10, `claude/pre-rp-brief-guarded-regen`,
+built, source-only) writes the same three reopen audit fields the Pre-Site
+guarded reopen uses (`wmkf_reopencycleid`, `wmkf_reopenreasoncode`,
+`wmkf_reopenreasonnote`) onto the new Draft successor row.
 
 The DOCX template — `shared/templates/pre-research-presentation-brief/brief-v1.docx`
 (tracked, six single-occurrence placeholders: `[[DV:InstitutionName]]`,

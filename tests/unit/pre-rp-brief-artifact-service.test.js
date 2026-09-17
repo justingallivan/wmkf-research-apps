@@ -652,6 +652,118 @@ describe('generatePreRpBrief', () => {
     )).rejects.toMatchObject({ code: 'invalid_client_operation_id' });
     expect(harness.dependencies.loadInputs).not.toHaveBeenCalled();
   });
+
+  // Guarded regeneration of a sent brief (owner decision 2026-09-16, plan
+  // §10). `reopen` is set only by lib/services/pre-rp-brief/reopen-service.js
+  // after its own preconditions pass; here it is exercised directly to prove
+  // the underlying generation option: a sent attempt no longer blocks, but an
+  // in-flight attempt still does, both before generation and at activation.
+  describe('the reopen option', () => {
+    const REOPEN = Object.freeze({
+      cycleId: '88888888-8888-4888-8888-888888888888',
+      reasonCode: 'accidental_handoff',
+      reasonNote: 'The Board received an incomplete draft and it must be corrected.',
+    });
+
+    it('lets a sent brief be replaced when reopen is present and no attempt is in flight', async () => {
+      const prior = briefRow({
+        wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+        wmkf_generationkey: 'prior-generation-key',
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      });
+      const harness = createHarness({ currentPointerRow: prior });
+      harness.dependencies.hasSentAttemptForSource.mockResolvedValue(true);
+      harness.dependencies.listDistributionAttempts.mockResolvedValue([]);
+
+      const result = await generatePreRpBrief(
+        { requestId: REQUEST_ID, clientOperationId: 'reopen-op', reopen: REOPEN },
+        harness.dependencies,
+      );
+
+      expect(result.reused).toBe(false);
+      expect(harness.prior.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED);
+      expect(harness.request._wmkf_currentprerpbrief_value).toBe(ARTIFACT_ID);
+      expect(harness.row.wmkf_reopencycleid).toBe(REOPEN.cycleId);
+      expect(harness.row.wmkf_reopenreasoncode).toBe(REOPEN.reasonCode);
+      expect(harness.row.wmkf_reopenreasonnote).toBe(REOPEN.reasonNote);
+    });
+
+    it('still refuses before generation when an attempt is in flight, even with reopen present', async () => {
+      const prior = briefRow({
+        wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+        wmkf_generationkey: 'prior-generation-key',
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      });
+      const harness = createHarness({ currentPointerRow: prior });
+      harness.dependencies.hasSentAttemptForSource.mockResolvedValue(true);
+      harness.dependencies.listDistributionAttempts.mockResolvedValue([{
+        source_document_id: OLDER_ARTIFACT_ID,
+        state: 'send_requested',
+        lease_token: 'send-lease',
+      }]);
+
+      await expect(generatePreRpBrief(
+        { requestId: REQUEST_ID, clientOperationId: 'reopen-op', reopen: REOPEN },
+        harness.dependencies,
+      )).rejects.toMatchObject({
+        code: 'brief_regeneration_distribution_started',
+        httpStatus: 409,
+      });
+      expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+      expect(harness.prior.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+    });
+
+    it('still refuses at activation when an attempt becomes in-flight while regenerating, even with reopen present', async () => {
+      const prior = briefRow({
+        wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+        wmkf_generationkey: 'prior-generation-key',
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      });
+      const harness = createHarness({ currentPointerRow: prior });
+      harness.dependencies.hasSentAttemptForSource.mockResolvedValue(true);
+      harness.dependencies.listDistributionAttempts
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{
+          source_document_id: OLDER_ARTIFACT_ID,
+          state: 'prepared',
+          lease_token: 'send-lease',
+        }]);
+
+      await expect(generatePreRpBrief(
+        { requestId: REQUEST_ID, clientOperationId: 'reopen-racing-op', reopen: REOPEN },
+        harness.dependencies,
+      )).rejects.toMatchObject({
+        code: 'brief_regeneration_distribution_started',
+        httpStatus: 409,
+      });
+      expect(harness.dependencies.listDistributionAttempts).toHaveBeenCalledTimes(2);
+      expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+      expect(harness.request._wmkf_currentprerpbrief_value).toBe(OLDER_ARTIFACT_ID);
+      expect(harness.prior.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+    });
+
+    // 2b: without `reopen`, a sent attempt still blocks. This is the existing
+    // 'sent' case of the it.each at line 357 above, kept unchanged — asserted
+    // again here by name only so this describe block documents the contrast.
+    it('without reopen, a sent attempt still blocks generation (see the it.each above)', async () => {
+      const prior = briefRow({
+        wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+        wmkf_generationkey: 'prior-generation-key',
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      });
+      const harness = createHarness({ currentPointerRow: prior });
+      harness.dependencies.hasSentAttemptForSource.mockResolvedValue(true);
+      harness.dependencies.listDistributionAttempts.mockResolvedValue([]);
+
+      await expect(generatePreRpBrief(
+        { requestId: REQUEST_ID, clientOperationId: 'no-reopen-op' },
+        harness.dependencies,
+      )).rejects.toMatchObject({
+        code: 'brief_regeneration_distribution_started',
+        httpStatus: 409,
+      });
+    });
+  });
 });
 
 describe('resolveCurrentPreRpBriefForDistribution', () => {
