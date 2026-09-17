@@ -131,6 +131,12 @@ describe('migration 052 real SQL contains the load-bearing predicates the pure-J
     expect(migration).toContain("jsonb_typeof(stale_inputs_delta) = 'object'");
   });
 
+  it('keeps the legacy (pre-brief) branch requiring all five columns null', () => {
+    expect(migration).toMatch(
+      /input_fingerprint_generated IS NULL\s*\n\s*AND input_fingerprint_live IS NULL\s*\n\s*AND stale_inputs_delta IS NULL\s*\n\s*AND stale_inputs_acknowledged_at IS NULL\s*\n\s*AND stale_inputs_acknowledged_by IS NULL/,
+    );
+  });
+
   it('requires both acknowledgement fields in the acknowledged-drift branch', () => {
     const acknowledgedBranch = migration.slice(migration.indexOf('Acknowledged drift'));
     expect(acknowledgedBranch).toMatch(/AND stale_inputs_acknowledged_at IS NOT NULL\s*\n\s*AND stale_inputs_acknowledged_by IS NOT NULL/);

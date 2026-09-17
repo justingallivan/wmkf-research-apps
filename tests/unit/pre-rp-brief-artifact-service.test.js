@@ -1,9 +1,12 @@
+import crypto from 'node:crypto';
 import {
+  buildPreRpBriefGenerationKey,
   generatePreRpBrief,
   getPreRpBriefStatus,
   projectPreRpBriefArtifact,
   resolveCurrentPreRpBriefForDistribution,
 } from '../../lib/services/pre-rp-brief/artifact-service.js';
+import { briefInputFingerprint } from '../../lib/services/pre-rp-brief/docx-renderer.js';
 import {
   PRE_RP_BRIEF_CONTRACT,
   PRE_SITE_DISTRIBUTION_CONTRACT,
@@ -402,6 +405,62 @@ describe('generatePreRpBrief', () => {
     expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
   });
 
+  it('refuses activation when a rival generation moved the pointer first, and deletes its own upload (activation fence)', async () => {
+    const harness = createHarness();
+    const rival = briefRow({
+      wmkf_requestdocumentid: NEWER_ARTIFACT_ID,
+      wmkf_generationkey: 'rival-generation-key',
+    });
+    const originalUpload = harness.dependencies.uploadFile.getMockImplementation();
+    harness.dependencies.uploadFile.mockImplementation(async (...args) => {
+      // A newer generation (e.g. a later render version) activates while this
+      // one is uploading.
+      harness.request._wmkf_currentprerpbrief_value = rival.wmkf_requestdocumentid;
+      const priorFind = harness.dependencies.findByRequest.getMockImplementation();
+      harness.dependencies.findByRequest.mockImplementation(async (...findArgs) => {
+        const result = await priorFind(...findArgs);
+        return { ...result, records: [...(result?.records || []), { ...rival }] };
+      });
+      return originalUpload(...args);
+    });
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'late-op' },
+      harness.dependencies,
+    )).rejects.toMatchObject({ code: 'brief_pointer_changed', httpStatus: 409 });
+    expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+    expect(harness.request._wmkf_currentprerpbrief_value).toBe(rival.wmkf_requestdocumentid);
+    expect(harness.dependencies.deleteFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not delete the deterministic-path upload when the claim was reclaimed between activation checks', async () => {
+    const harness = createHarness();
+    const rival = briefRow({ wmkf_requestdocumentid: NEWER_ARTIFACT_ID, wmkf_generationkey: 'rival-generation-key' });
+    const originalUpload = harness.dependencies.uploadFile.getMockImplementation();
+    const originalGetRequest = harness.dependencies.getRequest.getMockImplementation();
+    harness.dependencies.uploadFile.mockImplementation(async (...args) => {
+      harness.request._wmkf_currentprerpbrief_value = rival.wmkf_requestdocumentid;
+      const priorFind = harness.dependencies.findByRequest.getMockImplementation();
+      harness.dependencies.findByRequest.mockImplementation(async (...findArgs) => {
+        const result = await priorFind(...findArgs);
+        return { ...result, records: [...(result?.records || []), { ...rival }] };
+      });
+      // After the activation pass verified this claim, an expired-lease
+      // winner reclaims the row (and will replace the same-path file).
+      harness.dependencies.getRequest.mockImplementation(async (...requestArgs) => {
+        harness.row.wmkf_claimtoken = 'winner-claim';
+        return originalGetRequest(...requestArgs);
+      });
+      return originalUpload(...args);
+    });
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'late-op' },
+      harness.dependencies,
+    )).rejects.toMatchObject({ code: 'brief_pointer_changed', httpStatus: 409 });
+    expect(harness.dependencies.deleteFile).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['SUPERSEDED row', briefRow({
       wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
@@ -628,8 +687,9 @@ describe('generatePreRpBrief', () => {
       { requestId: REQUEST_ID, clientOperationId: 'op-1' },
       dependencies,
     )).rejects.toMatchObject({ code: 'claim_lost' });
-    expect(dependencies.deleteFile).toHaveBeenCalledTimes(1);
-    expect(dependencies.deleteFile).toHaveBeenCalledWith('drive-id', UPLOADED_ITEM_ID);
+    // Ownership passed to the winner: the item at the deterministic path may
+    // be the winner's (or about to be replaced by it), so it is never deleted.
+    expect(dependencies.deleteFile).not.toHaveBeenCalled();
   });
 
   it('fails closed on an invalid requestId before loading inputs', async () => {
@@ -728,21 +788,69 @@ describe('projectPreRpBriefArtifact', () => {
   });
 
   it('counts only received reviews from the stored input snapshot (H3a/B10 client mirror)', () => {
-    const snapshot = JSON.stringify({
+    const snapshot = {
+      ...ENVELOPE,
       reviews: [
-        { reviewReceivedAt: '2026-09-01T00:00:00Z' },
-        { reviewReceivedAt: null },
-        { reviewReceivedAt: '2026-09-02T00:00:00Z' },
+        { ...ENVELOPE.reviews[0], reviewReceivedAt: '2026-09-01T00:00:00Z' },
+        { ...ENVELOPE.reviews[0], suggestionId: 'pending-1', reviewReceivedAt: null },
+        { ...ENVELOPE.reviews[0], suggestionId: 'received-2', reviewReceivedAt: '2026-09-02T00:00:00Z' },
       ],
-    });
-    const artifact = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: snapshot }));
+    };
+    const artifact = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify(snapshot),
+      wmkf_inputfingerprint: briefInputFingerprint(snapshot),
+    }));
     expect(artifact.receivedReviewCount).toBe(2);
   });
 
-  it('reads zero received reviews when the snapshot is missing or malformed', () => {
+  it('reads null when the stored snapshot does not re-hash to the recorded fingerprint (server brief_snapshot_invalid mirror)', () => {
+    const mismatched = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify(ENVELOPE),
+      wmkf_inputfingerprint: 'f'.repeat(64),
+    }));
+    expect(mismatched.receivedReviewCount).toBeNull();
+    const badRequest = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify({ ...ENVELOPE, request: null }),
+      wmkf_inputfingerprint: briefInputFingerprint(ENVELOPE),
+    }));
+    expect(badRequest.receivedReviewCount).toBeNull();
+    const reviewsNotArray = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify({ ...ENVELOPE, reviews: {} }),
+      wmkf_inputfingerprint: briefInputFingerprint(ENVELOPE),
+    }));
+    expect(reviewsNotArray.receivedReviewCount).toBeNull();
+  });
+
+  it('binds the renderer version into the generation key so a render change never reuses an older identity', () => {
+    const key = buildPreRpBriefGenerationKey({ requestId: REQUEST_ID, inputFingerprint: 'a'.repeat(64), clientOperationId: 'op-1' });
+    const expected = crypto.createHash('sha256').update(JSON.stringify({
+      requestId: REQUEST_ID.toLowerCase(),
+      artifactType: PRE_RP_BRIEF_CONTRACT.artifactType,
+      inputFingerprint: 'a'.repeat(64),
+      clientOperationId: 'op-1',
+      templateId: PRE_RP_BRIEF_CONTRACT.templateId,
+      templateVersion: PRE_RP_BRIEF_CONTRACT.templateVersion,
+      renderVersion: PRE_RP_BRIEF_CONTRACT.renderVersion,
+    })).digest('hex');
+    expect(PRE_RP_BRIEF_CONTRACT.renderVersion).toBe('2');
+    expect(key).toBe(expected);
+  });
+
+  it('reads null (unreadable, distinct from zero) when the snapshot is missing, malformed, or of another envelope', () => {
     const missing = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: null }));
-    expect(missing.receivedReviewCount).toBe(0);
+    expect(missing.receivedReviewCount).toBeNull();
     const malformed = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: '{not json' }));
-    expect(malformed.receivedReviewCount).toBe(0);
+    expect(malformed.receivedReviewCount).toBeNull();
+    const foreign = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify({ ...ENVELOPE, schemaVersion: 99 }),
+      wmkf_inputfingerprint: briefInputFingerprint(ENVELOPE),
+    }));
+    expect(foreign.receivedReviewCount).toBeNull();
+    const emptySnapshot = { ...ENVELOPE, reviews: [] };
+    const empty = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify(emptySnapshot),
+      wmkf_inputfingerprint: briefInputFingerprint(emptySnapshot),
+    }));
+    expect(empty.receivedReviewCount).toBe(0);
   });
 });

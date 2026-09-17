@@ -317,14 +317,9 @@ export default function PreSiteDistributionPanel({
   const seedCc = suggestedCc.join(', ');
   const seed = `${seedTo}|${seedCc}`;
   const [seenSeed, setSeenSeed] = useState(null);
-  if (seenSeed !== seed) {
-    setSeenSeed(seed);
-    setForm((current) => ({
-      ...current,
-      to: current.to.trim() ? current.to : seedTo,
-      cc: current.cc.trim() ? current.cc : seedCc,
-    }));
-  }
+  // Explicit per-field ownership: true only after this component wrote its
+  // own seed into the field; cleared by every staff edit of that field.
+  const autoOwnedRef = useRef({ to: false, cc: false });
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   // Plan §3.4b step 3: a dedicated confirmation state for the prepare-time
@@ -332,6 +327,30 @@ export default function PreSiteDistributionPanel({
   // before retrying with `acknowledgeStaleInputs` bound to the exact live
   // fingerprint just returned.
   const [staleInputs, setStaleInputs] = useState(null);
+  // Every form change — a staff edit and the one-time admin-defaults seed
+  // alike — goes through here, so a prepared preview, its confirmation, and
+  // any stale-inputs acknowledgement bound to the old form never outlive it.
+  const applyFormPatch = (patch) => {
+    setForm((current) => ({ ...current, ...patch }));
+    setPreview(null);
+    setConfirmed(false);
+    setStaleInputs(null);
+  };
+  if (seenSeed !== seed) {
+    setSeenSeed(seed);
+    // A field is replaceable when it is blank or auto-owned (the component
+    // wrote its own seed there and staff have not edited it since). When the
+    // seed changes the form, the prepared preview and its confirmation are
+    // invalidated so a confirmed preview can never go to an obsolete set.
+    const owned = autoOwnedRef.current;
+    const replaceTo = !form.to.trim() || owned.to;
+    const replaceCc = !form.cc.trim() || owned.cc;
+    const nextTo = replaceTo ? seedTo : form.to;
+    const nextCc = replaceCc ? seedCc : form.cc;
+    if (replaceTo && seedTo) owned.to = true;
+    if (replaceCc && seedCc) owned.cc = true;
+    if (nextTo !== form.to || nextCc !== form.cc) applyFormPatch({ to: nextTo, cc: nextCc });
+  }
   const [history, setHistory] = useState([]);
   const [historyError, setHistoryError] = useState(null);
   const [error, setError] = useState(null);
@@ -367,11 +386,10 @@ export default function PreSiteDistributionPanel({
         unavailable: body.emailDefaults.unavailable === true,
       });
       if (!composerTouchedRef.current) {
-        setForm((current) => ({
-          ...current,
+        applyFormPatch({
           subject: renderDeliberationShareSubject(body.emailDefaults.subjectTemplate, requestNumber),
           bodyText: String(body.emailDefaults.bodyTemplate || ''),
-        }));
+        });
       }
     }
     const attempts = body.attempts || [];
@@ -421,10 +439,9 @@ export default function PreSiteDistributionPanel({
 
   const edit = (patch) => {
     composerTouchedRef.current = true;
-    setForm((current) => ({ ...current, ...patch }));
-    setPreview(null);
-    setConfirmed(false);
-    setStaleInputs(null);
+    if ('to' in patch) autoOwnedRef.current.to = false;
+    if ('cc' in patch) autoOwnedRef.current.cc = false;
+    applyFormPatch(patch);
     setError(null);
     setSendFeedback(null);
     setNotice(null);
@@ -503,6 +520,12 @@ export default function PreSiteDistributionPanel({
       // separately from the generic failure below so staff see why, not a
       // bare "Preview preparation failed" — and Regenerate Brief (allowed
       // while Review, B12) is the recovery path, not a stuck brief.
+      if (!response.ok && body.code === 'brief_snapshot_invalid') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError('The brief\'s stored input record could not be read, so it cannot be shared. Regenerate the brief and try again.');
+        }
+        return;
+      }
       if (!response.ok && body.code === 'brief_reviews_required') {
         if (sequence.current === currentSequence && id === requestId) {
           setError('This brief has no received reviews yet, so it cannot be shared. Wait for at least one review to come in, or regenerate the brief once one has.');
@@ -1003,7 +1026,7 @@ export default function PreSiteDistributionPanel({
                           <div className="mt-1 text-xs text-amber-800" data-testid="stale-inputs-acknowledged">
                             <p className="font-medium">
                               Staff acknowledged newer inputs at {new Date(attempt.staleInputsAcknowledged.acknowledgedAt).toLocaleString()}
-                              {attempt.staleInputsAcknowledged.acknowledgedBy ? ` (${attempt.staleInputsAcknowledged.acknowledgedBy})` : ''}.
+                              {attempt.staleInputsAcknowledged.acknowledgedByName ? ` by ${attempt.staleInputsAcknowledged.acknowledgedByName}` : ''}.
                             </p>
                             {attempt.staleInputsAcknowledged.delta?.changedRequestFields?.length > 0 && (
                               <p>Changed fields: {attempt.staleInputsAcknowledged.delta.changedRequestFields.join(', ')}</p>

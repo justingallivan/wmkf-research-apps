@@ -605,6 +605,103 @@ test('identical Ready retry does not rerun Claude, render, or upload', async () 
   expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
 });
 
+test('refuses a replayed generation whose key resolves to a non-current Ready row or a superseded row', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const firstRow = { ...harness.row };
+  const uploads = harness.dependencies.uploadFile.mock.calls.length;
+
+  // A newer draft became current; the same generation key still resolves to
+  // the first row, which must not be reactivated over the newer lineage.
+  const newer = {
+    ...firstRow,
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    wmkf_generationkey: 'newer-generation-key',
+  };
+  harness.request._wmkf_currentpresitevisit_value = newer.wmkf_requestdocumentid;
+  harness.dependencies.findByRequest.mockImplementation(async () => ({
+    records: [{ ...harness.row }, { ...newer }],
+  }));
+  await expect(generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies))
+    .rejects.toMatchObject({ code: 'pre_site_visit_generation_replay_stale', httpStatus: 409 });
+
+  harness.setRow({ ...firstRow, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED });
+  await expect(generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies))
+    .rejects.toMatchObject({ code: 'pre_site_visit_generation_replay_stale', httpStatus: 409 });
+
+  expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(uploads);
+  expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ['FAILED', { wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED, wmkf_lasterrorcode: 'render_failed' }],
+  ['expired GENERATING', { wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING, wmkf_claimtoken: 'stale-claim' }],
+])('refuses to reclaim an older %s row whose inputs recur after a newer document became current', async (_label, overrides) => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const firstRow = { ...harness.row };
+  const uploads = harness.dependencies.uploadFile.mock.calls.length;
+
+  const newer = {
+    ...firstRow,
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    wmkf_generationkey: 'newer-generation-key',
+    createdon: new Date(Date.parse(firstRow.createdon) + 60_000).toISOString(),
+  };
+  harness.request._wmkf_currentpresitevisit_value = newer.wmkf_requestdocumentid;
+  // The older lineage's row is no longer Ready (its claim failed or expired
+  // long ago) but sits under the same generation key as this retry.
+  harness.setRow({
+    ...firstRow,
+    ...overrides,
+    modifiedon: new Date(Date.parse(firstRow.createdon) - 3_600_000).toISOString(),
+  });
+  harness.dependencies.findByRequest.mockImplementation(async () => ({
+    records: [{ ...harness.row }, { ...newer }],
+  }));
+
+  await expect(generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies))
+    .rejects.toMatchObject({ code: 'pre_site_visit_generation_replay_stale', httpStatus: 409 });
+  expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(uploads);
+  expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
+});
+
+test('activation refuses when a concurrent generation moved the pointer first (activation fence)', async () => {
+  const harness = createHarness();
+  const rival = {
+    wmkf_requestdocumentid: '88888888-8888-4888-8888-888888888888',
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_generationkey: 'rival-generation-key',
+    wmkf_contenttype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'rival-item',
+    createdon: '2026-08-22T13:30:00Z',
+  };
+  const originalUpload = harness.dependencies.uploadFile.getMockImplementation();
+  harness.dependencies.uploadFile.mockImplementation(async (...args) => {
+    // The rival generation activates while this one is uploading.
+    harness.request._wmkf_currentpresitevisit_value = rival.wmkf_requestdocumentid;
+    const priorFind = harness.dependencies.findByRequest.getMockImplementation();
+    harness.dependencies.findByRequest.mockImplementation(async (...findArgs) => {
+      const result = await priorFind(...findArgs);
+      return { ...result, records: [...(result?.records || []), { ...rival }] };
+    });
+    return originalUpload(...args);
+  });
+
+  await expect(generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies))
+    .rejects.toMatchObject({ code: 'pre_site_visit_pointer_changed', httpStatus: 409 });
+  expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+  expect(harness.request._wmkf_currentpresitevisit_value).toBe(rival.wmkf_requestdocumentid);
+  // The refused generation's upload is not left orphaned in SharePoint.
+  expect(harness.dependencies.deleteFile).toHaveBeenCalledTimes(1);
+  const [deletedDrive, deletedItem] = harness.dependencies.deleteFile.mock.calls[0];
+  expect(deletedDrive).toBe(harness.uploaded.driveId);
+  expect(deletedItem).toBe(harness.uploaded.id);
+});
+
 test('read-only status returns the current Ready artifact without generation side effects', async () => {
   const harness = createHarness();
   await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);

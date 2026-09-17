@@ -12,6 +12,18 @@ import { Card } from '../Layout';
 const POLL_INTERVAL_MS = 2000;
 const POLL_ATTEMPTS = 10;
 const ACKNOWLEDGEMENT_SCHEMA_NOT_READY = 'final_writeup_acknowledgement_schema_not_ready';
+// Server `final_writeup_source_missing` (transition-service `resolveSource`):
+// the request has no current Site Visit document, which staff create with
+// Start Site Visit on Staff Deliberations, so say that instead of the
+// generic server sentence.
+const SITE_VISIT_PREREQUISITE_MESSAGE = 'Final Writeup needs a Site Visit working document first. '
+  + 'Start the Site Visit from the Staff Deliberations tab, then come back here.';
+
+function transitionErrorMessage(error) {
+  return error?.code === 'final_writeup_source_missing'
+    ? SITE_VISIT_PREREQUISITE_MESSAGE
+    : error?.message;
+}
 // Phases with a current Final row: review tracking loads and the review panel renders.
 const IN_REVIEW_PHASES = new Set(['group-review', 'leadership-review']);
 const STAGE_PRESENTATION = Object.freeze({
@@ -37,7 +49,11 @@ async function fetchStatus(requestId, signal) {
     { method: 'GET', signal },
   );
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Final Writeup status failed (${response.status})`);
+  if (!response.ok) {
+    const failure = new Error(body.error || `Final Writeup status failed (${response.status})`);
+    failure.code = body.code || null;
+    throw failure;
+  }
   return body;
 }
 
@@ -186,7 +202,7 @@ export default function FinalWriteupTab({ requestId }) {
         })
         .catch((loadError) => {
           if (activeController.current === controller && loadError?.name !== 'AbortError') {
-            setError(loadError.message);
+            setError(transitionErrorMessage(loadError));
           }
         })
         .finally(() => {
@@ -293,7 +309,11 @@ export default function FinalWriteupTab({ requestId }) {
         signal: controller.signal,
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `Final Writeup transition failed (${response.status})`);
+      if (!response.ok) {
+        const failure = new Error(body.error || `Final Writeup transition failed (${response.status})`);
+        failure.code = body.code || null;
+        throw failure;
+      }
       if (activeController.current !== controller) return;
       setConfirming(null);
       if (response.status === 202 || body.inProgress) {
@@ -311,7 +331,7 @@ export default function FinalWriteupTab({ requestId }) {
       }
     } catch (startError) {
       if (activeController.current === controller && startError?.name !== 'AbortError') {
-        setError(startError.message);
+        setError(transitionErrorMessage(startError));
       }
     } finally {
       if (activeController.current === controller) {
@@ -444,7 +464,7 @@ export default function FinalWriteupTab({ requestId }) {
                 .catch((loadError) => {
                   if (activeController.current === controller
                     && loadError?.name !== 'AbortError') {
-                    setError(loadError.message);
+                    setError(transitionErrorMessage(loadError));
                   }
                 })
                 .finally(() => {

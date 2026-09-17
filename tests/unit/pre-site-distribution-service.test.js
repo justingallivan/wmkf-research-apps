@@ -1169,6 +1169,58 @@ test('history marks a retained distribution changed when the working Word versio
   expect(result.currentSourceEverSent).toBe(false);
 });
 
+test('history resolves the drift-acknowledging actor to a name once per distinct actor; send-time projections carry none', async () => {
+  const ACTOR = 'AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE';
+  const acknowledged = attemptFixture({
+    input_fingerprint_generated: 'a'.repeat(64),
+    input_fingerprint_live: 'b'.repeat(64),
+    stale_inputs_delta: JSON.stringify({ changedRequestFields: ['akoya_title'] }),
+    stale_inputs_acknowledged_at: '2026-09-05T11:55:00Z',
+    stale_inputs_acknowledged_by: ACTOR,
+  });
+  const getSystemUserName = jest.fn(async () => 'Ada Staff');
+  const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
+    listAttempts: jest.fn(async () => [acknowledged, { ...acknowledged, id: 'attempt-2' }, attemptFixture()]),
+    getRequest: jest.fn(async () => ({})),
+    hasSentAttemptForSource: jest.fn(async () => false),
+    getSystemUserName,
+  });
+  expect(getSystemUserName).toHaveBeenCalledTimes(1);
+  expect(getSystemUserName).toHaveBeenCalledWith(ACTOR.toLowerCase());
+  expect(result.attempts[0].staleInputsAcknowledged).toMatchObject({
+    acknowledgedBy: ACTOR,
+    acknowledgedByName: 'Ada Staff',
+  });
+  expect(result.attempts[1].staleInputsAcknowledged.acknowledgedByName).toBe('Ada Staff');
+  expect(result.attempts[2].staleInputsAcknowledged).toBeNull();
+  expect(projectDistributionAttempt(acknowledged).staleInputsAcknowledged.acknowledgedByName).toBeNull();
+});
+
+test('history leaves the actor name null and still returns when the name lookup fails', async () => {
+  const acknowledged = attemptFixture({
+    input_fingerprint_generated: 'a'.repeat(64),
+    input_fingerprint_live: 'b'.repeat(64),
+    stale_inputs_delta: JSON.stringify({}),
+    stale_inputs_acknowledged_at: '2026-09-05T11:55:00Z',
+    stale_inputs_acknowledged_by: '11111111-1111-4111-8111-111111111111',
+  });
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
+      listAttempts: jest.fn(async () => [acknowledged]),
+      getRequest: jest.fn(async () => ({})),
+      hasSentAttemptForSource: jest.fn(async () => false),
+      getSystemUserName: jest.fn(async () => { throw new Error('dataverse down'); }),
+    });
+    expect(result.attempts[0].staleInputsAcknowledged).toMatchObject({
+      acknowledgedBy: '11111111-1111-4111-8111-111111111111',
+      acknowledgedByName: null,
+    });
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
+
 test('history returns configured Share defaults and preserves built-in fallbacks for blank values', async () => {
   const attempt = attemptFixture({ source_version_id: '1.0' });
   const getSettingStrict = jest.fn(async (key) => (

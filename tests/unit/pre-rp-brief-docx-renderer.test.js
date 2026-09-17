@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import JSZip from 'jszip';
 import {
   briefInputFingerprint,
+  canonicalBriefInputState,
   defaultPreRpBriefTemplatePath,
   renderBrief,
   REQUEST_FINGERPRINT_FIELDS,
@@ -118,10 +119,20 @@ describe('renderBrief', () => {
     const text = await wordText(docx);
     expect(text).toContain('Applicant University');
     expect(text).toContain('A test project');
-    expect(text).toContain('Ada Lovelace');
-    expect(text).toContain('Pat Director');
     expect(text).toContain('This project studies a phenomenon of interest.');
     expect(text).not.toMatch(/\[\[(?:DV|STAFF):/);
+  });
+
+  it('labels the PI and PD by role at fill time without changing the fingerprinted input names', async () => {
+    const { docx } = await renderBrief(envelope());
+    const text = await wordText(docx);
+    expect(text).toContain('PI: Ada Lovelace');
+    expect(text).toContain('PD: Pat Director');
+    // The prefix is presentation only: the canonical input state (and so the
+    // fingerprint) still carries the raw names.
+    const state = canonicalBriefInputState(envelope());
+    expect(state.request.principalInvestigator).toBe('Ada Lovelace');
+    expect(state.request.programDirector).toBe('Pat Director');
   });
 
   it('produces a package with no header or footer parts', async () => {

@@ -344,7 +344,36 @@ test('M2: recovers a Ready Word link after the generation connection is interrup
   expect(calls('presiteGet')).toHaveLength(2);
 });
 
-test('M2: a late response for a prior request cannot publish a stale Word link', async () => {
+test('M2: unmounting mid-generate aborts the in-flight request and publishes nothing', async () => {
+  let resolveFirst;
+  let capturedSignal = null;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'presitePost') {
+      capturedSignal = options.signal;
+      return new Promise((resolve) => { resolveFirst = resolve; });
+    }
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  const { unmount } = render(<StaffDeliberationsTab key={REQUEST_ID} requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
+  await waitFor(() => expect(capturedSignal).not.toBeNull());
+  expect(capturedSignal.aborted).toBe(false);
+
+  unmount();
+  // The effect cleanup bumps `generationSequence` and aborts the controller,
+  // so the late response is dropped rather than applied to a dead tree.
+  expect(capturedSignal.aborted).toBe(true);
+  await act(async () => { resolveFirst(response({ success: true, artifact: preSiteArtifact(DRAFT) })); });
+  expect(calls('presiteGet')).toHaveLength(1);
+});
+
+test('M2: a late response after switching to another request (remount) cannot publish a stale Word link', async () => {
   let resolveFirst;
   global.fetch = jest.fn(async (url, options = {}) => {
     const method = options.method || 'GET';
@@ -445,6 +474,18 @@ test('H3a/B10: Share is disabled with a reason when the brief has zero received 
   const shareButton = await screen.findByRole('button', { name: 'Share…' });
   expect(shareButton).toBeDisabled();
   expect(screen.getByText(/Share is blocked until at least one review is received/)).toBeInTheDocument();
+});
+
+test('Share is disabled with a distinct reason when the brief snapshot could not be read', async () => {
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(DRAFT, { receivedReviewCount: null }),
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  const shareButton = await screen.findByRole('button', { name: 'Share…' });
+  expect(shareButton).toBeDisabled();
+  expect(screen.getByText(/stored input record could not be read/)).toBeInTheDocument();
+  expect(screen.queryByText(/Share is blocked until at least one review is received/)).not.toBeInTheDocument();
 });
 
 test('H3a/B10: Share is enabled once at least one review is received', async () => {
@@ -728,7 +769,10 @@ test.each([
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
   expect(await screen.findByRole('heading', { name: 'Staff Deliberations is read-only' })).toBeInTheDocument();
-  expect(screen.getByText(/cannot be edited, downloaded, or regenerated from this tab/i)).toBeInTheDocument();
+  expect(screen.getByText(/cannot be downloaded or regenerated from this tab/i)).toBeInTheDocument();
+  // The banner speaks for the brief only; the Site Visit writeup card keeps
+  // its own affordances, so the copy must not claim editing is locked.
+  expect(screen.queryByText(/cannot be edited/i)).not.toBeInTheDocument();
   // L3: no Edit/Download/Regenerate affordances render alongside the read-only panel.
   expect(screen.queryByRole('link', { name: 'Edit in Word' })).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Open working document' })).not.toBeInTheDocument();

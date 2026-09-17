@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PreSiteDistributionPanel from '../../shared/components/workbench/PreSiteDistributionPanel';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -383,6 +383,103 @@ test('H3c/B10: a brief_reviews_required prepare failure shows named, non-generic
   expect(alert).toHaveTextContent(/has no received reviews yet/i);
   expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
+test('a late recipient suggestion that seeds a blank field invalidates the prepared preview and its confirmation', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }));
+  const { rerender } = render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      suggestedCc={[]}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  expect(screen.getByRole('button', { name: 'Send email' })).toBeEnabled();
+
+  rerender(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      suggestedCc={['late-consultant@example.org']}
+    />,
+  );
+  expect(screen.getByLabelText('Cc')).toHaveValue('late-consultant@example.org');
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Send email' })).not.toBeInTheDocument();
+});
+
+test('a later automatic seed replaces the earlier automatic seed and invalidates a confirmed preview, but never a staff edit', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }));
+  const props = { requestId: REQUEST_ID, requestNumber: '1002379', sourceArtifact: { artifactId: ARTIFACT_ID } };
+  const { rerender } = render(
+    <PreSiteDistributionPanel {...props} suggestedTo={['fallback@example.org']} suggestedCc={['first-cc@example.org']} />,
+  );
+  await screen.findByText(/No email previews/);
+  expect(screen.getByLabelText('To')).toHaveValue('fallback@example.org');
+  // Staff edit Cc only; To keeps the automatic seed.
+  fireEvent.change(screen.getByLabelText('Cc'), { target: { value: 'edited-cc@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  expect(screen.getByRole('button', { name: 'Send email' })).toBeEnabled();
+
+  rerender(
+    <PreSiteDistributionPanel {...props} suggestedTo={['attendee@example.org']} suggestedCc={['second-cc@example.org']} />,
+  );
+  expect(screen.getByLabelText('To')).toHaveValue('attendee@example.org');
+  expect(screen.getByLabelText('Cc')).toHaveValue('edited-cc@example.org');
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Send email' })).not.toBeInTheDocument();
+});
+
+test('a staff-typed recipient is never displaced by later seeds, even when a seed passes through the same value', async () => {
+  global.fetch.mockResolvedValueOnce(response({ success: true, attempts: [] }));
+  const props = { requestId: REQUEST_ID, requestNumber: '1002379', sourceArtifact: { artifactId: ARTIFACT_ID } };
+  const { rerender } = render(<PreSiteDistributionPanel {...props} suggestedTo={['a@example.org']} />);
+  await screen.findByText(/No email previews/);
+  expect(screen.getByLabelText('To')).toHaveValue('a@example.org');
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'b@example.org' } });
+  // Seed B equals the staff value: ownership must stay with staff.
+  rerender(<PreSiteDistributionPanel {...props} suggestedTo={['b@example.org']} />);
+  expect(screen.getByLabelText('To')).toHaveValue('b@example.org');
+  rerender(<PreSiteDistributionPanel {...props} suggestedTo={['c@example.org']} />);
+  expect(screen.getByLabelText('To')).toHaveValue('b@example.org');
+  // A staff edit that equals the previous automatic seed is still a staff edit.
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'a@example.org' } });
+  rerender(<PreSiteDistributionPanel {...props} suggestedTo={['d@example.org']} />);
+  expect(screen.getByLabelText('To')).toHaveValue('a@example.org');
+});
+
+test('a brief_snapshot_invalid prepare failure shows its own copy, distinct from the zero-review reason', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ code: 'brief_snapshot_invalid' }, 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/stored input record could not be read/i);
+  expect(alert).not.toHaveTextContent(/has no received reviews yet/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
 });
 
 test('turns a stale material response into a recoverable notice and requires a fresh confirmation', async () => {
@@ -915,6 +1012,7 @@ test('distribution history shows the bounded delta, actor, and time for an ackno
         delta: { changedRequestFields: ['akoya_title'], abstractChanged: false, generatedReviewCount: 1, liveReviewCount: 2 },
         acknowledgedAt: '2026-09-05T11:55:00Z',
         acknowledgedBy: 'actor-system-user-id',
+        acknowledgedByName: 'Ada Staff',
       },
     }],
   }));
@@ -928,7 +1026,9 @@ test('distribution history shows the bounded delta, actor, and time for an ackno
   fireEvent.click(await screen.findByText(/Email history/));
   const ack = await screen.findByTestId('stale-inputs-acknowledged');
   expect(ack).toHaveTextContent('Staff acknowledged newer inputs at');
-  expect(ack).toHaveTextContent('actor-system-user-id');
+  expect(ack).toHaveTextContent('by Ada Staff');
+  // The raw system-user GUID is never shown to staff.
+  expect(ack).not.toHaveTextContent('actor-system-user-id');
   expect(ack).toHaveTextContent('Changed fields: akoya_title');
   expect(ack).toHaveTextContent('Reviews: 1 at generation → 2 at share');
 });
