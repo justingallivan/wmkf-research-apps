@@ -67,6 +67,10 @@ const CENSUS = [
       // loadPreSiteVisitInputs calls the request-scoped getWriteupRoster
       // export to compose the deterministic [[STAFF:RefereeSection]] fill.
       'lib/services/pre-site-visit/proposal-core-service.js',
+      // Pre-Research Presentation Brief plan §2/§3.4a (slice 1, 2026-09-16):
+      // loadPreRpBriefInputs calls the same request-scoped getWriteupRoster
+      // export to build the brief's frozen input envelope and fingerprint.
+      'lib/services/pre-rp-brief/input-service.js',
     ],
   },
   {
