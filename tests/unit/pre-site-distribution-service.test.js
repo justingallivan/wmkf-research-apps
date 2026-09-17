@@ -4,16 +4,53 @@
  * Node environment: the service now imports the deliberation briefing link
  * service, whose token primitive resolves `jose` to its Node build.
  */
+// Plan §11 (Step C1): wrap the real `assembleReviewBundle` in a jest.fn so
+// tests can assert call count/arguments while every other test in this
+// suite still exercises the real assembly logic end to end.
+jest.mock('../../lib/services/pre-site-visit/review-bundle-service.js', () => {
+  const actual = jest.requireActual('../../lib/services/pre-site-visit/review-bundle-service.js');
+  return {
+    ...actual,
+    assembleReviewBundle: jest.fn(actual.assembleReviewBundle),
+  };
+});
+// Codex adversarial review round 2 (Step C finding 1): the producer-to-
+// prepare contract test below calls the REAL `getWriteupRoster`
+// (reviewers-service.js) and REAL `loadPreRpBriefInputs` (input-service.js)
+// end to end, rather than a hand-built envelope — this is the only way to
+// catch a roster-projection field that `assembleReviewBundle` needs but the
+// roster never carried. Everything ELSE that suite still touches (prepare
+// itself, Graph, DV writes) stays mocked via the existing `createPrepareHarness`.
+// Only `getWriteupRoster`'s own I/O boundaries are mocked here — the adapter
+// layer, not the projection logic.
+const rosterFindByRequest = jest.fn();
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  findByRequest: (...a) => rosterFindByRequest(...a),
+}));
+const rosterQueryReviewers = jest.fn();
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
+  queryReviewers: (...a) => rosterQueryReviewers(...a),
+}));
+const rosterFetchAnswersBySuggestion = jest.fn();
+jest.mock('../../lib/services/review-answers', () => ({
+  fetchAnswersBySuggestion: (...a) => rosterFetchAnswersBySuggestion(...a),
+}));
+import { getWriteupRoster } from '../../lib/services/review-manager/reviewers-service.js';
+import { loadPreRpBriefInputs } from '../../lib/services/pre-rp-brief/input-service.js';
 import {
   BRIEFING_LINK_PLACEHOLDER,
+  REVIEW_BUNDLE_LINK_PLACEHOLDER,
   distributionBodyHtml,
   getPreSiteDistributionHistory,
   renderBriefingBody,
+  reviewBundleDocumentUrl,
   normalizeDistributionRecipients,
   preparePreSiteDistribution,
   projectDistributionAttempt,
   sendPreSiteDistribution,
 } from '../../lib/services/pre-site-visit/distribution-service';
+import { assembleReviewBundle } from '../../lib/services/pre-site-visit/review-bundle-service.js';
+import { PRE_SITE_DISTRIBUTION_CONTRACT as REVIEW_BUNDLE_PRODUCER_CONTRACT } from '../../shared/config/requestDocument.js';
 import {
   PRE_RP_BRIEF_CONTRACT,
   PRE_SITE_VISIT_CONTRACT,
@@ -24,6 +61,18 @@ import {
 } from '../../shared/config/requestDocument.js';
 import { DELIBERATION_SHARE_SEED_BRIEFING_COPY } from '../../shared/config/deliberationShareEmail.js';
 import { briefInputFingerprint } from '../../lib/services/pre-rp-brief/docx-renderer.js';
+import { PDFDocument } from 'pdf-lib';
+
+// A real, parseable one-page PDF (plan §11, Step C1): `assembleReviewBundle`
+// calls `PDFDocument.load` on every part, so the magic-byte-only fixture
+// used elsewhere in this suite (`Buffer.from('%PDF-frozen-bytes')`) is not
+// sufficient for the review bundle's default happy path.
+let REVIEW_PART_PDF;
+beforeAll(async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([200, 200]);
+  REVIEW_PART_PDF = Buffer.from(await doc.save());
+});
 
 // A minimal, valid Pre-RP Brief input envelope (plan §3.4a shape) with one
 // received review, used as the "generated" snapshot stored on a source row
@@ -52,6 +101,12 @@ function briefEnvelope(overrides = {}) {
         reviewerAffiliation: 'Test University',
         mainInstitution: 'Test University',
         affiliation: 'Test University',
+        // Plan §11 (Step C1): a retained review file, so the review bundle
+        // gate's happy path (assembleReviewBundle needs at least one
+        // received review with a file) holds for every test that doesn't
+        // deliberately override it.
+        reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_1',
+        reviewFilename: 'review-1.pdf',
       },
     ],
     ...overrides,
@@ -390,6 +445,12 @@ function createPrepareHarness({
   let uuidSequence = 6;
   let settledWordVersion = settledWordVersionId;
   let settledWordETag = 'word-etag';
+  // Plan §11 (Step C1): the review bundle's assembled bytes, tracked by
+  // itemId so getFileMetadataById/downloadFile can serve back exactly what
+  // was uploaded (its size varies with the review set, unlike the fixed
+  // sourceBytes/pdfBytes used for the word/pdf snapshots).
+  let uploadedBundleBytes = null;
+  let uploadedBundleFilename = 'bundle.pdf';
 
   const metadata = (itemId, versionId, eTag, size, name) => ({
     siteId: 'snapshot-site',
@@ -502,12 +563,30 @@ function createPrepareHarness({
       Object.assign(row, patch, { _etag: `${row._etag}-next` });
     }),
     ensureFolderPath: jest.fn(async () => undefined),
-    getFileMetadataByPath: jest.fn(async () => null),
-    uploadFile: jest.fn(async (_library, _folder, filename, buffer, contentType) => (
-      contentType === PRE_SITE_VISIT_CONTRACT.contentType
-        ? metadata('word-snapshot', 'ctag-provisional', provisionalWordETag, buffer.length, filename)
-        : metadata('pdf-snapshot', 'ctag-pdf', 'pdf-etag', buffer.length, filename)
+    // `assembleReviewBundle`'s resource-bound preflight (Codex adversarial
+    // review, Step C finding 4) fetches metadata for EVERY received review
+    // before downloading any bytes, so review filenames must resolve here
+    // too, not just non-review lookups (which stay null by default).
+    getFileMetadataByPath: jest.fn(async (library, folder, filename) => (
+      /^review-.*\.(pdf|docx)$/i.test(filename || '')
+        ? { id: `${filename}-item`, driveId: `${filename}-drive`, size: 2048 }
+        : null
     )),
+    // Plan §11 (Step C1): the default review file is `review-1.pdf`
+    // (briefEnvelope's default review), so assembleReviewBundle's happy
+    // path downloads it directly rather than converting via Graph.
+    downloadFileByPath: jest.fn(async () => ({ buffer: REVIEW_PART_PDF })),
+    uploadFile: jest.fn(async (_library, _folder, filename, buffer, contentType) => {
+      if (contentType === PRE_SITE_VISIT_CONTRACT.contentType) {
+        return metadata('word-snapshot', 'ctag-provisional', provisionalWordETag, buffer.length, filename);
+      }
+      if (/ - Reviews - /.test(filename)) {
+        uploadedBundleBytes = buffer;
+        uploadedBundleFilename = filename;
+        return metadata('bundle-snapshot', 'ctag-bundle', 'bundle-etag', buffer.length, filename);
+      }
+      return metadata('pdf-snapshot', 'ctag-pdf', 'pdf-etag', buffer.length, filename);
+    }),
     getFileMetadataById: jest.fn(async (driveId, itemId) => {
       if (driveId === 'source-drive' && itemId === 'source-item') {
         return {
@@ -530,9 +609,16 @@ function createPrepareHarness({
       if (itemId === 'pdf-snapshot') {
         return metadata(itemId, '1.0', 'pdf-etag', pdfBytes.length, 'snapshot.pdf');
       }
+      if (itemId === 'bundle-snapshot') {
+        return metadata(itemId, '1.0', 'bundle-etag', uploadedBundleBytes ? uploadedBundleBytes.length : 0, uploadedBundleFilename);
+      }
       return null;
     }),
-    downloadFile: jest.fn(async () => ({ buffer: sourceBytes, filename: sourceRow.wmkf_filename })),
+    downloadFile: jest.fn(async (_driveId, itemId) => (
+      itemId === 'bundle-snapshot'
+        ? { buffer: uploadedBundleBytes, filename: uploadedBundleFilename }
+        : { buffer: sourceBytes, filename: sourceRow.wmkf_filename }
+    )),
     downloadFileVersion: jest.fn(),
     downloadFileAsPdf: jest.fn(async () => pdfBytes),
     hashDocx: jest.fn(async () => sourceHash),
@@ -561,6 +647,15 @@ function createPrepareHarness({
         calendar_content_type: prepared.calendar?.contentType || null,
         calendar_byte_hash: prepared.calendar?.byteHash || null,
         calendar_size: prepared.calendar?.size || null,
+        review_bundle_document_id: prepared.reviewBundle?.documentId || null,
+        review_bundle_drive_id: prepared.reviewBundle?.driveId || null,
+        review_bundle_item_id: prepared.reviewBundle?.itemId || null,
+        review_bundle_version_id: prepared.reviewBundle?.versionId || null,
+        review_bundle_filename: prepared.reviewBundle?.filename || null,
+        review_bundle_size: prepared.reviewBundle?.size || null,
+        review_bundle_byte_hash: prepared.reviewBundle?.byteHash || null,
+        review_bundle_set_fingerprint: prepared.reviewBundle?.setFingerprint || null,
+        review_bundle_review_count: prepared.reviewBundle?.reviewCount || null,
       };
       if (dedupeAttempts) attemptsByOperationId.set(attempt.operation_id, attempt);
       return attempt;
@@ -724,9 +819,10 @@ describe('prepare-time review/drift gate (plan §3.4b)', () => {
     );
     expect(second.reused).toBe(true);
     expect(second.attempt.attemptId).toBe(first.attempt.attemptId);
-    // Only the first call built new snapshot documents; the retry recovered
-    // the prepared attempt without doing that file work again.
-    expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(2);
+    // Only the first call built new snapshot documents (docx, pdf, and the
+    // review bundle); the retry recovered the prepared attempt without
+    // doing that file work again.
+    expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(3);
   });
 
   test('the same operation id with a different acknowledgement conflicts instead of silently reusing the prior attempt', async () => {
@@ -899,9 +995,9 @@ test('prepare persists native Graph publication versions instead of provisional 
   expect(result.attempt.state).toBe('prepared');
   expect(result.attempt.attachments).toEqual([]);
   const pinned = harness.dependencies.recordPrepared.mock.calls[0][1];
-  expect([pinned.docx.versionId, pinned.pdf.versionId]).toEqual(['1.0', '1.0']);
+  expect([pinned.docx.versionId, pinned.pdf.versionId, pinned.reviewBundle.versionId]).toEqual(['1.0', '1.0', '1.0']);
   expect(harness.snapshots.map((row) => row.wmkf_sharepointversionid))
-    .toEqual(['1.0', '1.0']);
+    .toEqual(['1.0', '1.0', '1.0']);
 });
 
 test('prepare accepts the settled stable-ID eTag when the upload response eTag is provisional', async () => {
@@ -1330,6 +1426,7 @@ test('history returns configured Share defaults and preserves built-in fallbacks
   expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_link_text');
   expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_description');
   expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_expiry_lead_in');
+  expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.review_bundle_link_text');
 });
 
 test('history marks Share defaults configured only when every stored value is non-blank', async () => {
@@ -1340,6 +1437,7 @@ test('history marks Share defaults configured only when every stored value is no
     'email.deliberation_share.briefing_link_text': 'Open the packet',
     'email.deliberation_share.briefing_description': 'background and review materials.',
     'email.deliberation_share.briefing_expiry_lead_in': 'Available until',
+    'email.deliberation_share.review_bundle_link_text': 'Get every review',
   };
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => []),
@@ -1357,6 +1455,7 @@ test('history marks Share defaults configured only when every stored value is no
       linkText: 'Open the packet',
       description: 'background and review materials.',
       expiryLeadIn: 'Available until',
+      reviewBundleLinkText: 'Get every review',
     },
     configured: true,
     unavailable: false,
@@ -1380,7 +1479,7 @@ test('history reports unavailable Share defaults while retaining built-in wordin
     configured: false,
     unavailable: true,
   });
-  expect(consoleSpy).toHaveBeenCalledTimes(6);
+  expect(consoleSpy).toHaveBeenCalledTimes(7);
   consoleSpy.mockRestore();
 });
 
@@ -2130,6 +2229,26 @@ test('body html carries the briefing section only when a link was minted', () =>
   expect(withLink.indexOf('Briefing page')).toBeLessThan(withLink.indexOf('wmkf-pre-site-distribution'));
 });
 
+test('body html carries the review-bundle placeholder alongside the briefing link; renderBriefingBody resolves both hrefs from the one token', () => {
+  const link = { id: 'l', url: 'https://apps.test/external/briefing/abc123', expiresAt: '2026-10-08T20:00:00Z' };
+  const withLink = distributionBodyHtml('Hello', OPERATION_ID, [], link);
+  expect(withLink).toContain(`href="${REVIEW_BUNDLE_LINK_PLACEHOLDER}"`);
+  expect(withLink).toContain('Download all reviews (PDF)');
+  // Never a second token, or the token embedded anywhere in the stored body.
+  expect(withLink).not.toContain('apps.test');
+
+  const rendered = renderBriefingBody(withLink, link.url);
+  expect(rendered).toContain('href="https://apps.test/external/briefing/abc123"');
+  expect(rendered).toContain('href="https://apps.test/api/external/briefing/abc123/document?member=review-bundle"');
+  expect(rendered).not.toContain(BRIEFING_LINK_PLACEHOLDER);
+  expect(rendered).not.toContain(REVIEW_BUNDLE_LINK_PLACEHOLDER);
+
+  expect(reviewBundleDocumentUrl(link.url))
+    .toBe('https://apps.test/api/external/briefing/abc123/document?member=review-bundle');
+  expect(reviewBundleDocumentUrl(null)).toBeNull();
+  expect(reviewBundleDocumentUrl('not a url')).toBeNull();
+});
+
 test('body html uses Admin briefing wording while keeping the bound URL and expiration date server-owned', () => {
   const link = {
     id: 'l',
@@ -2181,6 +2300,29 @@ test('prepare freezes the Admin briefing wording into the stored body and previe
   }));
   const secondResult = await preparePreSiteDistribution(prepareInput(), second.dependencies);
   expect(secondResult.attempt.previewHash).not.toBe(firstResult.attempt.previewHash);
+});
+
+test('draftHash and previewHash both bind the review-bundle link-text copy key (discriminating: change only that key)', async () => {
+  const base = createPrepareHarness();
+  const baseResult = await preparePreSiteDistribution(prepareInput(), base.dependencies);
+  const baseDraftHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+  const changed = createPrepareHarness();
+  changed.dependencies.getSettingStrict = jest.fn(async (key) => (
+    key === 'email.deliberation_share.review_bundle_link_text'
+      ? { found: true, value: 'Get every review' }
+      : { found: false, value: null }
+  ));
+  const changedResult = await preparePreSiteDistribution(
+    prepareInput({ operationId: '77777777-7777-4777-8777-777777777779' }),
+    changed.dependencies,
+  );
+  const changedDraftHash = changed.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+  expect(changedDraftHash).not.toBe(baseDraftHash);
+  expect(changedResult.attempt.previewHash).not.toBe(baseResult.attempt.previewHash);
+  const stored = changed.dependencies.createOrGetAttempt.mock.calls[0][0].bodyHtml;
+  expect(stored).toContain('>Get every review</a>');
 });
 
 test('prepare mints the briefing link, binds it to the attempt, and folds it into the preview hash', async () => {
@@ -2361,4 +2503,251 @@ test('a retry of a send-requested attempt reconciles an accepted Dynamics send b
   expect(result.reused).toBe(true);
   expect(dependencies.getLiveBriefingLink).not.toHaveBeenCalled();
   expect(dependencies.sendEmail).not.toHaveBeenCalled();
+});
+
+async function onePagePdfBuffer(label) {
+  const { PDFDocument: LocalPDFDocument } = await import('pdf-lib');
+  const doc = await LocalPDFDocument.create();
+  const page = doc.addPage([200, 200]);
+  page.drawText(label, { x: 10, y: 10, size: 10 });
+  return Buffer.from(await doc.save());
+}
+
+describe('review bundle (plan §11, Step C1)', () => {
+  beforeEach(() => {
+    assembleReviewBundle.mockClear();
+  });
+
+  test('prepare calls assembleReviewBundle exactly once with the live received reviews, creates the bundle registry row with the institution-led filename (no request number), and persists the nine columns', async () => {
+    const harness = createPrepareHarness();
+    const result = await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+
+    expect(assembleReviewBundle).toHaveBeenCalledTimes(1);
+    const [callArgs] = assembleReviewBundle.mock.calls[0];
+    expect(callArgs.reviews).toEqual(briefEnvelope().reviews);
+    expect(callArgs.institutionName).toBe('Test Institution');
+
+    const bundleDoc = harness.dependencies.createDocument.mock.calls
+      .map((call) => call[0])
+      .find((payload) => payload.wmkf_producer === `${REVIEW_BUNDLE_PRODUCER_CONTRACT.producerPrefix}-review-bundle`);
+    expect(bundleDoc).toBeDefined();
+    expect(bundleDoc.wmkf_templateid).toBe('pdf-lib-review-bundle');
+    expect(bundleDoc.wmkf_name).toBe('1002379 frozen review bundle');
+    expect(bundleDoc.wmkf_filename).toMatch(/^Test Institution - Reviews - [0-9a-f]{8}\.pdf$/);
+    expect(bundleDoc.wmkf_filename).not.toContain('1002379');
+
+    const persisted = harness.dependencies.recordPrepared.mock.calls[0][1];
+    expect(persisted.reviewBundle).toMatchObject({
+      documentId: expect.any(String),
+      driveId: 'snapshot-drive',
+      itemId: 'bundle-snapshot',
+      versionId: '1.0',
+      filename: bundleDoc.wmkf_filename,
+      size: expect.any(Number),
+      byteHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      setFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+      reviewCount: 1,
+    });
+    expect(result.attempt.reviewBundle).toMatchObject({
+      filename: bundleDoc.wmkf_filename,
+      reviewCount: 1,
+      setFingerprint: persisted.reviewBundle.setFingerprint,
+    });
+    // No drive/item ids to the client.
+    expect(JSON.stringify(result.attempt.reviewBundle)).not.toMatch(/drive|item/i);
+  });
+
+  test('draftHash and previewHash both change when the review set changes, isolated from the brief input fingerprint (same reviewer identity, only the retained file changes)', async () => {
+    const base = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput(), base.dependencies);
+    const baseDraftHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+    const basePreviewHash = base.dependencies.recordPrepared.mock.calls[0][1].previewHash;
+
+    // Only `reviewFilename` changes; every REVIEW_FINGERPRINT_FIELDS field
+    // (suggestionId, name, academicRank, ...) is identical, so
+    // briefInputFingerprint (and therefore every other draftHash/previewHash
+    // input) is unchanged — the review-set identity is the only thing that
+    // can move either hash here.
+    const [baseReview] = briefEnvelope().reviews;
+    const movedFileEnvelope = briefEnvelope({
+      reviews: [{ ...baseReview, reviewFilename: 'review-1-v2.pdf' }],
+    });
+    expect(briefInputFingerprint(movedFileEnvelope)).toBe(briefInputFingerprint(briefEnvelope()));
+    const moved = createPrepareHarness({
+      briefGate: briefGateFixture({ generated: movedFileEnvelope, live: movedFileEnvelope }),
+    });
+    await preparePreSiteDistribution(
+      prepareInput({ operationId: '55555555-5555-4555-8555-555555555555' }),
+      moved.dependencies,
+    );
+    const movedDraftHash = moved.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+    const movedPreviewHash = moved.dependencies.recordPrepared.mock.calls[0][1].previewHash;
+
+    expect(movedDraftHash).not.toBe(baseDraftHash);
+    expect(movedPreviewHash).not.toBe(basePreviewHash);
+  });
+
+  test('previewHash changes when only the bundle byte hash changes (same review set, different bytes at the same path)', async () => {
+    const base = createPrepareHarness();
+    await preparePreSiteDistribution(prepareInput(), base.dependencies);
+    const baseDraftHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+    const basePreviewHash = base.dependencies.recordPrepared.mock.calls[0][1].previewHash;
+
+    const changedBytes = createPrepareHarness();
+    const differentPdf = await onePagePdfBuffer('different-content');
+    changedBytes.dependencies.downloadFileByPath = jest.fn(async () => ({ buffer: differentPdf }));
+    await preparePreSiteDistribution(
+      prepareInput({ operationId: '66666666-6666-4666-8666-666666666666' }),
+      changedBytes.dependencies,
+    );
+    const changedDraftHash = changedBytes.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+    const changedPreviewHash = changedBytes.dependencies.recordPrepared.mock.calls[0][1].previewHash;
+
+    // The review SET (paths/filenames) is unchanged, so draftHash (which
+    // binds only the set fingerprint) is unaffected; previewHash binds the
+    // exact bundle byte hash, so it changes.
+    expect(changedDraftHash).toBe(baseDraftHash);
+    expect(changedPreviewHash).not.toBe(basePreviewHash);
+  });
+
+  test('a bundle failure (Graph unavailable) leaves the attempt un-prepared and surfaces the bundle error code', async () => {
+    const harness = createPrepareHarness();
+    harness.dependencies.downloadFileByPath = jest.fn(async () => { throw new Error('Graph is down'); });
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({ code: 'review_bundle_unavailable', httpStatus: 502 });
+    expect(harness.dependencies.recordPrepared).not.toHaveBeenCalled();
+    expect(harness.dependencies.createOrGetAttempt).toHaveBeenCalled();
+  });
+
+  test('a received review with no retained file leaves the attempt un-prepared and fails closed with review_bundle_incomplete (Codex adversarial review, Step C finding 2 — no silent skip)', async () => {
+    const noFileEnvelope = briefEnvelope({
+      reviews: [{
+        suggestionId: 'reviewer-1',
+        reviewReceivedAt: '2026-09-01T00:00:00Z',
+        name: 'Reviewer One',
+        affiliation: 'Test University',
+        reviewSharePointFolder: null,
+        reviewFilename: null,
+      }],
+    });
+    const harness = createPrepareHarness({
+      briefGate: briefGateFixture({ generated: noFileEnvelope, live: noFileEnvelope }),
+    });
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({
+        code: 'review_bundle_incomplete',
+        httpStatus: 409,
+        message: expect.stringContaining('Reviewer One'),
+      });
+    expect(harness.dependencies.recordPrepared).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Producer-to-prepare contract (Codex adversarial review round 2, Step C
+// finding 1): `assembleReviewBundle` requires `reviewSharePointFolder`/
+// `reviewFilename` on every received review (fail-closed, Step C round 1
+// finding 2). Every OTHER test above proves that requirement against a
+// hand-built `briefEnvelope()` fixture that already carries those fields —
+// which does NOT prove the REAL producer (`getWriteupRoster` ->
+// `loadPreRpBriefInputs`) actually supplies them. This block calls the real
+// projection end to end (only its own adapter I/O mocked) and feeds the
+// result into the real `preparePreSiteDistribution`.
+// ---------------------------------------------------------------------------
+describe('producer-to-prepare contract: the real roster projection through prepare (Codex adversarial review round 2, Step C finding 1)', () => {
+  beforeEach(() => {
+    rosterFindByRequest.mockReset();
+    rosterQueryReviewers.mockReset();
+    rosterFetchAnswersBySuggestion.mockReset();
+  });
+
+  function realLoadPreRpBriefInputs({ requestId }) {
+    return loadPreRpBriefInputs({ requestId }, {
+      getRequest: async () => ({
+        akoya_requestid: requestId,
+        akoya_requestnum: '1002379',
+        akoya_title: 'Test Project',
+        _akoya_applicantid_value: null,
+        _akoya_applicantid_value_formatted: 'Test Institution',
+        _wmkf_projectleader_value_formatted: 'Dr. PI',
+        _wmkf_programdirector_value_formatted: 'Dr. PD',
+        wmkf_abstract: 'A test abstract.',
+        wmkf_meetingdate: '2026-12-01',
+      }),
+      getAccount: async () => null,
+      // The real getWriteupRoster projection — only ITS OWN adapter calls
+      // (findByRequest / queryReviewers / fetchAnswersBySuggestion) are mocked.
+      getWriteupRoster: (rid) => getWriteupRoster({ requestId: rid }),
+    });
+  }
+
+  test('a received review from the REAL roster carries reviewSharePointFolder/reviewFilename, so prepare assembles the bundle (not review_bundle_incomplete)', async () => {
+    rosterFindByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: 'reviewer-1',
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: 'person-a',
+      wmkf_selected: true,
+      wmkf_invited: true,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: '2026-09-01T00:00:00Z',
+      wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_1',
+      wmkf_reviewfilename: 'review-1.pdf',
+    }]);
+    rosterQueryReviewers.mockResolvedValue({
+      records: [{
+        wmkf_potentialreviewersid: 'person-a',
+        wmkf_name: 'Reviewer One',
+        wmkf_primaryaffiliation: 'Test University',
+      }],
+    });
+    rosterFetchAnswersBySuggestion.mockResolvedValue({});
+
+    // Real end-to-end producer read: getWriteupRoster (mocked adapters only)
+    // -> loadPreRpBriefInputs (real). Assert the pointers arrive BEFORE
+    // feeding this into prepare, so a future regression here fails at the
+    // most specific line, not just "prepare threw".
+    const { envelope: generatedEnvelope } = await realLoadPreRpBriefInputs({ requestId: REQUEST_ID });
+    expect(generatedEnvelope.reviews).toHaveLength(1);
+    expect(generatedEnvelope.reviews[0]).toMatchObject({
+      suggestionId: 'reviewer-1',
+      reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_1',
+      reviewFilename: 'review-1.pdf',
+    });
+
+    // Use the SAME real envelope as both "generated" (the stored snapshot)
+    // and "live" (no input drift) — the ordinary happy path when the brief
+    // was generated from the same live inputs it is now being shared from.
+    const gate = briefGateFixture({ generated: generatedEnvelope, live: generatedEnvelope });
+    gate.loadPreRpBriefInputs = jest.fn(realLoadPreRpBriefInputs);
+    const harness = createPrepareHarness({ briefGate: gate });
+
+    const result = await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+    expect(result.attempt.reviewBundle.reviewCount).toBe(1);
+    expect(harness.dependencies.recordPrepared).toHaveBeenCalledTimes(1);
+  });
+
+  test('a received review missing the SharePoint pointers from the real roster still fails closed with review_bundle_incomplete (proves this contract test would have caught the round-1 regression)', async () => {
+    rosterFindByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: 'reviewer-1',
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: 'person-a',
+      wmkf_selected: true,
+      wmkf_invited: true,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: '2026-09-01T00:00:00Z',
+      // No wmkf_reviewsharepointfolder/wmkf_reviewfilename on this row.
+    }]);
+    rosterQueryReviewers.mockResolvedValue({
+      records: [{ wmkf_potentialreviewersid: 'person-a', wmkf_name: 'Reviewer One' }],
+    });
+    rosterFetchAnswersBySuggestion.mockResolvedValue({});
+
+    const { envelope: generatedEnvelope } = await realLoadPreRpBriefInputs({ requestId: REQUEST_ID });
+    const gate = briefGateFixture({ generated: generatedEnvelope, live: generatedEnvelope });
+    gate.loadPreRpBriefInputs = jest.fn(realLoadPreRpBriefInputs);
+    const harness = createPrepareHarness({ briefGate: gate });
+
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({ code: 'review_bundle_incomplete', httpStatus: 409 });
+  });
 });

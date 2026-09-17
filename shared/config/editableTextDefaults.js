@@ -322,6 +322,16 @@ export const EDITABLE_TEXT_DEFAULTS = [
     emailLabel: 'Share for deliberation',
   },
   {
+    key: 'email.deliberation_share.review_bundle_link_text',
+    label: 'Share for deliberation review bundle link text',
+    description: 'Clickable text for the "every review, one PDF" link under the briefing link. Blank retains “Download all reviews (PDF)”. The destination URL cannot be changed here.',
+    multiline: false,
+    placeholders: [],
+    group: 'internal',
+    emailKey: 'email.deliberation_share',
+    emailLabel: 'Share for deliberation',
+  },
+  {
     key: 'email.deliberation_agenda.subject',
     label: 'Deliberation agenda subject',
     description: 'Default subject line for the deliberation session agenda email (Meeting Tracker session page, "Agenda email" card). Mustache {{tokens}}, not [brackets]. {{sessionDate}} renders as e.g. "Friday, September 11" in the session\'s time zone.',

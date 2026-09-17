@@ -102,7 +102,8 @@ export const PRE_SITE_DISTRIBUTION_CONTRACT = Object.freeze({
 export function isPreSiteDistributionSnapshot(row) {
   const producer = String(row?.wmkf_producer || '');
   return producer === `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx`
-    || producer === `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-pdf`;
+    || producer === `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-pdf`
+    || producer === `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-review-bundle`;
 }
 
 export const PRE_SITE_REOPEN_REASON = Object.freeze({

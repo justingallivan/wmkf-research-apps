@@ -385,6 +385,91 @@ test('H3c/B10: a brief_reviews_required prepare failure shows named, non-generic
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
+test('review bundle (plan §11): a review_bundle_incomplete prepare failure shows named copy, not the generic failure', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    // No `error` string (discriminating: the generic fallback would show
+    // "Preview preparation failed (409)", so passing requires the dedicated branch).
+    .mockResolvedValueOnce(response({ code: 'review_bundle_incomplete' }, 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/has no retained file yet/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+});
+
+test('review bundle (plan §11): a review_bundle_part_invalid prepare failure shows named, non-generic copy', async () => {
+  // No `error` string in the body — discriminating: the generic fallback
+  // would show "Preview preparation failed (409)".
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ code: 'review_bundle_part_invalid' }, 502));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/not a valid PDF/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+});
+
+test('review bundle (plan §11): a review_bundle_unavailable prepare failure shows named, non-generic copy', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ code: 'review_bundle_unavailable' }, 502));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/could not be assembled from SharePoint/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+});
+
+test('review bundle (plan §11): a review_bundle_too_large prepare failure shows named copy, not the generic failure', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    // No `error` string (discriminating, see above).
+    .mockResolvedValueOnce(response({ code: 'review_bundle_too_large' }, 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/too large to assemble/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
+});
+
 // Codex adversarial review (2026-09-17, round 5 finding 1): mirrors the
 // brief_reviews_required test above for the new 409
 // brief_regeneration_in_progress code (a guarded regeneration is live for

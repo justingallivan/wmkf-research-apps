@@ -71,6 +71,11 @@ const CENSUS = [
       // loadPreRpBriefInputs calls the same request-scoped getWriteupRoster
       // export to build the brief's frozen input envelope and fingerprint.
       'lib/services/pre-rp-brief/input-service.js',
+      // Review bundle (plan §11, Step C, 2026-09-17): the external briefing
+      // member's on-demand rebuild derives the live review set from the same
+      // request-scoped getWriteupRoster producer prepare uses, so prepare and
+      // rebuild fingerprint one identity (Codex Step C round 2, finding 2).
+      'lib/services/deliberation-briefing/briefing-page-service.js',
     ],
   },
   {

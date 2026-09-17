@@ -1129,3 +1129,68 @@ clock-controlled status test fail.
 **Verdict: approve, no material findings.** Codex confirmed prepare and both send-time
 checks use the lease-aware resolver, the pending projection and tab suppression share the same
 15-minute lease semantics, and expired claims remain reclaimable through the guarded dialog.
+
+## 11. Review bundle PDF (owner request 2026-09-16; Step C on `claude/pre-rp-brief-review-bundle`)
+
+**Ask.** A Board member asked to download every review shown inline on the deliberation
+briefing page as one PDF. Owner decision 2026-09-16 (option 2): assemble the bundle when staff
+Share (prepare) so the latency lands on staff, retain it as a governed request document beside
+the brief distribution snapshot, pin its identity on the attempt, serve it as a token-verified
+briefing-page member and as a link in the briefing email, and rebuild it once on demand when the
+live review set differs from the pinned set. Board-facing filename is institution-led with no
+request number.
+
+### Contract-reconcile (Mode A, 2026-09-16, S516; evidence from the Explore pass on `694863d5`)
+
+| Layer | Fact | Evidence |
+|---|---|---|
+| Caller | Prepare already loads live brief inputs (received reviews with `reviewSharePointFolder`/`reviewFilename`) for the drift gate, then creates the DOCX and PDF snapshots through `ensureSnapshot` before `previewHash` and `recordPrepared`. | `[VERIFIED via lib/services/pre-site-visit/distribution-service.js:1305-1336,1506-1555,1570-1615]` |
+| Conversion | DOCX→PDF is `GraphService.downloadFileAsPdf(driveId, itemId)`; review files are path-addressed, so drive/item ids come from `getFileMetadataByPath` (the `locateProposal` pattern). | `[VERIFIED via lib/services/graph-service.js:903-916,921,950; lib/services/deliberation-briefing/briefing-page-service.js:259-279]` |
+| Review identity | `wmkf_appreviewersuggestion.wmkf_reviewsharepointfolder` + `wmkf_reviewfilename`; no drive/item/version/hash exists, so the pinned "review set" is path-keyed and byte identity is known only after download. | `[VERIFIED via lib/services/review-upload.js:267-268; lib/services/review-manager/download-review-service.js:56-82]` |
+| Persistence | `pre_site_distribution_attempts` `pdf_*` family is the column template; migration 053 adds a `review_bundle_*` family (ten columns, two CHECKs) mirrored in `scripts/setup-database.js` `v54Statements` and pinned by the parity test. | `[VERIFIED via lib/services/pre-site-visit/distribution-store.js:12-52,131-165; scripts/setup-database.js:1176-1237,2310-2325; tests/unit/pre-site-distribution-schema-parity.test.js:27-79]` |
+| Registry | Snapshot rows reuse the brief artifact type with producer `request-workbench-distribution-<format>`; `isPreSiteDistributionSnapshot` matches only `-docx`/`-pdf`, so a third suffix must be added or the bundle row leaks into the materials lists. | `[VERIFIED via shared/config/requestDocument.js:97-106; lib/services/deliberation-briefing/briefing-page-service.js:192-200; lib/services/pre-site-visit/distribution-service.js:518]` |
+| Consumer (page) | Members are bounded ids resolved by `resolveBriefingMember`; `writeup-docx` re-reads the latest sent attempt, downloads by pinned drive/item, and re-hashes against `docx_byte_hash` (409 on drift). Reviews render live; non-PDF review files are hidden today (`isPdfFilename`). | `[VERIFIED via lib/services/deliberation-briefing/briefing-page-service.js:67-73,239-252,327-352,128,186; pages/external/briefing/[token].js:85,200-230]` |
+| Consumer (email) | The briefing link is a placeholder href substituted at send time; copy comes from `email.deliberation_share.*` settings registered in three places and pinned by three tests. | `[VERIFIED via lib/services/pre-site-visit/distribution-service.js:351-356,419-450; shared/config/deliberationShareEmail.js:7-15; shared/config/editableTextDefaults.js:295-315]` |
+| Library | `pdf-lib` ^1.17.1 is already a dependency (split direction only today). No new dependency. | `[VERIFIED via package.json:141-142; lib/utils/pdf-page-splitter.js:27]` |
+| Partial success | Prepare fails closed if any part cannot be fetched or converted; no attempt reaches `prepared` without a bundle. The on-demand rebuild is idempotent through the registry generation key (review-set fingerprint) so two concurrent Board reads converge on one row/file. | design |
+| Stale async | Send-time checks (`assertAttemptSourceCurrent`, `assertAttemptExtensionsCurrent`) do not recheck the review set; drift after prepare is handled by the on-demand rebuild on read, not at send. | `[VERIFIED via lib/services/pre-site-visit/distribution-service.js:1752-1800]` |
+
+### Design
+
+- **C1 (server):** `lib/services/pre-site-visit/review-bundle-service.js` (`reviewSetFingerprint`, `assembleReviewBundle` with pdf-lib separator pages), retention through `ensureSnapshot` format `review-bundle` (producer suffix added to `isPreSiteDistributionSnapshot`), migration 053 + fresh-install mirror + parity/mirror tests, `draftHash` binds the review-set fingerprint, `previewHash` binds the bundle identity, `recordPrepared` persists the family, `projectDistributionAttempt` exposes `reviewBundle` (no drive/item ids).
+- **C2 (consumers):** `review-bundle` member in `resolveBriefingMember` (latest sent attempt; re-hash; inline PDF; institution-led filename); on read, if `reviewSetFingerprint(live received reviews)` differs from the pinned set fingerprint, rebuild through the same assembly + `ensureSnapshot`, update the attempt's family and `review_bundle_rebuilt_at`, then serve; `buildBriefingContext` gains `reviewBundle { member, filename, size, reviewCount, rebuiltAt }`; the page renders "Download all reviews (PDF)" in the Reviews section; the email body gains a second placeholder href resolved at send time to the document route with `member=review-bundle`, with copy key `email.deliberation_share.review_bundle_link_text` registered alongside the existing keys.
+- **Behavior change to note:** DOCX-origin reviews, hidden on the page today, appear in the bundle as converted PDF pages.
+
+**Deployment protocol (same as migration 052) — done: 053 applied 2026-09-17T13:57:15Z, readback exact (ten columns, two CHECKs, 17 legacy rows pass), before PR #312 merged.** merge auto-deploys code that names the new `review_bundle_*` columns, so migration 053 must be applied to the shared Production/Preview database (`node scripts/apply-migrations.js`) before this branch merges — prepare must not run in an environment where migration 053 is absent.
+
+### Codex adversarial review round 2 (Step C) — disposition 2026-09-17
+
+1. **[high — production breaker, fixed]** `getWriteupRoster` (`lib/services/review-manager/reviewers-service.js`) never projected `reviewSharePointFolder`/`reviewFilename` into its output, even though the shared entity-registry `$select` for `wmkf_appreviewersuggestions` already fetched both fields (`lib/dataverse/core/entity-registry.js`) — a missing projection, not a missing fetch. Since `loadPreRpBriefInputs` passes this roster's `reviews` straight into `envelope.reviews` (`lib/services/pre-rp-brief/input-service.js:110-112`), every received review looked incomplete to `assembleReviewBundle`'s round-1 fail-closed check, so every Share would 409 `review_bundle_incomplete`. Fixed by adding both fields to the roster projection literal; `REVIEW_FINGERPRINT_FIELDS` untouched. A producer-to-prepare contract test (`tests/unit/pre-site-distribution-service.test.js`, "producer-to-prepare contract" describe block) now calls the REAL `getWriteupRoster` → `loadPreRpBriefInputs` → `preparePreSiteDistribution` end to end (only the roster's own adapter I/O mocked) and would have caught this regression.
+2. **[medium, fixed]** Prepare and the on-demand rebuild derived a reviewer's name/affiliation from two different reductions — prepare via the Potential-Reviewer-hydrated `getWriteupRoster`, rebuild via an ad-hoc `personName`/`personAffiliation` reduction of the raw suggestion row only — so a Potential Reviewer rename could be visible to one and not the other. Fixed by making `loadLiveReviewsForBundle` (`briefing-page-service.js`) call the SAME `getWriteupRoster` producer; the ad-hoc suggestion mapping is gone. `personName`/`personAffiliation` remain in use for the (unrelated) reviews list in `buildBriefingContext`.
+3. **[medium, fixed]** TOCTOU after the CAS: the live set could drift again between selecting a bundle to serve (fresh rebuild winner, or unchanged pinned) and downloading/serving its bytes. Fixed with a bounded (2-attempt) retry in `resolveBriefingMember`: after downloading and byte-hash-verifying the selected bundle, the live fingerprint is recomputed one final time and compared to the fingerprint that bundle was built for; a mismatch retries the whole selection once more, and a second miss serves 503 `review_bundle_unavailable` rather than stale bytes. Applies on both the rebuild branch and the unchanged-pinned branch.
+
+Side effect of (2)/(3): the review-bundle document route now reads `getWriteupRoster` twice on the unchanged-fast-path (was once) and up to three times per rebuild attempt (up to six across a full 2-attempt retry) — each read is `findByRequest` + a chunked `queryReviewers` + `fetchAnswersBySuggestion` (Dataverse only, no Graph). Acceptable added latency for a page-view-triggered read; flag if it becomes measurable.
+
+### Codex adversarial review round 3 (Step C) — disposition 2026-09-17
+
+Codex confirmed the roster projection, the shared producer, the DAL context, and the documented
+read bound. One finding remains and is **dispositioned as a contract statement, not a code
+change**: the final post-download recheck compares the selected bundle against one roster
+snapshot, and that snapshot is assembled across sequential Dataverse reads, so a mutation landing
+between the suggestion read and the response is invisible to it. A return-time fence would need a
+request-scoped revision/lease held through response completion across Dataverse, which no read
+path in this application has; the briefing page's own inline reviews are served with the same
+last-observed-snapshot semantics (`loadReviews` reads suggestions then hydrates). **Contract:**
+the review bundle is consistent with the review set *as last observed during delivery*
+(pinned-set comparison before selection, one final recheck after download, at most two attempts);
+it is not a linearizable guarantee against concurrent Dataverse edits. A review deselected during
+the delivery window can appear in that one response exactly as it can in the inline list served
+by the same request; the next read repairs it. Recorded in the security matrix row.
+
+### Open for owner (2026-09-16)
+
+1. A review file that cannot be converted blocks Share (fail closed) rather than being skipped with a placeholder page. Conservative default chosen; say if a placeholder page is preferred.
+1a. Codex adversarial review (Step C): a review missing its retained file also fails closed now (`review_bundle_incomplete`, 409, names the reviewer), matching (1) — no silent per-review skip.
+1b. Separator-page text uses the standard WinAnsi (Helvetica) font, which cannot encode non-Latin reviewer names/affiliations (e.g. CJK); unencodable characters are replaced with `?` so assembly never throws. A Unicode-capable font requires adding the `@pdf-lib/fontkit` dependency plus a bundled Unicode TTF — neither exists in the repo today; owner call on whether to add them.
+2. The bundle includes reviewer names and affiliations on separator pages, matching what the page already shows to the Board.
+3. The bundle bounds (`MAX_REVIEW_COUNT` 25, `MAX_SOURCE_BYTES` 100 MB, `MAX_OUTPUT_BYTES` 50 MB in `lib/services/pre-site-visit/review-bundle-service.js`) are code literals. The owner rule of 2026-08-28 (mutable parameters live in admin-editable settings, code holds bounds and fallbacks) may apply if staff ever need to raise them. They are safety ceilings, not workload tunables, so they were left in code for this build; say if they should move behind `wmkf_appsystemsettings`.

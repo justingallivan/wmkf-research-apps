@@ -96,6 +96,7 @@ describe('seed-email-defaults script core', () => {
       'email.deliberation_share.briefing_link_text',
       'email.deliberation_share.briefing_description',
       'email.deliberation_share.briefing_expiry_lead_in',
+      'email.deliberation_share.review_bundle_link_text',
     ]) {
       expect(setSetting).toHaveBeenCalledWith(key, EMAIL_DEFAULT_SEED_TEXT[key], null);
     }
@@ -133,6 +134,8 @@ describe('seed-email-defaults script core', () => {
       .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.description);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.briefing_expiry_lead_in'])
       .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.expiryLeadIn);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.review_bundle_link_text'])
+      .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.reviewBundleLinkText);
   });
 
   test('registers both site-visit email families with the previous default wording', async () => {

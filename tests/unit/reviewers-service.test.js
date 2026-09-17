@@ -733,6 +733,12 @@ describe('getWriteupRoster', () => {
         wmkf_invited: true,
         wmkf_accepted: true,
         wmkf_reviewreceivedat: '2026-09-01T00:00:00Z',
+        // Retained-file pointers (Codex adversarial review round 2, Step C
+        // finding 1): `assembleReviewBundle` requires these on every
+        // received review — they must survive the roster projection, not
+        // just live on the underlying adapter row.
+        wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_1',
+        wmkf_reviewfilename: 'review-a.pdf',
       },
       {
         // accepted but not yet submitted — in the roster, but no answers fetched for it.
@@ -780,10 +786,18 @@ describe('getWriteupRoster', () => {
       keywords: 'genomics; immunology',
       reviewReceivedAt: '2026-09-01T00:00:00Z',
       reviewerOverallAssessment: 5,
+      reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_1',
+      reviewFilename: 'review-a.pdf',
     });
     expect(a.answers).toEqual([{ questionKey: 'q1', answerText: 'x' }]);
     const b = out.reviewers.find((r) => r.suggestionId === IDS[1]);
-    expect(b).toMatchObject({ name: 'Dr. B', reviewReceivedAt: null, reviewerOverallAssessment: null });
+    expect(b).toMatchObject({
+      name: 'Dr. B',
+      reviewReceivedAt: null,
+      reviewerOverallAssessment: null,
+      reviewSharePointFolder: null,
+      reviewFilename: null,
+    });
     expect(b.answers).toEqual([]);
   });
 

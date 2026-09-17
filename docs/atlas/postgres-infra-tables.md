@@ -207,6 +207,39 @@ delta, and both acknowledgement fields). Mirrored byte-for-byte in
 Written by `distribution-service.js` prepare when staff acknowledge drift; read
 by `briefing-page-service.js` as the timestamp-only `staffAcknowledgedNewerInputs`.
 
+**[VERIFIED LIVE 2026-09-17 — migration 053 applied to the shared Production/Preview database by the owner-authorized `node scripts/apply-migrations.js` run (tracker `applied_at` 2026-09-17T13:57:15Z); readback exact: ten nullable columns, both CHECK constraints, 17 pre-existing attempt rows all satisfy the constraints]**
+Migration `053_pre_site_distribution_review_bundle.sql` (plan §11, Step C1)
+adds ten nullable columns retaining the "every review" PDF bundle assembled at
+Share (prepare) time — `review_bundle_document_id TEXT`,
+`review_bundle_drive_id TEXT`, `review_bundle_item_id TEXT`,
+`review_bundle_version_id TEXT`, `review_bundle_filename TEXT`,
+`review_bundle_size INTEGER`, `review_bundle_byte_hash CHAR(64)`,
+`review_bundle_set_fingerprint CHAR(64)`, `review_bundle_review_count INTEGER`,
+`review_bundle_rebuilt_at TIMESTAMPTZ` — and two CHECK constraints,
+`pre_site_distribution_review_bundle_shape` (both hashes NULL or lowercase
+hex64) and `pre_site_distribution_review_bundle_coherence` (legacy all-NULL
+rows satisfy it; a prepared review-bundle attempt requires the document/drive/
+item/filename/byte-hash/set-fingerprint identity plus `review_count >= 1`;
+`version_id` and `size` are metadata, not part of the coherence check).
+Mirrored byte-for-byte in `scripts/setup-database.js` (`v54Statements`); the
+parity test compares the real CHECK bodies. The bundle sits beside the brief
+PDF snapshot as a governed `wmkf_requestdocument` row
+(producer `request-workbench-distribution-review-bundle`), created through
+`ensureSnapshot` and retained via
+`lib/services/pre-site-visit/review-bundle-service.js`/`retainReviewBundle`
+(`distribution-service.js`). The nine identity columns are written by
+`distribution-service.js` prepare (`recordDistributionPrepared`) at Share
+time; `review_bundle_rebuilt_at` stays NULL there. **[SOURCE-BUILT
+2026-09-16 on `claude/pre-rp-brief-review-bundle`; deployment pending; plan
+§11, Step C2]** The same nine columns plus `review_bundle_rebuilt_at` are
+rewritten by `recordReviewBundleRebuilt` (`distribution-store.js`, guarded
+`WHERE state = 'sent'`), called from `briefing-page-service.js`
+`resolveBriefingMember`'s `review-bundle` member on read, only when a
+fingerprint over the live received review set no longer matches
+`review_bundle_set_fingerprint` [VERIFIED via
+lib/services/deliberation-briefing/briefing-page-service.js and
+lib/services/pre-site-visit/distribution-store.js `recordReviewBundleRebuilt`].
+
 One client operation UUID binds one Request, exact editable source Word
 identity/version/governed hash/raw byte hash, attachment mode (`none` for every
 attempt prepared since 2026-09-10, migration 039, the email carrying the

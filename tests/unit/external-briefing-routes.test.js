@@ -104,6 +104,27 @@ describe('document', () => {
     expect(resolveBriefingMember).toHaveBeenCalledWith({ requestId: 'req', member: 'writeup-docx' });
   });
 
+  test('member=review-bundle streams the resolved bundle inline with the pinned filename', async () => {
+    verifyBriefingToken.mockResolvedValueOnce({ ok: true, requestId: 'req', link: {} });
+    resolveBriefingMember.mockResolvedValueOnce({
+      buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'Example University - Reviews - abc12345.pdf', size: 5, inline: true,
+    });
+    const res = mockRes();
+    await documentHandler({ method: 'GET', query: { token: 't', member: 'review-bundle' } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Disposition']).toBe('inline; filename="Example University - Reviews - abc12345.pdf"');
+    expect(resolveBriefingMember).toHaveBeenCalledWith({ requestId: 'req', member: 'review-bundle' });
+  });
+
+  test('an unrecognized member still resolves to 404 via the service (no route-level allowlist bypass)', async () => {
+    verifyBriefingToken.mockResolvedValueOnce({ ok: true, requestId: 'req', link: {} });
+    resolveBriefingMember.mockRejectedValueOnce(new ServiceHttpError('not found', { httpStatus: 404, body: { ok: false, reason: 'not_found' } }));
+    const res = mockRes();
+    await documentHandler({ method: 'GET', query: { token: 't', member: 'not-a-real-member' } }, res);
+    expect(res.statusCode).toBe(404);
+    expect(resolveBriefingMember).toHaveBeenCalledWith({ requestId: 'req', member: 'not-a-real-member' });
+  });
+
   test('a 404 from member resolution passes through as the service body', async () => {
     verifyBriefingToken.mockResolvedValueOnce({ ok: true, requestId: 'req', link: {} });
     resolveBriefingMember.mockRejectedValueOnce(new ServiceHttpError('nope', { httpStatus: 404, body: { ok: false, reason: 'not_found' } }));

@@ -201,6 +201,14 @@ export default function BriefingPage() {
         <h2 className="text-base font-semibold text-gray-900">
           Reviews{data.reviews?.length ? ` (${data.reviews.length})` : ''}
         </h2>
+        {data.reviewBundle && (
+          <p className="mt-1 text-sm">
+            <a className="text-blue-800 underline" href={documentHref(data.reviewBundle.member)} target="_blank" rel="noreferrer noopener">
+              Download all reviews (PDF)
+            </a>
+            {' '}({data.reviewBundle.reviewCount} reviews)
+          </p>
+        )}
         {!data.reviews?.length && (
           <p className="mt-2 text-sm text-gray-600">No completed reviews yet. New reviews appear here as they arrive.</p>
         )}

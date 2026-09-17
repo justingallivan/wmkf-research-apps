@@ -1219,6 +1219,52 @@ const v53Statements = [
      )`,
 ];
 
+// V54: review bundle PDF retention (plan §11, Step C1). Ten nullable
+// columns on pre_site_distribution_attempts. Mirrors migration 053.
+const v54Statements = [
+  `ALTER TABLE pre_site_distribution_attempts
+     ADD COLUMN IF NOT EXISTS review_bundle_document_id TEXT,
+     ADD COLUMN IF NOT EXISTS review_bundle_drive_id TEXT,
+     ADD COLUMN IF NOT EXISTS review_bundle_item_id TEXT,
+     ADD COLUMN IF NOT EXISTS review_bundle_version_id TEXT,
+     ADD COLUMN IF NOT EXISTS review_bundle_filename TEXT,
+     ADD COLUMN IF NOT EXISTS review_bundle_size INTEGER,
+     ADD COLUMN IF NOT EXISTS review_bundle_byte_hash CHAR(64),
+     ADD COLUMN IF NOT EXISTS review_bundle_set_fingerprint CHAR(64),
+     ADD COLUMN IF NOT EXISTS review_bundle_review_count INTEGER,
+     ADD COLUMN IF NOT EXISTS review_bundle_rebuilt_at TIMESTAMPTZ`,
+  `ALTER TABLE pre_site_distribution_attempts
+     DROP CONSTRAINT IF EXISTS pre_site_distribution_review_bundle_shape,
+     DROP CONSTRAINT IF EXISTS pre_site_distribution_review_bundle_coherence`,
+  `ALTER TABLE pre_site_distribution_attempts
+     ADD CONSTRAINT pre_site_distribution_review_bundle_shape CHECK (
+       (review_bundle_byte_hash IS NULL OR review_bundle_byte_hash ~ '^[0-9a-f]{64}$')
+       AND (review_bundle_set_fingerprint IS NULL OR review_bundle_set_fingerprint ~ '^[0-9a-f]{64}$')
+     ),
+     ADD CONSTRAINT pre_site_distribution_review_bundle_coherence CHECK (
+       (
+         review_bundle_document_id IS NULL
+         AND review_bundle_drive_id IS NULL
+         AND review_bundle_item_id IS NULL
+         AND review_bundle_filename IS NULL
+         AND review_bundle_byte_hash IS NULL
+         AND review_bundle_set_fingerprint IS NULL
+         AND review_bundle_review_count IS NULL
+         AND review_bundle_rebuilt_at IS NULL
+       )
+       OR (
+         review_bundle_document_id IS NOT NULL
+         AND review_bundle_drive_id IS NOT NULL
+         AND review_bundle_item_id IS NOT NULL
+         AND review_bundle_filename IS NOT NULL
+         AND review_bundle_byte_hash IS NOT NULL
+         AND review_bundle_set_fingerprint IS NOT NULL
+         AND review_bundle_review_count IS NOT NULL
+         AND review_bundle_review_count >= 1
+       )
+     )`,
+];
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -2319,6 +2365,24 @@ async function runMigration() {
           console.log(`[v53-${i + 1}/${v53Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v53-${i + 1}/${v53Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V54 schema updates (review bundle PDF retention; mirrors migration 053)
+    console.log(`\nApplying v54 schema updates - review bundle PDF retention (${v54Statements.length} statements)...`);
+    for (let i = 0; i < v54Statements.length; i++) {
+      const statement = v54Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v54-${i + 1}/${v54Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v54-${i + 1}/${v54Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v54-${i + 1}/${v54Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }
