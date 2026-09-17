@@ -19,7 +19,7 @@ Production deployment, and cleaned up a stale 2026-07-02 stash.
    `reviewer-workbench-lifecycle.md`. No leaf deleted; every removed router reference
    resolves through a hub.
 2. **Full §6 routine audit, commit `724d4e52`.** All 21 health flags dispositioned
-   (21 → 9 → 5 by session end). Recall rules added to eleven routed leaves;
+   (21 → 9 → 7 by session end). Recall rules added to eleven routed leaves;
    `feedback-red-gates-are-p0` re-pointed from a `CLAUDE.md` heading that no longer
    exists to Universal Operating Rule 4; `feedback-codex-model-gpt56-sol` corrected
    (`~/.codex/config.toml` now pins `gpt-5.6-sol`). Five-leaf sample verified against
@@ -67,7 +67,7 @@ Production deployment, and cleaned up a stale 2026-07-02 stash.
 2. **Memory deep-audit remainder.** Evidence: audit note "Unknowns" section. Shrink
    `project-site-visit-materials-planning-handoff` (7.6 KB, ship-status description now
    duplicated by the archive); the other four oversize-routed leaves are accepted.
-   `check:memory-health` is advisory and prints 5 flags, all oversize-routed.
+   `check:memory-health` is advisory and prints 7 flags: 5 oversize-routed plus 2 shadow-atlas false positives accepted in the audit note.
 
 ### Owner Decision Needed
 
@@ -135,7 +135,7 @@ Production deployment, and cleaned up a stale 2026-07-02 stash.
 npm test -- --runInBand --silent
 npm run lint
 npm run check:memory-router && npm run check:memory-router:self-test
-npm run check:memory-health          # advisory; expect 5 oversize-routed flags
+npm run check:memory-health          # advisory; expect 7 flags (5 oversize-routed, 2 accepted shadow-atlas)
 npm run check:reviewer-reminder-hold # any vercel.json edit
 ```
 
