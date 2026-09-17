@@ -602,6 +602,14 @@ Pre-Site cleanup fix confirmed sound. Two findings, both fixed in the next commi
    that field. Tests: A → staff B → seed B → seed C keeps B; a staff edit equal to the previous
    seed survives the next seed.
 
+### Codex adversarial review — follow-ups round 4 (2026-09-16, gpt-5.6-sol, verification only)
+
+**Verdict: approve, no material findings.** Codex confirmed: cleanup deletes only for an
+observed same-token GENERATING claim (the 15-minute lease exceeds the route's 5-minute maximum,
+so a same-row reclaimer cannot enter the deletion window); retained files are invisible until a
+later upload replaces them; recipient ownership clears per field on every staff edit and
+request-keyed remounts reset the ref.
+
 ## 8. Follow-ups (not required for this pass)
 
 - **Pre-RP replay closed; Pre-Site parity ported (Session 516 follow-ups, 2026-09-16).**
