@@ -1123,3 +1123,9 @@ dropping the GENERATING/lease check in the resolver (replacing the
 `regenerating` condition with `false`) made the new prepare-refusal test
 fail; (ii) hardcoding `leaseActive: true` in the projector made the new
 clock-controlled status test fail.
+
+### 10.5 Codex round 5 (2026-09-17, gpt-5.6-sol, verification only)
+
+**Verdict: approve, no material findings.** Codex confirmed prepare and both send-time
+checks use the lease-aware resolver, the pending projection and tab suppression share the same
+15-minute lease semantics, and expired claims remain reclaimable through the guarded dialog.
