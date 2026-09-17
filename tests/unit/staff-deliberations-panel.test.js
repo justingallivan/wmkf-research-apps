@@ -65,6 +65,37 @@ it('renders the stage sentence, session and visit lines, and a plain Open docume
   expect(screen.getByTestId('deliberations-visit-line')).toHaveTextContent('Visit not scheduled.');
 });
 
+it('M3: a needsReconciliation row shows a distinct call-out, not the generic "Not the current draft" line', async () => {
+  global.fetch.mockResolvedValue(mockResponse({
+    success: true,
+    cycleCode: 'D26',
+    scope: 'all',
+    stageLabels: STAGE_LABELS,
+    counts: { draft: 1, shared: 0, visit: 0, final: 0 },
+    artifacts: [artifact({ isCurrent: false, needsReconciliation: true })],
+  }));
+  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
+
+  expect(await screen.findByTestId('deliberations-reconciliation'))
+    .toHaveTextContent(/needs reconciliation/i);
+  expect(screen.queryByText('Not the current draft.')).not.toBeInTheDocument();
+});
+
+it('a non-current row without needsReconciliation still shows the generic line', async () => {
+  global.fetch.mockResolvedValue(mockResponse({
+    success: true,
+    cycleCode: 'D26',
+    scope: 'all',
+    stageLabels: STAGE_LABELS,
+    counts: { draft: 1, shared: 0, visit: 0, final: 0 },
+    artifacts: [artifact({ isCurrent: false, needsReconciliation: false })],
+  }));
+  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
+
+  expect(await screen.findByText('Not the current draft.')).toBeInTheDocument();
+  expect(screen.queryByTestId('deliberations-reconciliation')).not.toBeInTheDocument();
+});
+
 it('a scheduled session renders its date and time in the session\'s own time zone', async () => {
   global.fetch.mockResolvedValue(mockResponse({
     success: true,

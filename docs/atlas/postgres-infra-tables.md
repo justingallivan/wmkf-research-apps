@@ -194,6 +194,19 @@ calendar/hash/material constraints and columns read back exact.
 SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
 Dynamics remains email-activity/transport authority.
 
+**[VERIFIED LIVE 2026-09-16 — migration 052 applied to the shared Production/Preview database by the owner via `node scripts/apply-migrations.js` (tracker `applied_at` 2026-09-17T03:59:31Z); readback exact: five nullable columns, both CHECK constraints, 14 pre-existing attempt rows all satisfy the constraints]** Migration
+`052_pre_site_distribution_brief_inputs.sql` (Pre-RP Brief plan §3.4b, slice 4)
+adds five nullable audit columns — `input_fingerprint_generated CHAR(64)`,
+`input_fingerprint_live CHAR(64)`, `stale_inputs_delta JSONB`,
+`stale_inputs_acknowledged_at TIMESTAMPTZ`, `stale_inputs_acknowledged_by UUID` —
+and two CHECK constraints, `pre_site_distribution_brief_fingerprint_shape` and
+`pre_site_distribution_brief_inputs_coherence` (legacy all-NULL rows satisfy both;
+an acknowledged-drift row requires both fingerprints, a differing pair, an object
+delta, and both acknowledgement fields). Mirrored byte-for-byte in
+`scripts/setup-database.js`; the parity test compares the real CHECK bodies.
+Written by `distribution-service.js` prepare when staff acknowledge drift; read
+by `briefing-page-service.js` as the timestamp-only `staffAcknowledgedNewerInputs`.
+
 One client operation UUID binds one Request, exact editable source Word
 identity/version/governed hash/raw byte hash, attachment mode (`none` for every
 attempt prepared since 2026-09-10, migration 039, the email carrying the

@@ -111,7 +111,12 @@ function DeliberationCard({ artifact, stageLabels }) {
               {siteVisitMaterialsLine(artifact.materials)}
             </p>
           )}
-          {!artifact.isCurrent && (
+          {artifact.needsReconciliation && (
+            <p className="mt-1 text-xs font-semibold text-red-700" role="alert" data-testid="deliberations-reconciliation">
+              This document&apos;s pointer needs reconciliation. Contact an administrator.
+            </p>
+          )}
+          {!artifact.needsReconciliation && !artifact.isCurrent && (
             <p className="mt-1 text-xs text-amber-700">Not the current draft.</p>
           )}
         </div>

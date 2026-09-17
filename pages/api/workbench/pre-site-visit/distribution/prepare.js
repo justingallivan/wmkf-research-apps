@@ -12,8 +12,12 @@ export const config = {
 const ALLOWED = new Set([
   'requestId', 'expectedArtifactId', 'operationId', 'attachmentMode',
   'to', 'cc', 'subject', 'bodyText', 'includeCalendar', 'siteVisitId',
-  'selectedMaterialIds',
+  'selectedMaterialIds', 'acknowledgeStaleInputs',
 ]);
+
+// Plan §3.4b: absent, or the exact 64-char lowercase-hex live fingerprint
+// the service's own 409 body just named — never a bare boolean.
+const HEX64 = /^[0-9a-f]{64}$/;
 
 function sendError(res, error) {
   if (error instanceof ServiceHttpError) {
@@ -33,6 +37,11 @@ export default async function handler(req, res) {
   if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)
     || Object.keys(req.body).some((key) => !ALLOWED.has(key))) {
     return res.status(400).json({ error: 'The preview request contains unsupported fields.' });
+  }
+  if (req.body.acknowledgeStaleInputs !== undefined
+    && req.body.acknowledgeStaleInputs !== null
+    && !HEX64.test(String(req.body.acknowledgeStaleInputs))) {
+    return res.status(400).json({ error: 'acknowledgeStaleInputs must be the exact live input fingerprint.' });
   }
   const fromEmail = String(access.session?.user?.azureEmail || '').trim().toLowerCase();
   if (!fromEmail) return res.status(400).json({ error: 'Your account has no sending email address.' });

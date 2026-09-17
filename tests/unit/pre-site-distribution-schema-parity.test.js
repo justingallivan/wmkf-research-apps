@@ -19,6 +19,10 @@ const sessionMigration = fs.readFileSync(
   path.join(ROOT, 'lib/db/migrations/040_pre_site_distribution_session_snapshot.sql'),
   'utf8',
 );
+const briefInputsMigration = fs.readFileSync(
+  path.join(ROOT, 'lib/db/migrations/052_pre_site_distribution_brief_inputs.sql'),
+  'utf8',
+);
 
 const CONSTRAINT_NAMES = [
   'pre_site_distribution_mode_check',
@@ -90,4 +94,62 @@ test('migration 040 and fresh install declare the session snapshot column and it
   expect(sessionMigration).toContain('CONSTRAINT pre_site_distribution_session_shape');
   expect(setup).toContain('session_snapshot JSONB');
   expect(setup).toContain('CONSTRAINT pre_site_distribution_session_shape');
+});
+
+test('migration 052 and fresh install declare the same Pre-RP Brief prepare-gate audit columns and constraints', () => {
+  for (const column of [
+    'input_fingerprint_generated',
+    'input_fingerprint_live',
+    'stale_inputs_delta',
+    'stale_inputs_acknowledged_at',
+    'stale_inputs_acknowledged_by',
+  ]) {
+    expect(briefInputsMigration).toContain(column);
+    expect(setup).toContain(column);
+  }
+  for (const name of [
+    'pre_site_distribution_brief_fingerprint_shape',
+    'pre_site_distribution_brief_inputs_coherence',
+  ]) {
+    expect(briefInputsMigration).toContain(`CONSTRAINT ${name}`);
+    expect(setup).toContain(`CONSTRAINT ${name}`);
+  }
+});
+
+function extractCheckBody(source, constraintName) {
+  const marker = `CONSTRAINT ${constraintName} CHECK (`;
+  const start = source.indexOf(marker);
+  if (start === -1) {
+    throw new Error(`Constraint ${constraintName} not found`);
+  }
+  let depth = 1;
+  let i = start + marker.length;
+  const bodyStart = i;
+  while (depth > 0) {
+    if (source[i] === '(') depth += 1;
+    else if (source[i] === ')') depth -= 1;
+    i += 1;
+    if (i > source.length) {
+      throw new Error(`Unbalanced parentheses for ${constraintName}`);
+    }
+  }
+  return source.slice(bodyStart, i - 1);
+}
+
+function normalizeSql(text) {
+  return text
+    .replace(/--[^\n]*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+test('migration 052 and fresh install declare byte-identical CHECK predicates for the brief prepare-gate constraints', () => {
+  for (const name of [
+    'pre_site_distribution_brief_fingerprint_shape',
+    'pre_site_distribution_brief_inputs_coherence',
+  ]) {
+    const migrationBody = normalizeSql(extractCheckBody(briefInputsMigration, name));
+    const setupBody = normalizeSql(extractCheckBody(setup, name));
+    expect(setupBody).toEqual(migrationBody);
+  }
 });

@@ -51,6 +51,32 @@ test('renders the placeholder states before any share, review, or schedule exist
   expect(screen.getByText(/No completed reviews yet/)).toBeInTheDocument();
   expect(screen.getByText(/The proposal is not available/)).toBeInTheDocument();
   expect(screen.queryByText('Join meeting')).toBeNull();
+  expect(screen.queryByText(/acknowledged newer inputs/i)).toBeNull();
+});
+
+test('B14/H2: shows the non-sensitive staff-acknowledged-newer-inputs notice when present', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, reviews: [], proposal: null,
+    writeup: { docx: { member: 'writeup-docx', displayName: 'Staff Brief 1002379.docx', size: 2048 }, sharedAt: '2026-09-09T01:00:00Z' },
+    staffAcknowledgedNewerInputs: { acknowledgedAt: '2026-09-10T12:00:00Z' },
+  }));
+  render(<BriefingPage />);
+  const notice = await screen.findByText(/Staff acknowledged newer inputs at share time/);
+  expect(notice).toHaveTextContent('September 10, 2026');
+  // Non-sensitive: no reviewer names, delta fields, or counts beyond the date.
+  expect(notice.textContent).not.toMatch(/\d+ field|abstract|reviewer/i);
+});
+
+test('B14/H2: renders no acknowledgement notice when the field is absent', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, reviews: [], proposal: null,
+    writeup: { docx: { member: 'writeup-docx', displayName: 'Staff Brief 1002379.docx', size: 2048 }, sharedAt: '2026-09-09T01:00:00Z' },
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('Staff Brief 1002379.docx');
+  expect(screen.queryByText(/Staff acknowledged newer inputs/)).not.toBeInTheDocument();
 });
 
 test.each(['http://zoom.example/j/1', '//zoom.example/j/1', 'javascript:alert(1)', 'ftp://x', 'not a url'])('never renders a meeting link for %s', async (meetingLink) => {

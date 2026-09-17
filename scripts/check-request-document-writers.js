@@ -22,6 +22,7 @@ const WRITERS = Object.freeze([
   ['lib/services/final-writeup/transition-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/site-visit-materials/contributor-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/consultant-feedback-attachment-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
+  ['lib/services/pre-rp-brief/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
 ]);
 
 const ALLOWED_ORIGIN_FIELD_FILES = new Set([

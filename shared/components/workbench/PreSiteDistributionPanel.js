@@ -106,7 +106,7 @@ function BriefingLinkCard({ link, onReissue, busy, error }) {
             </p>
           ) : (
             <p className="mt-1 text-sm text-gray-600">
-              Board members and consultants open the writeup, every completed review, the proposal, and the site visit materials here without a login.
+              Board members and consultants open the brief, every completed review, the proposal, and the site visit materials here without a login.
               {expires ? ` Live until ${expires}.` : ''}
             </p>
           )}
@@ -239,7 +239,7 @@ function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
           <div>
             <h3 id="share-composer-title" className="text-lg font-semibold text-gray-900">Share for the deliberation session</h3>
             <p className="mt-1 text-sm text-gray-600">
-              The email carries the briefing page link; the writeup, every completed review, the proposal, and the site visit materials open there without a login.
+              The email carries the briefing page link; the brief, every completed review, the proposal, and the site visit materials open there without a login.
             </p>
           </div>
           <button
@@ -327,6 +327,11 @@ export default function PreSiteDistributionPanel({
   }
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
+  // Plan §3.4b step 3: a dedicated confirmation state for the prepare-time
+  // 409 `brief_inputs_stale` response — the bounded delta staff must review
+  // before retrying with `acknowledgeStaleInputs` bound to the exact live
+  // fingerprint just returned.
+  const [staleInputs, setStaleInputs] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyError, setHistoryError] = useState(null);
   const [error, setError] = useState(null);
@@ -402,11 +407,24 @@ export default function PreSiteDistributionPanel({
     };
   }, [requestId, loadHistory]);
 
+  // Clear a pending stale-inputs confirmation whenever the request, the
+  // source document, or the form changes underneath it — an acknowledgement
+  // is bound to one exact delta and must never survive a context switch.
+  // Derived during render (not an effect) so the clear lands in the same
+  // commit as the key change, matching the `seenSeed` pattern above.
+  const staleInputsKey = `${requestId || ''}|${sourceArtifact?.artifactId || ''}`;
+  const [seenStaleInputsKey, setSeenStaleInputsKey] = useState(staleInputsKey);
+  if (seenStaleInputsKey !== staleInputsKey) {
+    setSeenStaleInputsKey(staleInputsKey);
+    setStaleInputs(null);
+  }
+
   const edit = (patch) => {
     composerTouchedRef.current = true;
     setForm((current) => ({ ...current, ...patch }));
     setPreview(null);
     setConfirmed(false);
+    setStaleInputs(null);
     setError(null);
     setSendFeedback(null);
     setNotice(null);
@@ -430,9 +448,15 @@ export default function PreSiteDistributionPanel({
     setRecipientPickerTarget(null);
   }, []);
 
-  const prepare = async () => {
+  // `acknowledge`: retry a prepare that returned 409 `brief_inputs_stale`,
+  // binding the retry to the exact live fingerprint staff just reviewed
+  // (plan §3.4b step 3) — never a bare `true`. Only the dedicated
+  // confirmation UI below passes this; the plain Create-preview button never
+  // does, so an unacknowledged drift always surfaces the confirmation first.
+  const prepare = async ({ acknowledge = false } = {}) => {
     if (!requestId || !sourceArtifact?.artifactId || preparing || sending) return;
     const id = requestId;
+    const acknowledgeStaleInputs = acknowledge ? staleInputs?.liveFingerprint : null;
     const currentSequence = ++sequence.current;
     controllerRef.current?.abort();
     const controller = new AbortController();
@@ -442,6 +466,7 @@ export default function PreSiteDistributionPanel({
     setSendFeedback(null);
     setNotice(null);
     setConfirmed(false);
+    if (!acknowledge) setStaleInputs(null);
     try {
       // Lock first (owner 2026-09-10): the preview is built from the locked
       // version, so the lock happens here, before prepare, never after.
@@ -456,14 +481,38 @@ export default function PreSiteDistributionPanel({
           operationId: newOperationId(),
           ...form,
           siteVisitId: siteVisit?.activityId || null,
+          ...(acknowledgeStaleInputs ? { acknowledgeStaleInputs } : {}),
         }),
         signal: controller.signal,
       });
       const body = await response.json().catch(() => ({}));
       if (body.inProgress) throw new Error(body.error || 'Preview preparation is already in progress.');
+      if (!response.ok && body.code === 'brief_inputs_stale') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setStaleInputs({
+            generatedFingerprint: body.generatedFingerprint,
+            liveFingerprint: body.liveFingerprint,
+            delta: body.delta || null,
+          });
+        }
+        return;
+      }
+      // H3c/B10: the server's zero-review gate (`assertBriefInputsReady`,
+      // `lib/services/pre-site-visit/distribution-service.js`) fires here
+      // when the client-side mirror in the tab was stale or bypassed. Named
+      // separately from the generic failure below so staff see why, not a
+      // bare "Preview preparation failed" — and Regenerate Brief (allowed
+      // while Review, B12) is the recovery path, not a stuck brief.
+      if (!response.ok && body.code === 'brief_reviews_required') {
+        if (sequence.current === currentSequence && id === requestId) {
+          setError('This brief has no received reviews yet, so it cannot be shared. Wait for at least one review to come in, or regenerate the brief once one has.');
+        }
+        return;
+      }
       if (!response.ok) throw new Error(body.error || `Preview preparation failed (${response.status})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setPreview(body.attempt || null);
+      setStaleInputs(null);
       if (body.briefingLink) setBriefingLink(body.briefingLink);
     } catch (prepareError) {
       if (prepareError?.name !== 'AbortError'
@@ -702,7 +751,7 @@ export default function PreSiteDistributionPanel({
         )}
         <button
           type="button"
-          onClick={prepare}
+          onClick={() => prepare()}
           disabled={preparing || sending || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()}
           className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
@@ -713,6 +762,38 @@ export default function PreSiteDistributionPanel({
         {notice && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status" aria-live="polite">
             {notice}
+          </div>
+        )}
+        {staleInputs && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="alert" data-testid="stale-inputs-notice">
+            <h4 className="font-semibold">The request&apos;s inputs changed since the brief was generated</h4>
+            <p className="mt-1">Review the changes below before sharing.</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {staleInputs.delta?.changedRequestFields?.length > 0 && (
+                <li>Changed fields: {staleInputs.delta.changedRequestFields.join(', ')}</li>
+              )}
+              {staleInputs.delta?.abstractChanged && <li>The abstract changed.</li>}
+              {staleInputs.delta?.addedReviewerSuggestionIds?.length > 0 && (
+                <li>{staleInputs.delta.addedReviewerSuggestionIds.length} reviewer(s) added</li>
+              )}
+              {staleInputs.delta?.removedReviewerSuggestionIds?.length > 0 && (
+                <li>{staleInputs.delta.removedReviewerSuggestionIds.length} reviewer(s) removed</li>
+              )}
+              {staleInputs.delta?.changedReviewerSuggestionIds?.length > 0 && (
+                <li>{staleInputs.delta.changedReviewerSuggestionIds.length} reviewer(s) changed</li>
+              )}
+              <li>
+                Reviews: {staleInputs.delta?.generatedReviewCount ?? 0} at generation → {staleInputs.delta?.liveReviewCount ?? 0} now
+              </li>
+            </ul>
+            <button
+              type="button"
+              onClick={() => prepare({ acknowledge: true })}
+              disabled={preparing || sending}
+              className="mt-3 rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              I reviewed the changes above — share anyway
+            </button>
           </div>
         )}
 
@@ -844,7 +925,7 @@ export default function PreSiteDistributionPanel({
           </details>
         ) : (
           <>
-            <h3 className="text-base font-semibold text-gray-900">Send Site Visit materials</h3>
+            <h3 className="text-base font-semibold text-gray-900">Send deliberation materials</h3>
             <p className="mt-1 text-sm text-gray-600">
               Create a fixed preview, review the recipients and the briefing page link, then send through Dynamics.
             </p>
@@ -917,6 +998,21 @@ export default function PreSiteDistributionPanel({
                         )}
                         {attempt.lastError && !presentation.superseded && !presentation.unconfirmed && (
                           <p className="mt-1 text-red-700">{attempt.lastError}</p>
+                        )}
+                        {attempt.staleInputsAcknowledged && (
+                          <div className="mt-1 text-xs text-amber-800" data-testid="stale-inputs-acknowledged">
+                            <p className="font-medium">
+                              Staff acknowledged newer inputs at {new Date(attempt.staleInputsAcknowledged.acknowledgedAt).toLocaleString()}
+                              {attempt.staleInputsAcknowledged.acknowledgedBy ? ` (${attempt.staleInputsAcknowledged.acknowledgedBy})` : ''}.
+                            </p>
+                            {attempt.staleInputsAcknowledged.delta?.changedRequestFields?.length > 0 && (
+                              <p>Changed fields: {attempt.staleInputsAcknowledged.delta.changedRequestFields.join(', ')}</p>
+                            )}
+                            {attempt.staleInputsAcknowledged.delta?.abstractChanged && <p>The abstract changed.</p>}
+                            <p>
+                              Reviews: {attempt.staleInputsAcknowledged.delta?.generatedReviewCount ?? 0} at generation → {attempt.staleInputsAcknowledged.delta?.liveReviewCount ?? 0} at share
+                            </p>
+                          </div>
                         )}
                         {(attempt.dynamicsEmailId || attempt.sourceVersionId) && (
                           <details className="mt-1 text-xs text-gray-500">

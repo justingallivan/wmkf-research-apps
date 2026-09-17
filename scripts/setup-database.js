@@ -1172,6 +1172,53 @@ const v52Statements = [
     ON reviewer_institution_measurement_events (case_key, created_at)`,
 ];
 
+// V53: Pre-Research Presentation Brief prepare-time review/drift gate audit
+// columns on pre_site_distribution_attempts. Mirrors migration 052.
+const v53Statements = [
+  `ALTER TABLE pre_site_distribution_attempts
+     ADD COLUMN IF NOT EXISTS input_fingerprint_generated CHAR(64),
+     ADD COLUMN IF NOT EXISTS input_fingerprint_live CHAR(64),
+     ADD COLUMN IF NOT EXISTS stale_inputs_delta JSONB,
+     ADD COLUMN IF NOT EXISTS stale_inputs_acknowledged_at TIMESTAMPTZ,
+     ADD COLUMN IF NOT EXISTS stale_inputs_acknowledged_by UUID`,
+  `ALTER TABLE pre_site_distribution_attempts
+     DROP CONSTRAINT IF EXISTS pre_site_distribution_brief_fingerprint_shape,
+     DROP CONSTRAINT IF EXISTS pre_site_distribution_brief_inputs_coherence`,
+  `ALTER TABLE pre_site_distribution_attempts
+     ADD CONSTRAINT pre_site_distribution_brief_fingerprint_shape CHECK (
+       (input_fingerprint_generated IS NULL OR input_fingerprint_generated ~ '^[0-9a-f]{64}$')
+       AND (input_fingerprint_live IS NULL OR input_fingerprint_live ~ '^[0-9a-f]{64}$')
+     ),
+     ADD CONSTRAINT pre_site_distribution_brief_inputs_coherence CHECK (
+       (
+         input_fingerprint_generated IS NULL
+         AND input_fingerprint_live IS NULL
+         AND stale_inputs_delta IS NULL
+         AND stale_inputs_acknowledged_at IS NULL
+         AND stale_inputs_acknowledged_by IS NULL
+       )
+       OR (
+         input_fingerprint_generated IS NOT NULL
+         AND input_fingerprint_live IS NOT NULL
+         AND (
+           (
+             input_fingerprint_generated = input_fingerprint_live
+             AND stale_inputs_delta IS NULL
+             AND stale_inputs_acknowledged_at IS NULL
+             AND stale_inputs_acknowledged_by IS NULL
+           )
+           OR (
+             input_fingerprint_generated <> input_fingerprint_live
+             AND stale_inputs_delta IS NOT NULL
+             AND jsonb_typeof(stale_inputs_delta) = 'object'
+             AND stale_inputs_acknowledged_at IS NOT NULL
+             AND stale_inputs_acknowledged_by IS NOT NULL
+           )
+         )
+       )
+     )`,
+];
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -2254,6 +2301,24 @@ async function runMigration() {
           console.log(`[v52-${i + 1}/${v52Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v52-${i + 1}/${v52Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V53 schema updates (Pre-RP Brief prepare-time drift audit columns; mirrors migration 052)
+    console.log(`\nApplying v53 schema updates - Pre-RP Brief prepare-time drift audit (${v53Statements.length} statements)...`);
+    for (let i = 0; i < v53Statements.length; i++) {
+      const statement = v53Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v53-${i + 1}/${v53Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v53-${i + 1}/${v53Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v53-${i + 1}/${v53Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

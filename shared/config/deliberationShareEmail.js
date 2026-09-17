@@ -11,11 +11,11 @@ export const DELIBERATION_SHARE_BRIEFING_DESCRIPTION_KEY = 'email.deliberation_s
 export const DELIBERATION_SHARE_BRIEFING_EXPIRY_LEAD_IN_KEY = 'email.deliberation_share.briefing_expiry_lead_in';
 
 export const DELIBERATION_SHARE_SEED_SUBJECT = 'Site Visit materials — {{requestNumber}}';
-export const DELIBERATION_SHARE_SEED_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the research presentation materials.';
+export const DELIBERATION_SHARE_SEED_BODY = 'The deliberation briefing page linked below has the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials.';
 export const DELIBERATION_SHARE_SEED_BRIEFING_COPY = Object.freeze({
   heading: 'Briefing page:',
   linkText: 'Open the deliberation briefing',
-  description: 'the writeup, every completed review, the proposal, and the research presentation materials, no login required.',
+  description: 'the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials, no login required.',
   expiryLeadIn: 'The link expires on',
 });
 

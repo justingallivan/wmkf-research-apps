@@ -151,6 +151,26 @@ test('the staff brief exposes only a friendly DOCX descriptor and downloads veri
   expect(docx).toMatchObject({ filename: 'PreSite_1002379.docx', inline: false });
 });
 
+test('staffAcknowledgedNewerInputs is null unless the send was prepared over acknowledged drift (B14)', async () => {
+  const noDrift = deps({ getLatestAttempt: jest.fn(async () => sentAttempt()) });
+  const contextNoDrift = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, noDrift);
+  expect(contextNoDrift.staffAcknowledgedNewerInputs).toBeNull();
+
+  const drifted = deps({
+    getLatestAttempt: jest.fn(async () => sentAttempt({
+      stale_inputs_acknowledged_at: '2026-09-10T18:30:00Z',
+      stale_inputs_acknowledged_by: '33333333-3333-4333-8333-333333333333',
+      stale_inputs_delta: { abstractChanged: true, changedRequestFields: ['abstract'] },
+    })),
+  });
+  const contextDrifted = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, drifted);
+  // Only the boolean-implied presence plus timestamp — never the delta,
+  // changed field names, actor id, or abstract text.
+  expect(contextDrifted.staffAcknowledgedNewerInputs).toEqual({ acknowledgedAt: '2026-09-10T18:30:00.000Z' });
+  expect(JSON.stringify(contextDrifted.staffAcknowledgedNewerInputs)).not.toContain('abstract');
+  expect(JSON.stringify(contextDrifted.staffAcknowledgedNewerInputs)).not.toContain('33333333');
+});
+
 test('a snapshot whose bytes no longer match the pinned hash is refused', async () => {
   const mutated = deps({
     getLatestAttempt: jest.fn(async () => sentAttempt()),

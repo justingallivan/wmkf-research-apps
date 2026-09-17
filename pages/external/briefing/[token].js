@@ -153,6 +153,11 @@ export default function BriefingPage() {
         ) : (
           <p className="mt-2 text-sm text-gray-600">The staff brief will appear here once staff share it.</p>
         )}
+        {data.staffAcknowledgedNewerInputs?.acknowledgedAt && (
+          <p className="mt-2 text-xs text-gray-500">
+            Staff acknowledged newer inputs at share time ({formatDate(data.staffAcknowledgedNewerInputs.acknowledgedAt)}).
+          </p>
+        )}
       </section>
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">

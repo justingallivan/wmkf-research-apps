@@ -312,6 +312,20 @@ Pre-Site no brief; Final started while the brief stays Review; both rails (tab a
 
 ## 4. Surfaces
 
+[RECHECKED after lib/services/pre-rp-brief/input-service.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after lib/services/pre-rp-brief/artifact-service.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after lib/services/pre-rp-brief/share-lock-service.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after lib/services/pre-rp-brief/docx-renderer.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after pages/api/workbench/pre-rp-brief.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after pages/api/workbench/pre-rp-brief/lock-for-share.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after scripts/check-request-document-writers.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after scripts/setup-database.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after lib/services/pre-site-visit/distribution-store.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after lib/services/pre-site-visit/distribution-service.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after lib/db/migrations-manifest.json change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after pages/api/workbench/pre-site-visit/distribution/prepare.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after lib/services/deliberation-briefing/briefing-page-service.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+
 | Layer | Change |
 |---|---|
 | `shared/config/requestDocument.js` | new artifact type + label; brief contract constants (content type, template id/version, producer). |
@@ -524,3 +538,94 @@ notice (boolean plus acknowledged-at) projected through `buildBriefingContext`
 on the Board page. The delta itself, reviewer identities, and abstract text are never sent to
 the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`
 §2.1 gains the new member in slice 6.
+
+## 8. Follow-ups (not required for this pass)
+
+- **Pre-RP replay closed; Pre-Site parity remains parked (2026-09-16).**
+  `generatePreRpBrief` now refuses 409 `brief_generation_replay_stale` when
+  the recomputed generation key resolves to a Superseded row or to a Ready
+  row that is not the current request-pointer target; an exact retry of the
+  current Ready row remains read-only/idempotent. Regeneration also enforces
+  the shared-not-sent rule server-side: a sent or in-flight distribution row
+  for the current brief refuses 409
+  `brief_regeneration_distribution_started`, with the distribution state
+  checked before generation side effects and again at pointer activation to
+  cover a concurrent send. The analogous replay behavior in
+  `lib/services/pre-site-visit/artifact-service.js` is deliberately unchanged
+  in this fix and remains a parity follow-up; do not infer that the Pre-Site
+  service now has the brief-specific guard.
+
+- **Carried from the slice 4–5 Opus reviews (Session 516, 2026-09-16):**
+  (i) **Resolved 2026-09-16:** the delta and fingerprint now consume the same
+  canonical received-only form. Non-received suggestions move neither; received
+  reviews retain the raw fingerprint fields, so a `reviewReceivedAt` timestamp
+  rewrite moves both the fingerprint and the changed-reviewer delta. The former
+  asymmetry-based hash test now asserts equal delta/hash identity for a pending
+  suggestion and a separate regression covers the raw timestamp change.
+  (ii) `tests/unit/migration-052-*.test.js`
+  pins the acknowledged-drift CHECK tokens but not the legacy all-NULL branch.
+  (iii) `stale_inputs_acknowledged_by` renders as a raw system-user GUID in the
+  Workbench distribution history; a server-side actor-name projection is needed.
+  (iv) `FinalWriteupTab.js` still shows the generic `final_writeup_source_missing`
+  copy; the Site Visit prerequisite wording lives only on the Staff Deliberations
+  Pre-Site card. (v) The tab's `beyond` banner derives from the brief while the
+  Pre-Site card stays live. (vi) `PreSiteDistributionPanel.js` defaults-seeding
+  `setForm` bypasses the `staleInputs` reset (unreachable in practice).
+  (vii) A malformed brief snapshot disables Share with the "no received reviews"
+  reason, while the server would refuse with `brief_snapshot_invalid`; project a
+  tri-state or reword. (viii) The restored tab test "a late response for a prior
+  request cannot publish a stale Word link" guards React remount, not
+  `generate()`'s sequence guard; rename or add an unmount-mid-generate case.
+  (ix) **Closed 2026-09-16:** Regenerate on a brief already **sent** to the
+  Board remains deliberately unavailable and is now enforced in the service,
+  not only hidden in the UI. A send that is already in flight also blocks
+  replacement. If the owner wants to reopen either state, it still needs the
+  guarded-reopen treatment (typed request number, reason, audit), not a menu
+  item.
+
+## 9. Build-loop handoff (paused 2026-09-16, Session 515; resumed and completed Session 516)
+
+Owner-directed loop: Sonnet builds, Opus reviews (max 3 rounds per group, structured
+APPROVE/CHANGES verdicts, mutation-checked), controller reviews at the end, then Codex
+adversarial review. Paused at the owner's request after the slice-4 build report.
+
+| Group | State | Commits on `claude/pre-rp-brief` |
+|---|---|---|
+| Slices 1–2 | APPROVED (3 rounds; template metadata scrubbed, slice-2 commit replaced before any push) | `66cd2eb2`, `538388f2`, `c6f4a95c`, `eec8311d` |
+| Slice 3 | APPROVED (2 rounds) | `1b0eab56`, `8320d9ec`, `4bc38700` |
+| Slice 4 | APPROVED (2 rounds; round 1 found no code defect, six test-teeth gaps and the missing delta hash binding) | `d08ae753` (code), `4dbef6d7` (docs), `6a03389d` |
+| Slice 5 | APPROVED after 3 rounds (round 1: legacy-rail regression, missing Board notice, unmirrored B10 gate; round 2: Regenerate narrowed to shared-not-sent; round 3 verified by the controller with a mutation check) | `77e662b8`, `c3e8af10`, `89d92ccf` |
+| Slice 6 | DONE (docs reconcile, this commit) | see `git log` |
+
+Branch was pushed at the pause; the Session 516 commits are pushed with the PR.
+
+**Production schema: DONE 2026-09-16 (owner-run).** Picklist value `100000009` inserted and
+re-read; relationship `wmkf_request_currentprerpbrief` created under
+`DATAVERSE_PROD_WRITE_ACK`; preflight `--target=prod` reports 43 exact / 0 absent / 0 divergent.
+Atlas, matrix, file-model, briefing-plan, wiki, and work-queue restatements were reconciled
+in slice 6. Migration 052 was applied to the shared Production/Preview database by the
+owner on 2026-09-16 (readback exact) before merge, per the Codex adversarial finding that
+merge auto-deploys code naming the new columns.
+
+**Resume steps:**
+1. `git checkout claude/pre-rp-brief`; confirm HEAD `4dbef6d7`.
+2. Spawn an Opus reviewer for slice 4 (`git diff 4bc38700..HEAD`), with the self-trace: prepare
+   gate ordering (resolveSource → live-input load → `assertBriefInputsReady` → any write),
+   fingerprint provenance (stored snapshot re-hash equals `wmkf_inputfingerprint`), hash
+   binding (`draftHash`/`previewHash` include both fingerprints, delta, acknowledgement),
+   migration 052 CHECK coherence vs. legacy rows, `staffAcknowledgedNewerInputs` timestamp-only
+   on the external context. Builder ran four hand mutations; a reviewer mutation pass is still due.
+3. Items carried for slice 4 review / slice 5: (a) **resolved 2026-09-16** — keep raw
+   `reviewReceivedAt` in `REVIEW_FINGERPRINT_FIELDS` and make the delta consume the same
+   received-only canonical form and raw fields; a timestamp rewrite now appears in the
+   changed-reviewer delta, while non-received suggestions affect neither representation;
+   (b) no route test exists for
+   `distribution/prepare.js`'s new `acknowledgeStaleInputs` validation; (c) slice-3 reviewer's
+   queued fixture: claim-race guard should also prove the orphan IS deleted when the winner
+   adopted a different item.
+4. Then slices 5 (Staff Deliberations UI, Start Site Visit action, drift confirmation UI,
+   composite stage projection in both callers, cycle-list union) and 6 (docs reconcile via
+   `/sweep`, Atlas "applied 2026-09-16", `DATAVERSE_SHAREPOINT_FILE_MODEL.md`, wiki, work queue).
+5. Controller review: `/contract-reconcile` Mode B invariant table, full `/start` gate list
+   sequentially, full jest, lint, build; push; PR; then owner runs
+   `/codex:adversarial-review --wait --base 236d9219 --model gpt-5.6-sol …` with the receipt marker.

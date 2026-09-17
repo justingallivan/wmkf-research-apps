@@ -64,11 +64,11 @@ test('offers no attachment choice; the default message names the briefing page a
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
     />,
   );
-  expect(await screen.findByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Send deliberation materials' })).toBeInTheDocument();
   expect(screen.queryByRole('group', { name: 'Document attachment' })).not.toBeInTheDocument();
   expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Message')).toHaveValue(
-    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the research presentation materials.',
+    'The deliberation briefing page linked below has the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials.',
   );
 });
 
@@ -129,7 +129,7 @@ test('offers no material checkboxes and no calendar controls; the briefing page 
     />,
   );
 
-  expect(await screen.findByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Send deliberation materials' })).toBeInTheDocument();
   // Calendar attachments have no UI (owner decision S466: unused).
   expect(screen.queryByText(/add-to-calendar/i)).not.toBeInTheDocument();
   // Material links retired (owner 2026-09-10): no "Include links to materials" group.
@@ -358,6 +358,30 @@ test('surfaces an in-progress prepare response instead of accepting it as a prev
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/already being prepared/i);
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
+test('H3c/B10: a brief_reviews_required prepare failure shows named, non-generic copy', async () => {
+  // No `error` string in the body (discriminating: the generic `!response.ok`
+  // path would fall back to "Preview preparation failed (409)" with no body
+  // text to borrow from, so passing requires the dedicated code branch).
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ code: 'brief_reviews_required' }, 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/has no received reviews yet/i);
+  expect(alert).not.toHaveTextContent(/Preview preparation failed/i);
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
@@ -595,7 +619,7 @@ test('collapsed mode folds the composer behind a Send-materials-again disclosure
 
   expect(await screen.findByText('Send materials again')).toBeInTheDocument();
   expect(screen.getByText(/already been sent/)).toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Send Site Visit materials' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Send deliberation materials' })).not.toBeInTheDocument();
   // The composer remains reachable inside the disclosure.
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
 });
@@ -743,4 +767,185 @@ test('with no session the slot says not yet scheduled and names the PC', async (
   const slot = await screen.findByTestId('composer-session-slot');
   expect(slot).toHaveTextContent('Deliberation session: not yet scheduled.');
   expect(slot).toHaveTextContent('the PC schedules sessions in Meeting Tracker');
+});
+
+// ── Stale-inputs confirmation (plan §3.4b step 3, PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md) ─
+
+function staleInputsBody(liveFingerprint = 'b'.repeat(64)) {
+  return {
+    error: "The request's inputs changed since the brief was generated. Review the changes before sharing.",
+    code: 'brief_inputs_stale',
+    generatedFingerprint: 'a'.repeat(64),
+    liveFingerprint,
+    delta: {
+      changedRequestFields: ['akoya_title'],
+      abstractChanged: true,
+      addedReviewerSuggestionIds: ['reviewer-1'],
+      removedReviewerSuggestionIds: [],
+      changedReviewerSuggestionIds: [],
+      generatedReviewCount: 1,
+      liveReviewCount: 2,
+    },
+  };
+}
+
+test('a 409 brief_inputs_stale renders the bounded delta and retries only with the returned live fingerprint', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response(staleInputsBody(), 409))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  const notice = await screen.findByTestId('stale-inputs-notice');
+  expect(notice).toHaveTextContent("changed since the brief was generated");
+  expect(notice).toHaveTextContent('Changed fields: akoya_title');
+  expect(notice).toHaveTextContent('The abstract changed.');
+  expect(notice).toHaveTextContent('1 reviewer(s) added');
+  expect(notice).toHaveTextContent('Reviews: 1 at generation → 2 now');
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+
+  fireEvent.click(within(notice).getByRole('button', { name: /share anyway/i }));
+
+  await waitFor(() => expect(screen.getByText('Email preview')).toBeInTheDocument());
+  const retryCall = global.fetch.mock.calls.filter(([url]) => url.endsWith('/prepare'))[1];
+  expect(JSON.parse(retryCall[1].body)).toMatchObject({ acknowledgeStaleInputs: 'b'.repeat(64) });
+  expect(screen.queryByTestId('stale-inputs-notice')).not.toBeInTheDocument();
+});
+
+test('a retry echoing a stale acknowledgement while inputs moved again shows the new delta, not a bare retry', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response(staleInputsBody('b'.repeat(64)), 409))
+    .mockResolvedValueOnce(response(staleInputsBody('c'.repeat(64)), 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  const firstNotice = await screen.findByTestId('stale-inputs-notice');
+  fireEvent.click(within(firstNotice).getByRole('button', { name: /share anyway/i }));
+
+  await waitFor(() => expect(
+    global.fetch.mock.calls.filter(([url]) => url.endsWith('/prepare')),
+  ).toHaveLength(2));
+  const retryBody = JSON.parse(global.fetch.mock.calls.filter(([url]) => url.endsWith('/prepare'))[1][1].body);
+  expect(retryBody.acknowledgeStaleInputs).toBe('b'.repeat(64));
+
+  const secondNotice = await screen.findByTestId('stale-inputs-notice');
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+  // A follow-up retry must bind to the NEW live fingerprint, not the one just echoed.
+  fireEvent.click(within(secondNotice).getByRole('button', { name: /share anyway/i }));
+  await waitFor(() => expect(
+    global.fetch.mock.calls.filter(([url]) => url.endsWith('/prepare')),
+  ).toHaveLength(3));
+  const thirdBody = JSON.parse(global.fetch.mock.calls.filter(([url]) => url.endsWith('/prepare'))[2][1].body);
+  expect(thirdBody.acknowledgeStaleInputs).toBe('c'.repeat(64));
+});
+
+test('the stale-inputs confirmation clears when the form changes', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response(staleInputsBody(), 409));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await screen.findByTestId('stale-inputs-notice');
+
+  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Edited after the stale-inputs notice.' } });
+  expect(screen.queryByTestId('stale-inputs-notice')).not.toBeInTheDocument();
+});
+
+test('the stale-inputs confirmation clears when the source artifact id changes', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response(staleInputsBody(), 409))
+    .mockResolvedValue(response({ success: true, attempts: [] }));
+  const { rerender } = render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await screen.findByTestId('stale-inputs-notice');
+
+  rerender(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: 'a-new-brief-artifact-id' }}
+    />,
+  );
+  expect(screen.queryByTestId('stale-inputs-notice')).not.toBeInTheDocument();
+});
+
+test('distribution history shows the bounded delta, actor, and time for an acknowledged attempt', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    success: true,
+    attempts: [{
+      ...preparedAttempt(),
+      state: 'sent',
+      transportAccepted: true,
+      createdAt: '2026-09-05T12:00:00Z',
+      staleInputsAcknowledged: {
+        delta: { changedRequestFields: ['akoya_title'], abstractChanged: false, generatedReviewCount: 1, liveReviewCount: 2 },
+        acknowledgedAt: '2026-09-05T11:55:00Z',
+        acknowledgedBy: 'actor-system-user-id',
+      },
+    }],
+  }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  fireEvent.click(await screen.findByText(/Email history/));
+  const ack = await screen.findByTestId('stale-inputs-acknowledged');
+  expect(ack).toHaveTextContent('Staff acknowledged newer inputs at');
+  expect(ack).toHaveTextContent('actor-system-user-id');
+  expect(ack).toHaveTextContent('Changed fields: akoya_title');
+  expect(ack).toHaveTextContent('Reviews: 1 at generation → 2 at share');
+});
+
+test('an attempt without an acknowledgement shows no stale-inputs audit line', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    success: true,
+    attempts: [{ ...preparedAttempt(), state: 'sent', transportAccepted: true, createdAt: '2026-09-05T12:00:00Z' }],
+  }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  fireEvent.click(await screen.findByText(/Email history/));
+  await screen.findByText(preparedAttempt().subject);
+  expect(screen.queryByTestId('stale-inputs-acknowledged')).not.toBeInTheDocument();
 });

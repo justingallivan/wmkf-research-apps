@@ -6,9 +6,18 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
+  - lib/dataverse/schema/wave16-request-document-registry/zz_akoya_request_pre_rp_brief_pointer.json
+  - scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs
+  - shared/templates/pre-research-presentation-brief/brief-v1.docx
+  - lib/services/pre-rp-brief/docx-renderer.js
+  - lib/services/pre-rp-brief/input-service.js
+  - lib/services/pre-rp-brief/artifact-service.js
+  - lib/services/pre-rp-brief/share-lock-service.js
+  - pages/api/workbench/pre-rp-brief.js
+  - pages/api/workbench/pre-rp-brief/lock-for-share.js
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/schema/wave22-final-writeup-transition/wmkf_requestdocument_final_writeup_transition.json
@@ -428,6 +437,91 @@ PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template v3 makes that
 label explicitly non-wrapping under another generation identity. Signed-in
 current-status, compact actions/download, and Word Online v3 proof remain open;
 this was never a registry consistency failure.
+
+## Pre-Research Presentation Brief contract (schema live; code built on `claude/pre-rp-brief`, slices 1-5)
+
+`[VERIFIED LIVE 2026-09-16 — owner-run insert and re-read; preflight --target=prod 43 exact / 0 absent / 0 divergent]`
+`docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §3, §5
+slices 1-2. Artifact type option `Pre-Research Presentation Brief =
+100000009` is added by the sibling script
+`scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs` (same
+dry-run-default/`--execute`/re-read-verify shape as the Consultant Feedback
+insert above; owner-run against Production). The picklist script's dry run
+was run once, 2026-09-16, as a read-only Production Dataverse metadata read
+(no `--execute`; confirmed value `100000009` free, no write made) — see
+`feedback-never-self-authorize-prod-dataverse-reads.md` on not repeating
+that read without asking first. The pointer record's own dry-run apply
+(`apply-dataverse-schema.js --wave=16-request-document-registry`) was not
+run; it goes through the target/write interlock, which correctly refused
+without `DATAVERSE_ALLOW_PROD_READS=yes`, and that flag was not set.
+Mirrored in `shared/config/requestDocument.js`
+(`REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF` +
+`PRE_RP_BRIEF_CONTRACT`) and in the Wave 16 schema record
+(`lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json`).
+
+A second, independent Wave 16 schema-as-code record,
+`zz_akoya_request_pre_rp_brief_pointer.json`, adds
+`akoya_request.wmkf_CurrentPreRPBrief` (N:1 lookup to `wmkf_requestdocument`,
+relationship `wmkf_request_currentprerpbrief`) — the request-level canonical
+pointer for the brief, shaped exactly like
+`wmkf_currentinitialassessment`/`wmkf_request_currentinitialassessment`
+above. Both records were applied to Production by the owner on 2026-09-16 (picklist value inserted and re-read; relationship created under `DATAVERSE_PROD_WRITE_ACK`) via
+`node scripts/apply-dataverse-schema.js --target=<target>
+--wave=16-request-document-registry --execute`, same as every other file in
+this directory.
+
+Brief rows reuse the Pre-Site Visit registry's write-once
+`wmkf_presiteinputsnapshotjson` / `wmkf_inputfingerprint` fields (§ above) for
+their own self-describing envelope
+`{ schemaVersion: 1, artifactType: 'pre-rp-brief', request, reviews }` rather
+than adding a third Dataverse field — safe because every current raw-field
+reader of that snapshot column asserts/filters `PRE_SITE_VISIT` before
+parsing (plan §7 finding, `lib/services/pre-site-visit/artifact-service.js`).
+Canonical/pending pointer-resolution and generation code is built on
+`claude/pre-rp-brief` **[BUILT on claude/pre-rp-brief — not merged, not deployed]** (the schema above is live):
+`lib/services/pre-rp-brief/input-service.js` (request/roster -> envelope,
+fails closed with "Add the abstract on the Reviews tab first." when
+`wmkf_abstract` is empty), `lib/services/pre-rp-brief/artifact-service.js`
+(`getPreRpBriefStatus`/`generatePreRpBrief`, mirroring
+`lib/services/pre-site-visit/artifact-service.js`'s claim/render/upload/
+activate lineage but with no prompt/AI phase — rendering is synchronous and
+deterministic), and `lib/services/pre-rp-brief/share-lock-service.js`
+(`lockPreRpBriefForShare`, mirroring
+`lib/services/pre-site-visit/site-visit-transition-service.js`'s one-time
+Draft-to-Review lock; no review gate — that is slice 4's prepare-time gate).
+Routes `pages/api/workbench/pre-rp-brief.js` (GET status, POST generate) and
+`pages/api/workbench/pre-rp-brief/lock-for-share.js` (POST) are registered
+in `docs/API_ROUTE_SECURITY_MATRIX.md` as source-built, deployment pending.
+Slice 4 (built, same branch) swaps the distribution source to the current
+brief (`akoya_request._wmkf_currentprerpbrief_value`; distribution snapshot
+rows created by `ensureSnapshot` now carry artifact type `100000009`) and adds
+the prepare-time gate in `lib/services/pre-site-visit/distribution-service.js`:
+zero received reviews in the stored generation snapshot fails closed as
+`brief_reviews_required`; live-input drift returns 409 `brief_inputs_stale`
+with both fingerprints and a bounded delta, retryable only with
+`acknowledgeStaleInputs` equal to the returned live fingerprint; both
+fingerprints, the delta, and the acknowledgement are bound into `draftHash`
+and `previewHash`. The acknowledgement persists on the Postgres attempt row
+via migration `052_pre_site_distribution_brief_inputs.sql`
+**[VERIFIED LIVE 2026-09-16 — applied to the shared Production/Preview
+database by the owner via `node scripts/apply-migrations.js`; readback exact]**. Slice 5 (built, same
+branch) adds the brief card, explicit Start Site Visit action, composite stage
+projection, cycle-list union, drift-confirmation retry UI, and the timestamp-only
+Board notice on the briefing page.
+
+The DOCX template — `shared/templates/pre-research-presentation-brief/brief-v1.docx`
+(tracked, six single-occurrence placeholders: `[[DV:InstitutionName]]`,
+`[[DV:ProjectTitle]]`, `[[DV:PrincipalInvestigator]]`, `[[DV:ProgramDirector]]`,
+`[[DV:Abstract]]`, `[[STAFF:RefereeSentences]]`, no header/footer parts per
+B6) — is derived reproducibly from the owner's untracked example file by
+`scripts/build-pre-rp-brief-template.mjs`. The renderer,
+`lib/services/pre-rp-brief/docx-renderer.js`, fills those placeholders and
+composes the referee paragraph from the same deterministic
+`composeScoreSentence`/`composeReviewerSentence` composers the Reviews tab and
+Pre-Site writeup use (`shared/utils/review-writeup-paragraphs.js`); it also
+exports `briefInputFingerprint`, a pure sha256-over-stable-keys function of
+that same envelope with reviews ordered by `compareReviewersByName`, for the
+prepare-time drift gate (plan §3.4b).
 
 ## Retry and partial-success behavior
 

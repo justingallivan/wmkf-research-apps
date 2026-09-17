@@ -495,7 +495,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 ## Deliberation briefing page (third external surface, S502)
 
 `pages/external/briefing/[token].js` + `/api/external/briefing/[token]/{context,document}`
-serve a read-only per-request page (shared writeup snapshot, every received review with
+serve a read-only per-request page (the shared Pre-Research Presentation Brief snapshot — the Pre-Site writeup before Pre-RP Brief slice 4, **[BUILT on `claude/pre-rp-brief` — not merged, not deployed]** — plus a date-only "staff acknowledged newer inputs" notice when the send carried a drift acknowledgement; every received review with
 author and re-sanitized answers, the proposal as `Reviewer Materials/Proposal_<num>.pdf` since 2026-09-10 D20) to Board members and consultants
 who have no Dataverse login. Plan and owner decisions D13–D16:
 `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`. Verifier

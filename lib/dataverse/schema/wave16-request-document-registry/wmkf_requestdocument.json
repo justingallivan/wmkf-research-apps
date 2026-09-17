@@ -29,7 +29,8 @@
         { "value": 100000005, "label": "Recording" },
         { "value": 100000006, "label": "Transcript" },
         { "value": 100000007, "label": "Transcript Summary" },
-        { "value": 100000008, "label": "Consultant Feedback" }
+        { "value": 100000008, "label": "Consultant Feedback" },
+        { "value": 100000009, "label": "Pre-Research Presentation Brief" }
       ]
     },
     {
