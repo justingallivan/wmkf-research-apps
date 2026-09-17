@@ -139,6 +139,11 @@ export const PRE_RP_BRIEF_CONTRACT = Object.freeze({
   contentType: PRE_SITE_VISIT_CONTRACT.contentType,
   templateId: 'pre-research-presentation-brief-v1',
   templateVersion: '1',
+  // Versions the renderer's fill behavior independently of the template
+  // bytes, and is bound into the generation key so a render change can never
+  // produce different bytes under an identical generation identity.
+  // '2' (2026-09-16): PI/PD role prefixes on the two people tokens.
+  renderVersion: '2',
   snapshotArtifactType: 'pre-rp-brief',
   snapshotSchemaVersion: 1,
   relativeFolder: 'Artifacts/Pre-Research Presentation Brief',

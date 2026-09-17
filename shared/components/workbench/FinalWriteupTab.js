@@ -49,7 +49,11 @@ async function fetchStatus(requestId, signal) {
     { method: 'GET', signal },
   );
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Final Writeup status failed (${response.status})`);
+  if (!response.ok) {
+    const failure = new Error(body.error || `Final Writeup status failed (${response.status})`);
+    failure.code = body.code || null;
+    throw failure;
+  }
   return body;
 }
 
@@ -198,7 +202,7 @@ export default function FinalWriteupTab({ requestId }) {
         })
         .catch((loadError) => {
           if (activeController.current === controller && loadError?.name !== 'AbortError') {
-            setError(loadError.message);
+            setError(transitionErrorMessage(loadError));
           }
         })
         .finally(() => {
@@ -460,7 +464,7 @@ export default function FinalWriteupTab({ requestId }) {
                 .catch((loadError) => {
                   if (activeController.current === controller
                     && loadError?.name !== 'AbortError') {
-                    setError(loadError.message);
+                    setError(transitionErrorMessage(loadError));
                   }
                 })
                 .finally(() => {

@@ -1,9 +1,12 @@
+import crypto from 'node:crypto';
 import {
+  buildPreRpBriefGenerationKey,
   generatePreRpBrief,
   getPreRpBriefStatus,
   projectPreRpBriefArtifact,
   resolveCurrentPreRpBriefForDistribution,
 } from '../../lib/services/pre-rp-brief/artifact-service.js';
+import { briefInputFingerprint } from '../../lib/services/pre-rp-brief/docx-renderer.js';
 import {
   PRE_RP_BRIEF_CONTRACT,
   PRE_SITE_DISTRIBUTION_CONTRACT,
@@ -728,17 +731,52 @@ describe('projectPreRpBriefArtifact', () => {
   });
 
   it('counts only received reviews from the stored input snapshot (H3a/B10 client mirror)', () => {
-    const snapshot = JSON.stringify({
-      schemaVersion: PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion,
-      artifactType: PRE_RP_BRIEF_CONTRACT.snapshotArtifactType,
+    const snapshot = {
+      ...ENVELOPE,
       reviews: [
-        { reviewReceivedAt: '2026-09-01T00:00:00Z' },
-        { reviewReceivedAt: null },
-        { reviewReceivedAt: '2026-09-02T00:00:00Z' },
+        { ...ENVELOPE.reviews[0], reviewReceivedAt: '2026-09-01T00:00:00Z' },
+        { ...ENVELOPE.reviews[0], suggestionId: 'pending-1', reviewReceivedAt: null },
+        { ...ENVELOPE.reviews[0], suggestionId: 'received-2', reviewReceivedAt: '2026-09-02T00:00:00Z' },
       ],
-    });
-    const artifact = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: snapshot }));
+    };
+    const artifact = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify(snapshot),
+      wmkf_inputfingerprint: briefInputFingerprint(snapshot),
+    }));
     expect(artifact.receivedReviewCount).toBe(2);
+  });
+
+  it('reads null when the stored snapshot does not re-hash to the recorded fingerprint (server brief_snapshot_invalid mirror)', () => {
+    const mismatched = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify(ENVELOPE),
+      wmkf_inputfingerprint: 'f'.repeat(64),
+    }));
+    expect(mismatched.receivedReviewCount).toBeNull();
+    const badRequest = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify({ ...ENVELOPE, request: null }),
+      wmkf_inputfingerprint: briefInputFingerprint(ENVELOPE),
+    }));
+    expect(badRequest.receivedReviewCount).toBeNull();
+    const reviewsNotArray = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify({ ...ENVELOPE, reviews: {} }),
+      wmkf_inputfingerprint: briefInputFingerprint(ENVELOPE),
+    }));
+    expect(reviewsNotArray.receivedReviewCount).toBeNull();
+  });
+
+  it('binds the renderer version into the generation key so a render change never reuses an older identity', () => {
+    const key = buildPreRpBriefGenerationKey({ requestId: REQUEST_ID, inputFingerprint: 'a'.repeat(64), clientOperationId: 'op-1' });
+    const expected = crypto.createHash('sha256').update(JSON.stringify({
+      requestId: REQUEST_ID.toLowerCase(),
+      artifactType: PRE_RP_BRIEF_CONTRACT.artifactType,
+      inputFingerprint: 'a'.repeat(64),
+      clientOperationId: 'op-1',
+      templateId: PRE_RP_BRIEF_CONTRACT.templateId,
+      templateVersion: PRE_RP_BRIEF_CONTRACT.templateVersion,
+      renderVersion: PRE_RP_BRIEF_CONTRACT.renderVersion,
+    })).digest('hex');
+    expect(PRE_RP_BRIEF_CONTRACT.renderVersion).toBe('2');
+    expect(key).toBe(expected);
   });
 
   it('reads null (unreadable, distinct from zero) when the snapshot is missing, malformed, or of another envelope', () => {
@@ -747,15 +785,14 @@ describe('projectPreRpBriefArtifact', () => {
     const malformed = projectPreRpBriefArtifact(briefRow({ wmkf_presiteinputsnapshotjson: '{not json' }));
     expect(malformed.receivedReviewCount).toBeNull();
     const foreign = projectPreRpBriefArtifact(briefRow({
-      wmkf_presiteinputsnapshotjson: JSON.stringify({ schemaVersion: 99, reviews: [{ reviewReceivedAt: '2026-09-01T00:00:00Z' }] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify({ ...ENVELOPE, schemaVersion: 99 }),
+      wmkf_inputfingerprint: briefInputFingerprint(ENVELOPE),
     }));
     expect(foreign.receivedReviewCount).toBeNull();
+    const emptySnapshot = { ...ENVELOPE, reviews: [] };
     const empty = projectPreRpBriefArtifact(briefRow({
-      wmkf_presiteinputsnapshotjson: JSON.stringify({
-        schemaVersion: PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion,
-        artifactType: PRE_RP_BRIEF_CONTRACT.snapshotArtifactType,
-        reviews: [],
-      }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(emptySnapshot),
+      wmkf_inputfingerprint: briefInputFingerprint(emptySnapshot),
     }));
     expect(empty.receivedReviewCount).toBe(0);
   });

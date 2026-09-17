@@ -385,6 +385,38 @@ test('H3c/B10: a brief_reviews_required prepare failure shows named, non-generic
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
+test('a late recipient suggestion that seeds a blank field invalidates the prepared preview and its confirmation', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }));
+  const { rerender } = render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      suggestedCc={[]}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  expect(screen.getByRole('button', { name: 'Send email' })).toBeEnabled();
+
+  rerender(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      suggestedCc={['late-consultant@example.org']}
+    />,
+  );
+  expect(screen.getByLabelText('Cc')).toHaveValue('late-consultant@example.org');
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Send email' })).not.toBeInTheDocument();
+});
+
 test('a brief_snapshot_invalid prepare failure shows its own copy, distinct from the zero-review reason', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))

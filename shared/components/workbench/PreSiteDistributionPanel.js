@@ -317,14 +317,6 @@ export default function PreSiteDistributionPanel({
   const seedCc = suggestedCc.join(', ');
   const seed = `${seedTo}|${seedCc}`;
   const [seenSeed, setSeenSeed] = useState(null);
-  if (seenSeed !== seed) {
-    setSeenSeed(seed);
-    setForm((current) => ({
-      ...current,
-      to: current.to.trim() ? current.to : seedTo,
-      cc: current.cc.trim() ? current.cc : seedCc,
-    }));
-  }
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   // Plan §3.4b step 3: a dedicated confirmation state for the prepare-time
@@ -341,6 +333,15 @@ export default function PreSiteDistributionPanel({
     setConfirmed(false);
     setStaleInputs(null);
   };
+  if (seenSeed !== seed) {
+    setSeenSeed(seed);
+    // Seed only blank fields, and only invalidate the prepared preview when
+    // the seed actually changes the form (a late suggestion that lands after
+    // a preview would otherwise leave a sendable preview for the old form).
+    const nextTo = form.to.trim() ? form.to : seedTo;
+    const nextCc = form.cc.trim() ? form.cc : seedCc;
+    if (nextTo !== form.to || nextCc !== form.cc) applyFormPatch({ to: nextTo, cc: nextCc });
+  }
   const [history, setHistory] = useState([]);
   const [historyError, setHistoryError] = useState(null);
   const [error, setError] = useState(null);

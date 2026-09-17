@@ -167,6 +167,18 @@ test('confirms the irreversible handoff and then exposes only the separate Word 
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
 
+test('names the Site Visit prerequisite when the initial status load reports no source document', async () => {
+  global.fetch.mockReset().mockResolvedValueOnce(response({
+    error: 'A Site Visit Word document is required before Final Writeup can start.',
+    code: 'final_writeup_source_missing',
+  }, 409));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(/Start the Site Visit from the Staff Deliberations tab/);
+  expect(alert).not.toHaveTextContent(/is required before Final Writeup can start/);
+});
+
 test('names the Site Visit prerequisite when the server reports no source document', async () => {
   global.fetch
     .mockResolvedValueOnce(response(readyStatus()))

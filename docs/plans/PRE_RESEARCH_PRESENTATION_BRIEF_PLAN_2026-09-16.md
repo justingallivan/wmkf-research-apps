@@ -539,6 +539,36 @@ on the Board page. The delta itself, reviewer identities, and abstract text are 
 the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`
 §2.1 gains the new member in slice 6.
 
+### Codex adversarial review — follow-ups round 1 (2026-09-16, gpt-5.6-sol, base `de349928`, commit `a0056014`)
+
+Verdict needs-attention, five findings, all accepted and fixed in the next commit on
+`claude/pre-rp-brief-followups`:
+
+1. **[high] Pre-Site replay guard bypassed by FAILED/expired claims and concurrent activation.**
+   Fixed: `generatePreSiteVisitArtifact` captures the pointer observed before any claim
+   (`expectedPointerId`); a non-Ready row under the recurring generation key is refused
+   (`pre_site_visit_generation_replay_stale`) unless it was created after the current
+   document (fail closed on unreadable creation times); `commitReadyLineage` refuses
+   409 `pre_site_visit_pointer_changed` when the pointer no longer equals the observed one
+   (and is not this row), on every activation path including upload recovery. Tests: FAILED
+   and expired-GENERATING reclaim, and a rival activation during upload.
+2. **[medium] Suggested-recipient seed bypassed `applyFormPatch`.** Fixed: the seed goes
+   through `applyFormPatch` and only when it changes a blank field, so a late suggestion
+   cannot leave a sendable preview for the old form. Test: prepare + confirm, late `suggestedCc`.
+3. **[medium] Final Writeup initial-load path discarded `body.code`.** Fixed: `fetchStatus`
+   preserves the code; load, retry, and transition errors all pass through
+   `transitionErrorMessage`. Test: first GET returns `final_writeup_source_missing`.
+4. **[medium] Tri-state count did not mirror every `brief_snapshot_invalid` path.** Fixed:
+   `receivedReviewCountOf` also requires `reviews` to be an array and the stored envelope to
+   re-hash (via `briefInputFingerprint`, which validates the request shape) to the row's
+   `wmkf_inputfingerprint`; null otherwise. Tests: fingerprint mismatch, null request,
+   non-array reviews.
+5. **[medium] PI/PD render change absent from generation identity.** Fixed:
+   `PRE_RP_BRIEF_CONTRACT.renderVersion = '2'` is bound into the generation key
+   (`buildPreRpBriefGenerationKey`, exported and byte-pinned by test); the template bytes and
+   `templateVersion` are unchanged. Consequence: a pre-deploy READY brief keeps its identity;
+   any new generation after deploy is a new lineage.
+
 ## 8. Follow-ups (not required for this pass)
 
 - **Pre-RP replay closed; Pre-Site parity ported (Session 516 follow-ups, 2026-09-16).**
