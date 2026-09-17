@@ -53,24 +53,13 @@ function occurrences(source, needle) {
   return count;
 }
 
-// Plan §11 (Step C2): distribution-service.js `ensureSnapshot` is shared by
-// prepare (REQUIRED) and the review-bundle on-demand rebuild (a
-// caller-supplied `spec.actorPolicy` override, ALLOW_UNATTRIBUTED — an
-// external Board reader's token carries no staff Dynamics identity). The
-// pattern below still requires the literal expected policy to be the
-// resolved default whenever no override is supplied, so a writer cannot
-// silently downgrade its floor.
-function actorPolicyPattern(expectedPolicy) {
-  return new RegExp(`actorPolicy:\\s*(?:[A-Za-z0-9_.]+\\s*\\|\\|\\s*)?REQUEST_DOCUMENT_ACTOR_POLICY\\.${expectedPolicy}\\b`);
-}
-
 function validateWriter(relative, source, callNeedle, expectedPolicy) {
   const errors = [];
   const count = occurrences(source, callNeedle);
   if (count !== 1) errors.push(`${relative}: expected exactly one ${callNeedle} call, found ${count}`);
   const callAt = source.indexOf(callNeedle);
   const callWindow = callAt >= 0 ? source.slice(callAt, callAt + 4000) : '';
-  if (!actorPolicyPattern(expectedPolicy).test(callWindow)) {
+  if (!callWindow.includes(`actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.${expectedPolicy}`)) {
     errors.push(`${relative}: create call is missing actor policy ${expectedPolicy}`);
   }
   if (!callWindow.includes('actorContext:')) {

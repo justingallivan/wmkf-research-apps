@@ -474,11 +474,14 @@ const PINNED_SET_FINGERPRINT = reviewSetFingerprint([{
 const BUNDLE_BYTES = Buffer.from('%PDF-pinned-bundle-bytes');
 const BUNDLE_BYTE_HASH = require('crypto').createHash('sha256').update(BUNDLE_BYTES).digest('hex');
 
+const REVIEW_BUNDLE_ACTOR_ID = 'aaaaaaaa-1111-4111-8111-111111111111';
+
 function bundleAttemptFixture(overrides = {}) {
   return {
     operation_id: 'op-bundle-1',
     state: 'sent',
     source_document_id: 'source-doc-1',
+    acting_user_system_id: REVIEW_BUNDLE_ACTOR_ID,
     review_bundle_document_id: 'bundle-doc-1',
     review_bundle_drive_id: 'bundle-drive',
     review_bundle_item_id: 'bundle-item',
@@ -534,7 +537,7 @@ describe('resolveBriefingMember: review-bundle (plan §11, Step C2)', () => {
     expect(d.retainReviewBundle).not.toHaveBeenCalled();
   });
 
-  test('rebuilds once through retainReviewBundle when the live set differs, persists the new identity, and serves the new bytes', async () => {
+  test('rebuilds once through retainReviewBundle when the live set differs, attributed to the sent attempt\'s staff actor, persists the new identity, and serves the new bytes', async () => {
     const rebuiltBytes = Buffer.from('%PDF-rebuilt-bundle-bytes');
     const rebuiltHash = require('crypto').createHash('sha256').update(rebuiltBytes).digest('hex');
     const newSuggestions = () => ([
@@ -590,7 +593,9 @@ describe('resolveBriefingMember: review-bundle (plan §11, Step C2)', () => {
     const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d);
 
     expect(d.retainReviewBundle).toHaveBeenCalledTimes(1);
-    const [rebuildArgs] = d.retainReviewBundle.mock.calls[0];
+    const [rebuildArgs, rebuildActorId] = d.retainReviewBundle.mock.calls[0];
+    // Attributed to the staff member who shared — never unattributed.
+    expect(rebuildActorId).toBe(REVIEW_BUNDLE_ACTOR_ID);
     expect(rebuildArgs.sourceDocumentId).toBe('source-doc-1');
     expect(rebuildArgs.folderPath).toBe('Requests/1002379/Distribution Snapshots');
     expect(rebuildArgs.cycleCode).toBe('D26');
@@ -631,6 +636,43 @@ describe('resolveBriefingMember: review-bundle (plan §11, Step C2)', () => {
     });
     await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
       .rejects.toMatchObject({ httpStatus: 503, body: { reason: 'review_bundle_unavailable' } });
+    expect(d.recordReviewBundleRebuilt).not.toHaveBeenCalled();
+  });
+
+  test('a legacy actor-less attempt (no acting_user_system_id) never rebuilds unattributed: changed set → 503 and no writes', async () => {
+    const d = deps({
+      findSuggestions: jest.fn(async () => ([{
+        wmkf_appreviewersuggestionid: RECEIVED_ID,
+        wmkf_reviewreceivedat: '2026-09-01T10:00:00Z',
+        wmkf_reviewerfirstname: 'Ada',
+        wmkf_reviewerlastname: 'Lovelace',
+        // The live folder/filename differ from the pinned identity, so the
+        // fingerprints diverge and a rebuild would otherwise be attempted.
+        wmkf_reviewsharepointfolder: 'Requests/1002379/Reviewer_Uploads/attempt_y',
+        wmkf_reviewfilename: 'review-v2.pdf',
+      }])),
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture({ acting_user_system_id: null })),
+      findDocumentById: jest.fn(async () => ({ records: [sourceRowFixture()] })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d))
+      .rejects.toMatchObject({ httpStatus: 503, body: { reason: 'review_bundle_unavailable' } });
+    expect(d.retainReviewBundle).not.toHaveBeenCalled();
+    expect(d.recordReviewBundleRebuilt).not.toHaveBeenCalled();
+    expect(d.findDocumentById).not.toHaveBeenCalled();
+  });
+
+  test('a legacy actor-less attempt still serves the pinned bundle when the live set is unchanged', async () => {
+    const d = deps({
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture({ acting_user_system_id: null })),
+      downloadFile: jest.fn(async (driveId, itemId) => (
+        driveId === 'bundle-drive' && itemId === 'bundle-item'
+          ? { buffer: BUNDLE_BYTES, mimeType: 'application/pdf', filename: 'bundle.pdf', size: BUNDLE_BYTES.length }
+          : { buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 }
+      )),
+    });
+    const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d);
+    expect(file.buffer).toEqual(BUNDLE_BYTES);
+    expect(d.retainReviewBundle).not.toHaveBeenCalled();
     expect(d.recordReviewBundleRebuilt).not.toHaveBeenCalled();
   });
 
