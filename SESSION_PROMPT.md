@@ -63,8 +63,10 @@ cron. No code behaviour changed.
    required checks. Stage 4 accepted in `569ab797`: Pre-Site model/defaults/read/
    lineage/recovery, with populated/historical fixtures verified on both old and new
    code; fresh Sol and root approval, 955 suites / 14,085 tests and required checks.
-   Stage 5a route prerequisites are committed in `e3d4826f` (six suites / 152 tests).
-   Next: distribution leaves/composition/context extraction. Receipts:
+   Stage 5a accepted in `d673afc6`: distribution model/composition/defaults/context,
+   unchanged public facade and writer; fresh Sol and root approval, 957 suites /
+   14,100 tests and required checks. Calendar-send prerequisites passed on old/new code.
+   Next: Stage 5b retained snapshot extraction and atomic writer-registry path update. Receipts:
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 
