@@ -66,7 +66,9 @@ cron. No code behaviour changed.
    Stage 5a accepted in `d673afc6`: distribution model/composition/defaults/context,
    unchanged public facade and writer; fresh Sol and root approval, 957 suites /
    14,100 tests and required checks. Calendar-send prerequisites passed on old/new code.
-   Next: Stage 5b retained snapshot extraction and atomic writer-registry path update. Receipts:
+   Stage 5b accepted in `555a7bda`: retained snapshot module and atomic writer-registry
+   move; fresh Sol/root approval, 957 suites / 14,101 tests and required checks.
+   Next: Stage 6 send/restart prerequisites, then prepare/send/history extraction. Receipts:
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 

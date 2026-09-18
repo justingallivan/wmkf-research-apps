@@ -248,8 +248,9 @@ Root caught and restored two accidentally shortened catch bindings before accept
 all 172 function bodies and 39 declaration initializers remain exact after AST
 normalization. Named-import audit checked 410 bindings; explicit no-undefined lint passed.
 
-Fresh Sol runtime review approved preservation, requiring the two test corrections
-above. A fresh bounded correction review returned READY and verified all six runtime
+Fresh Sol runtime review `01a0b579-0839-7042-8464-b88d2a3d54cf` approved preservation,
+requiring the two test corrections above. Fresh bounded correction review
+`01a0b582-ee13-7242-9d6a-c41099629928` returned READY and verified all six runtime
 fingerprints match. One earlier review session drifted into delegation and was stopped;
 its incomplete output was not used as approval. Final runtime SHA-256:
 
@@ -268,3 +269,45 @@ scoped tests, types and canonical build passed again; after test additions, old/
 scoped tests, test lint and full tests passed. Root inspected outputs and zero exits.
 No live operations/deployment. Rollback: revert `d673afc6` as one unit, including agenda.
 Next permitted stage: Stage 5b after committing its real-retention consumer prerequisite.
+
+
+## Stage 5b — accepted (`555a7bda`)
+
+Prerequisites `cb549a1f` and `9d795a85` exercise the real briefing consumer through
+bundle assembly/retention and refuse an unknown divergent item already occupying
+the deterministic snapshot path. The latter's 91 service cases passed against
+both the original Stage 5a facade and extracted code; root restored the facade
+byte-for-byte. No upload, delete, Ready transition or owned identity for the unknown
+item is accepted. Existing tests cover normalized DOCX versus exact PDF/ICS bytes
+and interrupted upload finalization.
+
+All twelve assigned functions moved into `distribution/retained-snapshot.js`.
+The original facade keeps the positional `retainReviewBundle(args, dependencies,
+actor)` export. Only the distribution writer registry path moved; the default
+adapter binding, REQUIRED policy, bounded actor context and other eight writers
+remain unchanged. Added missing/moved writer, duplicate call/binding, wrong-policy
+and missing-context self-tests. Root corrected fixture targeting and caught a
+missing compatibility export before acceptance. Atlas ownership is local-source
+verified, explicitly not a deployment claim.
+
+Fresh Sol `01a0b58c-fa5f-7363-ae55-648980aa01f4` approved exact runtime/gate
+preservation and required the unknown-path fixture plus Atlas date correction.
+Fresh correction review `01a0b595-c320-7752-bba7-45af3462db23` returned READY,
+matching the unchanged runtime/gate fingerprints. Root inspected moved ownership,
+imports, tests, writer fixtures and logs. Reviewed SHA-256:
+
+- Facade: `43a6b6ac3da43c1cd592a4d252f6cf5053830c1906632e4fa52e1c9508d565b2`
+- Retention: `4b25b714e3b93df4254fe57b4959bd826b865737d093b2806e44a1ca1e543729`
+- Writer gate: `a37c67839c21f1a6f627d411c850ad97ebbc179977d64bcc0b68f8fc14893d96`
+- Final service tests: `ed375fb1d0beede27bdbb9d6ac70b316467982a4ef39dbe80ff381e20d3811d6`
+- Atlas: `9eb6fa0d881ecc357f3ea3b2e64eb1377124da1958741eb5f7ab6103615e6221`
+
+[VERIFIED via local outputs] Scoped 4 suites / 160 tests, separate bundle suite
+26 tests, final full 957 suites / 14,101 tests, all 17 gate/self-test pairs
+sequentially plus migrations-manifest/docs-catalog, lint, types, canonical build,
+explicit undefined-name/import checks and AST comparisons passed. Baseline lint
+warnings remain 104; existing build tracing warnings remain. Final fixture/date
+correction reran old/new focused tests, test lint, full tests and scoped docs gates;
+reviewed runtime/gate/build inputs did not change. No live operations/deployment.
+Rollback: revert `555a7bda` as one unit including physical writer registration.
+Next permitted stage: Stage 6 after its persistence/transport restart prerequisites.
