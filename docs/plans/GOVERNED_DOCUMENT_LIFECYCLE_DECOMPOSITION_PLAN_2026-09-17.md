@@ -2,8 +2,8 @@
 title: Governed Document Lifecycle Decomposition Plan
 domain: architecture
 kind: plan
-status: draft
-summary: Planning-only, behavior-preserving decomposition of document generation, recovery, retained snapshots, distribution, and Final transitions, with test prerequisites and independent review checkpoints.
+status: active
+summary: Authorized local, staged, behavior-preserving decomposition of document generation, recovery, retained snapshots, distribution, and Final transitions, with test prerequisites and independent review checkpoints.
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -14,9 +14,13 @@ related:
 
 # Governed Document Lifecycle Decomposition
 
-**Planning only. No migration authorized or executed.** Source baseline: local `main`
-commit `a7cf2518`, 2026-09-17. Proposed paths, tests, and stages below are **PLANNED**,
-not built. This is a source-code migration, not a database migration.
+**Local implementation authorized by the owner on 2026-09-18.** Luna implements
+and runs reconnaissance/builds; Sol reviews each stage; the orchestrator performs
+final acceptance and takes over stalled correction loops. Work runs on
+`codex/document-lifecycle-decomposition`; no push, deployment or live data writes
+are authorized. Source planning baseline: `a7cf2518`, 2026-09-17; execution starts
+from `02c41a08`. Stages remain **PLANNED** until their execution receipts are accepted.
+This is a source-code migration, not a database migration.
 
 ## 1. Decision and scope
 
