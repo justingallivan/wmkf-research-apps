@@ -41,6 +41,16 @@ cron. No code behaviour changed.
    and self-test pass: 61 ok, 0 stale, 6 unverifiable, 11 closed. The six unverifiable
    rows (J27-034, -061, -067, -075, -076, -077) are advisory and pre-existing.
 
+2. **Governed document lifecycle refactor scoped — planning only.** The owner requested
+   a staged plan, with fresh-context assumption reviews, for the largest defensible
+   remaining refactor. The plan is
+   `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_DECOMPOSITION_PLAN_2026-09-17.md`.
+   It covers four document service coordinators, preserves separate state machines
+   and public facades, and specifies prerequisite tests, ordered symbol/file moves,
+   stage gates, review receipts and rollback. It is a proposal, not execution
+   authorization or a change to the product priority queue. No runtime migration
+   was performed. See the plan's review record and evidence limits before acting.
+
 ## Next Items
 
 ### Verified Open
