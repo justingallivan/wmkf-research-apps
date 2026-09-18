@@ -39,6 +39,7 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
       'cycle-dossier.entry': { kind: 'timeout', timeoutMsOverride: 200000 },
       'review-panel.seat': { kind: 'standing', maxTokensOverride: 16000, timeoutMsOverride: 200000 },
       'review-panel.chair': { kind: 'standing', maxTokensOverride: 12000, timeoutMsOverride: 200000 },
+      'initial-assessment.generate': { kind: 'standing', maxTokensOverride: 12000, timeoutMsOverride: 120000 },
     },
     limits: {
       'pre-site-visit.proposal-core.generate': {
@@ -62,6 +63,10 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
       'review-panel.chair': {
         maxTokensOverride: { min: 4000, max: 16000 },
         timeoutMsOverride: { min: 60000, max: 220000 },
+      },
+      'initial-assessment.generate': {
+        maxTokensOverride: { min: 4096, max: 32000 },
+        timeoutMsOverride: { min: 60000, max: 240000 },
       },
     },
     descriptions: {
@@ -152,6 +157,10 @@ test('the review panel seat and chair output budgets are editable, range-checked
   });
   expect(JSON.parse(put[1].body).budgets['review-panel.chair']).toEqual({
     kind: 'standing', maxTokensOverride: 10000, timeoutMsOverride: 200000,
+  });
+  // The Initial Assessment standing budget rides along untouched.
+  expect(JSON.parse(put[1].body).budgets['initial-assessment.generate']).toEqual({
+    kind: 'standing', maxTokensOverride: 12000, timeoutMsOverride: 120000,
   });
 });
 

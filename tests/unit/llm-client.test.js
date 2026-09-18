@@ -107,6 +107,20 @@ describe('LLMClient.complete', () => {
     expect(result.textStreamed).toBe(false);
   });
 
+  test('reports a content-free block census and thinking tokens without retaining block text', () => {
+    const r = normalizeUnaryResponse({
+      content: [{ type: 'thinking', thinking: '', signature: 'opaque' }, { type: 'text', text: 'hello' }],
+      usage: { input_tokens: 10, output_tokens: 2200, output_tokens_details: { thinking_tokens: 2195 } },
+      stop_reason: 'max_tokens',
+    }, 'claude-opus-5');
+    expect(r.blocks).toEqual([{ type: 'thinking', chars: 0 }, { type: 'text', chars: 5 }]);
+    expect(r.thinkingTokens).toBe(2195);
+    expect(JSON.stringify(r.blocks)).not.toContain('opaque');
+    const bare = normalizeUnaryResponse({}, 'claude-opus-5');
+    expect(bare.blocks).toEqual([]);
+    expect(bare.thinkingTokens).toBeNull();
+  });
+
   test.each([
     [undefined],
     [{ input_tokens: 1 }],

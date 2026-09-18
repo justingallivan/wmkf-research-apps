@@ -6,17 +6,26 @@ import {
 import { FIELD_PRIMER_PROMPT_NAME } from '../../lib/services/field-primer-service.js';
 import { FIELD_PRIMER_LEASE_TTL_MS } from '../../shared/utils/field-primer-envelope.js';
 import { LEASE_GROUNDING_RESERVE_MS, LEASE_SAFETY_MARGIN_MS } from '../../lib/services/field-primer/generate-service.js';
-import { PRE_SITE_VISIT_CONTRACT } from '../../shared/config/requestDocument.js';
+import { INITIAL_ASSESSMENT_CONTRACT, PRE_SITE_VISIT_CONTRACT } from '../../shared/config/requestDocument.js';
 import { lookupModelCapabilities } from '../../lib/services/model-capabilities.js';
 import { resolveModel } from '../../lib/services/model-resolver.js';
 import { BASE_CONFIG } from '../../shared/config/baseConfig.js';
-import { resolveMaxTokensForCall } from '../../lib/services/execute-prompt.js';
+import { resolveMaxTokensForCall, thinkingBudgetAdvisory, THINKING_BUDGET_FLOOR_TOKENS } from '../../lib/services/execute-prompt.js';
+import { requestCapabilitiesForModel } from '../../lib/services/model-capabilities.js';
 
 // Code defaults are the bounded outage fallback and initial Admin values. They
 // must use the real prompt names and remain under the reviewed default model's
 // output ceiling.
 
 test('registry keys are the prompt names the callers use', () => {
+  expect(EXECUTOR_BUDGET_DEFAULTS[INITIAL_ASSESSMENT_CONTRACT.promptName]).toMatchObject({
+    kind: 'standing',
+    maxTokensOverride: 12_000,
+    timeoutMsOverride: 120_000,
+  });
+  // The standing floor equals the Executor's thinking-budget advisory floor.
+  expect(EXECUTOR_BUDGET_LIMITS[INITIAL_ASSESSMENT_CONTRACT.promptName].maxTokensOverride.min)
+    .toBe(THINKING_BUDGET_FLOOR_TOKENS);
   expect(EXECUTOR_BUDGET_DEFAULTS[PRE_SITE_VISIT_CONTRACT.promptName]).toMatchObject({
     kind: 'standing',
     maxTokensOverride: 32_768,
@@ -92,4 +101,19 @@ test('the final Executor seam caps a server override to the resolved model ceili
     model: 'claude-limited',
     maxOutputTokens: 64000,
   })).toThrow(/exceeds reviewed limit/);
+});
+
+test('the thinking-budget advisory fires only for thinking-default models below the floor', () => {
+  expect(THINKING_BUDGET_FLOOR_TOKENS).toBe(4096);
+  const opus5 = requestCapabilitiesForModel('claude-opus-5');
+  const sonnet5 = requestCapabilitiesForModel('claude-sonnet-5');
+  const opus48 = requestCapabilitiesForModel('claude-opus-4-8');
+  expect(thinkingBudgetAdvisory({ maxTokens: 2200, capabilities: opus5 }))
+    .toEqual({ thinkingMode: 'adaptive_default_on', maxTokens: 2200, floor: 4096 });
+  expect(thinkingBudgetAdvisory({ maxTokens: 4095, capabilities: sonnet5 })).not.toBeNull();
+  expect(thinkingBudgetAdvisory({ maxTokens: 4096, capabilities: sonnet5 })).toBeNull();
+  // Opus 4.6–4.8 run without thinking when the request omits it.
+  expect(thinkingBudgetAdvisory({ maxTokens: 2200, capabilities: opus48 })).toBeNull();
+  expect(thinkingBudgetAdvisory({ maxTokens: 2200, capabilities: requestCapabilitiesForModel('gpt-5.6-sol') })).toBeNull();
+  expect(thinkingBudgetAdvisory({ maxTokens: 2200, capabilities: undefined })).toBeNull();
 });

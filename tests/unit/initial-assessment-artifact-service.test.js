@@ -19,6 +19,11 @@ jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({
 jest.mock('../../lib/dataverse/core/changeset.js', () => ({
   runChangeset: jest.fn(),
 }));
+jest.mock('../../lib/services/executor-budget-service.js', () => ({
+  getExecutorBudget: jest.fn(async () => ({
+    kind: 'standing', maxTokensOverride: 12000, timeoutMsOverride: 120000,
+  })),
+}));
 jest.mock('../../lib/services/execute-prompt.js', () => ({
   executePrompt: jest.fn(),
 }));
@@ -48,6 +53,7 @@ import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import { runChangeset } from '../../lib/dataverse/core/changeset.js';
 import { executePrompt } from '../../lib/services/execute-prompt.js';
+import { getExecutorBudget } from '../../lib/services/executor-budget-service.js';
 import { GraphService } from '../../lib/services/graph-service.js';
 import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents.js';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets.js';
@@ -63,6 +69,7 @@ import {
 } from '../../lib/services/initial-assessment/artifact-service.js';
 import {
   INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT,
+  INITIAL_ASSESSMENT_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
@@ -258,7 +265,7 @@ beforeEach(() => {
     blocked: false,
     meta: {
       promptName: 'initial-assessment.generate',
-      promptVersion: 1,
+      promptVersion: INITIAL_ASSESSMENT_CONTRACT.promptVersion,
       promptId: '66666666-6666-6666-6666-666666666666',
     },
   });
@@ -569,6 +576,50 @@ it('does not return success when SharePoint upload succeeds but final registry P
     ARTIFACT_ID,
     expect.objectContaining({
       wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    }),
+    expect.any(Object),
+  );
+});
+
+it('threads the admin-tunable standing budget into the Executor call', async () => {
+  getExecutorBudget.mockResolvedValueOnce({
+    kind: 'standing', maxTokensOverride: 9000, timeoutMsOverride: 90000,
+  });
+  await generateInitialAssessment({ requestId: REQUEST_ID });
+  expect(getExecutorBudget).toHaveBeenCalledWith('initial-assessment.generate');
+  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({
+    promptName: 'initial-assessment.generate',
+    maxTokensOverride: 9000,
+    timeoutMsOverride: 90000,
+  }));
+  expect(getExecutorBudget.mock.invocationCallOrder[0]).toBeLessThan(executePrompt.mock.invocationCallOrder[0]);
+});
+
+it('fails closed with a specific code when the published prompt version differs from the producer contract', async () => {
+  const runId = '55555555-5555-5555-5555-555555555555';
+  executePrompt.mockResolvedValueOnce({
+    parsed: { summary: 's', significance_impact: 'i', research_plan: 'r', team_expertise: 't' },
+    runId,
+    blocked: false,
+    meta: {
+      promptName: 'initial-assessment.generate',
+      promptVersion: INITIAL_ASSESSMENT_CONTRACT.promptVersion + 1,
+      promptId: '66666666-6666-6666-6666-666666666666',
+    },
+  });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 500,
+    body: { code: 'initial_assessment_prompt_version_mismatch', runId },
+  });
+  expect(renderInitialAssessmentDocx).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.update).toHaveBeenCalledWith(
+    ARTIFACT_ID,
+    expect.objectContaining({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      wmkf_lasterrorcode: 'initial_assessment_prompt_version_mismatch',
+      'wmkf_AIRun@odata.bind': `/wmkf_ai_runs(${runId})`,
     }),
     expect.any(Object),
   );
@@ -891,7 +942,7 @@ it('stops an active successor when cleanup overflow appears after preparation', 
       blocked: false,
       meta: {
         promptName: 'initial-assessment.generate',
-        promptVersion: 1,
+        promptVersion: INITIAL_ASSESSMENT_CONTRACT.promptVersion,
         promptId: '66666666-6666-6666-6666-666666666666',
       },
     };
