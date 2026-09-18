@@ -41,6 +41,7 @@ const EXECUTOR_BUDGET_EDITABLE_FIELDS = {
   'cycle-dossier.entry': ['timeoutMsOverride'],
   'review-panel.seat': ['maxTokensOverride', 'timeoutMsOverride'],
   'review-panel.chair': ['maxTokensOverride', 'timeoutMsOverride'],
+  'initial-assessment.generate': ['maxTokensOverride', 'timeoutMsOverride'],
 };
 
 function newRequestId() {

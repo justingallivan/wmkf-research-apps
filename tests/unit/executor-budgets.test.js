@@ -6,7 +6,7 @@ import {
 import { FIELD_PRIMER_PROMPT_NAME } from '../../lib/services/field-primer-service.js';
 import { FIELD_PRIMER_LEASE_TTL_MS } from '../../shared/utils/field-primer-envelope.js';
 import { LEASE_GROUNDING_RESERVE_MS, LEASE_SAFETY_MARGIN_MS } from '../../lib/services/field-primer/generate-service.js';
-import { PRE_SITE_VISIT_CONTRACT } from '../../shared/config/requestDocument.js';
+import { INITIAL_ASSESSMENT_CONTRACT, PRE_SITE_VISIT_CONTRACT } from '../../shared/config/requestDocument.js';
 import { lookupModelCapabilities } from '../../lib/services/model-capabilities.js';
 import { resolveModel } from '../../lib/services/model-resolver.js';
 import { BASE_CONFIG } from '../../shared/config/baseConfig.js';
@@ -18,6 +18,14 @@ import { requestCapabilitiesForModel } from '../../lib/services/model-capabiliti
 // output ceiling.
 
 test('registry keys are the prompt names the callers use', () => {
+  expect(EXECUTOR_BUDGET_DEFAULTS[INITIAL_ASSESSMENT_CONTRACT.promptName]).toMatchObject({
+    kind: 'standing',
+    maxTokensOverride: 12_000,
+    timeoutMsOverride: 120_000,
+  });
+  // The standing floor equals the Executor's thinking-budget advisory floor.
+  expect(EXECUTOR_BUDGET_LIMITS[INITIAL_ASSESSMENT_CONTRACT.promptName].maxTokensOverride.min)
+    .toBe(THINKING_BUDGET_FLOOR_TOKENS);
   expect(EXECUTOR_BUDGET_DEFAULTS[PRE_SITE_VISIT_CONTRACT.promptName]).toMatchObject({
     kind: 'standing',
     maxTokensOverride: 32_768,

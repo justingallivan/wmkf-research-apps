@@ -255,6 +255,12 @@ Migration plans touching either entity must preserve these foreign keys.
   240 000 ms). The response reported model ceilings for the two token-carrying prompts only.
   Admin and runtime reads return `source: dataverse`, version 1, `latestRevision` 1, zero
   storage warnings.
+  **[SOURCE-BUILT ON BRANCH `fix/ia-thinking-budget-floor` 2026-09-18; NOT MERGED, NOT DEPLOYED]**
+  `initial-assessment.generate` joins the registry as a standing budget (default
+  12,000 tokens / 120 s; limits 4,096–32,000 / 60–240 s) after Opus 5 default
+  thinking consumed the prompt row's 2,200-token budget; the IA facade threads it
+  as `maxTokensOverride`. A revision published before that registration fills it
+  from the code default.
   `lib/services/executor-budget-service.js` resolves the Pre-Site
   standing output/transport budget, the review-synthesis retry range, and the
   field-primer timeout-only budget (S493) from the

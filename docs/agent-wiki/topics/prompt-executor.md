@@ -142,7 +142,9 @@ thinking-default models; reverting the alias alone is not a fix.
 
 **Why it was invisible.** The prompt row stores a tier alias, not a concrete id;
 admin publish clones `wmkf_ai_maxtokens` from the prior version and exposes no budget
-input; standing budgets (`EXECUTOR_BUDGET_DEFAULTS`) cover only listed prompts. A
+input; standing budgets (`EXECUTOR_BUDGET_DEFAULTS`) cover only listed prompts
+(`initial-assessment.generate` was added on the same branch: standing 12,000 / 120 s,
+limits 4,096–32,000, threaded through the IA facade via `getExecutorBudget`). A
 model-only republish therefore never re-reviews the budget. Adaptive thinking may skip
 trivial tasks, so several live prompts run below 4,096 and still succeed (read-only
 audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 5 at
@@ -166,9 +168,10 @@ audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 
 2. Check the resolved model's `thinkingMode` (`lib/services/model-capabilities.js`)
    and the row's `wmkf_ai_maxtokens`. Below 4,096 on a thinking-default model is the
    known-bad shape.
-3. Fix = raise the budget (standing budget if the prompt is eligible, otherwise a new
-   prompt version once publish can carry a budget) or lower effort. Do not retry the
-   same budget; `claimExisting` reclaims a Failed IA row and pays again.
+3. Fix = raise the budget (standing budget via `/admin` Executor Budgets when the prompt
+   is registered in `EXECUTOR_BUDGET_DEFAULTS`; register it and thread `getExecutorBudget`
+   through the caller when it is not) or lower effort. Do not retry the same budget;
+   `claimExisting` reclaims a Failed IA row and pays again.
 4. If the prompt is a producer with a pinned `promptVersion` contract
    (`INITIAL_ASSESSMENT_CONTRACT`), ship the contract bump with the republish; the
    producer refuses a mismatch AFTER the paid call (`initial_assessment_prompt_version_mismatch`).

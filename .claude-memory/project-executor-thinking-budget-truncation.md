@@ -35,10 +35,12 @@ decision 2026-09-18).
 ## Ship state
 
 **[SOURCE-BUILT ON BRANCH `fix/ia-thinking-budget-floor` 2026-09-18; NOT MERGED, NOT DEPLOYED.]**
-Until merged, production runs still record the old notes format and the IA
-contract still pins prompt version 1. The IA prompt row itself still carries
-2,200 tokens on Opus 5; raising it needs a code path (standing budget or a
-publish that accepts a budget) plus a coordinated republish and contract bump.
+Until merged, production runs still record the old notes format, the IA
+contract still pins prompt version 1, and the IA call still sends the row's
+2,200 tokens. On the branch, `initial-assessment.generate` is a registered
+standing budget (default 12,000 / 120 s; admin-tunable 4,096–32,000) that the
+IA facade passes as `maxTokensOverride`, so the row budget no longer governs
+the call once deployed.
 
 ## How to apply
 

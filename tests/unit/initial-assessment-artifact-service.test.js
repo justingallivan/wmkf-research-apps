@@ -19,6 +19,11 @@ jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({
 jest.mock('../../lib/dataverse/core/changeset.js', () => ({
   runChangeset: jest.fn(),
 }));
+jest.mock('../../lib/services/executor-budget-service.js', () => ({
+  getExecutorBudget: jest.fn(async () => ({
+    kind: 'standing', maxTokensOverride: 12000, timeoutMsOverride: 120000,
+  })),
+}));
 jest.mock('../../lib/services/execute-prompt.js', () => ({
   executePrompt: jest.fn(),
 }));
@@ -48,6 +53,7 @@ import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import { runChangeset } from '../../lib/dataverse/core/changeset.js';
 import { executePrompt } from '../../lib/services/execute-prompt.js';
+import { getExecutorBudget } from '../../lib/services/executor-budget-service.js';
 import { GraphService } from '../../lib/services/graph-service.js';
 import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents.js';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets.js';
@@ -573,6 +579,20 @@ it('does not return success when SharePoint upload succeeds but final registry P
     }),
     expect.any(Object),
   );
+});
+
+it('threads the admin-tunable standing budget into the Executor call', async () => {
+  getExecutorBudget.mockResolvedValueOnce({
+    kind: 'standing', maxTokensOverride: 9000, timeoutMsOverride: 90000,
+  });
+  await generateInitialAssessment({ requestId: REQUEST_ID });
+  expect(getExecutorBudget).toHaveBeenCalledWith('initial-assessment.generate');
+  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({
+    promptName: 'initial-assessment.generate',
+    maxTokensOverride: 9000,
+    timeoutMsOverride: 90000,
+  }));
+  expect(getExecutorBudget.mock.invocationCallOrder[0]).toBeLessThan(executePrompt.mock.invocationCallOrder[0]);
 });
 
 it('fails closed with a specific code when the published prompt version differs from the producer contract', async () => {
