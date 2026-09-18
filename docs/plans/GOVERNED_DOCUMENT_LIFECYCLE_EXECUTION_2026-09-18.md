@@ -358,3 +358,40 @@ checks and AST comparisons. All 172 original bodies/39 initializers match;
 scoped lint and full tests; the approved runtime/build inputs did not change.
 No live operations/deployment. Rollback: revert `c76703eb`; prior facade reads the
 same persisted attempts. Next permitted stage: Stage 7 after Final T2/T8 prerequisites.
+
+
+## Stage 7 — accepted (`a9d4b0e8`)
+
+Prerequisite `03dd0ab2` adds exact populated Final status DTOs with Failed versus
+Generating priority, milestone/superseded distractions, committed-current versus
+pending separation, duplicate pending rejection and unknown authoritative states.
+Read-purity spies forbid writes, AI, transfers, metadata, downloads and hashing.
+The activation test pins the full ordered conditional source/Final/request changeset
+and same-item/no-upload/no-copy behavior. All 75 prerequisite tests passed before
+extraction; existing leadership actor, race and milestone checks remain intact.
+
+Moved model constants/helpers, the single default dependency object, state reads/
+verification and claim/activation helpers into four modules. Both commands remain
+in the original facade with the registered REQUIRED actor creation seam and all
+five public names. Root took over mechanical import/export cleanup to bound iteration,
+removed unused imports and placed both distinct verification tuples in the model.
+All 172 original bodies and 39 initializers still match after AST normalization;
+516 named/default imports resolve and explicit undefined/unused-name checks pass.
+
+Fresh Sol `01a0b5be-e821-71d3-b395-445cddb26334` returned READY with no substantive
+findings. Root inspected source, fixtures, actual logs and matching fingerprints.
+Reviewed SHA-256:
+
+- Facade: `89ae3d6e965308a1d230435415e9ff6c2ec568b428b8bc0e6a0c839ad9bbdf52`
+- Model: `13e88730a1df9d5ab0a862bd6ef081712768e30179e5ed10cabe10de1c1d37e7`
+- Dependencies: `2ddeae125317b4aa3824ba06c2fa1fcfb3ce50a7768a431cc1b145b0bfcdade4`
+- State: `1925f0f4d77c04ad6278ce0b1de226bb3052e2b5b5aff3a6c28995fd951525b8`
+- Claims: `5f38989bda99bb8d6441c4213709fdfc401ddfb86ad7adbfd479bedc5f81129f`
+- Final prerequisite test: `dec49c5aef157a53cec2ddddf2e4115089ccdf5880b432170b1af3151d40b4cf`
+
+[VERIFIED via local outputs] Scoped eight suites / 149 tests and full 957 suites /
+14,121 tests passed. All 17 gate/self-test pairs ran sequentially and passed, plus
+migrations-manifest/docs-catalog, lint (0 errors / 104 existing warnings), types and
+canonical Turbopack build. Existing build tracing warnings remain. No live operations
+or deployment. Rollback: revert `a9d4b0e8`; prerequisites remain valid on the old facade.
+Next permitted stage: Stage 8 boundary enforcement, source headers and scoped docs.

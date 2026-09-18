@@ -70,8 +70,10 @@ cron. No code behaviour changed.
    move; fresh Sol/root approval, 957 suites / 14,101 tests and required checks.
    Stage 6 accepted in `c76703eb`: prepare/send/history/email recovery separated,
    unchanged facade exports and sequencing; fresh Sol/root approval, 957 suites /
-   14,113 tests and required checks. Next: Stage 7 Final state/claims prerequisites
-   and extraction, then Stage 8 boundaries/documentation. Receipts:
+   14,113 tests and required checks. Stage 7 accepted in `a9d4b0e8`: Final model/
+   defaults/state/claims separated, both commands and five public names preserved;
+   fresh Sol/root approval, 957 suites / 14,121 tests and required checks. Next:
+   Stage 8 boundaries/documentation. Receipts:
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 
