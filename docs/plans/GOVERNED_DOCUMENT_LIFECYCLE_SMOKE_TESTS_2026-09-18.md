@@ -194,7 +194,7 @@ The subsequent distribution prepare returned HTTP 503 `distribution_briefing_req
 
 Guarded PSV reopen separately returned HTTP 503 `Guarded reopen is unavailable until its Dataverse schema is verified`; no retry was attempted. Readback `/tmp/wmkf-smoke2-reopen-blocked.json` shows the request, document projection and distribution attempts unchanged. The sanitized environment classification found `GUARDED_REOPEN_SCHEMA_READY` unset. The owner must complete the documented Dataverse schema verification and supported deployment configuration before retrying; no flag was changed here.
 
-The process used local `NEXTAUTH_URL=http://localhost:3000`. That is usable only for a local app and is not a deliverable external email URL. No distribution email was sent. A controlled rehearsal requires the supported public `NEXTAUTH_URL` for the target deployment (the production branded URL is documented); do not substitute `localhost`, and do not infer a Preview fallback because the briefing-link builder reads `NEXTAUTH_URL` directly. The backend and proxy were stopped cleanly with SIGINT (exit 130); Final and leadership were intentionally deferred to preserve the reopen order.
+The recorded blocked attempt used local `NEXTAUTH_URL=http://localhost:3000`, before the public-link override was configured. That remains suitable for local auth but is not a deliverable external email URL. The supported configuration keeps `NEXTAUTH_URL` for staff auth and sets `DELIBERATION_BRIEFING_PUBLIC_BASE_URL` to an approved HTTPS origin for briefing links; no distribution email was sent. The backend and proxy were stopped cleanly with SIGINT (exit 130); Final and leadership were intentionally deferred to preserve the reopen order.
 
 ## Smoke cases and evidence
 
