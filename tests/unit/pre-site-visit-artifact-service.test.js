@@ -408,6 +408,13 @@ function createHarness({
   };
 }
 
+function orderedDependencyCalls(dependencies, entries) {
+  return entries
+    .flatMap(([label, name]) => dependencies[name].mock.invocationCallOrder.map((order) => ({ label, order })))
+    .sort((left, right) => left.order - right.order)
+    .map(({ label }) => label);
+}
+
 test('generation cannot replace a draft that becomes the Site Visit workspace in flight', async () => {
   const harness = createHarness({
     currentPointerRow: {
@@ -571,6 +578,34 @@ test('persists eight sections and snapshots, renders the Dataverse read-back, th
   expect(harness.row.wmkf_renderinputfingerprint).toMatch(/^[a-f0-9]{64}$/);
   expect(harness.request._wmkf_currentpresitevisit_value).toBe(ARTIFACT_ID);
   expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+  expect(orderedDependencyCalls(harness.dependencies, [
+    ['inputs', 'loadInputs'],
+    ['request', 'getRequest'],
+    ['prompt-config', 'getCurrentPrompt'],
+    ['generation-read', 'findByGenerationKey'],
+    ['bucket', 'getBuckets'],
+    ['create', 'createDocument'],
+    ['proposal-core', 'runProposalCore'],
+    ['update', 'updateDocument'],
+    ['render', 'renderDocx'],
+    ['hash', 'hashDocx'],
+    ['folder', 'ensureFolderPath'],
+    ['upload', 'uploadFile'],
+    ['request-documents', 'findByRequest'],
+    ['commit', 'commitChangeset'],
+  ])).toEqual([
+    'request', 'request-documents', 'inputs', 'prompt-config',
+    'generation-read', 'bucket', 'create',
+    'generation-read', 'proposal-core',
+    'generation-read', 'update',
+    'generation-read', 'render', 'hash',
+    'generation-read', 'update',
+    'generation-read', 'folder',
+    'generation-read', 'upload',
+    'generation-read', 'request-documents',
+    'request', 'commit', 'generation-read',
+    'request', 'request-documents',
+  ]);
 });
 
 test('fails closed when named fields diverge from the audited proposal-core envelope', async () => {
@@ -708,9 +743,14 @@ test('read-only status returns the current Ready artifact without generation sid
   const sideEffectCounts = {
     create: harness.dependencies.createDocument.mock.calls.length,
     update: harness.dependencies.updateDocument.mock.calls.length,
+    commit: harness.dependencies.commitChangeset.mock.calls.length,
     run: harness.dependencies.runProposalCore.mock.calls.length,
     render: harness.dependencies.renderDocx.mock.calls.length,
+    ensureFolder: harness.dependencies.ensureFolderPath.mock.calls.length,
     upload: harness.dependencies.uploadFile.mock.calls.length,
+    delete: harness.dependencies.deleteFile.mock.calls.length,
+    metadata: harness.dependencies.getFileMetadataByPath.mock.calls.length,
+    download: harness.dependencies.downloadFile.mock.calls.length,
   };
 
   const status = await getPreSiteVisitArtifactStatus(
@@ -727,9 +767,14 @@ test('read-only status returns the current Ready artifact without generation sid
   });
   expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(sideEffectCounts.create);
   expect(harness.dependencies.updateDocument).toHaveBeenCalledTimes(sideEffectCounts.update);
+  expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(sideEffectCounts.commit);
   expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(sideEffectCounts.run);
   expect(harness.dependencies.renderDocx).toHaveBeenCalledTimes(sideEffectCounts.render);
+  expect(harness.dependencies.ensureFolderPath).toHaveBeenCalledTimes(sideEffectCounts.ensureFolder);
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(sideEffectCounts.upload);
+  expect(harness.dependencies.deleteFile).toHaveBeenCalledTimes(sideEffectCounts.delete);
+  expect(harness.dependencies.getFileMetadataByPath).toHaveBeenCalledTimes(sideEffectCounts.metadata);
+  expect(harness.dependencies.downloadFile).toHaveBeenCalledTimes(sideEffectCounts.download);
 });
 
 test('schema-v2 proposal cores remain readable and derive available warnings', async () => {
@@ -1207,6 +1252,26 @@ test('post-upload finalization retry recovers the same item without Claude or a 
   expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(1);
   expect(harness.dependencies.downloadFile).toHaveBeenCalledTimes(1);
+  expect(orderedDependencyCalls(harness.dependencies, [
+    ['inputs', 'loadInputs'],
+    ['request', 'getRequest'],
+    ['generation-read', 'findByGenerationKey'],
+    ['metadata-path', 'getFileMetadataByPath'],
+    ['download', 'downloadFile'],
+    ['request-documents', 'findByRequest'],
+    ['update', 'updateDocument'],
+    ['commit', 'commitChangeset'],
+  ])).toEqual([
+    'request', 'request-documents', 'inputs', 'generation-read',
+    'generation-read', 'generation-read', 'update', 'generation-read',
+    'generation-read', 'update', 'generation-read', 'generation-read',
+    'generation-read', 'request-documents', 'request', 'commit',
+    'generation-read', 'request', 'request-documents', 'generation-read',
+    'update', 'request', 'request-documents', 'inputs', 'generation-read',
+    'update', 'generation-read', 'metadata-path', 'download',
+    'generation-read', 'request-documents', 'request', 'commit',
+    'generation-read', 'request', 'request-documents',
+  ]);
 });
 
 test('prompt race marks the claimed row Failed before render or upload', async () => {
