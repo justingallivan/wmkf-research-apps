@@ -6,7 +6,10 @@
  */
 import { buildBriefingContext, resolveBriefingMember } from '../../lib/services/deliberation-briefing/briefing-page-service';
 import { PRE_SITE_DISTRIBUTION_CONTRACT } from '../../shared/config/requestDocument.js';
+import { REQUEST_DOCUMENT_ACTOR_POLICY } from '../../lib/services/request-document-actor-service.js';
 import { reviewSetFingerprint } from '../../lib/services/pre-site-visit/review-bundle-service.js';
+import { retainReviewBundle as realRetainReviewBundle } from '../../lib/services/pre-site-visit/distribution-service.js';
+import { PDFDocument } from 'pdf-lib';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RECEIVED_ID = '22222222-2222-4222-8222-222222222222';
@@ -545,6 +548,70 @@ function sourceRowFixture(overrides = {}) {
 }
 
 describe('resolveBriefingMember: review-bundle (plan §11, Step C2)', () => {
+  test('rebuild consumer can execute the real retention helper with mocked external I/O and preserves actor plus snapshot ledger identity', async () => {
+    const sourcePdf = await PDFDocument.create();
+    sourcePdf.addPage([300, 200]);
+    const reviewBytes = Buffer.from(await sourcePdf.save());
+    let retainedBuffer = null;
+    let retainedActor = null;
+    let snapshotRow = null;
+    const roster = [{
+      suggestionId: RECEIVED_ID,
+      name: 'Ada Lovelace',
+      reviewerAffiliation: 'Analytical Engines Ltd',
+      reviewSharePointFolder: 'Requests/1002379/Reviewer_Uploads/attempt_real',
+      reviewFilename: 'review.pdf',
+      reviewReceivedAt: '2026-09-01T10:00:00Z',
+    }];
+    const d = deps({
+      getWriteupRoster: jest.fn(async () => ({ reviewers: roster, blockers: [] })),
+      getLatestAttempt: jest.fn(async () => bundleAttemptFixture()),
+      findDocumentById: jest.fn(async (id) => (id === 'source-doc-1' ? { records: [sourceRowFixture()] } : { records: [] })),
+      retainReviewBundle: async (args, actor) => { retainedActor = actor; return realRetainReviewBundle(args, d, actor); },
+      downloadFileByPath: jest.fn(async () => ({ buffer: reviewBytes, mimeType: 'application/pdf', filename: 'review.pdf', size: reviewBytes.length })),
+      getFileMetadataByPath: jest.fn(async (_library, folder, filename) => (
+        folder.includes('Distribution Snapshots') ? null : { id: 'review-item', driveId: 'review-drive', size: reviewBytes.length, name: filename }
+      )),
+      downloadFileAsPdf: jest.fn(),
+      findDocumentByGenerationKey: jest.fn(async () => ({ records: snapshotRow ? [{ ...snapshotRow }] : [] })),
+      createDocument: jest.fn(async (payload) => {
+        snapshotRow = { ...payload, wmkf_requestdocumentid: 'bundle-real', _etag: 'etag-1', modifiedon: '2026-09-18T12:00:00Z' };
+        return snapshotRow.wmkf_requestdocumentid;
+      }),
+      updateDocument: jest.fn(async (_id, patch) => { snapshotRow = { ...snapshotRow, ...patch, _etag: 'etag-2' }; }),
+      randomUUID: jest.fn(() => 'claim-real'),
+      now: jest.fn(() => new Date('2026-09-18T12:00:00Z')),
+      ensureFolderPath: jest.fn(async () => undefined),
+      uploadFile: jest.fn(async (_library, _folder, filename, buffer) => {
+        retainedBuffer = buffer;
+        return { siteId: 'bundle-site', driveId: 'bundle-drive', id: 'bundle-item', versionId: '1.0', eTag: 'bundle-etag', webUrl: 'https://sharepoint.test/bundle.pdf', size: buffer.length, name: filename };
+      }),
+      getFileMetadataById: jest.fn(async () => ({ siteId: 'bundle-site', driveId: 'bundle-drive', id: 'bundle-item', versionId: '1.0', eTag: 'bundle-etag', webUrl: 'https://sharepoint.test/bundle.pdf', size: retainedBuffer.length, name: 'Example University - Reviews - real.pdf' })),
+      hashDocx: jest.fn(),
+      recordReviewBundleRebuilt: jest.fn(async (_operationId, rebuilt) => ({
+        operation_id: 'op-bundle-1', state: 'sent',
+        review_bundle_document_id: rebuilt.documentId, review_bundle_drive_id: rebuilt.driveId,
+        review_bundle_item_id: rebuilt.itemId, review_bundle_version_id: rebuilt.versionId,
+        review_bundle_filename: rebuilt.filename, review_bundle_size: rebuilt.size,
+        review_bundle_byte_hash: rebuilt.byteHash, review_bundle_set_fingerprint: rebuilt.setFingerprint,
+        review_bundle_review_count: rebuilt.reviewCount, review_bundle_rebuilt_at: '2026-09-18T12:00:00Z',
+      })),
+      downloadFile: jest.fn(async () => ({ buffer: retainedBuffer, mimeType: 'application/pdf', filename: 'real.pdf', size: retainedBuffer.length })),
+    });
+
+    const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'review-bundle' }, d);
+    expect(d.recordReviewBundleRebuilt).toHaveBeenCalledTimes(1);
+    expect(retainedActor).toBe(REVIEW_BUNDLE_ACTOR_ID);
+    const expectedByteHash = require('crypto').createHash('sha256').update(retainedBuffer).digest('hex');
+    expect(d.recordReviewBundleRebuilt.mock.calls[0][1]).toMatchObject({ documentId: 'bundle-real', itemId: 'bundle-item', byteHash: expectedByteHash, size: retainedBuffer.length });
+    expect(d.createDocument).toHaveBeenCalledWith(expect.objectContaining({ wmkf_producer: expect.stringContaining('review-bundle') }), expect.objectContaining({
+      actingUserSystemId: REVIEW_BUNDLE_ACTOR_ID,
+      actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.REQUIRED,
+      actorContext: expect.objectContaining({ operation: 'pre-site-distribution-snapshot' }),
+    }));
+    expect(file.buffer).toEqual(retainedBuffer);
+  });
+
   test('serves the pinned bundle when the live review set is unchanged, without any retainReviewBundle call', async () => {
     const d = deps({
       getLatestAttempt: jest.fn(async () => bundleAttemptFixture()),
