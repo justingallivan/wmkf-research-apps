@@ -3,7 +3,7 @@ title: Governed Document Lifecycle Execution Record
 domain: architecture
 kind: plan
 status: active
-summary: All stages 0–8 accepted locally for the document service decomposition; no deployment or live-data changes.
+summary: All stages 0–8 accepted locally for the document service decomposition; the refactor stages made no deployment or live-data changes. A later controlled rehearsal is recorded below.
 owner: product-engineering
 related:
   - docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_DECOMPOSITION_PLAN_2026-09-17.md
@@ -14,8 +14,9 @@ related:
 Authorized locally by the owner on 2026-09-18. Branch:
 `codex/document-lifecycle-decomposition`. Luna implements/reconnoiters/builds;
 Sol reviews with fresh context for each stage; the orchestrator resolves stalls,
-performs final review and owns acceptance. No push, deployment, schema or live-data
-write is authorized. The plan's stages and gates remain binding.
+performs final review and owns acceptance. No push, deployment or schema change is authorized by this record. A separate
+owner-approved controlled rehearsal may exercise explicitly listed disposable
+fixture writes; the plan's stages and gates remain binding.
 
 ## Contract and invariants
 
@@ -472,7 +473,7 @@ All planned stages 0–8 are accepted locally. No migration stage remains to bui
 User-visible behavior is intended to remain unchanged; the benefit is separated
 ownership, smaller service entry points and permanent regression coverage for
 future maintenance. Promotion remains a separate owner-authorized release action
-under the existing campaign release strategy. No production smoke was attempted.
+under the existing campaign release strategy. No complete production smoke was completed. A separately owner-authorized controlled rehearsal was stopped after two Initial Assessment failures; its evidence is recorded below.
 
 No production milestone entry was required: this branch has not shipped. The
 optional claim-evidence pilot report was unavailable because its local state
@@ -523,8 +524,8 @@ remains attached to the original refactor. The added
 `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md` records executable
 local commands and staged operator checks, including the write-capable external
 review-bundle GET. At hardening acceptance, browser/live checks were NOT RUN.
-The subsequent read-only S1 subset is recorded in the smoke runbook; S2–S4
-remain unrun.
+The subsequent read-only S1 subset and the separately recorded incomplete S2
+rehearsal are recorded in the smoke runbook; S3–S4 remain unrun.
 
 Fresh Sol review `01a0b60a-83f7-74b0-a724-eebb7b1ceb1d` returned **READY** after
 one bounded correction round. Its direct analyzer probes confirmed the expanded
@@ -536,3 +537,12 @@ negative/positive fixtures and actual final test outputs. Review-output SHA-256:
 `241bc4c1751aec3e3004c216c2cc38ac27b952cd7fc5f266fd31ec33c9d5aaf0`.
 Checker diff SHA-256 (UTF-8 `git diff --` for the helper and its unit suite against
 `5f069b32`): `3f9d7f8d4ec60ccfbcb8e408868fc4821680bcd7b0478718a8a4e99dfe74fda2`.
+
+
+## Controlled rehearsal attempt — 2026-09-18
+
+[VERIFIED via `/tmp/wmkf-document-rehearsal-before.json`, `/tmp/wmkf-document-rehearsal-after.json`, `/tmp/wmkf-restore-readback.json` and sanitized local logs] The owner-authorized loopback rehearsal used request `1003222 / ZZTEST-03` (`e43ae6ea-698f-f111-8076-6045bd018a07`) and was stopped before any downstream stage. IA generation returned HTTP 500 `claude_output_truncated` (`max_tokens=2200`) for run `7d8b647c-abb3-f111-aaac-000d3a361c1f`; it created one Failed row `ea6e4768-abb3-f111-aaac-6045bd04539e` with no SharePoint item. The request and 24 pre-existing Dataverse Request Document rows were unchanged, and the 13 distribution attempts were unchanged; the SharePoint restore effect is recorded separately below.
+
+The second attempt selected IA version 1.0 from current 2.0. Graph restore succeeded, but the API returned HTTP 500 `initial_assessment_restore_bytes_mismatch` before registry metadata persistence. Final readback shows current version 3.0 stable, historical 1.0/2.0 preserved, and matching governed hashes `gdc1:yGi7ISeqZspD0PwIecM9bbGPZQhn7hJpEV_k6Qgv4Yk`; raw package bytes differ only in custom XML/properties and trash parts, with no Word body-part changes. Registry metadata reconciliation was not confirmed and no rollback was attempted.
+
+The backend and proxy were stopped. The process-only proxy used the reviewed interlock-on target and dated ACK; no environment file was changed. No Pre-Site generation/reopen/start-site-visit, distribution prepare/send, email, Final transition or leadership request ran. The earlier S1 read-only smoke is separate historical evidence and is not upgraded by this attempt. Do not retry until the restore mismatch is diagnosed/fixed and registry metadata is reconciled.
