@@ -123,3 +123,36 @@ using ChatGPT login and sending relevant source/plans to ChatGPT/Codex. Subseque
 reviews use fresh read-only sessions with provider API-key variables removed.
 The first attempt was rejected by automatic approval review pending this explicit
 consent; no fallback review ran before consent.
+
+
+## Stage 2 — accepted (`e4c10355`)
+
+Prior accepted runtime: `8a7060b9` (receipt `b4507f7c`). Fresh Sol prerequisite
+review required a composite exact DTO fixture and complete read-purity assertions.
+Luna added these in test-only commit `de875d68`, with populated Ready/newer Failed/
+Board/superseded records, malformed cleanup and unknown registry values, metadata
+failure/deadline guards, and suite-wide version-history write/AI/folder/upload/delete
+assertions. Two suites / 73 tests passed on the old code; broader pre-move regression
+scope passed 8 suites / 129 tests. Root inspected the actual fixture and assertions.
+
+Moved 14 functions and eight constant/select declarations into the model and reader.
+The original facade retains generation, crypto UUID use, its registered creation seam
+and all ten public names. Controls and routes keep their facade imports; direct
+adapter/Graph test seams remain effective. No persistence or user-flow change.
+
+Fresh read-only Sol session `01a0b536-fe87-7a52-89a8-46298d155488` returned READY.
+It independently verified exact moved declarations, no duplicate definitions or
+static import cycles/back-imports, consumer bindings, and the resolved prerequisites.
+Root checked matching fingerprints, import bindings, complete function/declaration
+comparisons and actual exit logs. Runtime SHA-256:
+
+- Facade: `2256aee106619fadccdaa4e517f9108b6db1f4ad6e372afa90abf8c3485a87b8`
+- Model: `59e236c3e2ee75f65e0dfa7ec82f188ad90f6fa32c3f2bbd0993a01dbc7a554b`
+- Reader: `58202f73d13f323fd5c22d72c284af3e5455299eada3c356c85a2cc1ae5d77a4`
+
+Verification: full 955 suites / 14,078 tests, all 17 gate/self-test pairs sequentially,
+lint (0 errors / 104 existing warnings), types, migrations-manifest, docs-catalog
+and canonical build passed with recorded zero exit codes. Parent's comparison still
+finds all 172 original function bodies and 39 initializers unchanged. No live-system
+operations or deployment. Rollback: revert `e4c10355`; prerequisite tests remain valid.
+Next permitted stage: Stage 3 after T3 prerequisite mapping/additions pass.

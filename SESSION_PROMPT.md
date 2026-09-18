@@ -55,7 +55,10 @@ cron. No code behaviour changed.
    required gates passed; Sol approved and root verified the real-route tests.
    Stage 1 accepted in `8a7060b9` after prerequisite commit `c58237c4`: neutral
    hash leaf, ten consumer imports, unchanged public hash API; 955 suites / 14,076
-   tests and all required checks passed. Next: Stage 2 IA model/read extraction. Receipts:
+   tests and all required checks passed. Stage 2 accepted in `e4c10355` after test
+   prerequisite `de875d68`: IA model/read modules; fresh Sol review and root checks
+   passed, 955 suites / 14,078 tests plus all required checks. Next: Stage 3 IA
+   lineage/upload recovery. Receipts:
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 
