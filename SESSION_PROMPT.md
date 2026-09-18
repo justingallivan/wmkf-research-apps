@@ -91,10 +91,11 @@ cron. No code behaviour changed.
    Fresh Sol acceptance and root final review passed after one bounded correction
    round. A subsequent source-mode read-only smoke on ZZTEST-03 passed signed-in
    IA/version/Pre-Site/history/Final reads and signed-out redirects; S1 is partial.
-   The subsequent read-only S1 subset is recorded separately; the controlled S2 rehearsal is incomplete and S3–S4 remain NOT RUN. No fresh canonical build for this import/test/docs
-   follow-up; prior build evidence remains historical. No push/deploy authorized.
+   The subsequent read-only S1 subset and incomplete S2 rehearsal are recorded separately; bounded service reconciliation completed the restore metadata, while S3–S4 remain NOT RUN. No fresh canonical build for the earlier hardening import/test/docs follow-up; prior build evidence remains historical. The current restore fix has 4 suites / 42 tests plus a successful canonical build recorded in the execution receipt. No push/deploy authorized.
 
-   A separately owner-authorized controlled rehearsal on ZZTEST-03 was stopped after two IA failures. Generation returned HTTP 500 `claude_output_truncated` (run `7d8b647c-abb3-f111-aaac-000d3a361c1f`) and created one Failed row `ea6e4768-abb3-f111-aaac-6045bd04539e`; request state, 24 pre-existing Dataverse Request Document rows and 13 distribution attempts were unchanged; the SharePoint restore effect is recorded separately. Restore selected version 1.0 from current 2.0; Graph produced stable current 3.0 with historical 1.0/2.0 retained and equal governed hashes, but the API returned `initial_assessment_restore_bytes_mismatch` before registry metadata persistence. Readback is `/tmp/wmkf-restore-readback.json`; raw package differences were limited to custom XML/properties/trash parts. No PSV, distribution prepare/send, email, Final or leadership action ran. This is incomplete evidence; the restore mismatch must be diagnosed/fixed and registry metadata reconciled before retry, not treated as a completed smoke.
+   A separately owner-authorized controlled rehearsal on ZZTEST-03 was stopped after two IA failures. Generation returned HTTP 500 `claude_output_truncated` (run `7d8b647c-abb3-f111-aaac-000d3a361c1f`) and created one Failed row `ea6e4768-abb3-f111-aaac-6045bd04539e`; request state, 24 pre-existing Dataverse Request Document rows and 13 distribution attempts were unchanged; the SharePoint restore effect is recorded separately. Restore selected version 1.0 from current 2.0; Graph produced stable current 3.0 with historical 1.0/2.0 retained and equal governed hashes, but the API returned `initial_assessment_restore_bytes_mismatch` before registry metadata persistence. Readback is `/tmp/wmkf-restore-readback.json`; raw package differences were limited to custom XML/properties/trash parts. No PSV, distribution prepare/send, email, Final or leadership action ran. The initial browser restore failure is historical. A bounded PATCH-only service recovery then returned `restored:false`, `reconciled:true` with one registry update and zero Graph restores; independent readback confirmed the existing IA row at version 3.0, preserved history and the same governed hash. The recovery process exited 0. This is not a global database audit, and the browser restore was not rerun; S2 remains incomplete and S3–S4 remain NOT RUN.
+
+   Current next step: Claude-owned token-budget/prompt-version work remains unresolved; no Codex work is authorized on that issue.
 
 ## Next Items
 
@@ -153,7 +154,7 @@ before any live work; this refactor did not re-probe production.
 1. ZZTEST-03 residue: the prior regenerated brief remains locked and previewed (not sent) as the
    current share; the 9:20 AM sent row and shared briefing link remain. The 2026-09-18
    controlled rehearsal stopped after the IA generation/restore failures recorded above;
-   review the Failed row and restore metadata reconciliation before any future smoke.
+   review the Failed row and keep the bounded restore reconciliation evidence with any future smoke.
 2. The #311/#312 conflict resolution (`dcc9c796`) and the fixture fix (`8f8cfc1b`) are
    test-verified but were never Codex-reviewed.
 3. Worktree `../WMKF_Apps-codex` was left clean on `codex/parked` at `6ed14ae9` by S518;

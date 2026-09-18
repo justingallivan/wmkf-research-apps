@@ -121,7 +121,8 @@ run; it is not a claim that every listed case ran. Automated coverage above has
 run. Subsequent browser/external read coverage and the controlled rehearsal are
 recorded below; the earlier read-only record did not include external writes. No
 fresh canonical build was run for this follow-up; the earlier refactor build is
-recorded separately in the execution receipt.
+recorded separately in the execution receipt. The current restore-fix build is
+recorded in the bounded reconciliation section.
 
 ## Recorded read-only smoke — 2026-09-18
 
@@ -160,22 +161,30 @@ census was performed. Direct API tab navigation was blocked by the browser clien
 the signed-in UI requests and server status logs supplied the positive evidence.
 No Workbench/external mutation request appeared in the local HTTP log. This is not
 a database-wide proof of zero incidental authentication/telemetry writes.
-S2 is incomplete after the controlled attempt recorded below; S3–S4 remain NOT RUN.
-No production deployment was changed. Further rehearsal is blocked until the
-restore mismatch is diagnosed/fixed and registry metadata is reconciled.
+S2 remains incomplete because generation failed and was not retried; the restore
+metadata was subsequently reconciled by the bounded service recovery recorded
+below. S3–S4 remain NOT RUN. No production deployment was changed.
 
 ## Controlled rehearsal attempt — 2026-09-18
 
-**STOPPED / INCOMPLETE — two IA write checks failed before downstream stages.** [VERIFIED via the controlled loopback rehearsal logs and Dataverse/Graph readbacks] The owner-approved rehearsal used request **1003222 / ZZTEST-03** (`e43ae6ea-698f-f111-8076-6045bd018a07`) with the sole approved recipient `justingallivan@me.com`. The backend and proxy were stopped after the two failures below. This is a separate run from the earlier S1 read-only subset; it does not turn any prior partial read result into a write or end-to-end pass.
+**STOPPED / INCOMPLETE — two IA write checks failed before downstream stages.** [VERIFIED via the controlled loopback rehearsal logs and Dataverse/Graph readbacks] The owner-approved rehearsal used request **1003222 / ZZTEST-03** (`e43ae6ea-698f-f111-8076-6045bd018a07`) with the sole approved recipient `justingallivan@me.com`. The backend and proxy were stopped after the two failures below. This is a separate run from the earlier S1 read-only subset; it does not turn any prior partial read result into a write or end-to-end pass. The initial restore failure is historical; the later bounded service recovery is recorded immediately after it.
 
 | Attempt | Result | Durable readback |
 |---|---|---|
 | IA generation | HTTP 500; `claude_output_truncated` (`max_tokens=2200`), run `7d8b647c-abb3-f111-aaac-000d3a361c1f`; no SharePoint item/output was persisted | One new Failed IA row `ea6e4768-abb3-f111-aaac-6045bd04539e`; the request remained unchanged; the 24 pre-existing Dataverse Request Document rows were unchanged; distribution attempts remained at 13 |
 | IA restore | Selected historical version 1.0 from current 2.0. Graph restore succeeded, then the API returned HTTP 500 `initial_assessment_restore_bytes_mismatch` before registry metadata persistence | Readback `/tmp/wmkf-restore-readback.json` shows current version 3.0 stable, historical 1.0/2.0 preserved, and equal governed hashes `gdc1:yGi7ISeqZspD0PwIecM9bbGPZQhn7hJpEV_k6Qgv4Yk`; raw package bytes differ only in custom XML, custom properties and trash parts, with no Word body-part changes. Registry metadata reconciliation was not confirmed and no rollback was attempted |
 
-After stopping, the request and its 24 pre-existing Dataverse Request Document rows were unchanged apart from the single new Failed IA row (25 total); the SharePoint restore effect is recorded separately above. No PSV generation/reopen/start-site-visit, distribution prepare/send, Final transition or leadership request ran, and no email was sent. The prior signed-in read-only observations remain historical S1 evidence. The generation truncation and restore metadata mismatch are separate failures; neither is evidence that downstream stages passed.
+After stopping, the request and its 24 pre-existing Dataverse Request Document rows were unchanged apart from the single new Failed IA row (25 total); the SharePoint restore effect is recorded separately above. No PSV generation/reopen/start-site-visit, distribution prepare/send, Final transition or leadership request ran, and no email was sent. The prior signed-in read-only observations remain historical S1 evidence.
 
-The process-only proxy used the reviewed interlock-on target and dated ACK; no environment file was changed. Evidence files: `/tmp/wmkf-document-rehearsal-before.json`, `/tmp/wmkf-document-rehearsal-after.json`, `/tmp/wmkf-restore-readback.json`, and the corresponding sanitized rehearsal/backend/proxy logs. Do not retry or continue the fixture until the restore mismatch is diagnosed/fixed and registry metadata is reconciled.
+The process-only proxy used the reviewed interlock-on target and dated ACK; no environment file was changed. Evidence files: `/tmp/wmkf-document-rehearsal-before.json`, `/tmp/wmkf-document-rehearsal-after.json`, `/tmp/wmkf-restore-readback.json`, and the corresponding sanitized rehearsal/backend/proxy logs.
+
+## Bounded restore reconciliation — 2026-09-18
+
+**PASS — service recovery only; no new browser restore.** [VERIFIED via `/tmp/wmkf-ia-restore-reconcile-applied.json`, `/tmp/wmkf-restore-registry-before.json`, `/tmp/wmkf-restore-registry-after.json`, `/tmp/wmkf-restore-reconciled-graph.json` and process logs] Root invoked the public restore service with the original request/artifact/target payload under a five-minute PATCH-only grant. The wrapper prohibited Graph restore calls and allowed one exact update for artifact `a6876ad6-3b94-f111-8075-70a8a59cded0`.
+
+The service returned `restored:false`, `reconciled:true`, `targetVersionId:1.0`; it made one registry update and zero Graph restore calls. The independent comparison found the request projection unchanged, 25 Request Document rows before and after, only the existing IA row’s captured version/etag/modified time changed, all other 24 captured rows unchanged, and all 13 distribution attempts unchanged. Graph readback at 22:23:44Z confirmed the same item, stable current version 3.0, preserved 3.0/2.0/1.0 history, and the same governed hash as version 1.0.
+
+The recovery process and wrapper exited 0. Limits: this was not a global database audit, and the browser restore was not rerun after the service fix. S2 therefore remains incomplete; S3–S4 remain NOT RUN.
 
 ## Smoke cases and evidence
 
@@ -188,7 +197,7 @@ Unexercised portions retain `NOT RUN — live`; partial results refer to the rec
 | IA-1 generation | `pages/api/workbench/initial-assessment.js` POST; `shared/components/workbench/InitialAssessmentTab.js` | Valid request returns Ready artifact, stable SharePoint identity, registry lineage, and UI Word/SharePoint action. | `MOCKED SUITES PASS` | `FAILED — controlled rehearsal HTTP 500; no SharePoint item; no retry` |
 | IA-2 exact retry | Same POST and `lib/services/initial-assessment/artifact-service.js` retry path | Repeating the same request reuses the generation/registry identity and does not call AI, upload, or create a second row. Capture row identity, generation key, call counts, and response. | `MOCKED SUITES PASS` | `NOT RUN — stopped after IA-1 failure` |
 | IA-3 read/status | `pages/api/workbench/initial-assessment.js` GET with `requestId` or `cycleCode`; Initial Assessment tab | Current Ready/Board Ready projections are returned with response-only metadata refresh; malformed/unknown rows fail closed and no write spy fires. | `MOCKED SUITES PASS; operator case NOT RUN` | `PARTIAL — read subset above; remaining checks NOT RUN` |
-| IA-4 versions/restore | `pages/api/workbench/initial-assessment/versions.js`, `restore-version.js`, `board-snapshot.js`; `tests/unit/initial-assessment-artifact-versions.test.js` | Version list, selected-version restore, and Board snapshot preserve stable identity, conditional writes, actor policy, and cleanup ownership. | `MOCKED SUITES PASS` | `FAILED/UNRECONCILED — restore reached Graph but API rejected byte comparison before registry persistence; Board snapshot not run` |
+| IA-4 versions/restore | `pages/api/workbench/initial-assessment/versions.js`, `restore-version.js`, `board-snapshot.js`; `tests/unit/initial-assessment-artifact-versions.test.js` | Version list, selected-version restore, and Board snapshot preserve stable identity, conditional writes, actor policy, and cleanup ownership. | `MOCKED SUITES PASS` | `PARTIAL — initial browser restore failed historically; bounded service recovery reconciled metadata; browser restore was not rerun and Board snapshot was not run` |
 | PSV-1 generation/status | `pages/api/workbench/pre-site-visit.js`; Staff Deliberations tab | POST generates/reuses the governed Pre-Site row; GET returns current and newer pending status; UI exposes the correct Word action. | `MOCKED SUITES PASS` | `PARTIAL — prior S1 read only; write case NOT RUN after IA stop` |
 | PSV-2 stale correction | `pages/api/workbench/pre-site-visit/reopen.js`; reopen service and route suite | Stale/current pointer or correction-cycle input is rejected or creates the approved successor; old row remains evidence and a retry does not create a duplicate. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
 | DIST-1 current brief prepare | `pages/api/workbench/pre-site-visit/distribution/prepare.js`; `PreSiteDistributionPanel.js` | Current **`attachmentMode: none`** prepare is the supported happy path: server-owned retained snapshot/review-bundle identities, received-review requirement, input fingerprint, and preview hash are returned. Assert no writes on failed read/drift gates and exact DTOs on success. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |

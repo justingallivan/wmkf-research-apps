@@ -519,13 +519,14 @@ and changed test helper/suite. Full lint passed (0 errors / 104 existing warning
 as did types, the nine-seam Request Document writer gate/self-test, applicable
 sequential document gate/self-test pairs, docs-catalog and agent invariants.
 Baseline comparison still matches all 172 function bodies and 39 initializers.
-No fresh canonical build was run for this follow-up; prior build evidence above
-remains attached to the original refactor. The added
+No fresh canonical build was run for the earlier hardening follow-up; prior build
+evidence above remains attached to the original refactor. The current restore fix
+build is recorded in the later reconciliation section. The added
 `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md` records executable
 local commands and staged operator checks, including the write-capable external
 review-bundle GET. At hardening acceptance, browser/live checks were NOT RUN.
-The subsequent read-only S1 subset and the separately recorded incomplete S2
-rehearsal are recorded in the smoke runbook; S3–S4 remain unrun.
+The subsequent read-only S1 subset, incomplete S2 rehearsal and bounded S2
+service reconciliation are recorded in the smoke runbook; S3–S4 remain unrun.
 
 Fresh Sol review `01a0b60a-83f7-74b0-a724-eebb7b1ceb1d` returned **READY** after
 one bounded correction round. Its direct analyzer probes confirmed the expanded
@@ -545,4 +546,13 @@ Checker diff SHA-256 (UTF-8 `git diff --` for the helper and its unit suite agai
 
 The second attempt selected IA version 1.0 from current 2.0. Graph restore succeeded, but the API returned HTTP 500 `initial_assessment_restore_bytes_mismatch` before registry metadata persistence. Final readback shows current version 3.0 stable, historical 1.0/2.0 preserved, and matching governed hashes `gdc1:yGi7ISeqZspD0PwIecM9bbGPZQhn7hJpEV_k6Qgv4Yk`; raw package bytes differ only in custom XML/properties and trash parts, with no Word body-part changes. Registry metadata reconciliation was not confirmed and no rollback was attempted.
 
-The backend and proxy were stopped. The process-only proxy used the reviewed interlock-on target and dated ACK; no environment file was changed. No Pre-Site generation/reopen/start-site-visit, distribution prepare/send, email, Final transition or leadership request ran. The earlier S1 read-only smoke is separate historical evidence and is not upgraded by this attempt. Do not retry until the restore mismatch is diagnosed/fixed and registry metadata is reconciled.
+The backend and proxy were stopped. The process-only proxy used the reviewed interlock-on target and dated ACK; no environment file was changed. No Pre-Site generation/reopen/start-site-visit, distribution prepare/send, email, Final transition or leadership request ran. The earlier S1 read-only smoke is separate historical evidence and is not upgraded by this attempt. No retry was attempted during this stopped run; the later bounded reconciliation below resolved the registry metadata.
+
+
+## Restore reconciliation — 2026-09-18
+
+[VERIFIED via `/tmp/wmkf-ia-restore-reconcile-applied.json`, `/tmp/wmkf-restore-registry-before.json`, `/tmp/wmkf-restore-registry-after.json`, `/tmp/wmkf-restore-reconciled-graph.json` and process logs] After the initial browser restore mismatch, root invoked the public restore service with the original payload under a five-minute PATCH-only grant. The wrapper prohibited Graph restore and allowed one exact update for artifact `a6876ad6-3b94-f111-8075-70a8a59cded0`. The service returned `restored:false`, `reconciled:true`, target `1.0`, with one registry update and zero Graph restore calls.
+
+Independent readback showed the request projection unchanged, 25 Request Document rows before and after, only the existing IA row's captured version/etag/modified time changed, the other 24 captured rows unchanged, and all 13 distribution attempts unchanged. Graph readback at 22:23:44Z confirmed the same item, stable current version 3.0, preserved 3.0/2.0/1.0 history and the same governed hash as version 1.0. The recovery process and wrapper exited 0. Sol returned READY and root accepted the bounded recovery. This is not a global database audit, and the browser restore was not rerun after the service fix; S2 remains incomplete and S3–S4 remain unrun.
+
+[VERIFIED via local outputs] Restore-focused validation after the fix: 4 suites / 42 tests passed, including controls, governed-hash and restore-route coverage; strict scoped lint, request-document writer gate/self-test, Dataverse access gate/self-test, types and canonical build passed. Logs are `/tmp/wmkf-restore-fix-integration-tests.log`, `/tmp/wmkf-restore-fix-lint-final.log`, `/tmp/wmkf-restore-fix-writer-gate.log`, `/tmp/wmkf-restore-fix-writer-self-test.log`, `/tmp/wmkf-restore-fix-dataverse-gate.log`, `/tmp/wmkf-restore-fix-dataverse-self-test.log`, `/tmp/wmkf-restore-fix-types.log` and `/tmp/wmkf-restore-fix-build.log`; all recorded exit files are 0.

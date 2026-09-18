@@ -11,6 +11,9 @@ import {
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument.js';
+import JSZip from 'jszip';
+import { hashGovernedDocxContent } from '../../lib/services/documents/governed-docx-hash.js';
+import { renderIndividualReviewDocx } from '../../lib/services/review-documents/docx-renderer.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const SOURCE_ID = '22222222-2222-4222-8222-222222222222';
@@ -63,6 +66,36 @@ function retainedMetadata(overrides = {}) {
     versionId: '1.0',
     ...overrides,
   });
+}
+
+function reviewFixture(answer = 'Strong work.') {
+  return {
+    header: {
+      reviewerName: 'Dr. Reviewer',
+      reviewerTitleAndOrganization: 'Professor, University One',
+      requestNumber: '1002903',
+      requestTitle: 'A Proposal',
+      institution: 'University Two',
+      submittedAt: '2026-09-02T17:30:00.000Z',
+      generatedAtIso: '2026-09-03T18:00:00.000Z',
+    },
+    sections: [{
+      questionKey: 'approach',
+      questionOrder: 1,
+      questionText: 'Comment on the approach.',
+      questionType: 'richtext',
+      state: 'answered',
+      answerLabel: null,
+      blocks: [{ type: 'paragraph', runs: [{ text: answer }] }],
+    }],
+  };
+}
+
+async function repackWithContainerDate(buffer, date) {
+  const zip = await JSZip.loadAsync(buffer);
+  const appProperties = zip.file('docProps/app.xml');
+  zip.file('docProps/app.xml', await appProperties.async('nodebuffer'), { date });
+  return zip.generateAsync({ type: 'nodebuffer' });
 }
 
 function harness() {
@@ -179,7 +212,7 @@ it('refuses a stale restore when current bytes do not match the selected target'
   expect(h.dependencies.updateDocument).not.toHaveBeenCalled();
 });
 
-it('refuses a stale restore when normalized hashes match but exact bytes differ', async () => {
+it('reconciles a stale restore when governed hashes match but exact bytes differ', async () => {
   const h = harness();
   h.dependencies.hashDocx.mockResolvedValue('same-governed-hash');
   h.dependencies.getFileMetadataById.mockResolvedValue(metadata({ versionId: '3.0' }));
@@ -187,19 +220,22 @@ it('refuses a stale restore when normalized hashes match but exact bytes differ'
   h.dependencies.downloadFileVersion.mockResolvedValue(Buffer.from('selected-version-bytes'));
   h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('different-current-bytes') });
 
-  await expect(restoreInitialAssessmentVersion({
+  const result = await restoreInitialAssessmentVersion({
     requestId: REQUEST_ID,
     expectedArtifactId: SOURCE_ID,
     targetVersionId: '1.0',
     expectedCurrentVersionId: '2.0',
-  }, { dependencies: h.dependencies })).rejects.toMatchObject({
-    body: expect.objectContaining({ code: 'initial_assessment_restore_stale' }),
-  });
+  }, { dependencies: h.dependencies });
+  expect(result).toMatchObject({ restored: false, reconciled: true, targetVersionId: '1.0' });
   expect(h.dependencies.restoreFileVersion).not.toHaveBeenCalled();
-  expect(h.dependencies.updateDocument).not.toHaveBeenCalled();
+  expect(h.dependencies.updateDocument).toHaveBeenCalledWith(
+    SOURCE_ID,
+    expect.objectContaining({ wmkf_contenthash: 'same-governed-hash' }),
+    expect.objectContaining({ ifMatch: 'source-etag-1' }),
+  );
 });
 
-it('fails restore readback when normalized hashes match but exact restored bytes differ', async () => {
+it('accepts restore readback when governed hashes match but exact restored bytes differ', async () => {
   const h = harness();
   const before = metadata();
   h.dependencies.hashDocx.mockResolvedValue('same-governed-hash');
@@ -210,6 +246,118 @@ it('fails restore readback when normalized hashes match but exact restored bytes
   h.dependencies.getFileVersionMetadata.mockResolvedValue({ versionId: '1.0' });
   h.dependencies.downloadFileVersion.mockResolvedValue(Buffer.from('selected-version-bytes'));
   h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('different-restored-bytes') });
+
+  const result = await restoreInitialAssessmentVersion({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    targetVersionId: '1.0',
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies });
+  expect(result).toMatchObject({ restored: true, targetVersionId: '1.0' });
+  expect(h.dependencies.restoreFileVersion).toHaveBeenCalledTimes(1);
+  expect(h.dependencies.updateDocument).toHaveBeenCalledWith(
+    SOURCE_ID,
+    expect.objectContaining({ wmkf_contenthash: 'same-governed-hash' }),
+    expect.objectContaining({ ifMatch: 'source-etag-1' }),
+  );
+});
+
+it('accepts a real DOCX repackaging with the same governed content after restore', async () => {
+  const h = harness();
+  const targetBytes = await renderIndividualReviewDocx(reviewFixture());
+  const repackagedBytes = await repackWithContainerDate(
+    targetBytes,
+    new Date('2026-09-03T18:02:00.000Z'),
+  );
+  const before = metadata();
+  h.dependencies.hashDocx.mockImplementation(hashGovernedDocxContent);
+  h.dependencies.getFileMetadataById
+    .mockResolvedValueOnce(before)
+    .mockResolvedValueOnce(before)
+    .mockResolvedValueOnce(metadata({ versionId: '3.0', eTag: 'graph-etag-3' }));
+  h.dependencies.getFileVersionMetadata.mockResolvedValue({ versionId: '1.0' });
+  h.dependencies.downloadFileVersion.mockResolvedValue(targetBytes);
+  h.dependencies.downloadFile.mockResolvedValue({ buffer: repackagedBytes });
+
+  const result = await restoreInitialAssessmentVersion({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    targetVersionId: '1.0',
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies });
+
+  expect(targetBytes.equals(repackagedBytes)).toBe(false);
+  expect(result).toMatchObject({ restored: true, targetVersionId: '1.0' });
+  expect(h.dependencies.updateDocument).toHaveBeenCalledWith(
+    SOURCE_ID,
+    expect.objectContaining({
+      wmkf_contenthash: await hashGovernedDocxContent(targetBytes),
+    }),
+    expect.objectContaining({ ifMatch: 'source-etag-1' }),
+  );
+});
+
+it('rejects an invalid historical DOCX before restore or registry update', async () => {
+  const h = harness();
+  h.dependencies.hashDocx.mockImplementation(hashGovernedDocxContent);
+  h.dependencies.getFileVersionMetadata.mockResolvedValue({ versionId: '1.0' });
+  h.dependencies.downloadFileVersion.mockResolvedValue(Buffer.from('not-a-docx'));
+
+  await expect(restoreInitialAssessmentVersion({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    targetVersionId: '1.0',
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies })).rejects.toThrow();
+  expect(h.dependencies.restoreFileVersion).not.toHaveBeenCalled();
+  expect(h.dependencies.updateDocument).not.toHaveBeenCalled();
+});
+
+it('reconciles real repackaged DOCX on stale expected-current recovery without restoring twice', async () => {
+  const h = harness();
+  const targetBytes = await renderIndividualReviewDocx(reviewFixture());
+  const repackagedBytes = await repackWithContainerDate(
+    targetBytes,
+    new Date('2026-09-03T18:04:00.000Z'),
+  );
+  h.dependencies.hashDocx.mockImplementation(hashGovernedDocxContent);
+  h.dependencies.getFileMetadataById.mockResolvedValue(metadata({ versionId: '3.0' }));
+  h.dependencies.getFileVersionMetadata.mockResolvedValue({ versionId: '1.0' });
+  h.dependencies.downloadFileVersion.mockResolvedValue(targetBytes);
+  h.dependencies.downloadFile.mockResolvedValue({ buffer: repackagedBytes });
+
+  const result = await restoreInitialAssessmentVersion({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    targetVersionId: '1.0',
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies });
+
+  expect(targetBytes.equals(repackagedBytes)).toBe(false);
+  expect(result).toMatchObject({ restored: false, reconciled: true, targetVersionId: '1.0' });
+  expect(h.dependencies.restoreFileVersion).not.toHaveBeenCalled();
+  expect(h.dependencies.updateDocument).toHaveBeenCalledWith(
+    SOURCE_ID,
+    expect.objectContaining({
+      wmkf_contenthash: await hashGovernedDocxContent(targetBytes),
+    }),
+    expect.objectContaining({ ifMatch: 'source-etag-1' }),
+  );
+});
+
+it('rejects restore readback when governed DOCX content differs', async () => {
+  const h = harness();
+  const targetBytes = await renderIndividualReviewDocx(reviewFixture('Strong work.'));
+  const differentBytes = await renderIndividualReviewDocx(reviewFixture('Different work.'));
+  const before = metadata();
+  h.dependencies.hashDocx.mockImplementation(hashGovernedDocxContent);
+  h.dependencies.getFileMetadataById
+    .mockResolvedValueOnce(before)
+    .mockResolvedValueOnce(before)
+    .mockResolvedValueOnce(metadata({ versionId: '3.0', eTag: 'graph-etag-3' }));
+  h.dependencies.getFileVersionMetadata.mockResolvedValue({ versionId: '1.0' });
+  h.dependencies.downloadFileVersion.mockResolvedValue(targetBytes);
+  h.dependencies.downloadFile.mockResolvedValue({ buffer: differentBytes });
 
   await expect(restoreInitialAssessmentVersion({
     requestId: REQUEST_ID,
