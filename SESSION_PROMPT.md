@@ -80,6 +80,18 @@ cron. No code behaviour changed.
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 
+3. **Post-review hardening (2026-09-18).** Claude reviewed `5f069b32` as READY
+   with three low findings. Removed four unused imports, corrected the facade/leaf
+   export receipt wording, and extended boundary mutation tests for cross-domain
+   imports, adapter aliases, optional/call/apply writes and hash-consumer ownership.
+   [VERIFIED via local commands] Core smoke: 18 suites / 478 tests; auth routes:
+   9 suites / 64 tests; full Jest: 958 suites / 14,174 tests. Lint/types pass.
+   Operator smoke stages, fixtures, evidence and stop criteria are in
+   `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md`.
+   Fresh Sol acceptance and root final review passed after one bounded correction
+   round. Live smoke remains NOT RUN. No fresh canonical build for this import/test/docs
+   follow-up; prior build evidence remains historical. No push/deploy authorized.
+
 ## Next Items
 
 **Local refactor release boundary:** all stages are committed on

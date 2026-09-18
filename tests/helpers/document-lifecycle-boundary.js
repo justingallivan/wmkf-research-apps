@@ -16,7 +16,20 @@ const FACADES = [
   'lib/services/final-writeup/transition-service.js',
 ];
 const HASH = 'lib/services/documents/governed-docx-hash.js';
+const DISTRIBUTION_SHARED_LEAVES = new Set([
+  'lib/services/pre-site-visit/review-bundle-service.js',
+  'lib/services/pre-site-visit/distribution-store.js',
+]);
 const AGENDA = 'lib/services/meeting-tracker/agenda-service.js';
+const HASH_CONSUMERS = [
+  'review-documents/individual-file-service.js', 'deliberation-briefing/briefing-page-service.js',
+  'pre-site-visit/site-visit-transition-service.js', 'pre-site-visit/reopen-service.js',
+  'pre-site-visit/distribution/dependencies.js', 'pre-site-visit/artifact-dependencies.js',
+  'pre-rp-brief/share-lock-service.js', 'pre-rp-brief/artifact-service.js',
+  'final-writeup/transition-dependencies.js', 'initial-assessment/artifact-service.js',
+  'initial-assessment/artifact-upload-recovery.js', 'initial-assessment/controls-service.js',
+].map((file) => `lib/services/${file}`);
+const ADAPTER = 'lib/dataverse/adapters/request-document.js';
 const COMPOSITION = 'lib/services/pre-site-visit/distribution/composition.js';
 const WRITERS = [FACADES[0], 'lib/services/initial-assessment/controls-service.js',
   FACADES[1], 'lib/services/pre-site-visit/reopen-service.js',
@@ -32,6 +45,12 @@ const isInternal = (file) => (
   || file.startsWith('lib/services/pre-site-visit/distribution/')
   || /^lib\/services\/final-writeup\/transition-(model|dependencies|state|claims)\.js$/.test(file)
 );
+const domainOf = (file) => {
+  if (file?.startsWith('lib/services/pre-site-visit/distribution/')) return 'distribution';
+  return DOMAIN_DIRS.find((dir) => file?.startsWith(dir)) || null;
+};
+const isMember = (node) => ['MemberExpression', 'OptionalMemberExpression'].includes(node?.type);
+const isCall = (node) => ['CallExpression', 'OptionalCallExpression'].includes(node?.type);
 const literal = (node) => node?.type === 'StringLiteral' ? node.value : null;
 const memberName = (node) => node?.computed ? literal(node.property) : node?.property?.name;
 function walk(node, visit) {
@@ -90,6 +109,7 @@ function loadSources(root) {
   }
   DOMAIN_DIRS.forEach((dir) => collect(dir.slice(0, -1)));
   load(AGENDA);
+  HASH_CONSUMERS.forEach(load);
   return sources;
 }
 function analyzeSources(sources) {
@@ -97,8 +117,8 @@ function analyzeSources(sources) {
   const asts = new Map();
   const graph = new Map();
   const resolve = (file, spec) => candidates(file, spec).find((name) => sources.has(name));
-  const roots = [...sources.keys()].filter((file) => isScoped(file) || file === AGENDA);
-  for (const file of [...FACADES, HASH, AGENDA, COMPOSITION, ...WRITERS, ...BINDINGS]) {
+  const roots = [...sources.keys()].filter((file) => isScoped(file) || file === AGENDA || HASH_CONSUMERS.includes(file));
+  for (const file of [...FACADES, HASH, AGENDA, COMPOSITION, ...WRITERS, ...BINDINGS, ...HASH_CONSUMERS]) {
     if (!sources.has(file)) errors.push(`missing required module: ${file}`);
   }
   for (const [file, source] of sources) {
@@ -112,8 +132,41 @@ function analyzeSources(sources) {
       if (roots.includes(file) && edge.spec == null) errors.push(`nonliteral dependency: ${file}`);
       if (edge.spec?.startsWith('.') && !edge.target) errors.push(`unresolved dependency: ${file} -> ${edge.spec}`);
       if (isInternal(file) && FACADES.includes(edge.target)) errors.push(`internal facade dependency: ${file} -> ${edge.target}`);
+      // Internal lifecycle modules may share neutral leaves, but cannot reach
+      // another lifecycle domain's implementation service. Keep this broader
+      // than the extracted-module list so an unclassified sibling cannot become
+      // an escape hatch for the boundary check.
+      const sharedDistributionLeaf = domainOf(file) === 'distribution'
+        && DISTRIBUTION_SHARED_LEAVES.has(edge.target);
+      if (isInternal(file) && isScoped(edge.target || '') && edge.target !== HASH
+        && !sharedDistributionLeaf
+        && domainOf(file) !== domainOf(edge.target)) {
+        errors.push(`cross-domain internal dependency: ${file} -> ${edge.target}`);
+      }
       if (file === HASH && !['crypto', 'node:crypto', 'jszip'].includes(edge.spec)) errors.push(`hash dependency: ${edge.spec}`);
       if (file === AGENDA && edge.target === FACADES[2]) errors.push('agenda imports distribution facade');
+    }
+  }
+  for (const file of HASH_CONSUMERS) {
+    const edges = graph.get(file) || [];
+    if (!edges.some((edge) => edge.target === HASH)) errors.push(`hash consumer must import neutral leaf: ${file}`);
+    for (const edge of edges) {
+      if (edge.target !== FACADES[0]) continue;
+      const hashNamed = (edge.node.specifiers || []).some((specifier) => (
+        (specifier.imported || specifier.local)?.name === 'hashGovernedDocxContent'
+      ));
+      const namespaces = (edge.node.specifiers || [])
+        .filter((specifier) => specifier.type === 'ImportNamespaceSpecifier')
+        .map((specifier) => specifier.local.name);
+      const hashMember = namespaces.some((name) => {
+        let found = false;
+        walk(asts.get(file), (node) => {
+          if (isMember(node) && node.object?.type === 'Identifier'
+            && node.object.name === name && memberName(node) === 'hashGovernedDocxContent') found = true;
+        });
+        return found;
+      });
+      if (hashNamed || hashMember) errors.push(`hash consumer imports hash from IA facade: ${file}`);
     }
   }
   if (!(graph.get(AGENDA) || []).some((edge) => edge.target === COMPOSITION)) errors.push('agenda must import composition');
@@ -182,13 +235,25 @@ function analyzeSources(sources) {
   const bindingCounts = new Map();
   for (const file of roots.filter(isScoped)) {
     let writes = 0; let bindings = 0;
+    // Resolve namespace imports by their actual adapter source, never by local
+    // spelling alone; unrelated namespaces may use the same identifier.
+    const adapterNames = new Set();
+    for (const edge of graph.get(file) || []) {
+      if (edge.target !== ADAPTER || edge.node.type !== 'ImportDeclaration') continue;
+      for (const specifier of edge.node.specifiers) {
+        if (specifier.type === 'ImportNamespaceSpecifier') adapterNames.add(specifier.local.name);
+      }
+    }
+    const adapterCreate = (node) => isMember(node)
+      && adapterNames.has(node.object?.name) && memberName(node) === 'create';
+    const documentWriter = (node) => isMember(node)
+      && (memberName(node) === 'createDocument' || adapterCreate(node));
     walk(asts.get(file), (node) => {
-      const isAdapterCreate = node.type === 'MemberExpression'
-        && node.object.name === 'requestDocumentAdapter' && memberName(node) === 'create';
-      if (isAdapterCreate) bindings += 1;
-      if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression'
-        && (memberName(node.callee) === 'createDocument'
-          || (node.callee.object.name === 'requestDocumentAdapter' && memberName(node.callee) === 'create'))) writes += 1;
+      if (adapterCreate(node)) bindings += 1;
+      if (!isCall(node)) return;
+      if (documentWriter(node.callee)
+        || (isMember(node.callee) && ['call', 'apply'].includes(memberName(node.callee))
+          && documentWriter(node.callee.object))) writes += 1;
     });
     if (writes) writerCounts.set(file, writes);
     if (bindings) bindingCounts.set(file, bindings);
@@ -197,4 +262,4 @@ function analyzeSources(sources) {
   }
   return { errors, writerCounts: Object.fromEntries(writerCounts), bindingCounts: Object.fromEntries(bindingCounts), modules: roots.length };
 }
-module.exports = { analyzeSources, loadSources, FACADES, HASH, AGENDA, COMPOSITION, WRITERS, BINDINGS };
+module.exports = { analyzeSources, loadSources, FACADES, HASH, AGENDA, COMPOSITION, WRITERS, BINDINGS, HASH_CONSUMERS };

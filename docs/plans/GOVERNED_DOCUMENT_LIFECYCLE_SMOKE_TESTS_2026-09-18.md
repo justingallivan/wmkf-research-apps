@@ -1,0 +1,360 @@
+---
+title: Governed Document Lifecycle Smoke Tests
+domain: operations
+kind: runbook
+status: active
+summary: Local, mocked, sandbox, and controlled read-only smoke coverage for the governed document lifecycle. No production writes or sends are authorized by this document.
+owner: product-engineering
+related:
+  - docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_DECOMPOSITION_PLAN_2026-09-17.md
+  - docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md
+  - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
+  - docs/API_ROUTE_SECURITY_MATRIX.md
+---
+
+# Governed Document Lifecycle Smoke Tests
+
+This runbook defines the evidence required to smoke the Initial Assessment,
+Pre-Site, distribution, and Final Writeup flows after the staged decomposition.
+It separates repeatable local automation from sandbox integration and controlled
+read-only checks. It does not authorize a deployment, production write, email,
+SharePoint upload, Blob operation, or Dataverse action.
+
+The source and route pointers below are **[VERIFIED via repository source and
+tests on 2026-09-18]**. Live deployment state, fixture readiness, and external
+record identities are **[UNKNOWN until the owner records a run]**. Every live
+case therefore remains `NOT RUN — live` in this document.
+
+## Preconditions and release controls
+
+Run local automation in Mode A from `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`.
+Use a sandbox only after its schema, permissions, policy/configuration rows,
+authentication, file behavior, background behavior, and email capture mode have
+been re-probed. A preview/local process pointed at production may read only when
+`DATAVERSE_ALLOW_PROD_READS=yes`; its writes remain denied by the target
+interlock. Any controlled production rehearsal requires a separately approved
+test request, throwaway records, allowlisted recipients, an explicit expected
+write list, capture mode unless real delivery is the named objective, and
+post-run reconciliation.
+
+Before a sandbox or controlled rehearsal, the operator must record:
+
+- deployment class and Dataverse target classification;
+- the approved request/document/operation IDs and actor identity;
+- schema/readiness and SharePoint folder prerequisites;
+- an approved recipient address or email-capture sink;
+- cleanup ownership for every row, file, activity, attachment, and ledger entry;
+- the rollback/cleanup result, including any unresolved recovery work.
+
+No fixture IDs are embedded here. A run is blocked until the operator has named
+real approved fixtures and verified their preconditions from the relevant read
+routes. Do not use an ordinary staff request, real reviewer, or unapproved
+recipient as a smoke fixture.
+
+Smoke stages are separated as follows: **S1** read-only status/history/version
+checks with an explicit read allowlist; **S2** approved generation/retry checks;
+**S3** current-Brief prepare and any approved capture/send rehearsal; and
+**S4** Final same-item/leadership checks. S2–S4 require the fixture and write
+inventory below before starting. A related mocked Jest suite passing is evidence
+for local behavior only; it is not evidence that the corresponding browser,
+Dataverse, SharePoint, Postgres, Dynamics, or UI case ran.
+
+## Exact local commands
+
+These commands use existing repository paths. They are the repeatable baseline
+and do not contact external services when the tests' mocks are left in place.
+
+```sh
+npx jest --runInBand --silent \
+  tests/unit/initial-assessment-artifact-service.test.js \
+  tests/unit/initial-assessment-artifact-versions.test.js \
+  tests/unit/initial-assessment-controls-service.test.js \
+  tests/unit/review-docx-governed-hash.test.js \
+  tests/unit/pre-site-visit-artifact-service.test.js \
+  tests/unit/pre-site-visit-reopen-service.test.js \
+  tests/unit/pre-site-distribution-service.test.js \
+  tests/unit/pre-site-distribution-store.test.js \
+  tests/unit/deliberation-briefing-page-service.test.js \
+  tests/unit/workbench-pre-site-visit-distribution-prepare-route.test.js \
+  tests/unit/workbench-pre-site-visit-distribution-send-route.test.js \
+  tests/unit/workbench-pre-site-visit-distribution-history-route.test.js \
+  tests/unit/final-writeup-transition-service.test.js \
+  tests/unit/final-writeup-leadership-transition-service.test.js \
+  tests/unit/workbench-final-writeup-route.test.js \
+  tests/unit/workbench-final-writeup-leadership-review-route.test.js \
+  tests/unit/document-lifecycle-boundary.test.js \
+  tests/unit/document-lifecycle-public-contract.test.js
+```
+
+The route-security negative coverage remains in the named route suites. Run the
+focused auth/route contract set separately when changing route guards:
+
+```sh
+npx jest --runInBand --silent \
+  tests/unit/workbench-initial-assessment-route.test.js \
+  tests/unit/workbench-initial-assessment-versions-route.test.js \
+  tests/unit/workbench-pre-site-visit-route.test.js \
+  tests/unit/workbench-pre-site-visit-distribution-prepare-route.test.js \
+  tests/unit/workbench-pre-site-visit-distribution-send-route.test.js \
+  tests/unit/workbench-pre-site-visit-distribution-history-route.test.js \
+  tests/unit/workbench-final-writeup-route.test.js \
+  tests/unit/workbench-final-writeup-leadership-review-route.test.js \
+  tests/unit/external-briefing-routes.test.js
+```
+
+## Recorded local verification — 2026-09-18
+
+[VERIFIED via local Jest, ESLint and TypeScript command outputs] The core command
+above passed **18 suites / 478 tests**; the auth/route command passed **9 suites /
+64 tests**. Full Jest passed **958 suites / 14,174 tests**. Full lint passed with
+0 errors and 104 existing warnings; types and strict unused-import lint passed.
+The checker/public-contract subset passed 62 tests, including the new mutation
+fixtures. Logs: `/tmp/wmkf-smoke-final2-core.log`,
+`/tmp/wmkf-smoke-auth-final.log`, `/tmp/wmkf-smoke-final2-full.log`,
+`/tmp/wmkf-smoke-full-lint.log`, and `/tmp/wmkf-smoke-full-types.log`.
+These local logs are transient; this paragraph preserves their results.
+
+The case table below is an operator evidence template, not a claim that a new
+manual fixture run occurred. Automated coverage above has run; browser and
+external-system checks have not. No fresh canonical build was run for this
+follow-up; the earlier refactor build is recorded separately in the execution
+receipt.
+
+## Smoke cases and evidence
+
+Each row is a separate run record. The operator fills in the run timestamp,
+fixture IDs, deployment/target mode, command or URL, result, and evidence links.
+Until then, the status is explicitly `NOT RUN — live`.
+
+| Case | Source entry point and consumer | Required proof | Local status | Live status |
+|---|---|---|---|---|
+| IA-1 generation | `pages/api/workbench/initial-assessment.js` POST; `shared/components/workbench/InitialAssessmentTab.js` | Valid request returns Ready artifact, stable SharePoint identity, registry lineage, and UI Word/SharePoint action. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| IA-2 exact retry | Same POST and `lib/services/initial-assessment/artifact-service.js` retry path | Repeating the same request reuses the generation/registry identity and does not call AI, upload, or create a second row. Capture row identity, generation key, call counts, and response. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| IA-3 read/status | `pages/api/workbench/initial-assessment.js` GET with `requestId` or `cycleCode`; Initial Assessment tab | Current Ready/Board Ready projections are returned with response-only metadata refresh; malformed/unknown rows fail closed and no write spy fires. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| IA-4 versions/restore | `pages/api/workbench/initial-assessment/versions.js`, `restore-version.js`, `board-snapshot.js`; `tests/unit/initial-assessment-artifact-versions.test.js` | Version list, selected-version restore, and Board snapshot preserve stable identity, conditional writes, actor policy, and cleanup ownership. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| PSV-1 generation/status | `pages/api/workbench/pre-site-visit.js`; Staff Deliberations tab | POST generates/reuses the governed Pre-Site row; GET returns current and newer pending status; UI exposes the correct Word action. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| PSV-2 stale correction | `pages/api/workbench/pre-site-visit/reopen.js`; reopen service and route suite | Stale/current pointer or correction-cycle input is rejected or creates the approved successor; old row remains evidence and a retry does not create a duplicate. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| DIST-1 current brief prepare | `pages/api/workbench/pre-site-visit/distribution/prepare.js`; `PreSiteDistributionPanel.js` | Current **`attachmentMode: none`** prepare is the supported happy path: server-owned retained snapshot/review-bundle identities, received-review requirement, input fingerprint, and preview hash are returned. Assert no writes on failed read/drift gates and exact DTOs on success. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| DIST-2 review-bundle rebuild | `lib/services/deliberation-briefing/briefing-page-service.js` `resolveBriefingMember`; external briefing document route | A changed live review set rebuilds through real retention with mocked external I/O, preserves actor/ledger/hash/size, and an unchanged set reuses the retained identity. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| DIST-3 legacy modes | `distribution/prepare.js` and `distribution/send.js` | `docx`, `pdf`, and `both` remain readable/retryable for existing ledger rows. **MOCK-ONLY; no live status is applicable.** Current prepare does not accept these modes for new attempts. | `MOCKED SUITES PASS` | `NOT APPLICABLE — live send prohibited` |
+| DIST-4 send retry/uncertain transport | `pages/api/workbench/pre-site-visit/distribution/send.js`; `send.js` and email-recovery tests | Activity identity is persisted/recovered before exact assertions; uncertain response, lease loss, stale source, duplicate attachment, and sent retry do not create a second activity or send. **MOCK-ONLY; no live status is applicable.** | `MOCKED SUITES PASS` | `NOT APPLICABLE — live send prohibited` |
+| DIST-5 history | `pages/api/workbench/pre-site-visit/distribution/history.js`; distribution history panel | History returns ordered attempts, source drift, actor names when available, and strict-read defaults without changing ledger state. Invalid request and denied access return the route contract. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| FINAL-1 same-item transition | `pages/api/workbench/final-writeup.js`; `shared/components/workbench/FinalWriteupTab.js` | Start requires session actor and lead-PD/superuser authorization, verifies the current stable document, creates/reuses one Final row, and changes no SharePoint item. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| FINAL-2 leadership transition | `pages/api/workbench/final-writeup/leadership-review.js`; Final Writeup tab | Leadership transition verifies current pointer/version, applies the ordered ETag changeset, records actor/time, and replays a landed response without a second write. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| AUTH-1 negative access | Every named Workbench route plus external briefing routes | Unauthenticated, wrong-app, non-reviewer, missing actor, invalid GUID/body, stale expected identity, and unauthorized leadership requests fail before service writes. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+
+The external briefing `GET /api/external/briefing/[token]/document?member=review-bundle`
+is **not** a read-only production smoke. `resolveBriefingMember` may rebuild and
+write a retained review bundle when the live review fingerprint differs. A read-only
+briefing check may use only `context` and non-rebuilding document members with
+rebuild dependencies disabled; the review-bundle member belongs in DIST-2's mocked
+case or an explicitly approved sandbox write rehearsal.
+
+## Concrete fixture and observation steps
+
+These steps make each local case executable without inventing external IDs. The
+fixture builders must use the existing test factories/rows in the named suites;
+an operator supplies disposable sandbox values only after the release-policy
+preconditions pass.
+
+1. **Initial Assessment.** Start from a request fixture with one active proposal
+   narrative and a resolved request library. POST the exact `{ requestId }`,
+   capture the response artifact id, generation key, SharePoint drive/item,
+   version/eTag, content hash, and registry row. Repeat the same POST and assert
+   the same identity plus zero additional AI/create/upload calls. GET by
+   `requestId`, list `versions`, then exercise restore and Board snapshot with
+   an approved version; record ETag-conditional updates and final rows. The
+   expected UI evidence is a Ready/Board Ready card with the Word/SharePoint
+   action and a separate version/snapshot result.
+2. **Pre-Site and correction.** Start with a current Draft/Ready Pre-Site row
+   and stable source metadata. POST `/api/workbench/pre-site-visit`, repeat it,
+   then mutate the fixture's expected current pointer/version in a mock or
+   disposable sandbox row. The expected result is a stale/correction response,
+   no supersession of a newer pointer, and at most one approved successor from
+   `reopen`; record row ids, source/target identity, cycle code, and cleanup
+   work. GET status must show current and newer pending rows without a write.
+3. **Current Brief prepare.** Use a stored Brief snapshot with at least one
+   received review, a current brief pointer, stable source metadata, session
+   snapshot, and valid actor. POST prepare with the exact request/artifact/
+   operation ids and compose inputs from the panel. Record `previewHash`, input
+   fingerprints/delta, retained DOCX/PDF rows, review-bundle identity, and the
+   prepared ledger row. Repeat the same payload and assert exact preview/ledger
+   reuse. For stale input, change one real snapshot field and assert the named
+   drift error before any write.
+4. **Review-bundle rebuild.** Invoke the real `resolveBriefingMember` with a
+   fixture whose live received-review set differs from the pinned fingerprint,
+   but inject mocked Graph/PDF/Dataverse persistence. Capture the actor passed
+   to retention, uploaded bytes, SHA-256/size, Request Document create, and
+   ledger update. Repeat with the same set and assert no second create/upload;
+   then use the external route only as a mocked route-shape test, never as a
+   read-only live claim.
+5. **Final same-item and leadership.** Start from a current Ready/Review
+   Pre-Site row and stable SharePoint identity. Call the real local service or
+   route with a session-derived authorized actor; assert one Final row and one
+   ordered ETag changeset with no upload/copy. Repeat after a simulated lost
+   response and assert reconciliation, not a second row/write. For leadership,
+   assert the ordered final-row PATCH then request-pointer PATCH, actor/time,
+   version/eTag/hash persistence, and landed-response replay. The UI evidence
+   is the Final Writeup state changing from ready/group review to leadership.
+6. **Auth negatives.** For each route in the command above, run unauthenticated,
+   wrong-app/non-reviewer, invalid method/body/GUID, missing actor, stale expected
+   identity, and unauthorized leadership fixtures. Record status/code/body and
+   verify no create/update/delete/upload/send spy fired.
+
+## Mock-only cases
+
+The following remain local/mock-only even when a deployment smoke is approved:
+
+- legacy attachment modes and all send-retry/uncertain-transport faults;
+- duplicate activity/attachment responses and lost-response recovery;
+- malformed registry rows, unknown producer/lifecycle values, and metadata drift;
+- all AI calls, PDF/DOCX assembly inputs, Graph upload/copy/delete, and Dynamics
+  email transport unless a separate sandbox approval names them.
+
+These cases must assert ordered calls and final durable-row projections in their
+fixtures. A negative “no write” assertion is valid only when the fixture contains
+the row/input that would otherwise cause the write.
+
+## Sandbox and controlled rehearsal
+
+Sandbox writes may be proposed only after the release-policy preconditions above
+are satisfied. The smallest approved write rehearsal is one disposable request:
+generate, exact retry, read/version check, prepare, and cleanup. Inventory every
+Request Document row, SharePoint file, Postgres attempt, Dynamics
+activity/attachment, and review-bundle path; there is no single disposable
+artifact path. A send rehearsal uses capture mode and an approved test
+recipient unless the owner explicitly authorizes real delivery. The operator
+must record every expected Dataverse/SharePoint/Postgres/Dynamics write before
+starting and reconcile every resulting identity afterward.
+
+Production-read shadow checks are read-only and must prove the request/document
+read model, current pointer, version metadata, and distribution history;
+they must not call prepare, send, restore, reopen, create, update, delete, or
+email paths. Controlled production rehearsal is a separate owner approval and
+is not implied by this document.
+
+The external `GET /api/external/briefing/[token]/document?member=review-bundle`
+route is excluded from this read-only allowlist: `resolveBriefingMember` may
+rebuild and persist a retained review bundle when the live review fingerprint
+differs. Exercise that member only in the mocked DIST-2 case or an explicitly
+approved sandbox write rehearsal.
+
+## Operator checklist (deployment cases not run)
+
+Use separate disposable fixtures when restore, reopen or a lifecycle transition
+would invalidate another case's preconditions. For each case record the exact
+candidate commit/deployment URL, signed-in role, before/after identities and
+network responses. A local mocked pass does not complete this checklist.
+
+### S1 — signed-in read-only checks
+
+Prerequisites: an authorized deployment/target, a staff account with `reviewers`
+access, a second account without that access, and known existing IA, Pre-Site,
+Final and distribution-history fixtures. Use the signed-in browser's normal
+session; do not export tokens/cookies. The explicit document-flow read allowlist is:
+
+- `GET /api/workbench/initial-assessment?requestId=<approved-request-guid>`
+- `GET /api/workbench/initial-assessment/versions?requestId=<approved-request-guid>&expectedArtifactId=<displayed-IA-guid>`
+- `GET /api/workbench/pre-site-visit?requestId=<approved-request-guid>`
+- `GET /api/workbench/final-writeup?requestId=<approved-request-guid>`
+- `GET /api/workbench/pre-site-visit/distribution/history?requestId=<approved-request-guid>`
+
+1. Open the matching Workbench panels and capture these requests/responses.
+   Confirm the displayed current document, file link, version list, Final phase
+   and distribution receipt match the corresponding DTO and recorded fixture.
+2. Reload twice. Confirm stable row/item/pointer identities and no new document,
+   snapshot, distribution attempt or email activity. Volatile metadata-read
+   timestamps need not be identical. Do not click generate, restore, snapshot,
+   reopen, prepare, send or transition actions in this stage.
+3. Try an allowed GET while signed out, and with the account lacking app access.
+   Expect the existing authentication/authorization rejection and no document
+   payload. With the authorized account, an invalid GUID must return 400.
+4. Save sanitized network evidence and before/after document-domain readbacks.
+   Mark PASS only after those checks; otherwise record the exact mismatch.
+
+Do not open external briefing document/download routes in S1. The review-bundle
+GET can write, and opening a complete page may initiate additional requests.
+
+### S2 — approved generation and retry
+
+Prerequisites: approved disposable request library, prompts/readiness and input
+fixtures; explicitly authorized application AI/file/registry writes. Select a
+fixture with the required active narrative and no competing active claim.
+
+1. In IA, generate once; if the response is in progress, use status reads until
+   completion or the operator's recorded timeout. Record row, generation key,
+   request pointer, drive/item, version and governed hash.
+2. Replay the same generate request with unchanged inputs. Require the same
+   artifact/item, with no additional AI run or upload. Reload the panel and
+   confirm the same file action. Repeat the corresponding Pre-Site happy path
+   with its own eligible fixture.
+3. Restore/Board-snapshot and guarded-reopen checks are separate approved write
+   cases with their own preconditions, not automatic cleanup. Exercise them only
+   with a preselected version or eligible Review source and the required role.
+   Record the intended distinct snapshot/successor and its pointer relationship.
+   Keep stale-pointer and crash injection in the mocked suites.
+
+### S3 — approved current-Brief preparation and send
+
+Prerequisites: current Brief with at least one received review, fresh input
+fingerprint (or an explicitly reviewed exact-fingerprint acknowledgement),
+valid staff sender, approved recipients, required session/readiness and a verified
+mail capture configuration. Capture support must be proved before relying on it;
+if unavailable, omit send unless real delivery is separately authorized.
+
+1. Open the Share composer and prepare without sending. The UI omits
+   `attachmentMode`; the server defaults it to current mode `none`. Record the panel's exact request/expected-artifact/operation IDs and returned
+   preview hash. Check retained document/bundle rows, files and ledger identities.
+   Confirm that preparation alone did not send an email.
+2. Replay the captured preparation request in the authorized browser session,
+   preserving the identical payload and operation ID. Do not click Prepare again:
+   that action generates a new operation ID. Require reuse of the attempt and
+   retained identities. Do not manufacture a second ID to disguise a failed retry.
+3. If send is approved, confirm the preview once. Capture the send payload
+   (`requestId`, `operationId`, `previewHash`) and the resulting Dynamics activity
+   and ledger status. A confirmed success displays **Sent for delivery.** This
+   proves transport acceptance only, not inbox delivery.
+4. Replay the same send payload after confirmed success. Require the same
+   activity and sent attempt, with no additional transport/attachment work.
+   If the outcome is uncertain, stop and reconcile; do not induce or retry that
+   fault live. The mocked suites cover uncertain/lost-response paths.
+5. Optional, separately approved bundle-write smoke: on a sent fixture, add one
+   approved test review through its normal flow, then download the review bundle.
+   Verify one changed fingerprint/new retained bundle and the original sharing
+   actor attribution; a second download must reuse it. This GET is a write case.
+
+### S4 — approved Final and leadership transitions
+
+Prerequisites: current Ready/Review Pre-Site fixture, authorized lead PD or
+superuser with resolved actor identity, stable SharePoint item and readiness.
+
+1. Record the source row/item/version/hash and request's current pointers. Start
+   Final via the panel (`POST /api/workbench/final-writeup` with `requestId` and
+   `expectedArtifactId`). After completion, verify source lifecycle Final,
+   Final row Ready/Review, current-Final pointer, and identical drive/item IDs.
+   There must be no new SharePoint file or upload/copy.
+2. Replay the identical start payload. Require the same Final row/item and
+   preserved milestone fields. Observe the group-review UI after reload.
+3. Advance via `POST /api/workbench/final-writeup/leadership-review` with
+   `requestId` and `expectedFinalArtifactId`. Verify leadership actor/time and
+   current version/hash, unchanged milestone version/hash/time, the same item,
+   and the leadership UI state. Replay the same payload; require reuse without
+   restamping the transition. Use mocked tests for ambiguous commits and races.
+4. Reconcile every approved write against the fixture inventory. Record cleanup
+   or retained test evidence under the release policy; never delete unowned data
+   or attempt to reverse a business transition by hand as generic cleanup.
+
+## Stop criteria and evidence record
+
+Stop immediately on an unexpected write, a second activity/attachment, a changed
+SharePoint item when same-item behavior is required, an actor/pointer mismatch,
+an unapproved recipient, a missing lease/ETag conflict, a fixture that is not
+disposable, or any response that claims success without durable readback. Mark
+the case `BLOCKED` with the error, request/operation IDs, and cleanup owner;
+do not retry against the same external fixture until the state is reconciled.
+
+For every completed case, retain the exact command or route, fixture
+preconditions, sanitized request/response, ordered external-call trace, durable
+row/file/activity identities, cleanup result, and final status. This runbook
+must never be changed to turn an unrun live case into a pass without that
+evidence.

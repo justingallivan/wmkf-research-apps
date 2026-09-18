@@ -99,8 +99,10 @@ non-hash identity/UUID use. Writer registry, routes, schemas and persisted value
 are unchanged. New-leaf assertions use the frozen value, not only wrapper parity.
 
 Sol `sol_stage1` reviewed the prerequisite and extraction with fresh stage context.
-One correction round removed an accidental public prefix export, the unused original
-comparator, and a stale test header. Final verdict READY. Leaf SHA-256:
+One correction round removed an accidental prefix re-export from the IA facade,
+the unused original comparator, and a stale test header. The neutral hash leaf
+intentionally still exports `GOVERNED_DOCX_HASH_PREFIX` for internal IA consumers
+(now the upload-recovery module). Final verdict READY. Leaf SHA-256:
 `576b4c59626b4ee082d190dea9ffc9292fd0767527daad59f27ebe8972d46e8a`;
 IA facade SHA-256:
 `7c57919dbd8938f94531096b661ee94f27c5d9e6b353ded9f809d53685735a40`.
@@ -376,7 +378,9 @@ in the original facade with the registered REQUIRED actor creation seam and all
 five public names. Root took over mechanical import/export cleanup to bound iteration,
 removed unused imports and placed both distinct verification tuples in the model.
 All 172 original bodies and 39 initializers still match after AST normalization;
-516 named/default imports resolve and explicit undefined/unused-name checks pass.
+516 named/default imports resolve. Explicit undefined/unused-name checks passed
+on the five Final transition modules changed in this stage; this was not a
+repository-wide unused-import check.
 
 Fresh Sol `01a0b5be-e821-71d3-b395-445cddb26334` returned READY with no substantive
 findings. Root inspected source, fixtures, actual logs and matching fingerprints.
@@ -474,3 +478,59 @@ No production milestone entry was required: this branch has not shipped. The
 optional claim-evidence pilot report was unavailable because its local state
 could not be read; no observation row or inferred result was added. This advisory
 report limitation does not replace or invalidate the passing required gates.
+
+
+## Post-review hardening — 2026-09-18
+
+The owner supplied Claude's independent READY review of `5f069b32` and requested
+its three low findings be addressed plus a smoke-test suite. Change surface:
+unused imports, test-only static boundary analysis and durable verification docs.
+Entry point/consumer: Jest and future smoke operators. Persistence: no runtime
+schema/data change; only this receipt, the handoff and smoke runbook are durable.
+
+| Invariant | Changed surface | Verification |
+|---|---|---|
+| Runtime behavior/public contracts remain unchanged | Four unused import specifiers in three Pre-Site files | Strict unused-variable lint, baseline body/initializer comparison and mocked service/route tests |
+| Separate lifecycle internals remain separate | AST edge classification | Cross-domain negative fixtures and same-domain/neutral-leaf positive fixture |
+| Counts follow real adapter namespace imports and alternate calls | AST writer/binding census | Renamed namespaces, optional calls, call/apply, computed members, binding-only and unrelated-adapter fixtures |
+| Migrated hash consumers retain neutral ownership | Explicit migrated-consumer inventory | In-domain and external-consumer regressions; other IA public API calls remain allowed |
+| Local evidence is not a live smoke claim | Smoke runbook and receipt wording | Source-checked routes/side effects, recorded commands, live cases marked not run |
+
+The Stage 1 wording now identifies the removed **facade** prefix re-export;
+the hash leaf intentionally exports the prefix for IA recovery. The Stage 7
+unused-name claim is explicitly limited to its five Final transition files.
+The prior stage fingerprints/counts above remain historical evidence for their
+named commits, not assertions about the later hardening diff.
+
+Static-check limits remain explicit: literal imports and the recognized writer
+forms are checked; arbitrary alias propagation, reflection, computed runtime
+module names or namespace property names are not a general JavaScript proof.
+Partial-success, async and enum-consumer production changes are N/A for this
+follow-up because no executable function body or persisted contract changed;
+the smoke suite exercises their existing contracts with mocked I/O. No new
+route, migration, readiness flag or production action was introduced.
+
+[VERIFIED via local command outputs and root inspection] Follow-up verification:
+core smoke 18 suites / 478 tests; auth/route smoke 9 suites / 64 tests;
+checker/public-contract subset 2 suites / 62 tests; full Jest 958 suites /
+14,174 tests. Strict unused-name checks passed for the three runtime import files
+and changed test helper/suite. Full lint passed (0 errors / 104 existing warnings),
+as did types, the nine-seam Request Document writer gate/self-test, applicable
+sequential document gate/self-test pairs, docs-catalog and agent invariants.
+Baseline comparison still matches all 172 function bodies and 39 initializers.
+No fresh canonical build was run for this follow-up; prior build evidence above
+remains attached to the original refactor. The added
+`docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md` records executable
+local commands and staged operator checks, including the write-capable external
+review-bundle GET. Browser/live checks remain NOT RUN.
+
+Fresh Sol review `01a0b60a-83f7-74b0-a724-eebb7b1ceb1d` returned **READY** after
+one bounded correction round. Its direct analyzer probes confirmed the expanded
+cross-domain target check, distribution-only shared-helper allowances, namespace
+hash detection and resolved adapter bindings; live source has zero boundary errors.
+The smoke instructions now distinguish captured-request replay from another Prepare
+click (which creates a new operation ID). Root accepted the corrected implementation,
+negative/positive fixtures and actual final test outputs. Review-output SHA-256:
+`241bc4c1751aec3e3004c216c2cc38ac27b952cd7fc5f266fd31ec33c9d5aaf0`.
+Checker diff SHA-256 (UTF-8 `git diff --` for the helper and its unit suite against
+`5f069b32`): `3f9d7f8d4ec60ccfbcb8e408868fc4821680bcd7b0478718a8a4e99dfe74fda2`.
