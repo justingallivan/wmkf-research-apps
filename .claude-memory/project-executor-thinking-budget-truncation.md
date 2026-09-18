@@ -1,6 +1,6 @@
 ---
 name: project-executor-thinking-budget-truncation
-description: Opus 5 / Sonnet 5 / Fable think by default and spend max_tokens on reasoning; a prompt row budget sized for answer text (IA 2,200) stops on max_tokens with ZERO text. Advisory floor 4,096 + content-free block census built 2026-09-18 on branch fix/ia-thinking-budget-floor (not merged, not deployed); a tier-alias advance or model-only republish is the usual trigger.
+description: Opus 5 / Sonnet 5 / Fable think by default and spend max_tokens on reasoning; a prompt row budget sized for answer text (IA 2,200) stops on max_tokens with ZERO text. Advisory floor 4,096 + content-free block census deployed to production 2026-09-18 via PR #314 (IA generation not yet re-rehearsed); a tier-alias advance or model-only republish is the usual trigger.
 status: active
 metadata:
   type: project
@@ -34,13 +34,12 @@ decision 2026-09-18).
 
 ## Ship state
 
-**[SOURCE-BUILT ON BRANCH `fix/ia-thinking-budget-floor` 2026-09-18; NOT MERGED, NOT DEPLOYED.]**
-Until merged, production runs still record the old notes format, the IA
-contract still pins prompt version 1, and the IA call still sends the row's
-2,200 tokens. On the branch, `initial-assessment.generate` is a registered
-standing budget (default 12,000 / 120 s; admin-tunable 4,096–32,000) that the
-IA facade passes as `maxTokensOverride`, so the row budget no longer governs
-the call once deployed.
+**[DEPLOYED TO PRODUCTION 2026-09-18 via PR #314, merge `0b240f0a`, GitHub deployment 6534604317 success; IA generation itself not yet re-rehearsed]**
+Production now records the new notes fields, the IA contract pins prompt version 2
+(the live row), and `initial-assessment.generate` is a registered standing budget
+(default 12,000 / 120 s; admin-tunable 4,096–32,000) that the IA facade passes as
+`maxTokensOverride`, so the row's 2,200 no longer governs the call. Still open: one
+authorized rehearsal generation on request 1003222 to prove `end_turn` + DOCX.
 
 ## How to apply
 

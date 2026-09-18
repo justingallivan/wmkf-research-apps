@@ -143,14 +143,14 @@ thinking-default models; reverting the alias alone is not a fix.
 **Why it was invisible.** The prompt row stores a tier alias, not a concrete id;
 admin publish clones `wmkf_ai_maxtokens` from the prior version and exposes no budget
 input; standing budgets (`EXECUTOR_BUDGET_DEFAULTS`) cover only listed prompts
-(`initial-assessment.generate` was added on the same branch: standing 12,000 / 120 s,
+(`initial-assessment.generate` was added in the same PR: standing 12,000 / 120 s,
 limits 4,096–32,000, threaded through the IA facade via `getExecutorBudget`). A
 model-only republish therefore never re-reviews the budget. Adaptive thinking may skip
 trivial tasks, so several live prompts run below 4,096 and still succeed (read-only
 audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 5 at
 3,000 passed 5/5). A blanket pre-call floor would break them, so the guard is advisory.
 
-**What the code does now — [SOURCE-BUILT ON BRANCH `fix/ia-thinking-budget-floor` 2026-09-18; NOT MERGED, NOT DEPLOYED]:**
+**What the code does now — [DEPLOYED TO PRODUCTION 2026-09-18 via PR #314, merge `0b240f0a`, GitHub deployment 6534604317 success; IA generation itself not yet re-rehearsed]:**
 - `llm-client.js` normalizers return `blocks` (content-free `{type, chars}` census) and
   `thinkingTokens` (`usage.output_tokens_details.thinking_tokens`, null when absent).
 - `execute-prompt.js` `thinkingBudgetAdvisory()` flags a thinking-default model below
