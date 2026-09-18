@@ -120,8 +120,8 @@ The existing scalar/enum values and every reader remain unchanged.
 
 ## 3. Target structure and dependency rules
 
-**PLANNED.** Move existing functions, not behavior. Filenames below are exact proposed
-destinations. Retain all currently exported names at the original public file.
+**Migration specification.** Move existing functions, not behavior. Filenames below
+are exact destinations; accepted stages are identified in the execution record. Retain all currently exported names at the original public file.
 Use direct named imports/re-exports; no wildcard barrels.
 
 1. Neutral leaf `lib/services/documents/governed-docx-hash.js` may import Node crypto
@@ -258,7 +258,8 @@ oracles. A green test suite achieved by mocking away the moved implementation is
 | 7 | Final state/claims with distinct command orchestrators | No |
 | 8 | Import/export boundaries and durable documentation | No |
 
-Every numbered stage, including 5a and 5b, ends at §4. All new paths are PLANNED.
+Every numbered stage, including 5a and 5b, ends at §4. Destination paths are planned
+until their stage is accepted in the execution record.
 Within a stage the file order below is mandatory: leaves before their consumers.
 Edits that move a function and repair all its callers belong in one green commit;
 never commit an intermediate tree with missing imports.

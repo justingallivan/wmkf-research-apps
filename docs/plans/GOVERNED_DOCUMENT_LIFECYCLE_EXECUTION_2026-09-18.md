@@ -82,3 +82,44 @@ versions 2/3/4 and write version 4; no serialization changes were made.
 Logs are local temporary evidence; this receipt retains conclusions and fingerprints.
 Rollback: revert Stage 0's test-only commit; no runtime/data rollback required.
 Next permitted stage: Stage 1, after T1 prerequisites are added and pass on old code.
+
+
+## Stage 1 — accepted (`8a7060b9`)
+
+Prior accepted stage: `7a2ed504` (receipt `59dd9157`). Test-only prerequisite commit
+`c58237c4` froze the base/normalized fixture and two shipped-template digests and
+added unknown hash-scheme recovery. Sol approved; root independently ran 3 suites /
+70 tests against the old implementation before permitting extraction.
+
+Moved ten hash functions and two constants into
+`lib/services/documents/governed-docx-hash.js`; retained the old facade's hash export
+and internal prefix import. Ten external production consumers now import the leaf;
+the individual-file mock follows its actual dependency. Crypto remains in IA for
+non-hash identity/UUID use. Writer registry, routes, schemas and persisted values
+are unchanged. New-leaf assertions use the frozen value, not only wrapper parity.
+
+Sol `sol_stage1` reviewed the prerequisite and extraction with fresh stage context.
+One correction round removed an accidental public prefix export, the unused original
+comparator, and a stale test header. Final verdict READY. Leaf SHA-256:
+`576b4c59626b4ee082d190dea9ffc9292fd0767527daad59f27ebe8972d46e8a`;
+IA facade SHA-256:
+`7c57919dbd8938f94531096b661ee94f27c5d9e6b353ded9f809d53685735a40`.
+Root inspected imports/exports and test changes, verified all 172 original function
+bodies and 39 declaration initializers match after AST normalization, and checked
+command logs/exit codes. These comparisons do not replace binding/behavior review.
+
+Verification: scoped 3 suites / 104 tests; full 955 suites / 14,076 tests; lint
+0 errors / 104 existing warnings; types, canonical Turbopack build, all 17 gate/self-test
+pairs, migrations-manifest and docs-catalog passed. Gates and self-tests ran sequentially.
+An initial prose-only receipt was insufficient; Luna reran with individual outputs
+and an exit-code index, all zero. Root inspected the recorded results before acceptance.
+No live calls, deployment or data changes. Existing build tracing warnings remain.
+Rollback: revert `8a7060b9` as one unit; frozen prerequisite tests remain valid.
+Next permitted stage: Stage 2 after its T2 coverage review and any missing prerequisites.
+
+Review transport: the subagent tool reached its task limit after Stage 1. On
+2026-09-18 the owner explicitly approved fresh Sol reviews via local Codex CLI,
+using ChatGPT login and sending relevant source/plans to ChatGPT/Codex. Subsequent
+reviews use fresh read-only sessions with provider API-key variables removed.
+The first attempt was rejected by automatic approval review pending this explicit
+consent; no fallback review ran before consent.

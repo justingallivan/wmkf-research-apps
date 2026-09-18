@@ -53,7 +53,9 @@ cron. No code behaviour changed.
    correction loops. Branch: `codex/document-lifecycle-decomposition`. Stage 0
    accepted in `7a2ed504`: 955 suites / 14,075 tests, lint/types/canonical build and
    required gates passed; Sol approved and root verified the real-route tests.
-   Next: Stage 1 hash prerequisites and extraction. Receipts:
+   Stage 1 accepted in `8a7060b9` after prerequisite commit `c58237c4`: neutral
+   hash leaf, ten consumer imports, unchanged public hash API; 955 suites / 14,076
+   tests and all required checks passed. Next: Stage 2 IA model/read extraction. Receipts:
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 
