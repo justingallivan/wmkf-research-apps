@@ -1318,6 +1318,154 @@ function currentSourceDependencies(row) {
   };
 }
 
+function durableSendHarness(overrides = {}) {
+  let row = attemptFixture(overrides.row || {});
+  const emailId = '88888888-8888-4888-8888-888888888888';
+  const attachmentBytes = Buffer.from('pdf-bytes');
+  const persistedAttachments = new Map();
+  let createdActivity = false;
+  let claimCount = 0;
+  const events = [];
+  const state = {
+    activityStatus: 1,
+    sendCalls: 0,
+    lostClaim: false,
+    loseActivityResponse: false,
+    loseAttachmentLedgerResponse: false,
+    loseAttachmentResponse: false,
+    loseIntentResponse: false,
+    loseSentResponse: false,
+    loseRenewResponse: false,
+    ...overrides.state,
+  };
+  const source = currentSourceDependencies(row);
+  const dependencies = {
+    ...source,
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => {
+      events.push('claim');
+      if (row.state === 'sent') return null;
+      if (row.locked_until && Date.parse(row.locked_until) > Date.parse('2026-09-18T12:00:00Z')) return null;
+      row = {
+        ...row,
+        lease_token: `claim-${++claimCount}`,
+        locked_until: '2026-09-18T12:05:00Z',
+        attempt_count: Number(row.attempt_count || 0) + 1,
+      };
+      if (state.lostClaim) throw new Error('claim response lost after lease write');
+      return row;
+    }),
+    findEmailByCorrelation: jest.fn(async () => (createdActivity ? [emailFixture(row, { activityid: emailId })] : [])),
+    createEmailActivity: jest.fn(async () => {
+      events.push('activity');
+      createdActivity = true;
+      if (state.loseCreateResponse) {
+        state.loseCreateResponse = false;
+        throw new Error('activity creation response lost after write');
+      }
+      return emailId;
+    }),
+    recordEmailActivity: jest.fn(async (attempt, persistedId) => {
+      events.push('email-ledger');
+      if (!attempt.lease_token || row.lease_token !== attempt.lease_token) return null;
+      row = { ...row, dynamics_email_id: persistedId, state: row.state === 'prepared' ? 'activity_created' : row.state };
+      if (state.loseActivityResponse) {
+        state.loseActivityResponse = false;
+        throw new Error('activity ledger response lost after commit');
+      }
+      return row;
+    }),
+    getEmailActivity: jest.fn(async () => emailFixture(row, { statuscode: state.activityStatus })),
+    findEmailAttachments: jest.fn(async (_id, filename) => {
+      const attachment = persistedAttachments.get(filename);
+      return attachment ? [attachment] : [];
+    }),
+    getEmailAttachmentContent: jest.fn(async (attachmentId) => {
+      const entry = [...persistedAttachments.values()].find((item) => item.activitymimeattachmentid === attachmentId);
+      return {
+        activitymimeattachmentid: attachmentId,
+        filename: entry?.filename,
+        mimetype: entry?.mimetype,
+        filesize: attachmentBytes.length,
+        body: attachmentBytes.toString('base64'),
+      };
+    }),
+    downloadFile: jest.fn(async () => ({ buffer: attachmentBytes })),
+    addEmailAttachment: jest.fn(async (_id, attachment) => {
+      persistedAttachments.set(attachment.filename, {
+        activitymimeattachmentid: `${attachment.filename}-id`,
+        filename: attachment.filename,
+        mimetype: attachment.contentType,
+      });
+      if (state.loseAttachmentResponse) {
+        state.loseAttachmentResponse = false;
+        throw new Error('attachment response lost after write');
+      }
+    }),
+    recordAttachment: jest.fn(async (attempt, kind) => {
+      events.push(`attachment-ledger:${kind}`);
+      if (!attempt.lease_token || row.lease_token !== attempt.lease_token) return null;
+      row = { ...row, [`${kind}_attached_at`]: new Date('2026-09-18T12:00:00Z') };
+      if (state.loseAttachmentLedgerResponse) {
+        state.loseAttachmentLedgerResponse = false;
+        throw new Error('attachment ledger response lost after commit');
+      }
+      return row;
+    }),
+    recordSendRequested: jest.fn(async (attempt) => {
+      events.push('intent');
+      if (!attempt.lease_token || row.lease_token !== attempt.lease_token) return null;
+      row = { ...row, state: 'send_requested', send_requested_at: row.send_requested_at || new Date('2026-09-18T12:01:00Z') };
+      if (state.loseIntentResponse) {
+        state.loseIntentResponse = false;
+        throw new Error('send intent response lost after commit');
+      }
+      return row;
+    }),
+    renewSendLease: jest.fn(async (attempt) => {
+      events.push('renew');
+      if (!attempt.lease_token || row.lease_token !== attempt.lease_token || row.state !== 'send_requested') return null;
+      row = { ...row, locked_until: '2026-09-18T12:06:00Z' };
+      if (state.loseRenewResponse) {
+        state.loseRenewResponse = false;
+        throw new Error('renew response lost after lease write');
+      }
+      return row;
+    }),
+    sendEmail: jest.fn(async () => {
+      events.push('send');
+      state.sendCalls += 1;
+      state.activityStatus = 6;
+    }),
+    recordSent: jest.fn(async (attempt, status) => {
+      events.push('sent');
+      if (!attempt.lease_token || row.lease_token !== attempt.lease_token) return null;
+      row = { ...row, dynamics_statuscode: status.statuscode, state: 'sent', sent_at: new Date('2026-09-18T12:02:00Z'), lease_token: null, locked_until: null };
+      if (state.loseSentResponse) {
+        state.loseSentResponse = false;
+        throw new Error('sent response lost after commit');
+      }
+      return row;
+    }),
+    recordFailure: jest.fn(async (_attempt, error) => {
+      // Store-like conditional failure bookkeeping preserves committed IDs,
+      // attachment receipts, send intent, and terminal sent state.
+      events.push('failure');
+      if (_attempt.lease_token && row.lease_token === _attempt.lease_token) {
+        row = { ...row, lease_token: null, locked_until: null, last_error_code: error?.code || 'send_failed' };
+      }
+      return row;
+    }),
+  };
+  return {
+    dependencies,
+    get row() { return row; },
+    state,
+    persistedAttachments,
+    events,
+  };
+}
+
 function emailFixture(row, overrides = {}) {
   return {
     activityid: row.dynamics_email_id || '88888888-8888-4888-8888-888888888888',
@@ -1906,6 +2054,188 @@ test('an exact sent retry returns its receipt without another Dynamics write', a
   }, dependencies);
   expect(result.reused).toBe(true);
   expect(dependencies.claimSend).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['recordEmailActivity', { loseActivityResponse: true }, 2],
+  ['createEmailActivity', { loseCreateResponse: true }, 1],
+])('replays a durable activity identity after %s loses its response', async (_boundary, state, ledgerCalls) => {
+  const harness = durableSendHarness({ row: { attachment_mode: 'none' }, state });
+  const send = () => sendPreSiteDistribution({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies);
+
+  const first = await send();
+  expect(harness.row.dynamics_email_id).toBe('88888888-8888-4888-8888-888888888888');
+  expect(first.attempt.transportAccepted).toBe(true);
+  expect(harness.dependencies.recordFailure).not.toHaveBeenCalled();
+
+  const result = await send();
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(harness.dependencies.createEmailActivity).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.recordEmailActivity).toHaveBeenCalledTimes(ledgerCalls);
+  expect(harness.dependencies.sendEmail).toHaveBeenCalledTimes(1);
+});
+
+test('replays a durable attachment receipt after recordAttachment loses its response', async () => {
+  const crypto = require('node:crypto');
+  const bytes = Buffer.from('pdf-bytes');
+  const harness = durableSendHarness({
+    row: {
+      attachment_mode: 'pdf',
+      pdf_byte_hash: crypto.createHash('sha256').update(bytes).digest('hex'),
+      pdf_size: bytes.length,
+    },
+    state: { loseAttachmentLedgerResponse: true },
+  });
+  const send = () => sendPreSiteDistribution({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies);
+
+  await expect(send()).rejects.toThrow('attachment ledger response lost after commit');
+  expect(harness.row.pdf_attached_at).toBeTruthy();
+  const result = await send();
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(harness.dependencies.addEmailAttachment).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.recordAttachment).toHaveBeenCalledTimes(1);
+});
+
+test('replays durable send intent after recordSendRequested loses its response', async () => {
+  const harness = durableSendHarness({ row: { attachment_mode: 'none' }, state: { loseIntentResponse: true } });
+  const send = () => sendPreSiteDistribution({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies);
+
+  await expect(send()).rejects.toThrow('send intent response lost after commit');
+  expect(harness.row.send_requested_at).toBeTruthy();
+  const result = await send();
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(harness.dependencies.recordSendRequested).toHaveBeenCalledTimes(2);
+  expect(harness.dependencies.sendEmail).toHaveBeenCalledTimes(1);
+});
+
+test('replays a terminal sent row after recordSent loses its response', async () => {
+  const harness = durableSendHarness({ row: { attachment_mode: 'none' }, state: { loseSentResponse: true } });
+  const send = () => sendPreSiteDistribution({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies);
+
+  await expect(send()).rejects.toThrow('sent response lost after commit');
+  expect(harness.row.state).toBe('sent');
+  const result = await send();
+  expect(result.reused).toBe(true);
+  expect(harness.dependencies.claimSend).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.sendEmail).toHaveBeenCalledTimes(1);
+});
+
+test.each(['draft', 'unavailable'])('leaves an unconfirmed transport uncertain when status is %s', async (status) => {
+  const harness = durableSendHarness({ row: { attachment_mode: 'none' } });
+  harness.dependencies.sendEmail = jest.fn(async () => {
+    harness.state.sendCalls += 1;
+    throw new Error('transport response unavailable');
+  });
+  const getEmail = harness.dependencies.getEmailActivity;
+  harness.dependencies.getEmailActivity = jest.fn(async (...args) => {
+    if (status === 'unavailable' && harness.state.sendCalls) throw new Error('status unavailable');
+    return getEmail(...args);
+  });
+  await expect(sendPreSiteDistribution({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies)).rejects.toMatchObject({
+    code: 'distribution_send_unconfirmed',
+    httpStatus: 202,
+    body: expect.objectContaining({ outcome: 'uncertain' }),
+  });
+  expect(harness.state.sendCalls).toBe(1);
+  expect(harness.row.send_requested_at).toBeTruthy();
+  expect(harness.dependencies.recordFailure).toHaveBeenCalled();
+});
+
+test('does not duplicate attachments when the second upload and its ledger responses are lost before restart', async () => {
+  const crypto = require('node:crypto');
+  const bytes = Buffer.from('pdf-bytes');
+  const harness = durableSendHarness({
+    row: {
+      attachment_mode: 'both',
+      source_content_hash: 'gdc1:attachment-bytes',
+      pdf_byte_hash: crypto.createHash('sha256').update(bytes).digest('hex'),
+      pdf_size: bytes.length,
+    },
+  });
+  harness.dependencies.hashDocx = jest.fn(async () => 'gdc1:attachment-bytes');
+  const add = harness.dependencies.addEmailAttachment;
+  harness.dependencies.addEmailAttachment = jest.fn(async (emailId, attachment) => {
+    if (attachment.filename === 'frozen.pdf') harness.state.loseAttachmentResponse = true;
+    return add(emailId, attachment);
+  });
+  const record = harness.dependencies.recordAttachment;
+  harness.dependencies.recordAttachment = jest.fn(async (attempt, kind) => {
+    if (kind === 'pdf') harness.state.loseAttachmentLedgerResponse = true;
+    return record(attempt, kind);
+  });
+  const send = () => sendPreSiteDistribution({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies);
+
+  await expect(send()).rejects.toThrow('attachment ledger response lost after commit');
+  expect(harness.row.docx_attached_at).toBeTruthy();
+  expect(harness.row.pdf_attached_at).toBeTruthy();
+  expect(harness.dependencies.getEmailAttachmentContent).toHaveBeenCalledWith('frozen.pdf-id');
+  const result = await send();
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(harness.dependencies.addEmailAttachment.mock.calls.map(([, attachment]) => attachment.filename))
+    .toEqual(['frozen.docx', 'frozen.pdf']);
+  expect(harness.dependencies.recordAttachment.mock.calls.map(([, kind]) => kind))
+    .toEqual(['docx', 'pdf']);
+});
+
+test('does not replace a durable send lease when claimSend loses its response', async () => {
+  const harness = durableSendHarness({ row: { attachment_mode: 'none' }, state: { lostClaim: true } });
+  const input = {
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  };
+  await expect(sendPreSiteDistribution(input, harness.dependencies))
+    .rejects.toThrow('claim response lost after lease write');
+  expect(harness.row.lease_token).toBeTruthy();
+  await expect(sendPreSiteDistribution(input, harness.dependencies))
+    .rejects.toMatchObject({ code: 'distribution_send_in_progress', httpStatus: 202 });
+  expect(harness.dependencies.createEmailActivity).not.toHaveBeenCalled();
+  const lostToken = harness.row.lease_token;
+  harness.row.locked_until = '2026-09-18T11:59:00Z';
+  harness.state.lostClaim = false;
+  const reclaimed = await sendPreSiteDistribution(input, harness.dependencies);
+  expect(reclaimed.attempt.transportAccepted).toBe(true);
+  expect(harness.dependencies.recordEmailActivity.mock.calls[0][0].lease_token).not.toBe(lostToken);
+  expect(harness.dependencies.sendEmail).toHaveBeenCalledTimes(1);
+});
+
+test('a lost lease-renewal response leaves durable intent and retries under a new lease before one transport', async () => {
+  const harness = durableSendHarness({ row: { attachment_mode: 'none' }, state: { loseRenewResponse: true } });
+  const input = {
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  };
+  await expect(sendPreSiteDistribution(input, harness.dependencies))
+    .rejects.toThrow('renew response lost after lease write');
+  expect(harness.row.state).toBe('send_requested');
+  expect(harness.row.send_requested_at).toBeTruthy();
+  expect(harness.row.lease_token).toBeNull();
+  expect(harness.dependencies.sendEmail).not.toHaveBeenCalled();
+  const result = await sendPreSiteDistribution(input, harness.dependencies);
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(harness.dependencies.createEmailActivity).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.sendEmail).toHaveBeenCalledTimes(1);
+  expect(harness.events).toEqual([
+    'claim', 'activity', 'email-ledger', 'intent', 'renew', 'failure',
+    'claim', 'intent', 'renew', 'send', 'sent',
+  ]);
 });
 
 test('a prepared send fails before its lease or any Dynamics call when impersonation is disabled', async () => {
