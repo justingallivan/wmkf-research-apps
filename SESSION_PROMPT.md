@@ -89,7 +89,9 @@ cron. No code behaviour changed.
    Operator smoke stages, fixtures, evidence and stop criteria are in
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md`.
    Fresh Sol acceptance and root final review passed after one bounded correction
-   round. Live smoke remains NOT RUN. No fresh canonical build for this import/test/docs
+   round. A subsequent source-mode read-only smoke on ZZTEST-03 passed signed-in
+   IA/version/Pre-Site/history/Final reads and signed-out redirects; S1 is partial,
+   S2–S4 remain NOT RUN (no configured sandbox; local production writes denied). No fresh canonical build for this import/test/docs
    follow-up; prior build evidence remains historical. No push/deploy authorized.
 
 ## Next Items

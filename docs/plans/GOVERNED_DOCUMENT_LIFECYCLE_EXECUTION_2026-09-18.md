@@ -522,7 +522,9 @@ No fresh canonical build was run for this follow-up; prior build evidence above
 remains attached to the original refactor. The added
 `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md` records executable
 local commands and staged operator checks, including the write-capable external
-review-bundle GET. Browser/live checks remain NOT RUN.
+review-bundle GET. At hardening acceptance, browser/live checks were NOT RUN.
+The subsequent read-only S1 subset is recorded in the smoke runbook; S2–S4
+remain unrun.
 
 Fresh Sol review `01a0b60a-83f7-74b0-a724-eebb7b1ceb1d` returned **READY** after
 one bounded correction round. Its direct analyzer probes confirmed the expanded

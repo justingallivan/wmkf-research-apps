@@ -22,8 +22,8 @@ SharePoint upload, Blob operation, or Dataverse action.
 
 The source and route pointers below are **[VERIFIED via repository source and
 tests on 2026-09-18]**. Live deployment state, fixture readiness, and external
-record identities are **[UNKNOWN until the owner records a run]**. Every live
-case therefore remains `NOT RUN — live` in this document.
+record identities require per-run evidence. The recorded local-to-live read-only
+run below passed a subset of S1; unexercised live cases remain `NOT RUN — live`.
 
 ## Preconditions and release controls
 
@@ -46,7 +46,8 @@ Before a sandbox or controlled rehearsal, the operator must record:
 - cleanup ownership for every row, file, activity, attachment, and ledger entry;
 - the rollback/cleanup result, including any unresolved recovery work.
 
-No fixture IDs are embedded here. A run is blocked until the operator has named
+The read-only run below names its observed fixture; this does not authorize writes
+to that fixture. A write run is blocked until the operator has named
 real approved fixtures and verified their preconditions from the relevant read
 routes. Do not use an ordinary staff request, real reviewer, or unapproved
 recipient as a smoke fixture.
@@ -115,33 +116,74 @@ fixtures. Logs: `/tmp/wmkf-smoke-final2-core.log`,
 These local logs are transient; this paragraph preserves their results.
 
 The case table below is an operator evidence template, not a claim that a new
-manual fixture run occurred. Automated coverage above has run; browser and
-external-system checks have not. No fresh canonical build was run for this
+manual fixture run occurred. Automated coverage above has run. Subsequent browser/external read coverage is
+recorded below; external write checks have not run. No fresh canonical build was run for this
 follow-up; the earlier refactor build is recorded separately in the execution
 receipt.
+
+## Recorded read-only smoke — 2026-09-18
+
+**PARTIAL PASS — S1 read subset only.** [VERIFIED via in-app browser UI and local
+Next.js HTTP logs] Candidate `bb2faa6e` ran from source at `http://localhost:3000`
+against the configured production read target, signed in as the existing staff
+account. Luna verified local interlock `on`, production reads enabled and no
+sandbox URL configured. Sandbox schema readiness was not freshly probed; the
+older absence report is not a current probe. A configured email capture flag is
+not proof of distribution-send capture support.
+
+Fixture: existing request **1003222 / ZZTEST-03**, request GUID
+`e43ae6ea-698f-f111-8076-6045bd018a07`, discovered in Workbench. Only navigation,
+read-only expansions and reloads were exercised. No generate, restore, Board
+snapshot, reopen, prepare, send, download or lifecycle-transition action was taken.
+
+| Observed check | Result |
+|---|---|
+| Existing Microsoft sign-in and Workbench request list/detail | PASS |
+| Initial Assessment status | PASS: Ready/Draft, linked existing Word file, SharePoint version 2.0 |
+| Initial Assessment version history | PASS: versions 2.0 (current) and 1.0; no Restore click |
+| Staff Deliberations read model | PASS: existing locked Brief and existing Pre-Site Word file rendered |
+| Distribution history | PASS: 13 historical attempts; latest preview not sent and prior sent receipt rendered |
+| Final read model | PASS: Ready for group review; source file `1003222 Pre-Site Visit e8eb3d87-f0376846.docx`; same display after two reloads |
+| Five authenticated read endpoints | PASS: initial-assessment, versions, pre-site-visit, distribution/history and final-writeup each logged HTTP 200 |
+| Same five endpoints without session | PASS: each returned HTTP 307 to sign-in, without document payload |
+
+Evidence: browser observations in this task; transient local logs
+`/tmp/wmkf-document-smoke-server-polling.log` and
+`/tmp/wmkf-document-smoke-unauth.json`. The first dev startup hit EMFILE watcher
+errors; restarting with `WATCHPACK_POLLING=true` served the candidate successfully.
+
+**Limits:** complete S1 is not claimed. No second wrong-app account, authenticated
+invalid-GUID probe, full raw-DTO comparison or independent database before/after
+census was performed. Direct API tab navigation was blocked by the browser client;
+the signed-in UI requests and server status logs supplied the positive evidence.
+No Workbench/external mutation request appeared in the local HTTP log. This is not
+a database-wide proof of zero incidental authentication/telemetry writes.
+S2–S4 remain NOT RUN: local production writes are denied, no sandbox is configured,
+and a controlled production-write rehearsal requires its separate fixture/write
+inventory and release authorization. No production deployment was changed.
 
 ## Smoke cases and evidence
 
 Each row is a separate run record. The operator fills in the run timestamp,
 fixture IDs, deployment/target mode, command or URL, result, and evidence links.
-Until then, the status is explicitly `NOT RUN — live`.
+Unexercised portions retain `NOT RUN — live`; partial results refer to the run below.
 
 | Case | Source entry point and consumer | Required proof | Local status | Live status |
 |---|---|---|---|---|
 | IA-1 generation | `pages/api/workbench/initial-assessment.js` POST; `shared/components/workbench/InitialAssessmentTab.js` | Valid request returns Ready artifact, stable SharePoint identity, registry lineage, and UI Word/SharePoint action. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
 | IA-2 exact retry | Same POST and `lib/services/initial-assessment/artifact-service.js` retry path | Repeating the same request reuses the generation/registry identity and does not call AI, upload, or create a second row. Capture row identity, generation key, call counts, and response. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
-| IA-3 read/status | `pages/api/workbench/initial-assessment.js` GET with `requestId` or `cycleCode`; Initial Assessment tab | Current Ready/Board Ready projections are returned with response-only metadata refresh; malformed/unknown rows fail closed and no write spy fires. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
-| IA-4 versions/restore | `pages/api/workbench/initial-assessment/versions.js`, `restore-version.js`, `board-snapshot.js`; `tests/unit/initial-assessment-artifact-versions.test.js` | Version list, selected-version restore, and Board snapshot preserve stable identity, conditional writes, actor policy, and cleanup ownership. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
-| PSV-1 generation/status | `pages/api/workbench/pre-site-visit.js`; Staff Deliberations tab | POST generates/reuses the governed Pre-Site row; GET returns current and newer pending status; UI exposes the correct Word action. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| IA-3 read/status | `pages/api/workbench/initial-assessment.js` GET with `requestId` or `cycleCode`; Initial Assessment tab | Current Ready/Board Ready projections are returned with response-only metadata refresh; malformed/unknown rows fail closed and no write spy fires. | `MOCKED SUITES PASS; operator case NOT RUN` | `PARTIAL — read subset above; remaining checks NOT RUN` |
+| IA-4 versions/restore | `pages/api/workbench/initial-assessment/versions.js`, `restore-version.js`, `board-snapshot.js`; `tests/unit/initial-assessment-artifact-versions.test.js` | Version list, selected-version restore, and Board snapshot preserve stable identity, conditional writes, actor policy, and cleanup ownership. | `MOCKED SUITES PASS; operator case NOT RUN` | `PARTIAL — read subset above; remaining checks NOT RUN` |
+| PSV-1 generation/status | `pages/api/workbench/pre-site-visit.js`; Staff Deliberations tab | POST generates/reuses the governed Pre-Site row; GET returns current and newer pending status; UI exposes the correct Word action. | `MOCKED SUITES PASS; operator case NOT RUN` | `PARTIAL — read subset above; remaining checks NOT RUN` |
 | PSV-2 stale correction | `pages/api/workbench/pre-site-visit/reopen.js`; reopen service and route suite | Stale/current pointer or correction-cycle input is rejected or creates the approved successor; old row remains evidence and a retry does not create a duplicate. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
 | DIST-1 current brief prepare | `pages/api/workbench/pre-site-visit/distribution/prepare.js`; `PreSiteDistributionPanel.js` | Current **`attachmentMode: none`** prepare is the supported happy path: server-owned retained snapshot/review-bundle identities, received-review requirement, input fingerprint, and preview hash are returned. Assert no writes on failed read/drift gates and exact DTOs on success. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
 | DIST-2 review-bundle rebuild | `lib/services/deliberation-briefing/briefing-page-service.js` `resolveBriefingMember`; external briefing document route | A changed live review set rebuilds through real retention with mocked external I/O, preserves actor/ledger/hash/size, and an unchanged set reuses the retained identity. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
 | DIST-3 legacy modes | `distribution/prepare.js` and `distribution/send.js` | `docx`, `pdf`, and `both` remain readable/retryable for existing ledger rows. **MOCK-ONLY; no live status is applicable.** Current prepare does not accept these modes for new attempts. | `MOCKED SUITES PASS` | `NOT APPLICABLE — live send prohibited` |
 | DIST-4 send retry/uncertain transport | `pages/api/workbench/pre-site-visit/distribution/send.js`; `send.js` and email-recovery tests | Activity identity is persisted/recovered before exact assertions; uncertain response, lease loss, stale source, duplicate attachment, and sent retry do not create a second activity or send. **MOCK-ONLY; no live status is applicable.** | `MOCKED SUITES PASS` | `NOT APPLICABLE — live send prohibited` |
-| DIST-5 history | `pages/api/workbench/pre-site-visit/distribution/history.js`; distribution history panel | History returns ordered attempts, source drift, actor names when available, and strict-read defaults without changing ledger state. Invalid request and denied access return the route contract. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
-| FINAL-1 same-item transition | `pages/api/workbench/final-writeup.js`; `shared/components/workbench/FinalWriteupTab.js` | Start requires session actor and lead-PD/superuser authorization, verifies the current stable document, creates/reuses one Final row, and changes no SharePoint item. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| DIST-5 history | `pages/api/workbench/pre-site-visit/distribution/history.js`; distribution history panel | History returns ordered attempts, source drift, actor names when available, and strict-read defaults without changing ledger state. Invalid request and denied access return the route contract. | `MOCKED SUITES PASS; operator case NOT RUN` | `PARTIAL — read subset above; remaining checks NOT RUN` |
+| FINAL-1 same-item transition | `pages/api/workbench/final-writeup.js`; `shared/components/workbench/FinalWriteupTab.js` | Start requires session actor and lead-PD/superuser authorization, verifies the current stable document, creates/reuses one Final row, and changes no SharePoint item. | `MOCKED SUITES PASS; operator case NOT RUN` | `PARTIAL — read subset above; remaining checks NOT RUN` |
 | FINAL-2 leadership transition | `pages/api/workbench/final-writeup/leadership-review.js`; Final Writeup tab | Leadership transition verifies current pointer/version, applies the ordered ETag changeset, records actor/time, and replays a landed response without a second write. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
-| AUTH-1 negative access | Every named Workbench route plus external briefing routes | Unauthenticated, wrong-app, non-reviewer, missing actor, invalid GUID/body, stale expected identity, and unauthorized leadership requests fail before service writes. | `MOCKED SUITES PASS; operator case NOT RUN` | `NOT RUN — live` |
+| AUTH-1 negative access | Every named Workbench route plus external briefing routes | Unauthenticated, wrong-app, non-reviewer, missing actor, invalid GUID/body, stale expected identity, and unauthorized leadership requests fail before service writes. | `MOCKED SUITES PASS; operator case NOT RUN` | `PARTIAL — read subset above; remaining checks NOT RUN` |
 
 The external briefing `GET /api/external/briefing/[token]/document?member=review-bundle`
 is **not** a read-only production smoke. `resolveBriefingMember` may rebuild and
@@ -239,7 +281,7 @@ rebuild and persist a retained review bundle when the live review fingerprint
 differs. Exercise that member only in the mocked DIST-2 case or an explicitly
 approved sandbox write rehearsal.
 
-## Operator checklist (deployment cases not run)
+## Operator checklist (read subset run; write cases not run)
 
 Use separate disposable fixtures when restore, reopen or a lifecycle transition
 would invalidate another case's preconditions. For each case record the exact
