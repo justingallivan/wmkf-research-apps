@@ -63,6 +63,7 @@ import {
 } from '../../lib/services/initial-assessment/artifact-service.js';
 import {
   INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT,
+  INITIAL_ASSESSMENT_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
@@ -258,7 +259,7 @@ beforeEach(() => {
     blocked: false,
     meta: {
       promptName: 'initial-assessment.generate',
-      promptVersion: 1,
+      promptVersion: INITIAL_ASSESSMENT_CONTRACT.promptVersion,
       promptId: '66666666-6666-6666-6666-666666666666',
     },
   });
@@ -569,6 +570,36 @@ it('does not return success when SharePoint upload succeeds but final registry P
     ARTIFACT_ID,
     expect.objectContaining({
       wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    }),
+    expect.any(Object),
+  );
+});
+
+it('fails closed with a specific code when the published prompt version differs from the producer contract', async () => {
+  const runId = '55555555-5555-5555-5555-555555555555';
+  executePrompt.mockResolvedValueOnce({
+    parsed: { summary: 's', significance_impact: 'i', research_plan: 'r', team_expertise: 't' },
+    runId,
+    blocked: false,
+    meta: {
+      promptName: 'initial-assessment.generate',
+      promptVersion: INITIAL_ASSESSMENT_CONTRACT.promptVersion + 1,
+      promptId: '66666666-6666-6666-6666-666666666666',
+    },
+  });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 500,
+    body: { code: 'initial_assessment_prompt_version_mismatch', runId },
+  });
+  expect(renderInitialAssessmentDocx).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.update).toHaveBeenCalledWith(
+    ARTIFACT_ID,
+    expect.objectContaining({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      wmkf_lasterrorcode: 'initial_assessment_prompt_version_mismatch',
+      'wmkf_AIRun@odata.bind': `/wmkf_ai_runs(${runId})`,
     }),
     expect.any(Object),
   );
@@ -891,7 +922,7 @@ it('stops an active successor when cleanup overflow appears after preparation', 
       blocked: false,
       meta: {
         promptName: 'initial-assessment.generate',
-        promptVersion: 1,
+        promptVersion: INITIAL_ASSESSMENT_CONTRACT.promptVersion,
         promptId: '66666666-6666-6666-6666-666666666666',
       },
     };

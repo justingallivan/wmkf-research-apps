@@ -48,7 +48,7 @@
 - Review-form multiselect: ../docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md
 - Dataverse / Dynamics / Explorer / CRM facts: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Dynamics Explorer behavior campaign / SoCal vernacular / Explorer telemetry+eval: ../docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md; project-dynamics-explorer-socal-campaign.md
-- Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md; project-prompt-governance.md
+- Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md; project-prompt-governance.md; project-executor-thinking-budget-truncation.md
 - Initial Assessment registry/controls and Final Writeup lineage/review: ../docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md; ../docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md; project-j27-doc-capture-evolution.md; project-reviewer-apps-redesign-direction.md
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
 - Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md; project-reviewer-org-open-access-by-design.md

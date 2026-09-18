@@ -207,10 +207,18 @@ The normalized provider response must end with `stopReason="end_turn"` before
 raw or JSON output can reach persistence. `max_tokens`,
 `model_context_window_exceeded`, `refusal`, missing, and unreviewed stop reasons
 fail closed even if the returned text happens to be syntactically valid JSON.
-Typed output errors include `code`, `stopReason`, and `maxTokens`; the current
-codes are `claude_output_truncated`, `claude_context_window_exceeded`,
+Typed output errors include `code`, `stopReason`, `maxTokens`, and the content-free
+diagnostics `blocks` (per-block `{type, chars}` census), `thinkingTokens`
+(`usage.output_tokens_details.thinking_tokens`, null when not reported), and
+`budgetAdvisory` (set when a thinking-default model runs below the 4,096-token
+advisory floor; never blocks the call). The current codes are
+`claude_output_truncated`, `claude_context_window_exceeded`,
 `claude_output_refused`, `claude_output_incomplete`, and
-`claude_output_invalid_json`.
+`claude_output_invalid_json`. A `max_tokens` stop with no text block keeps the
+`claude_output_truncated` code (callers' bounded escalation retry depends on it)
+and additionally sets `truncatedBeforeText=true`: on Opus 5 / Sonnet 5 / Fable,
+default thinking spends tokens inside `max_tokens`, so an under-sized row budget
+can be consumed before any answer text exists.
 
 Every error thrown from inside the audited execution pipeline is annotated with `usage`, `modelUsed`, `provider`,
 `usageComplete`, and `paidCall`. `paidCall=true` means a provider response was
@@ -476,7 +484,7 @@ that no execution occurred.
 | `wmkf_ai_model` | The model ID actually used |
 | `wmkf_ai_rawoutput` | Completed provider response according to `rawOutputRetention` (`full`, `hash`, or `none`), or a thrown-failure diagnostic envelope whose nested response output applies the same retention policy |
 | `wmkf_ai_request` | Lookup to `akoya_request` (if applicable) |
-| `wmkf_ai_notes` | Input/output token counts + cache hit counts + any error summary; includes `semanticAttempt` and, for a linked caller retry, `retryOf=<prior run GUID>` |
+| `wmkf_ai_notes` | Input/output token counts + cache hit counts + any error summary; includes `semanticAttempt`, for a linked caller retry `retryOf=<prior run GUID>`, and the content-free diagnostics `blocks=<type:chars,...>`, `thinkingTokens=<n>` (when reported), `thinkingBudget=below_floor(4096)` (thinking-default model under the advisory floor), and on a zero-text `max_tokens` stop `truncatedBeforeText=true` |
 | `createdon` | Built-in Dataverse creation timestamp for the run row. Do not write vestigial `wmkf_ai_rundatetime`. |
 
 ---

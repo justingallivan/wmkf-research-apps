@@ -29,6 +29,7 @@ jest.mock('../../lib/services/openai-client.js', () => ({
 
 import { executePrompt } from '../../lib/services/execute-prompt.js';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
+import * as aiRunAdapter from '../../lib/dataverse/adapters/ai-run.js';
 import { LLMClient } from '../../lib/services/llm-client.js';
 import { OpenAIClient } from '../../lib/services/openai-client.js';
 
@@ -187,6 +188,58 @@ describe('Executor post-response accounting', () => {
         cache_read_input_tokens: 0,
       },
     });
+  });
+
+  it('classifies a thinking-only max_tokens stop as truncated before text and audits a content-free census', async () => {
+    aiRunAdapter.create.mockClear();
+    mockClaudeComplete.mockResolvedValueOnce({
+      ...normalized({ text: '', stopReason: 'max_tokens', model: 'claude-opus-5' }),
+      content: [{ type: 'thinking', thinking: '', signature: 'opaque-signature' }],
+      blocks: [{ type: 'thinking', chars: 0 }],
+      thinkingTokens: 2200,
+    });
+    await expect(run(prompt('claude-opus-5'))).rejects.toMatchObject({
+      code: 'claude_output_truncated',
+      truncatedBeforeText: true,
+      stopReason: 'max_tokens',
+      blocks: [{ type: 'thinking', chars: 0 }],
+      thinkingTokens: 2200,
+      budgetAdvisory: { thinkingMode: 'adaptive_default_on', maxTokens: 1000, floor: 4096 },
+      message: expect.stringMatching(/before emitting any answer text.*thinking floor/),
+    });
+    const payload = aiRunAdapter.create.mock.calls.at(-1)[0];
+    for (const fragment of ['truncatedBeforeText=true', 'blocks=thinking:0', 'thinkingTokens=2200', 'thinkingBudget=below_floor(4096)']) {
+      expect(payload.wmkf_ai_notes).toContain(fragment);
+    }
+    const raw = JSON.parse(payload.wmkf_ai_rawoutput);
+    expect(raw.response.blocks).toEqual([{ type: 'thinking', chars: 0 }]);
+    expect(raw.response.thinkingTokens).toBe(2200);
+    expect(raw.response.budgetAdvisory).toEqual({ thinkingMode: 'adaptive_default_on', maxTokens: 1000, floor: 4096 });
+    expect(payload.wmkf_ai_rawoutput).not.toContain('opaque-signature');
+  });
+
+  it('keeps partial-text truncation out of the before-text classification', async () => {
+    mockClaudeComplete.mockResolvedValueOnce({
+      ...normalized({ text: '{"answer":"par', stopReason: 'max_tokens', model: 'claude-opus-5' }),
+      blocks: [{ type: 'thinking', chars: 0 }, { type: 'text', chars: 14 }],
+      thinkingTokens: null,
+    });
+    const error = await run(prompt('claude-opus-5')).catch((e) => e);
+    expect(error.code).toBe('claude_output_truncated');
+    expect(error.truncatedBeforeText).toBe(false);
+    expect(error.message).not.toMatch(/before emitting/);
+  });
+
+  it('records the thinking-budget advisory on a successful low-budget run only for thinking-default models', async () => {
+    aiRunAdapter.create.mockClear();
+    await run(prompt('claude-opus-5'));
+    expect(aiRunAdapter.create.mock.calls.at(-1)[0].wmkf_ai_notes).toContain('thinkingBudget=below_floor(4096)');
+    aiRunAdapter.create.mockClear();
+    await run(prompt('claude-opus-4-8'));
+    expect(aiRunAdapter.create.mock.calls.at(-1)[0].wmkf_ai_notes).not.toContain('thinkingBudget');
+    aiRunAdapter.create.mockClear();
+    await run(prompt('claude-opus-5', { wmkf_ai_maxtokens: 4096 }));
+    expect(aiRunAdapter.create.mock.calls.at(-1)[0].wmkf_ai_notes).not.toContain('thinkingBudget');
   });
 
   it('propagates incomplete usage on success and failure', async () => {
