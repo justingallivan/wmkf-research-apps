@@ -117,6 +117,45 @@ function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
   return { request, source, rows, metadata, dependencies, actorId };
 }
 
+function finalStatusRow(overrides = {}) {
+  return {
+    wmkf_requestdocumentid: FINAL_ID,
+    _wmkf_request_value: REQUEST_ID,
+    _wmkf_sourcedocument_value: SOURCE_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.FINAL_WRITEUP,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: 'final-generation',
+    wmkf_claimtoken: 'claim-token',
+    wmkf_sharepointsiteid: 'site-id',
+    wmkf_sharepointdriveid: 'drive-id',
+    wmkf_sharepointitemid: 'item-id',
+    wmkf_sharepointweburl: 'https://sharepoint.test/final.docx',
+    wmkf_sharepointversionid: '2.0',
+    wmkf_sharepointetag: 'file-etag-2',
+    wmkf_filename: '1002379 Final Writeup.docx',
+    wmkf_filesize: 1300,
+    wmkf_sharepointlastmodified: '2026-08-30T19:00:00Z',
+    ...overrides,
+  };
+}
+
+function installFinalStatusReadPurity(dependencies) {
+  const names = [
+    'createDocument', 'updateDocument', 'commitChangeset', 'uploadFile',
+    'copyFile', 'deleteFile', 'generateText', 'getFileMetadataById',
+    'downloadFile', 'hashDocx',
+  ];
+  for (const name of names) {
+    if (!dependencies[name]) dependencies[name] = jest.fn(() => { throw new Error(`${name} must not run`); });
+  }
+  return names;
+}
+
+function expectFinalStatusReadPure(dependencies, names = installFinalStatusReadPurity(dependencies)) {
+  for (const name of names) expect(dependencies[name]).not.toHaveBeenCalled();
+}
+
 test('Wave 24 strict mode rejects an unverified actor before Graph or Dataverse writes', async () => {
   const harness = createHarness();
   harness.dependencies.resolveActor.mockRejectedValue(Object.assign(
@@ -140,6 +179,8 @@ test('Wave 24 strict mode rejects an unverified actor before Graph or Dataverse 
 
 test('moves the same stable Word item into one Ready/Review Final row atomically', async () => {
   const harness = createHarness();
+  harness.dependencies.uploadFile = jest.fn();
+  harness.dependencies.copyFile = jest.fn();
   const result = await startFinalWriteup({
     requestId: REQUEST_ID,
     expectedArtifactId: SOURCE_ID,
@@ -181,24 +222,43 @@ test('moves the same stable Word item into one Ready/Review Final row atomically
     }),
   );
   expect(harness.dependencies.commitChangeset).toHaveBeenCalledWith(
-    expect.arrayContaining([
-      expect.objectContaining({
+    [
+      {
+        method: 'PATCH',
+        entitySet: 'wmkf_requestdocuments',
+        key: SOURCE_ID,
         body: { wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL },
-      }),
-      expect.objectContaining({
-        body: expect.objectContaining({
+        ifMatch: 'source-etag-1',
+      },
+      {
+        method: 'PATCH',
+        entitySet: 'wmkf_requestdocuments',
+        key: FINAL_ID,
+        body: {
+          wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+          wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+          wmkf_claimtoken: null,
           wmkf_groupreviewstartedat: '2026-08-30T19:05:00.000Z',
           'wmkf_GroupReviewStartedBy@odata.bind': `/systemusers(${LEAD_PD_ID})`,
-        }),
-      }),
-      expect.objectContaining({
-        body: {
-          'wmkf_CurrentFinalWriteup@odata.bind': `/wmkf_requestdocuments(${FINAL_ID})`,
+          wmkf_milestonecreatedat: '2026-08-30T19:05:00.000Z',
+          wmkf_lasterrorcode: null,
+          wmkf_lasterrormessage: null,
+          wmkf_lastfailedat: null,
         },
-      }),
-    ]),
+        ifMatch: 'final-etag-1',
+      },
+      {
+        method: 'PATCH',
+        entitySet: 'akoya_requests',
+        key: REQUEST_ID,
+        body: { 'wmkf_CurrentFinalWriteup@odata.bind': `/wmkf_requestdocuments(${FINAL_ID})` },
+        ifMatch: 'request-etag-1',
+      },
+    ],
     { actingUserSystemId: LEAD_PD_ID },
   );
+  expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+  expect(harness.dependencies.copyFile).not.toHaveBeenCalled();
   expect(harness.request._wmkf_currentpresitevisit_value).toBe(SOURCE_ID);
   expect(harness.request._wmkf_currentfinalwriteup_value).toBe(FINAL_ID);
   expect(harness.source.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL);
@@ -291,6 +351,189 @@ test('schema-off status and transition perform no Dataverse work', async () => {
     httpStatus: 503,
   });
   expect(harness.dependencies.getRequest).not.toHaveBeenCalled();
+});
+
+test.each([true, false])('status projects the exact pending Final from populated rows (generating present: %s)', async (hasGenerating) => {
+  const harness = createHarness();
+  const failedId = '88888888-8888-4888-8888-888888888888';
+  const pendingId = '77777777-7777-4777-8777-777777777777';
+  harness.rows.push(
+    finalStatusRow({
+      wmkf_requestdocumentid: failedId,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      wmkf_claimtoken: null,
+      wmkf_lasterrorcode: 'final_writeup_source_changed',
+      wmkf_lasterrormessage: 'source changed',
+      wmkf_lastfailedat: '2026-08-30T19:07:00Z',
+    }),
+    {
+      ...harness.source,
+      wmkf_requestdocumentid: '99999999-9999-4999-8999-999999999999',
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_milestoneversionid: 'milestone-v1',
+      wmkf_milestonecontenthash: 'gdc1:milestone',
+      wmkf_milestonecreatedat: '2026-08-30T18:30:00Z',
+    },
+    finalStatusRow({
+      wmkf_requestdocumentid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+      wmkf_claimtoken: null,
+    }),
+  );
+  if (hasGenerating) harness.rows.push(finalStatusRow({ wmkf_requestdocumentid: pendingId }));
+  const purityNames = installFinalStatusReadPurity(harness.dependencies);
+
+  const result = await getFinalWriteupStatus({
+    requestId: REQUEST_ID,
+    isSuperuser: false,
+    actingUserSystemId: LEAD_PD_ID,
+  }, harness.dependencies);
+
+  expect(result).toEqual({
+    available: true,
+    phase: hasGenerating ? 'starting' : 'ready',
+    canStart: true,
+    canAdvance: false,
+    sourceArtifactId: SOURCE_ID,
+    sourceFile: { webUrl: harness.source.wmkf_sharepointweburl, name: harness.source.wmkf_filename },
+    artifact: null,
+    pendingArtifact: {
+      artifactId: hasGenerating ? pendingId : failedId,
+      sourceArtifactId: SOURCE_ID,
+      artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.FINAL_WRITEUP,
+      operationStatus: hasGenerating ? REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING : REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      file: {
+        siteId: 'site-id',
+        driveId: 'drive-id',
+        itemId: 'item-id',
+        webUrl: 'https://sharepoint.test/final.docx',
+        versionId: '2.0',
+        name: '1002379 Final Writeup.docx',
+        size: 1300,
+        lastModified: '2026-08-30T19:00:00Z',
+      },
+      groupReview: { startedAt: null, startedById: null },
+      leadershipReview: { startedAt: null, startedById: null, startedByName: null },
+      lastError: hasGenerating ? null : {
+        code: 'final_writeup_source_changed',
+        message: 'source changed',
+        failedAt: '2026-08-30T19:07:00Z',
+      },
+    },
+  });
+  expectFinalStatusReadPure(harness.dependencies, purityNames);
+});
+
+test('status ignores pending rows after a valid committed Final pointer and remains read-pure', async () => {
+  const harness = createHarness();
+  const committed = finalStatusRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    wmkf_claimtoken: null,
+    wmkf_sourceversionid: '2.0',
+    wmkf_sourcecontenthash: 'gdc1:final-source-hash',
+    wmkf_groupreviewstartedat: '2026-08-30T19:05:00Z',
+    _wmkf_groupreviewstartedby_value: LEAD_PD_ID,
+  });
+  const pending = finalStatusRow({
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    wmkf_generationkey: 'later-generation',
+  });
+  harness.rows.push(committed, pending);
+  harness.request._wmkf_currentfinalwriteup_value = FINAL_ID;
+  harness.source.wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
+  const forbidden = installFinalStatusReadPurity(harness.dependencies);
+
+  const result = await getFinalWriteupStatus({
+    requestId: REQUEST_ID,
+    isSuperuser: false,
+    actingUserSystemId: LEAD_PD_ID,
+  }, harness.dependencies);
+
+  expect(result).toEqual({
+    available: true,
+    phase: 'group-review',
+    canStart: false,
+    canAdvance: true,
+    sourceArtifactId: SOURCE_ID,
+    artifact: {
+      artifactId: FINAL_ID,
+      sourceArtifactId: SOURCE_ID,
+      artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.FINAL_WRITEUP,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      file: {
+        siteId: 'site-id', driveId: 'drive-id', itemId: 'item-id',
+        webUrl: 'https://sharepoint.test/final.docx', versionId: '2.0',
+        name: '1002379 Final Writeup.docx', size: 1300,
+        lastModified: '2026-08-30T19:00:00Z',
+      },
+      groupReview: { startedAt: '2026-08-30T19:05:00Z', startedById: LEAD_PD_ID },
+      leadershipReview: { startedAt: null, startedById: null, startedByName: null },
+      lastError: null,
+    },
+    pendingArtifact: null,
+  });
+  expectFinalStatusReadPure(harness.dependencies, forbidden);
+});
+
+test('status rejects duplicate pending Generating Final rows even when a Failed row is also present', async () => {
+  const harness = createHarness();
+  harness.rows.push(
+    finalStatusRow({ wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777' }),
+    finalStatusRow({ wmkf_requestdocumentid: '88888888-8888-4888-8888-888888888888' }),
+    finalStatusRow({
+      wmkf_requestdocumentid: '99999999-9999-4999-8999-999999999999',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      wmkf_claimtoken: null,
+    }),
+  );
+  const purityNames = installFinalStatusReadPurity(harness.dependencies);
+  await expect(getFinalWriteupStatus({
+    requestId: REQUEST_ID,
+    isSuperuser: false,
+    actingUserSystemId: LEAD_PD_ID,
+  }, harness.dependencies)).rejects.toMatchObject({
+    code: 'final_writeup_duplicate_pending',
+    httpStatus: 500,
+  });
+  expectFinalStatusReadPure(harness.dependencies, purityNames);
+});
+
+test.each([
+  ['unknown source operation', (h) => { h.source.wmkf_operationstatus = 999999999; }, 'final_writeup_state_unknown'],
+  ['unknown source lifecycle', (h) => { h.source.wmkf_lifecyclestate = 999999999; }, 'final_writeup_state_unknown'],
+  ['unknown current Final operation', (h) => {
+    h.source.wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
+    h.request._wmkf_currentfinalwriteup_value = FINAL_ID;
+    h.rows.push(finalStatusRow({
+      wmkf_operationstatus: 999999999,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_claimtoken: null,
+    }));
+  }, 'final_writeup_state_unknown'],
+  ['unknown current Final lifecycle', (h) => {
+    h.source.wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
+    h.request._wmkf_currentfinalwriteup_value = FINAL_ID;
+    h.rows.push(finalStatusRow({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: 999999999,
+      wmkf_claimtoken: null,
+    }));
+  }, 'final_writeup_state_unknown'],
+])('status fails closed for %s', async (_label, mutate, code) => {
+  const harness = createHarness();
+  mutate(harness);
+  const purityNames = installFinalStatusReadPurity(harness.dependencies);
+  await expect(getFinalWriteupStatus({
+    requestId: REQUEST_ID,
+    isSuperuser: false,
+    actingUserSystemId: LEAD_PD_ID,
+  }, harness.dependencies)).rejects.toMatchObject({ code });
+  expectFinalStatusReadPure(harness.dependencies, purityNames);
 });
 
 test('does not create a Final row when Word changes during verification', async () => {
