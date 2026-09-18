@@ -419,6 +419,11 @@ required for this feature. Map an invalid/non-DOCX item at the target path to
 `content_conflict` rather than leaking the helper's Initial-Assessment-branded
 exception.
 
+The first-release import restriction above is historical evidence. **Current
+source state is built on the local decomposition branch and not deployed:** the
+neutral implementation lives in `documents/governed-docx-hash.js`, while the
+Initial Assessment path remains a compatibility export for existing consumers.
+
 ### Create-only and recovery algorithm
 
 For one eligible suggestion:

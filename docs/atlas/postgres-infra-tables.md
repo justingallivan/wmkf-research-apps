@@ -204,7 +204,7 @@ and two CHECK constraints, `pre_site_distribution_brief_fingerprint_shape` and
 an acknowledged-drift row requires both fingerprints, a differing pair, an object
 delta, and both acknowledgement fields). Mirrored byte-for-byte in
 `scripts/setup-database.js`; the parity test compares the real CHECK bodies.
-Written by `distribution-service.js` prepare when staff acknowledge drift; read
+Written by `distribution/prepare.js` (entered through the `distribution-service.js` compatibility facade) when staff acknowledge drift; read
 by `briefing-page-service.js` as the timestamp-only `staffAcknowledgedNewerInputs`.
 
 **[VERIFIED LIVE 2026-09-17 — migration 053 applied to the shared Production/Preview database by the owner-authorized `node scripts/apply-migrations.js` run (tracker `applied_at` 2026-09-17T13:57:15Z); readback exact: ten nullable columns, both CHECK constraints, 17 pre-existing attempt rows all satisfy the constraints]**
@@ -226,9 +226,9 @@ parity test compares the real CHECK bodies. The bundle sits beside the brief
 PDF snapshot as a governed `wmkf_requestdocument` row
 (producer `request-workbench-distribution-review-bundle`), created through
 `ensureSnapshot` and retained via
-`lib/services/pre-site-visit/review-bundle-service.js`/`retainReviewBundle`
-(`distribution-service.js`). The nine identity columns are written by
-`distribution-service.js` prepare (`recordDistributionPrepared`) at Share
+`lib/services/pre-site-visit/review-bundle-service.js` / `distribution/retained-snapshot.js` `retainReviewBundle`
+(also exported by the `distribution-service.js` compatibility facade). The nine identity columns are written by
+`distribution/prepare.js` (`recordDistributionPrepared`, entered through the facade) at Share
 time; `review_bundle_rebuilt_at` stays NULL there. **[SOURCE-BUILT
 2026-09-16 on `claude/pre-rp-brief-review-bundle`; deployment pending; plan
 §11, Step C2]** The same nine columns plus `review_bundle_rebuilt_at` are
@@ -266,9 +266,10 @@ cannot advance past attachment recovery without that receipt. The calendar is
 rebuilt from the stored bounded snapshot and byte-hash checked before send;
 selected links and the live Site Visit ETag are re-resolved under the lease.
 `sent_at` means Dynamics accepted or status readback proved the transport
-request, not inbox delivery. Read/write paths:
-`lib/services/pre-site-visit/distribution-store.js` and
-`lib/services/pre-site-visit/distribution-service.js`.
+request, not inbox delivery. Read/write paths (**Stage1–7 owner paths are source-built on this local branch; not deployed**):
+`lib/services/pre-site-visit/distribution-store.js`,
+`distribution/prepare.js`, `send.js`, `history.js`, and `email-recovery.js`
+(entered through the `distribution-service.js` compatibility facade).
 Migration 038 **[PLANNED, not applied]** adds nullable `briefing_link_id`
 (the `deliberation_briefing_links.id` an exact preview carried; send refuses
 when that link is no longer live). The column is only named by a separate

@@ -24,6 +24,13 @@ This is a source-code migration, not a database migration. Accepted stages and
 verification are recorded in
 `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`.
 
+**Implementation annotation — verified locally 2026-09-18.** Stages 1–7 have
+accepted behavior-preserving runtime commits and receipts. The original service
+modules remain compatibility facades; physical ownership now follows the staged
+leaf inventory in this plan, including the neutral governed-DOCX hash leaf and
+the distribution prepare/send/history/recovery leaves. This annotation records
+source state only; it does not claim deployment or live-data migration.
+
 ## 1. Decision and scope
 
 The recommended large refactor is **separating the governed document lifecycle's
