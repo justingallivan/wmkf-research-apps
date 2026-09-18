@@ -170,6 +170,13 @@ function expectNoReadSideEffects() {
   expect(GraphService.deleteFile).not.toHaveBeenCalled();
 }
 
+function orderedMockCalls(entries) {
+  return entries
+    .flatMap(([label, mock]) => mock.mock.invocationCallOrder.map((order) => ({ label, order })))
+    .sort((left, right) => left.order - right.order)
+    .map(({ label }) => label);
+}
+
 it('projects only the explicit initiator and never relabels built-in createdby as staff', () => {
   const projected = projectArtifact(registryRow({
     _createdby_value: '99999999-9999-4999-8999-999999999999',
@@ -492,6 +499,17 @@ it('returns a Ready row without rerunning AI or overwriting SharePoint', async (
   expect(executePrompt).not.toHaveBeenCalled();
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
   expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
+  expect(GraphService.ensureFolderPath).not.toHaveBeenCalled();
+  expect(orderedMockCalls([
+    ['request', grantRequestAdapter.getById],
+    ['proposal', getAiProposalNarrativeText],
+    ['generation-read', requestDocumentAdapter.findByGenerationKey],
+    ['request-documents', requestDocumentAdapter.findByRequest],
+  ])).toEqual([
+    'request', 'proposal', 'generation-read', 'generation-read',
+    'request-documents', 'request',
+  ]);
 });
 
 it('fails closed before persistence or AI when the AI proposal narrative is absent', async () => {
@@ -548,6 +566,28 @@ it('atomically reactivates an exact superseded Ready artifact when inputs revert
     .toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED);
   expect(executePrompt).not.toHaveBeenCalled();
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(runChangeset).toHaveBeenCalledTimes(1);
+  expect(runChangeset.mock.calls[0][0].map((operation) => [
+    operation.entitySet,
+    operation.key,
+    Object.keys(operation.body)[0],
+  ])).toEqual([
+    ['wmkf_requestdocuments', currentlyActive.wmkf_requestdocumentid, 'wmkf_lifecyclestate'],
+    ['wmkf_requestdocuments', currentRegistryRow.wmkf_requestdocumentid, 'wmkf_operationstatus'],
+    ['akoya_requests', REQUEST_ID, 'wmkf_CurrentInitialAssessment@odata.bind'],
+  ]);
+  expect(orderedMockCalls([
+    ['request', grantRequestAdapter.getById],
+    ['proposal', getAiProposalNarrativeText],
+    ['generation-read', requestDocumentAdapter.findByGenerationKey],
+    ['request-documents', requestDocumentAdapter.findByRequest],
+    ['request-update', requestDocumentAdapter.update],
+    ['changeset', runChangeset],
+  ])).toEqual([
+    'request', 'proposal', 'generation-read', 'generation-read',
+    'request-documents', 'request', 'changeset', 'request-update',
+    'request-update', 'generation-read', 'request', 'request-documents',
+  ]);
 });
 
 it('writes the approved Artifacts/Initial Assessment path and confirms registry Ready', async () => {
@@ -574,6 +614,60 @@ it('writes the approved Artifacts/Initial Assessment path and confirms registry 
     requireNoPersistence: true,
   }));
   expect(result.artifact.file).toMatchObject({ driveId: 'drive', itemId: 'item' });
+  expect(orderedMockCalls([
+    ['request', grantRequestAdapter.getById],
+    ['proposal', getAiProposalNarrativeText],
+    ['generation-read', requestDocumentAdapter.findByGenerationKey],
+    ['bucket', getRequestSharePointBuckets],
+    ['create', requestDocumentAdapter.create],
+    ['ai', executePrompt],
+    ['render', renderInitialAssessmentDocx],
+    ['update', requestDocumentAdapter.update],
+    ['folder', GraphService.ensureFolderPath],
+    ['upload', GraphService.uploadFile],
+    ['request-documents', requestDocumentAdapter.findByRequest],
+    ['changeset', runChangeset],
+  ])).toEqual([
+    'request', 'proposal', 'generation-read', 'bucket', 'create',
+    'generation-read', 'ai', 'render', 'generation-read', 'update',
+    'generation-read', 'folder', 'generation-read', 'upload',
+    'generation-read', 'request-documents', 'request', 'changeset',
+    'update', 'generation-read', 'request', 'request-documents',
+  ]);
+
+  const effectOrder = [
+    ['create', requestDocumentAdapter.create.mock.invocationCallOrder[0]],
+    ['ai', executePrompt.mock.invocationCallOrder[0]],
+    ['folder', GraphService.ensureFolderPath.mock.invocationCallOrder[0]],
+    ['upload', GraphService.uploadFile.mock.invocationCallOrder[0]],
+    ['ready-changeset', runChangeset.mock.invocationCallOrder[0]],
+  ];
+  expect(effectOrder.map(([label]) => label)).toEqual([
+    'create', 'ai', 'folder', 'upload', 'ready-changeset',
+  ]);
+  expect(effectOrder.map(([, order]) => order)).toEqual(
+    [...effectOrder.map(([, order]) => order)].sort((left, right) => left - right),
+  );
+  const operations = runChangeset.mock.calls[0][0];
+  expect(operations.map((operation) => [operation.entitySet, Object.keys(operation.body)]))
+    .toEqual([
+      ['wmkf_requestdocuments', [
+        'wmkf_operationstatus',
+        'wmkf_lifecyclestate',
+        'wmkf_lasterrorcode',
+        'wmkf_lasterrormessage',
+        'wmkf_lastfailedat',
+        'wmkf_sharepointsiteid',
+        'wmkf_sharepointdriveid',
+        'wmkf_sharepointitemid',
+        'wmkf_sharepointweburl',
+        'wmkf_sharepointversionid',
+        'wmkf_sharepointetag',
+        'wmkf_filesize',
+        'wmkf_sharepointlastmodified',
+      ]],
+      ['akoya_requests', ['wmkf_CurrentInitialAssessment@odata.bind']],
+    ]);
 });
 
 it('does not return success when SharePoint upload succeeds but final registry PATCH fails', async () => {
@@ -983,6 +1077,32 @@ it('repairs a prior post-upload registry failure by content hash without rerunni
   expect(result).toMatchObject({ reused: true, recovered: true });
   expect(executePrompt).not.toHaveBeenCalled();
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(GraphService.getFileMetadataByPath.mock.invocationCallOrder[0])
+    .toBeLessThan(GraphService.downloadFile.mock.invocationCallOrder[0]);
+  expect(GraphService.downloadFile.mock.invocationCallOrder[0])
+    .toBeLessThan(runChangeset.mock.invocationCallOrder[0]);
+  expect(runChangeset.mock.calls[0][0].map((operation) => [
+    operation.entitySet,
+    Object.keys(operation.body)[0],
+  ])).toEqual([
+    ['wmkf_requestdocuments', 'wmkf_operationstatus'],
+    ['akoya_requests', 'wmkf_CurrentInitialAssessment@odata.bind'],
+  ]);
+  expect(orderedMockCalls([
+    ['request', grantRequestAdapter.getById],
+    ['proposal', getAiProposalNarrativeText],
+    ['generation-read', requestDocumentAdapter.findByGenerationKey],
+    ['metadata-path', GraphService.getFileMetadataByPath],
+    ['download', GraphService.downloadFile],
+    ['request-documents', requestDocumentAdapter.findByRequest],
+    ['request-update', requestDocumentAdapter.update],
+    ['changeset', runChangeset],
+  ])).toEqual([
+    'request', 'proposal', 'generation-read', 'request-update',
+    'generation-read', 'metadata-path', 'download', 'generation-read',
+    'request-documents', 'request', 'changeset', 'request-update',
+    'generation-read', 'request', 'request-documents',
+  ]);
 });
 
 it('recovers a legacy whole-package hash only when downloaded bytes still match exactly', async () => {
