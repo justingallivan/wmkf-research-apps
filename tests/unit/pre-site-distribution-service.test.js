@@ -2057,24 +2057,36 @@ test('an exact sent retry returns its receipt without another Dynamics write', a
 });
 
 test.each([
-  ['recordEmailActivity', { loseActivityResponse: true }, 2],
-  ['createEmailActivity', { loseCreateResponse: true }, 1],
-])('replays a durable activity identity after %s loses its response', async (_boundary, state, ledgerCalls) => {
+  ['recordEmailActivity', { loseActivityResponse: true }, true],
+  ['createEmailActivity', { loseCreateResponse: true }, false],
+])('restarts from an intermediate durable activity after %s loses its response', async (_boundary, state, ledgerWritten) => {
   const harness = durableSendHarness({ row: { attachment_mode: 'none' }, state });
+  const correlation = harness.dependencies.findEmailByCorrelation;
+  let recoveryUnavailable = true;
+  harness.dependencies.findEmailByCorrelation = jest.fn(async (...args) => {
+    const saved = await correlation(...args);
+    if (recoveryUnavailable && saved.length) throw new Error('correlation temporarily unavailable');
+    return saved;
+  });
   const send = () => sendPreSiteDistribution({
     requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
     fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
   }, harness.dependencies);
 
-  const first = await send();
-  expect(harness.row.dynamics_email_id).toBe('88888888-8888-4888-8888-888888888888');
-  expect(first.attempt.transportAccepted).toBe(true);
-  expect(harness.dependencies.recordFailure).not.toHaveBeenCalled();
+  await expect(send()).rejects.toThrow('correlation temporarily unavailable');
+  expect(harness.dependencies.sendEmail).not.toHaveBeenCalled();
+  expect(harness.dependencies.recordFailure).toHaveBeenCalledTimes(1);
+  expect(harness.row.lease_token).toBeNull();
+  expect(harness.row.dynamics_email_id || null).toBe(ledgerWritten ? '88888888-8888-4888-8888-888888888888' : null);
+  expect(harness.row.state).toBe(ledgerWritten ? 'activity_created' : 'prepared');
+  expect(await correlation()).toEqual([expect.objectContaining({ activityid: '88888888-8888-4888-8888-888888888888' })]);
 
+  recoveryUnavailable = false;
   const result = await send();
   expect(result.attempt.transportAccepted).toBe(true);
+  expect(harness.row.dynamics_email_id).toBe('88888888-8888-4888-8888-888888888888');
   expect(harness.dependencies.createEmailActivity).toHaveBeenCalledTimes(1);
-  expect(harness.dependencies.recordEmailActivity).toHaveBeenCalledTimes(ledgerCalls);
+  expect(harness.dependencies.recordEmailActivity).toHaveBeenCalledTimes(1);
   expect(harness.dependencies.sendEmail).toHaveBeenCalledTimes(1);
 });
 
@@ -2592,6 +2604,95 @@ test('transport is not called when the source changes after activity recovery bu
   expect(dependencies.recordSendRequested).not.toHaveBeenCalled();
   expect(dependencies.renewSendLease).not.toHaveBeenCalled();
   expect(dependencies.sendEmail).not.toHaveBeenCalled();
+});
+
+test('final material freshness recheck blocks intent after activity and attachment work', async () => {
+  const crypto = require('node:crypto');
+  const bytes = Buffer.from('pdf-bytes');
+  const materialId = '99999999-9999-4999-8999-999999999999';
+  const harness = durableSendHarness({
+    row: {
+      attachment_mode: 'pdf',
+      pdf_byte_hash: crypto.createHash('sha256').update(bytes).digest('hex'),
+      pdf_size: bytes.length,
+      material_links: [{
+        artifactId: materialId,
+        artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES,
+        artifactTypeLabel: REQUEST_DOCUMENT_ARTIFACT_LABEL[REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES],
+        filename: 'Applicant Slides.pdf',
+        webUrl: 'https://sharepoint.test/slides',
+        driveId: 'materials-drive',
+        itemId: 'slides-item',
+        versionId: '1.0',
+      }],
+    },
+  });
+  const sourceRecords = (await harness.dependencies.findDocumentsByRequest()).records;
+  let materialReads = 0;
+  harness.dependencies.findDocumentsByRequest = jest.fn(async () => {
+    materialReads += 1;
+    const material = {
+      wmkf_requestdocumentid: materialId,
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_filename: 'Applicant Slides.pdf',
+      wmkf_sharepointweburl: 'https://sharepoint.test/slides',
+      wmkf_sharepointdriveid: 'materials-drive',
+      wmkf_sharepointitemid: 'slides-item',
+      wmkf_sharepointversionid: materialReads >= 4 ? '2.0' : '1.0',
+    };
+    return { records: [...sourceRecords, material] };
+  });
+  const input = {
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  };
+  await expect(sendPreSiteDistribution(input, harness.dependencies))
+    .rejects.toMatchObject({ code: 'distribution_material_stale' });
+  expect(materialReads).toBeGreaterThanOrEqual(4);
+  expect(harness.dependencies.recordAttachment).toHaveBeenCalledWith(expect.any(Object), 'pdf');
+  expect(harness.dependencies.recordSendRequested).not.toHaveBeenCalled();
+  expect(harness.dependencies.renewSendLease).not.toHaveBeenCalled();
+  expect(harness.dependencies.sendEmail).not.toHaveBeenCalled();
+});
+
+test('final session-slot freshness recheck blocks intent after activity and attachment work', async () => {
+  const crypto = require('node:crypto');
+  const bytes = Buffer.from('pdf-bytes');
+  const stored = {
+    sessionId: SESSION.sessionId,
+    scheduledStartIso: SESSION.scheduledStartIso,
+    scheduledEndIso: SESSION.scheduledEndIso,
+    ianaTimeZone: 'America/Los_Angeles',
+    meetingLink: 'https://zoom.example/j/123',
+    location: '',
+  };
+  const harness = durableSendHarness({
+    row: {
+      attachment_mode: 'pdf',
+      pdf_byte_hash: crypto.createHash('sha256').update(bytes).digest('hex'),
+      pdf_size: bytes.length,
+      session_snapshot: stored,
+    },
+  });
+  let sessionReads = 0;
+  harness.dependencies.getSession = jest.fn(async () => {
+    sessionReads += 1;
+    return sessionReads === 1 ? SESSION : { ...SESSION, meetingLink: 'https://zoom.example/j/999' };
+  });
+  const input = {
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  };
+  await expect(sendPreSiteDistribution(input, harness.dependencies))
+    .rejects.toMatchObject({ code: 'distribution_session_stale' });
+  expect(sessionReads).toBe(2);
+  expect(harness.dependencies.recordAttachment).toHaveBeenCalledWith(expect.any(Object), 'pdf');
+  expect(harness.dependencies.recordSendRequested).not.toHaveBeenCalled();
+  expect(harness.dependencies.renewSendLease).not.toHaveBeenCalled();
+  expect(harness.dependencies.sendEmail).not.toHaveBeenCalled();
 });
 
 test('a created activity ID is persisted before exact-content mismatch and reused on retry', async () => {
