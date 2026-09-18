@@ -3,7 +3,7 @@ title: Governed Document Lifecycle Execution Record
 domain: architecture
 kind: plan
 status: active
-summary: Local execution receipts for the authorized document service decomposition; no deployment or live-data changes.
+summary: All stages 0–8 accepted locally for the document service decomposition; no deployment or live-data changes.
 owner: product-engineering
 related:
   - docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_DECOMPOSITION_PLAN_2026-09-17.md
@@ -395,3 +395,82 @@ migrations-manifest/docs-catalog, lint (0 errors / 104 existing warnings), types
 canonical Turbopack build. Existing build tracing warnings remain. No live operations
 or deployment. Rollback: revert `a9d4b0e8`; prerequisites remain valid on the old facade.
 Next permitted stage: Stage 8 boundary enforcement, source headers and scoped docs.
+
+
+## Stage 8 — accepted (`588fd382`, `7ed52a45`)
+
+Prior accepted runtime: `a9d4b0e8` (receipt `2fcd405e`). Test prerequisite
+`588fd382` adds the permanent AST boundary helper and thirty Jest cases; with
+nine frozen public-contract cases, 39 focused tests pass. Root took over the
+initial checker draft because its fixtures did not exercise the real checker
+and some import/writer forms were missed. The replacement runs in ordinary
+`npm test`, uses existing parser dependencies, and checks literal imports,
+re-exports, dynamic imports, nested require, named/default exports (including
+literal CommonJS objects), relevant transitive cycles, hash isolation and the
+agenda-to-composition boundary. Nonliteral dependencies in scoped modules fail.
+
+The scoped AST census preserves six physical create seams and six adapter
+bindings across the migrated domains. Separate negative fixtures detect an
+unregistered create call with unchanged binding counts and an added binding
+with unchanged call counts. The existing global gate still enforces all nine
+writers and actor policies. This bounded architecture check is not a general
+JavaScript security scanner. Compatibility imports and the frozen public API
+manifest remain intact; no package or lockfile changed.
+
+Closure `7ed52a45` reconciles source headers, the service catalog, Application/
+Request Document/Postgres Atlases and the historical retention-plan hash note.
+Old facade paths remain valid public entry points. Historical release evidence
+is retained; new physical-owner claims describe this local branch, not production.
+Root's scoped restatement review preserved compatible wiki/actor-plan/site-visit
+references rather than rewriting historical evidence. The source pass changes
+comments/whitespace and removes two unused IA model import specifiers from a
+module that remains imported; executable bodies and initializers are unchanged.
+
+Fresh Sol `01a0b5d4-4e6b-7fa0-b9a0-4c882da46c97` approved the boundary helper,
+negative fixtures, preserved contracts and cumulative scope. It required five
+missing Pre-Site owner headers and correct IA/Pre-Site stage labels. Root added
+the headers; Luna corrected the catalog and qualified Final ownership locally.
+Fresh bounded Sol correction review `01a0b5da-1cd9-7710-9483-56a7f19ddcd8`
+returned READY with no remaining issue. Root independently checked the actual
+source diff, matching fingerprints and verification outputs.
+
+Final reviewed fingerprints:
+
+- Boundary helper: `e401d2a0bb8bfcbf73a57a45efb7db3073f2c8b68cff24b31cba0f0796bb78f9`
+- Boundary tests: `c12083bdd012849b9868eac817ffebd27c3350813d952948f50f999d535bc983`
+- Catalog: `06d4d5e1ba7e96ff0f3d9b3ffc9a7d325f41f332e7da9e7f554a701a02834e2b`
+- Cumulative source/test/gate manifest: `d1685fb85ad2f8962217587d5929c301eb5f6963fd3f13eab17879c13103fae9`
+
+The cumulative fingerprint hashes the UTF-8 concatenation of sorted lines
+`<file SHA-256>  <relative path>\n` for the 49 changed files under `lib/`,
+`tests/` and `scripts/` from baseline `a7cf2518` through `7ed52a45`.
+Documentation and receipt updates are excluded from this source fingerprint.
+
+[VERIFIED via local command outputs and root inspection] Full 958 suites /
+14,151 tests passed, plus all 17 sequential gate/self-test pairs,
+migrations-manifest, docs-catalog, types, lint (0 errors / 104 existing warnings),
+canonical Turbopack build, named-import checks and agent symlink invariants.
+The existing two build tracing warnings remain. Final comment/document corrections
+reran the 39 focused tests, scoped lint, applicable docs gates and exact baseline
+comparisons: all 172 original function bodies and 39 initializers match; 514
+named/default imports resolve. The full tests/build preceded only the last
+comment/document corrections; no executable behavior changed afterward.
+
+No schema/migration, dependency lockfile, readiness/environment, cron, route,
+UI behavior, live-system operation, push or deployment changed. Rollback: revert
+`7ed52a45` and `588fd382` independently for closure/tests, then reverse the runtime
+stage commits if required on an isolated branch. No persisted-data rollback is
+needed for this source decomposition.
+
+## Local completion and release boundary
+
+All planned stages 0–8 are accepted locally. No migration stage remains to build.
+User-visible behavior is intended to remain unchanged; the benefit is separated
+ownership, smaller service entry points and permanent regression coverage for
+future maintenance. Promotion remains a separate owner-authorized release action
+under the existing campaign release strategy. No production smoke was attempted.
+
+No production milestone entry was required: this branch has not shipped. The
+optional claim-evidence pilot report was unavailable because its local state
+could not be read; no observation row or inferred result was added. This advisory
+report limitation does not replace or invalidate the passing required gates.

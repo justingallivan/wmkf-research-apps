@@ -24,12 +24,16 @@ This is a source-code migration, not a database migration. Accepted stages and
 verification are recorded in
 `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`.
 
-**Implementation annotation — verified locally 2026-09-18.** Stages 1–7 have
-accepted behavior-preserving runtime commits and receipts. The original service
+**Implementation annotation — verified locally 2026-09-18.** Stages 0–8 have
+accepted behavior-preserving runtime commits and receipts. The T9 prerequisite
+landed at `588fd382`, and the Stage8 closure was accepted at `7ed52a45`; the
+execution receipt linked above records the stage evidence. The original service
 modules remain compatibility facades; physical ownership now follows the staged
 leaf inventory in this plan, including the neutral governed-DOCX hash leaf and
-the distribution prepare/send/history/recovery leaves. This annotation records
-source state only; it does not claim deployment or live-data migration.
+the distribution prepare/send/history/recovery leaves. Local execution is
+complete, while this plan remains active pending deliberate release; this
+annotation records source state only and does not claim deployment or live-data
+migration.
 
 ## 1. Decision and scope
 

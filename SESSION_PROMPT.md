@@ -1,6 +1,6 @@
-# Session 520 Prompt: Pre-RP Brief bundle smoke and remaining documentation follow-ups
+# Session 521 Prompt: Local document refactor complete; release decision pending
 
-## Session 519 Summary
+## Prior Session 519 Summary
 
 Session 519 was short. It started on `main` in sync with origin, ran every `check:*` gate
 (one red: `check:j27-register`, see below), explained the open applicant-materials
@@ -29,7 +29,7 @@ cron. No code behaviour changed.
 ### Commits (main)
 - `28d719d9` - docs: retire the applicant-materials reminder cron (owner decision 2026-09-17)
 
-## Completed in Session 520
+## Session 520 Summary
 
 1. **J27 register citation repair.** The four rows in
    `docs/J27_TRANSITION_REGISTER.md` (J27-053 line 97, J27-057 line 101, J27-062 line 111,
@@ -72,12 +72,24 @@ cron. No code behaviour changed.
    unchanged facade exports and sequencing; fresh Sol/root approval, 957 suites /
    14,113 tests and required checks. Stage 7 accepted in `a9d4b0e8`: Final model/
    defaults/state/claims separated, both commands and five public names preserved;
-   fresh Sol/root approval, 957 suites / 14,121 tests and required checks. Next:
-   Stage 8 boundaries/documentation. Receipts:
+   fresh Sol/root approval, 957 suites / 14,121 tests and required checks. Stage 8
+   accepted in `588fd382` (boundary prerequisites) and `7ed52a45` (closure): AST
+   import/cycle/export/writer enforcement, source headers and ownership docs; fresh
+   Sol/root approval, 958 suites / 14,151 tests and required checks. All stages 0–8
+   are complete locally; no migration stage remains to build. Receipts:
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 
 ## Next Items
+
+**Local refactor release boundary:** all stages are committed on
+`codex/document-lifecycle-decomposition`; do not push, merge or deploy without a
+new release instruction. UI behavior is intended to remain unchanged. No production
+milestone entry was required because the branch has not shipped. The optional
+claim-evidence report could not read its local state; no observation was inferred.
+The unrelated carryovers below retain their prior evidence and need fresh checks
+before any live work; this refactor did not re-probe production.
+
 
 ### Verified Open
 
