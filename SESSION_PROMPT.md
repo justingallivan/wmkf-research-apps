@@ -97,6 +97,8 @@ cron. No code behaviour changed.
 
    Current next step: Claude-owned token-budget/prompt-version work remains unresolved; no Codex work is authorized on that issue.
 
+   Follow-up smoke continuation on isolated candidate `f45581ed`: the 269-route build passed; Board snapshot returned row `dc7558c4-b2b3-f111-aaac-7ced8d3c3a59` for IA artifact `a6876ad6-3b94-f111-8075-70a8a59cded0` at v3.0 with governed hash `gdc1:yGi7ISeqZspD0PwIecM9bbGPZQhn7hJpEV_k6Qgv4Yk` and distinct item `01G4GVMS5XTETQIS3JPNEIXAKRDZPRBY35`. Distribution prepare returned 503 `distribution_briefing_required` (operation `061f25d7-b0c1-40d7-8c1e-18f1e098d6c6`) with no send; the 26-document projection and 13 attempts were unchanged. Guarded reopen returned 503 because `GUARDED_REOPEN_SCHEMA_READY` was unset; its readback was unchanged. `DELIBERATION_BRIEFING_SCHEMA_READY` was also unset; migration 038 is present in source/manifest but no live schema probe or flag change was performed. Local `NEXTAUTH_URL=http://localhost:3000` is not a usable external email origin; no email was sent. S3 blocked at prepare; send not run; S4 deferred/unrun.
+
 ## Next Items
 
 **Local refactor release boundary:** all stages are committed on
