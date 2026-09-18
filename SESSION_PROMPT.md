@@ -50,8 +50,11 @@ cron. No code behaviour changed.
    stage gates, review receipts and rollback. Planning was committed as `02c41a08`.
    The owner subsequently authorized local execution: Luna implements and builds,
    Sol reviews, and the orchestrator performs final acceptance, taking over stalled
-   correction loops. Branch: `codex/document-lifecycle-decomposition`. Stage 0 is
-   in progress; no runtime stage is accepted yet. No push, deployment or live data
+   correction loops. Branch: `codex/document-lifecycle-decomposition`. Stage 0
+   accepted in `7a2ed504`: 955 suites / 14,075 tests, lint/types/canonical build and
+   required gates passed; Sol approved and root verified the real-route tests.
+   Next: Stage 1 hash prerequisites and extraction. Receipts:
+   `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 
 ## Next Items

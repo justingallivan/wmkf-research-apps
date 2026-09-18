@@ -20,7 +20,9 @@ final acceptance and takes over stalled correction loops. Work runs on
 `codex/document-lifecycle-decomposition`; no push, deployment or live data writes
 are authorized. Source planning baseline: `a7cf2518`, 2026-09-17; execution starts
 from `02c41a08`. Stages remain **PLANNED** until their execution receipts are accepted.
-This is a source-code migration, not a database migration.
+This is a source-code migration, not a database migration. Accepted stages and
+verification are recorded in
+`docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`.
 
 ## 1. Decision and scope
 
