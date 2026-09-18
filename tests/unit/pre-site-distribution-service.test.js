@@ -3162,6 +3162,59 @@ describe('partial-failure retries survive the SharePoint rewrite (Codex adversar
     }), dependencies)).rejects.toMatchObject({ code: 'distribution_snapshot_path_conflict' });
   });
 
+  test('an occupied snapshot path is rejected before upload or cleanup, and the unknown item never becomes a Ready snapshot', async () => {
+    const harness = createPrepareHarness();
+    const { dependencies, snapshots } = harness;
+    const differentDocument = Buffer.from('a-different-governed-document');
+    const originalMetadataByPath = dependencies.getFileMetadataByPath;
+    dependencies.getFileMetadataByPath = jest.fn(async (library, folder, filename) => {
+      if (!/^review-/i.test(filename || '')) {
+        return {
+          id: 'unknown-item',
+          driveId: 'unknown-drive',
+          versionId: 'unknown-version',
+          eTag: 'unknown-etag',
+          size: differentDocument.length,
+          name: filename,
+        };
+      }
+      return originalMetadataByPath(library, folder, filename);
+    });
+    const originalDownloadFile = dependencies.downloadFile;
+    dependencies.downloadFile = jest.fn(async (driveId, itemId) => (
+      itemId === 'unknown-item'
+        ? { buffer: differentDocument, filename: 'occupied.docx' }
+        : originalDownloadFile(driveId, itemId)
+    ));
+    dependencies.hashDocx = jest.fn(async (buffer) => (
+      buffer.equals(Buffer.from('governed-word-bytes')) ? 'gdc1:source-hash' : 'gdc1:other-document'
+    ));
+    dependencies.deleteFile = jest.fn();
+
+    await expect(preparePreSiteDistribution(prepareInput(), dependencies))
+      .rejects.toMatchObject({ code: 'distribution_snapshot_path_conflict' });
+
+    expect(dependencies.uploadFile).not.toHaveBeenCalled();
+    expect(dependencies.deleteFile).not.toHaveBeenCalled();
+    expect(dependencies.updateDocument.mock.calls).not.toEqual(expect.arrayContaining([
+      expect.arrayContaining([
+        expect.any(String),
+        expect.objectContaining({
+          wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+          wmkf_sharepointitemid: 'unknown-item',
+        }),
+      ]),
+    ]));
+    expect(dependencies.updateDocument.mock.calls.some(([, patch]) => (
+      patch?.wmkf_sharepointitemid === 'unknown-item'
+      || patch?.wmkf_operationstatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY
+    ))).toBe(false);
+    expect(snapshots.some((row) => (
+      row.wmkf_sharepointitemid === 'unknown-item'
+      || row.wmkf_operationstatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY
+    ))).toBe(false);
+  });
+
   test('same-operation retry: a source whose package SharePoint rewrote after the first capture still re-captures by version and governed content', async () => {
     const harness = createPrepareHarness({ dedupeAttempts: true });
     const { dependencies } = harness;
