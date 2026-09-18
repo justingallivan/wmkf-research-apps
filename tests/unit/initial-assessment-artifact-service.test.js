@@ -61,6 +61,7 @@ import {
   listInitialAssessmentCycles,
   projectArtifact,
 } from '../../lib/services/initial-assessment/artifact-service.js';
+import { hashGovernedDocxContent as hashGovernedDocxContentFromLeaf } from '../../lib/services/documents/governed-docx-hash.js';
 import {
   INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
@@ -296,7 +297,9 @@ it('hashes SharePoint-normalized packaging as the same governed DOCX content', a
   const sharePointVersion = await buildDocx({ sharePointMetadata: true });
 
   await expect(hashGovernedDocxContent(DOCX)).resolves.toBe(FROZEN_GOVERNED_DOCX_HASH);
+  await expect(hashGovernedDocxContentFromLeaf(DOCX)).resolves.toBe(FROZEN_GOVERNED_DOCX_HASH);
   await expect(hashGovernedDocxContent(sharePointVersion)).resolves.toBe(FROZEN_GOVERNED_DOCX_HASH);
+  await expect(hashGovernedDocxContentFromLeaf(sharePointVersion)).resolves.toBe(FROZEN_GOVERNED_DOCX_HASH);
   await expect(hashGovernedDocxContent(DOCX))
     .resolves.toBe(await hashGovernedDocxContent(sharePointVersion));
 });

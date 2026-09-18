@@ -1,14 +1,14 @@
 /**
- * Characterization of the existing governed DOCX hash using the approved
- * individual-review renderer. The hash implementation remains in the Initial
- * Assessment artifact service for this release.
+ * Characterization of the neutral governed DOCX hash using the approved
+ * individual-review renderer. The Initial Assessment facade remains the
+ * compatibility export for its existing public callers.
  *
  * @jest-environment node
  */
 
 const JSZip = require('jszip');
 
-const { hashGovernedDocxContent } = require('../../lib/services/initial-assessment/artifact-service');
+const { hashGovernedDocxContent } = require('../../lib/services/documents/governed-docx-hash');
 const { renderIndividualReviewDocx } = require('../../lib/services/review-documents/docx-renderer');
 
 function copyFixture() {
