@@ -150,7 +150,7 @@ trivial tasks, so several live prompts run below 4,096 and still succeed (read-o
 audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 5 at
 3,000 passed 5/5). A blanket pre-call floor would break them, so the guard is advisory.
 
-**What the code does now — [DEPLOYED TO PRODUCTION 2026-09-18 via PR #314, merge `0b240f0a`, GitHub deployment 6534604317 success; IA generation itself not yet re-rehearsed]:**
+**What the code does now — [DEPLOYED TO PRODUCTION 2026-09-18 via PR #314, merge `0b240f0a`, GitHub deployment 6534604317 success; IA generation re-rehearsed PASS 2026-09-18 23:38Z on request 1003222: run `7770d508` end_turn, out=1065, blocks=text:2971, thinkingTokens=0, maxTokens=12000; Ready row `7d00fffd` (prompt v2, 18,243-byte DOCX, SharePoint v1.0) is the current pointer, prior Ready `a6876ad6` superseded; exact retry reused the row with no new run]:**
 - `llm-client.js` normalizers return `blocks` (content-free `{type, chars}` census) and
   `thinkingTokens` (`usage.output_tokens_details.thinking_tokens`, null when absent).
 - `execute-prompt.js` `thinkingBudgetAdvisory()` flags a thinking-default model below

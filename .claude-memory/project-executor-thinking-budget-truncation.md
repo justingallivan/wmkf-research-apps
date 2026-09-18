@@ -1,6 +1,6 @@
 ---
 name: project-executor-thinking-budget-truncation
-description: Opus 5 / Sonnet 5 / Fable think by default and spend max_tokens on reasoning; a prompt row budget sized for answer text (IA 2,200) stops on max_tokens with ZERO text. Advisory floor 4,096 + content-free block census deployed to production 2026-09-18 via PR #314 (IA generation not yet re-rehearsed); a tier-alias advance or model-only republish is the usual trigger.
+description: Opus 5 / Sonnet 5 / Fable think by default and spend max_tokens on reasoning; a prompt row budget sized for answer text (IA 2,200) stops on max_tokens with ZERO text. Advisory floor 4,096 + content-free block census deployed to production 2026-09-18 via PR #314 (IA generation re-rehearsed PASS the same day: 1,065 output tokens, thinkingTokens=0); a tier-alias advance or model-only republish is the usual trigger.
 status: active
 metadata:
   type: project
@@ -34,12 +34,16 @@ decision 2026-09-18).
 
 ## Ship state
 
-**[DEPLOYED TO PRODUCTION 2026-09-18 via PR #314, merge `0b240f0a`, GitHub deployment 6534604317 success; IA generation itself not yet re-rehearsed]**
+**[DEPLOYED TO PRODUCTION 2026-09-18 via PR #314, merge `0b240f0a`, GitHub deployment 6534604317 success; IA generation re-rehearsed PASS 2026-09-18 23:38Z on request 1003222: run `7770d508` end_turn, out=1065, blocks=text:2971, thinkingTokens=0, maxTokens=12000; Ready row `7d00fffd` (prompt v2, 18,243-byte DOCX, SharePoint v1.0) is the current pointer, prior Ready `a6876ad6` superseded; exact retry reused the row with no new run]**
 Production now records the new notes fields, the IA contract pins prompt version 2
 (the live row), and `initial-assessment.generate` is a registered standing budget
 (default 12,000 / 120 s; admin-tunable 4,096–32,000) that the IA facade passes as
-`maxTokensOverride`, so the row's 2,200 no longer governs the call. Still open: one
-authorized rehearsal generation on request 1003222 to prove `end_turn` + DOCX.
+`maxTokensOverride`, so the row's 2,200 no longer governs the call. The signed-in
+production rehearsal on 1003222 passed the same evening (run `7770d508`: end_turn,
+1,065 output tokens, `blocks=text:2971`, `thinkingTokens=0`), so Opus 5 did not
+think on this input at all; the earlier 2,200-token burn was input-dependent, which
+is exactly why the guard stays advisory. The stale Failed row `ea6e4768` remains as
+historical evidence under a different generation key.
 
 ## How to apply
 
