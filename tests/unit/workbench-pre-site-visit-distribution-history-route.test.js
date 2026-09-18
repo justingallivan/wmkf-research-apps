@@ -41,6 +41,7 @@ test('returns the access denial without injecting an actor into the history quer
   requireAppAccess.mockResolvedValueOnce(null);
   const res = mockRes();
   await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
+  expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'reviewers');
   expect(getPreSiteDistributionHistory).not.toHaveBeenCalled();
 });
 

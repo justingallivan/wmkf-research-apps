@@ -62,6 +62,7 @@ import {
 import { DELIBERATION_SHARE_SEED_BRIEFING_COPY } from '../../shared/config/deliberationShareEmail.js';
 import { briefInputFingerprint } from '../../lib/services/pre-rp-brief/docx-renderer.js';
 import { PDFDocument } from 'pdf-lib';
+import { buildSiteVisitIcs } from '../../lib/external/calendar-invite';
 
 // A real, parseable one-page PDF (plan §11, Step C1): `assembleReviewBundle`
 // calls `PDFDocument.load` on every part, so the magic-byte-only fixture
@@ -1592,6 +1593,136 @@ test('a no-attachment send creates the activity, attaches nothing, and reaches s
   expect(dependencies.addEmailAttachment).not.toHaveBeenCalled();
   expect(dependencies.recordAttachment).not.toHaveBeenCalled();
   expect(dependencies.downloadFile).not.toHaveBeenCalled();
+  expect(dependencies.sendEmail).toHaveBeenCalledTimes(1);
+});
+
+test('a calendar-enabled send regenerates the frozen ICS, records its ledger receipt, and reaches sent', async () => {
+  const siteVisitSnapshot = {
+    version: 1,
+    activityId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    etag: 'W/"7"',
+    subject: 'Site Visit',
+    description: 'Discussion',
+    startIso: '2026-09-15T14:00:00Z',
+    endIso: '2026-09-15T16:00:00Z',
+    timeZone: 'America/Chicago',
+    format: 100000002,
+    location: 'Conference room / Teams',
+    organizerEmail: 'organizer@wmkeck.org',
+    attendeeRefs: { version: 1, organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [], optionalAttendees: [] },
+    modifiedAt: '2026-08-24T12:34:56Z',
+  };
+  const calendar = buildSiteVisitIcs({
+    activityId: siteVisitSnapshot.activityId,
+    startIso: siteVisitSnapshot.startIso,
+    endIso: siteVisitSnapshot.endIso,
+    subject: siteVisitSnapshot.subject,
+    description: siteVisitSnapshot.description,
+    location: siteVisitSnapshot.location,
+    organizerEmail: siteVisitSnapshot.organizerEmail,
+    nowIso: siteVisitSnapshot.modifiedAt,
+  });
+  const crypto = await import('node:crypto');
+  const calendarHash = crypto.createHash('sha256').update(calendar.content).digest('hex');
+  let row = attemptFixture({
+    attachment_mode: 'none',
+    calendar_enabled: true,
+    calendar_filename: calendar.filename,
+    calendar_content_type: calendar.contentType,
+    calendar_byte_hash: calendarHash,
+    calendar_size: calendar.content.length,
+    site_visit_id: siteVisitSnapshot.activityId,
+    site_visit_etag: siteVisitSnapshot.etag,
+    site_visit_snapshot: siteVisitSnapshot,
+    body_html: `<p>Hi</p><p><a href="${BRIEFING_LINK_PLACEHOLDER}">Open</a></p>`,
+  });
+  const calls = [];
+  const dependencies = {
+    ...currentSourceDependencies(row),
+    schemaReady: jest.fn(() => true),
+    getSiteVisitById: jest.fn(async () => ({
+      activityid: siteVisitSnapshot.activityId,
+      _etag: siteVisitSnapshot.etag,
+      _regardingobjectid_value: REQUEST_ID,
+      statecode: 0,
+      subject: siteVisitSnapshot.subject,
+      description: siteVisitSnapshot.description,
+      scheduledstart: siteVisitSnapshot.startIso,
+      scheduledend: siteVisitSnapshot.endIso,
+      wmkf_ianatimezone: siteVisitSnapshot.timeZone,
+      wmkf_visitformat: siteVisitSnapshot.format,
+      wmkf_locationorlink: siteVisitSnapshot.location,
+      wmkf_attendeerefsjson: JSON.stringify(siteVisitSnapshot.attendeeRefs),
+      modifiedon: siteVisitSnapshot.modifiedAt,
+      wmkf_SiteVisit_activity_parties: [{ participationtypemask: 7, addressused: siteVisitSnapshot.organizerEmail }],
+    })),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => {
+      row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777', attempt_count: 1 };
+      return row;
+    }),
+    findEmailByCorrelation: jest.fn(async () => []),
+    createEmailActivity: jest.fn(async () => '88888888-8888-4888-8888-888888888888'),
+    recordEmailActivity: jest.fn(async (attempt, emailId) => {
+      row = { ...attempt, dynamics_email_id: emailId, state: 'activity_created' };
+      calls.push('activity');
+      return row;
+    }),
+    findEmailAttachments: jest.fn(async () => []),
+    addEmailAttachment: jest.fn(async (_emailId, attachment) => {
+      calls.push(`add:${attachment.filename}`);
+      expect(attachment.content).toEqual(calendar.content);
+      expect(attachment.content.length).toBe(calendar.content.length);
+    }),
+    recordAttachment: jest.fn(async (attempt, kind) => {
+      row = { ...attempt, calendar_attached_at: new Date('2026-09-18T12:00:00Z') };
+      calls.push(`persist:${kind}`);
+      return row;
+    }),
+    getEmailActivity: jest.fn()
+      .mockImplementationOnce(async () => emailFixture(row, {
+        description: row.body_html.replace(BRIEFING_LINK_PLACEHOLDER, 'https://apps.test/external/briefing/fixture-token'),
+      }))
+      .mockResolvedValueOnce({ statuscode: 1 })
+      .mockResolvedValueOnce({ statuscode: 6, statecode: 0 }),
+    recordSendRequested: jest.fn(async (attempt) => {
+      row = { ...attempt, state: 'send_requested', send_requested_at: new Date('2026-09-18T12:00:00Z') };
+      calls.push('send_requested');
+      return row;
+    }),
+    renewSendLease: jest.fn(async (attempt) => attempt),
+    sendEmail: jest.fn(async () => { calls.push('send'); }),
+    recordSent: jest.fn(async (attempt, status) => {
+      row = { ...attempt, ...status, state: 'sent', sent_at: new Date('2026-09-18T12:00:00Z'), lease_token: null };
+      calls.push('sent');
+      return row;
+    }),
+    recordFailure: jest.fn(async () => row),
+  };
+
+  const result = await sendPreSiteDistribution({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, dependencies);
+
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(result.attempt.attachments).toEqual([expect.objectContaining({
+    kind: 'calendar',
+    filename: calendar.filename,
+    byteHash: calendarHash,
+    size: calendar.content.length,
+  })]);
+  expect(calls).toEqual([
+    'activity', `add:${calendar.filename}`, 'persist:calendar', 'send_requested', 'send', 'sent',
+  ]);
+  expect(dependencies.addEmailAttachment).toHaveBeenCalledWith('88888888-8888-4888-8888-888888888888', expect.objectContaining({
+    contentType: calendar.contentType,
+    actingUserSystemId: ACTOR_ID,
+    noFallback: true,
+  }));
   expect(dependencies.sendEmail).toHaveBeenCalledTimes(1);
 });
 
