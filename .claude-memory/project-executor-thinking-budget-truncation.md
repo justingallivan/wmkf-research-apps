@@ -1,6 +1,6 @@
 ---
 name: project-executor-thinking-budget-truncation
-description: Opus 5 / Sonnet 5 / Fable think by default and spend max_tokens on reasoning; a prompt row budget sized for answer text (IA 2,200) stops on max_tokens with ZERO text. Advisory floor 4,096 + content-free block census landed 2026-09-18; a tier-alias advance or model-only republish is the usual trigger.
+description: Opus 5 / Sonnet 5 / Fable think by default and spend max_tokens on reasoning; a prompt row budget sized for answer text (IA 2,200) stops on max_tokens with ZERO text. Advisory floor 4,096 + content-free block census built 2026-09-18 on branch fix/ia-thinking-budget-floor (not merged, not deployed); a tier-alias advance or model-only republish is the usual trigger.
 status: active
 metadata:
   type: project
@@ -31,6 +31,14 @@ the rehearsal). v1 runs on Sonnet 5 used 886–992 output tokens; the Opus 5 run
 2,200 with `sha256("")`. Eight live prompts run below 4,096 on thinking-default
 models and some succeed, so the guard is advisory, not a pre-call block (owner
 decision 2026-09-18).
+
+## Ship state
+
+**[SOURCE-BUILT ON BRANCH `fix/ia-thinking-budget-floor` 2026-09-18; NOT MERGED, NOT DEPLOYED.]**
+Until merged, production runs still record the old notes format and the IA
+contract still pins prompt version 1. The IA prompt row itself still carries
+2,200 tokens on Opus 5; raising it needs a code path (standing budget or a
+publish that accepts a budget) plus a coordinated republish and contract bump.
 
 ## How to apply
 

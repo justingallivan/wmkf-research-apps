@@ -148,7 +148,7 @@ trivial tasks, so several live prompts run below 4,096 and still succeed (read-o
 audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 5 at
 3,000 passed 5/5). A blanket pre-call floor would break them, so the guard is advisory.
 
-**What the code does now (branch `fix/ia-thinking-budget-floor`):**
+**What the code does now — [SOURCE-BUILT ON BRANCH `fix/ia-thinking-budget-floor` 2026-09-18; NOT MERGED, NOT DEPLOYED]:**
 - `llm-client.js` normalizers return `blocks` (content-free `{type, chars}` census) and
   `thinkingTokens` (`usage.output_tokens_details.thinking_tokens`, null when absent).
 - `execute-prompt.js` `thinkingBudgetAdvisory()` flags a thinking-default model below
