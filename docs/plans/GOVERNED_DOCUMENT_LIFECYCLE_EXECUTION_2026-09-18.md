@@ -311,3 +311,50 @@ correction reran old/new focused tests, test lint, full tests and scoped docs ga
 reviewed runtime/gate/build inputs did not change. No live operations/deployment.
 Rollback: revert `555a7bda` as one unit including physical writer registration.
 Next permitted stage: Stage 6 after its persistence/transport restart prerequisites.
+
+
+## Stage 6 — accepted (`c76703eb`)
+
+Prerequisite commits `a76e5e3d` and `f21c0a5c` characterize committed-but-lost
+activity creation/identity, attachment write/receipt, send intent, lease claim/
+renewal and terminal receipt responses. Durable fixture patches preserve saved
+state and enforce lease ownership; root tightened this harness to avoid a test
+model erasing the very receipts it should recover. Intermediate activity restart
+requires the first call to stop before transport, then reuses the external/ledger
+identity. Two-attachment recovery preserves the completed prefix. Draft/unavailable
+transport status stays uncertain. New material/session cases pass initial freshness
+checks and fail after attachment work, before intent, renewal or transport.
+
+All 103 final distribution tests passed against the original `a76e5e3d` facade and
+the extracted code; root performed the temporary replay and restored the facade
+byte-for-byte. Test SHA-256 is recorded below. Sol inspected the logs but did not
+rerun them; those temporary logs do not embed source fingerprints themselves.
+
+Moved five email-recovery helpers, whole prepare/send commands, and two history
+functions into four modules. The 45-line original facade retains sixteen public
+exports and its template alias. Recovery-before-liveness, final checks-before-intent,
+lease renewal and transport uncertainty sequencing remain unchanged. Default
+bindings and the Stage 5b writer location/policy remain unchanged.
+
+Fresh Sol `01a0b5a4-3fe5-73f0-a270-8f73c132ee8b` approved runtime preservation and
+required intermediate activity restart and final slot/material discriminators.
+Fresh correction review `01a0b5ac-ac62-7c63-9c8a-0a2cf3eb37db` returned READY with
+all five runtime hashes unchanged. Root checked imports, exact bodies/initializers,
+public exports, the fixture semantics and actual command outputs. SHA-256:
+
+- Facade: `d7070b3dcda4e41dc23194ee798ef20bf8ea15251a5960e760f12118f711bfa8`
+- Email recovery: `a01fdae2b3a1580f901cdf5571683c227ff763092892dc64a3c4444353db44e4`
+- Prepare: `e1adf871e2d13364ac9eb1f351abd7956c403627dd75be31e47fcc2e51fff7ab`
+- Send: `1f9866d3a95d48d0a30b93bc32f1983f52f6d4fc9b4e81f0ce80be5c161411ec`
+- History: `7d1c1f6a42a02ab70cb0140368d1434e4c16960f4b396cb5ba7860d83d504612`
+- Final service tests: `2b01362ce0bfda23fdd478873c2b9451b604c3b86078bc755ef4d03158176b9d`
+
+[VERIFIED via local outputs] Scoped nine suites / 256 tests before the two final
+drift additions; final full 957 suites / 14,113 tests. All 17 gate/self-test pairs
+ran sequentially and passed, plus migrations-manifest/docs-catalog, lint (0 errors /
+104 existing warnings), types, canonical build, explicit undefined-name/import
+checks and AST comparisons. All 172 original bodies/39 initializers match;
+454 named imports resolved. Test-only corrections reran old/new service tests,
+scoped lint and full tests; the approved runtime/build inputs did not change.
+No live operations/deployment. Rollback: revert `c76703eb`; prior facade reads the
+same persisted attempts. Next permitted stage: Stage 7 after Final T2/T8 prerequisites.
