@@ -160,6 +160,16 @@ function registryRow(overrides = {}) {
   };
 }
 
+function expectNoReadSideEffects() {
+  expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
+  expect(GraphService.ensureFolderPath).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(GraphService.deleteFile).not.toHaveBeenCalled();
+}
+
 it('projects only the explicit initiator and never relabels built-in createdby as staff', () => {
   const projected = projectArtifact(registryRow({
     _createdby_value: '99999999-9999-4999-8999-999999999999',
@@ -1456,34 +1466,129 @@ it('keeps the canonical Ready artifact while exposing a newer failed attempt sep
   const older = registryRow({
     wmkf_requestdocumentid: '11111111-1111-1111-1111-111111111111',
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
-    wmkf_sharepointdriveid: 'drive',
-    wmkf_sharepointitemid: 'ready-item',
+    wmkf_sharepointdriveid: null,
+    wmkf_sharepointitemid: null,
     createdon: '2026-07-28T12:00:00Z',
+    modifiedon: '2026-09-01T12:00:00Z',
   });
   const newer = registryRow({
     wmkf_requestdocumentid: '22222222-2222-2222-2222-222222222222',
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
     createdon: '2026-07-29T12:00:00Z',
+    modifiedon: '2026-09-01T12:01:00Z',
   });
   const superseded = registryRow({
     wmkf_requestdocumentid: '99999999-9999-9999-9999-999999999999',
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
     createdon: '2026-07-30T12:00:00Z',
   });
+  const milestone = registryRow({
+    wmkf_requestdocumentid: '88888888-8888-4888-8888-888888888888',
+    wmkf_generationkey: '8'.repeat(64),
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+    wmkf_producer: INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT.producer,
+    _wmkf_sourcedocument_value: older.wmkf_requestdocumentid,
+    wmkf_sourceversionid: '2.0',
+    createdon: '2026-07-29T13:00:00Z',
+    modifiedon: '2026-09-01T12:02:00Z',
+  });
   requestDocumentAdapter.findByRequest.mockResolvedValue({
-    records: [superseded, older, newer],
+    records: [superseded, older, newer, milestone],
   });
   request._wmkf_currentinitialassessment_value = older.wmkf_requestdocumentid;
 
   const result = await listInitialAssessmentArtifacts({ requestId: REQUEST_ID });
-
-  expect(result.artifacts).toHaveLength(1);
-  expect(result.artifacts[0].artifactId).toBe(older.wmkf_requestdocumentid);
-  expect(result.artifacts[0].operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
-  expect(result.latestAttempts).toHaveLength(1);
-  expect(result.latestAttempts[0].artifactId).toBe(newer.wmkf_requestdocumentid);
-  expect(result.latestAttempts[0].operationStatus)
-    .toBe(REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
+  const common = {
+    requestId: REQUEST_ID,
+    requestNumber: '1003001',
+    title: 'Mechanisms of Discovery',
+    institution: 'Example University',
+    programDirector: null,
+    artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.INITIAL_ASSESSMENT,
+    artifactLabel: 'Initial Assessment',
+    cycleCode: 'D26',
+    file: null,
+    provenance: {
+      inputFingerprint: 'b'.repeat(64),
+      templateId: 'initial-assessment-standard-business-brief',
+      templateVersion: '1.0.0',
+      promptName: 'initial-assessment.generate',
+      promptVersion: 1,
+      promptId: null,
+      runId: null,
+      contentHash: null,
+      sourceDocumentId: null,
+      sourceVersionId: null,
+      sourceContentHash: null,
+      milestoneVersionId: null,
+      milestoneContentHash: null,
+      milestoneCreatedAt: null,
+      initiatedAt: null,
+      createdBySystemUserId: null,
+      createdBy: null,
+      modifiedBySystemUserId: null,
+      modifiedBy: null,
+    },
+    attemptCount: 1,
+    retryAfterAt: null,
+    lastError: null,
+    cleanupRequired: [],
+  };
+  expect(result).toEqual({
+    success: true,
+    artifacts: [{
+      ...common,
+      artifactId: older.wmkf_requestdocumentid,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      operationLabel: 'Ready',
+      lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      lifecycleLabel: 'Draft',
+      isBoardSnapshot: false,
+      provenance: { producer: 'request-workbench', ...common.provenance },
+      retryable: false,
+      createdAt: '2026-07-28T12:00:00Z',
+      modifiedAt: '2026-09-01T12:00:00Z',
+    }],
+    latestAttempts: [{
+      ...common,
+      artifactId: newer.wmkf_requestdocumentid,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      operationLabel: 'Failed',
+      lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      lifecycleLabel: 'Draft',
+      isBoardSnapshot: false,
+      provenance: { producer: 'request-workbench', ...common.provenance },
+      retryable: true,
+      createdAt: '2026-07-29T12:00:00Z',
+      modifiedAt: '2026-09-01T12:01:00Z',
+    }],
+    milestones: [{
+      ...common,
+      artifactId: milestone.wmkf_requestdocumentid,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      operationLabel: 'Ready',
+      lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+      lifecycleLabel: 'Board Ready',
+      isBoardSnapshot: true,
+      provenance: {
+        producer: INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT.producer,
+        ...common.provenance,
+        sourceDocumentId: older.wmkf_requestdocumentid,
+        sourceVersionId: '2.0',
+      },
+      retryable: false,
+      createdAt: '2026-07-29T13:00:00Z',
+      modifiedAt: '2026-09-01T12:02:00Z',
+    }],
+  });
+  expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
+  expect(GraphService.ensureFolderPath).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(GraphService.deleteFile).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
 });
 
 it('refreshes file metadata from the stable Graph identity without writing Dataverse', async () => {
@@ -1597,6 +1702,7 @@ it('labels transient Graph failures without discarding the registry snapshot', a
       code: 'graph_unavailable',
     }),
   );
+  expectNoReadSideEffects();
 });
 
 it('labels an incomplete stable identity unavailable without guessing by path', async () => {
@@ -1617,6 +1723,51 @@ it('labels an incomplete stable identity unavailable without guessing by path', 
     metadataStatus: 'unavailable',
   });
   expect(GraphService.getFileMetadataById).not.toHaveBeenCalled();
+});
+
+it('fails closed on malformed persisted cleanup work without any read-side writes', async () => {
+  const ready = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'ready-item',
+    wmkf_orphancleanupjson: '{"not":"an array"}',
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [ready] });
+  request._wmkf_currentinitialassessment_value = ready.wmkf_requestdocumentid;
+
+  await expect(listInitialAssessmentArtifacts({ requestId: REQUEST_ID }))
+    .rejects.toMatchObject({
+      httpStatus: 500,
+      message: 'Initial Assessment registry contains unreadable SharePoint cleanup work.',
+    });
+  expect(GraphService.getFileMetadataById).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
+  expect(GraphService.ensureFolderPath).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(GraphService.deleteFile).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
+});
+
+it('fails closed on an unknown persisted registry contract without any read-side writes', async () => {
+  const unknown = registryRow({
+    wmkf_artifacttype: 999999999,
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [unknown] });
+  request._wmkf_currentinitialassessment_value = null;
+
+  const failure = listInitialAssessmentArtifacts({ requestId: REQUEST_ID });
+  await expect(failure).rejects.toMatchObject({ httpStatus: 500 });
+  await expect(failure).rejects.toThrow('Request document registry contains an unknown contract value.');
+  expect(GraphService.getFileMetadataById).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
+  expect(GraphService.ensureFolderPath).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(GraphService.deleteFile).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
 });
 
 it('fails closed when a non-null request pointer does not resolve to the active Ready row', async () => {
@@ -1849,6 +2000,7 @@ it('stops scheduling cycle metadata reads when the total refresh budget expires'
     expect(Math.max(...GraphService.getFileMetadataById.mock.calls.map(
       ([, , options]) => options.timeoutMs,
     ))).toBeLessThanOrEqual(10_000);
+    expectNoReadSideEffects();
   } finally {
     warning.mockRestore();
     jest.useRealTimers();

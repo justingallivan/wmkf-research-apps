@@ -41,6 +41,8 @@ jest.mock('../../lib/services/initial-assessment/template.js', () => ({
 
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
+import { runChangeset } from '../../lib/dataverse/core/changeset.js';
+import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { GraphService } from '../../lib/services/graph-service.js';
 import { listInitialAssessmentArtifactVersions } from '../../lib/services/initial-assessment/artifact-service.js';
 import {
@@ -83,6 +85,16 @@ beforeEach(() => {
     hasMore: false,
     limit: 20,
   });
+});
+
+afterEach(() => {
+  expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
+  expect(GraphService.ensureFolderPath).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(GraphService.deleteFile).not.toHaveBeenCalled();
 });
 
 it('reads drive and item identity from the registry row, never from the caller', async () => {
