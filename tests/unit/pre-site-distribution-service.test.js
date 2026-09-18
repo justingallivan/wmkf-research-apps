@@ -164,12 +164,12 @@ test('plain-text body rendering escapes markup and carries a recovery marker', (
   expect(html).toContain(`wmkf-pre-site-distribution:${OPERATION_ID}`);
 });
 
-test('prepare rejects an unrecognized attachment mode before any persistence or file work', async () => {
+test.each(['zip', 'docx', 'pdf', 'both'])('prepare rejects attachment mode %s before any persistence or file work', async (attachmentMode) => {
   await expect(preparePreSiteDistribution({
     requestId: REQUEST_ID,
     expectedArtifactId: '44444444-4444-4444-8444-444444444444',
     operationId: OPERATION_ID,
-    attachmentMode: 'zip',
+    attachmentMode,
     to: 'staff@example.org',
     subject: 'Frozen materials',
     bodyText: 'Attached.',
