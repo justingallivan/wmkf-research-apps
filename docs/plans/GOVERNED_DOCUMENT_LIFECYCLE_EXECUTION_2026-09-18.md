@@ -156,3 +156,33 @@ and canonical build passed with recorded zero exit codes. Parent's comparison st
 finds all 172 original function bodies and 39 initializers unchanged. No live-system
 operations or deployment. Rollback: revert `e4c10355`; prerequisite tests remain valid.
 Next permitted stage: Stage 3 after T3 prerequisite mapping/additions pass.
+
+
+## Stage 3 — accepted (`2f7668b6`)
+
+T3 prerequisite commit `fbede538` added fixed ordered effect traces for Ready reuse,
+reactivation, fresh generation and governed-hash recovery; 62 IA tests passed before
+extraction. Existing tests cover lost changeset responses, competing Ready/wrong
+pointer, newer claimant/412, exact losing-upload cleanup and overflow.
+
+Moved eleven lineage/claim functions and three upload-recovery functions into
+`artifact-lineage.js` and `artifact-upload-recovery.js`. Generation remains in the
+original facade with the same creation seam, actor policy and ten public exports.
+Root caught two missing/incorrect imports during implementation; Luna corrected them
+and reran scoped tests. Explicit undefined-name lint now supplements ordinary lint.
+
+Fresh Sol session `01a0b548-8284-7a23-ae86-8fb63b8bb601` returned READY with no
+findings. Root read the new modules, checked bindings, matched reviewer fingerprints,
+and verified the baseline comparison still preserves all 172 function bodies and
+39 declaration initializers. Reviewed SHA-256:
+
+- Facade: `758d555b42ff02901366f1cc9511fee36bd0e0a6156f4504614a844cc9bae945`
+- Lineage: `6a5f6ce15c08167caf740e9ca25ea4000be1eb252a418ece02dd170dbbc0bd4d`
+- Recovery: `d076600917bbc96a79833f9b9c0aecc42c9a5dc937f91bb5d0cb2e0c1026e3c4`
+
+[VERIFIED via recorded local command outputs] Full 955 suites / 14,078 tests,
+all 17 gate/self-test pairs sequentially, migrations-manifest, docs-catalog, types,
+lint (0 errors / 104 existing warnings), explicit undefined-name check and canonical
+Turbopack build passed. Root inspected actual logs and zero exit codes. No live
+operations or deployment. Rollback: revert `2f7668b6`; test prerequisites remain valid.
+Next permitted stage: Stage 4 after T2/T4 prerequisite review on the old PSV code.

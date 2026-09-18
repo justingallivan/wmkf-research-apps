@@ -57,8 +57,10 @@ cron. No code behaviour changed.
    hash leaf, ten consumer imports, unchanged public hash API; 955 suites / 14,076
    tests and all required checks passed. Stage 2 accepted in `e4c10355` after test
    prerequisite `de875d68`: IA model/read modules; fresh Sol review and root checks
-   passed, 955 suites / 14,078 tests plus all required checks. Next: Stage 3 IA
-   lineage/upload recovery. Receipts:
+   passed, 955 suites / 14,078 tests plus all required checks. Stage 3 accepted in
+   `2f7668b6` after test prerequisite `fbede538`: IA lineage/upload-recovery modules;
+   fresh Sol review and root checks passed with the same full test count and all
+   required checks. Next: Stage 4 Pre-Site model/read/lineage/recovery. Receipts:
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 
