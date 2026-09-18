@@ -782,6 +782,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
   await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
   const current = {
     ...harness.row,
+    createdon: '2026-08-20T12:00:00Z',
     wmkf_filename: 'Fixed Pre-Site Visit.docx',
     wmkf_inputfingerprint: 'input-fingerprint',
     wmkf_renderinputfingerprint: 'render-fingerprint',
@@ -797,7 +798,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
     wmkf_sharepointitemid: null,
     wmkf_sharepointweburl: null,
-    createdon: '2027-08-21T12:00:00Z',
+    createdon: '2026-08-21T12:00:00Z',
   };
   const frozen = {
     ...current,
@@ -966,7 +967,7 @@ test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s reta
       ...(schemaVersion === 2 ? { institutionalFundingHistory: undefined } : {}),
       ...(schemaVersion === 4
         ? { refereeSection: { text: 'We received one review.', names: ['Dr. A'] } }
-        : {}),
+        : { refereeSection: undefined }),
     },
   });
   const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
