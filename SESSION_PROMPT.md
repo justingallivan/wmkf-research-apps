@@ -60,7 +60,11 @@ cron. No code behaviour changed.
    passed, 955 suites / 14,078 tests plus all required checks. Stage 3 accepted in
    `2f7668b6` after test prerequisite `fbede538`: IA lineage/upload-recovery modules;
    fresh Sol review and root checks passed with the same full test count and all
-   required checks. Next: Stage 4 Pre-Site model/read/lineage/recovery. Receipts:
+   required checks. Stage 4 accepted in `569ab797`: Pre-Site model/defaults/read/
+   lineage/recovery, with populated/historical fixtures verified on both old and new
+   code; fresh Sol and root approval, 955 suites / 14,085 tests and required checks.
+   Stage 5a route prerequisites are committed in `e3d4826f` (six suites / 152 tests).
+   Next: distribution leaves/composition/context extraction. Receipts:
    `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
    writes are authorized. See the plan's review record and evidence limits before acting.
 

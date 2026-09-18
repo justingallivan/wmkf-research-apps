@@ -186,3 +186,48 @@ lint (0 errors / 104 existing warnings), explicit undefined-name check and canon
 Turbopack build passed. Root inspected actual logs and zero exit codes. No live
 operations or deployment. Rollback: revert `2f7668b6`; test prerequisites remain valid.
 Next permitted stage: Stage 4 after T2/T4 prerequisite review on the old PSV code.
+
+
+## Stage 4 — accepted (`569ab797`)
+
+Prerequisite `db533d3d` pinned generation/recovery order and complete Ready-read
+purity. Root removed duplicated mock labels before committing. Sol's first fresh
+review (`01a0b554-fcc3-7bd3-bb5e-148edb55bd62`) approved runtime preservation but
+required populated reader fixtures and genuine paired historical envelopes.
+Luna added seven cases in `d7e8fb73`; root replayed all 52 PSV tests against the
+original `2f7668b6` facade and restored the extracted facade byte-for-byte.
+Root then fixed deterministic fixture dates and omitted the v4-only referee field
+from v2/v3 snapshots. Both old and extracted implementations pass all 52 cases.
+Fresh final Sol session `01a0b563-2ffc-7052-980b-80cc1f47f152` returned READY for
+the exact remaining correction, retaining its prior runtime approval.
+
+Moved model, one dependency-default object, status reader, claim/lineage and upload
+recovery into five modules. Generation and nine public exports remain at the old
+facade, with the same registered create seam and actor policy. Pre-Site's refusal
+of stale Ready replay and correction-cycle/pointer fences remain separate from IA.
+Root checked imports, preserved bodies/initializers, error identity and final hashes.
+A temporary static named-import audit supplements no-undefined lint because the
+scoped happy paths initially missed a cleanup helper imported from the wrong owner.
+That binding was corrected before full verification and Sol's runtime fingerprint.
+
+Reviewed runtime SHA-256:
+
+- Facade: `2127dee1d1d8e7d1b8c77553632f74f555b0583da137309e04eee6abff443acb`
+- Model: `c8241eb42e6e289e0418c5a9773a1ea7cb10eaefafa8e2a729d7924962bcf7f7`
+- Dependencies: `8469964f756dfa32ba0191841d32e4dc5029b7bf91f24185e1b8f3f0736343a0`
+- Reader: `bd166f6fbeebed4b081f232b28e47bd337de1d380db80d89271567a65db4a601`
+- Lineage: `8bd0325b65becc6c2b4efd8b5ac699acb9a4b9b06d3cde46a1f12fa5bfbf3cff`
+- Recovery: `39a7a75a64a790966f7d1183913ea1195e3e89228bb3dedf779ec35f0558f7ed`
+- Final prerequisite test: `c382575e054961132e604cb1a590e3b68923dad5cffb5339fbf57f838db53872`
+
+[VERIFIED via local outputs] Scoped eight suites / 179 tests passed before the
+seven added cases. Final full suite: 955 suites / 14,085 tests. All 17 gate/self-test
+pairs sequentially, migrations-manifest, docs-catalog, types, lint (0 errors /
+104 existing warnings), canonical build, explicit undefined-name/import checks and
+AST comparisons passed. The final fixture-only corrections were rerun on both old
+and new code; runtime did not change after its full gates/build. Root inspected
+actual outputs, zero exits and matching fingerprints. No live operations/deployment.
+Rollback: revert `569ab797`; prerequisite tests remain valid on the old facade.
+Stage 5a route prerequisites are separately committed as `e3d4826f`: six suites /
+152 tests, including real history GUID rejection, method/auth/error contracts and
+session-derived send identity. Next permitted runtime stage: Stage 5a.
