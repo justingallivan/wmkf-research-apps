@@ -70,6 +70,11 @@ import {
 
 const REQUEST_ID = '33333333-3333-3333-3333-333333333333';
 const ARTIFACT_ID = '44444444-4444-4444-4444-444444444444';
+const FROZEN_GOVERNED_DOCX_HASH = 'gdc1:rMTMI6qqn1FeSsmp9dYCFGzS86rqwybAzhayMi5V-6g';
+const FROZEN_TEMPLATE_HASHES = {
+  'shared/templates/pre-research-presentation-brief/brief-v1.docx': 'gdc1:-UK_7JbFy0j8zjd7-nhLEANDNmTVEUKPFF7TnryFfoM',
+  'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx': 'gdc1:0GZBpFBbnKGY1Kya_cSm9-69AYqf5mrVtw0ehsBQrhk',
+};
 let DOCX;
 
 async function buildDocx({
@@ -290,8 +295,8 @@ beforeAll(async () => {
 it('hashes SharePoint-normalized packaging as the same governed DOCX content', async () => {
   const sharePointVersion = await buildDocx({ sharePointMetadata: true });
 
-  await expect(hashGovernedDocxContent(DOCX))
-    .resolves.toMatch(/^gdc1:[A-Za-z0-9_-]{43}$/);
+  await expect(hashGovernedDocxContent(DOCX)).resolves.toBe(FROZEN_GOVERNED_DOCX_HASH);
+  await expect(hashGovernedDocxContent(sharePointVersion)).resolves.toBe(FROZEN_GOVERNED_DOCX_HASH);
   await expect(hashGovernedDocxContent(DOCX))
     .resolves.toBe(await hashGovernedDocxContent(sharePointVersion));
 });
@@ -407,7 +412,7 @@ it('the shipped Word templates open word/document.xml and pass the governed pack
     'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx',
   ]) {
     const template = fs.readFileSync(path.join(process.cwd(), relativePath));
-    await expect(hashGovernedDocxContent(template)).resolves.toMatch(/^gdc1:/);
+    await expect(hashGovernedDocxContent(template)).resolves.toBe(FROZEN_TEMPLATE_HASHES[relativePath]);
   }
 });
 
@@ -415,7 +420,7 @@ it('rejects a package with no package relationships part', async () => {
   const archive = new JSZip();
   archive.file('word/document.xml', '<w:document/>');
   await expect(hashGovernedDocxContent(await archive.generateAsync({ type: 'nodebuffer' })))
-    .rejects.toThrow(/package relationships/);
+    .rejects.toThrow('Governed DOCX is missing its package relationships.');
 });
 
 it('changes the governed DOCX hash when a non-SharePoint document relationship changes', async () => {
@@ -430,7 +435,7 @@ it('changes the governed DOCX hash when a non-SharePoint document relationship c
 
 it('fails closed when content is not a DOCX package', async () => {
   await expect(hashGovernedDocxContent(Buffer.from('not a DOCX')))
-    .rejects.toThrow('invalid DOCX package');
+    .rejects.toThrow('Initial Assessment producer returned an invalid DOCX package.');
 });
 
 it('accepts whitespace-only paired relationship elements but rejects unparsed content', async () => {
@@ -1037,6 +1042,44 @@ it('blocks unverifiable legacy recovery without rerunning AI or uploading a dupl
     body: { code: 'legacy_content_hash_unverifiable' },
   });
   expect(projectArtifact(currentRegistryRow).cleanupRequired).toHaveLength(1);
+});
+
+it('blocks recovery for an unknown content-hash scheme without rerunning AI or uploading a duplicate', async () => {
+  const failed = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_contenthash: 'sha999:unrecognized-content-hash-scheme',
+  });
+  currentRegistryRow = failed;
+  GraphService.getFileMetadataByPath.mockResolvedValue({
+    siteId: 'site',
+    driveId: 'drive',
+    id: 'unknown-scheme-item',
+    name: failed.wmkf_filename,
+    size: DOCX.length,
+    webUrl: 'https://example.sharepoint.com/unknown-scheme-item',
+    eTag: '"unknown-scheme-etag"',
+    versionId: '1.0',
+    lastModified: '2026-07-29T12:00:00Z',
+  });
+  GraphService.downloadFile.mockResolvedValue({ buffer: DOCX });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 409,
+    body: { code: 'unknown_content_hash_scheme' },
+  });
+
+  expect(currentRegistryRow.wmkf_operationstatus).toBe(
+    REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+  );
+  expect(executePrompt).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(projectArtifact(currentRegistryRow).cleanupRequired).toEqual([
+    expect.objectContaining({
+      driveId: 'drive',
+      itemId: 'unknown-scheme-item',
+      reason: 'unknown_content_hash_scheme_retained',
+    }),
+  ]);
 });
 
 it('records a recovery download failure instead of leaving the row Generating', async () => {
