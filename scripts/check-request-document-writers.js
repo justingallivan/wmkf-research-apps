@@ -3,7 +3,7 @@
 /**
  * Guard the Wave 24 Request Document explicit-actor write contract.
  *
- * - exactly eight runtime create seams are registered;
+ * - exactly nine runtime create seams are registered;
  * - each create declares its approved actor policy beside the call;
  * - raw Request Document createRecord calls remain centralized in the adapter;
  * - immutable origin fields are not written by arbitrary services/changesets.
@@ -18,7 +18,7 @@ const WRITERS = Object.freeze([
   ['lib/services/initial-assessment/controls-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/pre-site-visit/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/pre-site-visit/reopen-service.js', 'dependencies.createDocument(', 'REQUIRED'],
-  ['lib/services/pre-site-visit/distribution-service.js', 'dependencies.createDocument(', 'REQUIRED'],
+  ['lib/services/pre-site-visit/distribution/retained-snapshot.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/final-writeup/transition-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/site-visit-materials/contributor-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/consultant-feedback-attachment-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
@@ -130,6 +130,55 @@ function runSelfTest() {
   errors = validateSources(missingPolicy);
   if (!errors.some((error) => error.includes('missing actor policy'))) {
     throw new Error('missing-policy fixture was not rejected');
+  }
+
+  const missingWriter = new Map(base);
+  missingWriter.delete(WRITERS[0][0]);
+  errors = validateSources(missingWriter);
+  if (!errors.some((error) => error.includes('registered writer file is missing'))) {
+    throw new Error('missing-writer fixture was not rejected');
+  }
+
+  const movedWriter = new Map(base);
+  const [distributionRelative, distributionNeedle, distributionPolicy] = WRITERS.find(
+    ([writerPath]) => writerPath === 'lib/services/pre-site-visit/distribution/retained-snapshot.js',
+  );
+  movedWriter.delete(distributionRelative);
+  movedWriter.set('lib/services/pre-site-visit/distribution-service.js', base.get(distributionRelative));
+  errors = validateSources(movedWriter);
+  if (!errors.some((error) => error.includes('registered writer file is missing'))) {
+    throw new Error('moved-writer fixture was not rejected');
+  }
+
+  const duplicateWriter = new Map(base);
+  duplicateWriter.set(distributionRelative, `${base.get(distributionRelative)}\n${goodCall(distributionNeedle, distributionPolicy)}`);
+  errors = validateSources(duplicateWriter);
+  if (!errors.some((error) => error.includes('expected exactly one'))) {
+    throw new Error('duplicate-writer fixture was not rejected');
+  }
+
+  const duplicateBinding = new Map(base);
+  duplicateBinding.set('lib/services/duplicate-binding.js', 'requestDocumentAdapter.create({}, {});');
+  errors = validateSources(duplicateBinding);
+  if (!errors.some((error) => error.includes('wiring count'))) {
+    throw new Error('duplicate-binding fixture was not rejected');
+  }
+
+  const wrongPolicy = new Map(base);
+  wrongPolicy.set(distributionRelative, base.get(distributionRelative).replace(
+    'actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.REQUIRED',
+    'actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED',
+  ));
+  errors = validateSources(wrongPolicy);
+  if (!errors.some((error) => error.includes('missing actor policy REQUIRED'))) {
+    throw new Error('wrong-policy fixture was not rejected');
+  }
+
+  const missingActorContext = new Map(base);
+  missingActorContext.set(distributionRelative, base.get(distributionRelative).replace('actorContext: {}', ''));
+  errors = validateSources(missingActorContext);
+  if (!errors.some((error) => error.includes('missing bounded actorContext'))) {
+    throw new Error('missing-actor-context fixture was not rejected');
   }
 
   const bypass = new Map(base);

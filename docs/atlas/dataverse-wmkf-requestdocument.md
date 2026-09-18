@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-16
+last_verified: 2026-09-18
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave16-request-document-registry/zz_akoya_request_pre_rp_brief_pointer.json
@@ -25,6 +25,7 @@ related:
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
+  - lib/services/pre-site-visit/distribution/retained-snapshot.js
   - lib/services/pre-site-visit/cycle-list-service.js
   - lib/services/pre-site-visit/artifact-service.js
   - lib/services/pre-site-visit/proposal-core-service.js
@@ -305,6 +306,14 @@ Production Request Document row was created by this release smoke.
   namespace is excluded from editable Pre-Site status, activation cardinality,
   supersession, and guarded-reopen downstream/competing-generation checks;
   missing or lookalike producers retain ordinary fail-closed lifecycle behavior.
+- **[VERIFIED 2026-09-18 via local branch source; not deployed]** Distribution
+  snapshot creation and review-bundle retention are physically owned by
+  `lib/services/pre-site-visit/distribution/retained-snapshot.js`. The writer
+  registry points to its single create call with the unchanged REQUIRED actor
+  policy and bounded actor context; the one adapter binding remains in
+  `distribution/dependencies.js`. The existing `distribution-service.js` facade
+  retains the public `retainReviewBundle` entry point and positional actor argument
+  used by the briefing-page rebuild consumer. No row/file identity or schema changed.
 - **[PRODUCTION-PROVED 2026-08-21]** the Site Visit transition
   resolves that current pointer, requires Ready/Draft Word state and a matching
   expected artifact id, verifies one stable SharePoint publication version
