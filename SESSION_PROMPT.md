@@ -1,4 +1,4 @@
-# Session 520 Prompt: Fix the red J27 register gate, then Pre-RP Brief bundle smoke
+# Session 520 Prompt: Pre-RP Brief bundle smoke and remaining documentation follow-ups
 
 ## Session 519 Summary
 
@@ -29,27 +29,27 @@ cron. No code behaviour changed.
 ### Commits (main)
 - `28d719d9` - docs: retire the applicant-materials reminder cron (owner decision 2026-09-17)
 
+## Completed in Session 520
+
+1. **J27 register citation repair.** The four rows in
+   `docs/J27_TRANSITION_REGISTER.md` (J27-053 line 97, J27-057 line 101, J27-062 line 111,
+   J27-064 line 113) now bind to exact excerpts in
+   `.claude-memory/project-reviewer-apps-redesign-history.md` (lines 369, 303, 319, and
+   329 respectively). J27-062 retains its separate `project-grant-phasing-evolution.md`
+   plan fragment; J27-064 retains the current owner decision in the register disposition
+   while using the historical allowlist-removal sentence as its source excerpt. The gate
+   and self-test pass: 61 ok, 0 stale, 6 unverifiable, 11 closed. The six unverifiable
+   rows (J27-034, -061, -067, -075, -076, -077) are advisory and pre-existing.
+
 ## Next Items
 
 ### Verified Open
 
-1. **RED GATE `check:j27-register` (P0 candidate first task).** Four register rows in
-   `docs/J27_TRANSITION_REGISTER.md` (J27-053 line 97, J27-057 line 101, J27-062 line 111,
-   J27-064 line 113) cite excerpts at memory `project-reviewer-apps-redesign-direction.md`.
-   The S518 split (`03bf0d8a`) moved those lines verbatim into
-   `.claude-memory/project-reviewer-apps-redesign-history.md`; S519 grep confirmed the
-   J27-053 and J27-064 excerpts are present in the history leaf and absent from the active
-   leaf. Fix: re-point the four rows' site path and line numbers to the history leaf (verify
-   each excerpt fragment with grep first; J27-062's fragment `Plan an upstream per-PD triage`
-   matched neither leaf, so read that row's full excerpt before editing). The gate is listed
-   as advisory in `/start` and is not wired into a CI workflow, but it prints FAILED. Also
-   6 rows print `unverifiable` (J27-034, -061, -067, -075, -076, -077); those are not
-   failures and were unverifiable before S518.
-2. **Bundle rebuild after a new review** was never smoked in Production (unchanged from
+1. **Bundle rebuild after a new review** was never smoked in Production (unchanged from
    S517). Evidence: `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §12 step
    table ("NOT RUN — no third review submitted"). Needs a third ZZTEST-03 reviewer submission
    via the portal, then "Download all reviews (PDF)" on the briefing page should rebuild.
-3. **Memory deep-audit remainder.** Evidence: `docs/audits/memory-routine-audit-2026-09-17.md`
+2. **Memory deep-audit remainder.** Evidence: `docs/audits/memory-routine-audit-2026-09-17.md`
    "Unknowns". Shrink `project-site-visit-materials-planning-handoff` (7.6 KB; its line 42
    "Open (plan §12)" list still names "reminder cadence", now decided). The other four
    oversize-routed leaves are accepted. `check:memory-health` is advisory and prints 7 flags:
@@ -109,8 +109,8 @@ cron. No code behaviour changed.
 
 | File | Purpose |
 |---|---|
-| `docs/J27_TRANSITION_REGISTER.md` | Lines 97, 101, 111, 113 are the stale rows behind the red gate |
-| `.claude-memory/project-reviewer-apps-redesign-history.md` | Where the cited J27 excerpts now live |
+| `docs/J27_TRANSITION_REGISTER.md` | Lines 97, 101, 111, 113 carry the repaired J27 citations |
+| `.claude-memory/project-reviewer-apps-redesign-history.md` | Authoritative historical excerpts for J27-053, -057, -062, and -064 |
 | `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.6 | Reminder-cron retirement decision, item 1 |
 | `.claude-memory/project-ops-meeting-2026-09-16-agenda.md` | Closed ops-meeting record, all items decided |
 | `pages/api/cron/site-visit-materials-reminders.js` | Built, unscheduled, header records the retirement |
@@ -120,7 +120,7 @@ cron. No code behaviour changed.
 ## Testing
 
 ```bash
-npm run check:j27-register           # currently FAILED: 4 stale rows (see Verified Open 1)
+npm run check:j27-register           # 61 ok / 0 stale / 6 unverifiable / 11 closed
 npm test -- --runInBand --silent
 npm run lint
 npm run check:memory-router && npm run check:memory-router:self-test
