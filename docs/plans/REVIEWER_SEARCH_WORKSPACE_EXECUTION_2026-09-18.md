@@ -39,7 +39,7 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–4 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
+provider or external-state call was made. Stages 0–5 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
 from historical checkpoints.
 
 ## Source-to-target map
@@ -653,3 +653,21 @@ cannot overwrite a new request's same-key candidate or issue stale follow-up cal
   own extraction reviews and full G.
 
 **Prerequisite verdict:** accepted by root before Stage 5.
+
+
+## Stage 5 acceptance — applicant enrichment hook
+
+[VERIFIED via source, commands and fresh review] Luna moved the applicant command,
+terminal/actionable/cache derivations and automatic effect together into
+`useApplicantReviewerEnrichment.js`. Root AST checks against `49958e13` confirm
+identical callback/memo bodies, cache initializer and auto-effect body. Passed refs
+and setters are explicit dependencies; state and generation remain facade-owned.
+
+- Fresh Sol `/root/sol_stage5_final`: **READY**, verified captures, cache policy,
+  terminal filtering, independent lane and stale completion/progress behavior.
+- Luna focused run: **4 suites / 44 tests passed**; strict targeted lint passed.
+- Full G: all **19 commands passed**, including **970 suites / 14,270 tests**,
+  repository lint (0 errors, 104 existing warnings) and canonical Turbopack build.
+  Evidence: `/private/tmp/reviewer-stage-5-gates/results.json`.
+
+**Stage 5 verdict:** accepted by root. Starting/rollback reference: `49958e13`.
