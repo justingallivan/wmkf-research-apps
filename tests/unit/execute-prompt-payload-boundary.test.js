@@ -309,6 +309,52 @@ describe('executePrompt — declarative payload boundary', () => {
     expect(sentBody).toContain('UNTRUSTED CONTENT RULES:');
     expect(sentBody).toContain('WMKF-UNTRUSTED-CONTENT nonce=');
     expect(sentBody).toContain('a benign proposal body');
+
+    // Prompt caching: the preamble must not name the per-document nonce, or
+    // unique bytes land at position 0 of the cache_control-marked system block
+    // and no two documents can ever share a cached prefix. The nonce lives on
+    // the sentinels in the user body only.
+    const sent = JSON.parse(sentBody);
+    expect(sent.system[0].text).toContain('UNTRUSTED CONTENT RULES:');
+    expect(sent.system[0].text).not.toMatch(/sentinel nonce\(s\) are/);
+    expect(sent.system[0].text).not.toMatch(/nonce=[0-9a-f]{24}/);
+    const userText = JSON.stringify(sent.messages);
+    expect(userText).toMatch(/WMKF-UNTRUSTED-CONTENT nonce=[0-9a-f]{24}/);
+  });
+
+  test('untrusted variable: two different documents share a byte-identical marked system block', async () => {
+    PROMPT_ROW = buildPromptRow({
+      variables: [
+        {
+          name: 'proposal_text',
+          source: { kind: 'override' },
+          required: true,
+          dataClass: 'proposal_text',
+          maxChars: 100_000,
+          untrusted: true,
+        },
+      ],
+    });
+
+    await executePrompt({
+      promptName: 'phase-i.summary',
+      overrideVariables: { proposal_text: 'first proposal about optics' },
+      runSource: 'Vercel Test',
+    });
+    await executePrompt({
+      promptName: 'phase-i.summary',
+      overrideVariables: { proposal_text: 'second proposal about genomics' },
+      runSource: 'Vercel Test',
+    });
+
+    expect(fetchedBodies.length).toBe(2);
+    const first = JSON.parse(fetchedBodies[0].body);
+    const second = JSON.parse(fetchedBodies[1].body);
+    // Same prompt row → same cache-key prefix (system + marker) regardless of
+    // the document; the documents themselves differ in the user turn.
+    expect(first.system).toEqual(second.system);
+    expect(first.system[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(JSON.stringify(first.messages)).not.toEqual(JSON.stringify(second.messages));
   });
 
   test('untrusted variable: a forged close sentinel in the input is scrubbed', async () => {

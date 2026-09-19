@@ -1,10 +1,18 @@
 /**
- * Audit: token-count every app's system block against Sonnet 4.6's current 1024-token
- * cache floor. Measures what's ACTUALLY sent to Claude, built from each app's
- * real prompt-construction code.
+ * Audit: token-count every app's system block against the cache floor of the
+ * model that app actually runs on. Measures what's ACTUALLY sent to Claude,
+ * built from each app's real prompt-construction code.
  *
- * The floor is model-specific; this script is pinned to Sonnet 4.6. Confirm
- * future model floors against Anthropic's prompt-caching documentation.
+ * Floors are model-specific and NOT monotonic across generations (verified
+ * 2026-09-19 against Anthropic's prompt-caching documentation):
+ *   Opus 5 / Fable 5.1 ........ 512
+ *   Opus 4.8 / Sonnet 5 / 4.6 . 1024
+ *   Opus 4.7 .................. 2048
+ *   Opus 4.6 / Haiku 4.5 ...... 4096
+ * Tokens are counted once with COUNT_MODEL; the per-app floor comes from
+ * FLOORS keyed by the tier that app resolves to in BASE_CONFIG.APP_MODELS
+ * (dynamics-explorer is Haiku, the rest below are Sonnet). Re-check both
+ * when a model tier or floor changes.
  */
 
 const fs = require('fs');
@@ -19,8 +27,9 @@ fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
   process.env[k] = val;
 });
 
-const MODEL = 'claude-sonnet-4-6';
-const FLOOR = 1024;
+const COUNT_MODEL = 'claude-sonnet-5';
+const FLOORS = { sonnet: 1024, haiku: 4096, opus: 512 };
+const MODEL = COUNT_MODEL;
 
 (async () => {
   const apiKey = process.env.CLAUDE_API_KEY;
@@ -45,9 +54,10 @@ const FLOOR = 1024;
     return (await resp.json()).input_tokens;
   };
 
-  const verdict = (n) => {
-    if (n < FLOOR) return 'TOO_SMALL (below Sonnet 4.6 cache floor)';
-    return 'MEETS_FLOOR (cache-eligible; usage proves realized writes/reads)';
+  const verdict = (n, tier = 'sonnet') => {
+    const floor = FLOORS[tier];
+    if (n < floor) return `TOO_SMALL (below the ${tier} cache floor of ${floor})`;
+    return `MEETS_FLOOR (${tier} floor ${floor}; usage proves realized writes/reads)`;
   };
 
   const rows = [];
@@ -87,8 +97,8 @@ const FLOOR = 1024;
     // Tools count against the cache prefix too — need to measure system+tools.
     const tokensSysOnly = await countTokens(sys);
     const tokensWithTools = await countTokens(sys, TOOL_DEFINITIONS);
-    rows.push({ app: 'dynamics-explorer (system only)', desc: 'buildSystemPrompt({power_user})', tokens: tokensSysOnly, hasCacheControl: true });
-    rows.push({ app: 'dynamics-explorer (system + tools)', desc: 'what actually gets cached', tokens: tokensWithTools, hasCacheControl: true });
+    rows.push({ app: 'dynamics-explorer (system only)', desc: 'buildSystemPrompt({power_user})', tokens: tokensSysOnly, hasCacheControl: true, tier: 'haiku' });
+    rows.push({ app: 'dynamics-explorer (system + tools)', desc: 'what actually gets cached', tokens: tokensWithTools, hasCacheControl: true, tier: 'haiku' });
   }
 
   // ── 4. expertise-finder ─────────────────────────────────────────────────
@@ -146,7 +156,7 @@ const FLOOR = 1024;
   for (const r of rows) {
     const tokStr = r.tokens == null ? '(n/a)' : String(r.tokens);
     const cc = r.hasCacheControl ? 'yes' : 'no';
-    const v = r.tokens == null ? '—' : verdict(r.tokens);
+    const v = r.tokens == null ? '—' : verdict(r.tokens, r.tier);
     console.log(`${r.app.padEnd(40)} ${tokStr.padStart(7)}  ${cc.padEnd(14)} ${v}`);
   }
   console.log('─'.repeat(110));

@@ -3,8 +3,8 @@ title: Prompt Caching Audit and Standardized Remediation
 domain: llm-platform
 kind: plan
 status: active
-summary: "July 2026 cache audit: R1/R3 and identical-rerun Executor mitigation shipped; cross-document composition and conditional R5 remain."
-last_verified: 2026-08-23
+summary: "July 2026 cache audit: R1/R3 shipped; R4 closed 2026-09-19 (nonce-free Executor preamble, no schema split); R5 and a panel user-turn marker stay data-gated."
+last_verified: 2026-09-19
 ---
 
 # Prompt Caching Audit and Standardized Remediation
@@ -37,14 +37,30 @@ remain owner decisions.
 - **R3 — DONE.** `pages/api/qa.js` now derives per-proposal / per-summary stable nonces
   (`deriveStableNonce`), so repeated turns against unchanged content have a byte-identical
   cached system prefix. Realized reads remain a telemetry question, not an assumed result.
-- **R4 — PARTIAL (owner decision on the rest).** The Executor
-  (`lib/services/execute-prompt.js` `applyVariableBoundaries`) now derives a stable nonce
-  keyed on `(promptName, variableName, value)`, so an *identical* rerun (same prompt
-  version + same document) reproduces a byte-identical marked system prompt and can hit —
-  strictly no worse than before for unique documents. The full cross-document win still
-  needs the Phase 2 prompt-seed template/variable split (`composeMessages` still
-  interpolates per-request variables into the system template ahead of the marker); that
-  schema work is NOT done here.
+- **R4 — DONE for the nonce line (2026-09-19, Session 524); schema split NOT needed.** The
+  July finding that the Executor "interpolates per-request variables into the system
+  template ahead of the marker" was re-verified on 2026-09-19 and found overstated: no
+  prompt definition under `shared/config/prompts/` declares an untrusted variable in the
+  system template (Phase II system prompts are empty; peer-review passes a route-built
+  `{{a7_preamble}}` and is outside this change). The only per-document bytes ahead of the
+  marker were the nonce list inside `buildUntrustedContentPreamble(untrustedNonces)`.
+  `composeMessages` now calls the preamble WITHOUT nonces (the helper documents the nonce
+  line as optional; the sentinels carry the nonce on open and close, which is what defeats
+  forgery; the Dynamics Explorer has shipped nonce-free since A7 Part 3). Every document of
+  the same prompt row (and, for `phase-i-dynamics`, the same settings tuple) now shares a
+  byte-identical marked system prefix. Pinned by
+  `tests/unit/execute-prompt-payload-boundary.test.js` ("two different documents share a
+  byte-identical marked system block"). The earlier stable-nonce derivation in
+  `applyVariableBoundaries` stays (identical reruns remain byte-identical in the user body)
+  [RECHECKED after lib/services/execute-prompt.js change: comment-only edit at the
+  `deriveStableNonce` call site; behaviour unchanged].
+  Realized reads remain a telemetry question: the marker only writes when the system block
+  clears the concrete model's floor — of the seeded system templates only `phase-i-dynamics`
+  (~1.5k tokens incl. preamble) and `pre-site-visit-proposal-core` (~1.4k) clear Sonnet 5's
+  1024; `review-panel` chair (~510) is borderline at Opus 5's 512 and the seat (~360) is
+  below Fable 5.1's 512, so the review panel caches nothing today. A user-turn breakpoint for
+  the panel is an owner decision that needs run-row cadence data first (it is net-negative
+  unless the same proposal is re-sent within the TTL).
 - **R5 — NOT DONE (verify-then-fix; left for owner).** `composeScorePrompt` and
   `process-phase-i-writeup` both require confirming the current model-specific prefix floor and
   real repeat-within-TTL usage first.
@@ -134,15 +150,15 @@ Q&A is inherently multi-turn against one ~30k-token proposal+summary prefix
 the existing marker at `qa.js:156` has a byte-identical prefix on unchanged follow-up
 questions; telemetry determines whether it produces realized reads. No restructure needed.
 
-**R4 — Executor: split stable template from dynamic content (depends on R2; schema work).**
-`execute-prompt.js` interpolates per-request variables *into* the system template ahead of
-the marker (`execute-prompt.js:403,411,448`), so distinct documents never share a prefix.
-Fix: two system blocks — `system[0]` = stable instruction template with the marker at its
-end; `system[1]`/user = interpolated variables + nonce-bearing wrappers. Requires the
-prompt-seed schema to separate template text from variable slots (the Phase 2
-`placement=system` + context-blocks work already referenced at `execute-prompt.js:402`).
-Highest-volume path; batch flows pushing many documents through the same prompt within
-minutes then hit on the shared template.
+**R4 — Executor: stable system prefix across documents (DONE 2026-09-19; see §0).**
+[Historical July framing] `execute-prompt.js` was believed to interpolate per-request
+variables *into* the system template ahead of the marker, requiring a two-block
+template/variable split backed by prompt-seed schema work. Re-verification on 2026-09-19
+showed the per-document bytes were only the preamble's nonce list; dropping that list from
+`composeMessages` (the preamble helper documents it as optional) was sufficient. The
+two-block split is no longer planned. Highest-volume path; batch flows pushing many
+documents through the same prompt within the TTL now hit on the shared template where the
+system block clears the concrete model's floor (§0 R4 lists which seeded prompts do).
 
 **R5 — Conditional, verify-then-fix items.**
 - `composeScorePrompt` batch loop (`claude-reviewer-service.js:708`;
@@ -178,7 +194,8 @@ are 1024; Opus 4.6/4.5 and Haiku 4.5 are 4096. See
 
 ## 4. Verification for the remediation session
 
-- Before/after: `scripts/audit-system-prompt-sizes.js` for prefix sizes; Anthropic console
+- Before/after: `scripts/audit-system-prompt-sizes.js` for prefix sizes (per-tier floors since
+  2026-09-19: Sonnet 1024, Haiku 4096, Opus 512 — [RECHECKED after scripts/audit-system-prompt-sizes.js change: FLOORS table + `verdict(n, tier)`]); Anthropic console
   cache metrics (or `usage.cache_read_input_tokens` in responses) for realized hit rate.
 - Gates: `check:prompt-injection-tagging` (+ self-test) after any `ai-payload-boundary`
   change; full `npm test`; `/contract-reconcile` for the R1 security review.

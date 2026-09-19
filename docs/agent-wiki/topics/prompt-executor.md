@@ -45,6 +45,13 @@ reviewer-finder prompt migration.
   its own guard (the `summarize-v2` class) cannot reach the selector. `check:trust-boundary-guid`
   treats `executePrompt({ requestId })` as an object-arg sink, so route-edge validation is still
   required and enforced in CI; this is defense-in-depth, not a replacement.
+- **Executor preamble is nonce-free by design (S524, 2026-09-19):** `composeMessages` calls
+  `buildUntrustedContentPreamble()` with NO nonce list, so the `cache_control`-marked system
+  block is byte-identical across documents of the same prompt row (prompt caching; see
+  `docs/PROMPT_CACHING_AUDIT.md` §0 R4). The nonce still rides on both sentinels in the user
+  body, which is what defeats forgery. Do not re-add the nonce list to the preamble "for
+  explicitness" — that puts unique bytes at position 0 and makes every cross-document call a
+  cache write with no read. Pinned by `tests/unit/execute-prompt-payload-boundary.test.js`.
 - **Route-owned A7 when passing pre-wrapped text (S344):** `applyVariableBoundaries` only
   wraps + emits a nonce for a variable declared `untrusted:true` + `dataClass`/`maxChars`, and
   `composeMessages` only injects the `buildUntrustedContentPreamble` when `untrustedNonces>0`.
