@@ -28,7 +28,7 @@ jest.mock('exceljs', () => ({}));
 let deriveRecordCount;
 
 beforeAll(async () => {
-  ({ deriveRecordCount } = await import('../../pages/api/dynamics-explorer/chat'));
+  ({ deriveRecordCount } = await import('../../lib/services/dynamics-explorer/result-shaping'));
 });
 
 describe('deriveRecordCount', () => {
