@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S8 ACCEPTED]**. Root accepted S0–S8 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S8 are accepted below; S9 is next. No push, deployment or live rehearsal is authorized.
+Status: **[S9 CANDIDATE / ROOT ACCEPTANCE PENDING]**. Root accepted S0–S9 after Sol review, full G and final diff audit. S9 source extraction and G are complete; fresh Sol review accepted conditionally on G, and root acceptance remains pending. User authorization covers all local stages; S0 is `546efff8`; S1–S8 are accepted below. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -383,3 +383,66 @@ npx jest --runInBand --silent --runTestsByPath tests/unit/artifact-version-histo
 Result: **28 unique suites / 375 tests passed**, zero snapshots (`/private/tmp/wmkf-graph-decomposition-logs/s8-jest-final.log`). This corrected run supersedes an earlier command that listed the contributor suite twice. The focused prerequisite set (`graph-service-folders`, `graph-service-write-contract`, `graph-service-boundary`, and `graph-service-consumer-contract`) passed **4 suites / 65 tests**. Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed; lint reported **114 warnings and 0 errors**, and the canonical Next.js **16.3.5 Turbopack** build retained the two known DOCX dynamic-filesystem tracing warnings. Every current `check:*` parent and available immediate self-test passed sequentially: `/private/tmp/wmkf-graph-decomposition-logs/s8-all-checks.log` records **67 commands, all exit code 0**. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
 
 No unresolved S8 contract finding remains. Root final review and G acceptance are complete. The commit introducing this receipt is the accepted S8 checkpoint; rollback is `4c6191d6`; S9 is next.
+
+## S9 execution receipt
+
+Status: **[S9 CANDIDATE / ROOT ACCEPTANCE PENDING]**. Baseline is accepted S8 commit `c8bf1848`; this candidate moves only `uploadFile`, `replaceFileContent`, and `deleteFile` into the existing `lib/services/graph/writes.js`, updates the explicit real-source boundary inventory, and keeps the public facade and callers unchanged. No upload-session move, dependency, environment, persistence, policy, live-service, deployment, or later-stage change was made.
+
+### Contract-reconcile surface and invariants
+
+| Surface | S9 evidence |
+|---|---|
+| Change surface | Simple upload, stable-item replacement, and delete transport owners move to `graph/writes.js`; `GraphService` remains the public facade. **[VERIFIED via diff and boundary analyzer]** |
+| Entry points | `GraphService.uploadFile`, `GraphService.replaceFileContent`, `GraphService.deleteFile`; all existing service/route callers remain unchanged. **[VERIFIED via source and consumer manifest]** |
+| Persistence | SharePoint/Graph drive items only; no schema, registry, Blob, or Dataverse ownership changes. **[VERIFIED via moved bodies and consumer tests]** |
+| Consumers | Real-facade upload/registry bridge plus contributor, grantee upload/replacement, review upload, cleanup, drain, lifecycle, and complete named manifest suites. **[VERIFIED via S9 G]** |
+| Prior findings | Fresh Sol `sol_s9` source review accepted conditional on G; root reviewed facade receiver forwarding and the 18-body parity result. **[VERIFIED via handoff]** |
+
+| Invariant | Evidence |
+|---|---|
+| Simple upload retains conflict modes, validation, conditional publication readback, stable identity, and readback failure handling. | `graph-service-write-contract.test.js`; baseline/candidate AST parity. |
+| Replacement retains stable drive/item identity, exact `If-Match`, 412 mapping, cTag fallback, and one write. | `graph-service-write-contract.test.js`; baseline/candidate AST parity. |
+| Delete retains 204/404 success, error text/status, and no retry. | `graph-service-write-contract.test.js`; baseline/candidate AST parity. |
+| Facade signatures/default destructuring remain unchanged and each delegate has one explicit receiver-forwarding return. | `graph-service-boundary.test.js`; facade lines 227–240, 339–347, 357–359. |
+
+### Owned move and exact AST bounds
+
+The bounds below were derived from `git show c8bf1848:lib/services/graph-service.js` and `nl -ba` on the candidate. The moved function bodies match after normalizing only source positions/comments and the permitted `this`→`svc` receiver change; the parity command returned zero unexplained differences.
+
+| Symbol | S8 facade declaration | Candidate declaration | Facade delegate |
+|---|---:|---:|---:|
+| `uploadFile` | `lib/services/graph-service.js:222–318` | `lib/services/graph/writes.js:124–221` | `lib/services/graph-service.js:227–240` |
+| `replaceFileContent` | `lib/services/graph-service.js:417–468` | `lib/services/graph/writes.js:228–280` | `lib/services/graph-service.js:339–347` |
+| `deleteFile` | `lib/services/graph-service.js:478–492` | `lib/services/graph/writes.js:290–304` | `lib/services/graph-service.js:357–359` |
+
+`writes.js` now imports `DOWNLOAD_TIMEOUT` in addition to its existing folder-write imports. The upload owner preserves the conditional readback branch exactly; replacement remains a separate cTag/If-Match path. The facade retains the original signatures and reconstructs the aliased upload fields for its explicit delegate; replacement forwards `{ siteId, ifMatch }`; delete forwards its raw identifiers.
+
+### Required tests and G evidence
+
+The prerequisite command initially caught the missing `DOWNLOAD_TIMEOUT` import; after that one source correction, it passed **4 suites / 95 tests**:
+
+```text
+npx jest --runInBand --silent --runTestsByPath tests/unit/graph-service-write-contract.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/document-lifecycle-boundary.test.js
+```
+
+The complete S9 Graph and consumer command was:
+
+```text
+npx jest --runInBand --silent --runTestsByPath tests/unit/graph-service-folders.test.js tests/unit/graph-service-versions.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-observability.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-public-contract.test.js tests/unit/graph-service-auth-cache.test.js tests/unit/graph-service-resolution.test.js tests/unit/graph-service-read-contract.test.js tests/unit/graph-service-downloads.test.js tests/unit/graph-service-write-contract.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/artifact-version-history.test.js tests/unit/initial-assessment-artifact-versions.test.js tests/unit/initial-assessment-controls-service.test.js tests/unit/workbench-initial-assessment-versions-route.test.js tests/unit/site-visit-materials-contributor-service.test.js tests/unit/external-materials-routes.test.js tests/unit/external-materials-routes-client.test.js tests/unit/consultant-feedback-attachment-service.test.js tests/unit/dynamics-explorer-search-documents.test.js tests/unit/dynamics-explorer-chat-characterization.test.js tests/unit/workbench-proposal-document-listing.test.js tests/unit/workbench-download-proposal-document-service.test.js tests/unit/load-proposal-service.test.js tests/unit/load-proposal.test.js tests/unit/document-lifecycle-boundary.test.js tests/unit/individual-review-file-service.test.js tests/unit/review-upload.test.js tests/unit/sharepoint-cleanup.test.js tests/unit/cycle-dossier-sharepoint.test.js tests/unit/grantee-upload-service.test.js tests/unit/grantee-replace-submission-service.test.js tests/unit/drain-files-moved-helpers.test.js tests/unit/drain-record-failure.test.js tests/integration/review-manager-download-review.test.js
+```
+
+Result: **37 suites / 606 tests passed**, one snapshot (`/private/tmp/wmkf-graph-decomposition-logs/s9-jest-final.log`). This includes the real-facade upload/registry bridge, `artifact-version-history`, `document-lifecycle-boundary`, contributor/grantee upload and replacement, review upload, cleanup, drain, and the complete named consumer manifest.
+
+Sequential regression commands all passed:
+
+```text
+npm run check:types                         # passed
+npm run lint                                # passed; 114 existing warnings, 0 errors
+npm run build                               # passed; Next.js 16.3.5 Turbopack, known DOCX tracing warnings
+```
+
+Every current `check:*` parent and available immediate self-test ran sequentially; `/private/tmp/wmkf-graph-decomposition-logs/s9-all-checks.log` records **67 commands, all exit code 0**. The body comparison is `/private/tmp/wmkf-graph-decomposition-logs/s9-body-parity.log` (**3/3 moved S9 bodies passed**); final `git diff --check` passed. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
+
+### Review and handoff
+
+Fresh Sol review **`sol_s9`** accepted the source extraction conditional on G, with no material finding. Root independently verified facade receiver forwarding and the all-18-body parity result. No unresolved S9 contract finding remains after G. Root final review and G acceptance are complete; the commit introducing this receipt is the S9 checkpoint; rollback remains accepted S8 commit `c8bf1848`. No live rehearsal, push, deployment, or merge is authorized; S10 is next.
