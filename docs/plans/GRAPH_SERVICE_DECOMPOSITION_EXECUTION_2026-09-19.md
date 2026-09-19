@@ -512,7 +512,7 @@ Fresh Sol review **`sol_s10`** accepted the source extraction conditional on G, 
 
 ## S11 closure receipt
 
-Status: **[S11 ACCEPTED LOCALLY — RELEASE BLOCKED]**. Baseline is accepted S10 commit `7bf1ce2d`; this closure pass performs only proven source cleanup, boundary-inventory tightening, stale Graph documentation reconciliation, and release-packet evidence. No runtime behavior, public signature, dependency, environment, persistence, policy, live-service, deployment, merge, or push change is included. The commit introducing this closure receipt is the accepted S11 checkpoint; its exact hash is recorded in the final handoff.
+Status: **[S11 ACCEPTED LOCALLY — RELEASE BLOCKED]**. Baseline is accepted S10 commit `7bf1ce2d`; this closure pass performs only proven source cleanup, boundary-inventory tightening, stale Graph documentation reconciliation, and release-packet evidence. No runtime behavior, public signature, dependency, environment, persistence, policy, live-service, deployment, merge, or push change is included. Accepted S11 checkpoint: `76cfbbcb`. The subsequent handoff commit changes documentation only.
 
 ### Closure surface and source ownership
 
@@ -577,7 +577,7 @@ The available browser check covers mocked Workbench responsiveness only; no exis
 
 | Required field | Recorded state / action before promotion |
 |---|---|
-| Branch and candidate head | `codex/graph-service-decomposition`; S10 baseline `7bf1ce2d` plus the reviewed S11 working-tree diff. Root must record the accepted S11 commit after committing and verify a clean tree before any promotion. |
+| Branch and candidate head | `codex/graph-service-decomposition`; accepted S11 code/test checkpoint `76cfbbcb` (parent `7bf1ce2d`). The final handoff commit is documentation-only. Resolve and record the exact branch HEAD and verify a clean tree again at any later promotion. |
 | Approved rehearsal mode | Only local Mode A synthetic/mocked verification was authorized and run. Any external rehearsal mode and its authorization remain **UNKNOWN / REQUIRED**. |
 | Approved environment and fixtures | **UNKNOWN / REQUIRED**: name the SharePoint tenant/site/library, synthetic files, Dataverse and other affected targets, actors, and cleanup owner. An isolated Dataverse target does not isolate Graph. |
 | Expected side effects | **UNKNOWN until a specific rehearsal is approved**. Enumerate expected uploads, versions/restores, replacements/deletes, registry writes, and any downstream effects for the chosen journeys; record before/after identities. The local verification here caused no remote file or registry writes. |
@@ -593,6 +593,6 @@ release, revert the rejected local stage and rerun G against its accepted predec
 
 ### Accepted history and rollback
 
-Accepted stage commits: S0 `546efff8`, S1 `77e94c0d`, S2 `7ff2f90f`, S3 `2addf72a`, S4 `c20b6538`, S5 `ac4a03b4`, S6 `0f5c90db`, S7 `4c6191d6`, S8 `c8bf1848`, S9 `1dad580e`, and S10 `7bf1ce2d`. S11 is accepted in the commit introducing this receipt. Its local rollback point is `7bf1ce2d`; any rollback must preserve unrelated work and rerun G before continuing. Code rollback does not undo any external state; no external state was changed by this local run.
+Accepted stage commits: S0 `546efff8`, S1 `77e94c0d`, S2 `7ff2f90f`, S3 `2addf72a`, S4 `c20b6538`, S5 `ac4a03b4`, S6 `0f5c90db`, S7 `4c6191d6`, S8 `c8bf1848`, S9 `1dad580e`, and S10 `7bf1ce2d`. S11 is accepted in `76cfbbcb`. Its local rollback point is `7bf1ce2d`; any rollback must preserve unrelated work and rerun G before continuing. Code rollback does not undo any external state; no external state was changed by this local run.
 
 Fresh Sol review **`sol_s11`** accepted the S11 source/test closure and, after inspecting the completed evidence, accepted the final receipt and blocked-promotion packet with no material finding. Root's independent parity and forwarding checks are recorded above. Root completed final review and accepts S11. No unresolved local source or gate finding remains; external rehearsals and promotion remain separate owner-controlled work.

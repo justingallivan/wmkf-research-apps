@@ -1,4 +1,90 @@
-# Session 525 Prompt: Prompt-cache prefix fix shipped; panel breakpoint and R5 wait on telemetry
+# Session 526 Prompt: GraphService decomposition complete locally; release requires a separate decision
+
+## Session 525 Summary
+
+[VERIFIED via local source, Git, stage tests/builds/gates, and fresh Sol reviews]
+The owner authorized the GraphService decomposition plan, then authorized local
+S0–S11 execution with Luna building, Sol reviewing each stage, and root performing
+final acceptance. All work is isolated on `codex/graph-service-decomposition` at
+`/private/tmp/wmkf-graph-decomposition`. No push, merge, deployment, live rehearsal,
+provider call, or infrastructure change was performed for this migration.
+
+### Completed and current work
+
+- Planning and amendment: `877b84c9`, `710892ac`; Claude Opus adversarial planning
+  review used the subscription/OAuth session. The accepted plan records the
+  dispositions and fresh-context review method.
+- S0–S11 are accepted: characterization prerequisites, shared leaves, authentication,
+  resolution, file reads, versions/restore, downloads, search/cooldown, folders,
+  simple writes, and large-upload sessions. The public facade and caller contracts
+  remain; source comparisons preserve existing behavior differences.
+- S11 closure is accepted in `76cfbbcb`: the 288-line facade retains 21 static
+  methods, with 11 internal modules and complete ownership checks. Fresh Sol
+  source and release-packet reviews passed; root accepted the final evidence.
+- Runtime commits, in order: `546efff8`, `77e94c0d`, `7ff2f90f`, `2addf72a`,
+  `c20b6538`, `ac4a03b4`, `0f5c90db`, `4c6191d6`, `c8bf1848`, `1dad580e`,
+  `7bf1ce2d`, `76cfbbcb`. Each accepted stage has its own verification receipt.
+
+## Next Items
+
+### Verified Open
+
+None for local implementation. S0–S11 and final review are complete; the
+execution receipt records acceptance and the separate blocked promotion packet.
+
+### Owner Decision Needed
+
+Promotion is outside the local authorization. Before any release, choose an
+approved rehearsal environment and synthetic fixtures, complete the required
+staff/external Tier 2 rehearsals, and record campaign timing, last-known-good
+deployment, rollback operator, and release approval. Those live facts were not
+queried in this task. Code rollback does not undo remote file or registry state.
+
+### Verify Before Acting
+
+The prior session's unrelated cache-telemetry, Preview CSRF, Entra callback,
+reviewer-search and memory-audit items are preserved below as historical routing
+context. They were not revalidated here and are not an automatic worklist.
+Main may have advanced independently; compare it before proposing integration.
+
+### Do Not Reopen Without New Decision
+
+Keep the GraphService facade and existing operation-specific behavior. This
+migration does not authorize transport unification, cache-race fixes, additional
+upload retries, live provider calls, or removal of retained rehearsal data.
+
+## Key Files Reference
+
+- Plan: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_PLAN_2026-09-19.md`
+- Stage evidence and release packet: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`
+- Consumer census: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_CONSUMER_MANIFEST_2026-09-19.md`
+- Public facade: `lib/services/graph-service.js`; internal owners: `lib/services/graph/`
+- Boundary enforcement: `tests/unit/graph-service-boundary.test.js`
+
+## Final local verification
+
+[VERIFIED via local command logs] Full Jest: 984 suites / 14,482 tests / one
+snapshot; named consumer regression set: 37 suites / 607 tests; types, lint,
+canonical Next.js 16.3.5 Turbopack build, and all 67 check/self-test commands
+passed. Three fully mocked Workbench browser scenarios passed; the local test
+servers were stopped. Existing lint/build warnings remain documented in the
+receipt. These checks do not establish live Graph or Tier 2 rehearsal coverage.
+
+## Handoff notes
+
+Owner: Codex root; builders Luna; independent reviewers Sol. This handoff stays
+on the isolated local branch under the owner's existing authorization. The
+claim-evidence pilot report could not read local state; no observation was
+inferred. No DEVELOPMENT_LOG milestone entry is required: this candidate has
+not shipped. The stage receipt is the authoritative verification record.
+
+## Historical handoffs — not current instructions
+
+The following prior Session 525 prompt and older summaries are retained evidence.
+Their deployment claims and authorizations belong to those named releases;
+current Graph migration status and next actions are above.
+
+## Prior Session 525 Prompt: Prompt-cache prefix fix shipped; panel breakpoint and R5 wait on telemetry
 
 ## Session 524 Summary
 
