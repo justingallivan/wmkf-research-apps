@@ -2,6 +2,8 @@
 
 Status: **[S0–S11 ACCEPTED LOCALLY — RELEASE BLOCKED]**. Luna built each stage, fresh Sol reviews accepted the work, and root completed final review and verified the recorded gates. The migration is complete on `codex/graph-service-decomposition`; no migration stage remains. Promotion requires the separately approved rehearsals and release decision specified in the S11 packet. No push, merge, deployment, or live rehearsal was performed.
 
+Current release preparation (integration comparison, production rollback candidate, and proposed rehearsal contract): [release preparation packet](GRAPH_SERVICE_RELEASE_PREPARATION_2026-09-19.md). Promotion remains blocked; no rehearsal or deployment is implied.
+
 ## Historical S0–S11 stage evidence
 
 The stage sections below preserve the code and verification at each accepted checkpoint. The post-Opus follow-up receipt at the end records the current mutation-runner behavior.
