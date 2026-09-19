@@ -39,7 +39,7 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–6 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
+provider or external-state call was made. Stages 0–7 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
 from historical checkpoints.
 
 ## Source-to-target map
@@ -690,3 +690,21 @@ call and retain their null defaults and facade ownership.
   not acceptance evidence. Stage 10 must rebuild against a stable revision.
 
 **Stage 6 verdict:** accepted by root. Starting/rollback reference: `212ebeee`.
+
+
+## Stage 7 acceptance — promotion and verification refresh
+
+[VERIFIED via source, commands and fresh review] Luna extracted
+`refreshExpiredVerification` and `saveSelected` together into
+`useReviewerPromotion.js`. Root AST comparison against `692ef7ff` matches both
+callback bodies and parameters. Exact-key correlation, ordinary/applicant order,
+partial results, generation-owned locks and the documented recovery asymmetry
+remain unchanged.
+
+- Fresh Sol `/root/sol_stage7_final`: **READY**, **4 suites / 41 tests passed**;
+  reviewed captures, callback counts, stale refresh writes and exact reconciliation.
+- Luna focused run: **5 suites / 47 tests passed**; targeted lint passed.
+- Full G: **19 commands passed**, including **970 suites / 14,270 tests** and
+  canonical build. Evidence: `/private/tmp/reviewer-stage-7-gates/results.json`.
+
+**Stage 7 verdict:** accepted by root. Starting/rollback reference: `692ef7ff`.
