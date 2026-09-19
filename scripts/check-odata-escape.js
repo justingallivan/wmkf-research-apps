@@ -14,7 +14,10 @@
  *     elsewhere.
  *   - the dynamics-explorer exempt dir (pages/api/dynamics-explorer/),
  *     mirroring check-dataverse-access-layer.js's EXEMPT_DIRS
- *     (scripts/check-dataverse-access-layer.js:75-76).
+ *     (scripts/check-dataverse-access-layer.js:75-76), plus a single-file
+ *     exemption for lib/services/dynamics-explorer/tools/get-entity.js (one
+ *     legacy escape carried over from the former chat.js:1253; retire with
+ *     option (b)).
  *   - comment-only mentions. Comment detection: `//` line comments and
  *     `/* *\/` block comments are stripped from the source BEFORE pattern
  *     matching, replacing comment characters with whitespace (not deleting
@@ -49,11 +52,15 @@ const EXCLUDE_DIR = /(^|\/)(node_modules|\.git|\.next)(\/|$)/;
 // pattern it forbids everywhere else.
 const EXEMPT_FILES = new Set([
   'lib/dataverse/core/odata.js',
+  // one legacy escape at the former chat.js:1253; retire with option (b)
+  'lib/services/dynamics-explorer/tools/get-entity.js',
 ]);
 
 // Mirrors scripts/check-dataverse-access-layer.js EXEMPT_DIRS (~:75-76): the
 // dynamics-explorer power-tool surface is out of scope for this law too
-// (docs/ODATA_ESCAPE_CONSOLIDATION_PLAN.md Out-of-scope section).
+// (docs/ODATA_ESCAPE_CONSOLIDATION_PLAN.md Out-of-scope section). One
+// additional single-file exemption above (EXEMPT_FILES) covers the moved
+// get-entity.js legacy escape without exempting the whole service dir.
 const EXEMPT_DIRS = [
   'pages/api/dynamics-explorer/',
 ];

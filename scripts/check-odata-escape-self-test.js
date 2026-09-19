@@ -108,6 +108,13 @@ function setupBaseFixtures() {
     const escaped = identifier.replace(/'/g, "''");
     module.exports = { escaped };
   `);
+
+  // Single-file exemption (S1): the moved get-entity.js legacy escape must
+  // still not be flagged, even though its directory is not exempt.
+  write('lib/services/dynamics-explorer/tools/get-entity.js', `
+    const escaped = identifier.replace(/'/g, "''");
+    module.exports = { escaped };
+  `);
 }
 
 function writeRedFixtures() {
@@ -126,11 +133,22 @@ function writeRedFixtures() {
     }
     module.exports = { findRow };
   `);
+  // S1: a second dynamics-explorer service file with its own hand-rolled
+  // escape must still be flagged -- the single-file exemption above covers
+  // only get-entity.js, not the whole lib/services/dynamics-explorer/ dir.
+  write('lib/services/dynamics-explorer/tools/other.js', `
+    function findRow(key) {
+      const filter = \`wmkf_settingkey eq '\${key.replace(/'/g, "''")}'\`;
+      return filter;
+    }
+    module.exports = { findRow };
+  `);
 }
 
 function removeRedFixtures() {
   fs.rmSync(path.join(tempRoot, 'lib/services/hand-rolled-escape.js'), { force: true });
   fs.rmSync(path.join(tempRoot, 'lib/services/hand-rolled-escape-variant.js'), { force: true });
+  fs.rmSync(path.join(tempRoot, 'lib/services/dynamics-explorer/tools/other.js'), { force: true });
 }
 
 function runRedAssertion() {
@@ -143,13 +161,23 @@ function runRedAssertion() {
     `expected the mechanical .replace(/'/g, "''") fixture to be named:\n${run.output}`);
   expect(run.output.includes('lib/services/hand-rolled-escape-variant.js'),
     `expected the single-quoted-replacement / String(x) variant fixture to be named:\n${run.output}`);
+  expect(run.output.includes('lib/services/dynamics-explorer/tools/other.js'),
+    `expected the non-exempt dynamics-explorer service file to be named:\n${run.output}`);
   expect(!run.output.includes('html-escape-decoy.js'), `HTML decoy wrongly flagged:\n${run.output}`);
   expect(!run.output.includes('xml-escape-decoy.js'), `XML decoy wrongly flagged:\n${run.output}`);
   expect(!run.output.includes('comment-only-decoy.js'), `comment-only decoy wrongly flagged:\n${run.output}`);
   expect(!run.output.includes('+ lib/dataverse/core/odata.js'), `canonical odata.js wrongly flagged:\n${run.output}`);
-  expect(!run.output.includes('dynamics-explorer'), `dynamics-explorer exempt dir wrongly flagged:\n${run.output}`);
+  // Narrowed from a blanket !includes('dynamics-explorer') (S1): the gate now
+  // has a legitimate green fixture at
+  // lib/services/dynamics-explorer/tools/get-entity.js, whose path also
+  // contains the substring "dynamics-explorer". The red assertion must
+  // therefore check the specific exempt route file, not the substring, or it
+  // would spuriously fail once dynamics-explorer/ fixtures exist outside the
+  // exempt route dir. The paired positive assertion above confirms a
+  // non-exempt file under the same directory is still flagged.
+  expect(!run.output.includes('pages/api/dynamics-explorer/chat.js'), `dynamics-explorer exempt route file wrongly flagged:\n${run.output}`);
 
-  console.log('PASS red assertion (mechanical + variant hand-rolled escapes flagged; decoys, canonical file, and exempt dir clean)');
+  console.log('PASS red assertion (mechanical + variant + non-exempt dynamics-explorer escapes flagged; decoys, canonical file, and exempt paths clean)');
 }
 
 function runGreenAssertion() {
