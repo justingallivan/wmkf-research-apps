@@ -1,24 +1,18 @@
 /**
  * Stage 0 characterization: pure-unit tests for the restriction-guard helpers
- * in pages/api/dynamics-explorer/chat.js (checkRestriction,
- * splitChatExpandSegments, redactRestrictedFieldNames). S0 adds `export` to
- * these declarations with no other source change; S2 will repoint this
- * import to the extracted restriction-guard module.
+ * (checkRestriction, splitChatExpandSegments, redactRestrictedFieldNames), now
+ * extracted to lib/services/dynamics-explorer/restriction-guard.js, a leaf
+ * module with no dependencies.
  *
  * Plan: docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_PLAN_2026-09-18.md
  * section 4, items 8-10.
  */
 
-// Importing the route module pulls in its full import graph (lib/utils/auth →
-// next-auth → openid-client → jose ESM), which Jest cannot parse unmocked.
-// tests/helpers/auth-mock registers the next-auth/@vercel/postgres module
-// mocks the harness relies on; import it first for its side effects only.
-import '../helpers/auth-mock';
 import {
   checkRestriction,
   splitChatExpandSegments,
   redactRestrictedFieldNames,
-} from '../../pages/api/dynamics-explorer/chat';
+} from '../../lib/services/dynamics-explorer/restriction-guard';
 
 describe('checkRestriction (Stage 0 characterization)', () => {
   test('table-level block: a restriction row with no field_name blocks the whole table', () => {
