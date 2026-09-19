@@ -38,11 +38,17 @@ const REAL_SOURCE_OPTIONS = {
     getDriveId: `${GRAPH}/resolution.js`,
     siteCache: `${GRAPH}/resolution.js`,
     driveCache: `${GRAPH}/resolution.js`,
+    listFiles: `${GRAPH}/files.js`,
+    getFileMetadataById: `${GRAPH}/files.js`,
+    getFileMetadataByPath: `${GRAPH}/files.js`,
   },
   delegates: {
     getAccessToken: { target: `${GRAPH}/auth.js`, binding: 'getAccessToken' },
     getSiteId: { target: `${GRAPH}/resolution.js`, binding: 'getSiteId' },
     getDriveId: { target: `${GRAPH}/resolution.js`, binding: 'getDriveId' },
+    listFiles: { target: `${GRAPH}/files.js`, binding: 'listFiles' },
+    getFileMetadataById: { target: `${GRAPH}/files.js`, binding: 'getFileMetadataById' },
+    getFileMetadataByPath: { target: `${GRAPH}/files.js`, binding: 'getFileMetadataByPath' },
   },
 };
 

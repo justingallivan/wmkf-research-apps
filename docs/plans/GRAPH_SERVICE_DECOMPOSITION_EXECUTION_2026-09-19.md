@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S3 ACCEPTED — S4 NEXT]**. Root accepted S2 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1 and S2 are accepted below and S3 is recorded below. No push, deployment or live rehearsal is authorized.
+Status: **[S4 ACCEPTED — S5 NEXT]**. Root accepted S3 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S3 are accepted below and S4 is recorded below. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -218,3 +218,35 @@ Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed. Li
 Every current `check:*` parent and available immediate self-test ran sequentially. Complete output is `/private/tmp/wmkf-graph-decomposition-logs/s3-all-checks.log`: **67 commands, all exit code 0**.
 
 Fresh Sol review **`sol_s3`** accepted the resolution body/reset parity and explicit boundary inventory conditional on G. Root independently verified the normalized method bodies, cache ownership, reset placement, and no stale-generation redesign. No unresolved S3 finding remains. Root final review and G acceptance are complete; next allowed stage is S4; the S0 mutation runner remains baseline-specific and was not rerun.
+
+## S4 execution receipt
+
+Status: **[S4 ACCEPTED]**. Baseline is accepted S3 commit `2addf72a`; the accepted candidate is the commit introducing this S4 receipt on `codex/graph-service-decomposition`.
+
+### Owned move and exact bounds
+
+S4 changed only the file-read owner and explicit real-source boundary inventory. Bounds below were derived from `git show 2addf72a:lib/services/graph-service.js` and `nl -ba` on the current candidate after the final `files.js` header correction.
+
+| Symbol | Baseline facade range | Candidate module range | Facade delegate |
+|---|---:|---:|---:|
+| `listFiles` | lines 146–216 | `lib/services/graph/files.js:36–106` | `lib/services/graph-service.js:147–149` |
+| `getFileMetadataById` | lines 222–269 | `lib/services/graph/files.js:112–160` | `lib/services/graph-service.js:155–161` |
+| `getFileMetadataByPath` | lines 723–771 | `lib/services/graph/files.js:169–218` | `lib/services/graph-service.js:615–625` |
+
+`listFiles` retains the original raw `options = {}` signature and in-body destructuring at `files.js:36–45`; its nested files-first walk, defaults, depth/file caps, deadline, path validation, and errors remain unchanged apart from `this`→`svc`. The two originally destructured metadata signatures reconstruct their bound fields in the sole facade return delegates. By-ID metadata retains publication-only `versionId` behavior and identity checks; by-path metadata retains its publication-or-cTag fallback and paired supplied site/drive behavior. Root's six-function body comparison matched all three moved bodies after the permitted `this`→`svc` and receiver/header boundary rewrites.
+
+The real-source boundary inventory explicitly assigns `listFiles`, `getFileMetadataById`, and `getFileMetadataByPath` to `graph/files.js` and names all three facade delegates. Generic fixture ownership options remain separate. No other method, state owner, caller, or runtime path changed.
+
+### S4 G evidence
+
+The exact required consumer-inclusive Jest command was:
+
+`npx jest --runInBand --silent --runTestsByPath tests/unit/artifact-version-history.test.js tests/unit/graph-service-auth-cache.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/graph-service-downloads.test.js tests/unit/graph-service-folders.test.js tests/unit/graph-service-observability.test.js tests/unit/graph-service-public-contract.test.js tests/unit/graph-service-read-contract.test.js tests/unit/graph-service-resolution.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-versions.test.js tests/unit/graph-service-write-contract.test.js tests/unit/document-lifecycle-boundary.test.js tests/unit/drain-record-failure.test.js tests/unit/initial-assessment-artifact-versions.test.js tests/unit/initial-assessment-controls-service.test.js tests/unit/workbench-proposal-document-listing.test.js tests/unit/workbench-download-proposal-document-service.test.js`
+
+Result: **20 suites / 307 tests passed**, zero snapshots. The post-correction affected subset (`graph-service-boundary`, `graph-service-read-contract`, `graph-service-consumer-contract`, `initial-assessment-artifact-versions`, `workbench-proposal-document-listing`, and `workbench-download-proposal-document-service`) passed **6 suites / 58 tests**.
+
+Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed. Lint reported **114 warnings and 0 errors**. The canonical Next.js **16.3.5 Turbopack** build completed with the same two known DOCX dynamic-filesystem tracing warnings and existing reviewer-reminder hold advisory.
+
+Every current `check:*` parent and available immediate self-test ran sequentially. Complete output is `/private/tmp/wmkf-graph-decomposition-logs/s4-all-checks.log`: **67 commands, all exit code 0**.
+
+Fresh Sol review **`sol_s4`** accepted the six moved body comparisons and explicit boundary inventory conditional on G. Root independently verified all six extracted functions and facade delegates after correcting the `listFiles` source header/body shape. No unresolved S4 finding remains. Root final review and G acceptance are complete; next allowed stage is S5; the S0 mutation runner remains baseline-specific and was not rerun.
