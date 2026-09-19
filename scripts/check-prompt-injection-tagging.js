@@ -337,7 +337,8 @@ const SURFACES = [
     id: 'dynamics-explorer-export',
     inv: 23,
     status: 'migrated',
-    callSiteFiles: ['pages/api/dynamics-explorer/chat.js'],
+    // Call site moved with the S6/S7 tool extraction (Stage 7).
+    callSiteFiles: ['lib/services/dynamics-explorer/tools/batch-processing.js'],
   },
   {
     // Route-local prompt — wrap + preamble live in the route.
