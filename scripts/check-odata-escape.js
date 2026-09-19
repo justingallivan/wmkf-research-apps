@@ -52,7 +52,7 @@ const EXCLUDE_DIR = /(^|\/)(node_modules|\.git|\.next)(\/|$)/;
 // pattern it forbids everywhere else.
 const EXEMPT_FILES = new Set([
   'lib/dataverse/core/odata.js',
-  // one legacy escape at the former chat.js:1253; retire with option (b)
+  // one legacy escape, today at pages/api/dynamics-explorer/chat.js:1253, moving here at S5; retire with option (b)
   'lib/services/dynamics-explorer/tools/get-entity.js',
 ]);
 

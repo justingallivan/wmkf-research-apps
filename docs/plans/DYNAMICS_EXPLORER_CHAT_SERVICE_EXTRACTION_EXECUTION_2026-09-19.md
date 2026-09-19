@@ -51,3 +51,21 @@ maximum per stage), root (Fable) performs the final review and any last edits.
 - Known limits: the mocked reads do not evaluate `DynamicsService.checkRestriction`
   semantics; the harness proves scope presence and the local guard only.
 - Next permitted stage: S1.
+
+## S1, Gate preparation — ACCEPTED
+
+- Commits: `c617b2ac` (access-layer gate: `lib/services/dynamics-explorer/` in
+  `EXEMPT_DIRS`, green self-test fixture), `06d0e98f` (odata-escape gate:
+  single-file `EXEMPT_FILES` entry for `tools/get-entity.js`, green and red
+  fixtures, narrowed self-test assertion), plus root's wording commit below.
+- Nothing removed from either gate; `pages/api/dynamics-explorer/` entries
+  remain until S9. No runtime file created.
+- Verification: both gate pairs green sequentially; `check:harness-framing`,
+  `check:doc-symbol-refs`, lint (0 errors), types clean.
+- Review: Opus READY at `06d0e98f`, with two temporary reverted mutations
+  proving each exemption is load-bearing (deleting the dir entry turns the
+  access-layer self-test red; deleting the file entry turns the odata green
+  assertion red). One non-blocking wording finding: comments stated the S8
+  importer and the S5 move as present fact; root reworded both to "today …
+  moves at S8/S5".
+- Next permitted stage: S2.
