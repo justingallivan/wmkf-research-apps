@@ -39,7 +39,7 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–5 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
+provider or external-state call was made. Stages 0–6 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
 from historical checkpoints.
 
 ## Source-to-target map
@@ -671,3 +671,22 @@ and setters are explicit dependencies; state and generation remain facade-owned.
   Evidence: `/private/tmp/reviewer-stage-5-gates/results.json`.
 
 **Stage 5 verdict:** accepted by root. Starting/rollback reference: `49958e13`.
+
+
+## Stage 6 acceptance — contact and identity actions
+
+[VERIFIED via source, commands and fresh review] Luna extracted ten callbacks into
+`useReviewerContactActions.js`. Root AST comparison against `212ebeee` confirms
+all bodies and parameters match. Both modal state declarations precede the hook
+call and retain their null defaults and facade ownership.
+
+- Fresh Sol `/root/sol_stage6_final`: **READY**, checked UI bindings, authority
+  fields, payload order, partial receipts, return/throw differences and stale exits.
+- Luna focused run: **5 suites / 51 tests passed**; strict targeted lint passed.
+- Full G: **19 commands passed**, including **970 suites / 14,270 tests** and
+  canonical build. Evidence: `/private/tmp/reviewer-stage-6-gates/results.json`.
+- A preparatory browser bundle overlapped active source edits and reported an
+  undefined hook. Current source imports and bindings were verified; that run is
+  not acceptance evidence. Stage 10 must rebuild against a stable revision.
+
+**Stage 6 verdict:** accepted by root. Starting/rollback reference: `212ebeee`.
