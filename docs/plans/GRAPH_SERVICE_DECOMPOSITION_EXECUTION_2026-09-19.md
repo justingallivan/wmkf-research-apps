@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S9 CANDIDATE / ROOT ACCEPTANCE PENDING]**. Root accepted S0–S9 after Sol review, full G and final diff audit. S9 source extraction and G are complete; fresh Sol review accepted conditionally on G, and root acceptance remains pending. User authorization covers all local stages; S0 is `546efff8`; S1–S8 are accepted below. No push, deployment or live rehearsal is authorized.
+Status: **[S10 CANDIDATE / ROOT ACCEPTANCE PENDING]**. Root accepted S0–S10 after Sol review, full G and final diff audit. S10 source extraction and G are complete; fresh Sol review accepted conditionally on G, and root acceptance remains pending. User authorization covers all local stages; S0 is `546efff8`; S0–S9 are accepted below. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -446,3 +446,66 @@ Every current `check:*` parent and available immediate self-test ran sequentiall
 ### Review and handoff
 
 Fresh Sol review **`sol_s9`** accepted the source extraction conditional on G, with no material finding. Root independently verified facade receiver forwarding and the all-18-body parity result. No unresolved S9 contract finding remains after G. Root final review and G acceptance are complete; the commit introducing this receipt is the S9 checkpoint; rollback remains accepted S8 commit `c8bf1848`. No live rehearsal, push, deployment, or merge is authorized; S10 is next.
+
+## S10 execution receipt
+
+Status: **[S10 CANDIDATE / ROOT ACCEPTANCE PENDING]**. Baseline is accepted S9 commit `1dad580e`; this candidate moves only `uploadFileLarge` into the new `lib/services/graph/upload-session.js`, updates the explicit real-source boundary inventory, and keeps the public facade and callers unchanged. No S11 closure, dependency, environment, persistence, policy, live-service, deployment, or later-stage change was made.
+
+### Contract-reconcile surface and invariants
+
+| Surface | S10 evidence |
+|---|---|
+| Change surface | Large upload-session transport owner moves behind the unchanged `GraphService.uploadFileLarge` facade. **[VERIFIED via diff and boundary analyzer]** |
+| Entry points | `GraphService.uploadFileLarge`; existing applicant, consultant, and external-material callers remain unchanged. **[VERIFIED via source and G consumers]** |
+| Persistence | SharePoint/Graph upload sessions and drive items only; no registry, schema, Blob, or Dataverse ownership changes. **[VERIFIED via moved body and consumer tests]** |
+| Consumers | All Graph suites, lifecycle boundaries, applicant/site-visit contributor, consultant attachment, and external-material routes. **[VERIFIED via S10 G]** |
+| Prior findings | Fresh Sol `sol_s10` source review accepted conditional on G; root reviewed the facade signature/receiver forwarding and 19-body parity. **[VERIFIED via handoff]** |
+
+| Invariant | Evidence |
+|---|---|
+| Small buffers retain facade receiver dispatch to `svc.uploadFile`. | `graph-service-upload-large.test.js`, `graph-service-public-contract.test.js`, facade lines 251–263. |
+| Session chunks remain contiguous and pre-authorized, with no bearer header on session PUT/DELETE. | `graph-service-upload-large.test.js`; moved body parity. |
+| HTTP chunk failure performs existing cleanup; network-thrown chunk failure does not add cleanup. | `graph-service-upload-large.test.js`; moved body parity. |
+| Final item readback remains unconditional and preserves final PUT publication when readback lacks publication. | `graph-service-upload-large.test.js`; moved body parity. |
+
+### Owned move and exact AST bounds
+
+The bounds below were derived from `git show 1dad580e:lib/services/graph-service.js` and `nl -ba` on the candidate. The moved function body matches after normalizing only source positions/comments and the permitted `this`→`svc` receiver change; the parity command returned zero unexplained differences.
+
+| Symbol | S9 facade declaration | Candidate declaration | Facade delegate |
+|---|---:|---:|---:|
+| `uploadFileLarge` | `lib/services/graph-service.js:250–332` | `lib/services/graph/upload-session.js:21–104` | `lib/services/graph-service.js:251–263` |
+
+The original facade signature and default destructuring remain unchanged. The delegate reconstructs `{ conflictBehavior, chunkBytes }`; the extracted owner retains the small-buffer `svc.uploadFile` call, session POST, chunk ranges, cleanup branch, and unconditional readback exactly. No logic was consolidated with `writes.js` simple upload.
+
+### Required tests and G evidence
+
+The pre-move prerequisite passed **2 suites / 17 tests**:
+
+```text
+npx jest --runInBand --silent --runTestsByPath tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-public-contract.test.js
+```
+
+The source-ready boundary rerun passed **3 suites / 41 tests** (`graph-service-upload-large`, `graph-service-public-contract`, `graph-service-boundary`).
+
+The complete S10 Graph/lifecycle/applicant-consultant/external-material command was:
+
+```text
+npx jest --runInBand --silent --runTestsByPath tests/unit/graph-service-folders.test.js tests/unit/graph-service-versions.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-observability.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-public-contract.test.js tests/unit/graph-service-auth-cache.test.js tests/unit/graph-service-resolution.test.js tests/unit/graph-service-read-contract.test.js tests/unit/graph-service-downloads.test.js tests/unit/graph-service-write-contract.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/artifact-version-history.test.js tests/unit/document-lifecycle-boundary.test.js tests/unit/document-lifecycle-public-contract.test.js tests/unit/site-visit-materials-contributor-service.test.js tests/unit/consultant-feedback-attachment-service.test.js tests/unit/external-materials-routes.test.js tests/unit/external-materials-routes-client.test.js tests/unit/review-upload.test.js
+```
+
+Result: **21 suites / 364 tests passed**, zero snapshots (`/private/tmp/wmkf-graph-decomposition-logs/s10-jest-final.log`).
+
+Sequential regression commands all passed:
+
+```text
+npm run check:types                         # passed
+npm run lint                                # passed; 114 existing warnings, 0 errors
+npm run build                               # passed; Next.js 16.3.5 Turbopack, known DOCX tracing warnings
+```
+
+Every current `check:*` parent and available immediate self-test ran sequentially; `/private/tmp/wmkf-graph-decomposition-logs/s10-all-checks.log` records **67 commands, all exit code 0**. The body comparison is `/private/tmp/wmkf-graph-decomposition-logs/s10-body-parity.log` (**1/1 moved S10 body passed**); final `git diff --check` passed. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
+
+### Review and handoff
+
+Fresh Sol review **`sol_s10`** accepted the source extraction conditional on G, with no material finding. Root independently verified facade forwarding and the all-19-body parity result. No unresolved S10 contract finding remains after G. Root final review and G acceptance are complete; the commit introducing this receipt is the S10 checkpoint; rollback remains accepted S9 commit `1dad580e`. No live rehearsal, push, deployment, or merge is authorized; S11 is next.

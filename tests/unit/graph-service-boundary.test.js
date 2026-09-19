@@ -63,6 +63,7 @@ const REAL_SOURCE_OPTIONS = {
     uploadFile: `${GRAPH}/writes.js`,
     replaceFileContent: `${GRAPH}/writes.js`,
     deleteFile: `${GRAPH}/writes.js`,
+    uploadFileLarge: `${GRAPH}/upload-session.js`,
     searchFiles: `${GRAPH}/search.js`,
     searchCooldownUntil: `${GRAPH}/search.js`,
     searchCooldownStatus: `${GRAPH}/search.js`,
@@ -92,6 +93,7 @@ const REAL_SOURCE_OPTIONS = {
     uploadFile: { target: `${GRAPH}/writes.js`, binding: 'uploadFile' },
     replaceFileContent: { target: `${GRAPH}/writes.js`, binding: 'replaceFileContent' },
     deleteFile: { target: `${GRAPH}/writes.js`, binding: 'deleteFile' },
+    uploadFileLarge: { target: `${GRAPH}/upload-session.js`, binding: 'uploadFileLarge' },
     searchFiles: { target: `${GRAPH}/search.js`, binding: 'searchFiles' },
   },
 };
