@@ -130,3 +130,31 @@ maximum per stage), root (Fable) performs the final review and any last edits.
 - Corrections: two module headers were off by one code line (fixed by root);
   plan §3.2/§6 `tool-errors` range now 777–794.
 - Next permitted stage: S6.
+
+## S6 and S7, Document tools, batch processing, export — ACCEPTED
+
+- Commits: `88f81f9a` documents, `b304507a` batch-processing (with the
+  `dynamics-explorer-export` registry `callSiteFiles` repoint in the same
+  commit), `fae523b3` export, `ed1747a2` fix-up (Opus round 1: dead
+  `callClaudeBatch` route import; three header citations in the wrong line
+  frame). Route 1,288 → 503 lines. Accepted at `ed1747a2` (Opus round 2).
+- Opus reconstruction: all three modules identical to baseline regions
+  (1922–2309; 70–73 + 2470–2471 + 2499–2655; 2311–2468 + 2657–2726).
+  `documents.js` has no `sendEvent`; the route still emits `document_links`
+  and strips `_files` inside `executeTool`. `file_ready` carries exactly
+  `base64, filename, recordCount, totalCount, capped, columns`. All four
+  export-path A7 sites are in `batch-processing.js`; the chat-surface wrap
+  and preamble remain in the route for S8. Route exports are `config` and
+  `handler` only; no unused import remains.
+- Verification: 14 suites 186 tests, 1 snapshot (`92a7a16f…` unchanged);
+  lint 0 errors; types clean; 13 gate pairs and docs-catalog green
+  sequentially; prompt-injection gate then self-test green in that order.
+- Corrections: plan §3.2 and §6 ranges for the three rows now end at the
+  last code line (1922–2309; 2499–2655; 2311–2468, 2657–2726). Plan §1–§10
+  hash at acceptance: `b96538d69994c0bd…`.
+- Caveat recorded: the prompt-injection gate's pass at S7 is necessary but
+  not sufficient, because the route still holds the chat surface's own
+  wrap and preamble; enforcement becomes real at S8 when those move.
+- Note for S8: no `// ───` markers remain in the route; locate regions by
+  symbol name.
+- Next permitted stage: S8.
