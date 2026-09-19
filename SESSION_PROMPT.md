@@ -1,4 +1,161 @@
-# Session 524 Prompt: Explorer chat service extraction and Workbench responsiveness promoted
+# Session 525 Prompt: Prompt-cache prefix fix shipped; panel breakpoint and R5 wait on telemetry
+
+## Session 524 Summary
+
+[VERIFIED via source, scoped Jest, gates, Codex adversarial review, Git, and Vercel
+API] A read-only prompt-caching review (delta against the July 2026 audit in
+`docs/PROMPT_CACHING_AUDIT.md`) found the audit's open item R4 was overstated, fixed
+the one-line cause on a Tier 1 branch, reconciled the durable restatements, and
+promoted the branch to production as a fast-forward of `main`.
+
+### What Was Completed
+
+1. **Executor cache prefix is now byte-identical across documents (R4 closed)**
+   - `composeMessages` in `lib/services/execute-prompt.js` prepended
+     `buildUntrustedContentPreamble(untrustedNonces)` to the `cache_control`-marked
+     system block, so every document put a unique nonce line at byte 0 and the
+     marker was a cache write with no read. It now calls the preamble with no
+     nonce list (the helper documents the line as optional; sentinels carry the
+     nonce on open and close; the Dynamics Explorer has shipped nonce-free since
+     A7 Part 3). No schema split was needed: no prompt definition places an
+     untrusted variable in a system template (disconfirming greps recorded in the
+     audit doc §0 R4).
+   - Pinned by `tests/unit/execute-prompt-payload-boundary.test.js` (nonce-free
+     system assertion + "two different documents share a byte-identical marked
+     system block"); mutation-tested by restoring the nonce list (2 tests red).
+   - `/contract-reconcile` (Mode B) confirmed both `assertSystemIncludes` callers
+     are unaffected: peer-review asserts its own route-built preamble nonces and
+     declares no untrusted variable; pre-site-visit asserts static sentences.
+   - Codex adversarial review (OAuth, `--base main`): no A7 regression; one medium
+     finding (audit script still read the removed `FLOOR`), fixed and re-verified
+     with mocked rows.
+
+2. **Durable reconciliation**
+   - `docs/PROMPT_CACHING_AUDIT.md` §0/§3 R4 rewritten (DONE; historical framing
+     kept and labelled), per-tier floors recorded (Opus 5 / Fable 5.1 512; Opus 4.8 /
+     Sonnet 5 1024; Haiku 4.5 4096), `last_verified` 2026-09-19.
+   - `.claude-memory/project-cache-hit-rate-review.md`, agent-wiki
+     `prompt-executor.md` (new "preamble is nonce-free by design" bullet),
+     `scripts/audit-system-prompt-sizes.js` (per-tier `FLOORS`, `verdict(n, tier)`),
+     docs catalog regenerated.
+
+3. **Release**
+   - `main` fast-forwarded `62454b07` → `b54d11b5`; Vercel production deployment
+     `dpl_VruCcbXfwdB96Fxmh7H6rjdYUjpB` READY at commit `b54d11b5` (verified via
+     `vercel api`). Rollback: `wmkfresearchapps-g8484ufro` (`62454b07`) or revert
+     `486ba38b`.
+   - Gates: full `/start` run 35 gates + 32 self-tests green before work; affected
+     gates re-run green after each edit. Scoped Jest 46 suites / 774 tests. Full
+     `npm test` NOT run (Tier 1; scoped suites + gates).
+
+### Commits
+- `486ba38b` - fix(executor): keep the nonce list out of the cached system prefix
+- `b54d11b5` - fix(scripts): finish per-tier floors in the prompt-size audit report
+
+## Next Items
+
+### Verified Open
+
+1. Prove realized cache reads for the Executor fix.
+   Evidence: `lib/services/execute-prompt.js` `callProvider` marks only the system
+   block; the Executor does not write `api_usage_log` (comment at the LLMClient
+   construction site), so cache tokens appear only in the `wmkf_ai_run` notes
+   string (`cache_read=`). Of the seeded system templates only `phase-i-dynamics`
+   (~1.5k tok incl. preamble, Sonnet 5 floor 1024) and
+   `pre-site-visit-proposal-core` (~1.4k) clear their floor; both are chars/4
+   estimates [ASSUMED until `scripts/audit-system-prompt-sizes.js` is run].
+   Next: after a Phase I batch (two documents through the same prompt row within
+   5 minutes), read the second run row's notes; expect `cache_read>0`. Owner reads
+   production Postgres; do not self-authorize.
+2. Preview CSRF origin check rejects alias-hosted POSTs (carried from S523,
+   unchanged). Evidence: `lib/utils/auth.js validateOrigin`; logged in
+   `docs/CURRENT_WORK_QUEUE.md`. Prefer the runbook step first.
+3. Remove two stale Entra callbacks for retired Codex branch aliases (carried,
+   owner-run tenant write).
+
+### Owner Decision Needed
+
+1. Review-panel user-turn cache breakpoint.
+   Evidence: `shared/config/prompts/review-panel-seat.js` system ~360 tok
+   (< Fable 5.1 floor 512) and chair ~510 (borderline at Opus 5 512); proposal
+   narrative + question set sit in the unmarked user turn
+   (`execute-prompt.js` `callProvider` `messages: [{ role: 'user', content: body }]`).
+   The panel caches nothing today. A second breakpoint on the user block pays only
+   if the same proposal is re-sent within the TTL (seat retries up to 5, chair
+   rerun); otherwise it is a 1.25× write on the most expensive tokens in the
+   system. Decide after reading `wmkf_ai_run` timestamps for panel runs
+   (cadence [ASSUMED unknown]); if gaps exceed 5 minutes the lever is `ttl: '1h'`.
+2. R5 items (`composeScorePrompt` batch loop, `process-phase-i-writeup` static
+   block) and the ~10 single-shot callers with a random nonce at byte 0
+   (`process.js`, `process-phase-i.js`, `summarize-service.js`, reviewer
+   analyze/score, `integrity-service.js`, `multi-llm-service.js`). Gate on the
+   `api_usage_log` hit-rate query per app (30-day window, grouped by app/model)
+   before any marker is added. `process.js`/`process-phase-i.js` call twice per
+   document with separate nonces, so nothing is shared today — verify, don't
+   assume a win.
+3. Reviewer search functional follow-ups (carried; `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md`).
+
+### Parked
+
+1. Dynamics Explorer history caching. Evidence:
+   `lib/services/dynamics-explorer/chat-session.js` `compactMessages` rewrites
+   earlier rounds each turn, so no message-level marker can hit; system+tools
+   (~11k tok) cache on Haiku 4.5. Re-open only if the Explorer moves off Haiku.
+2. Impeccable 11px exception (carried). Memory router diet debt (carried; router
+   unchanged this session).
+
+### Verify Before Acting
+
+1. Peer-review route still puts a nonce-bearing preamble at byte 0 of its system
+   prompt via `{{a7_preamble}}` (`pages/api/process-peer-reviews.js`). Out of this
+   session's scope; a cacheable variant would need the route to pass a nonce-free
+   preamble AND switch `assertSystemIncludes` from nonces to preamble text. Only
+   worth it if peer-review summaries repeat within the TTL.
+2. S523 carryovers unchanged: Graph drive-item 4xx events on Workbench Proposal tab
+   in Preview; transient Explorer 503 after redeploy; Explorer disconnect path not
+   live-proven post-extraction.
+
+### Do Not Reopen Without New Decision
+
+1. Do not re-add the nonce list to the Executor preamble "for explicitness"
+   (wiki `prompt-executor.md`; audit doc §0 R4). Do not add a cache marker to any
+   site without a verified floor for the concrete model and repeat-within-TTL use
+   (`project-cache-hit-rate-review` memory).
+2. Explorer extraction complete through S9; Workbench cache/code-splitting trials
+   rejected by measured gates; no routine paid Explorer smokes (carried from S523).
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/services/execute-prompt.js` | `composeMessages` (nonce-free preamble), `applyVariableBoundaries` (stable per-document nonce), `callProvider` (system-only marker) |
+| `lib/utils/ai-payload-boundary.js` | `wrapUntrustedContent`, `deriveStableNonce`, `buildUntrustedContentPreamble` |
+| `tests/unit/execute-prompt-payload-boundary.test.js` | Pins nonce-free system + cross-document prefix equality |
+| `docs/PROMPT_CACHING_AUDIT.md` | July audit + R4 closure record, per-tier floors, remaining data-gated items |
+| `scripts/audit-system-prompt-sizes.js` | Per-tier prefix-size audit (needs `.env.local` CLAUDE_API_KEY; `count_tokens`) |
+| `docs/agent-wiki/topics/prompt-executor.md` | Executor hazards incl. the nonce-free preamble rule |
+
+## Testing
+
+```bash
+npx jest tests/unit/execute-prompt --silent
+npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test
+npm run check:doc-currency && npm run check:doc-currency:self-test
+node scripts/audit-system-prompt-sizes.js   # measures real prefix sizes per tier
+```
+
+## Stop-time notes
+
+Claim-evidence pilot: report shows zero recorded advisory events for this session
+key, so no observation row was added. No milestone entry: a cost fix, not a new
+capability or cutover. This handoff push triggers a documentation-only production
+deployment.
+
+## Historical handoffs — not current instructions
+
+Everything below preserves prior-session evidence. The Session 525 guidance above
+controls current next steps. The Session 524 prompt body (Session 523 summary)
+follows unchanged.
 
 ## Session 523 Summary
 
@@ -135,11 +292,6 @@ on the Explorer plan document; classified in
 `DEVELOPMENT_LOG.md`. Lesson memory committed: only one session runs gates per
 worktree; per-stage gate lists must include every gate that scans moved paths.
 This handoff push may trigger a documentation-only production deployment.
-
-## Historical handoffs — not current instructions
-
-Everything below preserves prior-session evidence. The Session 524 guidance above
-controls current next steps. The Session 523 prompt body follows unchanged.
 
 ## Session 522 Summary
 
