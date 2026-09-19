@@ -39,7 +39,7 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–3 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
+provider or external-state call was made. Stages 0–4 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
 from historical checkpoints.
 
 ## Source-to-target map
@@ -610,3 +610,25 @@ check; fresh `/root/sol_stage3_review` verified the corrected case's preconditio
   Root restored the source and verified callback equivalence including export.
 - P8 is accepted for a separate prerequisite commit. Stage 8 runtime movement
   still requires its own G and fresh-context review.
+
+
+## Stage 4 acceptance — discovery hook
+
+[VERIFIED via source, commands and fresh review] Luna moved `runSearch` into
+`useReviewerDiscovery.js` with explicit inputs, refs and setters. Root's AST
+comparison against `f650c035` confirms identical callback parameters and body.
+Ordered analyze/discover/enrich streams, ranking, partitions, payloads, stale
+guards and awaited roster persistence remain unchanged.
+
+- Fresh Sol `/root/sol_stage4_final`: **READY**, 4 suites / 24 tests passed.
+- Luna focused verification: **5 suites / 45 tests passed**.
+- Full suite: **969 suites / 14,258 tests passed**. Initial repository lint
+  failed while a temporary root `.cjs` review draft was present. Moving the draft
+  outside the repository allowed lint to pass (0 errors, 104 existing warnings);
+  no lint configuration or runtime fix was needed.
+- All remaining G checks and canonical Turbopack build passed sequentially. The
+  full suite was not needlessly repeated. Original evidence remains at
+  `/private/tmp/reviewer-stage-4-gates/results.json`; the merged continuation is
+  `/private/tmp/reviewer-stage-4-gates-resume/results.json`.
+
+**Stage 4 verdict:** accepted by root. Starting/rollback reference: `f650c035`.
