@@ -122,4 +122,11 @@ describe('OverviewTab', () => {
     render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={() => {}} />);
     expect(await screen.findByText(/Couldn’t load reviewer progress/i)).toBeInTheDocument();
   });
+
+  it('loads reviewer progress independently while request context is pending', async () => {
+    mockRollup({ hint: 'Rollup loaded before context.' });
+    render(<OverviewTab context={null} requestId="r1" onSelectTab={() => {}} />);
+    expect(await screen.findByText('Rollup loaded before context.')).toBeInTheDocument();
+    expect(screen.queryByText('Loading overview…')).not.toBeInTheDocument();
+  });
 });

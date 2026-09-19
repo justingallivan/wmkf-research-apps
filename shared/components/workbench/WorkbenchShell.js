@@ -121,12 +121,19 @@ export function WorkbenchShell({ previewReadOnly = false }) {
   // working cycle, which is written back so the URL stays honest. Compared
   // against this render's location (not the ref) so an adoption committed by
   // the effect above cannot be undone by this one.
-  const cyclesReady = !loadingCycles && loadedProgramKey === requestedProgramId;
+  const cyclesReady = !loadingCycles && !cyclesError && loadedProgramKey === requestedProgramId;
   const urlCycleCode = location.cycleCode;
+  // A fully explicit program + cycle URL is sufficient to start the request
+  // row read while the cycle metadata catches up. The default path still waits
+  // for the server-resolved program/cycle before loading rows.
+  const explicitCycleArm = Boolean(requestedProgramId && urlCycleCode);
   const cycleCode = cyclesReady ? (urlCycleCode || defaultCycleCode) : null;
-  const cycleOptions = cycleCode && !cycles.some((cycle) => cycle.code === cycleCode)
-    ? [...cycles, { code: cycleCode, label: cycleCodeToLabel(cycleCode) || cycleCode }]
-    : cycles;
+  const requestListCycleCode = cyclesReady ? cycleCode : (explicitCycleArm ? urlCycleCode : null);
+  const visiblePrograms = cyclesReady ? programs : [];
+  const visibleCycles = cyclesReady ? cycles : [];
+  const cycleOptions = cycleCode && !visibleCycles.some((cycle) => cycle.code === cycleCode)
+    ? [...visibleCycles, { code: cycleCode, label: cycleCodeToLabel(cycleCode) || cycleCode }]
+    : visibleCycles;
   useEffect(() => {
     if (!cyclesReady || !cycleCode || cycleCode === urlCycleCode) return;
     navigate({ cycleCode });
@@ -182,8 +189,8 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           onChange={(e) => changeProgram(e.target.value)}
           hint={programHint}
         >
-          {programs.length === 0 && <option value="">Loading programs…</option>}
-          {programs.map((program) => (
+          {visiblePrograms.length === 0 && <option value="">Loading programs…</option>}
+          {visiblePrograms.map((program) => (
             <option key={program.programId} value={program.programId}>{program.name}</option>
           ))}
         </ToolbarSelect>
@@ -245,8 +252,8 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         <RequestListPanel
           key={programId}
           programId={programId}
-          cycleCode={cycleCode}
-          cycles={cycles}
+          cycleCode={requestListCycleCode}
+          cycles={visibleCycles}
           cyclesGeneration={cyclesGeneration}
           patchCycleCounts={patchCycleCounts}
           loadingCycles={!cyclesReady && !cyclesError}
@@ -254,6 +261,8 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           includeSetAside={location.includeSetAside}
           onScopeChange={(scope) => navigate({ scope })}
           onIncludeSetAsideChange={(includeSetAside) => navigate({ includeSetAside })}
+          cycleMetadataReady={cyclesReady}
+          allowRowsWhileCyclesLoading={explicitCycleArm}
         />
       ) : location.view === 'reviewer-follow-up' ? (
         <ReviewerFollowUpPanel

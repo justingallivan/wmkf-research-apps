@@ -81,8 +81,28 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
   const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
 
   const [ctx, setCtx] = useState(null);
+  const [ctxOwnerGeneration, setCtxOwnerGeneration] = useState(-1);
   const [error, setError] = useState(null);
+  const [errorRequestId, setErrorRequestId] = useState(null);
+  const ctxLoadGeneration = useRef(0);
   const tabScrollerRef = useRef(null);
+  const routeRequestId = typeof requestId === 'string' && requestId ? requestId : null;
+  const routeKey = routeRequestId?.toLowerCase() || '';
+  const routeStateRef = useRef({ key: routeKey, generation: 0 });
+  if (routeStateRef.current.key !== routeKey) {
+    routeStateRef.current = {
+      key: routeKey,
+      generation: routeStateRef.current.generation + 1,
+    };
+  }
+  const routeGeneration = routeStateRef.current.generation;
+  const contextMatchesRoute = !!routeRequestId
+    && typeof ctx?.requestId === 'string'
+    && ctx.requestId.toLowerCase() === routeRequestId.toLowerCase();
+  const visibleContext = contextMatchesRoute && ctxOwnerGeneration === routeGeneration ? ctx : null;
+  const visibleError = error && errorRequestId?.toLowerCase() === routeRequestId?.toLowerCase()
+    ? error
+    : null;
 
   useEffect(() => {
     const scroller = tabScrollerRef.current;
@@ -99,18 +119,42 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
   // bookmarked links too, not only when the dashboard passes ?n= (Codex S209).
   const requestNumber = typeof router.query.n === 'string' ? router.query.n : null;
   const loadCtx = useCallback(async (id) => {
+    const loadGeneration = (ctxLoadGeneration.current += 1);
+    const ownerGeneration = routeGeneration;
+    setError(null);
+    setErrorRequestId(null);
     try {
       const res = await fetch(`/api/workbench/resolve-request?requestId=${encodeURIComponent(id)}`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Failed to load request (${res.status})`);
-      setCtx(body);
+      if (body?.success !== true || typeof body.requestId !== 'string'
+        || body.requestId.toLowerCase() !== id.toLowerCase()) {
+        throw new Error('Request context did not match the requested request');
+      }
+      if (ctxLoadGeneration.current === loadGeneration && routeKey === id.toLowerCase()) {
+        setCtx(body);
+        setCtxOwnerGeneration(ownerGeneration);
+      }
     } catch (e) {
-      setError(e.message);
+      if (ctxLoadGeneration.current === loadGeneration && routeKey === id.toLowerCase()) {
+        setCtx(null);
+        setCtxOwnerGeneration(-1);
+        setError(e.message);
+        setErrorRequestId(id);
+      }
     }
-  }, []);
+  }, [routeKey, routeGeneration]);
 
   useEffect(() => {
+    ctxLoadGeneration.current += 1;
+    setCtx(null);
+    setCtxOwnerGeneration(-1);
+    setError(null);
+    setErrorRequestId(null);
     if (typeof requestId === 'string' && requestId) loadCtx(requestId);
+    return () => {
+      ctxLoadGeneration.current += 1;
+    };
   }, [requestId, loadCtx]);
 
   const selectTab = (key) => {
@@ -124,7 +168,7 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
   // Fail-closed UI gate. Protected mutation routes independently enforce their
   // server-side policy; this client projection is never authorization.
   const myUserId = session?.user?.dynamicsSystemuserId || null;
-  const pdId = ctx?.programDirectorId || null;
+  const pdId = visibleContext?.programDirectorId || null;
   const canManage = computeCanManage({ isSuperuser, pdId, myUserId });
 
   // Per-user invite signature — the unified email_signature preference, with
@@ -144,15 +188,15 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">
-          {ctx?.requestNumber ? `Request #${ctx.requestNumber}` : (requestNumber ? `Request #${requestNumber}` : 'Request Workbench')}
+          {visibleContext?.requestNumber ? `Request #${visibleContext.requestNumber}` : (requestNumber ? `Request #${requestNumber}` : 'Request Workbench')}
         </h1>
-        {ctx?.title && <p className="text-gray-600 mt-1">{ctx.title}</p>}
-        {ctx && (
+        {visibleContext?.title && <p className="text-gray-600 mt-1">{visibleContext.title}</p>}
+        {visibleContext && (
           <p className="text-sm text-gray-500 mt-1">
-            {[ctx.cycleLabel, ctx.grantProgram, ctx.institution].filter(Boolean).join(' · ')}
+            {[visibleContext.cycleLabel, visibleContext.grantProgram, visibleContext.institution].filter(Boolean).join(' · ')}
           </p>
         )}
-        {error && <p className="text-sm text-amber-600 mt-1">Couldn’t load request details: {error}</p>}
+        {visibleError && <p className="text-sm text-amber-600 mt-1">Couldn’t load request details: {visibleError}</p>}
       </div>
 
       {reviewerSurfaceReadOnly && (
@@ -185,8 +229,9 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
 
       {activeTab === 'overview' ? (
         <OverviewTab
-          context={ctx}
-          requestId={typeof requestId === 'string' ? requestId : ''}
+          key={routeRequestId || ''}
+          context={visibleContext}
+          requestId={routeRequestId || ''}
           onSelectTab={selectTab}
         />
       ) : activeTab === 'reviewers' ? (
@@ -198,13 +243,13 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           // in-flight fetches; a fresh mount starts clean.
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
-          context={ctx}
+          context={visibleContext}
           canManage={canManage}
           settings={reviewerSettings}
           previewReadOnly={reviewerSurfaceReadOnly}
         />
       ) : activeTab === 'proposal' ? (
-        <ProposalTab context={ctx} />
+        <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
       ) : activeTab === 'initial-writeup' ? (
         <InitialAssessmentTab
           key={typeof requestId === 'string' ? requestId : ''}
@@ -213,6 +258,7 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
         />
       ) : activeTab === 'reviews' ? (
         <ReviewsTab
+          key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           previewReadOnly={reviewerSurfaceReadOnly}
         />
@@ -225,7 +271,7 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
         <StaffDeliberationsTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
-          requestNumber={ctx?.requestNumber || requestNumber || ''}
+          requestNumber={visibleContext?.requestNumber || requestNumber || ''}
           isSuperuser={isSuperuser}
           onSelectTab={selectTab}
         />
@@ -235,12 +281,12 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           requestId={typeof requestId === 'string' ? requestId : ''}
         />
       ) : activeTab === 'status' ? (
-        <StatusTab context={ctx} />
+        <StatusTab context={visibleContext} />
       ) : activeTab === 'awardee' ? (
         <AwardeeTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
-          context={ctx}
+          context={visibleContext}
         />
       ) : (
         <Card hover={false}>

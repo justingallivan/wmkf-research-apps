@@ -400,12 +400,7 @@ function describeSynthesisBlocker(blocker) {
  * so it stays enabled even in read-only Preview.
  *
  * Named export (in addition to being used internally by the default-exported
- * `ReviewsTab`) so a unit test can mount it directly with changing props —
- * `ReviewsTab`'s own full-page loading gate (`if (loading) return <spinner>`)
- * unmounts this card on every `load()` call, including same-request
- * re-fetches, which would otherwise mask a stale-copy-promise regression
- * test (an unmounted component's `setState` is already a no-op, for an
- * unrelated reason) rather than actually exercising the generation guard.
+ * `ReviewsTab`) so a unit test can mount it directly with changing props.
  */
 export function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }) {
   const { paragraphs, warnings, text, html, themes } = useMemo(
@@ -497,11 +492,11 @@ export function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }
   );
 }
 
-function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, previewReadOnly = false }) {
+function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, updating = false, previewReadOnly = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const automaticInFlight = state?.status === 'queued' || state?.status === 'running';
-  const canGenerate = state?.canRunManually === true && !automaticInFlight;
+  const canGenerate = state?.canRunManually === true && !automaticInFlight && !updating;
 
   const generate = useCallback(async (overwrite) => {
     if (previewReadOnly) return;
@@ -558,6 +553,7 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated,
         ? 'Automatic synthesis is generating.'
         : 'Automatic synthesis is queued.';
     }
+    if (updating) return 'Refreshing reviews…';
     if (state?.status === 'failed') {
       return state.lastError
         ? `Latest generation failed: ${state.lastError}`
@@ -741,7 +737,7 @@ const REMINDER_ELIGIBILITY_INFO = {
   },
 };
 
-function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewReadOnly = false }) {
+function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, updating = false, previewReadOnly = false }) {
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const lastReminder = formatDate(reviewer.reminderSentAt);
@@ -756,7 +752,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewRea
   const affiliation = reviewerAffiliationOf(reviewer);
 
   const handleSend = useCallback(async () => {
-    if (previewReadOnly) return;
+    if (previewReadOnly || updating || sending) return;
     setSending(true);
     setFeedback(null);
     try {
@@ -798,7 +794,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewRea
     } finally {
       setSending(false);
     }
-  }, [requestId, reviewer.suggestionId, onSent, previewReadOnly]);
+  }, [requestId, reviewer.suggestionId, onSent, previewReadOnly, updating, sending]);
 
   return (
     <div className="grid gap-3 border-b border-gray-100 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_16rem_20rem] lg:items-start">
@@ -841,7 +837,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewRea
         <button
           type="button"
           onClick={handleSend}
-          disabled={previewReadOnly || sending || !canSend}
+          disabled={previewReadOnly || updating || sending || !canSend}
           title={previewReadOnly ? 'Reminders are disabled in read-only Preview' : eligibilityInfo.title}
           className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -862,11 +858,9 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewRea
 }
 
 export default function ReviewsTab({ requestId, previewReadOnly = false }) {
-  const [proposal, setProposal] = useState(null);
   // Phase 2: the live admin-panel question set (or null on fetch failure —
   // fail-soft per the route; the matrix derivation falls back to
   // snapshot-order-only and marks nothing retired in that case).
-  const [liveQuestions, setLiveQuestions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   // View toggle for the submitted-reviews area (Phase 2). "cards" is the
@@ -874,46 +868,82 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
   // matrix.
   const [view, setView] = useState('cards');
   const [manualEntry, setManualEntry] = useState(null);
+  const [snapshot, setSnapshot] = useState(null);
+  const [updating, setUpdating] = useState(false);
 
-  // Monotonic fetch id: [requestId].js is a dynamic page, so switching between
-  // two workbench requests re-renders this component rather than remounting it
-  // — without this guard a slow response for the PREVIOUS requestId could land
-  // after the current one and paint the wrong proposal's reviews.
+  // The page keys this owner by request. Keep callbacks and in-flight reads
+  // fenced as well, including direct callers that reuse this component.
   const fetchIdRef = useRef(0);
+  const mountedRef = useRef(false);
+  const snapshotRef = useRef(null);
+  const currentRequestRef = useRef(requestId);
+  currentRequestRef.current = requestId;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; fetchIdRef.current += 1; };
+  }, []);
 
   const load = useCallback(async () => {
-    if (!requestId) return;
+    if (!requestId || !mountedRef.current || currentRequestRef.current !== requestId) return;
     const fetchId = ++fetchIdRef.current;
-    setLoading(true);
+    const retained = snapshotRef.current?.requestId === requestId;
+    setLoading(!retained);
+    setUpdating(retained);
     setError(null);
     try {
       const res = await fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(requestId)}`);
       const data = await res.json().catch(() => ({}));
-      if (fetchId !== fetchIdRef.current) return; // stale response — a newer load started
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Failed to load reviews (${res.status})`);
+      if (fetchId !== fetchIdRef.current || !mountedRef.current || currentRequestRef.current !== requestId) return;
+      const proposals = data?.proposals;
+      const nextProposal = Array.isArray(proposals) && proposals.length === 1 ? proposals[0] : null;
+      const malformed = res.ok && (!data || data.success !== true || !Array.isArray(proposals)
+        || proposals.length > 1
+        || proposals.some((item) => !item
+          || typeof item !== 'object'
+          || Array.isArray(item)
+          || typeof item.proposalId !== 'string'
+          || item.proposalId.toLowerCase() !== requestId.toLowerCase()
+          || !Array.isArray(item.reviewers)
+          || item.reviewers.some((reviewer) => !reviewer || typeof reviewer !== 'object' || Array.isArray(reviewer))));
+      if (!res.ok || malformed) {
+        const error = new Error(data?.error || `Failed to load reviews (${res.status})`);
+        error.denial = res.status === 401 || res.status === 403;
+        error.malformed = malformed;
+        throw error;
       }
-      setProposal((data.proposals && data.proposals[0]) || null);
-      setLiveQuestions(data.liveQuestions ?? null);
+      const nextSnapshot = { requestId, proposal: nextProposal, liveQuestions: data.liveQuestions ?? null };
+      snapshotRef.current = nextSnapshot;
+      setSnapshot(nextSnapshot);
     } catch (e) {
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current || !mountedRef.current || currentRequestRef.current !== requestId) return;
       setError(e.message);
-      setProposal(null);
+      if (e.denial || e.malformed || !retained) {
+        snapshotRef.current = null;
+        setSnapshot(null);
+      }
     } finally {
-      if (fetchId === fetchIdRef.current) setLoading(false);
+      if (fetchId === fetchIdRef.current && mountedRef.current && currentRequestRef.current === requestId) {
+        setLoading(false);
+        setUpdating(false);
+      }
     }
   }, [requestId]);
 
   useEffect(() => {
     load();
+    return () => { fetchIdRef.current += 1; };
   }, [load]);
 
   const handleManualSubmitted = useCallback(async () => {
     await load();
-    setManualEntry(null);
-  }, [load]);
+    if (mountedRef.current && currentRequestRef.current === requestId) setManualEntry(null);
+  }, [load, requestId]);
 
-  const reviewers = proposal?.reviewers || [];
+  const activeSnapshot = snapshot?.requestId === requestId ? snapshot : null;
+  const activeProposal = activeSnapshot ? activeSnapshot.proposal : null;
+  const activeLiveQuestions = activeSnapshot ? activeSnapshot.liveQuestions : null;
+  const reviewers = activeProposal?.reviewers || [];
   // A submitted review is signalled by reviewReceivedAt (set on both the
   // file-upload and the staff "mark received (no file)" paths) — same signal
   // Track uses for `hasReview`.
@@ -939,7 +969,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
     );
   }
 
-  if (error) {
+  if (error && !activeSnapshot) {
     return (
       <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
         Couldn’t load reviews: {error}
@@ -947,9 +977,18 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
     );
   }
 
+  const refreshNotice = error && activeSnapshot ? (
+    <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm" role="status">
+      Couldn’t refresh reviews: {error}{' '}
+      <button type="button" className="underline" onClick={load}>Retry</button>
+    </div>
+  ) : null;
+
   if (submitted.length === 0 && outstanding.length === 0) {
     return (
       <div className="space-y-4">
+        {refreshNotice}
+        {updating && <p className="text-sm text-gray-500" role="status">Updating reviews…</p>}
         <Card hover={false}>
           <p className="text-sm text-gray-500">
             No reviews submitted yet
@@ -960,10 +999,11 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
         </Card>
         <SynthesisCard
           requestId={requestId}
-          synthesis={proposal?.reviewSynthesis ?? null}
-          state={proposal?.reviewSynthesisState ?? null}
+          synthesis={activeProposal?.reviewSynthesis ?? null}
+          state={activeProposal?.reviewSynthesisState ?? null}
           reviewers={submitted}
           onUpdated={load}
+          updating={updating}
           previewReadOnly={previewReadOnly}
         />
         <ConsultantFeedbackSection key={requestId} requestId={requestId} previewReadOnly={previewReadOnly} />
@@ -973,6 +1013,8 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
 
   return (
     <div className="space-y-4">
+      {refreshNotice}
+      {updating && <p className="text-sm text-gray-500" role="status">Updating reviews…</p>}
       {outstanding.length > 0 && (
         <section aria-labelledby="outstanding-reviews-heading">
           <h2 id="outstanding-reviews-heading" className="text-sm font-semibold text-gray-900">
@@ -993,6 +1035,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
                 reviewer={r}
                 requestId={requestId}
                 onSent={load}
+                updating={updating}
                 onManualEntry={(reviewer) => setManualEntry({ requestId, reviewer })}
                 previewReadOnly={previewReadOnly}
               />
@@ -1022,7 +1065,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
               {submitted.length} of {acceptedCount} accepted reviewer{acceptedCount === 1 ? '' : 's'} submitted a review.
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <ExportMenu proposal={proposal} />
+              <ExportMenu proposal={activeProposal} />
               <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
                 <button
                   type="button"
@@ -1049,24 +1092,25 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
             </div>
           ) : (
             <Card hover={false}>
-              <CompareView submitted={submitted} liveQuestions={liveQuestions} />
+              <CompareView submitted={submitted} liveQuestions={activeLiveQuestions} />
             </Card>
           )}
         </>
       )}
       <SynthesisCard
         requestId={requestId}
-        synthesis={proposal?.reviewSynthesis ?? null}
-        state={proposal?.reviewSynthesisState ?? null}
+        synthesis={activeProposal?.reviewSynthesis ?? null}
+        state={activeProposal?.reviewSynthesisState ?? null}
         reviewers={submitted}
         onUpdated={load}
+        updating={updating}
         previewReadOnly={previewReadOnly}
       />
       {submitted.length > 0 && (
         <WriteupParagraphsCard
           reviewers={submitted}
-          synthesis={proposal?.reviewSynthesis ?? null}
-          synthesisCurrent={proposal?.reviewSynthesisState?.current ?? null}
+          synthesis={activeProposal?.reviewSynthesis ?? null}
+          synthesisCurrent={activeProposal?.reviewSynthesisState?.current ?? null}
         />
       )}
     </div>

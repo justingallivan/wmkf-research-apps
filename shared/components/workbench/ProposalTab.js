@@ -495,8 +495,8 @@ function DocumentsSection({ requestId, docs, error }) {
   );
 }
 
-export default function ProposalTab({ context }) {
-  const requestId = context?.requestId || null;
+export default function ProposalTab({ context, requestId: requestIdProp }) {
+  const requestId = requestIdProp || context?.requestId || null;
   const [docs, setDocs] = useState(null);
   const [docsError, setDocsError] = useState(null);
 
@@ -508,7 +508,7 @@ export default function ProposalTab({ context }) {
     fetch(`/api/workbench/proposal-documents?requestId=${encodeURIComponent(requestId)}`)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || `Failed to load documents (${res.status})`);
+        if (!res.ok || body?.success !== true) throw new Error(body?.error || `Failed to load documents (${res.status})`);
         if (!cancelled) setDocs(body);
       })
       .catch((e) => {
@@ -519,22 +519,19 @@ export default function ProposalTab({ context }) {
     };
   }, [requestId]);
 
-  if (!context) {
-    return (
-      <Card hover={false}>
-        <p className="text-sm text-gray-500">Loading proposal…</p>
-      </Card>
-    );
-  }
-
-  const info = context.proposalInfo || {};
-  const ai = context.aiContent || {};
+  const info = context?.proposalInfo || {};
+  const ai = context?.aiContent || {};
   const coPIs = Array.isArray(info.coPIs) ? info.coPIs : [];
 
   return (
     <div className="space-y-4">
+      {!context && (
+        <Card hover={false}>
+          <p className="text-sm text-gray-500">Loading proposal…</p>
+        </Card>
+      )}
       {/* Top — proposal info */}
-      <Section title="Proposal">
+      {context && <Section title="Proposal">
         <dl className="grid sm:grid-cols-2 gap-4">
           <Field label="Principal Investigator">{info.pi}</Field>
           <Field label="Co-Investigators">{coPIs.length ? coPIs.join(', ') : '—'}</Field>
@@ -547,7 +544,7 @@ export default function ProposalTab({ context }) {
             {info.abstract || <span className="text-gray-500">No abstract on the request.</span>}
           </dd>
         </div>
-      </Section>
+      </Section>}
 
       {/* Middle — proposal documents */}
       <Section title="Documents">
@@ -555,7 +552,7 @@ export default function ProposalTab({ context }) {
       </Section>
 
       {/* Bottom — AI content */}
-      <Section title="AI Content">
+      {context && <Section title="AI Content">
         <div className="space-y-4">
           <div>
             <dt className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Fit Rationale</dt>
@@ -587,7 +584,7 @@ export default function ProposalTab({ context }) {
             }}
           />
         </div>
-      </Section>
+      </Section>}
     </div>
   );
 }

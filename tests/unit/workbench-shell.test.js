@@ -52,7 +52,8 @@ function mockFetch(overrides = {}) {
       return response({ success: true, programs, programId: 'p2', cycles: [{ code: 'J27', label: 'June 2027', count: 1 }], defaultCycleCode: 'J27' });
     }
     if (href.startsWith('/api/workbench/dashboard?cycleCode=')) {
-      return response({ success: true, proposals: [], rollup: { total: 0, stages: {} } });
+      const params = new URL(href, 'http://localhost').searchParams;
+      return response({ success: true, programId: params.get('programId'), cycleCode: params.get('cycleCode'), scope: params.get('scope'), includeSetAside: params.get('includeSetAside') === '1', proposals: [], rollup: { total: 0, stages: {} } });
     }
     if (href.startsWith('/api/review-manager/reviewers?')) return response({ success: true, proposals: [] });
     if (href === '/api/workbench/grantee-deliverables/awardees') {
@@ -142,6 +143,49 @@ test('a deep-linked cycle the program lists is honored without rewriting the URL
   expect(replace).not.toHaveBeenCalled();
   expect(screen.getByLabelText('Include set-aside requests')).toBeChecked();
   await waitFor(() => expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=J26&scope=all&programId=p1&includeSetAside=1']));
+});
+
+test('an explicit program and cycle can load rows while cycle metadata is held, but defers counts and triage', async () => {
+  let releaseCycles;
+  const cyclesReady = new Promise((resolve) => { releaseCycles = resolve; });
+  routerState.query = { programId: 'p1', cycleCode: 'J26' };
+  routerState.asPath = '/workbench?programId=p1&cycleCode=J26';
+  mockFetch({
+    '/api/workbench/dashboard?programId=p1': async () => {
+      await cyclesReady;
+      return response({ success: true, programs, programId: 'p1', cycles: CYCLES, defaultCycleCode: 'D26' });
+    },
+    '/api/workbench/dashboard?cycleCode=J26&scope=my&programId=p1': () => response({
+      success: true, programId: 'p1', cycleCode: 'J26', scope: 'my', includeSetAside: false,
+      proposals: [{ requestId: 'r-explicit', requestNumber: '1002', cycleLabel: 'June 2026', institution: 'Explicit row', workRemaining: 'find', reviewers: [], canManage: true, isMine: true }],
+      rollup: { total: 1, stages: { find: 1 } },
+    }),
+  });
+  render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByText('#1002')).toBeInTheDocument());
+  expect(screen.getByLabelText('Grant cycle')).toBeDisabled();
+  expect(screen.queryByTitle('Set triage status')).not.toBeInTheDocument();
+  expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=J26&scope=my&programId=p1']);
+  releaseCycles();
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J26'));
+  await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
+});
+
+test('an explicit cycle without a program keeps the default-program waterfall', async () => {
+  let releaseCycles;
+  const cyclesReady = new Promise((resolve) => { releaseCycles = resolve; });
+  routerState.query = { cycleCode: 'J26' };
+  routerState.asPath = '/workbench?cycleCode=J26';
+  mockFetch({
+    '/api/workbench/dashboard': async () => {
+      await cyclesReady;
+      return response({ success: true, programs, programId: 'p1', cycles: CYCLES, defaultCycleCode: 'D26' });
+    },
+  });
+  render(<WorkbenchShell />);
+  await waitFor(() => expect(rowFetches()).toEqual([]));
+  releaseCycles();
+  await waitFor(() => expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=J26&scope=my&programId=p1']));
 });
 
 test('an unlisted deep-linked cycle is honored and rendered as an extra option (a Final writeups or Awardees cycle need not have pending requests)', async () => {
