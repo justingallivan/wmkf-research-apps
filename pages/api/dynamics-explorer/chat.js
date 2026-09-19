@@ -28,7 +28,7 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { withDynamicsContext } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../lib/utils/sharepoint-buckets';
-import { buildSystemPrompt, TOOL_DEFINITIONS, TABLE_ANNOTATIONS } from '../../../shared/config/prompts/dynamics-explorer';
+import { buildSystemPrompt, TOOL_DEFINITIONS } from '../../../shared/config/prompts/dynamics-explorer';
 import {
   DATA_CLASSES,
   wrapUntrustedContent,
@@ -46,21 +46,16 @@ import {
   DynamicsExplorerRequestTelemetry,
   normalizeSessionId,
 } from '../../../lib/services/dynamics-explorer-request-telemetry';
-import {
-  expandRestrictedFieldNames,
-  isLookupAliasType,
-  lookupAliasFor,
-  validateODataCall,
-} from '../../../lib/services/dynamics-odata-validator';
 import { describeChatFailure, detectPossibleFailure } from '../../../lib/services/dynamics-explorer/failure-copy';
 import { trimConversation, compactMessages } from '../../../lib/services/dynamics-explorer/conversation';
-import { MAX_RESULT_CHARS, TOOL_CHAR_LIMITS, sanitizeSelect, applyActiveOnlyFilter, isOperationalLogTable, stripEmpty, truncateResult, deriveRecordCount, getThinkingMessage } from '../../../lib/services/dynamics-explorer/result-shaping';
-import { checkRestriction, restrictedFieldsForTable } from '../../../lib/services/dynamics-explorer/restriction-guard';
+import { MAX_RESULT_CHARS, TOOL_CHAR_LIMITS, sanitizeSelect, applyActiveOnlyFilter, stripEmpty, truncateResult, deriveRecordCount, getThinkingMessage } from '../../../lib/services/dynamics-explorer/result-shaping';
+import { checkRestriction } from '../../../lib/services/dynamics-explorer/restriction-guard';
 import { getUserRole, getActiveRestrictions, logQuery } from '../../../lib/services/dynamics-explorer/explorer-store';
 import { callClaude, callClaudeBatch } from '../../../lib/services/dynamics-explorer/model-call';
 import { findReportsDue, searchRecords } from '../../../lib/services/dynamics-explorer/tools/composite';
 import { describeTable } from '../../../lib/services/dynamics-explorer/tools/describe-table';
 import { getEntity, ENTITY_TYPE_CONFIGS } from '../../../lib/services/dynamics-explorer/tools/get-entity';
+import { validateEffectiveODataCall, validatorReject, classifyToolError } from '../../../lib/services/dynamics-explorer/tool-errors';
 
 export const config = {
   api: {
@@ -510,121 +505,6 @@ async function executeTool(name, input, sendEvent, userProfileId, restrictions =
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
-}
-
-async function validateEffectiveODataCall(name, input, restrictions) {
-  if (isOperationalLogTable(input?.table_name)) {
-    return {
-      reject: 'DENIED: wmkf_ai_run is an operational AI audit log, not business data. '
-        + 'Dynamics Explorer does not expose it through natural-language queries.',
-    };
-  }
-  return await validateODataCall(name, input, {
-    tableAnnotations: TABLE_ANNOTATIONS,
-    getEntityAttributes: tableName => DynamicsService.getEntityAttributes(tableName),
-    restrictions,
-    entityConfigs: ENTITY_TYPE_CONFIGS,
-  });
-}
-
-function validatorReject(message) {
-  return { error: message, _validatorReject: true };
-}
-
-// ─── A5: fail-loud typed errors ───
-//
-// Dataverse 400s for a bad field/entity name are returned as truncated plain
-// strings today, so the model re-guesses across rounds (the dominant Explorer
-// failure per the S200 soak). Classify the common "unknown field/property"
-// shape and hand back a deterministic correction path: the offending name, the
-// closest VALID field names (restriction-filtered, capped for token budget),
-// and a describe_table pointer — instead of a bare error string.
-
-const UNKNOWN_FIELD_RE = /Could not find a property named '([^']+)'/i;
-const UNKNOWN_PROP_RE = /The property '([^']+)' does not exist/i;
-const UNKNOWN_SEGMENT_RE = /Resource not found for the segment '([^']+)'/i;
-
-/**
- * Rank valid field names by similarity to a bad name (prefix overlap +
- * substring containment). Lookup fields are filtered as `x` in metadata but
- * queried as `_x_value`, so compare against the de-affixed core too. Returns
- * up to `limit` names.
- */
-function closestFieldNames(invalid, validFields, limit = 8) {
-  const lc = String(invalid).toLowerCase();
-  const core = lc.replace(/^_/, '').replace(/_value$/, '');
-  const scored = [];
-  for (const v of validFields) {
-    const vl = v.toLowerCase();
-    let score = 0;
-    if (vl === lc || vl === core) score += 100;
-    else if (vl.includes(core) || core.includes(vl)) score += 50;
-    let p = 0;
-    while (p < vl.length && p < core.length && vl[p] === core[p]) p++;
-    score += p;
-    if (score > 2) scored.push({ v, score });
-  }
-  return scored.sort((a, b) => b.score - a.score).slice(0, limit).map(s => s.v);
-}
-
-async function classifyToolError(err, name, input, restrictions = []) {
-  const raw = err?.message || 'Unknown error';
-  const fallback = { error: raw.substring(0, 500) };
-
-  // The /$count Edm.Int32 bug surfaces UNKNOWN_FIELD_RE with the CORRECT field
-  // name on type 'Edm.Int32' — not a real unknown field. A3 fixed the count
-  // path, but guard anyway so this never mislabels it as a bad field.
-  if (/on type 'Edm\.Int32'/i.test(raw)) return fallback;
-
-  const fieldMatch = raw.match(UNKNOWN_FIELD_RE) || raw.match(UNKNOWN_PROP_RE);
-  if (fieldMatch && input?.table_name) {
-    const invalidField = fieldMatch[1];
-    try {
-      // Normalize to the logical name so enrichment works when the model passed
-      // an accepted entity-set alias (e.g. "akoya_requests"), and so restriction
-      // filtering matches restrictions (keyed by logical name). Inside the try so
-      // any failure falls back to the raw error — enrichment never masks it.
-      const tableName = DynamicsService.resolveLogicalName(input.table_name);
-      const attrs = await DynamicsService.getEntityAttributes(tableName);
-      // Expanded across both lookup spellings so a restriction stored under one
-      // can't be suggested back under the other.
-      const restricted = expandRestrictedFieldNames(
-        restrictedFieldsForTable(tableName, restrictions),
-        attrs,
-      );
-      // Suggest the spelling the model must actually type in $select/$filter.
-      // Offering the bare lookup name here contradicted this hint's own
-      // "_<name>_value" instruction and cost a round every time.
-      const validNames = attrs
-        .map(a => (isLookupAliasType(a.type) ? lookupAliasFor(a.logicalName) : a.logicalName))
-        .filter(f => !restricted.has(f));
-      const suggestions = closestFieldNames(invalidField, validNames);
-      return {
-        error: raw.substring(0, 300),
-        errorType: 'unknown_field',
-        invalidField,
-        table: tableName,
-        suggestions,
-        hint: `"${invalidField}" is not a readable field on ${tableName}. Do NOT retry with a guessed name. ${
-          suggestions.length ? `Closest valid fields: ${suggestions.join(', ')}. ` : ''
-        }Lookup fields are queried as _<name>_value in $filter/$select. For the full field list call describe_table with { table_name: "${tableName}", full: true }.`,
-      };
-    } catch {
-      return fallback; // enrichment is best-effort; never mask the original error
-    }
-  }
-
-  const segMatch = raw.match(UNKNOWN_SEGMENT_RE);
-  if (segMatch) {
-    return {
-      error: raw.substring(0, 300),
-      errorType: 'unknown_entity',
-      invalidSegment: segMatch[1],
-      hint: `"${segMatch[1]}" is not a valid table/navigation. Use discover_tables to find the correct table name, then describe_table before querying. Do NOT guess.`,
-    };
-  }
-
-  return fallback;
 }
 
 // ─── get_related ───
