@@ -86,6 +86,7 @@ async function installApiFixture(page, {
   holdCycleRows = false,
   holdCycles = false,
   holdContext = false,
+  holdReviewsRefresh = false,
   cycleRows = rows(),
 } = {}) {
   const requests = [];
@@ -96,9 +97,12 @@ async function installApiFixture(page, {
   let releaseCycleRows;
   let releaseContext;
   let releaseCycles;
+  let releaseReviews;
+  let reviewerReads = 0;
   const cycleRowsReady = new Promise((resolve) => { releaseCycleRows = resolve; });
   const contextReady = new Promise((resolve) => { releaseContext = resolve; });
   const cyclesReady = new Promise((resolve) => { releaseCycles = resolve; });
+  const reviewsReady = new Promise((resolve) => { releaseReviews = resolve; });
 
   await page.context().route('**/api/**', async (route) => {
     const request = route.request();
@@ -150,6 +154,12 @@ async function installApiFixture(page, {
     });
     if (path === '/api/workbench/consultant-feedback') return fulfill({ success: true, feedback: [], consultants: [] });
     if (path === '/api/workbench/consultant-feedback/consultants') return fulfill({ success: true, consultants: [] });
+    if (path === '/api/review-manager/reviewers') {
+      reviewerReads += 1;
+      if (holdReviewsRefresh && reviewerReads > 1) await reviewsReady;
+      return fulfill({ success: true, proposals: [{ proposalId: REQUEST_ID, proposalTitle: 'Review fixture', reviewers: [{ suggestionId: 'reviewer-e2e', name: 'Held Reviewer', reviewReceivedAt: '2026-09-18T00:00:00Z', answers: [] }], reviewSynthesis: null, reviewSynthesisState: { current: false, status: 'not_started', ready: true, canRunManually: true, submittedCount: 1, blockingCount: 0 } }], liveQuestions: [] });
+    }
+    if (path === '/api/review-manager/synthesize-reviews' && request.method() === 'POST') return fulfill({ ok: true });
 
     unexpected.push(`${request.method()} ${path}${url.search}`);
     await route.abort('blockedbyclient');
@@ -161,7 +171,8 @@ async function installApiFixture(page, {
     releaseCycleRows: () => releaseCycleRows(),
     releaseContext: () => releaseContext(),
     releaseCycles: () => releaseCycles(),
-    counts: () => ({ cycleRowsCount, contextReads, cyclesResponseServed }),
+    releaseReviews: () => releaseReviews(),
+    counts: () => ({ cycleRowsCount, contextReads, cyclesResponseServed, reviewerReads }),
   };
 }
 
@@ -222,6 +233,23 @@ test.describe('Workbench responsiveness baseline characterization', () => {
 
     expect(fixture.requests.filter((entry) => entry.path === '/api/workbench/reviewer-rollup')).toHaveLength(1);
     expect(fixture.requests.filter((entry) => entry.path === '/api/workbench/proposal-documents')).toHaveLength(1);
+    expect(fixture.unexpected).toEqual([]);
+  });
+
+  test('Reviews retains mounted content during a same-request synthesis refresh', async ({ page, context }, testInfo) => {
+    const baseURL = testInfo.project.use.baseURL || 'http://localhost:3100';
+    await installStaffSession(context, baseURL);
+    const fixture = await installApiFixture(page, { holdReviewsRefresh: true });
+
+    await page.goto(`${baseURL}/workbench/${REQUEST_ID}?tab=reviews`);
+    const heldReviewer = page.locator('.font-semibold', { hasText: 'Held Reviewer' }).first();
+    await expect(heldReviewer).toBeVisible();
+    await page.getByRole('button', { name: 'Generate synthesis' }).click();
+    await expect.poll(() => fixture.counts().reviewerReads).toBe(2);
+    await expect(heldReviewer).toBeVisible();
+    await expect(page.getByText('Updating reviews…')).toBeVisible();
+    fixture.releaseReviews();
+    await expect(heldReviewer).toBeVisible();
     expect(fixture.unexpected).toEqual([]);
   });
 });

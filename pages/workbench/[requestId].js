@@ -258,6 +258,7 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
         />
       ) : activeTab === 'reviews' ? (
         <ReviewsTab
+          key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           previewReadOnly={reviewerSurfaceReadOnly}
         />

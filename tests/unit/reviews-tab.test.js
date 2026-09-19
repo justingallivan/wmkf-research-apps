@@ -934,14 +934,9 @@ test('Copy label resets to "Copy" when the composed content changes', async () =
   await screen.findByRole('button', { name: 'Copy' });
 });
 
-// Direct WriteupParagraphsCard mounts (not through ReviewsTab): ReviewsTab's
-// own full-page loading gate (`if (loading) return <spinner>`) unmounts this
-// card on EVERY `load()` call, including a same-request re-fetch, which
-// would make a stale-copy-promise test pass for the wrong reason (an
-// unmounted component's setState is already a no-op) rather than actually
-// exercising the generation-counter guard. Mounting the card directly and
-// changing its `reviewers` prop in place (as a manual-review-entry re-fetch,
-// or any future in-place update, would) is what isolates the guard itself.
+// Direct card mounts isolate its content-generation guard. Parent refresh
+// continuity is covered in reviews-tab-refresh-lifecycle.test.js; these cases
+// specifically change the composed text before the clipboard promise settles.
 const DIFFERENT_WRITEUP_REVIEWERS = [
   { ...WRITEUP_REVIEWERS[0], name: 'Different Reviewer' },
 ];

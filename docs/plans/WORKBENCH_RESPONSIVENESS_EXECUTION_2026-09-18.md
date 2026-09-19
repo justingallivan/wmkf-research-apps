@@ -31,7 +31,7 @@ files; installed dependencies are reused locally, not provider credentials.
 | S0 baseline | Accepted | Baseline evidence below |
 | S1 list continuity | Accepted | Same-key retention and scoped early rows; evidence below |
 | S2 independent reads | Accepted | Independent sections and request-owned context; evidence below |
-| S3 Reviews continuity | Not started | Requires S2 acceptance |
+| S3 Reviews continuity | Accepted | Retained children, guarded callbacks and response validation; evidence below |
 | S4 cache experiment | Conditional; not selected | Requires incremental benefit over local fixes |
 | S5 code splitting | Conditional; not selected | Requires bundle and first-use evidence |
 | S6 final acceptance | Not started | All selected stage gates and root review |
@@ -161,3 +161,39 @@ types, canonical build and **2/2 browser tests** passed. Local log:
 included in this commit so S3 begins with a green prerequisite. The browser proves
 one documents GET and one rollup GET produce useful content while context is held;
 no timing or production speedup is claimed. No API/service/schema changes.
+
+
+## S3 accepted
+
+[VERIFIED via source/tests/browser] Reviews keeps the full same-request snapshot
+(including live questions) and mounted children through a refresh. Ordinary failure
+retains the snapshot with Retry; 401/403 and invalid successful payloads clear it.
+The page keys the Reviews owner by request; mount/current-request/generation guards
+also fence obsolete callbacks before GET and after awaits. Manual entry still
+awaits reload before closing; synthesis success remains fire-and-forget and its
+partial-success path still awaits reload. Synthesis and reminder buttons remain
+disabled during the refresh, preventing repeats against old eligibility.
+
+Luna implemented and added baseline/focused/browser coverage. Fresh Sol
+`/root/sol_s3` found case-sensitive GUID validation, malformed roster handling,
+obsolete callback GETs and missing changed-lifetime tests. Root took over runtime
+corrections after bounded review rounds; Luna then added real-child lifecycle
+tests. Root strengthened their seeded cases and added held partial-success and
+reminder-repeat assertions. Sol's final verdict was READY WITH the reminder
+refresh guard, now implemented and tested; no other concrete blocker remained.
+Final tracked diff SHA-256 before receipt:
+`e7ad51b1234606700e03c8a041fde0932ded3496e989f4e385b6959edb877024`.
+
+Verification: **59 focused tests**, **974 Jest suites / 14,321 tests**, lint,
+types, canonical build and **3/3 browser tests** passed. Local log:
+`/tmp/workbench-s3-accepted.log`. The first sandboxed full run failed three
+repository-fixture writes with EPERM; the accepted host run passed unchanged tests.
+A new measurement probe's `.cjs` extension exposed the existing lint configuration's
+extension scope; matching the repository's `.js` script convention fixed it.
+No lint configuration, dependency, server route or persistence change was needed.
+
+Coverage includes retained manual/consultant drafts, awaited manual completion,
+held clipboard/export with one download, seeded failure/denial/malformed results,
+uppercase GUID response matching, valid empty results, stale/unmounted callbacks,
+and duplicate command prevention. The browser holds the actual same-mount reload.
+This demonstrates continuity and removed serial waits, not production timing.
