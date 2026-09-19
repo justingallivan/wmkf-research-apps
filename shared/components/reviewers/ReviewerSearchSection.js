@@ -1345,7 +1345,7 @@ export default function ReviewerSearchSection({
   const [sortMode, setSortMode] = useState('relevance'); // 'relevance' (confidence rank, default) | 'alpha' (by name, within each provenance group)
   const [exporting, setExporting] = useState(false); // Excel export in flight
   const [exportError, setExportError] = useState(null); // export-specific error (own surface; does not disturb search `error`/`phase`)
-  const exportingRef = useRef(false);
+  const exportingRef = useRef(null);
 
   // Applicant-recommended enrichment (separate flow from the search).
   const [recPhase, setRecPhase] = useState('idle'); // idle | running | done | error
@@ -1353,7 +1353,7 @@ export default function ReviewerSearchSection({
   const [recHandled, setRecHandled] = useState([]);
   const [recProgress, setRecProgress] = useState([]);
   const [recError, setRecError] = useState(null);
-  const recRunningRef = useRef(false);
+  const recRunningRef = useRef(null);
 
   // Per-user prompt-override editor toggle (S222).
   const [showPromptEditor, setShowPromptEditor] = useState(false);
@@ -1361,10 +1361,11 @@ export default function ReviewerSearchSection({
   // Imperative guards: prevent double-submit (Finding 8) and let a context change
   // invalidate an in-flight run so a stale stream can't overwrite newer state
   // (Finding 7).
-  const runningRef = useRef(false);
+  const runningRef = useRef(null);
   const savingRef = useRef(null);
   const genRef = useRef(0);
   const excludeEditedRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const applyRosterSnapshot = useCallback((data) => {
     setRosterActive(Array.isArray(data?.active) ? data.active : []);
@@ -1397,10 +1398,14 @@ export default function ReviewerSearchSection({
   // Also (re)loads the durable per-request roster (genRef-guarded) so the
   // active + excluded sets show even before any fresh search this session.
   useEffect(() => {
+    mountedRef.current = true;
     genRef.current += 1; // invalidate any in-flight run
     const myGen = genRef.current;
+    runningRef.current = null;
+    recRunningRef.current = null;
+    exportingRef.current = null;
     setPhase('idle'); setSavingCount(0); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null); setIdentityComparison(null);
-    setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null);
+    setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null); setExporting(false);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
     setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setRepairRequestsByCandidateKey({}); setRepairRequestsUnavailable(false); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
@@ -1438,6 +1443,15 @@ export default function ReviewerSearchSection({
     } else {
       setRosterLoaded(true); // no request → nothing to load; don't block the form
     }
+    return () => {
+      if (genRef.current === myGen) {
+        mountedRef.current = false;
+        genRef.current += 1;
+        runningRef.current = null;
+        recRunningRef.current = null;
+        exportingRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId, blobUrl, reloadRoster]);
 
@@ -1469,14 +1483,16 @@ export default function ReviewerSearchSection({
     if (!excludeEditedRef.current) setExcludeText((excludedNames || []).join(', '));
   }, [excludedNames]);
 
-  const pushProgress = useCallback((m) => {
-    if (m) setProgress((p) => [...p.slice(-6), m]);
+  const pushProgress = useCallback((m, expectedGeneration = genRef.current) => {
+    if (m && mountedRef.current && genRef.current === expectedGeneration) {
+      setProgress((p) => [...p.slice(-6), m]);
+    }
   }, []);
 
   const runSearch = useCallback(async () => {
-    if (!blobUrl || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
-    runningRef.current = true;
     const myGen = genRef.current;
+    if (!blobUrl || runningRef.current !== null || removingPrevious || noSourcesSelected || !rosterLoaded) return;
+    runningRef.current = myGen;
     // Exclude set = the manual/applicant box + everything already surfaced for
     // this request (roster, every status) + names already in the saved pool. The
     // union is what makes a re-run find NEW people instead of re-surfacing the
@@ -1511,7 +1527,7 @@ export default function ReviewerSearchSection({
         await readSseStream(aRes, ({ event, data }) => {
           if (event === 'error') { streamError = data || { message: 'Analysis failed' }; return; }
           if (data?.error) { streamError = { message: data.error, status: data.status, retryable: data.retryable }; return; }
-          if (data?.message) pushProgress(data.message);
+          if (data?.message) pushProgress(data.message, myGen);
           if (data?.proposalInfo) analysisResult = data;
         });
       } catch (transportError) {
@@ -1526,7 +1542,7 @@ export default function ReviewerSearchSection({
       if (analysisTransportError && !analysisResult) {
         throw new Error('The proposal analysis connection was interrupted before results arrived. Please run the search again.');
       }
-      if (analysisTransportError) pushProgress('Analysis results received; continuing after the connection closed.');
+      if (analysisTransportError) pushProgress('Analysis results received; continuing after the connection closed.', myGen);
       // Stream ended cleanly but no result frame arrived — almost always a
       // timed-out or dropped connection during the long Claude analysis, not a
       // content problem. Name the likely cause so the user knows to just retry.
@@ -1535,7 +1551,7 @@ export default function ReviewerSearchSection({
       setAnalysis(analysisResult);
 
       // 2. Discover + verify + rank across databases.
-      pushProgress('Searching databases for candidates…');
+      pushProgress('Searching databases for candidates…', myGen);
       const dRes = await fetch('/api/reviewer-finder/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1570,7 +1586,7 @@ export default function ReviewerSearchSection({
         await readSseStream(dRes, ({ event, data }) => {
           if (event === 'error') { streamError = data?.message || 'Discovery failed'; return; }
           if (data?.error) { streamError = data.error; return; }
-          if (data?.message) pushProgress(data.message);
+          if (data?.message) pushProgress(data.message, myGen);
           if (data?.ranked) ranked = data.ranked;
           if (data?.unverified) unverifiedRaw = data.unverified;
           if (Array.isArray(data?.blockedReferredSeeds)) blockedReferredRaw = data.blockedReferredSeeds;
@@ -1583,7 +1599,7 @@ export default function ReviewerSearchSection({
       if (discoveryTransportError && !ranked) {
         throw new Error('The candidate discovery connection was interrupted before results arrived. Please run the search again.');
       }
-      if (discoveryTransportError) pushProgress('Candidate results received; continuing after the connection closed.');
+      if (discoveryTransportError) pushProgress('Candidate results received; continuing after the connection closed.', myGen);
       if (!ranked) throw new Error('Discovery returned no candidates.');
       if (genRef.current !== myGen) return; // context changed — abort
       setIdentityComparison(identityComparisonRaw);
@@ -1605,7 +1621,7 @@ export default function ReviewerSearchSection({
       let enrichFailed = false;
       if (keyedKept.length > 0) {
         try {
-          pushProgress(`Finding contact info & citation metrics for ${keyedKept.length} reviewer(s)…`);
+          pushProgress(`Finding contact info & citation metrics for ${keyedKept.length} reviewer(s)…`, myGen);
           const eRes = await fetch('/api/reviewer-finder/enrich-contacts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1625,12 +1641,12 @@ export default function ReviewerSearchSection({
           try {
             await readSseStream(eRes, ({ event, data }) => {
               if (event === 'error' || data?.type === 'error') { enrichStreamError = data?.message || 'enrichment failed'; return; }
-              if (data?.type === 'progress' && data.overall) pushProgress(`Enriching ${data.overall.current}/${data.overall.total}…`);
+              if (data?.type === 'progress' && data.overall) pushProgress(`Enriching ${data.overall.current}/${data.overall.total}…`, myGen);
               if (data?.type === 'complete') enrichmentResults = data.results;
             });
           } catch (transportError) {
             if (!enrichmentResults) throw transportError;
-            pushProgress('Contact results received; continuing after the connection closed.');
+            pushProgress('Contact results received; continuing after the connection closed.', myGen);
           }
           if (enrichStreamError || !enrichmentResults) enrichFailed = true;
           else enriched = mergeEnrichment(kept, enrichmentResults);
@@ -1723,7 +1739,7 @@ export default function ReviewerSearchSection({
         setPhase('error');
       }
     } finally {
-      runningRef.current = false;
+      if (runningRef.current === myGen) runningRef.current = null;
     }
   }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress]);
 
@@ -1732,9 +1748,9 @@ export default function ReviewerSearchSection({
   // Independent of the search; reuses the search's `analysis` when present so the
   // server can skip a second analyze call.
   const enrichRecommended = useCallback(async () => {
-    if (!blobUrl || !proposalKey || recRunningRef.current) return;
-    recRunningRef.current = true;
     const myGen = genRef.current;
+    if (!blobUrl || !proposalKey || recRunningRef.current !== null) return;
+    recRunningRef.current = myGen;
     setRecPhase('running'); setRecError(null); setRecProgress([]); setRecCandidates([]); setRecHandled([]);
     try {
       if (genRef.current !== myGen) return; // abort if context changed before the request fires
@@ -1749,7 +1765,9 @@ export default function ReviewerSearchSection({
       await readSseStream(res, ({ event, data }) => {
         if (event === 'error') { streamError = data?.message || 'Enrichment failed'; return; }
         if (data?.error) { streamError = data.error; return; }
-        if (data?.message) setRecProgress((p) => [...p.slice(-6), data.message]);
+        if (data?.message && mountedRef.current && genRef.current === myGen) {
+          setRecProgress((p) => [...p.slice(-6), data.message]);
+        }
         if (data?.recommended) result = data.recommended;
         if (Array.isArray(data?.handled)) handledResult = data.handled;
       });
@@ -1772,7 +1790,7 @@ export default function ReviewerSearchSection({
     } catch (e) {
       if (genRef.current === myGen) { setRecError(e.message); setRecPhase('error'); }
     } finally {
-      recRunningRef.current = false;
+      if (recRunningRef.current === myGen) recRunningRef.current = null;
     }
   }, [blobUrl, proposalKey, requestId, analysis]);
 
@@ -1926,6 +1944,7 @@ export default function ReviewerSearchSection({
   const excludeCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
     if (!key || !requestId) return;
+    const myGen = genRef.current;
     const pruned = pruneCandidateForRoster(cand);
     setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
@@ -1942,9 +1961,11 @@ export default function ReviewerSearchSection({
       if (!res.ok) throw new Error('exclude failed');
     } catch {
       // Roll back the optimistic move so the card isn't silently lost.
-      setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
-      setRosterActive((prev) => dedupeByName([pruned, ...prev]));
-      setRosterNote("Couldn't exclude that reviewer — please try again.");
+      if (genRef.current === myGen) {
+        setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
+        setRosterActive((prev) => dedupeByName([pruned, ...prev]));
+        setRosterNote("Couldn't exclude that reviewer — please try again.");
+      }
     }
   }, [requestId]);
 
@@ -1956,6 +1977,7 @@ export default function ReviewerSearchSection({
   const excludeUnverifiedCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
     if (!key || !requestId) return;
+    const myGen = genRef.current;
     const pruned = pruneCandidateForRoster(cand);
     const nameAlreadyInRoster = rosterNames.includes(cand.name);
     setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
@@ -1968,11 +1990,13 @@ export default function ReviewerSearchSection({
       });
       if (!res.ok) throw new Error('exclude failed');
     } catch {
-      setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
-      if (!nameAlreadyInRoster) {
-        setRosterNames((prev) => prev.filter((name) => name !== cand.name));
+      if (genRef.current === myGen) {
+        setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
+        if (!nameAlreadyInRoster) {
+          setRosterNames((prev) => prev.filter((name) => name !== cand.name));
+        }
+        setRosterNote("Couldn't exclude that reviewer — please try again.");
       }
-      setRosterNote("Couldn't exclude that reviewer — please try again.");
     }
   }, [requestId, rosterNames]);
 
@@ -2408,7 +2432,7 @@ export default function ReviewerSearchSection({
     if (refreshableCandidates.length === 0) {
       return { refreshed: [], failures, stale: false };
     }
-    pushProgress(`Refreshing contact verification for ${refreshableCandidates.length} reviewer(s)…`);
+    pushProgress(`Refreshing contact verification for ${refreshableCandidates.length} reviewer(s)…`, expectedGeneration);
     const enrichmentResponse = await fetch('/api/reviewer-finder/enrich-contacts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2427,7 +2451,7 @@ export default function ReviewerSearchSection({
         return;
       }
       if (data?.type === 'progress' && data.overall && genRef.current === expectedGeneration) {
-        pushProgress(`Refreshing verification ${data.overall.current}/${data.overall.total}…`);
+        pushProgress(`Refreshing verification ${data.overall.current}/${data.overall.total}…`, expectedGeneration);
       }
       if (data?.type === 'complete') enrichmentResults = data.results;
     });
@@ -2459,6 +2483,9 @@ export default function ReviewerSearchSection({
     // acknowledgement for this candidate; recorded=0 stays retryable.
     const refreshed = [];
     for (const candidate of ready) {
+      if (genRef.current !== expectedGeneration) {
+        return { refreshed, failures, stale: true };
+      }
       const rosterResponse = await fetch('/api/workbench/reviewer-roster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2468,6 +2495,9 @@ export default function ReviewerSearchSection({
         }),
       });
       const rosterData = await rosterResponse.json().catch(() => ({}));
+      if (genRef.current !== expectedGeneration) {
+        return { refreshed, failures, stale: true };
+      }
       if (rosterResponse.ok && rosterData.success && rosterData.recorded === 1) {
         refreshed.push(candidate);
       } else {
@@ -2528,7 +2558,7 @@ export default function ReviewerSearchSection({
       let refreshedVerificationCandidates = [];
       const rosterWarnings = [];
       if (toSave.length > 0) {
-        pushProgress(`Saving ${toSave.length} candidate(s)…`);
+        pushProgress(`Saving ${toSave.length} candidate(s)…`, myGen);
         let receivedResponse = false;
         try {
           const sRes = await fetch('/api/reviewer-finder/save-candidates', {
@@ -2675,7 +2705,7 @@ export default function ReviewerSearchSection({
       let promoted = 0;
       const promotedCandidates = [];
       if (applicantChosen.length > 0) {
-        if (isCurrent()) pushProgress(`Adding ${applicantChosen.length} applicant-referred reviewer(s) to Invite…`);
+        if (isCurrent()) pushProgress(`Adding ${applicantChosen.length} applicant-referred reviewer(s) to Invite…`, myGen);
         const results = await Promise.all(applicantChosen.map(async (c) => {
           try {
             // Carry the PD's hand-corrections (ONLY the fields marked manual) so the
@@ -2954,10 +2984,11 @@ export default function ReviewerSearchSection({
   // shows (email/orcid/scholar fall back to contactEnrichment); the server fetches
   // request metadata (number/institution/PI) authoritatively by requestId.
   const exportSelected = useCallback(async () => {
-    if (exportingRef.current) return;
+    const myGen = genRef.current;
+    if (exportingRef.current !== null) return;
     const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
-    exportingRef.current = true;
+    exportingRef.current = myGen;
     setExporting(true);
     setExportError(null);
     try {
@@ -2997,6 +3028,7 @@ export default function ReviewerSearchSection({
         throw new Error(data.error || `Export failed (${res.status})`);
       }
       const blob = await res.blob();
+      if (genRef.current !== myGen || !mountedRef.current) return;
       const disposition = res.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
       const filename = match ? match[1] : 'reviewer-candidates.xlsx';
@@ -3009,10 +3041,12 @@ export default function ReviewerSearchSection({
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setExportError(e.message);
+      if (genRef.current === myGen && mountedRef.current) setExportError(e.message);
     } finally {
-      exportingRef.current = false;
-      setExporting(false);
+      if (exportingRef.current === myGen) {
+        exportingRef.current = null;
+        if (genRef.current === myGen && mountedRef.current) setExporting(false);
+      }
     }
   }, [displayCandidates, selected, requestId]);
 
