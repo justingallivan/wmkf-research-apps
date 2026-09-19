@@ -1,0 +1,470 @@
+---
+title: Reviewer Search Workspace Decomposition Execution Receipt
+domain: reviewers
+kind: execution-receipt
+status: active
+summary: Stage 0 source-to-target inventory, lifecycle defect disposition, and prerequisite coverage for the staged ReviewerSearchSection decomposition.
+canonical: false
+owner: product-engineering
+related:
+  - docs/plans/REVIEWER_SEARCH_WORKSPACE_DECOMPOSITION_PLAN_2026-09-18.md
+  - docs/audits/REVIEWER_SEARCH_WORKSPACE_OPUS_REVIEW_2026-09-18.md
+---
+
+# Reviewer Search Workspace Execution Receipt
+
+## Scope and status
+
+**Change surface:** component-local decomposition of
+`shared/components/reviewers/ReviewerSearchSection.js` into presentation leaves,
+operation hooks, projection, and a small composition controller. The public facade,
+HTTP payloads, persistence, identity policy, and server helper boundaries remain
+fixed.
+
+**Entry points:** `shared/components/reviewers/ReviewerSearchSection.js`, its
+`ReviewerFindPanel` caller, the institution-stage2 smoke page, and the existing
+reviewer unit suites.
+
+**Persistence:** none introduced or migrated. Existing Postgres working-roster and
+Dataverse writes remain behind the existing HTTP routes.
+
+**Consumers:** Find workspace cards and modals, Invite/Track callbacks, the smoke
+page, named facade exports, and the existing unit/gate surfaces.
+
+**Prior findings being verified:** the plan's §4 stale progress, optimistic rollback,
+export lifecycle, ref cleanup, refresh-loop, and unknown-outcome entries; the Opus
+review's free-variable, controller-order, and Stage 0 disposition findings.
+
+**Execution status [VERIFIED via command]:** worktree
+`/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
+source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
+`package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
+provider or external-state call was made. Stage 0 source/test work is authorized by
+the accepted revised plan; Stage 1 remains blocked pending fresh Sol review.
+
+## Source-to-target map
+
+The following map is derived from the current source symbols and AST-assisted
+capture analysis, then checked against the function bodies. Line numbers are
+navigation evidence only; symbol ownership controls implementation.
+
+| Stage | Target | Current symbols / source region | Return or ownership contract |
+|---|---|---|---|
+| 1 | `search/candidateKeys.js`, `presentation.js`, `SearchPrimitives.js`, `IdentityComparisonPanel.js`, `CandidateCard.js` | `candKey`, `dedupeByName`, `isApplicantOriginCandidate` (`267–281`); message/label helpers (`121–130`, `283–338`); primitives (`132–170`); comparison constant/panel (`107–265`); institution notice and `CandidateCard` (`340–1269`) | Preserve direct facade exports for `CandidateCard` and `addressTrustFailureMessage`; preserve delegated key/provenance behavior. |
+| 2 | `search/SearchControls.js`, `SearchResults.js`, `SearchContactModals.js`, `HandledReviewers.js`, `ApplicantReviewerStatus.js` | Existing JSX blocks (`3063–3763`), including `SEARCH_SOURCES` and `BLOCKED_REFERRAL_REASON` | Markup-only leaves. They receive named props and commands; they do not fetch or own workflow state. |
+| 3 | `search/useReviewerRoster.js` | `applyRosterSnapshot` (`1369`), `reloadRoster` (`1385`), `retryRosterLoad` (`1444`) | Returns `{ applyRosterSnapshot, reloadRoster, retryRosterLoad }`; reset effect and roster state remain with the composition owner until Stage 9. |
+| 3 | `search/useReviewerRosterActions.js` | `excludeCandidate` (`1926`), `excludeUnverifiedCandidate` (`1956`), `promoteCandidate` (`1980`), `removePreviousResults` (`2018`) | Returns the four commands. Preserve separate rollback semantics and exact `previousSearchRefs` with `updatedAt`. |
+| 4 | `search/useReviewerDiscovery.js` | `runSearch` (`1476–1728`) | Returns `{ runSearch }`; ordered SSE phases, local result variables, awaited roster POST, and partial transport handling remain intact. |
+| 5 | `search/useApplicantReviewerEnrichment.js` | `enrichRecommended` (`1734–1777`), terminal/cache derivations (`1783–1807`) | Returns `{ enrichRecommended, terminalApplicantKeys, actionableRecommended, haveValidCache }`; owns the applicant auto-effect and its exact dependency list. |
+| 6 | `search/useReviewerContactActions.js` | `setManualContact` (`2068–2116`), `applyAuthoritativeRosterCandidate` (`2118–2124`), `persistManualContact` (`2126–2161`), address/identity commands (`2163–2393`) | Returns named contact/remediation commands. `applyAuthoritativeRosterCandidate` is an internal helper. Modal state remains composition-owned and is hoisted before hook evaluation. |
+| 7 | `search/useReviewerPromotion.js` | `refreshExpiredVerification` (`2395–2485`), `saveSelected` (`2487–2950`) | Returns `{ refreshExpiredVerification, saveSelected }`; preserves ordinary/applicant endpoint differences, exact result correlation, and generation token. |
+| 8 | `search/useReviewerExport.js` | `exportSelected` (`2956–3017`) | Returns `{ exportSelected }`; preserves DTO construction, object URL/download cleanup, and independent export error state. |
+| 8 | `search/useReviewerSearchProjection.js` | roster/run merge and handled derivations (`1814–1911`), readiness/count projections (`3021–3058`) | Returns display/handled/COI/unverified/readiness/count projections; no new key, cache, or readiness policy. |
+| 9 | `search/useReviewerSearchController.js` | Remaining state/ref declarations (`1292–1367`), reset/prefill effects (`1399–1470`), selection callbacks (`1913–1921`), hook composition and view prop assembly | Owns the one generation/ref lifecycle and all state. Returns the named view props, derived values, and operation commands required by Stage 2 views. It must not contain extracted operation bodies. |
+
+## Exact free-variable inventory
+
+The lists below name the values a hook must receive or import. `state` means a
+read value, `setter` a React state setter, `ref` a mutable ref, `derived` a value
+computed by another hook/controller, `command` a sibling callback, and `module` an
+existing import or module constant. Browser globals (`fetch`, `window`, `document`,
+`URL`, built-ins, and `Error`) remain ambient globals and are not state inputs.
+
+### `useReviewerRoster`
+
+- `applyRosterSnapshot`: setters `setRosterActive`, `setRosterExcluded`,
+  `setRosterIneligible`, `setRosterBlocked`, `setRosterHandled`,
+  `setRosterSavedKeys`, `setRosterNames`, `setRepairRequestsByCandidateKey`,
+  `setRepairRequestsUnavailable`; returns nothing.
+- `reloadRoster`: prop `requestId`; ref `genRef`; command `applyRosterSnapshot`;
+  returns `null` for no request, stale generation, or failed response, otherwise
+  the decoded `data` object.
+- `retryRosterLoad`: ref `genRef`; command `reloadRoster`; setters
+  `setRosterLoaded`, `setRosterLoadFailed`, `setRosterNote`; returns undefined.
+- Module/global dependencies: `encodeURIComponent`, `fetch`, `Array`, `Object`.
+
+### `useReviewerRosterActions`
+
+- `excludeCandidate`: prop `requestId`; ref `genRef`; setters `setCandidates`,
+  `setRecCandidates`, `setRosterActive`, `setRosterExcluded`, `setRosterNames`,
+  `setSelected`, `setRosterNote`; modules `candKey`, `dedupeByName`,
+  `pruneCandidateForRoster`; returns undefined. Stage 0 adds a captured generation
+  and guards the catch rollback.
+- `excludeUnverifiedCandidate`: prop `requestId`; state `rosterNames`; ref `genRef`;
+  setters `setRosterExcluded`, `setRosterNames`, `setRosterNote`; same modules; returns
+  undefined. Its failure path must never restore the ephemeral row to active.
+- `promoteCandidate`: prop `requestId`; ref `genRef`; command `reloadRoster`; setters
+  `setRosterActive`, `setRosterExcluded`, `setRosterNote`; modules `candKey`,
+  `dedupeByName`; returns undefined. The existing generation/409 reload branches
+  remain explicit.
+- `removePreviousResults`: prop `requestId`; state `busy`, `removingPrevious`;
+  derived `previousSearchKeys`, `previousSearchRefs`; ref `genRef`; setters
+  `setRemovingPrevious`, `setRosterActive`, `setRosterExcluded`,
+  `setRosterIneligible`, `setRosterBlocked`, `setRosterHandled`,
+  `setRosterSavedKeys`, `setRosterNames`, `setSelected`, `setRosterNote`; returns
+  undefined. `window.confirm` and the `updatedAt` references remain unchanged.
+- Shared module/global dependencies: `candKey`, `dedupeByName`, `pruneCandidateForRoster`,
+  `fetch`, `JSON`, `Array`, `Set`, `Error`, and `window`.
+
+### `useReviewerDiscovery`
+
+`runSearch` closes over props `blobUrl`, `requestId`; state
+`excludeText`, `rosterNames`, `rosterLoaded`, `removingPrevious`, `searchSources`,
+`reviewerCount`, `additionalNotes`, `referredSeedsText`, and `referredBy`;
+derived `savedPoolNames` and `noSourcesSelected`; refs `runningRef` and `genRef`;
+command `pushProgress`; setters `setPhase`, `setError`, `setErrorMeta`,
+`setProgress`, `setCandidates`, `setUnverified`, `setIdentityComparison`,
+`setSelected`, `setPromotionNotice`, `setEnrichNote`, `setAnalysis`,
+`setExcludedRemoved`, `setExportError`, `setBlockedReferredSeeds`,
+`setRosterActive`, `setRosterIneligible`, `setRosterNames`, `setRosterNote`.
+
+Module dependencies are `parseExcludeList`, `parseReferredSeeds`, `filterExcluded`,
+`readSseStream`, `mergeEnrichment`, `rankByRelevance`, `withReviewerCandidateKey`,
+`withReviewerProvenance`, `pruneCandidateForRoster`, and `dedupeByName`. It returns
+undefined on all paths; early returns are part of the stale-generation contract.
+The Stage 0 progress guard must cover SSE progress and the fallback messages after
+analysis/discovery/enrichment transport errors (`1514`, `1529`, `1573`, `1586`,
+`1608`, `1628`, `1633`), not only the later terminal-result checks.
+
+### `useApplicantReviewerEnrichment`
+
+- `enrichRecommended`: props `blobUrl`, `proposalKey`, `requestId`; state `analysis`;
+  refs `genRef`, `recRunningRef`, `mountedRef`; setters `setRecPhase`, `setRecError`,
+  `setRecProgress`, `setRecCandidates`, `setRecHandled`, `setRosterIneligible`;
+  modules `readSseStream`, `dedupeByName`, `pruneCandidateForRoster`; returns
+  undefined. Its SSE progress write at `1752` must be generation-guarded.
+- `terminalApplicantKeys`: state `rosterExcluded`, `rosterSavedKeys`; module
+  `applicantTerminalSuggestionKeys`; returns a Set.
+- `actionableRecommended`: prop `recommended`; module
+  `reviewerEngagementProjection`; returns filtered recommendations.
+- `haveValidCache`: derived `rosterActive`, `rosterIneligible`,
+  `actionableRecommended`, `terminalApplicantKeys`; prop `proposalKey`; module
+  `hasValidApplicantEnrichmentCache`; returns a boolean.
+- Auto-effect inputs: `actionableRecommended`, `recPhase`, `rosterLoaded`,
+  `haveValidCache`, props `blobUrl`/`proposalKey`, ref `recRunningRef`, command
+  `enrichRecommended`, setter `setRecPhase`. Its accepted dependency array is
+  `[blobUrl, proposalKey, actionableRecommended, recPhase, rosterLoaded,
+  haveValidCache, enrichRecommended]`.
+
+### `useReviewerContactActions`
+
+- `setManualContact`: modules `candKey`; setters `setCandidates`,
+  `setRecCandidates`, `setRosterActive`; returns undefined.
+- `applyAuthoritativeRosterCandidate` (internal): module `candKey`; setters
+  `setCandidates`, `setRecCandidates`, `setRosterActive`; returns undefined.
+- `persistManualContact`: prop `requestId`; ref `genRef`; command
+  `setManualContact`, `applyAuthoritativeRosterCandidate`; setter `setRosterNote`;
+  module `candKey`; throws for missing request/key, network failure, or an
+  unsuccessful response; returns `false` only after a stale response and
+  otherwise resolves undefined.
+- `verifyAddressContact`: prop `requestId`; ref `genRef`; command
+  `applyAuthoritativeRosterCandidate`; setters `setSelected`, `setRosterNote`;
+  modules `candKey`, `addressTrustFailureMessage`; returns `false` only after a
+  stale response and `true` after authoritative verification; invalid input,
+  network failure, and unsuccessful responses throw, including when an
+  authoritative candidate was already applied before a later partial failure.
+- `reviewAddressConflict`: prop `requestId`; ref `genRef`; setters
+  `setEditingContact`, `setRosterNote`; modules `candKey`,
+  `addressTrustFailureMessage`; returns undefined.
+- `retryAddressCheck`: prop `requestId`; ref `genRef`; command
+  `applyAuthoritativeRosterCandidate`; setter `setRosterNote`; modules `candKey`,
+  `getCandidatePromotionDecision`, `addressTrustFailureMessage`; returns undefined.
+- `requestAddressRepair`: prop `requestId`; ref `genRef`; setters
+  `setRepairRequestsByCandidateKey`, `setRosterNote`; modules `candKey`,
+  `getCandidatePromotionDecision`, `getCandidateEmailReadiness`; returns undefined.
+- `useLead`: command `setManualContact`; setter `setEditingContact`; returns
+  undefined.
+- `openIdentityConfirmation`: prop `requestId`; ref `genRef`; setters
+  `setConfirmingContact`, `setRosterNote`; modules `candKey`,
+  `addressTrustFailureMessage`; returns undefined.
+- `confirmIdentityContact`: prop `requestId`; state `unverified`; ref `genRef`;
+  command `verifyAddressContact`, `applyAuthoritativeRosterCandidate`; setters
+  `setUnverified`, `setRosterActive`; modules `candKey`, `dedupeByName`,
+  `pruneCandidateForRoster`; returns `false` for invalid or stale outcomes, and
+  otherwise returns the result of `verifyAddressContact` after the confirmation
+  PATCH; record/confirm failures throw and a verification throw propagates. The
+  explicit `unverified` and `verifyAddressContact` inputs are required; neither
+  may be recovered through a broad state object.
+
+### `useReviewerPromotion`
+
+- `refreshExpiredVerification`: prop `requestId`; state `analysis`; ref `genRef`;
+  command `pushProgress`; modules `readSseStream`, `mergeEnrichment`,
+  `pruneCandidateForRoster`; returns `{ refreshed, failures, stale }`. The
+  per-row roster POST loop (`2461–2479`) must check generation before issuing each
+  next POST and after each response; an already-issued request cannot be undone.
+- `saveSelected`: props `requestId`, `onSaved`; state `selected`, `analysis`;
+  derived `displayCandidates`; refs `genRef`, `savingRef`; commands
+  `pushProgress`, `refreshExpiredVerification`, `reloadRoster`; setters
+  `setSavingCount`, `setPhase`, `setError`, `setErrorMeta`, `setProgress`,
+  `setPromotionNotice`, `setCandidates`, `setRecCandidates`, `setRosterActive`,
+  `setRosterBlocked`, `setRosterSavedKeys`, `setRosterNote`, `setSelected`;
+  modules `isCandidateSelectable`, `provenanceKindOf`, `PROVENANCE_KINDS`,
+  `correlateSaveResultsToRosterCandidates`, `candKey`, `dedupeByName`,
+  `formatSaveFailureDetails`. Returns undefined, including early stale returns.
+  The ordinary save, applicant promotion, exact-key correlation, and unknown-outcome
+  asymmetry are separate branches and must not be collapsed.
+
+### `useReviewerExport`
+
+`exportSelected` receives prop `requestId`; state `selected`; derived
+`displayCandidates`; refs `exportingRef`, `genRef`, `mountedRef`; setters `setExporting`, `setExportError`;
+modules `candKey`, `isCandidateSelectable`, `buildScholarSearchUrl`,
+`isRealScholarProfileUrl`; ambient `fetch`, `document`, `URL`; returns undefined.
+Stage 0 gives the operation a generation token, prevents a stale request from
+creating a download or writing `exportError`, and makes token cleanup conditional so
+an old `finally` cannot clear a newer context's export lock.
+
+### `useReviewerSearchProjection`
+
+Inputs are props `proposalKey`, `recommended`; state `rosterActive`, `recCandidates`,
+`candidates`, `rosterExcluded`, `rosterIneligible`, `rosterHandled`, `recHandled`,
+`unverified`, `sortMode`; external derived inputs `terminalApplicantKeys` and
+`engagedSavedIndex`. `rediscoveredEngaged` and `displayCandidates` are calculated
+inside this hook and consumed by its later projections, not passed back as inputs.
+Module helpers are
+`isApplicantOriginCandidate`, `candKey`, `dedupeByName`, `withReviewerProvenance`,
+`partitionRediscoveredCandidates`, `reviewerEngagementProjection`,
+`isCandidateSelectable`, and `provenanceGroupOf`.
+
+Returns exactly these named projections: `displayRosterActive`,
+`visibleRecCandidates`, `currentRunKeys`, `previousSearchCandidates`,
+`previousSearchKeys`, `previousSearchRefs`, `displayCandidates`,
+`rediscoveredEngaged`, `handledReviewers`, `incompleteCoiCandidates`,
+`incompleteCoiNames`, `incompleteCoiLabel`, `selectableCandidates`, `knownNameKeys`,
+`unverifiedToShow`, `readinessSections`, `recCount`, `applicantDisplayCandidates`,
+`recVerifiedCount`, and `recIdentityReviewCount`. Selection commands `toggle`,
+`toggleAll`, and `allSelected` stay composition-owned because they write the
+controller's `selected` state.
+
+### `useReviewerSearchController`
+
+The final hook receives all current facade props: `requestId`, `blobUrl`,
+`proposalKey`, `excludedNames`, `exclusionsUnavailable`, `excludedRaw`,
+`recommended`, `recommendedFailed`, `knownLookupFailed`, `slotsPopulated`,
+`ingestLoading`, `ingestError`, `onRetryIngestion`, `savedPool`, `onSaved`,
+`onNavigate`, `manualAddSlot`, `canManage`, and `repairCandidateKey`.
+
+It owns the exact state/setter pairs declared at `1292–1360`: `phase`,
+`savingCount`, `progress`, `candidates`, `unverified`, `analysis`,
+`identityComparison`, `selected`, `rosterActive`, `rosterExcluded`,
+`rosterIneligible`, `rosterBlocked`, `rosterHandled`, `rosterSavedKeys`,
+`rosterNames`, `repairRequestsByCandidateKey`, `repairRequestsUnavailable`,
+`rosterLoaded`, `rosterLoadFailed`, `rosterNote`, `removingPrevious`,
+`excludedOpen`, `error`, `errorMeta`, `promotionNotice`, `enrichNote`,
+`excludeText`, `excludedRemoved`, `searchSources`, `reviewerCount`,
+`additionalNotes`, `referredSeedsText`, `referredBy`, `blockedReferredSeeds`,
+`sortMode`, `exporting`, `exportError`, `recPhase`, `recCandidates`, `recHandled`,
+`recProgress`, `recError`, `showPromptEditor`, `editingContact`, and
+`confirmingContact`. It owns refs `exportingRef`, `recRunningRef`, `runningRef`,
+`savingRef`, `genRef`, `excludeEditedRef`, and the Stage 0 `mountedRef` lifecycle
+guard. The reset effect owns the mounted flag and clears operation tokens only for
+its current generation, so StrictMode cleanup cannot clear a remounted operation.
+
+It retains `savedPoolNames`, `engagedSavedIndex`, `busy`, `noSourcesSelected`,
+`pushProgress`, the reset/prefill effects, `toggle`, `allSelected`, `toggleAll`,
+`onExcludeChange`, and the operation-hook composition. AST capture of the current
+JSX return identifies these component-local values as the complete Stage 2 view
+contract (imports and JSX locals are omitted):
+
+```text
+activeInstitutionStage2Presentation, additionalNotes, allSelected, blobUrl,
+blockedReferredSeeds, busy, canConfirmCandidateForPromotion, canManage,
+candKey, confirmIdentityContact, confirmingContact, displayCandidates,
+editingContact, enrichNote, enrichRecommended, error, errorMeta,
+excludeCandidate, excludeText, excludeUnverifiedCandidate, excludedOpen,
+excludedRaw, excludedRemoved, exclusionsUnavailable, exportError, exportSelected,
+exporting, getCandidateEmailReadiness, getCandidatePromotionDecision,
+handledReviewers, identityComparison, incompleteCoiCandidates, incompleteCoiLabel,
+ingestError, ingestLoading, isApplicantOriginCandidate, isCandidateSelectable,
+knownLookupFailed, manualAddSlot, noSourcesSelected, onExcludeChange, onNavigate,
+onRetryIngestion, openIdentityConfirmation, persistManualContact, phase,
+previousSearchKeys, previousSearchRefs, progress, promoteCandidate,
+promotionNotice, proposalKey, readinessSections, recCount, recError,
+recIdentityReviewCount, recPhase, recProgress, recVerifiedCount, recommended,
+recommendedFailed, referredBy, referredSeedsText, removePreviousResults,
+removingPrevious, repairCandidateKey, repairRequestsByCandidateKey,
+repairRequestsUnavailable, requestAddressRepair, retryAddressCheck,
+retryRosterLoad, reviewAddressConflict, reviewerCount, rosterBlocked,
+rosterExcluded, rosterIneligible, rosterLoadFailed, rosterLoaded, rosterNames,
+rosterNote, runSearch, saveSelected, savingCount, searchSources, selected,
+setAdditionalNotes, setConfirmingContact, setEditingContact, setExcludedOpen,
+setReferredBy, setReferredSeedsText, setReviewerCount, setSearchSources,
+setShowPromptEditor, setSortMode, showPromptEditor, slotsPopulated, sortMode,
+toggle, toggleAll, unverifiedToShow, useLead, verifyAddressContact
+```
+
+The list includes the exact `showPromptEditor`/`setShowPromptEditor`,
+`recPhase`/`recProgress`/`recError`/`enrichRecommended`,
+`blockedReferredSeeds`, `identityComparison`, and roster category arrays used by
+the JSX. `genRef` is an internal lifecycle dependency and is not a view prop.
+No operation body belongs in this return assembly.
+
+## Stage 0 defect disposition and minimal fix designs
+
+These are `[VERIFIED via source reads and AST capture]` pre-existing behaviors at
+the baseline. The designs below are bounded to stale client state/lifecycle. They
+do not cancel or undo an already-issued HTTP write, change payloads, or alter the
+item-6 unknown-outcome asymmetry.
+
+1. **Progress writes before generation checks.** `pushProgress` writes without a
+   generation guard (`1472–1474`); stream callbacks and transport fallback messages
+   call it before later checks (`1514`, `1529`, `1573`, `1586`, `1608`, `1628`,
+   `1633`). Applicant progress writes directly at `1752`. Refresh progress has a
+   check at `2429`, but the helper call must still be generation-owned. Minimal fix:
+   carry `myGen`/`expectedGeneration` into progress writes and make the setter no-op
+   when the generation or mounted lifecycle is stale. Keep local stream variables
+   writable for terminal parsing, but suppress all stale UI state writes.
+
+2. **Exclusion rollback crosses request contexts.** `excludeCandidate` catch writes
+   `setRosterExcluded`, `setRosterActive`, and `setRosterNote` without a generation
+   check (`1943–1948`); unverified rollback has the same shape (`1970–1976`).
+   Minimal fix: capture the operation generation before the PATCH and guard every
+   rollback setter. The unverified path retains its `nameAlreadyInRoster` rule and
+   never restores the row to active. A delayed rejection from request A must not
+   put A into request B's display or later save selection.
+
+3. **Export side effects and lock cleanup are unowned.** `exportSelected` uses a
+   boolean lock and unconditionally writes the error/finally state after awaits
+   (`2956–3017`). Minimal fix: use a generation token for the lock, guard
+   `setExportError`, download DOM/object-URL side effects, and `setExporting`, and
+   clear the lock only when the finishing token still owns it. Reset/unmount cleanup
+   must release the prior token without allowing its old `finally` to clear a newer
+   export.
+
+4. **Operation refs have unconditional finally cleanup.** Search and applicant
+   operations set `runningRef.current = false` (`1726`) and
+   `recRunningRef.current = false` (`1775`) regardless of context. Reset does not
+   reset these refs (`1399–1442`). Minimal fix: retain the same-context duplicate
+   guard, assign the active generation to each operation lock, clear stale ownership
+   during a context/unmount cleanup, and let an old finally clear only its own token.
+   StrictMode cleanup/re-run must establish the new lifecycle before new work starts.
+
+5. **Refresh loop continues POSTs after staleness.** The enrichment stream is
+   generation-checked before the row loop (`2434`), but each roster POST proceeds
+   without a per-iteration check (`2461–2479`); only the final return reports stale
+   (`2483`). Minimal fix: check generation before each next POST and after each
+   response, stop issuing later rows when stale, and return `stale: true`. An
+   in-flight first POST remains an already-issued write and is not undone.
+
+6. **Unknown-outcome asymmetry is characterization only.** Ordinary save marks
+   `receivedResponse` before JSON parsing (`2544–2545`) and reloads only in the
+   pre-response catch (`2623–2643`); applicant promotion failures return per-row
+   failures without the ordinary GET reconciliation (`2694–2711`). Stage 0 records
+   these cases in P7 and leaves them unchanged.
+
+## Prerequisite and falsification coverage
+
+The focused cases below must run with mocked fetch/SSE only. Each test fixture must
+contain the competing row or delayed response that would make a missing guard fail.
+The failing-before output is recorded with the safety fix commit; no live provider,
+Dataverse, Postgres, Blob, or external HTTP call is permitted.
+
+| Requirement | Test coverage | Expected falsification |
+|---|---|---|
+| Context generation and unmount/StrictMode lifecycle | `reviewer-search-stage0-lifecycle.test.js` P2 | A delayed A response cannot set B state after request/blob change or unmount; B can start after A is invalidated; same-context lock remains blocked; pending export completion after unmount has no side effects; StrictMode remount cleanup does not clear a new token. ProposalKey-only changes remain characterized as baseline behavior. |
+| Exclusion rollback | `reviewer-search-stage0-lifecycle.test.js` P3 | Delayed rejected PATCH for A does not restore A into B active or selected state; unverified failure never becomes active; same-context rollback remains visible and retryable. |
+| Stream progress and stale callbacks | `reviewer-search-stage0-lifecycle.test.js` P4 | Progress/failure/success/finally writes after A→B are ignored, including transport fallback messages; the isolated unguarded mutation renders both stale messages. |
+| Applicant enrichment | `reviewer-search-stage0-lifecycle.test.js` P5 | Applicant progress is generation-owned; the isolated unguarded mutation renders stale applicant progress. Existing history-control suites cover valid cache and manual refresh behavior. |
+| Refresh loop | `reviewer-search-stage0-lifecycle.test.js` P7 | After generation changes during row 1, no row 2+ roster POST is issued; row 1 may complete and is reported as stale. |
+| Export | `reviewer-search-stage0-lifecycle.test.js` P8 | Stale/unmounted export produces no download, stale error, or lock corruption; current-context duplicate click remains blocked and object URLs are cleaned up. |
+| Unknown outcomes | P7 save contract | Ordinary pre-response, ordinary post-response malformed JSON, and applicant transport failures retain distinct existing outcomes; no new recovery is inferred. |
+
+Stage 0 now has additive characterization coverage for the deferred presentation
+contracts: `tests/unit/reviewer-search-public-contract.test.js` and
+`tests/unit/reviewer-search-workspace-composition.test.js` (8 cases total), plus
+`tests/unit/reviewer-search-callback-contract.test.js` (6 cases covering exact
+`onSaved`/modal callback behavior). `tests/unit/reviewer-search-context-lifecycle.test.js`
+adds the four P2 request/proposal lifecycle cases. Together with
+`tests/unit/reviewer-search-stage0-lifecycle.test.js` (9 cases), the five new test
+files contribute 27 additive cases. P9 boundary coverage remains a Stage 10
+prerequisite. Existing R1–R7 suites remain regression anchors and are not replaced
+by broad snapshots.
+
+## Verification log
+
+- `[VERIFIED via command]` `npm ci` completed in the isolated worktree; package
+  manifest and lockfile are unchanged.
+- `[VERIFIED via command]` `.agents/skills` resolves to `../.claude/skills`.
+- `[VERIFIED via CodeGraph then source]` parent repository CodeGraph located the
+  facade and callers; the worktree has no `.codegraph`, so current worktree source
+  and callers are authoritative for this receipt.
+- `[VERIFIED via source]` no new table, route, DTO, enum, or durable surface is
+  proposed. Durable-surface, symbol-fan-out, and migration audits are N/A.
+- `[VERIFIED via command]` Baseline focused run against the frozen source failed
+  all seven Stage 0 cases; the full log is `/private/tmp/reviewer-search-stage0-baseline.log`.
+  Both exclusion cases established that the request-B row stayed absent/present
+  as expected but exposed the stale A rollback note. The search and applicant
+  progress cases stopped at the precondition that request B never started (the
+  old operation lock), so they do not independently falsify the progress setter.
+  The old lock case likewise stopped before its delayed-finally check. The export
+  case could not find request B's export control after the context switch, which
+  is the stale export-state defect. The refresh case issued two roster POSTs
+  after the context changed instead of one.
+- `[VERIFIED via command]` With the bounded WIP restored, the focused suite passes
+  7/7. A separate mutation that removed only the progress-generation guards,
+  while retaining the other WIP fixes, fails both progress cases because the
+  stale A messages render; its log is
+  `/private/tmp/reviewer-search-stage0-progress-unguarded.log`. The source was
+  restored from `/private/tmp/ReviewerSearchSection.stage0-wip.final.js` after
+  that falsification run. Gate G and fresh Sol Stage 0 review remain required
+  before Stage 1.
+- `[VERIFIED via command]` The focused suite now passes 9/9 after adding an
+  unmounted export completion check and a StrictMode remount lifecycle check.
+  Temporarily removing only the conditional search/export lock cleanup makes the
+  captured React handlers issue a third search and third export; the red log is
+  `/private/tmp/reviewer-search-stage0-lock-unguarded.log`. The source was
+  restored from `/private/tmp/ReviewerSearchSection.stage0-wip.final2.js`.
+- `[VERIFIED via command]` Scoped regression suites pass sequentially: save-stale
+  4/4 (`/private/tmp/reviewer-search-save-stale.log`), history-controls 19/19
+  (`/private/tmp/reviewer-search-history-controls.log`), unverified-rescue 8/8
+  (`/private/tmp/reviewer-search-unverified-rescue.log`), and
+  promotion-reconciliation 16/16
+  (`/private/tmp/reviewer-search-promotion-reconciliation.log`). ESLint passes
+  for the bounded runtime and Stage 0 test files.
+
+## Contract-reconcile audit status
+
+- Whole-flow: traced caller → component state → unchanged HTTP routes → existing
+  persistence → response correlation → view/tests.
+- Partial-success: applicable to save/promotion and refresh; exact identifiers and
+  unknown-outcome distinctions are preserved in the Stage 7 inventory.
+- Async/stale-state: in scope; all five pre-existing defects and post-await writes
+  above have named guards/designs.
+- Helper extraction: in scope; key normalization, provenance, display projection,
+  and authoritative roster DTO handling remain separate.
+- Durable surface: N/A for schema/routes/persistence; this receipt is the only new
+  durable document.
+- Doc reconcile: this receipt records current execution facts; root-owned plan and
+  audit documents are not edited here.
+- Symbol-consumer fan-out: N/A for new enums/columns/statuses; public facade exports
+  and server `reviewer-search-logic` consumers are explicitly mapped.
+
+## Stage 0 acceptance — 2026-09-18 PT
+
+[VERIFIED via commands and reviews] Accepted by root after Luna implementation,
+Sol runtime review (`/root/sol_stage0_review`), correction review
+(`/root/sol_stage0_acceptance`), and final prerequisite delta acceptance
+(`/root/sol_stage0_prerequisites`). The final delta reviewer confirmed that both
+roster GETs are proven dispatched before testing A's stale completion. Root added
+the six callback-contract cases and corrected the projection inventory; no backend
+or shared helper changed. Original baseline/rollback reference: `8609d6ff`.
+
+- Full Jest after all additive tests: **963 suites / 14,222 tests passed** (Luna
+  session 30778, 126.432 seconds). Earlier full run: 961 / 14,212, before the last
+  ten additive tests; do not confuse these snapshots.
+- Canonical `npm run build` passed; log `/private/tmp/reviewer-search-stage0-build.log`.
+- Lint: 0 errors, 104 existing repo warnings; bounded runtime/test lint passed.
+  Types and all named G gates/self-tests passed. Serial all-check log:
+  `/private/tmp/reviewer-search-stage0-all-checks.log`.
+- The initial local `check:agent-invariants` failed because the per-worktree Claude
+  project memory link was absent. Root created only that missing host-local link,
+  then reran the gate: **3 symlinks passed**. Tracked AGENTS and skills invariants
+  remained valid; no source change was needed.
+- Source-only characterization of unknown-outcome asymmetry is retained. Actual
+  producer/consumer tests for those three cases are still required before Stage 7.
+- Remaining stages and mocked browser rehearsal are not yet executed; no release,
+  production data probe, provider call, merge or deployment occurred.
+
+**Current verdict:** Stage 0 accepted. Stage 1 may begin after its drift check.
+
