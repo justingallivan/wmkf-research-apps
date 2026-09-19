@@ -86,6 +86,8 @@ import SearchResults from './search/SearchResults';
 import SearchContactModals from './search/SearchContactModals';
 import HandledReviewers from './search/HandledReviewers';
 import ApplicantReviewerStatus from './search/ApplicantReviewerStatus';
+import useReviewerRoster from './search/useReviewerRoster';
+import useReviewerRosterActions from './search/useReviewerRosterActions';
 
 export { CandidateCard, addressTrustFailureMessage };
 
@@ -188,31 +190,22 @@ export default function ReviewerSearchSection({
   const excludeEditedRef = useRef(false);
   const mountedRef = useRef(true);
 
-  const applyRosterSnapshot = useCallback((data) => {
-    setRosterActive(Array.isArray(data?.active) ? data.active : []);
-    setRosterExcluded(Array.isArray(data?.excluded) ? data.excluded : []);
-    setRosterIneligible(Array.isArray(data?.ineligible) ? data.ineligible : []);
-    setRosterBlocked(Array.isArray(data?.blocked) ? data.blocked : []);
-    setRosterHandled(Array.isArray(data?.handled) ? data.handled : []);
-    setRosterSavedKeys(Array.isArray(data?.savedKeys) ? data.savedKeys : []);
-    setRosterNames(Array.isArray(data?.allNames) ? data.allNames : []);
-    setRepairRequestsByCandidateKey(Object.fromEntries(
-      (Array.isArray(data?.repairRequests) ? data.repairRequests : [])
-        .filter((request) => request?.candidateKey)
-        .map((request) => [request.candidateKey, request]),
-    ));
-    setRepairRequestsUnavailable(data?.repairRequestsUnavailable === true);
-  }, []);
-
-  const reloadRoster = useCallback(async (expectedGeneration = genRef.current) => {
-    if (!requestId) return null;
-    const res = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
-    const data = await res.json().catch(() => ({}));
-    if (genRef.current !== expectedGeneration) return null;
-    if (!res.ok || !data.success) return null;
-    applyRosterSnapshot(data);
-    return data;
-  }, [requestId, applyRosterSnapshot]);
+  const { reloadRoster, retryRosterLoad } = useReviewerRoster({
+    requestId,
+    genRef,
+    setRosterActive,
+    setRosterExcluded,
+    setRosterIneligible,
+    setRosterBlocked,
+    setRosterHandled,
+    setRosterSavedKeys,
+    setRosterNames,
+    setRepairRequestsByCandidateKey,
+    setRepairRequestsUnavailable,
+    setRosterLoaded,
+    setRosterLoadFailed,
+    setRosterNote,
+  });
 
   // Reset everything when the request or the loaded proposal changes — stale
   // candidates must never be savable under a different proposal (Finding 6).
@@ -275,28 +268,6 @@ export default function ReviewerSearchSection({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId, blobUrl, reloadRoster]);
-
-  const retryRosterLoad = useCallback(async () => {
-    const myGen = genRef.current;
-    setRosterLoaded(false);
-    setRosterLoadFailed(false);
-    setRosterNote(null);
-    try {
-      const snapshot = await reloadRoster(myGen);
-      if (genRef.current !== myGen) return;
-      if (snapshot) {
-        setRosterLoaded(true);
-      } else {
-        setRosterLoadFailed(true);
-        setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
-      }
-    } catch {
-      if (genRef.current === myGen) {
-        setRosterLoadFailed(true);
-        setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
-      }
-    }
-  }, [reloadRoster]);
 
   // When the applicant exclude list finishes loading (it can arrive after the
   // proposal), prefill the box — unless the user has already edited it.
@@ -759,148 +730,33 @@ export default function ReviewerSearchSection({
   const allSelected = selectableCandidates.length > 0 && selectableCandidates.every((c) => selected.has(candKey(c)));
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(selectableCandidates.map(candKey)));
 
-  // Move a surfaced candidate into the durable Excluded set (not deleted). Optimistic:
-  // splice it out of the active view immediately, persist in the background, restore on
-  // failure. The candidate stays in rosterNames so a re-run still won't re-surface it.
-  const excludeCandidate = useCallback(async (cand) => {
-    const key = candKey(cand);
-    if (!key || !requestId) return;
-    const myGen = genRef.current;
-    const pruned = pruneCandidateForRoster(cand);
-    setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
-    setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
-    setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
-    setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
-    setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
-    setSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
-    try {
-      const res = await fetch('/api/workbench/reviewer-roster', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, action: 'exclude', candidate: pruned }),
-      });
-      if (!res.ok) throw new Error('exclude failed');
-    } catch {
-      // Roll back the optimistic move so the card isn't silently lost.
-      if (genRef.current === myGen) {
-        setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
-        setRosterActive((prev) => dedupeByName([pruned, ...prev]));
-        setRosterNote("Couldn't exclude that reviewer — please try again.");
-      }
-    }
-  }, [requestId]);
-
-  // Exclude an ephemeral unverified suggestion. Same durable PATCH (the server
-  // exclude is an upsert, so no prior roster row is needed), but the rollback
-  // differs from excludeCandidate: the row never left `unverified` — it is only
-  // masked while its key sits in rosterExcluded — so a failure must NOT restore
-  // it into rosterActive (it was never active).
-  const excludeUnverifiedCandidate = useCallback(async (cand) => {
-    const key = candKey(cand);
-    if (!key || !requestId) return;
-    const myGen = genRef.current;
-    const pruned = pruneCandidateForRoster(cand);
-    const nameAlreadyInRoster = rosterNames.includes(cand.name);
-    setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
-    setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
-    try {
-      const res = await fetch('/api/workbench/reviewer-roster', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, action: 'exclude', candidate: pruned }),
-      });
-      if (!res.ok) throw new Error('exclude failed');
-    } catch {
-      if (genRef.current === myGen) {
-        setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
-        if (!nameAlreadyInRoster) {
-          setRosterNames((prev) => prev.filter((name) => name !== cand.name));
-        }
-        setRosterNote("Couldn't exclude that reviewer — please try again.");
-      }
-    }
-  }, [requestId, rosterNames]);
-
-  // Promote an excluded candidate back to the active, selectable list.
-  const promoteCandidate = useCallback(async (cand) => {
-    const key = candKey(cand);
-    if (!key || !requestId) return;
-    const myGen = genRef.current;
-    setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
-    setRosterActive((prev) => dedupeByName([cand, ...prev]));
-    try {
-      const res = await fetch('/api/workbench/reviewer-roster', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, action: 'promote', candidateKey: key }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (genRef.current !== myGen) return;
-      if (res.status === 409 && [
-        'candidate_not_excluded',
-        'reviewer_already_handled',
-        'reviewer_anchor_unavailable',
-      ].includes(data.code)) {
-        const snapshot = await reloadRoster(myGen);
-        if (genRef.current === myGen) {
-          const stage = data.stage ? ` (${String(data.stage).replaceAll('_', ' ')})` : '';
-          setRosterNote(snapshot
-            ? `That reviewer is no longer actionable${stage}, so the reviewer roster was reloaded.`
-            : 'That reviewer changed elsewhere. Reload this request before continuing.');
-        }
-        return;
-      }
-      if (!res.ok || !data.success) throw new Error(data.error || 'promote failed');
-    } catch {
-      if (genRef.current === myGen) {
-        setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
-        setRosterExcluded((prev) => dedupeByName([cand, ...prev]));
-        setRosterNote("Couldn't return that reviewer to the active list — please try again.");
-      }
-    }
-  }, [requestId, reloadRoster]);
-
-  const removePreviousResults = useCallback(async () => {
-    if (!requestId || busy || removingPrevious || previousSearchRefs.length === 0) return;
-    const count = previousSearchKeys.size;
-    if (!window.confirm(`Remove ${count} previously found reviewer${count === 1 ? '' : 's'} from this request? Applicant-recommended, saved, excluded, and COI records will be kept.`)) return;
-    const myGen = genRef.current;
-    setRemovingPrevious(true);
-    setRosterNote(null);
-    try {
-      const res = await fetch('/api/workbench/reviewer-roster', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId,
-          action: 'remove_previous_results',
-          candidateRefs: previousSearchRefs,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (genRef.current !== myGen) return;
-      if (!res.ok || !data.success) throw new Error(data.error || 'remove failed');
-      setRosterActive(Array.isArray(data.active) ? data.active : []);
-      setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
-      setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
-      setRosterBlocked(Array.isArray(data.blocked) ? data.blocked : []);
-      setRosterHandled(Array.isArray(data.handled) ? data.handled : []);
-      setRosterSavedKeys(Array.isArray(data.savedKeys) ? data.savedKeys : []);
-      setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
-      setSelected((prev) => {
-        const next = new Set(prev);
-        for (const key of Array.isArray(data.removedKeys) ? data.removedKeys : []) next.delete(key);
-        return next;
-      });
-      setRosterNote(`${data.removed || 0} previous search result${data.removed === 1 ? '' : 's'} removed.`);
-    } catch {
-      if (genRef.current === myGen) {
-        setRosterNote("Couldn't remove the previous search results — please try again.");
-      }
-    } finally {
-      if (genRef.current === myGen) setRemovingPrevious(false);
-    }
-  }, [requestId, busy, removingPrevious, previousSearchKeys, previousSearchRefs]);
+  const {
+    excludeCandidate,
+    excludeUnverifiedCandidate,
+    promoteCandidate,
+    removePreviousResults,
+  } = useReviewerRosterActions({
+    requestId,
+    genRef,
+    busy,
+    removingPrevious,
+    rosterNames,
+    previousSearchKeys,
+    previousSearchRefs,
+    reloadRoster,
+    setCandidates,
+    setRecCandidates,
+    setRosterActive,
+    setRosterExcluded,
+    setRosterIneligible,
+    setRosterBlocked,
+    setRosterHandled,
+    setRosterSavedKeys,
+    setRosterNames,
+    setSelected,
+    setRosterNote,
+    setRemovingPrevious,
+  });
 
   // Apply a staff-entered MANUAL contact to transient candidate state. Used by
   // the lead "Use this email" promotion (Slice 4); the on-card Edit-contact

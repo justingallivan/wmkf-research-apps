@@ -39,7 +39,7 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–2 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
+provider or external-state call was made. Stages 0–3 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
 from historical checkpoints.
 
 ## Source-to-target map
@@ -567,3 +567,46 @@ made the final bounded corrections after review; no production code changed.
 
 **Prerequisite verdict:** commit these tests before Stage 3 callback extraction.
 Stage 3 and later runtime moves still require their own full G and fresh review.
+
+
+## Stage 3 acceptance — roster hooks
+
+[VERIFIED via source, commands and fresh review] Luna `/root/luna_stage3` moved
+seven callbacks into `useReviewerRoster.js` and `useReviewerRosterActions.js`.
+The facade still owns state/reset and the one generation; callbacks receive named
+refs and setters with complete dependency arrays.
+
+- Starting/rollback reference: `03e5aad6`; origin/main stayed `b400c97d`.
+- Root AST comparison matches all seven callback bodies and parameters exactly.
+- Fresh Sol `/root/sol_stage3_review`: **READY**, no material findings. It checked
+  stable reload identity, reset order, active/unverified rollback distinction,
+  409 reload and awaited timestamped removal with exact response reconciliation.
+  Sol focused run: **8 suites / 58 tests**; strict dependency lint passed.
+- Luna focused run: **7 suites / 64 tests**. Gate G completed all **19 commands**,
+  including full **969 suites / 14,258 tests** and canonical Turbopack build.
+  Evidence: `/private/tmp/reviewer-stage-3-gates/results.json` and its named logs.
+  An accidentally repeated gate run was stopped from repeating further; the
+  retained final serial evidence starts at 03:33:16 UTC and ends at 03:36:23 UTC.
+- The full run includes the four green P8 export cases, to be committed separately
+  as prerequisites. Applicant/contact drafts arrived after suite discovery and
+  are not claimed as part of this stage's full-suite evidence.
+
+**Stage 3 verdict:** accepted by root. No payload, route, helper or persistence
+behavior changed.
+
+## Export prerequisite acceptance before Stage 8
+
+[VERIFIED via source, tests and review] Luna's export suite plus root's bounded
+stale-selection case cover DTO field precedence, selected/selectable filtering,
+Scholar classification, filename fallback, object-URL/anchor cleanup and separate
+error state. Existing Stage 0 tests cover stale/unmounted and duplicate behavior.
+Sol `/root/sol_save_prereqs_final` identified the originally vacuous selectability
+check; fresh `/root/sol_stage3_review` verified the corrected case's precondition.
+
+- Focused export + Stage 0: **2 suites / 13 tests passed**, with targeted lint;
+  `/private/tmp/reviewer-export-prereq-final.log`.
+- Removing only the export selectability guard makes the stale-selected case send
+  one forbidden POST instead of zero; `/private/tmp/reviewer-export-selectability-mutation.log`.
+  Root restored the source and verified callback equivalence including export.
+- P8 is accepted for a separate prerequisite commit. Stage 8 runtime movement
+  still requires its own G and fresh-context review.
