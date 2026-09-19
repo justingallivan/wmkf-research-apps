@@ -435,3 +435,10 @@ workflow. Execution status, hashes, review records, command results and conditio
 stage decisions belong in a companion execution receipt created during S0. The
 prior 128-test planning baseline is historical; new execution evidence must identify
 its own HEAD and commands. Nothing in this revision claims runtime changes shipped.
+
+
+Execution completed on the isolated `codex/workbench-responsiveness` branch;
+S4 was omitted and the S5 trial was rejected. See the
+[execution receipt](WORKBENCH_RESPONSIVENESS_EXECUTION_2026-09-18.md) for stage
+commits, verification, the OAuth Claude review, its corrected finding and release
+limitations. This records branch completion, not a production deployment.

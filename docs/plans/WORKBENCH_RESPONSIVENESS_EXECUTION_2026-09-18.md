@@ -20,8 +20,9 @@ part of this execution.
 Baseline: `2e611d9a42fd51f065da72a59e653500b5ae10da`.
 Branch: `codex/workbench-responsiveness`.
 Worktree: `/Users/gallivan/.codex/worktrees/workbench-responsiveness/WMKF_Apps`.
-Main checkout remains unchanged. Initial worktree contains no copied secret env
-files; installed dependencies are reused locally, not provider credentials.
+This task changes only the isolated worktree. The main checkout advanced with
+unrelated Explorer planning-document commits during execution; it remains clean.
+Initial worktree contains no copied secret env files; installed dependencies are reused locally, not provider credentials.
 
 ## Stage status
 
@@ -34,7 +35,7 @@ files; installed dependencies are reused locally, not provider credentials.
 | S3 Reviews continuity | Accepted | Retained children, guarded callbacks and response validation; evidence below |
 | S4 cache experiment | Omitted | No demonstrated incremental resource/journey beyond S1–S3 |
 | S5 code splitting | Trial rejected; import restored | 0.7135% initial gzip reduction, below predeclared 5% gate |
-| S6 final acceptance | In verification | Final checks and OAuth Claude adversarial review pending |
+| S6 final acceptance | Accepted | All checks green; OAuth Claude READY, finding corrected and Sol approved |
 
 ## Review and command records
 
@@ -50,8 +51,8 @@ external performance is UNKNOWN. Searching plan filename, Workbench responsivene
 and workbench-responsiveness across docs, memory, root instructions/session prompt
 and rules found only the plan before this receipt was created. Its frontmatter,
 summary, stages, acceptance and authorization were rewritten together. Existing
-Find/observability domain plans remain independent. Documentation gate results are
-pending; no whole-repository truth audit is claimed.
+Find/observability domain plans remain independent. Documentation gates passed at S0 and final verification; no whole-repository
+truth audit is claimed.
 
 ## Sol plan review — accepted by root
 
@@ -77,7 +78,7 @@ full branch diff using interactive OAuth/subscription authentication only. No
 API-key fallback or metered review product. Host `claude auth status` confirmed
 `authMethod: claude.ai`, subscription `max`; no tokens were read/exported. Recheck
 before launch. Luna fixes substantive findings, Sol reviews corrections, root
-accepts; two correction rounds before root adjudication. Review results pending.
+accepts; two correction rounds before root adjudication. Review completed; see the final adversarial-review record below.
 
 ## S0 accepted
 
@@ -235,3 +236,76 @@ broader splitting is justified. The probe remains for reproducibility.
 No 20-run timing comparison or production speedup is claimed. Deterministic
 held-response behavior is the accepted evidence for S1–S3; actual user timing is
 an explicit release-validation unknown. Neither conditional stage changes that.
+
+
+## S6 verification checkpoint
+
+[VERIFIED via commands] All **67 repository check scripts** passed sequentially,
+including each gate/self-test and types. The canonical build was rerun successfully
+after the rejected lazy-import candidate was restored. The final **9/9 browser
+journeys** passed: three responsiveness and six existing Program Director invitation
+flows. Final browser output: `/tmp/workbench-final-browser.log`; all-check/build
+output: `/tmp/workbench-final-gates.log`. At this pre-review checkpoint, full Jest was the accepted S3 runtime run:
+**974 suites / 14,321 tests**; the fixture correction changed no application source.
+The later Claude correction and its final rerun are recorded below.
+
+The broader browser run initially exposed an invitation fixture that omitted the
+resolver's `success:true` field, disabling context-dependent controls under S2.
+Luna added only that field, Sol traced the actual resolver/route contract and
+approved it, root reran all nine browser cases green, and committed `02627c2b`.
+No production permissions were weakened to accommodate a fixture.
+
+Root verified isolated branch status and main checkout cleanliness. Main's observed checkpoint
+`bdb2bd00` differs from this task's baseline only by unrelated Explorer plan changes;
+this task did not modify or promote main. No production deployment, schema change,
+package change or live API/provider call occurred. This checkpoint preceded the final OAuth review and root acceptance below.
+
+
+## Final Claude adversarial review and acceptance
+
+[VERIFIED via host CLI] A fresh Claude CLI session reviewed the complete branch
+read-only through OAuth (`authMethod: claude.ai`, subscription `max`), with a clean
+environment excluding provider API keys. `--safe-mode`, `--permission-mode plan`
+and read-only tool permissions prevented custom integrations or edits. No API-key
+fallback, Ultrareview or other metered review product was used. CLI model identifier:
+`claude-fable-5-1`. Exit 0, no tool permission denials; reviewer ran no tests/builds.
+Reviewed HEAD `02627c2b`, baseline `2e611d9a`; the reviewer noticed and inspected the
+one-line fixture commit that arrived during its review. Raw local result:
+`/tmp/workbench-claude-adversarial.json`, SHA-256
+`9d81b5347229fc93a0c9bab46666b86dd1bf2db7905e926fb4607930c786e2ef`.
+
+**Claude verdict: READY, one Low introduced finding, no blocker.** A triage POST
+failure was hidden when another row's successful POST started a same-context GET
+and advanced the GET generation. Luna removed that inappropriate generation check
+and added a two-row regression test. Fresh Sol `/root/sol_claude_fix` identified
+that the minimal removal weakened A→B→A command-error suppression. Root separated
+the context-change epoch from GET generations and added the round-trip case.
+Sol's final verdict was **READY** for both behaviors; reviewed two-file diff SHA-256:
+`42df651d58d85e4e7d990d45e0d284b8d5a79ca577a8e5093b5d0cb6666d4782`.
+Root accepts the source correction and the discriminating tests. Commit `d14ed625`.
+
+Final verification after that runtime correction: **42 focused tests**, **974 Jest
+suites / 14,323 tests**, lint, types, canonical build and **9/9 browser journeys**
+passed. Log: `/tmp/workbench-claude-fix-final.log`. All 67 repository checks passed
+at the S6 checkpoint; changed documentation gates were rerun after receipt edits.
+No open introduced finding remains. Stages S0–S3 and S6 are complete; S4 is omitted
+and S5's rejected trial is fully reverted. The worktree is committed on the feature
+branch; no push, main merge, deployment or live rehearsal is part of this task.
+
+Residual limits verified or acknowledged during review:
+
+- Production timing and revisit frequency are unknown. Held-response fixtures
+  prove request ordering and continuity; bundle estimates are not timing claims.
+- Existing reviewers-service request lookup catches errors and returns null
+  (`lib/services/review-manager/reviewers-service.js`, `fetchRequestByIdOrNumber`),
+  which can become successful empty data. Such a response legitimately replaces
+  a retained snapshot with empty content; the pre-existing server behavior is
+  unchanged by this client refactor.
+- Existing Proposal context failure leaves its loading placeholder beneath the
+  header error; independent documents can still load. No new context retry workflow
+  was introduced.
+
+Rollback uses the stage commits in reverse order and requires no database repair.
+Promotion still needs deliberate release validation against the target environment.
+No milestone-log entry is required: this is a local refactor with no production
+cutover, new production capability or persistence migration.
