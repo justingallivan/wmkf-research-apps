@@ -37,7 +37,6 @@ import {
 import { getModelForApp, getFallbackModelForApp } from '../../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { estimateCostCents } from '../../../lib/utils/usage-logger';
-import { LLMClient } from '../../../lib/services/llm-client';
 import {
   serializeDynamicsExplorerFieldValueForModel,
   serializeDynamicsExplorerRecordForModel,
@@ -59,6 +58,7 @@ import { trimConversation, compactMessages } from '../../../lib/services/dynamic
 import { MAX_RESULT_CHARS, TOOL_CHAR_LIMITS, sanitizeSelect, applyActiveOnlyFilter, isOperationalLogTable, stripEmpty, truncateResult, deriveRecordCount, getThinkingMessage } from '../../../lib/services/dynamics-explorer/result-shaping';
 import { checkRestriction, restrictedFieldsForTable, redactRestrictedFieldNames } from '../../../lib/services/dynamics-explorer/restriction-guard';
 import { getUserRole, getActiveRestrictions, logQuery } from '../../../lib/services/dynamics-explorer/explorer-store';
+import { callClaude, callClaudeBatch } from '../../../lib/services/dynamics-explorer/model-call';
 
 export const config = {
   api: {
@@ -401,51 +401,6 @@ export default async function handler(req, res) {
     res.off?.('close', handleDisconnect);
     if (!res.writableEnded && !res.destroyed) res.end();
   }
-}
-
-// ─── Claude API call ───
-
-/**
- * Call Claude API with streaming. Returns a parsed response object.
- * When onTextDelta is provided AND the response is text-only (no tool use),
- * text chunks are forwarded in real-time via the callback.
- *
- * @param {Object} opts
- * @param {Function} [opts.onTextDelta] - callback(text) for streaming text chunks
- * @returns {Promise<{content, model, usage}>}
- */
-async function callClaude({ apiKey, model, fallbackModel, systemPrompt, messages, tools, userProfileId, requestId, requestRound, signal, onTextDelta }) {
-  const claude = new LLMClient({
-    apiKey,
-    model,
-    fallbackModel,
-    appName: 'dynamics-explorer',
-    userProfileId,
-    requestId,
-    requestRound,
-  });
-  const r = await claude.stream({
-    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
-    messages,
-    tools,
-    maxTokens: 16000,
-    outputConfig: { effort: 'low' },
-    signal,
-    onTextDelta,
-  });
-  return {
-    content: r.content,
-    model: r.model,
-    usage: {
-      input_tokens: r.usage.inputTokens,
-      output_tokens: r.usage.outputTokens,
-      cache_creation_input_tokens: r.usage.cacheCreationTokens,
-      cache_read_input_tokens: r.usage.cacheReadTokens,
-    },
-    stopReason: r.stopReason,
-    refused: r.refused,
-    _textStreamed: r.textStreamed, // flag so the caller knows text was already sent
-  };
 }
 
 async function executeTool(name, input, sendEvent, userProfileId, restrictions = [], toolContext = {}) {
@@ -2100,33 +2055,6 @@ async function generateExcelExport(records, selectStr, tableName, filename, tota
 }
 
 // ─── AI Batch Processing ───
-
-/**
- * Non-streaming Claude API call for batch processing.
- * No tools, no text streaming — just returns raw text and usage.
- */
-async function callClaudeBatch({ systemPrompt, userMessage, userProfileId }) {
-  const claude = new LLMClient({
-    apiKey: process.env.CLAUDE_API_KEY,
-    model: getModelForApp('dynamics-explorer'),
-    appName: 'dynamics-explorer-export',
-    userProfileId,
-  });
-  const r = await claude.complete({
-    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: userMessage }],
-    maxTokens: 4096,
-  });
-  return {
-    text: r.text,
-    usage: {
-      input_tokens: r.usage.inputTokens,
-      output_tokens: r.usage.outputTokens,
-      cache_creation_input_tokens: r.usage.cacheCreationTokens,
-      cache_read_input_tokens: r.usage.cacheReadTokens,
-    },
-  };
-}
 
 /**
  * Run AI instruction on 1 sample record to determine output column names and preview.
