@@ -46,6 +46,16 @@ function response({ ok = true, status = 200, body = {} } = {}) {
   return { ok, status, json: async () => body };
 }
 
+// Match the existing dashboard rows envelope, including its server-input echo.
+function listResponse(url, proposals) {
+  const params = new URL(url, 'http://localhost').searchParams;
+  return response({ body: {
+    success: true, programId: params.get('programId') || '', cycleCode: params.get('cycleCode'),
+    scope: params.get('scope') || 'my', includeSetAside: params.get('includeSetAside') === '1',
+    proposals, rollup: { total: proposals.length, stages: {} },
+  } });
+}
+
 function deferred() {
   let resolve;
   const promise = new Promise((done) => { resolve = done; });
@@ -113,7 +123,7 @@ test('shows the signed-in PD request count for the selected cycle and set-aside 
       } });
     }
     if (String(url).startsWith('/api/workbench/dashboard?cycleCode=')) {
-      return response({ body: { proposals: [] } });
+      return listResponse(url, []);
     }
     return baseResponse(url);
   });
@@ -149,7 +159,7 @@ test('updates the personal count when a personal request moves into and out of S
       } });
     }
     if (String(url).startsWith('/api/workbench/dashboard?cycleCode=')) {
-      return response({ body: { proposals: setAside && !String(url).includes('includeSetAside=1') ? [] : [proposal()] } });
+      return listResponse(url, setAside && !String(url).includes('includeSetAside=1') ? [] : [proposal()]);
     }
     if (url === '/api/workbench/triage') {
       setAside = JSON.parse(options.body).triageStatus === TRIAGE_STATUS.SET_ASIDE;
@@ -195,9 +205,7 @@ test('keeps the personal count transition when set-aside visibility changes duri
       } }));
     }
     if (String(url).startsWith('/api/workbench/dashboard?cycleCode=')) {
-      return Promise.resolve(response({ body: {
-        proposals: serverSetAside && !String(url).includes('includeSetAside=1') ? [] : [proposal()],
-      } }));
+      return Promise.resolve(listResponse(url, serverSetAside && !String(url).includes('includeSetAside=1') ? [] : [proposal()]));
     }
     if (url === '/api/workbench/triage') {
       serverSetAside = JSON.parse(options.body).triageStatus === TRIAGE_STATUS.SET_ASIDE;
@@ -265,7 +273,7 @@ test('does not apply a delayed triage count patch after returning to the origina
       return Promise.resolve(response({ body: cycleBody('p1', true) }));
     }
     if (href.startsWith('/api/workbench/dashboard?cycleCode=')) {
-      return Promise.resolve(response({ body: { proposals: href.includes('programId=p1') ? [proposal()] : [] } }));
+      return Promise.resolve(listResponse(url, href.includes('programId=p1') ? [proposal()] : []));
     }
     if (url === '/api/workbench/triage') {
       triageStarted = true;

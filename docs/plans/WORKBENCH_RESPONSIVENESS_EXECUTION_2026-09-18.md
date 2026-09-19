@@ -29,7 +29,7 @@ files; installed dependencies are reused locally, not provider credentials.
 |---|---|---|
 | Plan revision | Fresh Sol review READY | Sol plan review below; local-first stages replace original cache-first plan |
 | S0 baseline | Accepted | Baseline evidence below |
-| S1 list continuity | Not started | Requires S0 and reviewed plan |
+| S1 list continuity | Accepted | Same-key retention and scoped early rows; evidence below |
 | S2 independent reads | Not started | Requires S1 acceptance |
 | S3 Reviews continuity | Not started | Requires S2 acceptance |
 | S4 cache experiment | Conditional; not selected | Requires incremental benefit over local fixes |
@@ -105,3 +105,29 @@ blanking with exactly one POST, one extra row GET and no extra cycles GET. Root
 accepted. S3 same-mount fixture belongs to S3 prerequisites; a cold-remount test
 was removed because it did not prove refresh continuity. No quantitative latency
 claim; comparative timing remains pending. Next: S1, Luna edits/Sol reviews.
+
+## S1 accepted
+
+Luna implemented the two-component change and focused tests. Sol `/root/sol_s1`
+identified cleanup generation, malformed/context response and browser assertion
+issues. Root took over bounded corrections after the review loop: preserved triage
+count patch/current-filter reload across filter changes; fenced obsolete errors;
+restored settled no-cycle empty state; required the existing server response's
+four context fields; and made synthetic fixtures reflect that actual envelope.
+No API/service/auth/dependency changes. A prior full run used auth settings intended
+for the browser and caused unrelated route failures; the accepted rerun uses the
+same minimal environment as S0. No unrelated code was changed to fix that run.
+
+Final Sol verdict READY; reviewed tracked diff SHA-256
+`635bb80160d017f6054f326694240272a85fa3d4aacf76f37626b8f16e8a70fd`, new panel-test hash
+`0eaf5603c4338a551acb4de7e860263e66245fa72b0672677ee6a2846f301124` at `c988bee2`.
+Reverified source response contract and each missing-field seeded-success test.
+Root final review accepted the unchanged triage semantics and tested stale races.
+
+Verification after final runtime/test edit: **58 focused tests**, **972 full Jest
+suites / 14,291 tests**, lint, types, canonical build and **2/2 browser tests** passed.
+Local output `/tmp/workbench-s1-accepted.log`. The browser proves rows render while
+matching cycle metadata is held, count/triage controls wait for that metadata, and
+triage retains rows with one POST + one row reload and no extra cycles GET. Other
+panels retain their prior cycle loading path. This is deterministic behavior
+proof, not a production latency claim. Next: Luna S2, fresh Sol review.

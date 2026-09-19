@@ -30,6 +30,10 @@ const STAGE_META = {
   done: { label: 'Sufficient coverage', cls: 'bg-green-100 text-green-800' },
 };
 
+function requestDataKey(programId, cycleCode, scope, includeSetAside) {
+  return JSON.stringify([programId || '', cycleCode || '', scope || '', includeSetAside === true]);
+}
+
 /**
  * Secondary metrics line under the request count: requests still at Find and
  * requests with sufficient review coverage. Returns null when neither applies
@@ -84,6 +88,8 @@ function TriageControl({ proposal, busy, onSet }) {
  * @param {boolean} props.includeSetAside
  * @param {Function} props.onScopeChange
  * @param {Function} props.onIncludeSetAsideChange
+ * @param {boolean} props.cycleMetadataReady  cycle metadata is for this program
+ * @param {boolean} props.allowRowsWhileCyclesLoading explicit URL row arm
  */
 export default function RequestListPanel({
   programId,
@@ -96,15 +102,24 @@ export default function RequestListPanel({
   includeSetAside,
   onScopeChange,
   onIncludeSetAsideChange,
+  cycleMetadataReady = true,
+  allowRowsWhileCyclesLoading = false,
 }) {
   const router = useRouter();
   const [proposals, setProposals] = useState([]);
   const [rollup, setRollup] = useState(null);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [error, setError] = useState(null);
+  const [errorKey, setErrorKey] = useState(null);
+  const [loadedKey, setLoadedKey] = useState(null);
   // Per-row triage flip: ids currently being saved disable only those controls.
   const [savingIds, setSavingIds] = useState(() => new Set());
   const filtersRef = useRef({ cycleCode, scope, includeSetAside, programId, cyclesGeneration });
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Load proposals whenever the selected cycle/scope/toggle changes. A monotonic
   // request id guards against a slower earlier fetch (e.g. a fast toggle) landing
@@ -113,20 +128,54 @@ export default function RequestListPanel({
   const loadProposals = useCallback(async (code, sc, incl, selectedProgramId) => {
     if (!code) return;
     const myReq = ++reqIdRef.current;
+    const loadKey = requestDataKey(selectedProgramId, code, sc, incl);
     setLoadingProposals(true);
     setError(null);
+    setErrorKey(null);
     try {
       const res = await fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(code)}&scope=${sc}&programId=${encodeURIComponent(selectedProgramId)}${incl ? '&includeSetAside=1' : ''}`);
       const body = await res.json().catch(() => ({}));
       if (reqIdRef.current !== myReq) return; // a newer request superseded this one
-      if (!res.ok) throw new Error(body.error || `Failed to load requests (${res.status})`);
+      if (!res.ok) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        const requestError = new Error(responseError || `Failed to load requests (${res.status})`);
+        requestError.status = res.status;
+        throw requestError;
+      }
+      if (!body || typeof body !== 'object' || !Array.isArray(body.proposals) || !body.rollup || typeof body.rollup !== 'object') {
+        const requestError = new Error('The request list response was malformed.');
+        requestError.clearSnapshot = true;
+        throw requestError;
+      }
+      const responseContext = [
+        ['programId', selectedProgramId],
+        ['cycleCode', code],
+        ['scope', sc],
+        ['includeSetAside', incl === true],
+      ];
+      const mismatched = responseContext.some(([key, expected]) => (
+        !Object.prototype.hasOwnProperty.call(body, key)
+        || (key === 'programId'
+          ? String(body[key]).toLowerCase() !== String(expected).toLowerCase()
+          : String(body[key]) !== String(expected))
+      ));
+      if (mismatched) {
+        const requestError = new Error('The request list response did not match the selected context.');
+        requestError.clearSnapshot = true;
+        throw requestError;
+      }
       setProposals(body.proposals || []);
       setRollup(body.rollup || null);
+      setLoadedKey(loadKey);
     } catch (e) {
       if (reqIdRef.current !== myReq) return;
       setError(e.message);
-      setProposals([]);
-      setRollup(null);
+      setErrorKey(loadKey);
+      if (e.status === 401 || e.status === 403 || e.clearSnapshot) {
+        setProposals([]);
+        setRollup(null);
+        setLoadedKey(loadKey);
+      }
     } finally {
       if (reqIdRef.current === myReq) setLoadingProposals(false);
     }
@@ -149,12 +198,23 @@ export default function RequestListPanel({
     const timer = window.setTimeout(() => {
       void loadProposals(cycleCode, scope, includeSetAside, programId);
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      reqIdRef.current += 1;
+    };
   }, [cycleCode, scope, includeSetAside, loadProposals, programId]);
 
   const selectedCycle = cycles.find((cycle) => cycle.code === cycleCode);
-  const myRequestCount = (selectedCycle?.myCount || 0)
-    + (includeSetAside ? selectedCycle?.mySetAsideCount || 0 : 0);
+  const myRequestCount = cycleMetadataReady
+    ? (selectedCycle?.myCount || 0) + (includeSetAside ? selectedCycle?.mySetAsideCount || 0 : 0)
+    : undefined;
+  const currentKey = requestDataKey(programId, cycleCode, scope, includeSetAside);
+  const currentKeyRef = useRef(currentKey);
+  currentKeyRef.current = currentKey;
+  const hasCurrentSnapshot = loadedKey === currentKey;
+  const visibleProposals = hasCurrentSnapshot ? proposals : [];
+  const visibleRollup = hasCurrentSnapshot ? rollup : null;
+  const visibleError = errorKey === currentKey ? error : null;
 
   // Flip a request's triage status, then refetch (a row may drop out of the
   // default view once Set aside). The server enforces the hard manage gate.
@@ -163,7 +223,9 @@ export default function RequestListPanel({
   const setTriage = useCallback(async (requestId, key) => {
     const triageStatus = key === 'advancing' ? TRIAGE_STATUS.ADVANCING : TRIAGE_STATUS.SET_ASIDE;
     const triageFilters = filtersRef.current;
-    const proposal = proposals.find((item) => item.requestId === requestId);
+    const triageKey = currentKey;
+    const triageGeneration = reqIdRef.current;
+    const proposal = visibleProposals.find((item) => item.requestId === requestId);
     const wasSetAside = proposal?.setAside === true;
     const isSetAside = triageStatus === TRIAGE_STATUS.SET_ASIDE;
     setSavingIds((prev) => {
@@ -188,17 +250,21 @@ export default function RequestListPanel({
           triageFilters.cyclesGeneration,
         );
       }
-      await loadProposals(current.cycleCode, current.scope, current.includeSetAside, current.programId);
+      if (mountedRef.current) {
+        await loadProposals(current.cycleCode, current.scope, current.includeSetAside, current.programId);
+      }
     } catch (e) {
+      if (!mountedRef.current || currentKeyRef.current !== triageKey || reqIdRef.current !== triageGeneration) return;
       setError(e.message);
+      setErrorKey(currentKey);
     } finally {
-      setSavingIds((prev) => {
+      if (mountedRef.current) setSavingIds((prev) => {
         const next = new Set(prev);
         next.delete(requestId);
         return next;
       });
     }
-  }, [loadProposals, patchCycleCounts, proposals]);
+  }, [currentKey, loadProposals, patchCycleCounts, visibleProposals]);
 
   return (
     <>
@@ -216,30 +282,39 @@ export default function RequestListPanel({
         </label>
       </div>
 
-      {rollup && (
+      {visibleRollup && (
         <div className="mb-6 text-sm">
           <p className="text-gray-900">
-            <span className="font-semibold">{rollup.total}</span> request{rollup.total === 1 ? '' : 's'}
+            <span className="font-semibold">{visibleRollup.total}</span> request{visibleRollup.total === 1 ? '' : 's'}
           </p>
-          {describeStageCounts(rollup.stages) && (
-            <p className="mt-0.5 text-gray-500">{describeStageCounts(rollup.stages)}</p>
+          {describeStageCounts(visibleRollup.stages) && (
+            <p className="mt-0.5 text-gray-500">{describeStageCounts(visibleRollup.stages)}</p>
           )}
         </div>
       )}
 
-      {error && (
-        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">{error}</div>
+      {visibleError && (
+        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+          <span>{visibleError}</span>{' '}
+          <button type="button" className="underline font-medium" onClick={() => loadProposals(cycleCode, scope, includeSetAside, programId)}>
+            Retry
+          </button>
+        </div>
       )}
 
-      {loadingCycles || loadingProposals || (!cycleCode && cycles.length > 0) ? (
+      {loadingProposals && hasCurrentSnapshot && (
+        <p className="mb-3 text-xs text-gray-500" role="status">Updating…</p>
+      )}
+
+      {visibleError && !hasCurrentSnapshot ? null : ((loadingCycles && !allowRowsWhileCyclesLoading) || (cycleCode && !hasCurrentSnapshot)) ? (
         <Card hover={false}><p className="text-gray-500">Loading…</p></Card>
-      ) : proposals.length === 0 ? (
+      ) : visibleProposals.length === 0 ? (
         <Card hover={false}>
           <p className="text-gray-500">No requests to show for this cycle and scope.</p>
         </Card>
       ) : (
         <div className="space-y-3">
-          {proposals.map((p) => {
+          {visibleProposals.map((p) => {
             const href = `/workbench/${p.requestId}?tab=reviewers&n=${encodeURIComponent(p.requestNumber)}`;
             return (
               <div
@@ -281,7 +356,7 @@ export default function RequestListPanel({
                     <div className="text-right shrink-0">
                       <StageChip stage={p.workRemaining} />
                       <ReviewerStatusIndicator reviewers={p.reviewers} />
-                      {p.canManage && (
+                      {cycleMetadataReady && p.canManage && (
                         <TriageControl proposal={p} busy={savingIds.has(p.requestId)} onSet={setTriage} />
                       )}
                     </div>

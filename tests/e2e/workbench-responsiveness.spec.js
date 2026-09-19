@@ -90,6 +90,7 @@ async function installApiFixture(page, {
   const requests = [];
   const unexpected = [];
   let cycleRowsCount = 0;
+  let cyclesResponseServed = false;
   let contextReads = 0;
   let releaseCycleRows;
   let releaseContext;
@@ -123,11 +124,12 @@ async function installApiFixture(page, {
       const hasCycle = url.searchParams.has('cycleCode');
       if (!hasCycle) {
         if (holdCycles) await cyclesReady;
+        cyclesResponseServed = true;
         return fulfill({ success: true, programId: PROGRAM_ID, defaultCycleCode: CYCLE, programs: [{ programId: PROGRAM_ID, name: 'Research' }], cycles: [{ code: CYCLE, label: 'June 2026', myCount: 1, mySetAsideCount: 0 }] });
       }
       cycleRowsCount += 1;
       if (holdCycleRows && cycleRowsCount > 1) await cycleRowsReady;
-      return fulfill({ success: true, programId: PROGRAM_ID, cycleCode: CYCLE, scope: url.searchParams.get('scope') || 'my', proposals: cycleRows, rollup: { total: cycleRows.length, stages: { find: cycleRows.length } } });
+      return fulfill({ success: true, programId: PROGRAM_ID, cycleCode: CYCLE, scope: url.searchParams.get('scope') || 'my', includeSetAside: url.searchParams.get('includeSetAside') === '1', proposals: cycleRows, rollup: { total: cycleRows.length, stages: { find: cycleRows.length } } });
     }
     if (path === '/api/workbench/triage' && request.method() === 'POST') return fulfill({ success: true });
     if (path === '/api/workbench/resolve-request') {
@@ -158,26 +160,33 @@ async function installApiFixture(page, {
     releaseCycleRows: () => releaseCycleRows(),
     releaseContext: () => releaseContext(),
     releaseCycles: () => releaseCycles(),
-    counts: () => ({ cycleRowsCount, contextReads }),
+    counts: () => ({ cycleRowsCount, contextReads, cyclesResponseServed }),
   };
 }
 
 test.describe('Workbench responsiveness baseline characterization', () => {
-  test('request list baseline waterfalls cycle metadata before rows and blanks during triage refresh', async ({ page, context }, testInfo) => {
+  test('request list retains rows during a same-key triage refresh', async ({ page, context }, testInfo) => {
     const baseURL = testInfo.project.use.baseURL || 'http://localhost:3100';
     await installStaffSession(context, baseURL);
     const fixture = await installApiFixture(page, { holdCycleRows: true, holdCycles: true });
 
     await page.goto(`${baseURL}/workbench?programId=${PROGRAM_ID}&cycleCode=${CYCLE}`);
     await expect.poll(() => fixture.requests.some((entry) => entry.path === '/api/workbench/dashboard')).toBe(true);
-    await expect(page.getByText('Loading…')).toBeVisible();
-    expect(fixture.counts().cycleRowsCount).toBe(0);
-    fixture.releaseCycles();
+    await expect.poll(() => fixture.counts().cycleRowsCount).toBe(1);
     await expect(page.getByText('#1002788')).toBeVisible();
+    expect(fixture.counts().cyclesResponseServed).toBe(false);
+    await expect(page.getByLabel('Grant cycle')).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Assigned to me', exact: true })).toBeVisible();
+    await expect(page.getByTitle('Set triage status')).not.toBeVisible();
+    fixture.releaseCycles();
+    await expect.poll(() => fixture.counts().cyclesResponseServed).toBe(true);
+    await expect(page.getByLabel('Grant cycle')).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Assigned to me (1)', exact: true })).toBeVisible();
+    await expect(page.getByTitle('Set triage status')).toBeVisible();
 
     await page.locator('select[title="Set triage status"]').selectOption('advancing');
-    await expect(page.getByText('Loading…')).toBeVisible();
-    await expect(page.getByText('#1002788')).toBeHidden();
+    await expect(page.getByText('#1002788')).toBeVisible();
+    await expect(page.getByText('Updating…')).toBeVisible();
     fixture.releaseCycleRows();
     await expect(page.getByText('#1002788')).toBeVisible();
     expect(fixture.counts().cycleRowsCount).toBe(2);
