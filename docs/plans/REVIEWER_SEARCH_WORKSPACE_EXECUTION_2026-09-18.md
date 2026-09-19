@@ -526,3 +526,44 @@ State, commands, outer Card and manual-add placement remain facade-owned.
 
 **Stage 2 verdict:** accepted by root. Stage 3 runtime movement remains blocked
 until its missing prerequisite tests are committed and freshly reviewed.
+
+
+## Prerequisite checkpoint before Stage 3
+
+[VERIFIED via current source, focused tests and fresh Sol review] At accepted
+Stage 2 `794423e4`, Luna added roster, real-SSE and save HTTP contract tests. Root
+made the final bounded corrections after review; no production code changed.
+
+- `reviewer-search-roster-contract.test.js`: five cases, including a populated
+  roster clearing immediately on a Blob-only change, deferred GET isolation and
+  observable unmount guard, exact timestamped removal/complements, and transient
+  active-exclusion rollback. Root's deliberate reset removal failed at the old
+  row visibility assertion; `/private/tmp/reviewer-roster-reset-mutation.log`.
+- `reviewer-search-stream-contract.test.js`: five cases with real fragmented UTF-8
+  streams, observable decoded progress, populated raw data removed from the POST,
+  ordered/awaited persistence, discovery and enrichment terminal-then-error
+  handling, and failure cases. Replacing pruning with identity failed on retained
+  raw `tierResults`; `/private/tmp/reviewer-search-stream-prune-mutation.log`.
+- P7's producer/pure-consumer/public-UI files plus shared fixture: 22 cases. The
+  producer uses real save, applicant promotion, roster route and projection
+  services; the recovery test also uses the real store row projection with SQL
+  mocked. Matching single-ordinary and finalized-applicant envelopes cover the
+  actual mixed click. Removing pre-response recovery failed the GET-count
+  assertion; `/private/tmp/reviewer-recovery-mutation.log`.
+- P7 corrections were bounded: root took over after two Luna correction rounds.
+  A formerly impossible mocked saved key was replaced by the actual store
+  projection. The ordinary non-suggestion row leaves `active` but has no saved
+  key, so recovery cannot confirm success or call `onSaved`; an empty roster
+  hides its action-local notice. These existing limitations are preserved and
+  now documented in the plan. No recovery policy was changed.
+- The review concern about missing stale refresh coverage was refuted by the
+  existing Stage 0 case `stale refresh stops issuing roster writes after the
+  first row` (deferred first POST followed by request change).
+- Fresh Sol `/root/sol_prerequisite_delta`: **READY** separately for Stage 3,
+  Stage 4 P4 and Stage 7 P7. Final focused run: **5 suites / 32 tests passed**;
+  `/private/tmp/reviewer-prereq-root-final.log`. Targeted lint passed.
+- All temporary mutations were restored byte-for-byte; facade diff is empty.
+  Stage 8 export tests are a separate draft/review obligation, not accepted here.
+
+**Prerequisite verdict:** commit these tests before Stage 3 callback extraction.
+Stage 3 and later runtime moves still require their own full G and fresh review.

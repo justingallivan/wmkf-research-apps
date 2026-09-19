@@ -218,6 +218,15 @@ No fixed LOC target overrides a cohesive function such as saveSelected.
    Characterize these three cases separately. This plan neither claims universal
    recovery nor authorizes adding it.
 
+   **Execution characterization [VERIFIED via real store projection and P7 tests]:**
+   `reviewer-roster-store.js` only emits saved keys whose row key matches the
+   suggestion anchor. A saved ordinary row retaining its original non-suggestion
+   key disappears from `active` without appearing in `savedKeys`. After a lost
+   response, the current UI can therefore remove that row without confirming
+   success or calling `onSaved`; when no cards remain, its action-local error
+   notice is also hidden. Preserve this existing limitation during decomposition.
+   A separate behavior fix is required before claiming universal recovery.
+
 **Stage 0 disposition: bounded fixes authorized before extraction.** Write deterministic
 reproductions against the unchanged implementation for items 1–5. In particular,
 an old exclusion rejection can insert request A's candidate into request B's active

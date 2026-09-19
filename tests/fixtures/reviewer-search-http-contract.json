@@ -1,0 +1,135 @@
+{
+  "ordinaryMixedSave": {
+    "success": true,
+    "savedCount": 1,
+    "savedNames": [
+      "Ordinary Saved"
+    ],
+    "savedKeys": [
+      "candidate:ordinary%20saved|email:applicant%40example.edu|orcid:-|affiliation:-"
+    ],
+    "totalRequested": 2,
+    "rejectedUnresolved": 1,
+    "errors": [
+      {
+        "name": "Ordinary Blocked",
+        "candidateKey": "candidate:ordinary%20blocked|email:applicant%40example.edu|orcid:-|affiliation:-",
+        "index": 1,
+        "error": "The reviewer address conflict was not recorded. Retry the check or create a repair request before promoting.",
+        "code": "conflict_record_unavailable",
+        "outcome": "withheld",
+        "remediation": [
+          {
+            "action": "retry_check",
+            "label": "Retry check"
+          },
+          {
+            "action": "create_repair_request",
+            "label": "Create repair request"
+          },
+          {
+            "action": "set_aside",
+            "label": "Set reviewer aside"
+          }
+        ]
+      }
+    ],
+    "results": [
+      {
+        "outcome": "saved",
+        "name": "Ordinary Saved",
+        "candidateKey": "candidate:ordinary%20saved|email:applicant%40example.edu|orcid:-|affiliation:-",
+        "index": 0,
+        "suggestionId": "SUGGESTION-1",
+        "potentialReviewerId": "PERSON-1",
+        "rosterFinalized": true
+      },
+      {
+        "name": "Ordinary Blocked",
+        "candidateKey": "candidate:ordinary%20blocked|email:applicant%40example.edu|orcid:-|affiliation:-",
+        "index": 1,
+        "error": "The reviewer address conflict was not recorded. Retry the check or create a repair request before promoting.",
+        "code": "conflict_record_unavailable",
+        "outcome": "withheld",
+        "remediation": [
+          {
+            "action": "retry_check",
+            "label": "Retry check"
+          },
+          {
+            "action": "create_repair_request",
+            "label": "Create repair request"
+          },
+          {
+            "action": "set_aside",
+            "label": "Set reviewer aside"
+          }
+        ]
+      }
+    ]
+  },
+  "applicantPartialPromotion": {
+    "success": true,
+    "suggestionId": "33333333-3333-3333-3333-333333333333",
+    "candidateKey": "roster:applicant",
+    "savedFields": [
+      "affiliation",
+      "email"
+    ],
+    "rosterFinalized": false,
+    "partialSuccess": true,
+    "contactError": null,
+    "emailAction": "ready",
+    "emailActionReason": "Address source: scholarly_multi"
+  },
+  "rosterRecovery": {
+    "active": [],
+    "excluded": [],
+    "ineligible": [],
+    "blocked": [],
+    "savedKeys": [],
+    "allNames": [
+      "Ordinary Saved"
+    ],
+    "handled": [],
+    "repairRequests": [],
+    "repairRequestsUnavailable": false,
+    "success": true
+  },
+  "ordinarySingleSave": {
+    "success": true,
+    "savedCount": 1,
+    "savedNames": [
+      "Ordinary Saved"
+    ],
+    "savedKeys": [
+      "candidate:ordinary%20saved|email:applicant%40example.edu|orcid:-|affiliation:-"
+    ],
+    "totalRequested": 1,
+    "results": [
+      {
+        "outcome": "saved",
+        "name": "Ordinary Saved",
+        "candidateKey": "candidate:ordinary%20saved|email:applicant%40example.edu|orcid:-|affiliation:-",
+        "index": 0,
+        "suggestionId": "SUGGESTION-1",
+        "potentialReviewerId": "PERSON-1",
+        "rosterFinalized": true
+      }
+    ]
+  },
+  "applicantFinalizedPromotion": {
+    "success": true,
+    "suggestionId": "33333333-3333-3333-3333-333333333333",
+    "candidateKey": "roster:applicant",
+    "savedFields": [
+      "affiliation",
+      "email"
+    ],
+    "rosterFinalized": true,
+    "partialSuccess": false,
+    "contactError": null,
+    "emailAction": "ready",
+    "emailActionReason": "Address source: scholarly_multi"
+  }
+}
