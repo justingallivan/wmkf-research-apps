@@ -37,6 +37,12 @@
  *   - slotsPopulated        : how many wmkf_potentialreviewer slots the applicant filled (null = unknown)
  *   - ingestLoading / ingestError / onRetryIngestion : applicant-reviewer ingestion state + retry (from ReviewerFindPanel)
  *   - onSaved               : optional callback after a successful save
+ *
+ * Ownership: this public facade owns the Stage 2 view contract and public
+ * defaults/exports. useReviewerSearchController owns state, lifecycle, and
+ * composition; operation hooks own commands; search view modules render; and
+ * existing reviewer-search-logic/sharedutils retain canonical policy;
+ * candidateKeys delegates to them.
  */
 
 import { Card } from '../Layout';

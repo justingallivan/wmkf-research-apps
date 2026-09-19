@@ -1,8 +1,11 @@
+/**
+ * Ownership: view module: renders search controls; controller owns state and operation hooks own commands.
+ */
 import ReviewerPromptOverridePanel from '../ReviewerPromptOverridePanel';
 import { Spinner } from './SearchPrimitives';
 
 // The search-card controls are a markup-only view. Workflow state and commands
-// remain owned by ReviewerSearchSection until the controller stage.
+// remain owned by useReviewerSearchController and the operation hooks.
 const SEARCH_SOURCES = [
   { key: 'pubmed', label: 'PubMed', icon: '📚', desc: 'Biomedical' },
   { key: 'arxiv', label: 'ArXiv', icon: '📄', desc: 'Physics, math, CS' },

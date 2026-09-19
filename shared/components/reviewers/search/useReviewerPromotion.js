@@ -1,3 +1,6 @@
+/**
+ * Ownership: operation hook: owns promotion/save commands; controller owns state and view modules render.
+ */
 import { useCallback } from 'react';
 import { readSseStream } from '../sse';
 import {

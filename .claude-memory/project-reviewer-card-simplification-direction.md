@@ -4,7 +4,7 @@ description: The card's 15 banners are a symptom of a matching layer with ~25 sc
 type: project
 status: active
 scope: reviewer
-last_verified: 2026-08-15 via current ReviewerSearchSection source, save gates, owner decisions, and the strategic-reset brief
+last_verified: 2026-09-18 for CandidateCard ownership and presentation; matching direction and owner decisions retain 2026-08-15 evidence
 ---
 
 ## Recall Rule
@@ -15,7 +15,7 @@ normalizer layer, fuzzy-matching work, institution comparison, or COI presentati
 ## Current truth
 
 - **Card simplification is not built.** `[VERIFIED via
-  shared/components/reviewers/ReviewerSearchSection.js, 2026-08-15]` The card still
+  shared/components/reviewers/search/CandidateCard.js, 2026-09-18]` The card still
   renders separate COI, identity, mismatch, relevance, and address warnings. The
   shared promotion/email helpers resolve blocking states, but there is no unified
   ready / needs-review / blocked band or one Details disclosure.

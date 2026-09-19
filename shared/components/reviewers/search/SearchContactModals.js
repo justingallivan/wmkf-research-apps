@@ -1,3 +1,6 @@
+/**
+ * Ownership: view module: renders contact modals; controller owns state and contact hooks own commands.
+ */
 import CandidateEditModal from '../CandidateEditModal';
 import { getCandidateEmailReadiness } from '../reviewer-search-logic';
 

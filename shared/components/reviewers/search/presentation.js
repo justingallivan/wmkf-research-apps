@@ -1,3 +1,6 @@
+/**
+ * Ownership: canonical helper module: owns reviewer-search presentation helpers; controller and operation/view modules consume them.
+ */
 import { leadSourceLabel } from '../ContactLeads';
 
 export function addressTrustFailureMessage(data, fallback) {

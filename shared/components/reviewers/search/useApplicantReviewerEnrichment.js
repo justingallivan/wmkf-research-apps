@@ -1,3 +1,6 @@
+/**
+ * Ownership: operation hook: owns applicant enrichment commands/effect; controller owns state and view modules render.
+ */
 import { useCallback, useEffect, useMemo } from 'react';
 import { readSseStream } from '../sse';
 import {

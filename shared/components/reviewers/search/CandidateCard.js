@@ -1,3 +1,6 @@
+/**
+ * Ownership: view module: renders a candidate card; controller owns state and operation hooks own commands.
+ */
 import { useState, useEffect, useRef, useId } from 'react';
 import { Pencil, RefreshCw, UserCheck, UserX } from 'lucide-react';
 import ContactLeads from '../ContactLeads';

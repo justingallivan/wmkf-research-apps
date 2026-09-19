@@ -145,12 +145,13 @@ instead of inferring one from identity confirmation or string equality.
 
 An identity-unresolved candidate is not selectable in the Find tab. The escape
 hatch is "✓ This is the right person → edit & add"
-(`shared/components/reviewers/ReviewerSearchSection.js:619-628`), which opens
-`CandidateEditModal` in `confirmMode`. That modal requires ticking "I've verified
+(`shared/components/reviewers/search/CandidateCard.js`), which opens
+`CandidateEditModal` in `confirmMode` through
+`shared/components/reviewers/search/SearchContactModals.js`. That modal requires ticking "I've verified
 this is the correct person" and always submits email/website/affiliation — "even
 an unchanged field is an explicit 'use this'" (`CandidateEditModal.js:134-150`).
 The client then stamps `emailSource: 'manual'`
-(`ReviewerSearchSection.js:1525`), and the server independently forces the same
+(`confirmIdentityContact` in `shared/components/reviewers/search/useReviewerContactActions.js`), and the server independently forces the same
 on the authoritative candidate before persisting
 (`pages/api/workbench/reviewer-roster.js:293-310`, field at `:296`).
 

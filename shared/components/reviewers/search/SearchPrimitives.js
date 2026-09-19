@@ -1,3 +1,6 @@
+/**
+ * Ownership: view primitives: renders shared reviewer-search UI; controller owns state and operation hooks own commands.
+ */
 export function Spinner() {
   return <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />;
 }

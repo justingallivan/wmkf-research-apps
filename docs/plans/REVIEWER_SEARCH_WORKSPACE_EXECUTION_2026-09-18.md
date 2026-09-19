@@ -2,7 +2,7 @@
 title: Reviewer Search Workspace Decomposition Execution Receipt
 domain: reviewers
 kind: execution-receipt
-status: active
+status: complete
 summary: Staged ReviewerSearchSection decomposition inventory, prerequisite coverage, and implementation acceptance evidence.
 canonical: false
 owner: product-engineering
@@ -39,7 +39,7 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–9 are accepted; Stage 10 remains planned. Stage receipts below distinguish completed evidence
+provider or external-state call was made. Stages 0–10 are accepted locally. No merge, deployment or live campaign rehearsal was performed. Stage receipts below distinguish completed evidence
 from historical checkpoints.
 
 ## Source-to-target map
@@ -795,3 +795,45 @@ canonical key wrapper are permitted. Both real-tree and mutation checks run in J
 - Final placed-test verification: **2 suites / 6 tests passed**, strict test lint
   passed. Temporary synthetic modules live outside the repository and are cleaned
   in finally. No runtime change belongs to this prerequisite commit.
+
+
+## Stage 10 — boundary and documentation closure accepted
+
+[VERIFIED via source, independent review and commands] The completed workspace
+has 19 modules under `shared/components/reviewers/search/`, behind the preserved
+public facade. Ownership headers identify presentation, orchestration and operation
+responsibilities. Active contact, promotion, applicant-cache and card memory
+pointers now name the extracted owners. Historical incident line references remain
+historical evidence rather than being rewritten as current implementation claims.
+
+- Root, Luna and fresh Sol `/root/sol_release_final` independently compared the
+  facade plus all 19 modules with `1fde149c`: runtime ASTs are unchanged by this
+  documentation stage. Sol returned **READY**, with a memory verification-date
+  clarification incorporated by root.
+- Final Gate G passed **71/71 commands**, including every package `check:*`
+  command, with gate/self-test pairs run serially. **971 suites / 14,272 tests**,
+  lint (zero errors), strict hook dependencies and canonical `npm run build`
+  passed. Evidence: `/private/tmp/reviewer-stage-10-gates/results.json`, completed
+  2026-09-19 04:34:55 UTC (2026-09-18 PT).
+- Root confirmed the final branch has no backend, API route, schema, package or
+  canonical server-helper changes. The Stage 9 browser evidence remains applicable
+  because Stage 10 changed comments only in runtime files.
+- Final plan/receipt status and memory metadata were reconciled after Gate G;
+  relevant documentation and memory gates were rerun separately before commit.
+
+**Stage 10 verdict:** accepted by root. Starting/rollback reference: `1fde149c`.
+**Local migration verdict:** all stages complete. The staged commits preserve the
+per-stage rollback boundaries recorded above; revert in reverse dependency order
+if a later review requires rollback. Do not delete extracted modules before their
+callers are restored. Stage 0 safety changes have their own commit and can be
+assessed separately from mechanical extraction.
+
+### Handoff limitations
+
+The canonical build and unit/gate suite are green locally. Browser comparison
+covers 13 mocked scenarios against the post-Stage-0 monolith, not live Dataverse,
+provider calls or full authenticated Next integration. Existing unknown-save and
+partial-success behavior documented above is preserved. Production promotion and
+any live campaign rehearsal require the separate release workflow. Temporary
+command logs and browser artifacts are local evidence; the checked-in tests and
+this receipt retain the durable acceptance record.

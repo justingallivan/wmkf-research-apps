@@ -461,11 +461,11 @@ outage. Findings, each source-verified:
    investigation in a single query.
 3. **Stale-cache replay without provenance (confirmed).** With a valid
    applicant-enrichment cache the panel restores `recPhase='done'` and
-   replays persisted verdicts (`ReviewerSearchSection.js:1376-1386`) with no
+   replays persisted verdicts from the `useApplicantReviewerEnrichment` cache restoration effect in `shared/components/reviewers/search/useApplicantReviewerEnrichment.js` with no
    indication of when they were produced. Related to the S397 enrichment-cache
    staleness backlog item.
 4. **Silent no-op button risk (latent).** `enrichRecommended()`
-   (`ReviewerSearchSection.js:1314`) early-returns without any state change
+   (the `enrichRecommended` operation in `shared/components/reviewers/search/useApplicantReviewerEnrichment.js`) early-returns without any state change
    when `blobUrl`/`proposalKey` are missing or a run is flagged in-flight; on
    a cache-restored 'done' panel a no-op click is indistinguishable from an
    instant successful run. (Did not bite in the observed run.)

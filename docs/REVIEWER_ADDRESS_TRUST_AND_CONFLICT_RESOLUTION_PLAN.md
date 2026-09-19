@@ -214,7 +214,7 @@ verify that new value. The explicit evidence-backed action is the distinction.
 
 ### The two promotion paths are real and must remain explicit
 
-`ReviewerSearchSection.saveSelected` partitions applicant-recommended candidates
+The `saveSelected` operation in `shared/components/reviewers/search/useReviewerPromotion.js` partitions applicant-recommended candidates
 from other candidates. Ordinary candidates call `save-candidates`; applicant
 candidates call `promote-applicant-reviewer`. The applicant service starts from
 an existing suggestion and exact person ID. The ordinary service generally

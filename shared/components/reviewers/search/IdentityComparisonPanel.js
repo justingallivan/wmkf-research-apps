@@ -1,3 +1,6 @@
+/**
+ * Ownership: view module: renders identity comparison; controller owns state and operation hooks own commands.
+ */
 import { IdentityDecision } from './SearchPrimitives';
 
 const IDENTITY_COMPARISON_REASON = {

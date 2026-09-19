@@ -1,3 +1,6 @@
+/**
+ * Ownership: state/lifecycle/composition hook: owns state, refs, reset/prefill effects, selection, and hook composition; operation hooks own commands and view modules render.
+ */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   buildEngagedSavedIndex,

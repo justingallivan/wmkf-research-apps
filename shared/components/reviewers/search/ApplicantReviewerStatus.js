@@ -1,3 +1,6 @@
+/**
+ * Ownership: view module: renders applicant status; controller owns state/lifecycle and operation hooks own commands.
+ */
 import { Card } from '../../Layout';
 import { Spinner } from './SearchPrimitives';
 

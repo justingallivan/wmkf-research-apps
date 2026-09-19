@@ -1,3 +1,6 @@
+/**
+ * Ownership: view module: renders handled reviewers; controller owns state and operation hooks own commands.
+ */
 import { Card } from '../../Layout';
 import { Pill } from './SearchPrimitives';
 import { REDISCOVERED_STAGE_LABELS } from '../../../utils/reviewer-rediscovery';

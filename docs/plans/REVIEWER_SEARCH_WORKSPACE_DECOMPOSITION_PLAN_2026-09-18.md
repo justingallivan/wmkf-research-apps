@@ -2,7 +2,7 @@
 title: Reviewer Search Workspace Decomposition Plan
 domain: reviewers
 kind: plan
-status: active
+status: complete
 summary: Authorized staged decomposition of ReviewerSearchSection into presentation and explicit workflow hooks, preserving HTTP, persistence, identity, and refresh contracts.
 canonical: false
 owner: product-engineering
@@ -16,15 +16,22 @@ related:
 
 ## 1. Decision, scope, and authorization
 
-**[PLANNED] Recommended refactor:** separate the Workbench Reviewers → Find
+**Chosen refactor:** separate the Workbench Reviewers → Find
 workspace's rendering, roster operations, search streams, applicant enrichment,
 contact remediation, and promotion reconciliation. Preserve the public
 `shared/components/reviewers/ReviewerSearchSection.js` entry point.
 
+**Execution status [VERIFIED via staged commits and checks]:** Stages 0–10 are
+accepted locally on `codex/reviewer-search-decomposition`, including boundary and
+documentation closure. Per-stage evidence, rollback references and
+mocked browser coverage are recorded in
+[the execution receipt](REVIEWER_SEARCH_WORKSPACE_EXECUTION_2026-09-18.md).
+Deployment and live campaign rehearsal remain outside this authorization.
+
 **Authorization updated 2026-09-18:** the owner authorized plan corrections and
 local implementation on an isolated branch, with Luna implementing, Sol reviewing,
 and the orchestrator accepting each stage. No merge, deployment or live writes are
-authorized. New paths remain proposed until recorded in the execution receipt. This is a maintainability/testability proposal,
+authorized. New paths remain proposed until recorded in the execution receipt. This is a maintainability/testability refactor,
 not a performance intervention, product redesign, or replacement state machine.
 
 **Baseline:** `b400c97d` on `main`, inspected 2026-09-18 PT. Line references below
@@ -626,4 +633,5 @@ and independently useful presentation stages. No API or paid review product was 
 The owner subsequently authorized implementation with Luna → fresh Sol → root
 acceptance. The execution receipt records the revised-plan review, stage commits,
 rollback references, tested assumptions, failures, corrections and remaining release
-limitations. Source has not changed merely because this plan was revised.
+limitations. The historical planning evidence in §9 describes the pre-implementation
+checkpoint; use the execution status above and the receipt for current local status.

@@ -1,3 +1,6 @@
+/**
+ * Ownership: operation hook: owns contact/address commands; controller owns state and view modules render.
+ */
 import { useCallback } from 'react';
 import { addressTrustFailureMessage } from './presentation';
 import {

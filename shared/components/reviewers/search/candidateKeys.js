@@ -1,3 +1,7 @@
+/**
+ * Ownership: helper wrapper module: existing reviewer-search-logic/sharedutils retain
+ * canonical key/provenance policy; this module delegates to them for consumers.
+ */
 import { dedupeReviewerCandidates, reviewerCandidateKey } from '../reviewer-search-logic';
 import { PROVENANCE_KINDS, provenanceKindOf } from '../../../../lib/utils/reviewer-provenance';
 

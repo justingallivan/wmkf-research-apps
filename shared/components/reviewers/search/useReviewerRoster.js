@@ -1,3 +1,6 @@
+/**
+ * Ownership: operation hook: owns roster loading command; controller owns state and view modules render.
+ */
 import { useCallback } from 'react';
 
 export default function useReviewerRoster({

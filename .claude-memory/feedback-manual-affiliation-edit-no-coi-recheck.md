@@ -12,7 +12,7 @@ metadata:
 
 ## Recall Rule
 
-When working on the reviewer on-card manual contact edit (`ReviewerSearchSection.setManualContact`
+When working on the reviewer on-card manual contact edit (`setManualContact` in `shared/components/reviewers/search/useReviewerContactActions.js`
 + `CandidateEditModal` local mode) or any future affiliation-edit affordance, do NOT gate or
 re-run institution-COI on a manually edited affiliation.
 

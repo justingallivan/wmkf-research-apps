@@ -1,3 +1,6 @@
+/**
+ * Ownership: projection hook: owns display/readiness derivations; controller owns state and operation hooks own commands.
+ */
 import { useMemo } from 'react';
 import { reviewerEngagementProjection } from '../../../utils/reviewer-engagement';
 import { partitionRediscoveredCandidates } from '../../../utils/reviewer-rediscovery';

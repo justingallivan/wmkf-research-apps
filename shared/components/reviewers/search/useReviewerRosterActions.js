@@ -1,3 +1,6 @@
+/**
+ * Ownership: operation hook: owns roster action commands; controller owns state and view modules render.
+ */
 import { useCallback } from 'react';
 import { pruneCandidateForRoster } from '../reviewer-search-logic';
 import { candKey, dedupeByName } from './candidateKeys';

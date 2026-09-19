@@ -1,3 +1,6 @@
+/**
+ * Ownership: operation hook: owns export command and side effects; controller owns state and view modules render.
+ */
 import { useCallback } from 'react';
 import { isCandidateSelectable } from '../reviewer-search-logic';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../../lib/utils/scholar-url';

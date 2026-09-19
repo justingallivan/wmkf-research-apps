@@ -1,3 +1,6 @@
+/**
+ * Ownership: view module: renders search results; controller owns state and operation hooks own commands.
+ */
 import { IdentityComparisonPanel } from './IdentityComparisonPanel';
 import { CandidateCard } from './CandidateCard';
 import { candKey, isApplicantOriginCandidate } from './candidateKeys';
@@ -15,7 +18,7 @@ const BLOCKED_REFERRAL_REASON = {
 };
 
 // The durable roster and this-run results are a markup-only view. Selection,
-// save, remediation and roster commands remain owned by the facade/controller.
+// save, remediation and roster commands remain owned by useReviewerSearchController and the operation hooks.
 export default function SearchResults({
   rosterNote,
   displayCandidates,
