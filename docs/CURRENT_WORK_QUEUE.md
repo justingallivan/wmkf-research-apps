@@ -48,6 +48,20 @@ sequence.
 | 12 | Pre-Research Presentation Brief: fourth governed artifact replacing the Pre-Site writeup as the Board distribution source | **[SHIPPED 2026-09-17 — PR #307 merged `f1cf8fe3`, hotfix PR #308 `9ab5fe71`, CI repair PR #309 `de349928`; migration 052 applied and read back.]** Owner decisions B1–B14 and Codex rounds in `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`. Follow-ups built S516 and **merged 2026-09-17**: PR #310 `0eba7358` (items 2–10), PR #311 `248233c7` (guarded regeneration of a sent brief), PR #312 `7f776e36` (review bundle PDF; migration 053 applied and read back exact). | ZZTEST-03 smoke run 2026-09-17 (plan §12): generate, lock, share with bundle, briefing page, drift detection, guarded regeneration pass. Email link confirmed by the owner. Finding A (snapshot hash mismatch) fixed in PR #313 `b5af962b`, deployed and smoked on ZZTEST-03 2026-09-17: Staff Brief download and same-version re-preview pass. **Met.** |
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
+  smoke).** `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
+  `VERCEL_URL` (the immutable deployment host), so any state-changing request made
+  through a Vercel alias such as `wmkfresearchapps-preview.vercel.app` returns 403
+  `Forbidden` while GETs pass. Seen on the Explorer chat POST during the
+  `integration/2026-09-19` Preview smoke; worked around with a branch-scoped Preview
+  `NEXTAUTH_URL` set to the alias origin. Pre-existing, not a regression. Fix
+  options: (a) document the branch-scoped `NEXTAUTH_URL` as the required step in the
+  Preview smoke runbook (`project-vercel-cli-deploy-preview-auth` and
+  `docs/AUTHENTICATION_SETUP.md`); (b) accept `VERCEL_BRANCH_URL` and a fixed
+  allowlist of registered alias origins alongside `VERCEL_URL`, never a request
+  header. Prefer (a) first; (b) widens a CSRF allowlist and goes through
+  `/contract-reconcile` under `docs/API_ROUTE_SECURITY_MATRIX.md`. Also remove the two
+  temporary Entra callbacks for retired Codex branch aliases while there.
 - **Dependabot triage 2026-09-12 (S509).** Patch bumps (Next 16.3.5, xmldom 0.8.15,
   sharp 0.35.4, qs 6.16.0, js-yaml 3.15.2/4.3.2) and csv-parse 7.0.2 (a mistaken major
   with no breaking changes; the IRS BMF importer's option set was smoke-tested but the
