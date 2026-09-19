@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S10 CANDIDATE / ROOT ACCEPTANCE PENDING]**. Root accepted S0–S10 after Sol review, full G and final diff audit. S10 source extraction and G are complete; fresh Sol review accepted conditionally on G, and root acceptance remains pending. User authorization covers all local stages; S0 is `546efff8`; S0–S9 are accepted below. No push, deployment or live rehearsal is authorized.
+Status: **[S0–S11 ACCEPTED LOCALLY — RELEASE BLOCKED]**. Luna built each stage, fresh Sol reviews accepted the work, and root completed final review and verified the recorded gates. The migration is complete on `codex/graph-service-decomposition`; no migration stage remains. Promotion requires the separately approved rehearsals and release decision specified in the S11 packet. No push, merge, deployment, or live rehearsal was performed.
 
 ## Contract-reconcile Step 0
 
@@ -386,7 +386,7 @@ No unresolved S8 contract finding remains. Root final review and G acceptance ar
 
 ## S9 execution receipt
 
-Status: **[S9 CANDIDATE / ROOT ACCEPTANCE PENDING]**. Baseline is accepted S8 commit `c8bf1848`; this candidate moves only `uploadFile`, `replaceFileContent`, and `deleteFile` into the existing `lib/services/graph/writes.js`, updates the explicit real-source boundary inventory, and keeps the public facade and callers unchanged. No upload-session move, dependency, environment, persistence, policy, live-service, deployment, or later-stage change was made.
+Status: **[S9 ACCEPTED]**. Baseline is accepted S8 commit `c8bf1848`; this stage moved only `uploadFile`, `replaceFileContent`, and `deleteFile` into the existing `lib/services/graph/writes.js`, updated the explicit real-source boundary inventory, and kept the public facade and callers unchanged. No upload-session move, dependency, environment, persistence, policy, live-service, deployment, or later-stage change was made.
 
 ### Contract-reconcile surface and invariants
 
@@ -449,7 +449,7 @@ Fresh Sol review **`sol_s9`** accepted the source extraction conditional on G, w
 
 ## S10 execution receipt
 
-Status: **[S10 CANDIDATE / ROOT ACCEPTANCE PENDING]**. Baseline is accepted S9 commit `1dad580e`; this candidate moves only `uploadFileLarge` into the new `lib/services/graph/upload-session.js`, updates the explicit real-source boundary inventory, and keeps the public facade and callers unchanged. No S11 closure, dependency, environment, persistence, policy, live-service, deployment, or later-stage change was made.
+Status: **[S10 ACCEPTED]**. Baseline is accepted S9 commit `1dad580e`; this stage moved only `uploadFileLarge` into the new `lib/services/graph/upload-session.js`, updated the explicit real-source boundary inventory, and kept the public facade and callers unchanged. No S11 closure, dependency, environment, persistence, policy, live-service, deployment, or later-stage change was made.
 
 ### Contract-reconcile surface and invariants
 
@@ -509,3 +509,90 @@ Every current `check:*` parent and available immediate self-test ran sequentiall
 ### Review and handoff
 
 Fresh Sol review **`sol_s10`** accepted the source extraction conditional on G, with no material finding. Root independently verified facade forwarding and the all-19-body parity result. No unresolved S10 contract finding remains after G. Root final review and G acceptance are complete; the commit introducing this receipt is the S10 checkpoint; rollback remains accepted S9 commit `1dad580e`. No live rehearsal, push, deployment, or merge is authorized; S11 is next.
+
+## S11 closure receipt
+
+Status: **[S11 ACCEPTED LOCALLY — RELEASE BLOCKED]**. Baseline is accepted S10 commit `7bf1ce2d`; this closure pass performs only proven source cleanup, boundary-inventory tightening, stale Graph documentation reconciliation, and release-packet evidence. No runtime behavior, public signature, dependency, environment, persistence, policy, live-service, deployment, merge, or push change is included. The commit introducing this closure receipt is the accepted S11 checkpoint; its exact hash is recorded in the final handoff.
+
+### Closure surface and source ownership
+
+The facade retains exactly 21 public static methods and the canonical `SHAREPOINT_CANONICAL_SITE_URL` export. Unused facade imports were removed after source-use verification. Headers now identify the physical Graph transport and state owners; `constants.js` owns immutable configuration, `versions.js` covers restore as well as reads, and `writes.js` covers folder and file writes. The Dynamics helper comment distinguishes its own transport from Graph's separate `graph/http.js` helper. Historical facade paths in error strings remain unchanged for caller compatibility.
+
+`tests/unit/graph-service-boundary.test.js` now inventories all real top-level Graph helpers, constants, and reset owners, with explicit physical `movedOwners` and public delegate maps. Private helpers remain private. The analyzer recognizes exported variable declarations, and the negative fixture appends duplicate helper/constant declarations to an in-memory facade copy; it passed without introducing duplicate imported identifiers or changing production runtime code. Boundary inventory result: **1 suite / 25 tests passed** (`/private/tmp/wmkf-graph-decomposition-logs/s11-boundary-inventory.log`). Root's supporting parity evidence also passed: all 21 facade signatures/default expressions/async flags and `buildHeaders` body against `710892ac`; all 14 leaf declarations; and all 19 moved operation bodies with only the permitted receiver substitution.
+
+### Durable sweep evidence
+
+| Surface | Classification and evidence |
+|---|---|
+| Graph source and service catalog | **AGREE / VERIFIED via current source and AST inventory.** The catalog lists the facade and physical Graph owners, including `upload-session.js`; Graph owns its transport and is outside the Dataverse interlock. |
+| `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` | **STALE sentence corrected.** The exact claim that Graph uses the Dynamics HTTP helper now identifies Graph's separate transport and the interlock's Dataverse scope. |
+| Telemetry catalog | **AGREE / unchanged.** Its two transport telemetry references are accurate and were not treated as an interlock claim. |
+| Consumer manifest | **HISTORICAL S0 baseline, dated 2026-09-19.** Its 124-file/233-match count is labelled baseline scope, not a current runtime inventory. |
+| Decomposition plan | **HISTORICAL stage specifications reconciled.** Current top status, section headings, implementation summary, recommendation table context, and tail identify S0–S11 as accepted locally and promotion as blocked. |
+| `SESSION_PROMPT.md` | **ROOT-OWNED handoff.** Root records local completion and the same release boundary separately from the stage commit. |
+| External environment, campaign window, last-known-good deployment, rollback operator | **UNKNOWN.** No live probe or external-state claim was made. |
+
+### Required gates and exact results
+
+The full Jest command was:
+
+```text
+npm test -- --runInBand --silent
+```
+
+It passed **984 suites / 14,482 tests / 1 snapshot**, exit 0, in 140.258 seconds. The accepted log is `/private/tmp/wmkf-graph-decomposition-logs/s11-full-jest.log`. This is compared with the S0 baseline of 984 suites / 14,480 tests: one test was added during S7 and one S11 inventory test was added here.
+
+The complete 37-suite named consumer command (Graph, lifecycle, artifact-version-history, document lifecycle, applicant/consultant attachments, external materials, upload/replacement/review-upload/cleanup/drain, and the real-facade bridges) passed **37 suites / 607 tests / 1 snapshot**, exit 0. Reproduction uses the complete 37-path consumer command recorded in the S0 test matrix above. The result summary is in `/private/tmp/wmkf-graph-decomposition-logs/s11-consumer-manifest.log`.
+
+Sequential configured gates passed:
+
+```text
+npm run check:types                         EXIT 0
+npm run lint                                EXIT 0
+npm run build                               EXIT 0
+all current check:* parents plus immediate self-tests, sequentially: 67 commands, EXIT 0
+```
+
+Logs are `/private/tmp/wmkf-graph-decomposition-logs/s11-check-types.log`, `s11-lint.log`, `s11-build.log`, and `s11-all-checks.log`. `git diff --check` passed. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
+
+After the canonical build, the existing fully mocked Mode A browser check ran against a local `next start` server with `NEXTAUTH_SECRET=e2e-throwaway-nextauth-secret-32-chars`, `NEXTAUTH_URL=http://localhost:3198`, and `E2E_PORT=3198`:
+
+```text
+npx playwright test tests/e2e/workbench-responsiveness.spec.js --project=chromium --reporter=line
+```
+
+It passed **3 tests**, exit 0, in 1.6 seconds. The server log records missing Postgres/Azure credentials while the app enforced auth; no external provider or live route was used. The first restricted-shell attempt was blocked before page execution by the host Chromium `MachPortRendezvousServer` permission boundary; the same test passed outside that boundary. Evidence: `/private/tmp/wmkf-graph-decomposition-logs/s11-modea-browser-escalated.log` and the initial bounded failure log `/private/tmp/wmkf-graph-decomposition-logs/s11-modea-browser.log`.
+
+### Five Mode A journeys and release limits
+
+1. **History and stale-request handling:** `tests/unit/artifact-version-history.test.js`, `tests/unit/document-lifecycle-boundary.test.js`, `tests/unit/graph-service-versions.test.js`, and the Initial Assessment artifact/version/control/route suites passed. Consumer suites use mocked dependencies; the dedicated Graph suites and `graph-service-consumer-contract.test.js` provide the real-facade transport bridge. Browser stale-request rendering remains outside these mocked checks.
+2. **Downloads and review bytes:** `tests/integration/review-manager-download-review.test.js`, `tests/unit/individual-review-file-service.test.js`, `tests/unit/workbench-download-proposal-document-service.test.js`, `tests/unit/review-upload.test.js`, and `tests/unit/graph-service-downloads.test.js` passed. Browser byte/content-header behavior remains unproven for live storage.
+3. **External uploads and registry identity:** `tests/unit/site-visit-materials-contributor-service.test.js`, `tests/unit/external-materials-routes.test.js`, `tests/unit/external-materials-routes-client.test.js`, `tests/unit/consultant-feedback-attachment-service.test.js`, `tests/unit/grantee-upload-service.test.js`, `tests/unit/grantee-replace-submission-service.test.js`, `tests/unit/graph-service-upload-large.test.js`, `tests/unit/graph-service-write-contract.test.js`, and `tests/unit/graph-service-consumer-contract.test.js` passed with mocked seams; the dedicated real-facade bridge additionally asserts exact request counts and registry identity. Real user/registry replay was not live.
+4. **Restore and publication identity:** `tests/unit/initial-assessment-controls-service.test.js`, `tests/unit/artifact-version-history.test.js`, `tests/unit/graph-service-versions.test.js`, and `tests/unit/graph-service-write-contract.test.js` passed. Tenant-level restore rehearsal was not performed.
+5. **Search throttle and incomplete response:** `tests/unit/dynamics-explorer-search-documents.test.js`, `tests/unit/dynamics-explorer-chat-characterization.test.js`, `tests/unit/graph-service-search-retry.test.js`, and `tests/unit/graph-service-consumer-contract.test.js` passed. No live browser/provider throttle loop was run.
+
+The available browser check covers mocked Workbench responsiveness only; no existing E2E harness covers all five Graph journeys. Browser live-provider, SharePoint, Dataverse, external-user, and Tier 2 campaign rehearsals remain uncovered. No approved external environment, campaign window, last-known-good deployment, or rollback operator was supplied, so those facts remain **UNKNOWN**. Local migration is complete and accepted by root; release remains blocked until the owner decision and approved rehearsals exist. No live probe, deploy, push, merge, or promotion was performed.
+
+### Blocked promotion packet — plan §6
+
+| Required field | Recorded state / action before promotion |
+|---|---|
+| Branch and candidate head | `codex/graph-service-decomposition`; S10 baseline `7bf1ce2d` plus the reviewed S11 working-tree diff. Root must record the accepted S11 commit after committing and verify a clean tree before any promotion. |
+| Approved rehearsal mode | Only local Mode A synthetic/mocked verification was authorized and run. Any external rehearsal mode and its authorization remain **UNKNOWN / REQUIRED**. |
+| Approved environment and fixtures | **UNKNOWN / REQUIRED**: name the SharePoint tenant/site/library, synthetic files, Dataverse and other affected targets, actors, and cleanup owner. An isolated Dataverse target does not isolate Graph. |
+| Expected side effects | **UNKNOWN until a specific rehearsal is approved**. Enumerate expected uploads, versions/restores, replacements/deletes, registry writes, and any downstream effects for the chosen journeys; record before/after identities. The local verification here caused no remote file or registry writes. |
+| Campaign window and promotion approval | **UNKNOWN / REQUIRED**: owner must choose timing and explicitly approve release after the required staff/external Tier 2 evidence is complete. |
+| Last-known-good deployment and rollback operator | **UNKNOWN / REQUIRED**: record the exact deployment/commit and named operator before promotion. Prior-session deployment records are not current evidence for this release. |
+
+Release is **BLOCKED** until these fields and required rehearsals are resolved.
+After a future release, rollback first restores the recorded previous deployment,
+then reconciles files, versions, and downstream receipts produced during the
+release interval. Code rollback does not reverse persisted state. Never delete
+uploaded files or version history automatically as part of rollback. Before any
+release, revert the rejected local stage and rerun G against its accepted predecessor.
+
+### Accepted history and rollback
+
+Accepted stage commits: S0 `546efff8`, S1 `77e94c0d`, S2 `7ff2f90f`, S3 `2addf72a`, S4 `c20b6538`, S5 `ac4a03b4`, S6 `0f5c90db`, S7 `4c6191d6`, S8 `c8bf1848`, S9 `1dad580e`, and S10 `7bf1ce2d`. S11 is accepted in the commit introducing this receipt. Its local rollback point is `7bf1ce2d`; any rollback must preserve unrelated work and rerun G before continuing. Code rollback does not undo any external state; no external state was changed by this local run.
+
+Fresh Sol review **`sol_s11`** accepted the S11 source/test closure and, after inspecting the completed evidence, accepted the final receipt and blocked-promotion packet with no material finding. Root's independent parity and forwarding checks are recorded above. Root completed final review and accepts S11. No unresolved local source or gate finding remains; external rehearsals and promotion remain separate owner-controlled work.

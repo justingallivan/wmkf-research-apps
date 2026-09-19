@@ -32,9 +32,16 @@ const REAL_SOURCE_OPTIONS = {
     methods: [
       ...METHODS,
       'isRetryableSearchStatus', 'parseRetryAfterMs', 'planSearchRetry', 'resetSearchCooldown',
+      'resetAuthCache', 'resetResolutionCaches', 'validatePath',
+      'clampApiTimeout', 'deadlineTimeoutError', 'remainingTimeoutMs',
+      'waitForPromiseWithin', 'safeEmitDependencyEvent', 'fetchWithTimeout',
+      'downloadRedirectBody',
     ],
     state: [
       ...STATE,
+      'GRAPH_BASE', 'API_TIMEOUT', 'DOWNLOAD_TIMEOUT', 'CACHE_TTL',
+      'SHAREPOINT_CANONICAL_SITE_URL', 'ALLOWED_SHAREPOINT_HOSTS', 'ALLOWED_LIBRARIES',
+      'MAX_VERSION_PAGES', 'MIN_VERSION_PAGE_BUDGET_MS',
       'SEARCH_MAX_ATTEMPTS', 'SEARCH_BACKOFF_CAP_MS', 'SEARCH_MAX_RETRY_WAIT_MS',
     ],
   },
@@ -74,6 +81,23 @@ const REAL_SOURCE_OPTIONS = {
     SEARCH_MAX_ATTEMPTS: `${GRAPH}/search.js`,
     SEARCH_BACKOFF_CAP_MS: `${GRAPH}/search.js`,
     SEARCH_MAX_RETRY_WAIT_MS: `${GRAPH}/search.js`,
+    resetAuthCache: `${GRAPH}/auth.js`,
+    resetResolutionCaches: `${GRAPH}/resolution.js`,
+    validatePath: `${GRAPH}/paths.js`,
+    clampApiTimeout: `${GRAPH}/http.js`,
+    deadlineTimeoutError: `${GRAPH}/http.js`,
+    remainingTimeoutMs: `${GRAPH}/http.js`,
+    waitForPromiseWithin: `${GRAPH}/http.js`,
+    safeEmitDependencyEvent: `${GRAPH}/http.js`,
+    fetchWithTimeout: `${GRAPH}/http.js`,
+    downloadRedirectBody: `${GRAPH}/downloads.js`,
+    GRAPH_BASE: `${GRAPH}/constants.js`,
+    API_TIMEOUT: `${GRAPH}/constants.js`,
+    DOWNLOAD_TIMEOUT: `${GRAPH}/constants.js`,
+    CACHE_TTL: `${GRAPH}/constants.js`,
+    SHAREPOINT_CANONICAL_SITE_URL: `${GRAPH}/constants.js`,
+    ALLOWED_SHAREPOINT_HOSTS: `${GRAPH}/constants.js`,
+    ALLOWED_LIBRARIES: `${GRAPH}/constants.js`,
   },
   delegates: {
     getAccessToken: { target: `${GRAPH}/auth.js`, binding: 'getAccessToken' },
@@ -298,6 +322,19 @@ test('the real search inventory rejects duplicate retry helpers and cooldown con
   expect(errors).toEqual(expect.arrayContaining([
     expect.stringContaining('method owner isRetryableSearchStatus: expected one owner'),
     expect.stringContaining('state owner SEARCH_MAX_ATTEMPTS: expected one owner'),
+  ]));
+});
+
+test('the complete real-source inventory rejects duplicate helper and constant owners', () => {
+  const sources = sourceMapFromRoot(path.resolve(__dirname, '../..'));
+  expect(analyzeSources(sources, REAL_SOURCE_OPTIONS).errors).toEqual([]);
+  const mutatedSources = new Map(sources);
+  mutatedSources.set(FACADE, `${sources.get(FACADE)}
+    function downloadRedirectBody() {} const CACHE_TTL = 1;`);
+  const errors = analyzeSources(mutatedSources, REAL_SOURCE_OPTIONS).errors;
+  expect(errors).toEqual(expect.arrayContaining([
+    expect.stringContaining('method owner downloadRedirectBody: expected one owner'),
+    expect.stringContaining('state owner CACHE_TTL: expected one owner'),
   ]));
 });
 

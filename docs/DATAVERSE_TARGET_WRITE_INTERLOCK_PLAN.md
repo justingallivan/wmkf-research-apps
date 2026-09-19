@@ -287,11 +287,11 @@ since 2026-07-22.]**
    exported `shouldInspectDataverseUrl(url)`, which inspects registry hosts,
    `*.crm.dynamics.com`, and any host matching the current
    `DYNAMICS_URL`/`DYNAMICS_SANDBOX_URL` (so a repointed env is never silently
-   skipped); parseable non-Dataverse hosts (the `login.microsoftonline.com`
-   token endpoint; this helper is also used by `graph-service.js` per the
-   comment at `http.js:27`) no-op with no logging, and unparseable URLs flow
-   into the classify/deny path (fail closed). Hook sites therefore call the
-   assert unconditionally.
+   skipped); parseable non-Dataverse hosts such as the
+   `login.microsoftonline.com` token endpoint no-op with no logging. Graph
+   uses its separate `lib/services/graph/http.js` transport and is outside
+   this Dataverse interlock. Unparseable URLs flow into the classify/deny path
+   (fail closed). Hook sites therefore call the assert unconditionally.
 2. **`call()` in `lib/dataverse/client.js:67`** (skip when `dryRun`; the token
    fetch at `client.js:44` doesn't go through `call` and needs no hook). This
    also puts schema-apply scripts and any future `createClient` consumer under

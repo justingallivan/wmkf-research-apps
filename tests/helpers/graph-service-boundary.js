@@ -93,8 +93,9 @@ function topLevelDeclarations(ast) {
     if (node.type === 'FunctionDeclaration' && node.id?.name) {
       methods.set(node.id.name, (methods.get(node.id.name) || 0) + 1);
     }
-    if (node.type === 'VariableDeclaration') {
-      for (const declaration of node.declarations) {
+    const variableNode = node.type === 'ExportNamedDeclaration' ? node.declaration : node;
+    if (variableNode?.type === 'VariableDeclaration') {
+      for (const declaration of variableNode.declarations) {
         if (declaration.id.type === 'Identifier') vars.set(declaration.id.name, (vars.get(declaration.id.name) || 0) + 1);
       }
     }

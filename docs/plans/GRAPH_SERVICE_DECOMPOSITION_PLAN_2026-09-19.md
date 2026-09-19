@@ -4,22 +4,22 @@ domain: architecture
 kind: plan
 status: active
 owner: product-engineering
-summary: "Authorized local migration: staged extraction of GraphService behind its existing public facade, with characterization prerequisites and independent review checkpoints."
+summary: "S0–S11 accepted locally: GraphService extracted behind its existing facade; stage evidence retained, promotion blocked pending approved rehearsals and owner decision."
 ---
 
 # GraphService and SharePoint transport decomposition
 
 ## 1. Decision and execution boundary
 
-**Recommendation:** decompose `lib/services/graph-service.js` into responsibility-specific modules behind its existing public facade. This is the largest justified **unplanned shared-service refactor found in the bounded survey**, measured by cross-capability impact, unrelated responsibilities, and migration risk—not the longest file or an assertion that every possible refactor has been ranked.
+**Accepted scope:** decompose `lib/services/graph-service.js` into responsibility-specific modules behind its existing public facade. This is the largest justified **unplanned shared-service refactor found in the bounded survey**, measured by cross-capability impact, unrelated responsibilities, and migration risk—not the longest file or an assertion that every possible refactor has been ranked.
 
-**Status: [LOCAL EXECUTION / S10 ACCEPTED — ROOT ACCEPTANCE PENDING].** The planning-only statement below is historical to the planning session. The current user authorization covers the local S0–S11 migration sequence on the isolated `codex/graph-service-decomposition` branch, with stage gates and root acceptance. S10 is the upload-session owner extraction behind the unchanged GraphService facade; S0–S9 are accepted locally and S10 awaits root acceptance. No live probe, deployment, infrastructure, dependency, or migration work is authorized.
+**Status: [S0–S11 ACCEPTED LOCALLY — RELEASE BLOCKED].** The local migration is complete on `codex/graph-service-decomposition`, with Luna builds, fresh Sol reviews, and root acceptance at each stage. The original planning specifications below remain an execution record; no migration stage remains. The public facade is now 288 lines with 21 unchanged static methods and 11 internal ownership modules. Verification and the blocked promotion packet are in the execution receipt. No push, merge, deployment, live rehearsal, infrastructure, dependency, or data migration was performed.
 
-Evidence baseline: `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`, 2026-09-19. Line references below refer to that baseline; symbols control if lines drift. Before implementation, compare the current source against this baseline and re-review changed assumptions. Stage specifications and target labels below describe the original baseline proposal. Current completed modules/tests and acceptance evidence are recorded in `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`; S0–S8 are accepted locally.
+Evidence baseline: `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`, 2026-09-19. Line references below refer to that baseline; symbols control if lines drift. The stage specifications and target labels below are historical baseline proposal text. Current completed modules/tests and acceptance evidence are recorded in `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`; S0–S11 are accepted locally.
 
-### Why this scope
+### Why this scope — historical survey
 
-[VERIFIED via tracked-source line census and CodeGraph/source] GraphService is 1,641 lines with 21 public static methods and the named `SHAREPOINT_CANONICAL_SITE_URL` export. It combines authentication, mutable caches, target resolution, file reads, version history/restoration, downloads/PDF conversion, search throttling, folder creation, simple/chunked uploads, conditional replacement, deletion, and per-attempt telemetry. Callers span governed writeups, external materials, reviewer files, Explorer, grantee files, and the intake drain. Changes to one concern currently require reviewing a file that also controls all the others.
+[VERIFIED at the survey baseline via tracked-source line census and CodeGraph/source] GraphService was 1,641 lines with 21 public static methods and the named `SHAREPOINT_CANONICAL_SITE_URL` export. It combined authentication, mutable caches, target resolution, file reads, version history/restoration, downloads/PDF conversion, search throttling, folder creation, simple/chunked uploads, conditional replacement, deletion, and per-attempt telemetry. Callers span governed writeups, external materials, reviewer files, Explorer, grantee files, and the intake drain. At that baseline, changes to one concern required reviewing a file that also controls all the others.
 
 | Candidate surveyed | Baseline evidence | Selection reasoning |
 |---|---|---|
@@ -77,9 +77,11 @@ This is a code-contract audit, not a claim that tenant permissions, production d
 
 Whole-flow: representative critical consumers traced above; S0 builds the full caller/test manifest before code moves. Partial success: version-page salvage, upload/readback ambiguity, folder partial creation, upload/registry split, and restore/registry split are explicit test requirements below. Async: token generation fencing, shared promises, process cooldown, and existing component generation guard are preserved; no claim is made that every current caller has perfect cancellation. Helper extraction: permitted mechanics below, preserved-difference list C3–C11. Durable surfaces: no new table/entity/route/enum; migration manifest and API matrix changes are N/A unless scope changes. Documentation: this proposal adds no shipped-state claim; adjacent restatements are classified in §8. Symbol-consumer fan-out: no new values; retain all current `versionId`, `hasMore`, `status`, `retryAfterMs`, and error fields, with reader assertions rather than writer-only tests.
 
-## 3. Target ownership and mechanical move rules
+## 3. Target ownership and mechanical move rules — historical baseline specification
 
-All destinations below are **[PLANNED]** beneath `lib/services/graph/`. The original facade path remains permanently supported. No barrel module is needed.
+The ownership table and mechanical rules in this section describe the accepted S0 proposal and staged implementation boundaries. The local migration has now completed S0–S11; the current physical ownership is verified in source and the S11 execution receipt.
+
+All destinations below were the **[PLANNED]** baseline beneath `lib/services/graph/`; they are now implemented locally. The original facade path remains permanently supported. No barrel module was added.
 
 | Destination | Exact ownership | First stage |
 |---|---|---|
@@ -101,12 +103,12 @@ Use the existing Dynamics decomposition only as a structural reference for expli
 
 Permitted mechanics: move declarations; fix relative imports; convert static methods to functions; add receiver parameter and replace `this.` accesses with `svc.`; add explicit facade delegates; move reset statements into owner reset functions; re-export the same canonical URL. No other body edits. Keep nested closures with their parent method. Keep literals/default parameters at their current evaluation points, including method-local upload limits.
 
-Example **[PLANNED]**: retain the original explicit signature and async nature on the facade, forwarding arguments to `files.listFiles(this, ...)`. Preserve default-argument behavior, promise rejection behavior, method arity, and call-time environment evaluation. `buildHeaders` remains the original synchronous facade method. `clearCaches` remains synchronous. Never bind a captured facade method at module load; spies and subclass receivers must continue to work.
+The accepted implementation retains the original explicit signature and async nature on the facade, forwarding arguments to extracted functions with the facade receiver. It preserves default-argument behavior, promise rejection behavior, method arity, and call-time environment evaluation. `buildHeaders` remains the original synchronous facade method. `clearCaches` remains synchronous. No extracted module binds a captured facade method at module load; spies and subclass receivers continue to work.
 
-For destructured options, forward the already destructured values, not the raw original argument: reading an options getter twice would be a behavior change. For example:
+For destructured options, the implementation forwards the already destructured values, not the raw original argument: reading an options getter twice would be a behavior change. The accepted facade pattern is:
 
 ```js
-// PLANNED facade wrapper; the extracted function receives svc first.
+// Accepted facade wrapper; the extracted function receives svc first.
 static async getFileMetadataById(
   driveId,
   itemId,
@@ -120,13 +122,13 @@ Pin getter call count/order, missing/undefined/null options, and rejected-Promis
 
 Intermediate cache ownership: S2 replaces only auth reset statements with `resetAuthCache()` while other resets remain local. S3 replaces only site/drive resets. S7 replaces search resets, producing the final synchronous reset sequence. At no point may old and new modules each own a cache/promise/cooldown copy.
 
-## 4. Tests required before moving code
+## 4. Tests required before moving code — historical baseline and current regression map
 
 **S0 is a tests-only preparation stage. All new behavior characterizations below must pass against the unchanged monolith before S1 begins.** New architecture assertions may initially allow the monolith and grow only with the staged target inventory. They must not require nonexistent destination modules at S0.
 
 [VERIFIED via planning-session Jest run] Existing suites: `tests/unit/graph-service-folders.test.js`, `graph-service-versions.test.js`, `graph-service-search-retry.test.js`, `graph-service-upload-large.test.js`, and `graph-service-observability.test.js`: **5 suites / 64 tests passed**. This proves their current assertions, not complete migration coverage.
 
-All additional filenames in this section are **[PLANNED]**, under `tests/unit/`. Extend an existing suite where it already owns the concern; do not duplicate a passing scenario merely to hit a target test count. Tests call the public facade and mock the lowest external seam (`global.fetch`, clock, telemetry), not the implementation being extracted. Install an unexpected-network rejection in every new fixture.
+The original test rows in this section are **[PLANNED]** historical prerequisites under `tests/unit/`; the current execution receipt records the completed S0–S11 checks. Extend an existing suite where it already owns the concern; do not duplicate a passing scenario merely to hit a target test count. Tests call the public facade and mock the lowest external seam (`global.fetch`, clock, telemetry), not the implementation being extracted. Install an unexpected-network rejection in every new fixture.
 
 | Test package | Mandatory cases before S1 | Used by stages |
 |---|---|---|
@@ -153,9 +155,9 @@ Boundary checker recipe **[PLANNED]**: create only `tests/helpers/graph-service-
 
 Static assertions supplement public contract tests; they do not establish behavior parity alone. Keep implementation bounded to this source-map analyzer and fixtures; if resolving actual import shapes requires a broader framework, stop S0 and re-plan that check rather than weakening its claimed coverage.
 
-### Consumer suite manifest
+### Consumer suite manifest — historical S0 baseline scope
 
-S0 creates **[PLANNED] `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`**, the single execution receipt used throughout S0–S11. Before S1, that committed receipt must list consumers discovered from the public import, re-exports, dependency wrappers, and raw methods. Use CodeGraph then targeted `rg` for shapes it omits. Include these **existing** minimum suites, confirming current filenames:
+S0 created `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`, the single execution receipt used throughout S0–S11. This paragraph records the baseline consumer discovery from the public import, re-exports, dependency wrappers, and raw methods; it is historical evidence, not an instruction to repeat S0. The tracked manifest is explicitly dated and scoped to that baseline. The named minimum suites remain the regression set:
 
 - `initial-assessment-artifact-versions`, `initial-assessment-controls-service`, `workbench-initial-assessment-versions-route`, `artifact-version-history`.
 - `site-visit-materials-contributor-service`, `external-materials-routes`, `external-materials-routes-client`, `consultant-feedback-attachment-service`.
@@ -163,9 +165,11 @@ S0 creates **[PLANNED] `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09
 - `document-lifecycle-boundary` (every stage: its dependency traversal reaches Graph).
 - `individual-review-file-service`, `review-upload`, `sharepoint-cleanup`, `cycle-dossier-sharepoint`, `grantee-upload-service`, `grantee-replace-submission-service`, `drain-files-moved-helpers`, `drain-record-failure`.
 
-These names resolve to `tests/unit/<name>.test.js`. Also include `tests/integration/review-manager-download-review.test.js`. Existing tests that mock Graph entirely prove consumer contracts but cannot prove the extraction. Add `graph-service-consumer-contract.test.js` **[PLANNED]** with real Graph facade + mocked fetch and mocked persistence for (a) partial version history to caller DTO, (b) upload identity to candidate/registry fields, (c) throttle error to Explorer `incomplete`/cooldown response. No real token, Blob, Graph, Dataverse, malware scan, or LLM call.
+These names resolve to `tests/unit/<name>.test.js`. Also include `tests/integration/review-manager-download-review.test.js`. Existing tests that mock Graph entirely prove consumer contracts but cannot prove the extraction. The implemented `graph-service-consumer-contract.test.js` uses the real Graph facade with mocked fetch and mocked persistence for (a) partial version history to caller DTO, (b) upload identity to candidate/registry fields, and (c) throttle error to Explorer `incomplete`/cooldown response. No real token, Blob, Graph, Dataverse, malware scan, or LLM call.
 
-## 5. Stage-by-stage migration instructions
+## 5. Stage-by-stage migration instructions — historical baseline specification
+
+The stage table below records the accepted execution plan and its original prerequisites/order. S0–S11 are complete locally; current results, exact commands, and acceptance evidence live in the execution receipt.
 
 Every stage starts from the previous accepted commit. One builder owns files; one reviewer is read-only. No parallel gate runs in the same worktree. A red prerequisite blocks that stage. **“Green” means the exit commands actually ran successfully, including the canonical build; presumed equivalence is insufficient.** Stop after two unsuccessful correction/review rounds and escalate the concrete disagreement rather than widening scope.
 
@@ -245,7 +249,7 @@ Accepted commit / rollback commit / next allowed stage:
 
 The builder opens only the current stage plus global invariants/test map. It must not prebuild later modules “while nearby,” rewrite error handling, auto-fix unrelated lint, or regenerate expectations without explanation. On stale baseline, missing prerequisite, unexplained source difference, red gate, or unresolved material review finding: stop the stage, report evidence, retain the last accepted green commit.
 
-## 8. Planning evidence, limits, and review receipts
+## 8. Planning evidence, limits, and review receipts — historical
 
 **Planning validation actually run (historical):** all 38 `check:*` gates and 29 self-tests passed during the planning session; five Graph suites / 64 tests passed against unchanged runtime code. Document currency, symbol references, build-claim freshness, fact consistency, canonical pointers, catalog, scaffolding and secret checks plus their defined self-tests passed after staging the plan; harness-framing and its self-test also passed. Existing consumer-suite filenames were checked on disk, and the staged diff passed whitespace checks. These gates have bounded registries/scan roots; they do not independently prove every plan statement. The full application build, full Jest suite, and new S0 prerequisites were intentionally left to the now-authorized S0 execution; tenant probes and browser rehearsals remain outside S0.
 
@@ -277,7 +281,7 @@ The subscription/OAuth Claude Opus review of the original plan returned **READY 
 
 Amendment checkpoint P4: fresh `amendment_review`, no inherited history, returned **ACCEPT** after checking the amended plan against `877b84c9` and current source, including the final C9 qualification. It verified the analyzer recipe, body-comparison procedure, upload branches, bounded coverage/release obligations, receiver mutations, suite names, type-check scope and transport distinction. Source-only review; no tests, gates, build or live calls. It did not independently re-audit unchanged consumer flows or the original Opus transcript. Amendment validation: nine relevant document/security gates and eight defined self-tests passed; whitespace checks passed. Only this plan changed.
 
-### Recommendation evidence
+### Recommendation evidence — historical planning record
 
 | Recommendation | Current prerequisite / execution availability | Tested evidence | Disconfirming check / status |
 |---|---|---|---|
@@ -286,4 +290,4 @@ Amendment checkpoint P4: fresh `amendment_review`, no inherited history, returne
 | Freeze metadata/error differences | Source branches C5–C11 exist today | Existing version/observability tests, additional cases required | Differential fixtures that disagree after permitted rewrites block stage. **[PLANNED]** |
 | Promote after isolated rehearsal | Release policy requires Tier 2 evidence; tenant rehearsal availability unknown | No release experiment performed | Missing safe target/rehearsal/owner promotion means release blocked. **[UNKNOWN until release preparation]** |
 
-Final planning verdict (historical): **READY TO IMPLEMENT after implementation authorization and S0 prerequisites**. The original three planning checkpoints and fresh amendment checkpoint P4 completed; their named corrections are incorporated, with Opus dispositions recorded above. The current user authorization now covers the local S0–S11 sequence; S0–S9 are accepted and S10 is a G-green candidate pending root acceptance; subsequent stages retain their specified tests, G and fresh-review prerequisites. No release, push, deployment, or live rehearsal is authorized by this local execution.
+Final planning verdict (historical): **READY TO IMPLEMENT after implementation authorization and S0 prerequisites**. The original three planning checkpoints and fresh amendment checkpoint P4 completed; their named corrections are incorporated, with Opus dispositions recorded above. Current execution status is S0–S11 accepted locally; promotion remains blocked pending the separate requirements in the S11 release packet. No release, push, deployment, or live rehearsal is authorized by this local execution.
