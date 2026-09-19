@@ -1,15 +1,100 @@
-# Session 522 Prompt: Governed document refactor deployed; handoff complete
+# Session 523 Prompt: Reviewer search refactor deployed; follow-ups separated
 
-## Reviewer Search follow-up handoff — 2026-09-18 PT
+## Session 522 Summary
 
-The reviewer search decomposition is deployed (runtime release `e332ad84`, release
-record `8da7f595`). Future work is recorded separately in
-`docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md`: uncertain-save recovery,
-exclusion rollback, stream cancellation, and proposal-key reset semantics.
-The same document has a **separate Impeccable section** for five preserved 11px
-notes and the two-file exception (`59184b39`). These are follow-up candidates,
-not authorization for implementation or live writes. Read current source and
-characterization tests before picking one. No refactor stage remains unfinished.
+[VERIFIED via source, tests, Git, Vercel and signed-in browser checks] Completed
+ReviewerSearchSection decomposition, Stages 0–10, into 19 focused modules behind
+the same public facade. Stage 0 fixed stale async-state/lock/export hazards;
+subsequent stages preserved behavior. No backend route, schema or dependency change.
+Luna built, fresh Sol reviewed, root accepted; root took over bounded corrections.
+Claude Opus planning review used OAuth only. The owner's fresh Claude review found
+no material regression; three unused imports were then removed.
+
+### Release and verification
+
+- Runtime release `e332ad84` pushed to main; production deployment
+  `dpl_F8DFjHtMGGJgPohZ1naM9YDZiXac` READY. Documentation release `8da7f595`
+  also reached production, `dpl_CNmuQKa9UgcUiFvdXo3dbKqgYTCA` READY.
+- Final local gates: 71 commands, 971 suites / 14,272 tests and canonical build
+  passed. All five remote workflows passed for runtime release e332ad84.
+- Thirteen mocked browser scenarios matched the post-Stage-0 monolith. Live smoke
+  proved Microsoft sign-in and a populated Workbench request list after retry.
+  Initial Dataverse 30-second timeouts also affected unrelated cron routes; cause
+  is unproven, dashboard recovered without a code/config change or rollback.
+- No live reviewer save/search/email rehearsal ran. The full live workflow remains
+  untested; do not convert the read-only dashboard smoke into that claim.
+- Rollback target: `dpl_EwRv2sCRMoTC5n7CwYpyyJxRLNyo` / baseline `b400c97d`.
+  Full evidence and rollback instructions are in the execution receipt.
+
+### Key commits
+
+- `8609d6ff`: revised plan; `a5bdc539`: bounded lifecycle fixes.
+- `307aa914` through `e6b74792`: presentation, workflow hooks and controller stages.
+- `1fde149c`: boundary tests; `6c3ec888`: verified stage closure.
+- `30bca34a` / `e332ad84`: dead-import and whitespace cleanup.
+- `8da7f595`: release receipt; `59184b39`: scoped Impeccable exception.
+- `d4d0e0e9`: functional follow-up queue and separate design notes.
+
+## Next Items
+
+### Verified Open — choose a separate scope before implementation
+
+Read `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md` for evidence and
+prerequisite tests. It records uncertain-save reconciliation, incomplete
+same-context exclusion rollback, uncancelled stale streams, and proposal-key-only
+reset semantics. Priority is proposed, not owner authorization to implement all.
+
+### Owner Decision Needed
+
+Choose one functional follow-up. For proposal-key-only reset, first decide the
+intended document identity contract. Do not combine fixes with a redesign.
+
+### Parked — separate Impeccable notes
+
+Five original 11px notes remain unchanged. `.impeccable/config.json` contains an
+11px exception scoped to CandidateCard and IdentityComparisonPanel, with rationale.
+The follow-up document's D1 section records the locations, future readability
+review and exception-removal criteria. Typography scan passed. This is not a
+project-wide approval for 11px text.
+
+### Verify Before Acting
+
+- If Dataverse timeouts recur, examine fresh logs; no root cause or durable fix
+  was established. Do not assume the refactor caused them.
+- Prior-session carryovers below were not revalidated; they are historical routing
+  aids, not an automatic worklist. In particular, retained rehearsal records must
+  be re-read before any separately authorized modification or cleanup.
+- Memory router measured 7005 bytes / 67 lines / 52 direct leaf references after
+  adding this queue pointer. Gates passed; existing router-diet debt remains
+  separate work and must not be silently dropped.
+
+### Do Not Reopen Without New Decision
+
+No decomposition stage remains unfinished. Do not remove legacy behavior or alter
+save/recovery contracts merely because the modules are now easier to edit. Do not
+rerun live provider, promotion or email operations as routine verification.
+
+## Key Files Reference
+
+- Plan: `docs/plans/REVIEWER_SEARCH_WORKSPACE_DECOMPOSITION_PLAN_2026-09-18.md`
+- Evidence: `docs/plans/REVIEWER_SEARCH_WORKSPACE_EXECUTION_2026-09-18.md`
+- Follow-ups: `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md`
+- Facade: `shared/components/reviewers/ReviewerSearchSection.js`
+- Extracted owners: `shared/components/reviewers/search/`
+
+## Stop-time notes
+
+The claim-evidence pilot report could not read local state; no observation row was
+inferred. No root-instruction change was needed. The development milestone is
+“Reviewer search workspace decomposition promoted (Session 522)”. This handoff and
+the pending follow-up/exception commits are synced by the stop workflow; its
+main-branch push may trigger a documentation/config-only Vercel deployment.
+
+## Historical handoffs — not current instructions
+
+Everything below preserves prior-session evidence. The Session 523 guidance above
+controls current next steps; historical completion and authorization statements
+are scoped to their named releases.
 
 ## Session 521 Summary
 

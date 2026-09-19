@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Reviewer search workspace decomposition promoted (Session 522)
+
+**Milestone:** Reviewer Find now composes 19 focused presentation/workflow modules behind its preserved public facade, with generation-owned async safety fixes and permanent boundary tests.
+**Sessions:** 522; Luna implementation, Sol/root acceptance, independent Claude review.
+**Ship state:**
+- Runtime `e332ad84` deployed as `dpl_F8DFjHtMGGJgPohZ1naM9YDZiXac`; documentation `8da7f595` also reached READY. No schema/backend changes.
+- 971 suites / 14,272 tests, 71 local gates, canonical build, 13 mocked browser comparisons and all five runtime-release CI workflows passed.
+- Microsoft sign-in and dashboard read passed after transient Dataverse timeouts; no full live reviewer-write rehearsal or root-cause fix is claimed.
+**Why it matters:** Reviewer UI responsibilities can be changed and tested independently while public contracts and existing behavior remain characterized.
+**Pointers:** `docs/plans/REVIEWER_SEARCH_WORKSPACE_EXECUTION_2026-09-18.md`; functional and separate design follow-ups in `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md`.
+
 ## September 2026 — Governed document lifecycle decomposition promoted (Session 521)
 
 **Milestone:** PR #315 promoted the accepted Stages 0–8 document lifecycle decomposition while preserving the existing compatibility facades and governed retry/read/write contracts.
