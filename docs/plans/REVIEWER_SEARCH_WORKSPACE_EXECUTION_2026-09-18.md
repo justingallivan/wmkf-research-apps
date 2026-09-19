@@ -776,3 +776,22 @@ rescue after committed confirmation; and rapid request/proposal replacement.
 - Scope is React `renderToString` → `hydrateRoot` and actual component interactions
   against mocked boundaries. It is not full Next authentication/instrumentation
   integration or a live campaign rehearsal. No live writes or provider calls ran.
+
+
+## P9 boundary prerequisite acceptance before Stage 10
+
+[VERIFIED via real source and synthetic mutations] The new
+`reviewer-search-boundary.test.js` protects public exports, operation back-imports/
+cycles, server consumers, view transport/effects, canonical implementations and
+controller operation bodies. CandidateCard's existing local effects and the exact
+canonical key wrapper are permitted. Both real-tree and mutation checks run in Jest.
+
+- Luna corrected the draft's overbroad view/server classification and incomplete
+  controller inventory. Sol `/root/sol_stage6_final` executed the corrected checks
+  and returned **READY**; its earlier canonical-wrapper concern was refuted by
+  running the real detector and required no source change.
+- Root's completed-tree assertion passed; **12 independent invalid mutations**
+  are rejected, including a state-only operation reintroduced into the controller.
+- Final placed-test verification: **2 suites / 6 tests passed**, strict test lint
+  passed. Temporary synthetic modules live outside the repository and are cleaned
+  in finally. No runtime change belongs to this prerequisite commit.
