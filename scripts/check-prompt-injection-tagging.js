@@ -294,7 +294,7 @@ const SURFACES = [
     inv: 17,
     status: 'migrated',
     promptFiles: ['shared/config/prompts/dynamics-explorer.js'],
-    callSiteFiles: ['pages/api/dynamics-explorer/chat.js'],
+    callSiteFiles: ['lib/services/dynamics-explorer/chat-session.js'],
   },
   {
     // Executor-driven (summarize-v2). Hardening lives in execute-prompt.js

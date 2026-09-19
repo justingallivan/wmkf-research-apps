@@ -67,9 +67,9 @@ const EXEMPT_FILES = new Set([
   'pages/dynamics-explorer.js',
   'pages/dataverse-bulk-export.js',
   'lib/services/dynamics-service.js',
-  // Explorer power-tool helper: sole importer is pages/api/dynamics-explorer/chat.js
-  // today; moves to lib/services/dynamics-explorer/chat-session.js at S8 of the extraction plan
-  // (exempt dir); its one raw call is a resolveLogicalName metadata lookup (S329 tail 3).
+  // Explorer power-tool helper: sole importer is
+  // lib/services/dynamics-explorer/chat-session.js (exempt dir); its one raw
+  // call is a resolveLogicalName metadata lookup (S329 tail 3).
   'lib/services/dynamics-explorer-taxonomy.js',
 ]);
 

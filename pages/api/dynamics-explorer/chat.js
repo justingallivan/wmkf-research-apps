@@ -24,30 +24,14 @@ import crypto from 'crypto';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { withDynamicsContext } from '../../../lib/services/dynamics-context';
-import { buildSystemPrompt, TOOL_DEFINITIONS } from '../../../shared/config/prompts/dynamics-explorer';
-import {
-  DATA_CLASSES,
-  wrapUntrustedContent,
-  buildUntrustedContentPreamble,
-} from '../../../lib/utils/ai-payload-boundary';
-import { getModelForApp, getFallbackModelForApp } from '../../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-import {
-  serializeDynamicsExplorerToolResult,
-} from '../../../lib/utils/dynamics-explorer-serializer';
-import { buildResolvedTaxonomyPromptBlock } from '../../../lib/services/dynamics-explorer-taxonomy';
 import {
   DynamicsExplorerRequestTelemetry,
   normalizeSessionId,
 } from '../../../lib/services/dynamics-explorer-request-telemetry';
-import { describeChatFailure, detectPossibleFailure } from '../../../lib/services/dynamics-explorer/failure-copy';
-import { trimConversation, compactMessages } from '../../../lib/services/dynamics-explorer/conversation';
-import { MAX_RESULT_CHARS, TOOL_CHAR_LIMITS, truncateResult, deriveRecordCount, getThinkingMessage } from '../../../lib/services/dynamics-explorer/result-shaping';
-import { checkRestriction } from '../../../lib/services/dynamics-explorer/restriction-guard';
-import { getUserRole, getActiveRestrictions, logQuery } from '../../../lib/services/dynamics-explorer/explorer-store';
-import { callClaude } from '../../../lib/services/dynamics-explorer/model-call';
-import { classifyToolError } from '../../../lib/services/dynamics-explorer/tool-errors';
-import { executeTool } from '../../../lib/services/dynamics-explorer/tool-executor';
+import { describeChatFailure } from '../../../lib/services/dynamics-explorer/failure-copy';
+import { getUserRole, getActiveRestrictions } from '../../../lib/services/dynamics-explorer/explorer-store';
+import { runExplorerChat } from '../../../lib/services/dynamics-explorer/chat-session';
 
 export const config = {
   api: {
@@ -57,8 +41,6 @@ export const config = {
 };
 
 const limiter = nextRateLimiter({ max: 10 });
-
-const MAX_TOOL_ROUNDS = 15;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -164,209 +146,35 @@ export default async function handler(req, res) {
       getUserRole(userProfileId),
       getActiveRestrictions(),
     ]);
-    return await withDynamicsContext({ restrictions, requestId }, async () => {
-    // A7 Part 3: CRM records returned as tool_result are untrusted — applicant-
-    // and staff-authored free-text fields can carry injection payloads that get
-    // re-fed into the agent loop. Each tool_result content string is wrapped in
-    // nonce sentinels (see executeOne); the preamble tells the model that
-    // sentinel-delimited tool output is data, not instructions. A fresh nonce
-    // per round means the preamble carries the general rule, not a nonce list.
-    const resolvedTaxonomyBlock = await buildResolvedTaxonomyPromptBlock({ restrictions });
-    const systemPrompt = `${buildUntrustedContentPreamble()}\n\n${buildSystemPrompt({ userRole, restrictions, resolvedTaxonomyBlock })}`;
 
-    // Only send the last few user/assistant exchanges to stay within token limits
-    const claudeMessages = trimConversation(messages);
-
-    sendEvent('thinking', { message: 'Analyzing your question...' });
-
-    // ─── Agentic loop ───
-    let round = 0;
-    let currentMessages = [...claudeMessages];
-    // Per-request tool context. `searchThrottle` is a server-side circuit
-    // breaker: once a document search hits a transient Graph failure
-    // (tenant throttle / 5xx / no response), every later search_documents call
-    // in THIS request short-circuits without touching Graph. Tool-result text
-    // is untrusted content to the model by design (A7), so it cannot be the
-    // control that stops a retry loop — this is (Codex adversarial S468).
-    const toolContext = { searchThrottle: null };
-    const model = getModelForApp('dynamics-explorer');
-    const fallbackModel = getFallbackModelForApp('dynamics-explorer');
-    lastModel = model;
-
-    while (round < MAX_TOOL_ROUNDS) {
-      if (disconnectObserved) {
-        await finalizeLifecycle('client_disconnected');
-        return;
-      }
-      round++;
-
-      errorStage = 'model';
-      const claudeResponse = await callClaude({
-        apiKey: claudeApiKey,
-        model,
-        fallbackModel,
-        systemPrompt,
-        messages: currentMessages,
-        tools: TOOL_DEFINITIONS,
-        userProfileId,
-        requestId,
-        requestRound: round,
-        signal: abortController.signal,
-        onTextDelta: (text) => {
-          // Stream text chunks to client in real-time
-          sendEvent('text_delta', { text });
-        },
-      });
-      completedRounds = round;
-      lastModel = claudeResponse.model || lastModel;
-      lastStopReason = claudeResponse.stopReason || null;
-
-      const textBlocks = claudeResponse.content.filter(b => b.type === 'text');
-      const toolBlocks = claudeResponse.content.filter(b => b.type === 'tool_use');
-
-      if (toolBlocks.length === 0) {
-        const outcome = claudeResponse.refused || claudeResponse.stopReason === 'refusal'
-          ? 'refused'
-          : claudeResponse.stopReason === 'max_tokens'
-            ? 'truncated'
-            : 'completed';
+    const result = await withDynamicsContext({ restrictions, requestId }, () => runExplorerChat({
+      messages,
+      sessionId,
+      userProfileId,
+      userRole,
+      restrictions,
+      requestId,
+      apiKey: claudeApiKey,
+      sendEvent,
+      signal: abortController.signal,
+      isDisconnected: () => disconnectObserved,
+      onRoundComplete: ({ round, model, stopReason }) => {
+        if (round === 0) { lastModel = model; return; }
+        completedRounds = round;
+        lastModel = model || lastModel;
+        lastStopReason = stopReason;
+      },
+      onStage: (stage) => { errorStage = stage; },
+      onTerminal: async ({ outcome }) => {
         terminalIntent = true;
         await finalizeLifecycle(outcome);
+      },
+    }));
 
-        if (!claudeResponse._textStreamed) {
-          // Text wasn't streamed (shouldn't happen, but fallback)
-          const finalText = textBlocks.map(b => b.text).join('\n');
-          sendEvent('response', { content: finalText });
-        }
-        // Check if response suggests failure — prompt user for feedback
-        const finalText = textBlocks.map(b => b.text).join('\n');
-        const suggestFeedback = outcome !== 'completed' || detectPossibleFailure(finalText);
-        sendEvent('complete', { requestId, rounds: round, outcome, suggestFeedback });
-        return;
-      }
-
-      errorStage = 'tool';
-      // Execute tool calls — parallel when multiple tools in one round
-      const toolResults = [];
-
-      // Send all thinking messages upfront
-      for (const toolBlock of toolBlocks) {
-        const restricted = checkRestriction(toolBlock.name, toolBlock.input, restrictions);
-        if (!restricted) {
-          sendEvent('thinking', { message: getThinkingMessage(toolBlock.name, toolBlock.input) });
-        }
-      }
-
-      const executeOne = async (toolBlock) => {
-        const { id, name, input } = toolBlock;
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[DynExp] Round ${round} tool: ${name}`, JSON.stringify(input).substring(0, 200));
-        }
-
-        const restricted = checkRestriction(name, input, restrictions);
-        if (restricted) {
-          sendEvent('thinking', { message: `Blocked: ${restricted}` });
-          logQuery({ requestId, requestRound: round, userProfileId, sessionId, queryType: name, tableName: input.table_name || null, queryParams: input, recordCount: 0, executionTime: 0, wasDenied: true, denialReason: restricted });
-          return { type: 'tool_result', tool_use_id: id, content: `DENIED: ${restricted}` };
-        }
-
-        const startTime = Date.now();
-        let result;
-        try {
-          result = await executeTool(name, input, sendEvent, userProfileId, restrictions, toolContext);
-        } catch (err) {
-          const errMsg = err.message || 'Unknown error';
-          console.log(`[DynExp] Round ${round} ${name} ERROR:`, errMsg.substring(0, 200));
-          // A5: classify into a typed, actionable result (unknown field/entity →
-          // closest valid names + describe_table pointer) so Claude can
-          // deterministically self-correct instead of re-guessing across rounds.
-          result = await classifyToolError(err, name, input, restrictions);
-        }
-        const executionTime = Date.now() - startTime;
-
-        const recordCount = deriveRecordCount(name, result);
-        console.log(`[DynExp] Round ${round} ${name} → ${recordCount} records, ${executionTime}ms`);
-
-        logQuery({
-          requestId,
-          requestRound: round,
-          userProfileId,
-          sessionId,
-          queryType: name,
-          tableName: input.table_name || null,
-          queryParams: input,
-          recordCount,
-          executionTime,
-          wasDenied: false,
-          denialReason: result?._validatorReject ? `ODATA_VALIDATOR_REJECT: ${result.error}` : null,
-        });
-
-        // `_notFound` is internal telemetry framing — strip it before the
-        // result reaches the model.
-        if (result && typeof result === 'object' && '_notFound' in result) {
-          delete result._notFound;
-        }
-
-        const resultForModel = serializeDynamicsExplorerToolResult(
-          result?._validatorReject ? { error: result.error } : result,
-          { toolName: name }
-        );
-        const charLimit = TOOL_CHAR_LIMITS[name] || MAX_RESULT_CHARS;
-        const resultStr = truncateResult(resultForModel, charLimit);
-
-        // A7 Part 3: wrap the CRM tool output in nonce sentinels so injection
-        // text in a record field cannot pose as an instruction to the agent.
-        const wrapped = wrapUntrustedContent({
-          text: resultStr,
-          source: `dynamics-explorer.tool_result.${name}`,
-          dataClass: DATA_CLASSES.CRM_RECORD_TEXT,
-          maxChars: charLimit,
-          label: `${name} result`,
-        });
-
-        return { type: 'tool_result', tool_use_id: id, content: wrapped.text };
-      };
-
-      // `settled` is index-aligned with toolBlocks, so a rejected executeOne
-      // still knows which tool_use it belongs to. Answering with a literal
-      // 'unknown' id instead left the real tool_use unanswered AND added a
-      // tool_result for an id that was never issued — both of which the
-      // Anthropic API rejects on the next round, turning any rejection here
-      // into an unexplainable top-level failure.
-      const settled = await Promise.allSettled(toolBlocks.map(executeOne));
-      settled.forEach((s, i) => {
-        toolResults.push(s.status === 'fulfilled' ? s.value : {
-          type: 'tool_result',
-          tool_use_id: toolBlocks[i].id,
-          content: JSON.stringify({ error: s.reason?.message || 'Tool execution failed' }),
-        });
-      });
-
-      if (disconnectObserved) {
-        await finalizeLifecycle('client_disconnected');
-        return;
-      }
-
-      // Append assistant + tool results, then compact old rounds
-      currentMessages.push({
-        role: 'assistant',
-        content: claudeResponse.content,
-      });
-      currentMessages.push({
-        role: 'user',
-        content: toolResults,
-      });
-
-      // Compact earlier tool rounds to save tokens for the next call
-      currentMessages = compactMessages(currentMessages);
+    if (result.outcome === 'client_disconnected') {
+      await finalizeLifecycle('client_disconnected');
+      return;
     }
-
-    console.log(`[DynExp] Hit max rounds (${MAX_TOOL_ROUNDS}) without final answer`);
-    terminalIntent = true;
-    await finalizeLifecycle('max_rounds');
-    sendEvent('response', { content: 'Reached maximum query steps. Please refine your question.' });
-    sendEvent('complete', { requestId, rounds: round, outcome: 'max_rounds', maxRoundsReached: true, suggestFeedback: true });
-    });
   } catch (error) {
     if (disconnectObserved) {
       await finalizeLifecycle('client_disconnected');
