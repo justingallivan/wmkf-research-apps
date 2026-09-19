@@ -7,8 +7,8 @@
  * `lib/services/<domain>/` services and drove the boundary census to zero.
  * Stage 7 made that permanent law: ANY in-scope route file that reaches the
  * Dataverse layer directly -- importing a `lib/dataverse/adapters/*` module or
- * `lib/services/dynamics-service` -- outside the two carried-over exempt dirs
- * (pages/api/dynamics-explorer/, pages/api/dataverse-export/) fails this gate.
+ * `lib/services/dynamics-service` -- outside the one carried-over exempt dir
+ * (pages/api/dataverse-export/) fails this gate.
  * There is no baseline file and no count ratchet -- this is the law, mirroring
  * scripts/check-dataverse-access-layer.js one layer up.
  *
@@ -59,7 +59,6 @@ const RESOLVE_EXTS = ['', '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '/index.
 
 const ROUTE_ROOT = 'pages/api/';
 const EXEMPT_ROUTE_DIRS = [
-  'pages/api/dynamics-explorer/',
   'pages/api/dataverse-export/',
 ];
 
@@ -110,7 +109,7 @@ function usage() {
     '',
     'Default mode is LAW MODE (Route→Service consolidation Stage 7): any',
     'pages/api route importing Dataverse adapters or dynamics-service (outside',
-    'the exempt dirs) fails the gate. No baseline file, no count ratchet.',
+    'the exempt dir) fails the gate. No baseline file, no count ratchet.',
     '--report prints a per-domain rollup and the offending routes (exit 0).',
     '--json prints the raw boundary-importing route entries.',
   ].join('\n');
