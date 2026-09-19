@@ -58,7 +58,7 @@ import {
 import { describeChatFailure, detectPossibleFailure } from '../../../lib/services/dynamics-explorer/failure-copy';
 import { trimConversation, compactMessages } from '../../../lib/services/dynamics-explorer/conversation';
 import { MAX_RESULT_CHARS, TOOL_CHAR_LIMITS, sanitizeSelect, applyActiveOnlyFilter, isOperationalLogTable, stripEmpty, truncateResult, deriveRecordCount, getThinkingMessage } from '../../../lib/services/dynamics-explorer/result-shaping';
-import { checkRestriction, splitChatExpandSegments, restrictedFieldsForTable, redactRestrictedFieldNames } from '../../../lib/services/dynamics-explorer/restriction-guard';
+import { checkRestriction, restrictedFieldsForTable, redactRestrictedFieldNames } from '../../../lib/services/dynamics-explorer/restriction-guard';
 
 export const config = {
   api: {
