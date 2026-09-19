@@ -248,7 +248,7 @@ each run then its self-test where one exists, sequentially):
 
 | Gate | Exit |
 |---|---|
-| check:agent-invariants | 1 (known pre-existing red — per-machine memory-store symlink; not fixed, per brief) |
+| check:agent-invariants | 1 (known pre-existing red — worktree-local: `.claude-memory` is not symlinked in this worktree; exit 0 in the primary checkout; not fixed, per brief) |
 | check:agent-wiki / :self-test | 0 / 0 |
 | check:api-routes / :self-test | 0 / 0 |
 | check:atlas / :self-test | 0 / 0 |
@@ -323,5 +323,5 @@ code/gate/doc move — no migrations, no schema changes, no env-var changes
 — so a revert is safe and complete.
 
 Known env red accepted into this release: `check:agent-invariants`
-(per-machine memory-store symlink) — pre-existing, machine-local, not part
+(per-machine memory-store symlink) — pre-existing, worktree-local (green in the primary checkout), not part
 of this plan's surface.

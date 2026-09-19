@@ -625,8 +625,10 @@ Drift found → this doc is edited BEFORE the next stage starts.
   unchanged integration tests); BILL/merge injection seams reshaped to
   adapter-shaped deps; all 6 unresolved-census files resolved and converted;
   `core/changeset.js` gained bare-collection POST for the review-questions
-  editor; `dynamics-explorer-taxonomy.js` exempted (sole importer is the
-  exempt Explorer route). Adapter layer: 18 modules `[VERIFIED via ls
+  editor; `dynamics-explorer-taxonomy.js` exempted (sole importer was the
+  then-exempt Explorer route; since S8 of the chat-service extraction,
+  2026-09-19, the sole importer is `lib/services/dynamics-explorer/chat-session.js`
+  and the route dir is no longer exempt). Adapter layer: 18 modules `[VERIFIED via ls
   lib/dataverse/adapters]`. Allowlist 132 → 12, all 12 non-entity-transport
   `[VERIFIED via allowlist entity scan — 0 non-transport]`. Full suite
   4163/4163; build clean. Stage 7 precondition MET.

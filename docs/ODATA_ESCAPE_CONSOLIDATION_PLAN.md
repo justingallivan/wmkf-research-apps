@@ -16,6 +16,15 @@ related:
 
 # OData Escape Consolidation Plan
 
+> **Exemption-scope note (2026-09-19):** every statement below that calls
+> `pages/api/dynamics-explorer/` an "exempt dir" (including the `[VERIFIED via
+> check-dataverse-access-layer.js:75-76]` tags) describes the 2026-07-05 baseline
+> this plan executed against. That route-dir exemption was retired at S9 of
+> `docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_PLAN_2026-09-18.md`;
+> `EXEMPT_DIRS` in `scripts/check-odata-escape.js` is now `[]` and the only
+> Explorer carve-out is the single-file `lib/services/dynamics-explorer/tools/get-entity.js`.
+> See the Stage Log entry at the end of this document.
+
 **Execution status: STAGES 0–2 COMPLETE AND REVIEW-CLOSED (S331, 2026-07-05).** Closing Codex
 code review of `5477a226..629d67e4`: **PASS-WITH-FINDINGS — no further review round needed** (one
 P3 wording caveat, no regression; verbatim verdict in the Stage Log). The docs-catalog enum has no
