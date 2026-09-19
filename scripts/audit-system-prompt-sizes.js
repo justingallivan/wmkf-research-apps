@@ -149,7 +149,7 @@ const MODEL = COUNT_MODEL;
 
   // ── Report ──────────────────────────────────────────────────────────────
   console.log(`\nModel: ${MODEL}`);
-  console.log(`Cache floor: ${FLOOR} tokens\n`);
+  console.log(`Cache floors by tier: ${Object.entries(FLOORS).map(([t, f]) => `${t}=${f}`).join(', ')} tokens (default tier: sonnet)\n`);
   console.log('─'.repeat(110));
   console.log(`${'App'.padEnd(40)} ${'Tokens'.padStart(7)}  ${'cache_control?'.padEnd(14)} Verdict`);
   console.log('─'.repeat(110));
@@ -166,10 +166,11 @@ const MODEL = COUNT_MODEL;
   }
 
   // Summary of below-floor apps
-  const belowFloor = rows.filter(r => r.tokens != null && r.tokens < FLOOR);
+  const floorFor = (r) => FLOORS[r.tier || 'sonnet'];
+  const belowFloor = rows.filter(r => r.tokens != null && r.tokens < floorFor(r));
   if (belowFloor.length) {
     console.log('\n⚠️  Below-floor apps (cache_control is a no-op):');
-    for (const r of belowFloor) console.log(`    - ${r.app} (${r.tokens} tok)`);
+    for (const r of belowFloor) console.log(`    - ${r.app} (${r.tokens} tok < ${r.tier || 'sonnet'} floor ${floorFor(r)})`);
   }
 })().catch(e => { console.error('FATAL:', e.message); console.error(e.stack); process.exit(1); });
 
