@@ -34,9 +34,15 @@ const REAL_SOURCE_OPTIONS = {
     tokenCache: `${GRAPH}/auth.js`,
     tokenPromise: `${GRAPH}/auth.js`,
     tokenGeneration: `${GRAPH}/auth.js`,
+    getSiteId: `${GRAPH}/resolution.js`,
+    getDriveId: `${GRAPH}/resolution.js`,
+    siteCache: `${GRAPH}/resolution.js`,
+    driveCache: `${GRAPH}/resolution.js`,
   },
   delegates: {
     getAccessToken: { target: `${GRAPH}/auth.js`, binding: 'getAccessToken' },
+    getSiteId: { target: `${GRAPH}/resolution.js`, binding: 'getSiteId' },
+    getDriveId: { target: `${GRAPH}/resolution.js`, binding: 'getDriveId' },
   },
 };
 

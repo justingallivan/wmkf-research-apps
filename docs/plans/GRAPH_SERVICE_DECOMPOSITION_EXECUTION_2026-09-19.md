@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S2 ACCEPTED — S3 NEXT]**. Root accepted S1 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1 is accepted below and S2 is recorded below. No push, deployment or live rehearsal is authorized.
+Status: **[S3 ACCEPTED — S4 NEXT]**. Root accepted S2 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1 and S2 are accepted below and S3 is recorded below. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -193,3 +193,28 @@ Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed. Li
 Every current `check:*` parent and available immediate self-test ran sequentially. Complete output is `/private/tmp/wmkf-graph-decomposition-logs/s2-all-checks.log`: **67 commands, all exit code 0**.
 
 Fresh Sol review **`sol_s2`** accepted the auth body/reset parity and explicit boundary inventory conditional on G. Root independently verified the body, reset replacement, and wrapper shape. No unresolved S2 finding remains. Root final review and G acceptance are complete; next allowed stage is S3; the S0 mutation runner remains baseline-specific and was not rerun.
+
+## S3 execution receipt
+
+Status: **[S3 ACCEPTED]**. Baseline is accepted S2 commit `7ff2f90f`; the accepted candidate is the commit introducing this S3 receipt on `codex/graph-service-decomposition`.
+
+### Owned move and parity
+
+S3 changed only the SharePoint resolution owner and explicit boundary inventory:
+
+- `lib/services/graph/resolution.js` now owns `siteCache`, `driveCache`, `getSiteId`, `getDriveId`, and `resetResolutionCaches` (candidate lines 20–21, 27–67, 79–145, and 147–151).
+- The baseline resolution implementations were `lib/services/graph-service.js:101–102` and `:124–164` and `:178–244`; both method bodies were moved with only `this` receiver calls rewritten to `svc` and module imports adjusted.
+- The baseline `clearCaches()` site/drive reset statements were `lib/services/graph-service.js:1430–1432`. The facade now calls `resetResolutionCaches()` at the same position after the auth reset (`lib/services/graph-service.js:1306–1311`).
+- The facade preserves `static async getSiteId()` and `static async getDriveId(libraryName, { siteId: suppliedSiteId = null } = {})`, each as a sole receiver-forwarding return delegate (`lib/services/graph-service.js:116–124`).
+
+Raw-case drive cache keys, TTL checks, supplied-site behavior, host/library validation, display-name then slug matching, errors, and unfenced late in-flight completion remain unchanged. Root matched all three moved method bodies after normalizing `this` to `svc` and verified the three reset statements. The explicit real-source boundary inventory names both resolution method owners, both cache owners, and both delegates; generic fixture options remain separate.
+
+### S3 G evidence
+
+The exact S1 focused command plus `tests/unit/workbench-proposal-document-listing.test.js tests/unit/load-proposal-service.test.js tests/unit/load-proposal.test.js` passed **19 suites / 297 tests**: all Graph suites, lifecycle/drain tests, `workbench-proposal-document-listing.test.js`, `load-proposal-service.test.js`, and `load-proposal.test.js`. The targeted resolution/boundary/consumer run passed **5 suites / 67 tests**.
+
+Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed. Lint reported **114 warnings and 0 errors**. The canonical Next.js **16.3.5 Turbopack** build completed with the same two known DOCX dynamic-filesystem tracing warnings and existing reviewer-reminder hold advisory.
+
+Every current `check:*` parent and available immediate self-test ran sequentially. Complete output is `/private/tmp/wmkf-graph-decomposition-logs/s3-all-checks.log`: **67 commands, all exit code 0**.
+
+Fresh Sol review **`sol_s3`** accepted the resolution body/reset parity and explicit boundary inventory conditional on G. Root independently verified the normalized method bodies, cache ownership, reset placement, and no stale-generation redesign. No unresolved S3 finding remains. Root final review and G acceptance are complete; next allowed stage is S4; the S0 mutation runner remains baseline-specific and was not rerun.
