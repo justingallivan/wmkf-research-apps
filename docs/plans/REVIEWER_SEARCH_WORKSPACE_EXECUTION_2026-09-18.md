@@ -39,8 +39,12 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–10 are accepted locally. No merge, deployment or live campaign rehearsal was performed. Stage receipts below distinguish completed evidence
-from historical checkpoints.
+provider or external-state call was made during implementation. Stages 0–10 are
+accepted and release commit `e332ad84` was subsequently pushed to `main` and
+deployed with explicit owner authorization. The release smoke check used Microsoft
+sign-in and a read-only Workbench dashboard load. No full live campaign rehearsal
+was performed. Stage receipts below distinguish historical implementation
+checkpoints from the production release record at the end.
 
 ## Source-to-target map
 
@@ -833,7 +837,43 @@ assessed separately from mechanical extraction.
 The canonical build and unit/gate suite are green locally. Browser comparison
 covers 13 mocked scenarios against the post-Stage-0 monolith, not live Dataverse,
 provider calls or full authenticated Next integration. Existing unknown-save and
-partial-success behavior documented above is preserved. Production promotion and
-any live campaign rehearsal require the separate release workflow. Temporary
+partial-success behavior documented above is preserved. Production promotion is recorded below. A full live campaign rehearsal remains
+outside the completed verification scope. Temporary
 command logs and browser artifacts are local evidence; the checked-in tests and
 this receipt retain the durable acceptance record.
+
+
+## Production release — 2026-09-18 PT
+
+[VERIFIED via Git, Vercel, GitHub Actions and Chrome] The owner explicitly requested
+commit, push and deployment after accepting the independent Claude review. Root
+fast-forwarded main and pushed release commit `e332ad8425e5afb0b472f0aa82a3bf5756c80fe2`.
+The feature branch was also pushed. No schema or configuration change accompanied
+this release. The final cleanup removed three unused facade imports (`30bca34a`)
+and one trailing blank line (`e332ad84`). Luna's focused tests passed (3 suites,
+10 tests plus 12 rejected boundary mutations); Sol and root approved the import diff.
+
+- Production deployment: `dpl_F8DFjHtMGGJgPohZ1naM9YDZiXac`, READY,
+  https://wmkfresearchapps-2n81zj1o9-justin-gallivans-projects.vercel.app
+  with the live aliases, including https://applications.wmkeck.org.
+- Remote checks for the release SHA: Tests, E2E (Playwright), Security Scan,
+  Secret Scanning and Dependency Scan all succeeded.
+- Authenticated smoke: Microsoft sign-in succeeded. The initial dashboard loads
+  hit 30-second Dataverse no-response timeouts; the read-only retry then rendered
+  the populated program/cycle and request list on the same deployment, without
+  configuration changes or rollback. Two unrelated cron paths also logged
+  Dataverse timeouts. This is not a clean error-free observation window. Cause is
+  unproven; relevant server/DAL code is unchanged by the refactor. No search,
+  promotion, reviewer save or email operation was triggered by this smoke check.
+- Last-known-good deployment before release:
+  `dpl_EwRv2sCRMoTC5n7CwYpyyJxRLNyo` (baseline `b400c97d`). If release rollback is
+  required, an authorized operator can run `vercel rollback
+  dpl_EwRv2sCRMoTC5n7CwYpyyJxRLNyo --yes` from the linked project. Code rollback
+  does not reverse data writes; none were introduced by this migration.
+- Local release evidence: `/private/tmp/reviewer-release-before.json`,
+  `/private/tmp/reviewer-release-after.json`, and
+  `/private/tmp/reviewer-release-5xx.jsonl`. The deployment IDs and checked-in
+  acceptance record remain durable even if temporary files are removed.
+
+This record is a documentation-only follow-up to the runtime release; later Git
+commits containing this record do not change the verified runtime code.

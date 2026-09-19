@@ -26,12 +26,14 @@ accepted locally on `codex/reviewer-search-decomposition`, including boundary an
 documentation closure. Per-stage evidence, rollback references and
 mocked browser coverage are recorded in
 [the execution receipt](REVIEWER_SEARCH_WORKSPACE_EXECUTION_2026-09-18.md).
-Deployment and live campaign rehearsal remain outside this authorization.
+The owner subsequently authorized commit, push and deployment. Release commit
+`e332ad84` reached production on 2026-09-18 PT; see the receipt for deployment,
+smoke-check evidence and rollback. A full live campaign rehearsal was not performed.
 
-**Authorization updated 2026-09-18:** the owner authorized plan corrections and
+**Initial implementation authorization, 2026-09-18 (historical):** the owner authorized plan corrections and
 local implementation on an isolated branch, with Luna implementing, Sol reviewing,
-and the orchestrator accepting each stage. No merge, deployment or live writes are
-authorized. New paths remain proposed until recorded in the execution receipt. This is a maintainability/testability refactor,
+and the orchestrator accepting each stage. That initial authorization excluded merge, deployment and live writes; the later
+release authorization supersedes the merge/deployment restriction. New paths remain proposed until recorded in the execution receipt. This is a maintainability/testability refactor,
 not a performance intervention, product redesign, or replacement state machine.
 
 **Baseline:** `b400c97d` on `main`, inspected 2026-09-18 PT. Line references below
