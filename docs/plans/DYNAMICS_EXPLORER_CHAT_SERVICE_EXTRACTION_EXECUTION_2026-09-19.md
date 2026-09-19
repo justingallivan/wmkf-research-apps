@@ -325,3 +325,25 @@ code/gate/doc move — no migrations, no schema changes, no env-var changes
 Known env red accepted into this release: `check:agent-invariants`
 (per-machine memory-store symlink) — pre-existing, worktree-local (green in the primary checkout), not part
 of this plan's surface.
+
+## Final acceptance — 2026-09-19
+
+- S9 accepted by Opus round 2 at `084f79e9` (round 1 found five stale
+  exempt-dir restatements, fixed by root in `084f79e9`; the j27-register
+  red from S5 was fixed by root in `542b0892`).
+- Root final review at `084f79e9`: whole-branch file set is inside the
+  permitted set (43 files, nothing outside); route shell read end to end;
+  every gate in package.json run with its self-test, sequentially: all
+  green except `check:agent-invariants` (worktree-local, accepted).
+- Hazard recorded: running gates in two sessions against the same worktree
+  at once produces spurious reds (doc-currency, fact-consistency,
+  model-override-warming self-tests), because self-tests write fixtures
+  into scanned paths. Each was green when re-run alone. Run the full set
+  from one session only.
+- Lesson for future stage plans: the per-stage 13-gate list omitted
+  `check:j27-register`, so a red caused at S5 surfaced only at the S9 full
+  run. Stage lists should include every gate that scans moved source.
+- Owner steps before merge: Preview smoke of the Explorer chat (one query,
+  one tool round, one export, one disconnect), canonical Turbopack build on
+  a checkout with a real `node_modules`, then merge; rollback = revert the
+  merge commit.
