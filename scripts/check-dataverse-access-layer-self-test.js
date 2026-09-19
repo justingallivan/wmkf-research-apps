@@ -349,6 +349,13 @@ function runLawExemptPathAssertion() {
     }
   `);
 
+  write(tempRoot, 'lib/services/dynamics-explorer/tools/example.js', `
+    import { DynamicsService } from '../../dynamics-service.js';
+    export async function example() {
+      return DynamicsService.queryRecords('akoya_requests', {});
+    }
+  `);
+
   expectGreen('exempt power-tool and DAL-internal paths still pass');
 }
 
