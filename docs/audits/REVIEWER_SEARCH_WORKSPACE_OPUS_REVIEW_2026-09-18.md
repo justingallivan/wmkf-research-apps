@@ -3,7 +3,7 @@ title: Claude Opus Review of Reviewer Search Workspace Plan
 domain: reviewers
 kind: audit
 status: draft
-summary: Independent OAuth-authenticated Claude Opus review; ready with named changes, with corrections not yet applied.
+summary: Historical OAuth-authenticated Claude Opus review; named corrections are addressed in the revised plan and tracked in its execution receipt.
 canonical: false
 owner: product-engineering
 related:
@@ -21,12 +21,13 @@ Reviewed plan commit: `0b7264c3`. Reviewed document SHA-256:
 `32e4163a0531795855f0b7219909dd78a455970da60efcd75363dd738125895e`.
 Runtime source baseline: `b400c97d8e5da8d72a5d146500d612a74bade1f8`.
 
-The report below is Claude Opus's review, retained verbatim. Its findings and
-proposed alternatives have not been independently adjudicated by the plan author
-or applied. In particular, suggestions concerning a fix on main or accepting
-baseline-defect characterizations do not override repository release rules or
-constitute owner authorization. The plan and runtime code remain unchanged.
-Review acceptance is distinct from implementation or release authorization.
+The report below is Claude Opus's review, retained verbatim at its reviewed
+snapshot. After this review, the owner authorized plan corrections and isolated
+local implementation. The revised plan §10 records disposition; its execution
+receipt tracks source changes and stage acceptance. Suggestions in the historical
+report about fixing on main or accepting unsafe baseline characterizations do not
+override repository rules: bounded fixes precede extraction on the isolated branch.
+Review acceptance remains distinct from merge, deployment or live-write approval.
 
 ---
 

@@ -2,8 +2,8 @@
 title: Reviewer Search Workspace Decomposition Plan
 domain: reviewers
 kind: plan
-status: draft
-summary: Planning-only decomposition of ReviewerSearchSection into presentation and explicit workflow hooks, preserving HTTP, persistence, identity, and refresh contracts.
+status: active
+summary: Authorized staged decomposition of ReviewerSearchSection into presentation and explicit workflow hooks, preserving HTTP, persistence, identity, and refresh contracts.
 canonical: false
 owner: product-engineering
 related:
@@ -21,9 +21,10 @@ workspace's rendering, roster operations, search streams, applicant enrichment,
 contact remediation, and promotion reconciliation. Preserve the public
 `shared/components/reviewers/ReviewerSearchSection.js` entry point.
 
-**Planning only. No migration is authorized or executed by this document.**
-Implementation needs a subsequent owner instruction. All new paths below are
-proposed, not existing files. This is a maintainability/testability proposal,
+**Authorization updated 2026-09-18:** the owner authorized plan corrections and
+local implementation on an isolated branch, with Luna implementing, Sol reviewing,
+and the orchestrator accepting each stage. No merge, deployment or live writes are
+authorized. New paths remain proposed until recorded in the execution receipt. This is a maintainability/testability proposal,
 not a performance intervention, product redesign, or replacement state machine.
 
 **Baseline:** `b400c97d` on `main`, inspected 2026-09-18 PT. Line references below
@@ -51,7 +52,7 @@ plans. Size was a search aid, not the sole selection criterion.
 `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md:717–723` explicitly
 postpones this component's decomposition until measured render cost justifies
 it. That performance work remains deferred. This new document proposes an
-independent maintainability case for owner consideration; it does not overturn
+independent maintainability case now authorized by the owner; it does not overturn
 that decision or claim measured performance benefit. Searches of `docs/` and
 `.claude-memory/` found that deferral and historical feature plans, but no dedicated
 stage-by-stage workspace decomposition plan. The completed governed-document
@@ -119,16 +120,16 @@ rename of the public facade or shared logic file is proposed.
 
 | Stage | New file(s), in creation order | Source slice/symbols |
 |---|---|---|
-| 0 | Test prerequisites only (listed in §5) | Freeze public behavior before any move. |
+| 0 | Regression prerequisites, bounded safety fixes, execution inventory (§4–5) | Reproduce defects first; commit fixes separately before any move. |
 | 1 | `candidateKeys.js`, `presentation.js`, `SearchPrimitives.js`, `IdentityComparisonPanel.js`, `CandidateCard.js` | candKey/dedupeByName/isApplicantOriginCandidate at 267–281 into candidateKeys; addressTrustFailureMessage/formatSaveFailureDetails and label helpers at 121–130,283–338 into presentation; Spinner/Pill/IdentityDecision 132–170; IDENTITY_COMPARISON_REASON (107–119) and comparison 172–265; InstitutionPresentationNotice 340–401 and CandidateCard 403–1269. Keep InstitutionPresentationNotice private in CandidateCard. |
 | 2 | `SearchControls.js`, `SearchResults.js`, `SearchContactModals.js`, `HandledReviewers.js`, `ApplicantReviewerStatus.js` | Controls/header/progress inside the first Card (3063–3247), results conditional (3249–3568), both modal conditionals (3569–3594), handled conditional (3601–3638), applicant Card (3645–3763). SEARCH_SOURCES (94–99) moves with controls; BLOCKED_REFERRAL_REASON (101–105) with results. Outer search Card and manual slot stay in facade. Boundaries are complete JSX expressions, with ranges as navigation only. |
-| 3 | `useReviewerSearchController.js` | Entire remaining non-JSX body of default component, including state, refs, effects, callbacks and derivations, moved without algorithm changes. Temporary bridge, not final architecture. |
-| 4 | `useReviewerRoster.js`, `useReviewerRosterActions.js` | applyRosterSnapshot/reloadRoster/retryRosterLoad; excludeCandidate/excludeUnverifiedCandidate/promoteCandidate/removePreviousResults. |
-| 5 | `useReviewerDiscovery.js` | runSearch only, retaining local stage variables and ordered awaits. |
-| 6 | `useApplicantReviewerEnrichment.js` | enrichRecommended, terminalApplicantKeys/actionableRecommended/cache derivation and auto-enrichment effect. |
-| 7 | `useReviewerContactActions.js` | setManualContact through confirmIdentityContact (2068–2393); modal state stays in controller. |
-| 8 | `useReviewerPromotion.js` | refreshExpiredVerification + saveSelected (2395–2954), moved together so refresh and reconciliation remain one operation. |
-| 9 | `useReviewerExport.js`, `useReviewerSearchProjection.js` | exportSelected; display derivations 1814–1911 and 3021–3057. Use Stage 1 candidateKeys wrappers; no replacement of canonical helpers. |
+| 3 | `useReviewerRoster.js`, `useReviewerRosterActions.js` | applyRosterSnapshot/reloadRoster/retryRosterLoad; excludeCandidate/excludeUnverifiedCandidate/promoteCandidate/removePreviousResults. |
+| 4 | `useReviewerDiscovery.js` | runSearch only, retaining local stage variables and ordered awaits. |
+| 5 | `useApplicantReviewerEnrichment.js` | enrichRecommended, terminalApplicantKeys/actionableRecommended/cache derivation and auto-enrichment effect. |
+| 6 | `useReviewerContactActions.js` | setManualContact through confirmIdentityContact (2068–2393); modal state stays in controller. |
+| 7 | `useReviewerPromotion.js` | refreshExpiredVerification + saveSelected (2395–2954), moved together so refresh and reconciliation remain one operation. |
+| 8 | `useReviewerExport.js`, `useReviewerSearchProjection.js` | exportSelected; display derivations 1814–1911 and 3021–3057. Use Stage 1 candidateKeys wrappers; no replacement of canonical helpers. |
+| 9 | `useReviewerSearchController.js` | Remaining state, refs, reset effects, selection callbacks and hook composition only; all operation bodies already extracted. |
 | 10 | Boundary tests and ownership documentation | Remove only now-unused imports/local definitions from owned files; preserve facade exports. |
 
 Stage 1 moves the three key wrappers once, with their exact delegated behavior;
@@ -156,7 +157,9 @@ controller. Existing server imports of reviewer-search-logic remain legal and
 unchanged. No barrel `export *`, generic operation dispatcher, React context,
 provider or new dependency is needed.
 
-**State ownership:** controller retains existing useState cells and one genRef.
+**State ownership:** the facade retains existing useState cells and one genRef
+through Stage 8; Stage 9 moves that composition owner into the controller. Below,
+“controller owner” means this single owner, even before the hook exists.
 The operation hooks receive explicit named input values, existing refs and named
 setters/callbacks, and return only their commands. They do not acquire a second
 copy of roster, candidate, selection, phase or generation state. Card-local
@@ -169,7 +172,7 @@ projections → roster-read hook → original reset and exclusion-prefill effect
 stable pushProgress → discovery hook → applicant hook/effect → display projection →
 selection callbacks → roster-action hook → contact-action hook → promotion hook →
 export hook → view prop assembly. The reset effect remains in the controller with
-its original dependency list and reset list. Moving declarations earlier must not
+its accepted Stage 0 dependency list and reset list. Moving declarations earlier must not
 change defaults or cause callbacks to execute during render.
 
 **Explicit dependency discipline:** destructure hook arguments and enumerate scalar,
@@ -177,13 +180,15 @@ array, ref and function dependencies as in the old callback. Do not make a newly
 allocated `state`, `actions` or `options` object an effect dependency; that can
 restart roster loading/enrichment every render. Do not use an empty dependency
 array, ref-to-latest conversion, or memoization to hide a stale closure. Preserve
-which refs reset and which survive a request change; suspected defects follow §4.
+the corrected Stage 0 ref lifecycle; bounded defect fixes follow §4. New search/
+hooks must pass `react-hooks/exhaustive-deps` as an error. Include passed-in setters
+and refs in dependency arrays; do not suppress warnings to hide extraction bugs.
 
 Controller-to-view interface is named props, grouped by existing view responsibility:
 search form/progress, candidate results/selection/actions, contact modal bindings,
 handled navigation, applicant ingestion/enrichment. A view gets only the values
-and callbacks its JSX reads. The temporary Stage 3 return object may be large;
-Stage 10 rejects simply relocating the entire original component into one hook.
+and callbacks its JSX reads. Extract operations directly from the facade at Stages 3–8. Stage 9 must not
+relocate large operation bodies into a controller bridge.
 No fixed LOC target overrides a cohesive function such as saveSelected.
 
 ## 4. Assumption and defect ledger
@@ -212,15 +217,23 @@ No fixed LOC target overrides a cohesive function such as saveSelected.
    Characterize these three cases separately. This plan neither claims universal
    recovery nor authorizes adding it.
 
-Before the affected stage, write deterministic delayed-response/stream tests against
-the **old implementation**. Separate observed behavior from intended behavior.
-A new safety assertion that fails on the baseline is a defect finding, not an
-extraction regression. Record the failing test/reproducer and stop that affected
-stage; seek a separate owner-authorized fix and rebaseline before continuing it.
-Do not weaken the assertion, silently repair the bug inside a move, or mark a
-known unsafe result as a safety pass. Unaffected presentation stages may proceed
-if independently green. No claim in this plan promises a universal stale-state
-fix or authorizes one.
+**Stage 0 disposition: bounded fixes authorized before extraction.** Write deterministic
+reproductions against the unchanged implementation for items 1–5. In particular,
+an old exclusion rejection can insert request A's candidate into request B's active
+UI/submission set; this is a cross-request UI/submission hazard, not proof that the
+server would authorize a cross-request write. Never bless that result as baseline.
+
+Commit reproductions and their narrowly scoped fixes separately from file moves;
+record observed failure, expected behavior and corrected baseline. Scope is stale
+progress/success/failure/cleanup after context change or unmount, generation-owned
+running refs allowing a new context to start without an old finally clearing its
+lock, export side effects, and stopping subsequent refresh-loop POSTs once stale.
+Preserve same-context duplicate-submit behavior. Already-issued writes cannot be
+undone by a generation guard. No endpoint, payload, identity or receipt policy may
+change. Item 6 is characterization only: retain its existing recovery asymmetry.
+If reproduction refutes a source concern, record evidence rather than invent a fix.
+If a defect needs changes beyond this scope, stop dependent work for orchestration
+review. No unsafe baseline or failed safety assertion is an accepted stage.
 
 ## 5. Tests that must exist before movement
 
@@ -248,14 +261,14 @@ Planned additional files, only if existing cases do not already satisfy the rows
 | ID / before stage | Planned test file | Required cases and falsification |
 |---|---|---|
 | P0 / 1 | `tests/unit/reviewer-search-public-contract.test.js` | Import old default/named paths; card with populated evidence, read-only/canManage=false, absent remedy callbacks, server repair and unknown status. Assert action availability and callback arguments, not random useId strings. Removing a permission/availability branch must fail. |
-| P1 / 2–3 | `tests/unit/reviewer-search-workspace-composition.test.js` | Populated active/excluded/ineligible/blocked/unverified/handled and applicant statuses; empty/error/loading; same-name distinct keys; sorting, selections, manual slot and modal lifecycle, search form edits and prompt editor. Parent onSaved/onNavigate counts and modal false/throw semantics. Move a slot or wire a wrong action and expect failure. |
-| P2 / 3–4 | `tests/unit/reviewer-search-context-lifecycle.test.js` | Deferred roster GET A→B, same-request blobUrl change, proposalKey-only change, exclusions arriving after edits, rerenders without reload loop, unmount, same-context double-click, prior operation finishing after new context. Assert reset/default/ref behavior from old code. Reproduce §4 separately. |
-| P3 / 4 | extend R4/R5 | Exclude failure restores only the original active source; unverified exclude failure never becomes active; stale promote 409 reload; scoped remove preserves newer updatedAt, applicant/saved/excluded rows and unaffected selection. Test actual populated complements. |
-| P4 / 5 | `tests/unit/reviewer-search-stream-contract.test.js` | Real readSseStream with in-memory fragmented ReadableStream (no mocked parser): UTF-8/chunk splits, progress, complete then transport error, transport error before complete, explicit error, missing body/non-OK. Exercise analyze/discover/enrich through the public component; roster POST awaited, prune payload, rank/off-topic ordering and deceased partition. Late callbacks/success/failure/finally are separately covered under §4. |
-| P5 / 6 | extend R4 + P2 | Exact expected applicant keys/cache version/proposal binding; active/ineligible versus excluded/saved terminals; partial cache; handled recommendations; manual refresh; concurrent discovery and applicant streams; no repeated enrich on ordinary rerender. Include unknown/missing fields, not only ideal DTOs. |
-| P6 / 7 | extend R3/R5 | Full server-authoritative contact candidate replacement; website/affiliation draft acknowledged first; exact receipt-bound fields; verify returns partialSuccess+receiptRecorded then throws; failed ephemeral record blocks confirm; committed confirm followed by failed address verification remains visible/retryable; request change at each await. |
-| P7 / 8 | extend R2/R3; `tests/unit/reviewer-search-save-contract.test.js` | Mixed ordinary/applicant batch; same save key/different roster keys; malformed explicit index; missing-index legacy result; all rejected; partial non-2xx; ordinary pre-response network loss and GET reconciliation; ordinary post-response malformed/unreadable JSON and applicant transport failure without that recovery; roster-finalized false; repair-priority codes; manual fields only in applicant payload. Expired refresh manual field skip, unchanged token, recorded=0/1 per row, partial refresh, no auto-save, context change, onSaved exact count. |
-| P8 / 9 | `tests/unit/reviewer-search-export.test.js`; projection cases in P1/R1 | Export includes only selected/selectable DTOs, top-level/enrichment fallbacks, Scholar URL classification, filename fallback, create/revokeObjectURL and anchor cleanup, independent failure surface, duplicate-click behavior; §4 stale/export reproduction. Projection must preserve merge precedence and all readiness buckets with populated conflicting fixtures. |
+| P1 / 2 | `tests/unit/reviewer-search-workspace-composition.test.js` | Populated active/excluded/ineligible/blocked/unverified/handled and applicant statuses; empty/error/loading; same-name distinct keys; sorting, selections, manual slot and modal lifecycle, search form edits and prompt editor. Parent onSaved/onNavigate counts and modal false/throw semantics. Move a slot or wire a wrong action and expect failure. |
+| P2 / 0, 3 | `tests/unit/reviewer-search-context-lifecycle.test.js` | Deferred roster GET A→B, same-request blobUrl change, proposalKey-only change, exclusions arriving after edits, rerenders without reload loop, unmount, same-context double-click, prior operation finishing after new context. Assert reset/default/ref behavior from old code. Reproduce §4 separately. |
+| P3 / 3 | extend R4/R5 | Exclude failure restores only the original active source; unverified exclude failure never becomes active; stale promote 409 reload; scoped remove preserves newer updatedAt, applicant/saved/excluded rows and unaffected selection. Test actual populated complements. |
+| P4 / 4 | `tests/unit/reviewer-search-stream-contract.test.js` | Real readSseStream with in-memory fragmented ReadableStream (no mocked parser): UTF-8/chunk splits, progress, complete then transport error, transport error before complete, explicit error, missing body/non-OK. Exercise analyze/discover/enrich through the public component; roster POST awaited, prune payload, rank/off-topic ordering and deceased partition. Late callbacks/success/failure/finally are separately covered under §4. |
+| P5 / 5 | extend R4 + P2 | Exact expected applicant keys/cache version/proposal binding; active/ineligible versus excluded/saved terminals; partial cache; handled recommendations; manual refresh; concurrent discovery and applicant streams; no repeated enrich on ordinary rerender. Include unknown/missing fields, not only ideal DTOs. |
+| P6 / 6 | extend R3/R5 | Full server-authoritative contact candidate replacement; website/affiliation draft acknowledged first; exact receipt-bound fields; verify returns partialSuccess+receiptRecorded then throws; failed ephemeral record blocks confirm; committed confirm followed by failed address verification remains visible/retryable; request change at each await. |
+| P7 / 7 | extend R2/R3; `tests/unit/reviewer-search-save-contract.test.js` | Mixed ordinary/applicant batch; same save key/different roster keys; malformed explicit index; missing-index legacy result; all rejected; partial non-2xx; ordinary pre-response network loss and GET reconciliation; ordinary post-response malformed/unreadable JSON and applicant transport failure without that recovery; roster-finalized false; repair-priority codes; manual fields only in applicant payload. Expired refresh manual field skip, unchanged token, recorded=0/1 per row, partial refresh, no auto-save, context change, onSaved exact count. |
+| P8 / 0, 8 | `tests/unit/reviewer-search-export.test.js`; projection cases in P1/R1 | Export includes only selected/selectable DTOs, top-level/enrichment fallbacks, Scholar URL classification, filename fallback, create/revokeObjectURL and anchor cleanup, independent failure surface, duplicate-click behavior; §4 stale/export reproduction. Projection must preserve merge precedence and all readiness buckets with populated conflicting fixtures. |
 | P9 / 10 | `tests/unit/reviewer-search-boundary.test.js` | AST check public exports, no cycle/back-import, no new server consumer of search/, no fetching in view modules, no new canonical key/prune/readiness implementation. Include synthetic invalid imports/calls to prove boundary detection, not a grep that always passes. |
 
 P4 must keep existing tests that mock SSE, and supplement them with the real parser.
@@ -279,16 +292,24 @@ DTO sample is useful at release; missing samples must be declared, not invented.
 stage commit, and a recorded rollback reference. No stage is accepted on scoped
 unit tests alone. Prerequisite tests are before, not after, the move.**
 
-### Stage 0 — Baseline and behavior inventory
+### Stage 0 — Baseline, safety fixes and explicit dependency inventory
 
-Prerequisite: implementation authorization, isolated `codex/reviewer-search-decomposition`
-branch/worktree, clean status, current instruction/skill reads, revalidated source
-baseline. Inventory imports/exports, hook/ref ownership, endpoints and JSX groups.
-Record a source→target mapping by symbol (not stale line range). Map R1–R7 and P0–P9
-to exact existing/new test names. Add only P0–P2 needed by the first moves; later
-prerequisites land just before their stage. Triage §4 reproducibly. Run G and store
-counts/output paths/commit. Exit: baseline green; unresolved affected-stage blockers
-explicit. There are no production changes. Rollback: test/doc commit only.
+Prerequisite: authorized isolated branch/worktree, current instructions and source
+baseline. Before any refactor, reproduce §4 items 1–5; land only the bounded fixes
+with failing-before/passing-after evidence and separate commits. Characterize item
+6 without changing it. Add P0–P2 for initial moves and export/lifecycle safety cases
+now; remaining prerequisites land immediately before their extraction stages.
+
+Create `docs/plans/REVIEWER_SEARCH_WORKSPACE_EXECUTION_2026-09-18.md` containing a
+source-to-target symbol map and exact free-variable inventory for every planned
+hook: props, state, setters, refs, derived values, sibling commands, returned names,
+and effect/callback dependencies. Use AST-assisted capture analysis, then inspect
+closures by hand. Explicitly include rosterNames for exclusion rollback and
+unverified plus verifyAddressContact for identity confirmation. Reviewer compares
+the proposed signatures to source, not a broad “state bag.” Map R/P requirements
+to exact tests. Run G and all check gates; record outputs and corrected baseline.
+Exit: all bounded defects resolved or disproved, inventory reviewed, baseline green.
+Rollback: revert safety commits separately from tests/docs; no data rollback.
 
 ### Stage 1 — Card and local presentation leaves
 
@@ -309,56 +330,48 @@ SearchResults owns markup only; selection/modals/actions stay with controller ow
 Do not add wrapper DOM nodes just to pass props. Exit: populated and failure-state
 composition matches, no new effects/fetches in views. Rollback: inline slices.
 
-### Stage 3 — Mechanical controller bridge
-
-Before: P2 plus prior tests. Move the remaining non-JSX body intact into
-useReviewerSearchController; facade calls it unconditionally once and renders the
-Stage 2 components. Preserve public default arguments, reference/dependency
-behavior, effect order and Set functional updates. Do not split state into reducers.
-This intentionally large interim hook buys a single stable extraction seam.
-Exit: no runtime algorithm differences and no rerender-induced request loops.
-Rollback: inline controller before reverting views; no data rollback needed.
-
-### Stage 4 — Roster reads and actions
+### Stage 3 — Roster reads and actions
 
 Before: P3, P2, R3/R4/R5. Extract read callbacks first, then action callbacks. Keep
 reset effect and all roster state in controller. Pass stable genRef, requestId and
 specific setters. Action hook gets busy/removingPrevious and exact previousSearchRefs
 with updatedAt, not just names. Preserve distinct optimistic rollback operations.
 Exit: load gating, 409 reconciliation and awaited removal/search exclusion are
-unchanged. §4 rollback defect blocks this stage if reproduced and unresolved.
+unchanged. Stage 0 regression protection must still pass.
 Rollback: inline these callbacks; keep tests.
 
-### Stage 5 — Discovery pipeline
+### Stage 4 — Discovery pipeline
 
 Before: P4, R4/R5, P2. Move runSearch as one hook-owned callback with existing
 refs, inputs, progress callback and setters. Preserve three transport handlers,
 local result variables, all option fields, exclusion union, provenance stamping,
 ranking and ineligible roster recording. Do not parallelize ordered phases or
 replace SSE reader. Exit: every request payload/ordered call and result partition
-matches baseline; current busy state lasts through POST. §4 stream/ref findings
-must be resolved separately or this stage stays blocked. Rollback: inline runSearch.
+matches baseline; current busy state lasts through POST. Stage 0 stream/ref regressions
+must remain green. Rollback: inline runSearch.
 
-### Stage 6 — Applicant enrichment
+### Stage 5 — Applicant enrichment
 
 Before: P5, R4/R7. Move cache derivations, command, then auto-effect together;
-return terminalApplicantKeys for display use. Use exact original effect dependencies
+return terminalApplicantKeys for display use. Use the accepted Stage 0 effect dependencies
 and recRunningRef. Discovery and applicant processing remain separate lanes sharing
 only the existing analysis snapshot, controller state and generation owner.
 Exit: valid cache never repeats work, partial cache does, manual refresh remains
 possible, handled rows do not become actionable. Rollback: inline this group.
 
-### Stage 7 — Contact and identity operations
+### Stage 6 — Contact and identity operations
 
 Before: P6, R3/R5/R6. Move local contact transforms first, then draft persistence,
 address verify/review/retry/repair, lead handling, openIdentityConfirmation and
 confirmIdentityContact. Keep editingContact/confirmingContact state in controller;
-pass existing set functions. Hook returns named commands used by modal bindings.
+hoist both useState declarations above the contact-hook call before evaluating
+setter arguments (the original declarations occur after other contact callbacks).
+Pass existing set functions; preserve defaults and hook order after the move. Hook returns named commands used by modal bindings.
 Do not deduplicate operations with different partial-success or exception behavior.
 Exit: request payload order, authority fields, partial receipts and retry surfaces
 match producer contracts. Rollback: inline group; no server receipt cleanup.
 
-### Stage 8 — Promotion and refresh
+### Stage 7 — Promotion and refresh
 
 Before: P7, R2/R3, real producer envelope checks. Move refreshExpiredVerification
 then saveSelected in one module. Preserve savingRef generation token and finally
@@ -368,15 +381,25 @@ still never requests a saved roster transition. Exit: all-success, mixed, all-fa
 unknown-outcome and stale cases preserve exact cards, callback counts and retries.
 Rollback: inline both functions together, never manually reset durable rows.
 
-### Stage 9 — Export and display projection
+### Stage 8 — Export and display projection
 
 Before: P8 plus R1/P1/P2. Extract export callback without payload changes. Extract
 existing useMemo derivations into a projection hook, preserving dependencies and
 merge order; ordinary synchronous derivations may stay synchronous. Keep Stage 1
 thin candidate-key wrappers unchanged. Do not split existing
 reviewer-search-logic or introduce new cache/version rules. Exit: remaining
-controller owns state/reset/composition only, export failure does not replace search
+facade workflow body owns state/reset/composition only, export failure does not replace search
 error, all readiness and handled projections unchanged. Rollback: inline these groups.
+
+### Stage 9 — Small controller composition last
+
+Before: all P0–P8 and R1–R7, plus the accepted free-variable inventory. Move only
+remaining state/ref declarations, reset/prefill effects, selection callbacks and
+hook composition into useReviewerSearchController. Facade calls it once and keeps
+public defaults/exports and Stage 2 rendering. Preserve Stage 0 lifecycle and
+composition order in §3; do not create a reducer or a second generation owner.
+Exit: all commands live in their operation modules; no new request loops, view
+behavior or state lifetime changes. Rollback: inline the small composition body.
 
 ### Stage 10 — Boundary closure and release handoff
 
@@ -384,8 +407,7 @@ Before: P9 and all prior tests. Add ownership headers, update only documentation
 that asserts changed internal ownership, and run scoped /sweep. Remove dead imports
 and duplicate local definitions only after caller search. Re-export facade remains.
 Verify operation modules import neither facade nor controller; server consumers
-still use old helpers. Reject an implementation that merely left Stage 3's giant
-controller intact. Keep coherent complex operations whole rather than splitting
+still use old helpers. Reject a controller containing the extracted operation bodies. Keep coherent complex operations whole rather than splitting
 for a line-count score. Run G and release checks below. Exit: independently reviewed
 candidate plus explicit release evidence/remaining limitations; no automatic merge.
 Rollback: revert accepted stage commits in reverse dependency order or restore the
@@ -400,6 +422,8 @@ At every stage, execute serially in the implementation worktree:
 npm test -- --runInBand --silent
 npm run lint
 npm run check:types
+# Once search/ exists; preserve zero NEW facade warnings versus baseline:
+npx eslint shared/components/reviewers/search --rule 'react-hooks/exhaustive-deps:error'
 npm run check:status-enum-parity && npm run check:status-enum-parity:self-test
 npm run check:api-routes && npm run check:api-routes:self-test
 npm run check:route-service-boundary && npm run check:route-service-boundary:self-test
@@ -416,8 +440,21 @@ self-test sequentially (enumerate package.json). Stage 10 runs the synthetic bou
 mutations. Build uses the canonical Next build; a sandbox process/port panic gets
 one normal escalation retry per CI_GATES_REFERENCE. Webpack fallback is explicitly
 weaker evidence and cannot be called a canonical green build. Record environment
-failures distinctly from code failures. No full build or full-suite green is claimed
-for this planning session.
+failures distinctly from code failures. Record actual full build/full-suite results in the execution receipt; historical
+planning checks in §9 do not establish an implementation pass.
+
+**Branch drift check before every stage:** fetch origin, record feature HEAD and
+origin/main, and compare upstream changes with the last reviewed baseline. If
+main advanced, merge origin/main into the feature branch (never pull main while
+checked out elsewhere, force-reset or rebase accepted stage history), inspect any
+conflicts, run G and fresh Sol review before continuing. Coordinate overlapping
+ownership if another agent touches these files; do not assume others are frozen.
+Source line numbers in this plan never override current symbols.
+
+Stages 1–2 form a useful independently releasable presentation-only group after
+Stage 0. Later accepted stages also remain buildable rollback points. Owner release
+approval is still required for any group; a partial milestone is not completion of
+the full authorized task. Continue unless blocked or asked to pause.
 
 **Release posture [PLANNED]: Tier 2 precaution**, given campaign-critical reviewer
 mutations controlled by this UI. Verify the current campaign window at execution;
@@ -455,7 +492,10 @@ exist); at P-B/P-C give repo path, baseline commit, document path/hash, checkpoi
 and the review contract below. Reviewer reads source independently and cites contradictions.
 A returning agent with the old conversation is not a fresh-context review.
 
-**Implementation later:** repeat the same procedure after every numbered stage
+**Implementation orchestration:** Luna performs reconnaissance, prerequisites,
+implementation and builds. A newly spawned Sol (`gpt-5.6-sol`, `fork_turns: none`)
+reviews each numbered stage and its next-stage prerequisites; root then accepts
+or corrects it. Repeat the same procedure after every numbered stage
 (including Stage 0) and after any material correction. Before starting the next
 stage, a fresh reviewer rechecks the next stage's prerequisites against the actual
 accepted code, not the original plan line numbers. New evidence that invalidates
@@ -481,6 +521,13 @@ approval by timeout. If fresh review is unavailable, mark the checkpoint pending
 and stop dependent work; do not impersonate a fresh reviewer through a self-summary.
 Ordinary subagent review is sufficient; no metered review product is authorized.
 
+Limit any stage to two Luna correction rounds on material Sol findings. Root then
+takes over unresolved changes or decides a documented nonblocking disposition;
+Sol reviews material corrections freshly. Do not cycle on optional style changes,
+and do not waive failed safety assertions. Root performs final diff/contract review
+and can implement necessary corrections. All agent sessions use subscription OAuth;
+no API keys or metered review-product substitution.
+
 Work order for a cheaper implementing model:
 
 1. Read this whole document and the prior stage receipt. Confirm owner execution
@@ -488,14 +535,18 @@ Work order for a cheaper implementing model:
 2. Read only current stage source, full functions, callers and listed tests using
    CodeGraph first. Do not infer a helper contract from its name.
 3. Add missing prerequisite tests; run on unchanged implementation; commit green
-   tests separately. A failed safety test triggers §4, not an inline behavior fix.
+   tests separately. Stage 0 safety failures follow the bounded fix protocol in §4; later failures
+   stop the move for diagnosis, never silently alter behavior inside extraction.
 4. Move the exact listed symbols with required imports, preserve exports and args.
    Keep public tests importing the facade. No cleanup of unrelated code.
 5. Run stage tests and G; inspect complete diff for accidental policy/DTO changes.
 6. Obtain fresh review, resolve findings, rerun affected checks, record receipt and
    commit accepted work. Continue only within authorized stage scope.
 
-## 9. Planning evidence and review receipts
+## 9. Historical planning evidence and review receipts
+
+These receipts describe the original planning snapshots, before the owner authorized
+implementation and the Opus corrections below. They are not current stage acceptance.
 
 **P-A — scope review completed.** Fresh agent `/root/scope_review`, no inherited
 conversation; baseline b400c97d. Verdict READY WITH NAMED CHANGES for UI-only scope,
@@ -552,3 +603,17 @@ backend inclusion. Extraction equivalence, added prerequisites, full build, full
 suite, browser rehearsal and deployment remain NOT TESTED/PLANNED. Acceptance of
 this document means usable planning guidance, not authorization or proof of a
 successful migration.
+
+## 10. Opus disposition and execution receipts
+
+Claude Opus reviewed via subscription OAuth; the unmodified report is
+`docs/audits/REVIEWER_SEARCH_WORKSPACE_OPUS_REVIEW_2026-09-18.md` (historical verdict:
+READY WITH NAMED CHANGES). This revision adopts all seven recommendations: upfront
+bounded defect fixes; per-stage branch synchronization; exact hook capture inventory;
+controller-last ordering; early modal-state declarations; exhaustive-deps enforcement;
+and independently useful presentation stages. No API or paid review product was used.
+
+The owner subsequently authorized implementation with Luna → fresh Sol → root
+acceptance. The execution receipt records the revised-plan review, stage commits,
+rollback references, tested assumptions, failures, corrections and remaining release
+limitations. Source has not changed merely because this plan was revised.
