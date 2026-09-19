@@ -38,6 +38,12 @@ function budgets(overrides = {}) {
       timeoutMsOverride: 200000,
       ...(overrides.chair || {}),
     },
+    'initial-assessment.generate': {
+      kind: 'standing',
+      maxTokensOverride: 12000,
+      timeoutMsOverride: 120000,
+      ...(overrides.initialAssessment || {}),
+    },
   };
 }
 
@@ -212,10 +218,10 @@ test('publishes and verifies the next immutable revision after model-ceiling che
 
   expect(result).toMatchObject({ status: 'completed', config: { version: 1, source: 'dataverse' } });
   // pre-site-visit.proposal-core.generate + review-synthesis.generate (retry)
-  // + review-panel.seat + review-panel.chair: every 'standing'/'retry' kind
-  // reads its current prompt row for a model-ceiling check; 'timeout' kinds
-  // (field-primer, cycle-dossier) do not.
-  expect(deps.fetchCurrentPrompt).toHaveBeenCalledTimes(4);
+  // + review-panel.seat + review-panel.chair + initial-assessment.generate:
+  // every 'standing'/'retry' kind reads its current prompt row for a
+  // model-ceiling check; 'timeout' kinds (field-primer, cycle-dossier) do not.
+  expect(deps.fetchCurrentPrompt).toHaveBeenCalledTimes(5);
   expect(deps.createSettingStrict).toHaveBeenCalledWith(
     'executor.budgets.v000001',
     expect.any(String),

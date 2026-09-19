@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-30
+last_verified: 2026-09-18
 stale_after_days: 90
 owner: ai-platform
 source_files:
@@ -121,12 +121,68 @@ reviewer-finder prompt migration.
   verified the Production Admin read surface in that safe no-revision/fallback
   state; publishing revision 1 remains an explicit later action.
 
+## Hazard: thinking-default models spend `max_tokens` on reasoning
+
+**Pattern (2026-09-18, Initial Assessment rehearsal, run `7d8b647c-abb3-f111-aaac-000d3a361c1f`):**
+`stop_reason=max_tokens`, `output_tokens` equal to the prompt row's `wmkf_ai_maxtokens`,
+and the retained answer text is EMPTY (hash of `""`). Nothing was dropped by us: the
+budget was consumed before the first `text` block existed.
+
+**Why.** Claude Opus 5, Sonnet 5, and the Fable/Mythos family run adaptive thinking
+when the request omits `thinking` (registry `thinkingMode: adaptive_default_on` /
+`adaptive_always_on`). Anthropic: thinking tokens "count toward `max_tokens`, a hard
+limit on total output", and under the default `display: "omitted"` the response
+"can begin with one or more `thinking` blocks ... returned with an empty `thinking`
+field". The Executor never sends `thinking` or `effort` (`llm-client.js` `_buildBody`),
+so a prompt row budget sized for answer text alone (IA: 2,200 for ~400 words) can be
+spent entirely on reasoning. Opus 4.6–4.8 run WITHOUT thinking when it is omitted,
+which is why a tier alias advancing from `opus`→4.8 to `opus`→5 changes token
+behaviour with no prompt edit. Both tiers (`opus`, `sonnet`) now resolve to
+thinking-default models; reverting the alias alone is not a fix.
+
+**Why it was invisible.** The prompt row stores a tier alias, not a concrete id;
+admin publish clones `wmkf_ai_maxtokens` from the prior version and exposes no budget
+input; standing budgets (`EXECUTOR_BUDGET_DEFAULTS`) cover only listed prompts
+(`initial-assessment.generate` was added in the same PR: standing 12,000 / 120 s,
+limits 4,096–32,000, threaded through the IA facade via `getExecutorBudget`). A
+model-only republish therefore never re-reviews the budget. Adaptive thinking may skip
+trivial tasks, so several live prompts run below 4,096 and still succeed (read-only
+audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 5 at
+3,000 passed 5/5). A blanket pre-call floor would break them, so the guard is advisory.
+
+**What the code does now — [DEPLOYED TO PRODUCTION 2026-09-18 via PR #314, merge `0b240f0a`, GitHub deployment 6534604317 success; IA generation re-rehearsed PASS 2026-09-18 23:38Z on request 1003222: run `7770d508` end_turn, out=1065, blocks=text:2971, thinkingTokens=0, maxTokens=12000; Ready row `7d00fffd` (prompt v2, 18,243-byte DOCX, SharePoint v1.0) is the current pointer, prior Ready `a6876ad6` superseded; exact retry reused the row with no new run]:**
+- `llm-client.js` normalizers return `blocks` (content-free `{type, chars}` census) and
+  `thinkingTokens` (`usage.output_tokens_details.thinking_tokens`, null when absent).
+- `execute-prompt.js` `thinkingBudgetAdvisory()` flags a thinking-default model below
+  `THINKING_BUDGET_FLOOR_TOKENS` (4,096). It never blocks; it lands in `wmkf_ai_notes`
+  as `thinkingBudget=below_floor(4096)` on success AND failure, next to
+  `blocks=thinking:0,text:0` and `thinkingTokens=N`.
+- A `max_tokens` stop with zero text keeps code `claude_output_truncated` (callers'
+  bounded escalation retry depends on it) but sets `truncatedBeforeText=true` and a
+  message naming the cause and remediation. The failure `wmkf_ai_rawoutput` envelope
+  carries `blocks`, `thinkingTokens`, and `budgetAdvisory`.
+
+**Triage checklist when you see `claude_output_truncated`:**
+1. Read `wmkf_ai_notes`: `truncatedBeforeText=true` + `blocks=thinking:...` with no
+   `text:` entry = reasoning ate the budget. Partial text = ordinary length overrun.
+2. Check the resolved model's `thinkingMode` (`lib/services/model-capabilities.js`)
+   and the row's `wmkf_ai_maxtokens`. Below 4,096 on a thinking-default model is the
+   known-bad shape.
+3. Fix = raise the budget (standing budget via `/admin` Executor Budgets when the prompt
+   is registered in `EXECUTOR_BUDGET_DEFAULTS`; register it and thread `getExecutorBudget`
+   through the caller when it is not) or lower effort. Do not retry the same budget;
+   `claimExisting` reclaims a Failed IA row and pays again.
+4. If the prompt is a producer with a pinned `promptVersion` contract
+   (`INITIAL_ASSESSMENT_CONTRACT`), ship the contract bump with the republish; the
+   producer refuses a mismatch AFTER the paid call (`initial_assessment_prompt_version_mismatch`).
+
 ## Durable Memory
 
 - Prompt storage and Dataverse ground truth: `project-prompt-storage-strategy`, `project-dynamics-as-prompt-ground-truth`.
 - PDF/document processing: `project-pdf-processing-tiers`.
 - Reviewer prompt migration: `project-reviewer-prompt-dataverse-migration`.
 - Prompt injection/security: `project-a7-prompt-injection-hardening`.
+- Thinking-default budget truncation (zero-text `max_tokens`): `project-executor-thinking-budget-truncation`.
 
 ## Standard Probe
 

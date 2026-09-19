@@ -216,7 +216,7 @@ The independent Graph probe read both items twice, downloaded both in memory, an
 
 **PASS — production IA generation and exact retry, attributed to the Claude handoff; decomposed candidate not rerun.** [Claude production evidence, with pointer/reconciliation fields independently verified via `/tmp/wmkf-claude-handoff-verified.json` and `/tmp/wmkf-claude-handoff-reconciliation.json`] PR #314 merge `0b240f0a` deployed the thinking-budget fix. Claude reports request `1003222 / ZZTEST-03` passed at 23:38Z: run `7770d508-bab3-f111-aaac-7ced8d3c3a59` ended `end_turn`, output 1,065 tokens, `thinkingTokens=0`, `maxTokens=12000`, and Ready IA row `7d00fffd-b9b3-f111-aaac-000d3a361c1f` became current, superseding `a6876ad6-3b94-f111-8075-70a8a59cded0`. The exact retry reused that row with no new run.
 
-Root independently verified 28 Request Document rows, one new Ready row, only the prior IA lifecycle/modified fields changed among 27 prior rows, current PSV `205da1cd-b7b3-f111-aaac-6045bd04539e` unchanged in Review, Final null, and all 14 attempts unchanged. Provider tokens, end reason and retry reuse remain Claude-attributed evidence. The decomposed candidate remains prompt v1 and has not been rerun against PR #314.
+Root independently verified 28 Request Document rows, one new Ready row, only the prior IA lifecycle/modified fields changed among 27 prior rows, current PSV `205da1cd-b7b3-f111-aaac-6045bd04539e` unchanged in Review, Final null, and all 14 attempts unchanged. Provider tokens, end reason and retry reuse remain Claude-attributed evidence. The isolated candidate now integrates prompt v2 and has passed local validation but has not been live-rerun.
 
 ## Smoke cases and evidence
 

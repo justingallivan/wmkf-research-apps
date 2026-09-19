@@ -255,6 +255,12 @@ Migration plans touching either entity must preserve these foreign keys.
   240 000 ms). The response reported model ceilings for the two token-carrying prompts only.
   Admin and runtime reads return `source: dataverse`, version 1, `latestRevision` 1, zero
   storage warnings.
+  **[DEPLOYED TO PRODUCTION 2026-09-18 via PR #314, merge `0b240f0a`, GitHub deployment 6534604317 success; IA generation re-rehearsed PASS 2026-09-18 23:38Z on request 1003222: run `7770d508` end_turn, out=1065, blocks=text:2971, thinkingTokens=0, maxTokens=12000; Ready row `7d00fffd` (prompt v2, 18,243-byte DOCX, SharePoint v1.0) is the current pointer, prior Ready `a6876ad6` superseded; exact retry reused the row with no new run]**
+  `initial-assessment.generate` joins the registry as a standing budget (default
+  12,000 tokens / 120 s; limits 4,096–32,000 / 60–240 s) after Opus 5 default
+  thinking consumed the prompt row's 2,200-token budget; the IA facade threads it
+  as `maxTokensOverride`. A revision published before that registration fills it
+  from the code default.
   `lib/services/executor-budget-service.js` resolves the Pre-Site
   standing output/transport budget, the review-synthesis retry range, and the
   field-primer timeout-only budget (S493) from the

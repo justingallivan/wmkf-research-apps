@@ -62,6 +62,16 @@ export const EXECUTOR_BUDGET_DEFAULTS = Object.freeze({
     maxTokensOverride: 12_000,
     timeoutMsOverride: 200_000,
   }),
+  // initial-assessment.generate is 'standing' (owner decision, 2026-09-18):
+  // the prompt row's 2,200-token budget was consumed entirely by Opus 5's
+  // default adaptive thinking (run 7d8b647c, zero answer text). Admin publish
+  // clones the row budget and cannot change it, so the tunable lives here.
+  // The 120 s timeout mirrors the LLM client default the call already used.
+  'initial-assessment.generate': Object.freeze({
+    kind: 'standing',
+    maxTokensOverride: 12_000,
+    timeoutMsOverride: 120_000,
+  }),
 });
 
 // Safety bounds remain code-owned. Admin publications may tune values only
@@ -99,6 +109,13 @@ export const EXECUTOR_BUDGET_LIMITS = Object.freeze({
     maxTokensOverride: Object.freeze({ min: 4_000, max: REVIEW_PANEL_PROMPT_ROW_MAX_TOKENS_CAP }),
     timeoutMsOverride: Object.freeze({ min: 60_000, max: 220_000 }),
   }),
+  // min = the Executor's thinking-budget advisory floor (THINKING_BUDGET_FLOOR_TOKENS);
+  // max = a bounded ceiling for a ~400-word JSON answer plus reasoning. The
+  // Workbench route allows 300 s, so 240 s matches the Pre-Site envelope.
+  'initial-assessment.generate': Object.freeze({
+    maxTokensOverride: Object.freeze({ min: 4_096, max: 32_000 }),
+    timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
+  }),
 });
 
 export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
@@ -125,6 +142,10 @@ export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
   'review-panel.chair': Object.freeze({
     since: '2026-09-13 (owner decision: admin-tunable ceiling, not hard-coded in the prompt row/seed)',
     reason: 'One synthesis over every seat\'s structured review. Adaptive thinking is counted inside this same output budget, so it must be raisable as models evolve without a code change.',
+  }),
+  'initial-assessment.generate': Object.freeze({
+    since: '2026-09-18 (owner decision after rehearsal run 7d8b647c)',
+    reason: 'Four short JSON sections over a proposal narrative. The prompt row\'s 2,200-token budget was spent entirely on Opus 5 default adaptive thinking (max_tokens stop, zero answer text). Thinking is counted inside this output budget, so it must be raisable without a prompt republish or code change.',
   }),
 });
 
