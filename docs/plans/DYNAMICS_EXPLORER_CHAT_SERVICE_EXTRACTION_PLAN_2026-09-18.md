@@ -162,13 +162,15 @@ ownership, or route path changes.
   resolver reached through a repo-local import (E5). Moving resolution into the
   route would change the event sequence when `getModelForApp` throws, so do not.
   `exportCsv` and `callClaudeBatch` keep their own direct calls (E19). Do not thread a model into export to "fix" this; that is scope.
-- **Two law-gate exemptions relocate, they are not eliminated.** The Explorer
+- **Two law-gate exemptions relocate, they are not widened.** The Explorer
   reads arbitrary tables, so no entity adapter can exist; the new service dir
-  therefore needs the same Dataverse access-layer exemption the route dir has
-  today, and the same OData-escape exemption unless the owner chooses the
-  one-line escape swap in §3.4. §1's measurable outcome is that the *route*
-  gate has no exemption. This relocation is an owner choice, presented in §3.4,
-  not a settled mechanism.
+  therefore needs the Dataverse access-layer exemption the route dir has today,
+  and exactly one file, `tools/get-entity.js`, needs the OData-escape exemption.
+  Relocation means the old `pages/api/dynamics-explorer/` entries are **removed**
+  from both gates at S9 with red self-test fixtures proving the route dir is
+  scanned again; adding the new entries at S1 without removing the old ones at
+  S9 is a stop condition. §1's measurable outcome is that the route gate has no
+  exemption. The relocation itself was the owner's choice on 2026-09-18.
 
 ### 3.2 Module map (all paths **new**)
 
@@ -277,11 +279,11 @@ introduces, together with `onStage`; keep them that small.
 
 | Gate | Change | When |
 |---|---|---|
-| `check:dataverse-access-layer` | Add `lib/services/dynamics-explorer/` to `EXEMPT_DIRS` with the `lib/services/dataverse-export/` precedent and the rationale "arbitrary-table explorer; no entity adapter can exist". Update the `dynamics-explorer-taxonomy.js` `EXEMPT_FILES` comment to name the new importer. Add a green fixture to the self-test. | S1, before any module that imports `DynamicsService` |
+| `check:dataverse-access-layer` | S1: add `lib/services/dynamics-explorer/` to `EXEMPT_DIRS` with the `lib/services/dataverse-export/` precedent and the rationale "arbitrary-table explorer; no entity adapter can exist"; update the `dynamics-explorer-taxonomy.js` `EXEMPT_FILES` comment to name the new importer; add a green fixture to the self-test. S9: remove `pages/api/dynamics-explorer/` from `EXEMPT_DIRS`, convert the self-test's exempt-dir fixtures at `scripts/check-dataverse-access-layer-self-test.js:155,338` into a red fixture proving a raw `DynamicsService` import under that route dir now fails, and keep `pages/dynamics-explorer.js` in `EXEMPT_FILES` (`:331` fixture) unchanged. | S1 add; S9 remove |
 | `check:prompt-injection-tagging` | Change `callSiteFiles` for `dynamics-explorer-chat` to `['lib/services/dynamics-explorer/chat-session.js']` and for `dynamics-explorer-export` to `['lib/services/dynamics-explorer/tools/batch-processing.js']` in the same commit that moves each wrap site. Run the self-test. | S7 for export, S8 for chat |
 | `check:dynamics-context-boundary` | No rule change. Update the header comment that cites `chat.js:124` to the shell's current line. | S8 |
 | `check:model-override-warming` | No rule change. Route keeps the awaited warm. | verify every stage |
-| `check:odata-escape` | **Owner choice, decide before S1.** (a) Add `lib/services/dynamics-explorer/` to `EXEMPT_DIRS` (`scripts/check-odata-escape.js:57-59`), update the header at `:15-16,55-57` which says the list mirrors the access-layer gate, and add a green fixture beside the existing exempt-dir fixture at `scripts/check-odata-escape-self-test.js:105-107,150`; a pure move. (b) Replace the one hand-rolled escape at `chat.js:1253` with `escape()` from `lib/dataverse/core/odata.js` as a deliberate one-line edit with a unit assertion that the produced `$filter` is identical for an identifier containing `'`; not a pure move, and must be its own commit. `escape()` coerces a non-string where today's call would throw; the tool schema types `identifier` as a string (`shared/config/prompts/dynamics-explorer.js:723`), so this is acceptable and must be stated in the commit. **Owner chose (a) on 2026-09-18.** | S1 for (a); S5 step before `get-entity` for (b) |
+| `check:odata-escape` | **Owner choice, decide before S1.** (a) Add the single file `lib/services/dynamics-explorer/tools/get-entity.js` to `EXEMPT_FILES` (`scripts/check-odata-escape.js:50`, checked at `:100`), not the directory, with the comment "one legacy escape at the former chat.js:1253; retire with option (b)"; update the header at `:15-16,55-57`; add a green fixture beside the existing exempt fixture at `scripts/check-odata-escape-self-test.js:105-107,150` and a red fixture for a second service file with a hand-rolled escape. At S9 remove `pages/api/dynamics-explorer/` from `EXEMPT_DIRS` (`:57-59`) and turn the `:105-107` fixture red. A pure move. (b) Replace the one hand-rolled escape at `chat.js:1253` with `escape()` from `lib/dataverse/core/odata.js` as a deliberate one-line edit with a unit assertion that the produced `$filter` is identical for an identifier containing `'`; not a pure move, and must be its own commit. `escape()` coerces a non-string where today's call would throw; the tool schema types `identifier` as a string (`shared/config/prompts/dynamics-explorer.js:723`), so this is acceptable and must be stated in the commit. **Owner chose (a) on 2026-09-18.** | S1 add file exemption; S9 remove route-dir exemption |
 | `check:route-service-boundary` | Remove `pages/api/dynamics-explorer/` from `EXEMPT_ROUTE_DIRS`. Self-test: the exempt fixtures at `:94` and `:272` are already `dataverse-export`; move the Explorer fixtures at `:93,268` (adapter import) and `:97,287` (`chat-submodule.js`, the GREEN half of the S338 matcher-extension guard whose RED half is `:87,278-283`) to `pages/api/dataverse-export/` paths with the same imports, keeping both in `GREEN_ROUTES` so the guard and the count assertion at `:307-308` are unchanged; give the relocated fixtures names distinct from the existing `thing.js`. Update the gate header `:10-11`, the self-test header `:51-52`, and `docs/CI_GATES_REFERENCE.md:54`. | S9, last |
 
 Never satisfy a gate with an env edit, an ignore marker, or a baseline file.
@@ -343,9 +345,16 @@ Characterization, driven through the real handler with the E12 mock set:
    asserting the finalize call arguments exactly. The harness already covers
    truncated and refused (`:262-264`), max_rounds (`:284`), abort during the
    model call (`:327`), and error at stage `model` (`:1403`). Add:
-   - **4b, finalize-before-complete ordering.** Mock `finalizeRequest` with a
-     deferred promise; assert no `event: complete` write occurs until it
-     resolves. This is the discriminating test for the §3.3 `onTerminal` rule.
+   - **4b, finalize-before-terminal ordering.** Mock `finalizeRequest` with a
+     deferred promise; assert that neither `event: response` nor
+     `event: complete` is written until it resolves, on both the streamed and
+     the non-streamed fallback path (`chat.js:260-263`) and on max rounds.
+     This is the discriminating test for the §3.3 `onTerminal` rule.
+   - **Exact counts everywhere.** Every terminal fixture in this item asserts
+     the full `finalizeRequest.mock.calls` array: exactly one call for
+     completed, truncated, refused, max_rounds, and each error stage; exactly
+     two, with exact payloads, for each disconnect path. `toHaveBeenCalledWith`
+     alone lets a duplicate `onTerminal` pass.
    - **4c, disconnect observed during tool execution.** Trigger the disconnect
      while a tool promise is pending so the polling check at `chat.js:369`
      fires, not the abort path. Script a second model response with final text
@@ -394,10 +403,25 @@ repoint at S2):
 10. `redactRestrictedFieldNames` replaces every occurrence and leaves other text
     intact.
 
-Known limit of the harness, carried into S0: its `getDynamicsContext` mock
-returns `{ restrictions: [] }` (`tests/integration/dynamics-explorer-tool-serialization.test.js:101`),
-so the ALS read guard inside `DynamicsService` is never exercised; S0 evidences
-the local guard only. Do not claim otherwise in a receipt.
+11. **Restriction context boundary.** The harness's `withDynamicsContext`
+    mock is `(ctx, fn) => fn()` and `getDynamicsContext` returns
+    `{ restrictions: [] }` (`tests/integration/dynamics-explorer-tool-serialization.test.js:96-102`),
+    so nothing today proves reads happen inside the loaded-restrictions scope
+    that `DynamicsService` fails closed without
+    (`lib/services/dynamics/restrictions.js:38-47`). Override both per test:
+    `withDynamicsContext` records `ctx` and sets an `active` flag for the
+    duration of `fn`; every mocked `DynamicsService` read throws unless
+    `active` is true. Assert that the recorded `ctx.restrictions` is the exact
+    array returned by the `dynamics_restrictions` query and `ctx.requestId`
+    equals the `requestId` in the `complete` event, and that a
+    `query_records` round succeeds. Broken implementations this catches: a
+    service invoked outside `withDynamicsContext`, a context established with
+    `[]` or a stale array, or a decorative context call that does not wrap the
+    loop. Required green at S0 and at S8.
+
+Known limit that remains: the mocked reads do not evaluate restriction
+semantics, so S0 evidences the local guard's decisions and the presence of
+the scope, not `DynamicsService.checkRestriction`'s own logic.
 
 `checkRestriction`, `splitChatExpandSegments`, `restrictedFieldsForTable`, and
 `redactRestrictedFieldNames` are not exported today [VERIFIED via
@@ -511,14 +535,20 @@ finalize-before-`complete` ordering in place, with `onStage` and the two
 (5) update the dynamics-context gate header comment, which cites `chat.js:124`
 while the call is at `:191` today.
 **Exit:** normalized SSE snapshot hash from S0 is identical; every terminal
-outcome test 4b through 4g passes; the route imports no
+outcome test 4b through 4g passes with exact call arrays; test 11 passes
+against the reduced shell; the route imports no
 `DynamicsService`, `GraphService`, `ExcelJS`, `LLMClient`, or `@vercel/postgres`
 (`grep -n "import" chat.js` is the check; line count is not a criterion). Run full Jest and `npm run build`.
 
 ### S9, Gate flip, docs, receipt
 
 **Order:** (1) `check-route-service-boundary.js` exempt-dir removal and self-test
-fixture swap; (2) `docs/CI_GATES_REFERENCE.md:54` wording; (3)
+fixture swap; (1b) remove `pages/api/dynamics-explorer/` from
+`check-dataverse-access-layer.js` `EXEMPT_DIRS` and from
+`check-odata-escape.js` `EXEMPT_DIRS`, converting each self-test's exempt-dir
+fixture to a red fixture as §3.4 specifies, each gate then its self-test,
+sequentially; (2) `docs/CI_GATES_REFERENCE.md:54` wording and the two gates'
+own rows; (3)
 `docs/SERVICE_AND_UTILITY_CATALOG.md` entries for each new module; (4) Atlas line
 `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md:69` path update; (5) matrix row
 `docs/API_ROUTE_SECURITY_MATRIX.md:177`: logic lives in the service dir, and the
@@ -527,7 +557,10 @@ restatement, including the historical line anchors in
 `docs/CHUNK_CONSOLIDATION_PLAN.md:204,211` and the carry-over row in
 `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md:55`; (7) full §9 gate run; (8) release
 receipt with tier, Preview smoke evidence, and rollback deployment.
-**Exit:** `check:route-service-boundary` green with no Explorer exemption;
+**Exit:** `check:route-service-boundary`, `check:dataverse-access-layer`, and
+`check:odata-escape` green with no `pages/api/dynamics-explorer/` exemption
+(`grep -n 'dynamics-explorer/' scripts/check-*.js` shows only the
+`dynamics-context-boundary` rule-2 sanction and the new service entries);
 `check:doc-currency`, `check:doc-symbol-refs`, `check:build-claim-freshness`,
 `check:atlas`, `check:api-routes` green.
 
@@ -655,7 +688,8 @@ At every stage, in this order:
 ## 10. Stop, rollback, and non-goals
 
 Stop the stage on: a harness edit needed to stay green; a changed SSE snapshot
-hash; a symbol defined in two files; a gate satisfied by an env edit, ignore
+hash; a symbol defined in two files; a gate exemption added without its S9
+removal step scheduled; test 11 red at S8; a gate satisfied by an env edit, ignore
 marker, or baseline; any prompt-file diff; any change to `withDynamicsContext`
 placement; a lifecycle finalize argument that differs for any outcome; a
 `complete` event written before its finalize settles (test 4b).
@@ -746,8 +780,24 @@ edited nothing; no gate, live call, or paid product. Root incorporated every
 finding and recorded the owner's three decisions of 2026-09-18 in §1 and §3.4.
 Revised sections 1 to 10 hash: `f1cd0809ca4e87accfd484de1337dbc9b6fe73aa5bcc09104ce5f1585dbb5174` at baseline `2e611d9a`.
 
-Next: the owner authorized a Codex adversarial review of this plan and
-execution of S0 to S9 on a feature branch (see §1).
+Codex adversarial review, 2026-09-19, owner-authorized, `gpt-5.6-sol` on
+ChatGPT OAuth, branch diff `HEAD~1..HEAD` at `52059e6b`, thread
+`01a0b875-3cab-75e2-8a8b-7b31d3e28b93`. Verdict: NEEDS REWORK. Findings:
+HIGH the harness could not detect a service invoked outside the
+loaded-restrictions scope, so S8 could silently weaken enforcement; HIGH S1
+added both gate exemptions for the new service dir and no stage removed the old
+route-dir entries, widening rather than relocating them, and the OData
+exemption was directory-wide for one surviving escape; MEDIUM test 4b checked
+only `complete` and no ordinary terminal asserted an exact finalize count.
+Root confirmed each against `lib/services/dynamics/restrictions.js:38-47`, the
+gate scripts, and the harness mocks, and incorporated all three: test 11
+(scope-tracking context mock, required at S0 and S8), exact-file OData
+exemption plus S9 removal of both route-dir exemptions with red fixtures, and
+4b covering `response` as well as `complete` with exact call arrays for every
+terminal. Revised sections 1 to 10 hash: `489d8c584dbd8e46ac718027e92a8aa20d8948822d0096397e179136573e5725` at `52059e6b`.
+
+Next: execution of S0 to S9 on branch `claude/explorer-chat-extraction`
+(worktree `../WMKF_Apps-explorer`), owner-authorized 2026-09-18.
 
 Remaining unknowns: exact line drift by the time implementation starts; whether
 the Explorer behavior campaign lands prompt changes concurrently (coordinate on
