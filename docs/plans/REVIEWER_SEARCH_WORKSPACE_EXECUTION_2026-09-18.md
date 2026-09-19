@@ -466,5 +466,28 @@ or shared helper changed. Original baseline/rollback reference: `8609d6ff`.
 - Remaining stages and mocked browser rehearsal are not yet executed; no release,
   production data probe, provider call, merge or deployment occurred.
 
-**Current verdict:** Stage 0 accepted. Stage 1 may begin after its drift check.
+**Stage 0 verdict:** accepted; first extraction authorized after the drift check.
 
+
+## Stage 1 acceptance — local presentation leaves
+
+[VERIFIED via source, tests and fresh review] Luna `/root/luna_stage1` extracted
+`candidateKeys.js`, `presentation.js`, `SearchPrimitives.js`,
+`IdentityComparisonPanel.js` and `CandidateCard.js`. The institution notice remains
+private with the card. The public facade retains direct named exports and its
+unchanged workflow/defaults. Existing server-shared logic stayed in place.
+
+- Pre-stage fetch: origin/main unchanged at `b400c97d`; starting/rollback reference
+  `cc119614` (includes accepted Stage 0).
+- Fresh Sol `/root/sol_stage1_review`: **READY**, no material corrections. Its AST
+  comparison matched 17 moved declarations/constants and the facade function and
+  remaining constants. Root independently matched 20 top-level bodies/values.
+- Luna and independent Sol focused runs: **12 suites / 185 tests passed**. Sol also
+  passed strict targeted ESLint with zero warnings and `git diff --check`.
+- Gate G: **19 commands passed**, including full **965 suites / 14,230 tests** and
+  canonical Next build. Evidence `/private/tmp/reviewer-stage-1-gates/results.json`;
+  focused log `/private/tmp/reviewer-search-stage1-focused.log`.
+- The full run includes eight draft Stage 7 contract tests in separate files. They
+  are not part of this extraction acceptance and do not yet satisfy P7's UI cases.
+
+**Current verdict:** Stage 1 accepted by root. Stage 2 awaits its drift check.

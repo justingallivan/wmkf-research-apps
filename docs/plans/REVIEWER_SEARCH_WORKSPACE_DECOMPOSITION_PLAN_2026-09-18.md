@@ -114,7 +114,8 @@ Preserved-difference checklist:
 
 ## 3. Target ownership and exact move order
 
-All paths in this section are **[PLANNED]**, beneath
+The target ownership below is **[PLANNED]**; completed stages and verified existing
+paths are recorded in the execution receipt. Paths are beneath
 `shared/components/reviewers/search/` unless otherwise stated. No whole-file
 rename of the public facade or shared logic file is proposed.
 
