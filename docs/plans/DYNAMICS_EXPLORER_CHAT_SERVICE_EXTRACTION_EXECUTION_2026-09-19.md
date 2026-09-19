@@ -90,3 +90,25 @@ maximum per stage), root (Fable) performs the final review and any last edits.
   slice is temporarily wider until S4 repoints it to `model-call.js` with a
   marker after each function.
 - Next permitted stage: S3.
+
+## S3 and S4, Postgres helpers and model calls — ACCEPTED
+
+- Commits: `b0f17125` explorer-store (route drops the `sql` import),
+  `1db1e2b1` model-call (route drops `LLMClient`; call-config test path
+  repointed, one line), `76c9eff0` header text fix-up.
+- Route 2,527 → 2,426 lines; route diff is exactly two added import lines.
+  Opus reconstruction: explorer-store identical to baseline 2956–2983 including
+  the fire-and-forget 42703 chain with no await; model-call identical to
+  596–640 and 2472–2498 apart from the two synthetic slicer markers, now
+  declared in plan §3.1. Call-config slices are tight again (one function
+  each). Helper-extraction audit clean: nothing shared with roles.js,
+  restrictions.js, or lib/utils/auth.js; getUserRole fail-soft,
+  getActiveRestrictions fail-closed.
+- Verification: 14 suites 186 tests, 1 snapshot; lint 0 errors; types clean;
+  13 gate pairs and docs-catalog green sequentially; model-override-warming
+  green through the transitive rule.
+- Deviation ruled correct: the `AI Batch Processing` marker stays in the
+  route until S7; plan §3.2 and §6 corrected accordingly.
+- Not followed: the plan's red-first step for the call-config repoint (test
+  and move landed in one green commit). Recorded, not repeated as a defect.
+- Next permitted stage: S5.
