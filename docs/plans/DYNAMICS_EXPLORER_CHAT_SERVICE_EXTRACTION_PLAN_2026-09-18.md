@@ -181,9 +181,9 @@ source header naming its owner, contract, and the route section it came from.
 |---|---|---|---|
 | `failure-copy.js` | 415–498 | `describeChatFailure`, `detectPossibleFailure` | nothing |
 | `conversation.js` | 499–595 | `trimConversation`, `compactMessages`, `summarizeToolResult` | nothing |
-| `result-shaping.js` | 69, 74–86, 648–669, 798–919, 2936–2955 | `MAX_RESULT_CHARS`, `TOOL_CHAR_LIMITS`, `OPERATIONAL_LOG_TABLES`, `sanitizeSelect`, `applyActiveOnlyFilter`, `isOperationalLogTable`, `stripEmpty`, `truncateResult`, `deriveRecordCount`, `getThinkingMessage` | nothing |
+| `result-shaping.js` | 69, 74–86, 641–669, 796–919, 2936–2955 | `MAX_RESULT_CHARS`, `TOOL_CHAR_LIMITS`, `OPERATIONAL_LOG_TABLES`, `sanitizeSelect`, `applyActiveOnlyFilter`, `isOperationalLogTable`, `stripEmpty`, `truncateResult`, `deriveRecordCount`, `getThinkingMessage` | nothing |
 | `restriction-guard.js` | 926–950, 2870–2935 | `checkRestriction`, `splitChatExpandSegments`, `restrictedFieldsForTable`, `redactRestrictedFieldNames` | nothing |
-| `tool-errors.js` (moves at S5, after `get-entity`) | 777–797, 951–1046 | `validateEffectiveODataCall`, `validatorReject`, `classifyToolError`, `closestFieldNames` | `dynamics-odata-validator`, `DynamicsService` (metadata reads), prompt module `TABLE_ANNOTATIONS`, `result-shaping`, `restriction-guard`, `tools/get-entity` for `ENTITY_TYPE_CONFIGS` (`chat.js:788`) |
+| `tool-errors.js` (moves at S5, after `get-entity`) | 777–795, 951–1046 | `validateEffectiveODataCall`, `validatorReject`, `classifyToolError`, `closestFieldNames` | `dynamics-odata-validator`, `DynamicsService` (metadata reads), prompt module `TABLE_ANNOTATIONS`, `result-shaping`, `restriction-guard`, `tools/get-entity` for `ENTITY_TYPE_CONFIGS` (`chat.js:788`) |
 | `explorer-store.js` | 2956–2983 | `getUserRole`, `getActiveRestrictions`, `logQuery` | `@vercel/postgres` |
 | `model-call.js` | 596–640, 2476–2498 | `callClaude`, `callClaudeBatch` | `LLMClient`, `baseConfig` (`getModelForApp`, `chat.js:2479`) |
 | `tools/describe-table.js` | 920–925 (marker and orphaned JSDoc), 1047–1158 | `describeTable` | `DynamicsService`, prompt module annotations, `restriction-guard`, `result-shaping`, `dynamics-odata-validator` |
@@ -196,8 +196,9 @@ source header naming its owner, contract, and the route section it came from.
 | `tool-executor.js` | 670–776 | `executeTool` (inline `query_records`, `count_records`, `aggregate` at 695–739) | every `tools/*`, `tool-errors`, `result-shaping` (`sanitizeSelect`, `applyActiveOnlyFilter`, `stripEmpty`), `DynamicsService` |
 | `chat-session.js` | 68 (`MAX_TOOL_ROUNDS`, moved with the loop; not a parameter), 192–392 (the callback body inside `withDynamicsContext`) | `runExplorerChat` | `model-call`, `tool-executor`, `restriction-guard`, `conversation`, `result-shaping`, `explorer-store`, `failure-copy` (`detectPossibleFailure`, `chat.js:268`), `tool-errors` (`classifyToolError`, `chat.js:305`), `baseConfig` (`getModelForApp`, `getFallbackModelForApp`, `chat.js:216-217`), serializer, `ai-payload-boundary`, prompt builder, taxonomy |
 
-Marker-only or comment-only lines 641–647, 2470–2475, and 2868–2869 move with
-the region that follows them; line 414 is blank. Every other line of the
+Marker-only or comment-only lines 641–647, 796–797, 2470–2475, and 2868–2869
+move with the region that follows them (S2 applied this: 641–647 and 796–797
+went to `result-shaping`, 2868–2869 to `restriction-guard`); line 414 is blank. Every other line of the
 baseline file is assigned exactly once above or to the shell.
 
 The route shell keeps lines 1–67, 87–191, and 393–413 in substance: imports, method dispatch,
@@ -584,7 +585,7 @@ S1  scripts/check-dataverse-access-layer.js (+ self-test fixture)
 S1  scripts/check-odata-escape.js (+ self-test) if owner option (a)
 S2  chat.js 415–498  → lib/services/dynamics-explorer/failure-copy.js
     chat.js 499–595  → conversation.js
-    chat.js 69, 74–86, 648–669, 798–919, 2936–2955 → result-shaping.js
+    chat.js 69, 74–86, 641–669, 796–919, 2936–2955 → result-shaping.js
     chat.js 926–950, 2870–2935 → restriction-guard.js
 S3  chat.js 2956–2983 → explorer-store.js
 S4  chat.js 596–640, 2476–2498 → model-call.js
@@ -592,7 +593,7 @@ S5  chat.js 1253 escape swap if owner option (b), own commit
     chat.js 2728–2867 → tools/composite.js
     chat.js 920–925, 1047–1158 → tools/describe-table.js
     chat.js 1159–1363 → tools/get-entity.js
-    chat.js 777–797, 951–1046 → tool-errors.js
+    chat.js 777–795, 951–1046 → tool-errors.js
     chat.js 1364–1921 → tools/get-related.js
 S6  chat.js 1922–2310 → tools/documents.js
 S7  chat.js 70–73, 2499–2660 → tools/batch-processing.js (+ A7 registry)
@@ -821,3 +822,9 @@ Remaining unknowns: exact line drift by the time implementation starts; whether
 the Explorer behavior campaign lands prompt changes concurrently (coordinate on
 the branch, since this plan never edits the prompt file); the campaign release
 window for a Tier 1 promotion.
+
+S2 stage review (2026-09-19, Opus, READY at `056d5a00`) required two
+line-range corrections above: `tool-errors` is 777–795 (796–797 is the
+`ENTITY_LOOKUP_TOOLS` comment that moved with `result-shaping`), and
+`result-shaping` starts at 641 and 796 per the marker rule. Applied in §3.2
+and §6; the execution receipt records the stage evidence.

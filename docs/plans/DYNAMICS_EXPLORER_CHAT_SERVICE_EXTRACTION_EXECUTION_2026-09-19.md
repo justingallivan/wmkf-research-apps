@@ -69,3 +69,24 @@ maximum per stage), root (Fable) performs the final review and any last edits.
   importer and the S5 move as present fact; root reworded both to "today …
   moves at S8/S5".
 - Next permitted stage: S2.
+
+## S2, Leaf helpers — ACCEPTED
+
+- Commits: `d2bc2c3a` failure-copy, `b95f0de1` conversation, `8383431e`
+  result-shaping (record-count test repointed), `13e8dd4b` restriction-guard
+  (guard test repointed, auth-mock side-effect import dropped), `056d5a00`
+  fix-up (unused route import removed, two header line ranges corrected).
+- Route 2,983 → 2,527 lines. Opus reconstructed each region from the baseline
+  and found zero non-whitespace differences in all four modules; the route
+  equals baseline minus the moved regions plus four import lines and one
+  blank line. Twenty moved names have no definition left in the route; route
+  exports are now `config`, `handler`, `searchDocuments` only.
+- Verification: 14 suites (12 Explorer + 2 S0) 186 tests, 1 snapshot; lint 0
+  errors; types clean; 13 gate pairs and docs-catalog green sequentially.
+- Plan corrections from this stage: `tool-errors` range is 777–795;
+  `result-shaping` includes 641–647 and 796–797 by the marker rule. Applied.
+- Notes for later stages: the `// ─── Tool execution ───` marker now lives in
+  `result-shaping.js`; S8 locates `executeTool` by name. The call-config test
+  slice is temporarily wider until S4 repoints it to `model-call.js` with a
+  marker after each function.
+- Next permitted stage: S3.
