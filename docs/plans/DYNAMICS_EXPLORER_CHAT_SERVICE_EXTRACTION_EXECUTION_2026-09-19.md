@@ -158,3 +158,39 @@ maximum per stage), root (Fable) performs the final review and any last edits.
 - Note for S8: no `// ───` markers remain in the route; locate regions by
   symbol name.
 - Next permitted stage: S8.
+
+## S8, Tool executor and chat session — ACCEPTED
+
+- Commits: `da1c47a7` tool-executor, `422043e9` chat-session with the three
+  gate-script edits (prompt-injection `dynamics-explorer-chat` callSiteFiles
+  → chat-session.js; dynamics-context-boundary header `chat.js:124` →
+  `chat.js:150`; access-layer taxonomy comment present tense). Route 503 →
+  197 lines, nine import lines, exports `config` and `handler` only.
+  Accepted at `422043e9` (Opus round 1, no blocking finding); root header
+  nit fix below.
+- Opus lifecycle trace: all writes to the six route-side flags map to the
+  same positions via `onRoundComplete`/`onStage`/`onTerminal`; both
+  terminal paths await `onTerminal` before `response`/`complete`; both
+  disconnect polls return without sending and the route finalizes once, so
+  the finalize count stays 2; the six finalize call sites are unchanged;
+  outer catch and finally byte-identical; no catch-and-wrap in the service.
+  `chat-session.js` body verbatim modulo the declared substitutions (170 vs
+  170 normalized lines, zero differences); `tool-executor.js` identical to
+  baseline 670–775. `withDynamicsContext` propagates the callback's return
+  value (`lib/services/dynamics-context.js:45-55`), which the harness mock
+  could not have proven. Registry union rule is now genuinely enforced:
+  wrap and preamble both live in chat-session.js and the route has none.
+- Semantic delta recorded (not a defect): the loop-time disconnect
+  finalize now runs just outside the `withDynamicsContext` ALS scope;
+  `finalizeRequest` is Postgres-only and reads no Dynamics context.
+- Verification: 14 suites 186 tests, snapshot `92a7a16f…` unchanged since
+  `a24867e3`; full Jest 973 suites 14,307 tests (builder and Opus
+  independently); lint 0 errors; types clean; 13 gate pairs and
+  docs-catalog green sequentially; no test file touched. `npm run build`:
+  Turbopack refuses this worktree's symlinked `node_modules` ("Symlink
+  [project]/node_modules is invalid"); `npx next build --webpack` succeeded
+  and compiled the route. The canonical Turbopack build must be evidenced
+  on a checkout with a real `node_modules` before merge (owner step).
+- Corrections: `tool-executor.js` header and plan §3.2/§6 range now
+  670–775 (last code line). Plan §1–§10 hash at acceptance: `5aff8767c2fac9b9…`.
+- Next permitted stage: S9.

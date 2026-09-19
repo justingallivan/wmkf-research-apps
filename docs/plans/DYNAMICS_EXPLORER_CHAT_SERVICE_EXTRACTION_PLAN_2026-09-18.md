@@ -196,7 +196,7 @@ source header naming its owner, contract, and the route section it came from.
 | `tools/export.js` | 2311–2468, 2657–2726 | `exportCsv`, `generateExcelExport`, `recordsToExcel`, `cleanColumnName` | `ExcelJS`, `DynamicsService`, `batch-processing`, `tool-errors`, `result-shaping`, serializer, `getModelForApp`, `estimateCostCents` |
 | `tools/batch-processing.js` | 70–73 (`DYNEXP_EXPORT_MAX_CHARS`), 2470–2471 (the `AI Batch Processing` marker), 2499–2655 | `runSampleProcessing`, `processRecordsBatch` | `model-call`, `ai-payload-boundary`, serializer |
 | `tools/composite.js` | 2728–2867 | `findReportsDue`, `searchRecords` | `DynamicsService`, `result-shaping` |
-| `tool-executor.js` | 670–776 | `executeTool` (inline `query_records`, `count_records`, `aggregate` at 695–739) | every `tools/*`, `tool-errors`, `result-shaping` (`sanitizeSelect`, `applyActiveOnlyFilter`, `stripEmpty`), `DynamicsService` |
+| `tool-executor.js` | 670–775 | `executeTool` (inline `query_records`, `count_records`, `aggregate` at 695–739) | every `tools/*`, `tool-errors`, `result-shaping` (`sanitizeSelect`, `applyActiveOnlyFilter`, `stripEmpty`), `DynamicsService` |
 | `chat-session.js` | 68 (`MAX_TOOL_ROUNDS`, moved with the loop; not a parameter), 192–392 (the callback body inside `withDynamicsContext`) | `runExplorerChat` | `model-call`, `tool-executor`, `restriction-guard`, `conversation`, `result-shaping`, `explorer-store`, `failure-copy` (`detectPossibleFailure`, `chat.js:268`), `tool-errors` (`classifyToolError`, `chat.js:305`), `baseConfig` (`getModelForApp`, `getFallbackModelForApp`, `chat.js:216-217`), serializer, `ai-payload-boundary`, prompt builder, taxonomy |
 
 Marker-only or comment-only lines 641–647, 796–797, 2472–2475, and 2868–2869
@@ -604,7 +604,7 @@ S5  chat.js 1253 escape swap if owner option (b), own commit
 S6  chat.js 1922–2309 → tools/documents.js
 S7  chat.js 70–73, 2470–2471, 2499–2655 → tools/batch-processing.js (+ A7 registry)
     chat.js 2311–2468, 2657–2726 → tools/export.js
-S8  chat.js 670–776 → tool-executor.js
+S8  chat.js 670–775 → tool-executor.js
     chat.js 68, 192–392 → chat-session.js (+ A7 registry, context-gate comment)
 S9  scripts/check-route-service-boundary.js (+ self-test), docs
 ```
