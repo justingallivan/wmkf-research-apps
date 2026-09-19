@@ -215,6 +215,16 @@
           "lib/services/notification-service.js"
         ],
         "createdAt": "2026-09-15T23:50:16.778Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "11px",
+        "files": [
+          "shared/components/reviewers/search/CandidateCard.js",
+          "shared/components/reviewers/search/IdentityComparisonPanel.js"
+        ],
+        "createdAt": "2026-09-19T05:06:10.802Z",
+        "reason": "Preserve the five pre-existing secondary-note sizes from ReviewerSearchSection at cc119614 during the authorized behavior-and-appearance-preserving extraction; not a new global typography step."
       }
     ]
   }
