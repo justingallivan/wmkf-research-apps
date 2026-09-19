@@ -189,6 +189,7 @@ async function installInviteMocks(context, baseURL, {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        success: true,
         requestId: REQUEST_ID,
         requestNumber: REQUEST_NUM,
         title: 'A Study of Test-Driven Reviewer Onboarding',
