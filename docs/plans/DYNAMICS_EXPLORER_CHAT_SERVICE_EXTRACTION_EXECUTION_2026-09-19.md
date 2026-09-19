@@ -347,3 +347,29 @@ of this plan's surface.
   one tool round, one export, one disconnect), canonical Turbopack build on
   a checkout with a real `node_modules`, then merge; rollback = revert the
   merge commit.
+
+## Release record — 2026-09-19
+
+- Integration branch `integration/2026-09-19` at `3f4a1068`: merge `4c3ce24d`
+  (this extraction, `claude/explorer-chat-extraction` `ca56aa36`), merge
+  `35610f64` (`codex/workbench-responsiveness` `9f0d1b55`), merge `71a1ae4f`
+  (memory frontmatter only). Combined-tree verification: 38 gates with 29
+  self-tests green; Jest 976 suites / 14,358 tests; lint 0 errors; types
+  clean; canonical Turbopack build; 9/9 local route-mocked browser journeys.
+- Preview: deployments `dpl_2HPypjcHRTfg3bqeTeZ3oFQCUiya` and
+  `wmkfresearchapps-e6b2sn5dd` with branch-scoped `DATAVERSE_ALLOW_PROD_READS`
+  and `NEXTAUTH_URL` (alias origin); temporary alias
+  `wmkfresearchapps-preview.vercel.app` created and removed. Explorer: query
+  with tool round, parallel two-tool round, UI list + Excel export (209 rows),
+  all `completed`; one transient 503 on the first invocation after redeploy,
+  not reproducible. Disconnect test inconclusive (answer finished before the
+  abort landed); the disconnect wiring is byte-identical to production and
+  pinned by the S0 tests. Workbench read paths (list, request, Overview,
+  Proposal, Reviews) rendered live data. Pre-existing Preview CSRF alias
+  limitation logged in `docs/CURRENT_WORK_QUEUE.md`.
+- Production: main fast-forwarded `7c18b622` → `3f4a1068` and pushed at
+  11:40 PDT; auto-deployed as `dpl_2zkcS5GMKaadkjJNdzujZTj5mLda`
+  (`wmkfresearchapps-g8484ufro`). Read-only production check: staff sign-in,
+  Workbench list and request 1002852 Overview, Explorer query completed in 3
+  rounds. Last-known-good for rollback: `dpl_6paPmnhgjdZ6bu23b57Q5A7XpGXK`
+  (`7c18b622`). Rollback = revert `4c3ce24d` or `35610f64` on main.
