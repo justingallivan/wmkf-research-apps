@@ -96,7 +96,12 @@ function topLevelDeclarations(ast) {
     const variableNode = node.type === 'ExportNamedDeclaration' ? node.declaration : node;
     if (variableNode?.type === 'VariableDeclaration') {
       for (const declaration of variableNode.declarations) {
-        if (declaration.id.type === 'Identifier') vars.set(declaration.id.name, (vars.get(declaration.id.name) || 0) + 1);
+        if (declaration.id.type !== 'Identifier') continue;
+        vars.set(declaration.id.name, (vars.get(declaration.id.name) || 0) + 1);
+        if (declaration.init?.type === 'ArrowFunctionExpression'
+          || declaration.init?.type === 'FunctionExpression') {
+          methods.set(declaration.id.name, (methods.get(declaration.id.name) || 0) + 1);
+        }
       }
     }
     const classNode = node.type === 'ExportNamedDeclaration' ? node.declaration : node;
@@ -190,7 +195,13 @@ function analyzeSources(sources, options = {}) {
     if (isGraphModule(file, graphDir) && file !== `${graphDir}/http.js`) {
       walk(ast, node => {
         if (node.type === 'ThisExpression') errors.push(`receiver access in Graph module: ${file}`);
-        if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'fetch') {
+        const callee = node.type === 'CallExpression' ? node.callee : null;
+        const globalFetch = callee?.type === 'MemberExpression'
+          && callee.object?.type === 'Identifier'
+          && callee.object.name === 'globalThis'
+          && ((callee.computed && callee.property?.type === 'StringLiteral' && callee.property.value === 'fetch')
+            || (!callee.computed && callee.property?.type === 'Identifier' && callee.property.name === 'fetch'));
+        if (callee?.type === 'Identifier' && callee.name === 'fetch' || globalFetch) {
           errors.push(`raw fetch outside graph http owner: ${file}`);
         }
       });

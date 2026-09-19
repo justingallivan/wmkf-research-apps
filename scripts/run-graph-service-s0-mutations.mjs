@@ -2,21 +2,28 @@
 /**
  * S0 mutation proof runner.
  *
- * Each mutant is loaded from a disposable sibling copy of graph-service.js,
- * so the tracked runtime is never edited. Relative imports still resolve to
- * the real dependency graph. A mutant is successful only when the named
+ * Each mutant is loaded from a disposable copy of the facade and graph
+ * modules, so the tracked runtime is never edited. A mutant is successful
+ * only when the named
  * characterization invariant rejects its changed behavior.
  */
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
-const sourcePath = path.join(root, 'lib/services/graph-service.js');
-const mutantPath = path.join(root, 'lib/services/.s0-graph-service-mutant.js');
-const source = await fs.readFile(sourcePath, 'utf8');
+const facadePath = path.join(root, 'lib/services/graph-service.js');
+const graphDir = path.join(root, 'lib/services/graph');
+const source = await fs.readFile(facadePath, 'utf8');
+const graphSources = new Map();
+for (const entry of await fs.readdir(graphDir, { withFileTypes: true })) {
+  if (entry.isFile() && entry.name.endsWith('.js')) {
+    graphSources.set(entry.name, await fs.readFile(path.join(graphDir, entry.name), 'utf8'));
+  }
+}
 const originalFetch = globalThis.fetch;
 const envKeys = ['DYNAMICS_TENANT_ID', 'DYNAMICS_CLIENT_ID', 'DYNAMICS_CLIENT_SECRET'];
 
@@ -37,29 +44,42 @@ function requireMutation(name, changed, original) {
 }
 
 async function runMutant(name, mutate, exercise) {
-  const changed = requireMutation(name, mutate(source), source);
+  const changed = mutate(graphSources);
+  if (!(changed instanceof Map) || [...changed].every(([file, text]) => text === graphSources.get(file))) {
+    throw new Error(`${name}: mutation did not change source`);
+  }
   const savedEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
   try {
-    for (const [mode, text] of [['control', source], ['mutant', changed]]) {
-      await fs.writeFile(mutantPath, text, { flag: 'wx' });
-      let failure;
+    for (const [mode, files] of [['control', graphSources], ['mutant', changed]]) {
+      const runtimeRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'graph-service-s0-'));
+      const runtimeServices = path.join(runtimeRoot, 'lib/services');
+      const runtimeGraph = path.join(runtimeServices, 'graph');
       try {
+        await fs.mkdir(runtimeGraph, { recursive: true });
+        await fs.symlink(path.join(root, 'lib/utils'), path.join(runtimeRoot, 'lib/utils'), 'dir');
+        await fs.symlink(path.join(root, 'lib/observability'), path.join(runtimeRoot, 'lib/observability'), 'dir');
+        // Keep the facade and every operation in the same disposable module
+        // graph so each control/mutant gets fresh module state.
+        await fs.writeFile(path.join(runtimeServices, 'graph-service.js'), source);
+        for (const [file, text] of files) await fs.writeFile(path.join(runtimeGraph, file), text);
+        const mutantPath = path.join(runtimeServices, 'graph-service.js');
+        let failure;
         globalThis.fetch = async () => { throw new Error('Unexpected network call in mutation exercise'); };
         for (const key of envKeys) delete process.env[key];
-        const loaded = await import(`${pathToFileURL(mutantPath).href}?s0=${encodeURIComponent(name)}-${mode}`);
+        const loaded = await import(`${pathToFileURL(mutantPath).href}?s0=${encodeURIComponent(name)}-${mode}-${Date.now()}`);
         try { await exercise(loaded.GraphService); } catch (error) { failure = error; }
-      } finally {
-        await fs.rm(mutantPath, { force: true });
-      }
-      if (mode === 'control') {
-        if (failure) throw new Error(`${name}: unmodified control failed`, { cause: failure });
-        console.log(`PASS ${name}: unmodified control`);
-      } else {
-        if (!failure) throw new Error(`${name}: mutant survived its intended characterization`);
-        if (failure.code !== 'ERR_ASSERTION' || !failure.message.includes(`[${name}]`)) {
-          throw new Error(`${name}: mutant failed for an unexpected reason`, { cause: failure });
+        if (mode === 'control') {
+          if (failure) throw new Error(`${name}: unmodified control failed`, { cause: failure });
+          console.log(`PASS ${name}: unmodified control`);
+        } else {
+          if (!failure) throw new Error(`${name}: mutant survived its intended characterization`);
+          if (failure.code !== 'ERR_ASSERTION' || !failure.message.includes(`[${name}]`)) {
+            throw new Error(`${name}: mutant failed for an unexpected reason`, { cause: failure });
+          }
+          console.log(`PASS ${name}: mutant rejected by named assertion`);
         }
-        console.log(`PASS ${name}: mutant rejected by named assertion`);
+      } finally {
+        await fs.rm(runtimeRoot, { recursive: true, force: true });
       }
     }
   } finally {
@@ -196,24 +216,13 @@ async function chunkFailureMutant(GraphService) {
 }
 
 const mutations = [
-  ['token-generation-fence', sourceText => sourceText.replace('if (generation === tokenGeneration) {', 'if (true) {'), tokenFenceMutant],
-  ['cdn-bearer-forwarding', sourceText => sourceText.replace(
-    '        { redirect: \'follow\' },\n        DOWNLOAD_TIMEOUT,',
-    '        { redirect: \'follow\', headers: this.buildHeaders(token) },\n        DOWNLOAD_TIMEOUT,',
-  ), cdnAuthMutant],
-  ['continuation-404-null', sourceText => sourceText.replace('        if (pagesFetched > 0\n', '        if (pagesFetched > 0 && resp.status === 404) return null;\n        if (pagesFetched > 0\n'), continuation404Mutant],
-  ['upload-receiver-forwarding', sourceText => sourceText.replace('return this.uploadFile(libraryName, folderPath, filename, content, contentType, { conflictBehavior });', 'return GraphService.uploadFile(libraryName, folderPath, filename, content, contentType, { conflictBehavior });'), uploadReceiverMutant],
-  ['download-receiver-forwarding', sourceText => sourceText.replace('return this.downloadFile(driveId, item.id);', 'return GraphService.downloadFile(driveId, item.id);'), downloadReceiverMutant],
-  ['replace-if-match', sourceText => sourceText.replace("          'If-Match': ifMatch,\n", ''), ifMatchMutant],
-  ['chunk-failure-propagation', sourceText => {
-    const marker = '      const chunk = content.subarray(start, end + 1);';
-    const start = sourceText.indexOf(marker);
-    const tail = sourceText.slice(start);
-    return sourceText.slice(0, start) + tail.replace(
-      '      if (!resp.ok) {',
-      '      if (false && !resp.ok) {',
-    );
-  }, chunkFailureMutant],
+  ['token-generation-fence', sources => new Map([...sources, ['auth.js', requireMutation('token-generation-fence', sources.get('auth.js').replace('if (generation === tokenGeneration) {', 'if (true) {'), sources.get('auth.js'))]]), tokenFenceMutant],
+  ['cdn-bearer-forwarding', sources => new Map([...sources, ['downloads.js', requireMutation('cdn-bearer-forwarding', sources.get('downloads.js').replace("      presignedUrl,\n      { redirect: 'follow' },", "      presignedUrl,\n      { redirect: 'follow', headers: svc.buildHeaders(token) },"), sources.get('downloads.js'))]]), cdnAuthMutant],
+  ['continuation-404-null', sources => new Map([...sources, ['versions.js', requireMutation('continuation-404-null', sources.get('versions.js').replace('      if (pagesFetched > 0\n', '      if (pagesFetched > 0 && resp.status === 404) return null;\n      if (pagesFetched > 0\n'), sources.get('versions.js'))]]), continuation404Mutant],
+  ['upload-receiver-forwarding', sources => new Map([...sources, ['upload-session.js', requireMutation('upload-receiver-forwarding', sources.get('upload-session.js').replace('return svc.uploadFile(libraryName, folderPath, filename, content, contentType, { conflictBehavior });', 'return Object.getPrototypeOf(svc).uploadFile(libraryName, folderPath, filename, content, contentType, { conflictBehavior });'), sources.get('upload-session.js'))]]), uploadReceiverMutant],
+  ['download-receiver-forwarding', sources => new Map([...sources, ['downloads.js', requireMutation('download-receiver-forwarding', sources.get('downloads.js').replace('return svc.downloadFile(driveId, item.id);', 'return Object.getPrototypeOf(svc).downloadFile(driveId, item.id);'), sources.get('downloads.js'))]]), downloadReceiverMutant],
+  ['replace-if-match', sources => new Map([...sources, ['writes.js', requireMutation('replace-if-match', sources.get('writes.js').replace("        'If-Match': ifMatch,\n", ''), sources.get('writes.js'))]]), ifMatchMutant],
+  ['chunk-failure-propagation', sources => new Map([...sources, ['upload-session.js', requireMutation('chunk-failure-propagation', sources.get('upload-session.js').replace('    if (!resp.ok) {', '    if (false && !resp.ok) {'), sources.get('upload-session.js'))]]), chunkFailureMutant],
 ];
 
 for (const [name, mutate, exercise] of mutations) {

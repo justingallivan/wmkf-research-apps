@@ -141,14 +141,14 @@ function validSources() {
   return sources;
 }
 
-test('the unchanged monolith has one public owner for every staged method/state item', () => {
+test('the current facade has one public owner for every staged method/state item', () => {
   const sources = sourceMapFromRoot(path.resolve(__dirname, '../..'));
   const result = analyzeSources(sources, REAL_SOURCE_OPTIONS);
   expect(result.errors).toEqual([]);
   expect(sources.has(FACADE)).toBe(true);
 });
 
-test('tracked runtime census has no direct imports of nonexistent Graph internals', () => {
+test('tracked runtime census has no direct imports of Graph internals', () => {
   const sources = loadTrackedRuntimeSources(path.resolve(__dirname, '../..'));
   const result = analyzeSources(sources, REAL_SOURCE_OPTIONS);
   expect(result.errors).toEqual([]);
@@ -308,6 +308,41 @@ test('duplicate state, receiver access, and direct fetch outside http are reject
     expect.stringContaining('receiver access in Graph module'),
     expect.stringContaining('raw fetch outside graph http owner'),
   ]));
+});
+
+test.each([
+  ['arrow export', 'export const getAccessToken = async () => "token";', 'const getAccessToken = async () => "duplicate"; export { getAccessToken };'],
+  ['function-expression local', 'const getAccessToken = function () { return "token"; }; export { getAccessToken };', 'const getAccessToken = function () { return "duplicate"; }; export { getAccessToken };'],
+])('top-level %s expressions count as method owners', (_label, ownerSource, duplicateSource) => {
+  const base = new Map([
+    [FACADE, `import { getAccessToken } from './graph/auth.js'; export class GraphService { static getAccessToken() { return getAccessToken(this); } }`],
+    [`${GRAPH}/auth.js`, ownerSource],
+  ]);
+  const options = {
+    facade: FACADE,
+    graphDir: GRAPH,
+    inventory: { methods: ['getAccessToken'] },
+    movedOwners: { getAccessToken: `${GRAPH}/auth.js` },
+    delegates: { getAccessToken: { target: `${GRAPH}/auth.js`, binding: 'getAccessToken' } },
+  };
+  expect(analyzeSources(base, options).errors).toEqual([]);
+  base.set(`${GRAPH}/other.js`, duplicateSource);
+  expect(analyzeSources(base, options).errors).toEqual(expect.arrayContaining([
+    expect.stringContaining('method owner getAccessToken: expected one owner'),
+  ]));
+});
+
+test('globalThis fetch forms are rejected outside the HTTP owner', () => {
+  const sources = validSources();
+  sources.set(`${GRAPH}/other.js`, 'export function run() { globalThis.fetch("/x"); globalThis["fetch"]("/y"); }');
+  const errors = analyzeSources(sources, options).errors;
+  expect(errors.filter(error => error.includes('raw fetch outside graph http owner'))).toHaveLength(2);
+});
+
+test('globalThis fetch is allowed in the HTTP owner fixture', () => {
+  const sources = validSources();
+  sources.set(`${GRAPH}/http.js`, 'export function fetchWithTimeout() { return globalThis.fetch("/x"); }');
+  expect(analyzeSources(sources, options).errors).toEqual([]);
 });
 
 test('the real search inventory rejects duplicate retry helpers and cooldown constants', () => {
