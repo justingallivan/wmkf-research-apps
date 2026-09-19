@@ -2,9 +2,9 @@
 title: GraphService and SharePoint transport decomposition
 domain: architecture
 kind: plan
-status: proposed
+status: active
 owner: product-engineering
-summary: "Planning only: staged extraction of GraphService behind its existing public facade, with characterization prerequisites and independent review checkpoints."
+summary: "Authorized local migration: staged extraction of GraphService behind its existing public facade, with characterization prerequisites and independent review checkpoints."
 ---
 
 # GraphService and SharePoint transport decomposition
@@ -13,9 +13,9 @@ summary: "Planning only: staged extraction of GraphService behind its existing p
 
 **Recommendation:** decompose `lib/services/graph-service.js` into responsibility-specific modules behind its existing public facade. This is the largest justified **unplanned shared-service refactor found in the bounded survey**, measured by cross-capability impact, unrelated responsibilities, and migration risk—not the longest file or an assertion that every possible refactor has been ranked.
 
-**Status: [PLANNED]. No migration stage has been executed.** This document is a proposed implementation contract for a subsequent agent. The current request authorizes planning only. Do not start S0, move runtime code, deploy, run live probes, or change infrastructure as part of producing this plan.
+**Status: [LOCAL EXECUTION / S0 ACCEPTED].** The planning-only statement below is historical to the planning session. The current user authorization covers the local S0–S11 migration sequence on the isolated `codex/graph-service-decomposition` branch, with stage gates and root acceptance. S0 remains tests, bounded checker fixtures, receipt, and local gates only; no runtime move, live probe, deployment, infrastructure, dependency, or migration work is authorized at this stage.
 
-Evidence baseline: `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`, 2026-09-19. Line references below refer to that baseline; symbols control if lines drift. Before implementation, compare the current source against this baseline and re-review changed assumptions. All target modules and new tests named below are **[PLANNED, not yet created]**.
+Evidence baseline: `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`, 2026-09-19. Line references below refer to that baseline; symbols control if lines drift. Before implementation, compare the current source against this baseline and re-review changed assumptions. The target modules remain **[PLANNED]**; the S0 tests and checker named below were planned at this baseline and are recorded as executed in the S0 receipt.
 
 ### Why this scope
 
@@ -247,7 +247,7 @@ The builder opens only the current stage plus global invariants/test map. It mus
 
 ## 8. Planning evidence, limits, and review receipts
 
-**Planning validation actually run:** all 38 `check:*` gates and 29 self-tests passed during session startup; five Graph suites / 64 tests passed against unchanged runtime code. Document currency, symbol references, build-claim freshness, fact consistency, canonical pointers, catalog, scaffolding and secret checks plus their defined self-tests passed after staging the plan; harness-framing and its self-test also passed. Existing consumer-suite filenames were checked on disk, and the staged diff passed whitespace checks. These gates have bounded registries/scan roots; they do not independently prove every plan statement. A full application build, full Jest suite, new prerequisite tests, tenant probes, and browser rehearsals have **not** been run for this document. S0 owns those future baselines.
+**Planning validation actually run (historical):** all 38 `check:*` gates and 29 self-tests passed during the planning session; five Graph suites / 64 tests passed against unchanged runtime code. Document currency, symbol references, build-claim freshness, fact consistency, canonical pointers, catalog, scaffolding and secret checks plus their defined self-tests passed after staging the plan; harness-framing and its self-test also passed. Existing consumer-suite filenames were checked on disk, and the staged diff passed whitespace checks. These gates have bounded registries/scan roots; they do not independently prove every plan statement. The full application build, full Jest suite, and new S0 prerequisites were intentionally left to the now-authorized S0 execution; tenant probes and browser rehearsals remain outside S0.
 
 Scoped sweep Mode B: claims are (1) Graph remains one implementation module, (2) prior plans do not supply this extraction, (3) target modules/tests are proposed, (4) no durable data change is required. Source authority is the complete Graph module and the cited consumer regions. Searched docs, plans, memory, handoff, runtime and test references using `graph-service`, `GraphService`, decomposition/refactor qualifiers and candidate names. Existing import paths are AGREE; completed Dynamics/DAL plans and prior candidate-selection discussions are historical context; the Explorer “already planned” classification is STALE/CONFLICT for selection and explicitly superseded here; unrelated Graph feature plans remain UNRELATED to extraction. No shipped implementation status is changed by this document. This is not a whole-repository documentation clean bill; older unrelated factual drift is outside scope.
 
@@ -286,4 +286,4 @@ Amendment checkpoint P4: fresh `amendment_review`, no inherited history, returne
 | Freeze metadata/error differences | Source branches C5–C11 exist today | Existing version/observability tests, additional cases required | Differential fixtures that disagree after permitted rewrites block stage. **[PLANNED]** |
 | Promote after isolated rehearsal | Release policy requires Tier 2 evidence; tenant rehearsal availability unknown | No release experiment performed | Missing safe target/rehearsal/owner promotion means release blocked. **[UNKNOWN until release preparation]** |
 
-Final planning verdict: **READY TO IMPLEMENT after separate implementation authorization and S0 prerequisites**. The original three planning checkpoints and fresh amendment checkpoint P4 completed; their named corrections are incorporated, with Opus dispositions recorded above. Current build health beyond the startup checks and five Graph suites remains an S0 verification obligation, not a planning-session claim. Implementation remains unauthorized by this planning-only request.
+Final planning verdict (historical): **READY TO IMPLEMENT after implementation authorization and S0 prerequisites**. The original three planning checkpoints and fresh amendment checkpoint P4 completed; their named corrections are incorporated, with Opus dispositions recorded above. The current user authorization now covers the local S0–S11 sequence; S0 verification and root acceptance remain the active prerequisites for S1. No release, push, deployment, or live rehearsal is authorized by this local execution.

@@ -442,6 +442,52 @@ it('returns page one as truncated when a continuation responds 503', async () =>
   expect(result.hasMore).toBe(true);
 });
 
+it('returns page one as truncated when a continuation responds 429', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  routeGraph({
+    item: itemResponse('1.0'),
+    current: response(200, { id: '1.0', lastModifiedBy: { user: { displayName: 'Page One Editor' } } }),
+    pages: [
+      response(200, {
+        value: [{ id: '0.9', lastModifiedDateTime: '2026-08-01T00:00:00Z' }],
+        '@odata.nextLink': nextLink('page2'),
+      }),
+      response(429, { error: 'throttled' }),
+    ],
+  });
+
+  const result = await GraphService.listFileVersions('drive', 'item', { limit: 20 });
+
+  expect(result.versions.map(version => version.versionId)).toEqual(['1.0', '0.9']);
+  expect(result.hasMore).toBe(true);
+});
+
+it('returns salvaged pages when a continuation response has invalid JSON', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  routeGraph({
+    item: itemResponse('1.0'),
+    current: response(200, { id: '1.0' }),
+    pages: [
+      response(200, {
+        value: [{ id: '0.9', lastModifiedDateTime: '2026-08-01T00:00:00Z' }],
+        '@odata.nextLink': nextLink('page2'),
+      }),
+      {
+        ok: true,
+        status: 200,
+        json: jest.fn(async () => { throw new Error('malformed continuation JSON'); }),
+        text: jest.fn(async () => ''),
+        headers: { get: jest.fn(() => null) },
+      },
+    ],
+  });
+
+  const result = await GraphService.listFileVersions('drive', 'item', { limit: 20 });
+
+  expect(result.versions.map(version => version.versionId)).toEqual(['1.0', '0.9']);
+  expect(result.hasMore).toBe(true);
+});
+
 it('does not report a missing file when a continuation page 404s', async () => {
   // Item metadata already proved the item exists, so a versions-endpoint 404 must
   // not return null — the caller maps null to `missing`, which would tell staff
@@ -473,6 +519,34 @@ it('still reports a missing file when item metadata itself 404s', async () => {
   await expect(GraphService.listFileVersions('drive', 'item', { limit: 20 })).resolves.toBeNull();
 });
 
+it('fails closed when the authoritative current version response has the wrong identity', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  routeGraph({
+    item: itemResponse('2.0'),
+    current: response(200, { id: 'different-version' }),
+    pages: [],
+  });
+
+  await expect(GraphService.listFileVersions('drive', 'item', { limit: 20 }))
+    .rejects.toMatchObject({ code: 'graph_version_identity_mismatch' });
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
+it('surfaces a failure while materializing the authoritative current version before pagination', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  routeGraph({
+    item: itemResponse('2.0'),
+    current: response(503, { error: 'current version unavailable' }),
+    pages: [],
+  });
+
+  await expect(GraphService.listFileVersions('drive', 'item', { limit: 20 }))
+    .rejects.toMatchObject({ status: 503, serviceName: 'graph' });
+  // Item metadata and the authoritative current-version request are the only
+  // calls; pagination must not begin after that prerequisite fails.
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
 it('fails loud when the FIRST versions page 404s, rather than claiming the file is missing', async () => {
   jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
   routeGraph({
@@ -482,6 +556,54 @@ it('fails loud when the FIRST versions page 404s, rather than claiming the file 
   });
 
   await expect(GraphService.listFileVersions('drive', 'item', { limit: 20 })).rejects.toThrow();
+});
+
+it('fails loud when the FIRST versions page has a non-salvageable 500 response', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  routeGraph({
+    item: itemResponse('2.0'),
+    current: response(200, { id: '2.0' }),
+    pages: [response(500, { error: 'version history unavailable' })],
+  });
+
+  await expect(GraphService.listFileVersions('drive', 'item', { limit: 20 }))
+    .rejects.toMatchObject({ status: 500, serviceName: 'graph' });
+});
+
+it('keeps stable ordering when the item has no authoritative current version and timestamps tie or are missing', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  routeGraph({
+    item: itemResponse(null),
+    current: response(500, { error: 'must not fetch a current version' }),
+    pages: [response(200, {
+      value: [
+        { id: 'same-a', lastModifiedDateTime: '2026-08-02T00:00:00Z' },
+        { id: 'same-b', lastModifiedDateTime: '2026-08-02T00:00:00Z' },
+        { id: 'missing-time' },
+      ],
+    })],
+  });
+
+  const result = await GraphService.listFileVersions('drive', 'item', { limit: 20 });
+
+  expect(result.versions.map(version => version.versionId)).toEqual(['same-a', 'same-b', 'missing-time']);
+  expect(result.versions.every(version => version.isCurrent === false)).toBe(true);
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
+it('returns null for an exact historical version that no longer exists', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(404, { error: 'gone' }));
+
+  await expect(GraphService.getFileVersionMetadata('drive', 'item', '1.0')).resolves.toBeNull();
+});
+
+it('fails closed when exact version metadata resolves to another version identity', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(200, { id: '2.0', size: 7 }));
+
+  await expect(GraphService.getFileVersionMetadata('drive', 'item', '1.0'))
+    .rejects.toMatchObject({ code: 'graph_version_identity_mismatch' });
 });
 
 it('reports no more versions after fully exhausting multiple pages under the limit', async () => {
@@ -536,4 +658,49 @@ it('reports more versions when the page cap stops a scan under the result limit'
   // from the early stop, not from the cap discarding rows.
   expect(result.versions).toHaveLength(4);
   expect(result.hasMore).toBe(true);
+});
+
+it.each([
+  ['wrong origin', 'https://evil.example/v1.0/drives/drive/items/item/versions?$skiptoken=x'],
+  ['wrong item path', 'https://graph.microsoft.com/v1.0/drives/drive/items/other/versions?$skiptoken=x'],
+  ['malformed URL', 'not a URL'],
+])('rejects a %s continuation link instead of following it', async (_name, next) => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  routeGraph({
+    item: itemResponse('2.0'),
+    current: response(200, { id: '2.0' }),
+    pages: [response(200, { value: [{ id: '1.0' }], '@odata.nextLink': next })],
+  });
+  await expect(GraphService.listFileVersions('drive', 'item', { limit: 20 }))
+    .rejects.toThrow();
+});
+
+it('rejects a repeated continuation link and does not loop', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  const repeated = nextLink('page2');
+  routeGraph({
+    item: itemResponse('2.0'),
+    current: response(200, { id: '2.0' }),
+    pages: [
+      response(200, { value: [{ id: '1.0' }], '@odata.nextLink': repeated }),
+      response(200, { value: [{ id: '0.9' }], '@odata.nextLink': repeated }),
+    ],
+  });
+  await expect(GraphService.listFileVersions('drive', 'item', { limit: 20 }))
+    .rejects.toThrow('repeated a nextLink');
+  expect(global.fetch).toHaveBeenCalledTimes(4);
+});
+
+it.each([401, 403])('does not salvage a continuation %s response as a successful history', async status => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  routeGraph({
+    item: itemResponse('2.0'),
+    current: response(200, { id: '2.0' }),
+    pages: [
+      response(200, { value: [{ id: '1.0' }], '@odata.nextLink': nextLink('page2') }),
+      response(status, { error: 'forbidden' }),
+    ],
+  });
+  await expect(GraphService.listFileVersions('drive', 'item', { limit: 20 }))
+    .rejects.toMatchObject({ status });
 });

@@ -178,6 +178,25 @@ test('a Graph timeout surfaces a structured graph/abort error and a timeout even
   expect(events[0].outcome).toBe('timeout');
 });
 
+test('an actual timeout aborts the pending fetch, clears its timer, and emits once', async () => {
+  jest.useFakeTimers();
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn((_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => {
+      const error = new Error('aborted by timeout');
+      error.name = 'AbortError';
+      reject(error);
+    }, { once: true });
+  }));
+  const pending = GraphService.getFileMetadataById('drive/id', 'item/id');
+  const rejection = expect(pending).rejects.toMatchObject({ serviceName: 'graph', noResponse: true, causeKind: 'abort' });
+  await jest.advanceTimersByTimeAsync(30_001);
+  await rejection;
+  expect(jest.getTimerCount()).toBe(0);
+  expect(readDependencyEvents(logSpy)).toHaveLength(1);
+  expect(readDependencyEvents(logSpy)[0].outcome).toBe('timeout');
+});
+
 test('missing-env config guard throws before any fetch and emits zero events', async () => {
   delete process.env.DYNAMICS_TENANT_ID;
   delete process.env.DYNAMICS_CLIENT_ID;

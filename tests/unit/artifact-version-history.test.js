@@ -179,6 +179,24 @@ it('discards an in-flight response when the request changes underneath it', asyn
   expect(screen.queryByText('Stale Editor')).not.toBeInTheDocument();
 });
 
+it('discards an in-flight rejection after the request changes and allows a fresh reopen', async () => {
+  let rejectStale;
+  global.fetch = jest.fn().mockReturnValue(new Promise((_resolve, reject) => { rejectStale = reject; }));
+  const { rerender } = render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+  rerender(<ArtifactVersionHistory requestId="99999999-9999-9999-9999-999999999999" />);
+  rejectStale(new Error('stale request failed'));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+  mockFetch({
+    status: 'current', hasMore: false, limit: 20,
+    versions: [{ versionId: '1.0', isCurrent: true, lastModifiedBy: 'Fresh Editor' }],
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+  await waitFor(() => expect(screen.getByText('Fresh Editor')).toBeInTheDocument());
+  expect(screen.queryByText('stale request failed')).not.toBeInTheDocument();
+});
+
 it('clears cached history when the artifact changes within the same request', async () => {
   global.fetch = jest.fn()
     .mockResolvedValueOnce({

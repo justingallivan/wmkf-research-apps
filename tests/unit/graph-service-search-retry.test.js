@@ -115,6 +115,45 @@ describe('GraphService.searchFiles throttle handling', () => {
     await expect(promise).resolves.toHaveLength(1);
   });
 
+  test('parses an HTTP-date Retry-After instead of immediately retrying', async () => {
+    const retryAt = new Date(Date.now() + 4_000).toUTCString();
+    const calls = routeFetch([throttled(retryAt), searchOk()]);
+    const promise = GraphService.searchFiles('budget');
+    promise.catch(() => {});
+    await jest.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveLength(1);
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(calls).toHaveLength(1);
+    await jest.advanceTimersByTimeAsync(5_000);
+    await expect(promise).resolves.toHaveLength(1);
+    expect(calls).toHaveLength(2);
+  });
+
+  test('falls back to jittered backoff for a malformed Retry-After value', async () => {
+    const calls = routeFetch([throttled('not-a-duration'), searchOk()]);
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).resolves.toHaveLength(1);
+    expect(calls).toHaveLength(2);
+  });
+
+  test('drains a retry response body before waiting for the next attempt', async () => {
+    const retry = throttled();
+    const calls = routeFetch([retry, searchOk()]);
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).resolves.toHaveLength(1);
+    expect(calls).toHaveLength(2);
+    expect(retry.text).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not convert a network rejection into an HTTP retry', async () => {
+    const calls = routeFetch([() => { throw new Error('search socket reset'); }]);
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).rejects.toMatchObject({
+      serviceName: 'graph',
+      noResponse: true,
+      isTransient: true,
+    });
+    expect(calls).toHaveLength(1);
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
   test('gives up after three throttles with one log line and a structured transient error', async () => {
     const calls = routeFetch([throttled(), throttled(), throttled()]);
     let caught;
@@ -192,6 +231,27 @@ describe('GraphService.searchFiles throttle handling', () => {
 });
 
 describe('process-level search cooldown', () => {
+  test('concurrent long Retry-After responses keep the maximum cooldown and latest status', async () => {
+    const calls = routeFetch([
+      response(500, { error: 'busy' }, { 'retry-after': '60' }),
+      response(429, { error: 'throttled' }, { 'retry-after': '120' }),
+    ]);
+    const settled = await runWithTimers(Promise.allSettled([
+      GraphService.searchFiles('first'),
+      GraphService.searchFiles('second'),
+    ]), 200_000, 1_000);
+
+    expect(settled.every(result => result.status === 'rejected')).toBe(true);
+    expect(calls).toHaveLength(2);
+    expect(settled.map(result => result.reason.retryAfterMs)).toEqual([60_000, 120_000]);
+    await expect(GraphService.searchFiles('later')).rejects.toMatchObject({
+      status: 429,
+      cooldown: true,
+      attempts: 0,
+    });
+    expect(calls).toHaveLength(2);
+  });
+
   test('a 500 with a long Retry-After is transient, establishes cooldown, and prevents an immediate second fetch', async () => {
     const calls = routeFetch([response(500, { error: 'busy' }, { 'retry-after': '60' })]);
     await expect(runWithTimers(GraphService.searchFiles('budget'))).rejects.toMatchObject({
@@ -237,5 +297,49 @@ describe('process-level search cooldown', () => {
     const calls = routeFetch([searchOk()]);
     await expect(runWithTimers(GraphService.searchFiles('budget'))).resolves.toHaveLength(1);
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe('search result scope and decoding', () => {
+  test('sends KQL path scope and filters off-site, incomplete, and disallowed-library hits', async () => {
+    const scopedHit = {
+      resource: {
+        name: 'Scoped.pdf',
+        size: 12,
+        webUrl: `${SITE}/akoya_request/Folder%20A/Scoped.pdf`,
+      },
+      summary: 'scoped',
+    };
+    const hits = [
+      scopedHit,
+      { resource: { name: 'Secret.pdf', webUrl: `${SITE}/secret/Secret.pdf` } },
+      { resource: { name: 'Offsite.pdf', webUrl: 'https://other.example/sites/akoyaGO/akoya_request/Offsite.pdf' } },
+      { resource: { name: 'LibraryRoot', webUrl: `${SITE}/akoya_request` } },
+    ];
+    const calls = routeFetch([response(200, { value: [{ hitsContainers: [{ hits, total: 4 }] }] })]);
+
+    await expect(runWithTimers(GraphService.searchFiles('budget', {
+      libraryName: 'akoya_request',
+      folderPath: 'Folder A',
+    }))).resolves.toEqual([expect.objectContaining({
+      name: 'Scoped.pdf',
+      library: 'akoya_request',
+      folder: 'Folder A',
+      webUrl: scopedHit.resource.webUrl,
+    })]);
+    expect(calls).toHaveLength(1);
+    const request = JSON.parse(calls[0].body);
+    expect(request.requests[0].query.queryString).toBe(
+      `budget path:"${SITE}/akoya_request/Folder A"`,
+    );
+  });
+
+  test('surfaces malformed encoded result URLs instead of silently accepting them', async () => {
+    const malformed = {
+      resource: { name: 'Broken.pdf', webUrl: `${SITE}/akoya_request/%E0%A4%A` },
+    };
+    routeFetch([response(200, { value: [{ hitsContainers: [{ hits: [malformed] }] }] })]);
+
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).rejects.toThrow(URIError);
   });
 });

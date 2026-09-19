@@ -160,6 +160,115 @@ it('rejects incomplete pinned identity before any Graph request', async () => {
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+it('re-reads the exact cumulative path after a concurrent 409 creator', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(404))
+    .mockResolvedValueOnce(response(409, { error: 'already exists' }))
+    .mockResolvedValueOnce(response(200, { id: 'raced-folder', name: 'Folder', folder: {} }));
+  await expect(GraphService.ensureFolderPath('akoya_request', 'Folder'))
+    .resolves.toMatchObject({ siteId: 'site', driveId: 'drive', id: 'raced-folder', path: 'Folder' });
+  expect(global.fetch.mock.calls[2][0]).toContain('/root:/Folder?$select=');
+});
+
+it('rejects a 409 recovery reread when the concurrent creator made a file', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(404))
+    .mockResolvedValueOnce(response(409, { error: 'already exists' }))
+    .mockResolvedValueOnce(response(200, { id: 'raced-file', name: 'Folder', file: { mimeType: 'text/plain' } }));
+
+  await expect(GraphService.ensureFolderPath('akoya_request', 'Folder'))
+    .rejects.toThrow('SharePoint path segment "Folder" is not a folder.');
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+  expect(global.fetch.mock.calls[2][0]).toContain('/root:/Folder?$select=');
+});
+
+it('preserves the original 409 when its recovery reread fails', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(404))
+    .mockResolvedValueOnce(response(409, { error: 'already exists' }))
+    .mockResolvedValueOnce(response(503, { error: 'reread unavailable' }));
+
+  await expect(GraphService.ensureFolderPath('akoya_request', 'Folder'))
+    .rejects.toMatchObject({ serviceName: 'graph', status: 409 });
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+});
+
+it('retains earlier created segments when a later folder segment fails', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(404))
+    .mockResolvedValueOnce(response(201, { id: 'one', name: 'One', folder: {} }))
+    .mockResolvedValueOnce(response(404))
+    .mockResolvedValueOnce(response(500, { error: 'second segment failed' }));
+
+  await expect(GraphService.ensureFolderPath('akoya_request', 'One/Two/Three'))
+    .rejects.toMatchObject({ serviceName: 'graph', status: 500 });
+  expect(global.fetch).toHaveBeenCalledTimes(4);
+  expect(global.fetch.mock.calls[1][1].method).toBe('POST');
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toMatchObject({ name: 'One', folder: {} });
+});
+
+it('propagates cancellation observed while credentials are still resolving', async () => {
+  const controller = new AbortController();
+  const reason = new Error('operator stop while authenticating');
+  let resolveToken;
+  const tokenPending = new Promise(resolve => { resolveToken = resolve; });
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockReturnValue(tokenPending);
+  global.fetch = jest.fn();
+  const request = GraphService.ensureFolderPath('akoya_request', 'Folder', { signal: controller.signal });
+  controller.abort(reason);
+  resolveToken('token');
+  await expect(request).rejects.toBe(reason);
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+it('keeps the existing empty-path behavior even when the signal is already aborted', async () => {
+  const controller = new AbortController();
+  const reason = new Error('operator stop');
+  controller.abort(reason);
+  const getSiteId = jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  const getDriveId = jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  const getAccessToken = jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn();
+  await expect(GraphService.ensureFolderPath('akoya_request', '', { signal: controller.signal }))
+    .resolves.toMatchObject({ siteId: 'site', driveId: 'drive', id: 'root', path: '' });
+  expect(getSiteId).toHaveBeenCalledTimes(1);
+  expect(getDriveId).toHaveBeenCalledTimes(1);
+  expect(getAccessToken).toHaveBeenCalledTimes(1);
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+it('allows the existing 409 recovery read after aborting after the POST response', async () => {
+  const controller = new AbortController();
+  const reason = new Error('operator stop after create race');
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(404))
+    .mockImplementationOnce(async () => {
+      controller.abort(reason);
+      return response(409, { error: 'already exists' });
+    })
+    .mockResolvedValueOnce(response(200, { id: 'raced-folder', folder: {} }));
+  await expect(GraphService.ensureFolderPath('akoya_request', 'Folder', { signal: controller.signal }))
+    .resolves.toMatchObject({ id: 'raced-folder' });
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+});
+
 it('reads current file metadata by encoded stable drive and item identity', async () => {
   jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
   global.fetch = jest.fn().mockResolvedValueOnce(response(200, {
