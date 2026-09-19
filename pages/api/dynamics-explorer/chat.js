@@ -923,7 +923,7 @@ function truncateResult(result, charLimit) {
  * Return annotated and live field metadata for a table, or list all annotated
  * tables if no table is requested.
  */
-function restrictedFieldsForTable(tableName, restrictions) {
+export function restrictedFieldsForTable(tableName, restrictions) {
   return new Set(
     restrictions
       .filter(r => r.field_name && r.table_name === tableName)
@@ -937,7 +937,7 @@ function restrictedFieldsForTable(tableName, restrictions) {
 // referenced in prose ("filter by wmkf_x ..."), which leaks its existence.
 // Token-bounded so a restricted name isn't matched inside a longer logical
 // name (logical names are [A-Za-z0-9_]).
-function redactRestrictedFieldNames(text, restrictedFieldNames) {
+export function redactRestrictedFieldNames(text, restrictedFieldNames) {
   if (!text || restrictedFieldNames.size === 0) return text;
   let out = String(text);
   for (const name of restrictedFieldNames) {
@@ -2867,7 +2867,7 @@ async function searchRecords({ search, entities, top }) {
 
 // ─── Helpers ───
 
-function checkRestriction(toolName, input, restrictions) {
+export function checkRestriction(toolName, input, restrictions) {
   if (!restrictions.length || !input.table_name) return null;
   for (const r of restrictions) {
     if (r.table_name === input.table_name) {
@@ -2915,7 +2915,7 @@ function checkRestriction(toolName, input, restrictions) {
 /**
  * Split $expand into segments, respecting parentheses depth.
  */
-function splitChatExpandSegments(expand) {
+export function splitChatExpandSegments(expand) {
   const segments = [];
   let depth = 0;
   let current = '';
