@@ -39,7 +39,7 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–8 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
+provider or external-state call was made. Stages 0–9 are accepted; Stage 10 remains planned. Stage receipts below distinguish completed evidence
 from historical checkpoints.
 
 ## Source-to-target map
@@ -726,3 +726,53 @@ Selection callbacks, state/reset and the generation owner remain in the facade.
   canonical build. Evidence: `/private/tmp/reviewer-stage-8-gates/results.json`.
 
 **Stage 8 verdict:** accepted by root. Starting/rollback reference: `3038184d`.
+
+
+## Stage 9 acceptance — composition controller
+
+[VERIFIED via source, commands and fresh review] Luna moved remaining state, refs,
+reset/prefill effects, selection and hook wiring into `useReviewerSearchController.js`.
+Root AST comparison against `34ee222c` confirms public props/JSX, state/ref
+initializers, both effects and dependencies/order, hook arguments and selection/
+progress initializers. Modal declarations move earlier as planned.
+
+- Fresh Sol `/root/sol_stage9_final`: **READY**; all 71 pre-return statements match
+  after the planned modal declaration move, with 45 state cells, seven refs and
+  80 returned bindings matched to the facade. No operation bodies moved back.
+- The reset effect retains its existing `set-state-in-effect` warning and
+  intentional excludedNames dependency suppression; strict dependency checks
+  expose no newly hidden capture. Exclusion prefill remains a separate effect.
+- Luna focused run: **8 suites / 62 tests passed**. Full G: **19 commands passed**,
+  including **970 suites / 14,270 tests** and canonical build.
+  Evidence: `/private/tmp/reviewer-stage-9-gates/results.json`.
+- Root cross-stage AST check against post-safety-fix baseline `cc119614` matches
+  all 25 extracted callback/memo bodies and parameters. Real P9 boundary assertion
+  and twelve invalid synthetic mutations pass against the completed tree.
+
+**Stage 9 verdict:** accepted by root. Starting/rollback reference: `34ee222c`.
+
+## Mocked browser rehearsal
+
+[VERIFIED via Chromium, standalone React and mocked HTTP] Root took over the
+browser harness after Luna's correction round retained material route-matching,
+async-assertion and hydration gaps. The corrected harness runs baseline `cc119614`
+and the Stage 9 implementation in isolated pages with identical synthetic props
+and responses. All **13 scenarios passed**: populated hydration/revisit/keyboard/
+manual slot and every roster bucket; fragmented discovery with terminal-before-
+transport-error; search retry; applicant cache and explicit retry; mixed ordinary/
+applicant save; partial ordinary save; lost-response roster reconciliation; JSON
+read failure; export payload/download cleanup; partial contact receipt; identity
+rescue after committed confirmation; and rapid request/proposal replacement.
+
+- Both outcomes and request traces match. Scenario-specific assertions verify
+  counts, payloads, selected rows, callbacks and completed UI transitions.
+- Zero console, page, hydration, unexpected fetch or external network errors.
+- Fresh Sol `/root/sol_browser_final`: **READY** after inspecting source and
+  completed evidence. Baseline source SHA-256 is
+  `824d024875e36a3eca06994a3dfcd1b7aa41a1aed85e4a06143cee8e555b9810`.
+- Evidence: `/private/tmp/reviewer-browser-rehearsal/results.json`,
+  `run-stage9.log`, and per-scenario `evidence-*.json`; harness source and bundle
+  are in that same temporary directory.
+- Scope is React `renderToString` → `hydrateRoot` and actual component interactions
+  against mocked boundaries. It is not full Next authentication/instrumentation
+  integration or a live campaign rehearsal. No live writes or provider calls ran.
