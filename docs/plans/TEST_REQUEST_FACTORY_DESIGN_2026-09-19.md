@@ -1,0 +1,126 @@
+# Test Request Factory — admin-only design
+
+Status: **DESIGN ONLY; no runtime or schema implemented, no requests created.** Owner scope confirmed 2026-09-19: admin-only synthetic test requests, not operational duplication. This is separate from the Graph decomposition release. Source baseline: `710892ac`; the accepted Graph facade contract remains compatible with this proposal.
+
+## Outcome and user flow
+
+From an existing request, an administrator selects **Create test request**. A short wizard asks for a test label, starting point, selected documents, and staff-controlled test identities. It previews exactly what will be copied, reset, created, and omitted, including the destination environment. One **Create test request** action produces a new request and opens it in the Workbench with a persistent TEST banner and a link to its creation receipt.
+
+A bounded source/script search found existing tests using prebuilt requests, but no reusable admin clone tool. **[VERIFIED via Luna source reconnaissance; not a tenant feature inventory.]**
+
+The tool supplies the repetitive setup. The user should not need to construct a Dataverse request, arrange SharePoint folders, repair document pointers, or send an invitation to establish a test fixture. Defaults come from a configured test organization and test personas; no contact is silently inherited from the source.
+
+Proposed starting points:
+
+| Preset | Result | Preconditions / limits |
+|---|---|---|
+| Basic request | New request identity and allowed proposal attributes; selected proposal files in an independent destination; no reviews or generated artifacts. | V1 minimum useful delivery. Does not claim readiness for version restore or external materials. |
+| Initial Assessment ready | Basic request plus a supported synthetic IA document, fresh registry row and canonical pointer. Optional two-version fixture for restore testing. | Requires an identity-safe artifact builder and final domain readback; no AI generation during cloning. Two target versions are newly created test history, not transplanted source history. |
+| Site-visit materials open | Basic request plus a synthetic scheduled visit and an open collection, one empty upload slot, fresh short-lived contributor link restricted to test personas. | Requires an explicit prepare-without-send operation plus at least one approved test PI/liaison email, active scheduled visit, eligible request stage and valid date/window. The current collection creation service sends an invitation; do not call it unchanged. |
+
+The materials recipe provisions/assigns dedicated test-persona contacts rather than bypassing recipient validation. Extract a named preparation operation that retains eligibility, scheduling, date/window and recipient checks but never calls the send step; ordinary collection creation keeps its existing send behavior.
+
+The IA recipe must supply the new request number, title, test institution and meeting-date cycle. To remain usable by the existing generation flow later, its canonical narrative must yield at least 60 characters of text (`initial-assessment/artifact-service.js` validation); fixture construction itself must not call that paid generation path.
+
+Proposal-dependent presets must also satisfy the exact canonical narrative filename/location for the **new** request number (currently `AI Materials/ProposalNarrative_<number>.pdf`); arbitrary copied attachments do not establish that contract.
+
+Presets are recipes with checked prerequisites, not a dropdown that blindly writes arbitrary lifecycle labels. A request already at a later source stage can seed a basic earlier-stage copy. Current-stage cloning of Review, Final, leadership, payment, or closed workflows is deferred until each has a valid recipe. Do not forge historical approvals or completion timestamps merely to light up a UI button.
+
+## Grounded current behavior
+
+All items below are **[VERIFIED via source inspection]**, not claims about current tenant configuration:
+
+| Existing surface | Design consequence |
+|---|---|
+| `lib/dataverse/adapters/grant-request.js` exports `getById`, `create`, and `updateById`; `create` passes through to Dynamics. | Reuse the adapter under trusted post-auth DAL context. It is not a validated clone service. |
+| `docs/atlas/dataverse-akoya-request.md` records vendor-owned request identity/status, contact/account lookups, and governed artifact pointers. | Use an explicit field manifest; do not POST the source row or its formatted annotations. Live required/createable fields and numbering must be verified before implementation acceptance. |
+| Intake `lib/services/cron/drain-submissions-service.js` `handleScanning` uses a preallocated request GUID and account binding, expects a server-generated request number, and recovers duplicate-PK creation by readback. | Reuse these proven source patterns, not the whole intake drain. This skeleton does not prove every target tenant/plugin create requirement. |
+| `lib/utils/sharepoint-buckets.js` resolves request document locations; the Graph facade reads/writes files separately from Dataverse. | Create and verify independent request-bound locations and files; never reuse the source's path or drive/item pointers as writable clone destinations. Governed writes require resolved parent locations (`requireResolvedParents: true`), not the read-only fallback library. |
+| `lib/dataverse/adapters/request-document.js` owns actor attribution and generation-key recovery. | Create new rows bound to the new request, with new generation keys and server-resolved actor context. |
+| IA `artifact-reader.js` resolves a unique Ready, non-superseded artifact through the request's canonical pointer; `controls-service.js` checks version identity and governed content during restore. | A copied file alone is not an IA-ready fixture. New file, registry row, pointer, content identity, and version checks must agree. |
+| `lib/services/site-visit-materials/collection-service.js` creates a collection from an eligible request/active site visit and sends an invitation. `contributor-service.js` chooses canonical filenames and can supersede a previous slot row. | Add a named no-send fixture preparation path; allocate a fresh collection/slot and never inherit real predecessor artifacts. |
+| `lib/external/verify-materials-token.js` verifies token audience/digest/request binding/expiry/collection state. | Do not copy tokens. A test-persona access restriction is additional proposed enforcement, not provided by the existing bearer link alone. |
+| `shared/config/workbenchVisibility.js` filters request status/triage, not a universal test marker. Historical test probes recognize Foundation-as-applicant. | A Foundation applicant or TEST title is useful labeling, but does not prove exclusion from queues, reports, or automations. |
+| `lib/dataverse/core/interlock.js` checks deployment/target/operation. | A synthetic marker must not bypass target restrictions. Dataverse target isolation does not isolate Graph, Blob, email, or external Power Automate flows. |
+
+Read also: `docs/CLAUDE_REMEDIATION_PLAN.md`, `docs/APPLICATION_STATE_ATLAS.md`, `docs/SYSTEM_MODEL.md`, and `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. Memory context read: `project-test-residue-cleanup-is-for-data-mining.md` (structured test residue must not masquerade as real data) and `project-dynamics-sandbox-state.md` (historical sandbox schema gaps; not current live proof). No live schema/automation probe was performed for this design.
+
+## Copy policy
+
+**[PROPOSED]** Maintain a versioned server-side allowlist, with per-field transformations and preset overrides. Anything unlisted is omitted. The browser submits source ID and approved choices, never an arbitrary Dataverse payload.
+
+| Data | Rule |
+|---|---|
+| Title, narrative, abstract, program/type and request amount | Allowlist-selected copies; title visibly marked TEST. Requested amount may remain for realistic display; it is not an award or payment authorization. Destination lookup values must be validated. |
+| Cycle, meeting date, request status and triage | Choose valid values from the preset and explicit test date/cycle. Show the change in preview. Do not inherit a closed/awarded state automatically. |
+| Applicant/payee and PI/liaison/Co-PI/CEO/contact memberships | Replace with approved test organization/personas where needed; omit unused roles. Never mutate shared real contacts/accounts or copy portal memberships. Staff PD/PC selection must resolve active authorized staff server-side. |
+| Request GUID and request number | Fresh destination identity; never retain the source number, calculate max+1, or fabricate a number. Use the platform's verified allocation mechanism. |
+| Selected proposal/supporting documents | Copy bytes into new files after source access and version/hash validation; preserve source untouched. Bounded count/size and supported types only. Never recursively copy the entire SharePoint tree by default. |
+| Governed IA/Pre-Site/Final artifacts | Exclude by default. A supported preset constructs fresh fixture artifacts/registry metadata. Any reused content requires a domain-specific transformer that rewrites embedded request references and verifies hashes; otherwise that option is unavailable. |
+| Pointers, registry identities, generation keys, source links, AI-run links | Reset. Rebuild only links among newly owned fixture resources. A source ID is allowed solely as admin-only provenance, never as an operational current-document pointer. |
+| Reviewers, reviews, honoraria, payments, approval/leadership/finalization history, email/calendar activities | Do not copy. Payment authorization and paid totals remain absent/zero as permitted by verified schema. Future reviewer fixtures must use dedicated test personas, not real invitees. |
+| Tokens, signatures, sessions, invitations, reminder schedules, leases, queues, completion timestamps | Do not copy. Create only fresh preset-specific records, with automation disabled by enforced policy. |
+
+Copying narrative or document bytes does **not** anonymize them. Preview must say that source content may contain real names/confidential information. Access remains at least as restrictive as the source; content-bearing external test fixtures require approved internal test actors and an enforced access boundary. Ordinary external bearer-link behavior is insufficient for this guarantee. Until that boundary exists, external presets use synthetic replacement content only and do not copy source documents into an externally visible location.
+
+## Isolation before the first create
+
+**[PROPOSED; enablement blocker]** Add an explicit server-readable synthetic-request marker and creation-run identifier to `akoya_request` using reviewed WMKF extension schema. Exact logical names are reserved only after metadata validation; suggested names are `wmkf_istestrequest` and `wmkf_testcreationrunid`. Record provenance in the admin operation ledger, not in public request DTOs. Keep the established test-organization convention where compatible, but do not use organization name or title matching as the safety boundary.
+
+The marker must be present in the initial INSERT. A later patch is too late for create-triggered automation. Before production enablement, inventory and test every relevant create/update consumer: Dataverse plugins/business rules, Power Automate, AkoyaGO/vendor processes, local cron/workers, reporting/export selectors, email/calendar transport, payment/honorarium paths, and AI automation. Repository inspection cannot establish off-platform suppression. Obtain a named platform-owner review and disconfirming tests demonstrating marked requests cannot trigger those effects. If vendor create logic cannot safely accept/exclude these requests, production cloning stays disabled; use a separately verified sandbox.
+
+Server enforcement:
+
+- Admin permission plus normal source-request read authorization on preview, create, resume, inspect and retire. Creating a clone must not bypass source program/access restrictions.
+- Test requests excluded from normal queues, dashboards, aggregates and exports by default; admin Test Requests view and explicit admin test mode expose them. Direct-ID routes also enforce test visibility; hiding list rows alone is insufficient. Unknown marker state fails closed in the test tool.
+- Background workers skip test requests by default. Deliberate AI/email/payment testing is outside V1; no generic client `testMode` escape hatch. Test collection setup creates no send job or email activity.
+- Each supported synchronous test action verifies the request marker, operation ownership and allowed test identity/target again. Synthetic status does not weaken ordinary auth or target interlocks.
+- Retiring a fixture first blocks new activity and revokes its links, then reconciles exact owned resources. No delete-by-prefix, source traversal, or deletion of shared test personas.
+
+This is the largest prerequisite. It must be delivered and tested before a convenient production “clone” button is enabled.
+
+## Operation contract and recovery
+
+**[PROPOSED]** One service owns the workflow. Suggested files: `lib/services/test-requests/{policy,service,store}.js`, `shared/config/testRequestPresets.js`, admin routes under `pages/api/admin/test-requests/`, and an Administration Test Requests panel. These paths do not exist as part of this design.
+
+Use a small durable Postgres operation ledger (operational orchestration, not a competing request master): proposed `test_request_runs` and `test_request_run_resources`. Define through numbered migrations/manifest and fresh-install schema together. Dataverse remains the request/document-registry authority; SharePoint remains file authority.
+
+A run stores actor, source/destination environment IDs, source request ID and revision, preset/policy version, selected file versions/hashes, a bounded approved plan, idempotency key, preallocated destination GUID, current step, lease/fencing generation, and sanitized result/error. Resources store exact destination IDs/pathnames and ownership evidence plus source→destination provenance. Record planned identity before dispatch and readback after dispatch. No credentials, bearer links, document bodies, or unrestricted source snapshots in the ledger.
+
+1. **Preview:** read source and selected resources; validate schema/config/preset prerequisites; produce a short-lived server-stored plan and digest. No request, file, token or email creation. Include realistic size/count estimates and missing prerequisites; unavailable presets explain why.
+2. **Confirm:** reauthorize and compare request revision plus selected document identities/versions. Reject stale plans rather than silently copying changed data. Atomically reserve `(actor, idempotencyKey)` with plan digest; identical retries return the same run, differing payloads conflict. A deliberate “create another” uses a new key.
+3. **Create:** persist intended destination GUID/marker before request POST. On timeout, read that exact GUID and verify run ownership before retrying. Platform numbering is read back; inability to identify the create outcome leaves `needs_attention`, never blindly creates a second request.
+4. **Provision/copy:** establish a new request-bound SharePoint location via the supported verified provisioning path. Process selected files in bounded steps; reject unsupported/oversized items at preview. Use deterministic run-owned destinations and create-only/conflict semantics. Recover ambiguous success by exact item/path ownership and byte/version evidence, never overwrite an unrelated existing file.
+5. **Apply preset:** build fresh registry rows and relations; set canonical pointers only after file/content readback. Each cross-system mutation is individually journaled. Reauthorize resumption and fence stale workers before subsequent writes. Destination conflicts or uncertain ownership stop the run.
+6. **Verify:** use the same domain readers as the Workbench/portal; validate all requested resources, identity map, source unchanged, absence of real contact/token/payment links, and preset-specific invariants. Only then mark `ready` and expose launch links.
+
+Run states: `prepared → creating → ready`, with `needs_attention` for partial/ambiguous failure and `retiring → retired` for explicit retirement. Store step identity separately. A bounded worker/continuation handles long file copies; do not launch detached promises from an HTTP handler. Reuse a suitable existing durable runner if verified; otherwise a lease-based step endpoint advances bounded work and can resume without the browser retaining state. Server-owned fencing and destination idempotency both matter: an expired lease alone cannot cancel an already dispatched remote write.
+
+The UI shows partial resources and a **Resume** action, not “failed—try creating again.” Preserve receipts on failure. Retirement is separately previewed, only acts on proven run-owned resources, retains tombstones/audit mapping, and respects actual deletion privileges. Inactivity/expiry never initiates a broad cascade delete. Retirement must not claim success if protected records or files remain; show those explicitly.
+
+## Build stages and verification gates
+
+Every stage leaves existing builds green; no runtime behavior is changed by this document. Luna builds/reconnoiters, fresh Sol reviews each stage, root accepts. Stop after two correction rounds for a root decision on remaining material issues; avoid cosmetic loops.
+
+| Stage | Work and files | Tests required before enabling the stage / exit evidence |
+|---|---|---|
+| 0. Prove platform contract | Read-only metadata/automation census; verify create privileges/required fields, numbering, folder provisioning, test organization/personas and schema availability. Produce exact field/consumer matrix and probe receipts. | No create experiment until the initial-insert suppression contract and target are approved. Mock metadata tests reject unknown/noncreateable fields. Unknown platform consumers keep production disabled. |
+| 1. Test identity and isolation | Add marker schema, server test-request resolver, admin visibility and applicable worker/report/transport exclusion guards. No clone UI enabled. | Before rollout: non-admin/direct-ID denial, marked/unmarked/unknown truth table, every enumerated reader/worker/transport consumer, false-positive normal-request regression, platform create/update trigger exclusion. Existing gates plus schema/Atlas/security updates. |
+| 2. Pure preview | Implement copy allowlist/preset validation and admin preview route/panel. | Before exposing: unauthorized source rejection; malicious fields ignored/rejected; reset matrix; no writes/providers in preview; stale source/file detection; content/access disclosure; missing persona/config rejection. |
+| 3. Basic clone | Add ledger/migrations, reservation, bounded runner, new request and independent file locations; basic preset only. | Before first controlled fixture: concurrent same-key requests; response lost after every write; no source mutation; deterministic GUID/number readback; ownership checks; count/size bounds; retries without extra request/file; lease expiry and unknown success; exact cleanup inventory. Domain readback and approved controlled rehearsal. |
+| 4. Useful starting points | Add IA-ready, then materials-open as separate slices. Reuse domain contracts, never direct arbitrary lifecycle patches. | IA: correct new request/file/registry pointers, valid governed content, two-version restore, no inherited audit links. Materials: eligible synthetic visit, fresh collection/token, no send/queue, token confinement/expiry, canonical empty slot, staging and registry reconciliation. Source-ID/link mutation tests must fail. |
+| 5. Admin operations and release | Finish list/status/resume/retire; retention policy; documentation and Tier 2 rehearsals. | Interrupted run resumes; retirement revokes links and reports residue; active worker/retire race; no deletion of source/shared resources; ordinary staff/reporting exclusions; first-time admin usability test; full relevant regressions/build and fresh adversarial review. |
+
+After each stage, a fresh-context reviewer receives only the accepted design, current diff and evidence paths. Re-read actual callers → adapters → persisted IDs → consuming UI/jobs, and deliberately disconfirm isolation and retry claims. Record assumptions that remain unknown. Stage 0's platform census must be refreshed if schemas, flows, selected presets, target environment or field policies change.
+
+Required durable updates when implementing: relevant Atlas pages, API route security matrix, schema records, migration manifest, service catalog and test-runbook. Run touched gates with each self-test sequentially. Do not treat these structural gates as proof that remote Power Automate is disabled.
+
+## Decisions and open prerequisites
+
+Decided: admin-only, test use, source preserved, independent destination identity, explicit starting-point recipes, no email/AI/payment action during creation. Recommended V1 order: basic clone, IA-ready, materials-open; first prioritize the recipe needed for the blocked Graph rehearsal.
+
+Before implementation acceptance, determine: approved deployment/data targets; live create/numbering/folder contracts; platform automation exclusions and owner; schema logical names; test personas; exact source-field allowlist; supported artifact transformers; content-access policy; maximum file/count limits; retention period. These are implementation prerequisites, not reasons for the user to hand-build test requests again. The engineering work should resolve discoverable metadata and source questions and bring only actual policy/authorization choices back to the owner.
+
+Review status: **ACCEPTED AS A DESIGN WITH EXPLICIT PLATFORM GATES** by fresh Sol `sol_clone_design` after a bounded correction recheck. The reviewer identified the materials recipient/scheduling prerequisite and IA narrative/context prerequisites; those corrections are incorporated. Root checked the create/recovery path and isolation limitations. This is a source-grounded design with explicit platform verification gates, not a claim that production cloning is currently safe. No live services, request creation, schema mutation, implementation, push or deployment performed.
+
+Document validation: doc-currency, fact-consistency and their sequential self-tests, plus docs-catalog passed; `git diff --check` passed. Evidence: `/private/tmp/test-request-design-gates.log`. The new worktree initially lacked parser resolution; the successful rerun used the existing main-checkout dependency through `NODE_PATH`, with no dependency change. Runtime tests/build were not run because this commit contains only the proposed design.
