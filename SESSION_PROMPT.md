@@ -1,5 +1,16 @@
 # Session 522 Prompt: Governed document refactor deployed; handoff complete
 
+## Reviewer Search follow-up handoff — 2026-09-18 PT
+
+The reviewer search decomposition is deployed (runtime release `e332ad84`, release
+record `8da7f595`). Future work is recorded separately in
+`docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md`: uncertain-save recovery,
+exclusion rollback, stream cancellation, and proposal-key reset semantics.
+The same document has a **separate Impeccable section** for five preserved 11px
+notes and the two-file exception (`59184b39`). These are follow-up candidates,
+not authorization for implementation or live writes. Read current source and
+characterization tests before picking one. No refactor stage remains unfinished.
+
 ## Session 521 Summary
 
 **[VERIFIED via GitHub PR/deployment records and signed-in production checks.]**
