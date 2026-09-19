@@ -46,7 +46,7 @@ import { trimConversation, compactMessages } from '../../../lib/services/dynamic
 import { MAX_RESULT_CHARS, TOOL_CHAR_LIMITS, sanitizeSelect, applyActiveOnlyFilter, stripEmpty, truncateResult, deriveRecordCount, getThinkingMessage } from '../../../lib/services/dynamics-explorer/result-shaping';
 import { checkRestriction } from '../../../lib/services/dynamics-explorer/restriction-guard';
 import { getUserRole, getActiveRestrictions, logQuery } from '../../../lib/services/dynamics-explorer/explorer-store';
-import { callClaude, callClaudeBatch } from '../../../lib/services/dynamics-explorer/model-call';
+import { callClaude } from '../../../lib/services/dynamics-explorer/model-call';
 import { findReportsDue, searchRecords } from '../../../lib/services/dynamics-explorer/tools/composite';
 import { describeTable } from '../../../lib/services/dynamics-explorer/tools/describe-table';
 import { getEntity } from '../../../lib/services/dynamics-explorer/tools/get-entity';
