@@ -3,7 +3,7 @@ title: Governed Document Lifecycle Execution Record
 domain: architecture
 kind: plan
 status: active
-summary: All stages 0–8 accepted locally for the document service decomposition; the refactor stages made no deployment or live-data changes. A later controlled rehearsal is recorded below.
+summary: Stages 0–8 accepted and promoted through PR #315; production deployment and verification are recorded below. No schema or migration change was included.
 owner: product-engineering
 related:
   - docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_DECOMPOSITION_PLAN_2026-09-17.md
@@ -14,7 +14,7 @@ related:
 Authorized locally by the owner on 2026-09-18. Branch:
 `codex/document-lifecycle-decomposition`. Luna implements/reconnoiters/builds;
 Sol reviews with fresh context for each stage; the orchestrator resolves stalls,
-performs final review and owns acceptance. No push, deployment or schema change is authorized by this record. A separate
+performs final review and owns acceptance. The original local authorization is historical; PR #315 promotion and production verification are recorded below. No schema or migration change was included. A separate
 owner-approved controlled rehearsal may exercise explicitly listed disposable
 fixture writes; the plan's stages and gates remain binding.
 
@@ -475,7 +475,7 @@ ownership, smaller service entry points and permanent regression coverage for
 future maintenance. Promotion remains a separate owner-authorized release action
 under the existing campaign release strategy. No complete production smoke was completed. A separately owner-authorized controlled rehearsal was stopped after two Initial Assessment failures; its evidence is recorded below.
 
-No production milestone entry was required: this branch has not shipped. The
+Production milestone: PR #315 merged as `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`; deployment `6535352663` succeeded at 2026-09-19T00:48:45Z. The
 optional claim-evidence pilot report was unavailable because its local state
 could not be read; no observation row or inferred result was added. This advisory
 report limitation does not replace or invalidate the passing required gates.
@@ -598,3 +598,10 @@ The identical start and leadership payloads each returned HTTP 200 with reused:t
 
 
 **Sol S4 acceptance receipt.** Sol independently recomputed the sanitized S4 evidence and accepted the Final/leadership result. Sol confirmed the explicit actor fields, same-version/eTag/hash before/after checks and the wording limits above. Root accepted the evidence and independently confirmed both loopback ports closed after stopping backend and proxy (exit 130). The run does not prove native CreatedBy impersonation or exhaustive fault coverage. Test rows are retained as owner-controlled evidence; no cleanup deletion or manual reversal ran. The four-field Final schema preflight was exact, with no schema apply. No environment file, runtime source, push or deployment changed.
+
+
+## PR315 production release receipt — 2026-09-19
+
+[VERIFIED via GitHub deployment `6535352663`, CI checks, `/tmp/wmkf-pr315-production-unauth.json`, and root's signed-in production readback] PR #315 merged at `2026-09-19T00:48:02Z` as `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`; deployment `6535352663` succeeded at `2026-09-19T00:48:45Z`. The deployed production application was signed in and reloaded successfully: Final remained in leadership with the recorded actor/time/file identity, and the current IA read returned Ready Draft filename `1003222 Initial Assessment a6b2ef92-1f1335c9.docx` with the expanded v1.0 history. Five unauthenticated route checks returned 307. CI passed 958 suites / 14,195 tests, the canonical build passed, and the required security/preview checks passed. No new writes, paid calls, email, schema, migration, or environment change was performed during this verification.
+
+Rollback reference: last-known-good merge `7a335e27`, deployment `6534771071`, preview `https://wmkfresearchapps-np1mb2ny5-justin-gallivans-projects.vercel.app`.

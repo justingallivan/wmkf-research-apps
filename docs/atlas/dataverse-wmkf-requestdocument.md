@@ -319,8 +319,8 @@ Production Request Document row was created by this release smoke.
   namespace is excluded from editable Pre-Site status, activation cardinality,
   supersession, and guarded-reopen downstream/competing-generation checks;
   missing or lookalike producers retain ordinary fail-closed lifecycle behavior.
-- **[SOURCE-BUILT ON THIS LOCAL BRANCH; NOT DEPLOYED.]** The Stage1–7 decomposition owner paths below are local source state; the compatibility facade and registry behavior remain the documented public contract.
-- **[VERIFIED 2026-09-18 via local branch source; not deployed]** Distribution
+- **[DEPLOYED via PR #315 `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`, deployment `6535352663`; production verification is recorded in the lifecycle smoke receipt.]** The Stage1–8 decomposition owner paths below are deployed source state; the compatibility facade and registry behavior remain the documented public contract.
+- **[DEPLOYED via PR #315 `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`, deployment `6535352663`; production verification is recorded in the lifecycle smoke receipt]** Distribution
   snapshot creation and review-bundle retention are physically owned by
   `lib/services/pre-site-visit/distribution/retained-snapshot.js`. The writer
   registry points to its single create call with the unchanged REQUIRED actor

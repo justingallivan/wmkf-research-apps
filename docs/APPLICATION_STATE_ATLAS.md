@@ -24,7 +24,7 @@ related:
 
 ## Governed document decomposition ownership
 
-**[SOURCE-BUILT ON THIS LOCAL BRANCH; NOT DEPLOYED.]** The Initial Assessment, Pre-Site, and Final compatibility facades remain the public service surfaces. Their extracted physical owners are IA `artifact-model.js`, `artifact-reader.js`, `artifact-lineage.js`, and `artifact-upload-recovery.js`; Pre-Site `distribution/` and artifact leaves; and Final `transition-model.js`, `transition-dependencies.js`, `transition-state.js`, and `transition-claims.js`. These pointers describe source ownership only and do not alter the Dataverse, SharePoint, Graph, or Postgres authority statements below.
+**[DEPLOYED via PR #315 `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`, deployment `6535352663`; production verification is recorded in the lifecycle smoke receipt.]** The Initial Assessment, Pre-Site, and Final compatibility facades remain the public service surfaces. Their extracted physical owners are IA `artifact-model.js`, `artifact-reader.js`, `artifact-lineage.js`, and `artifact-upload-recovery.js`; Pre-Site `distribution/` and artifact leaves; and Final `transition-model.js`, `transition-dependencies.js`, `transition-state.js`, and `transition-claims.js`. These pointers describe source ownership only and do not alter the Dataverse, SharePoint, Graph, or Postgres authority statements below.
 
 ## Claim labeling
 

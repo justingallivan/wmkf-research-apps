@@ -77,8 +77,7 @@ cron. No code behaviour changed.
    import/cycle/export/writer enforcement, source headers and ownership docs; fresh
    Sol/root approval, 958 suites / 14,151 tests and required checks. All stages 0–8
    are complete locally; no migration stage remains to build. Receipts:
-   `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
-   writes are authorized. See the plan's review record and evidence limits before acting.
+   `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. PR #315 is merged as `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`; production deployment `6535352663` succeeded at 2026-09-19T00:48:45Z. See the plan's release receipt and evidence limits before acting.
 
 3. **Post-review hardening (2026-09-18).** Claude reviewed `5f069b32` as READY
    with three low findings. Removed four unused imports, corrected the facade/leaf
@@ -91,7 +90,7 @@ cron. No code behaviour changed.
    Fresh Sol acceptance and root final review passed after one bounded correction
    round. A subsequent source-mode read-only smoke on ZZTEST-03 passed signed-in
    IA/version/Pre-Site/history/Final reads and signed-out redirects; S1 is partial.
-   The subsequent read-only S1 subset and incomplete S2 rehearsal are recorded separately; bounded service reconciliation completed the restore metadata. The later guarded Pre-Site reopen and return-to-Review succeeded; the exact retry/stale/fault matrix remains unrun, while S3 passed separately and S4 was NOT RUN at that earlier run. No fresh canonical build for the earlier hardening import/test/docs follow-up; prior build evidence remains historical. The current restore fix has 4 suites / 42 tests plus a successful canonical build recorded in the execution receipt. No push/deploy authorized.
+   The subsequent read-only S1 subset and incomplete S2 rehearsal are recorded separately; bounded service reconciliation completed the restore metadata. The later guarded Pre-Site reopen and return-to-Review succeeded; the exact retry/stale/fault matrix remains unrun, while S3 passed separately and S4 was NOT RUN at that earlier run. No fresh canonical build for the earlier hardening import/test/docs follow-up; prior build evidence remains historical. The current restore fix has 4 suites / 42 tests plus a successful canonical build recorded in the execution receipt. PR #315 has been merged and deployed; no schema or migration change was included.
 
    A separately owner-authorized controlled rehearsal on ZZTEST-03 was stopped after two IA failures. Generation returned HTTP 500 `claude_output_truncated` (run `7d8b647c-abb3-f111-aaac-000d3a361c1f`) and created one Failed row `ea6e4768-abb3-f111-aaac-6045bd04539e`; request state, 24 pre-existing Dataverse Request Document rows and 13 distribution attempts were unchanged; the SharePoint restore effect is recorded separately. Restore selected version 1.0 from current 2.0; Graph produced stable current 3.0 with historical 1.0/2.0 retained and equal governed hashes, but the API returned `initial_assessment_restore_bytes_mismatch` before registry metadata persistence. Readback is `/tmp/wmkf-restore-readback.json`; raw package differences were limited to custom XML/properties/trash parts. No PSV, distribution prepare/send, email, Final or leadership action ran. The initial browser restore failure is historical. A bounded PATCH-only service recovery then returned `restored:false`, `reconciled:true` with one registry update and zero Graph restores; independent readback confirmed the existing IA row at version 3.0, preserved history and the same governed hash. The recovery process exited 0. This is not a global database audit, and the browser restore was not rerun; S2 remains incomplete and S3–S4 were NOT RUN at that earlier run.
 
@@ -107,10 +106,10 @@ Current fixture: IA `7d00fffd` remains unchanged; PSV `205da1cd` is now Final; c
 
 ## Next Items
 
-**Local refactor release boundary:** all stages are committed on
-`codex/document-lifecycle-decomposition`; do not push, merge or deploy without a
-new release instruction. UI behavior is intended to remain unchanged. No production
-milestone entry was required because the branch has not shipped. The optional
+**Refactor release boundary:** all stages were committed on
+`codex/document-lifecycle-decomposition` and promoted through PR #315. UI behavior
+is intended to remain unchanged; no schema or migration change was included. The
+production milestone is recorded for deployment `6535352663`. The optional
 claim-evidence report could not read its local state; no observation was inferred.
 The unrelated carryovers below retain their prior evidence and need fresh checks
 before any live work; this refactor did not re-probe production.
