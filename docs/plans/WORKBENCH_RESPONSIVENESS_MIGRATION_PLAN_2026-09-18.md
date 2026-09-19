@@ -2,8 +2,8 @@
 title: Workbench Responsiveness Migration Plan
 domain: architecture
 kind: plan
-status: draft
-summary: Proposed staged migration of Workbench read lifetimes, navigation loading, and refresh continuity; implementation is not authorized.
+status: active
+summary: "Authorized staged implementation: measure and ship local refresh/waterfall fixes first; shared caching and code splitting remain evidence-gated."
 canonical: false
 owner: product-engineering
 related:
@@ -12,56 +12,38 @@ related:
   - docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md
 ---
 
-# Workbench responsiveness: preserve reads across navigation
+# Workbench responsiveness: small improvements before shared caching
 
-## 1. Decision and authorization boundary
+## 1. Decision and authorization
 
-**[PLANNED] Recommendation:** move Workbench GET-response ownership out of individual
-panels into a small, session-scoped client query layer. Keep the existing pages,
-URLs, route guards, API envelopes, domain services, and mutation workflows.
-Render an already-loaded resource while revalidating it; start independent reads
-concurrently; load expensive tab code only when needed.
+**[PLANNED]** Preserve useful content during same-context refresh and remove
+independent-read waterfalls before adding a shared query layer. This supersedes
+the original cache-first stages at commit `2e611d9a`. The user authorized revision
+and implementation, with Luna doing reconnaissance/builds, Sol reviewing, and the
+root orchestrator accepting stages and resolving review loops. Production promotion,
+live writes/sends and provider calls are outside this execution.
 
-This is the largest coherent performance refactor supported by this inspection:
-the dashboard and request workspace share the same read-lifetime problem across
-multiple journeys. It is not a claim that this is the objectively slowest code in
-production. **[UNKNOWN]** Current production p50/p95, dependency latency, browser
-CPU cost, and compressed chunk sizes have not been measured in this planning task.
-Stage 0 can shrink or stop the plan when measurements contradict the hypothesis.
+Work on `codex/workbench-responsiveness` in an isolated worktree. Treat the combined
+release as Tier 2, with explicit owner promotion under the release strategy. No
+runtime changes land directly on main. Each accepted stage is independently
+revertible. Preserve existing routes, API envelopes, domain services, auth guards,
+server authority, and mutation semantics.
 
-The owner authorized **scoping and a migration document only**. No migration,
-dependency installation, live data probe, provider call, or deployment is authorized
-by this document. A future implementation belongs on a `codex/` feature branch.
-Treat the aggregate release as Tier 2; reviewer mutation integration may require
-Tier 3 treatment under the campaign release strategy. Do not push runtime stages
-directly to production `main`.
+The expected benefits are less blanking during refresh, faster independent content,
+and potentially faster revisits. **[UNKNOWN]** Production latency distributions and
+revisit frequency have not been measured. Do not call this the objectively largest
+production bottleneck or promise a percentage gain. Complete the justified local
+stages; conditional stages can be explicitly omitted with evidence, not left as
+implicit unfinished work.
 
-### What a user should notice
-
-- Returning to a recently visited list or read tab shows its last successful data
-  immediately, with a small updating indicator rather than a full-panel spinner.
-- Refreshing a populated list does not remove its rows or move the user's focus.
-- Opening Proposal or Overview no longer serializes an independent read behind
-  the header/context request.
-- Opening a request downloads less unused tab code if the bundle experiment passes.
-- Known mutations refresh all existing dependent surfaces without requiring F5.
-
-**Limits:** a hard browser reload still starts a fresh in-memory cache. The plan
-does not make external services or LLM generation intrinsically faster. Reusing a
-snapshot is not a fresh server confirmation. Most remounts still revalidate: the
-initial policy deliberately uses `staleTime: 0`, so the plan does not promise zero
-warm network traffic. Concurrent identical reads can share a request.
-
-### Alternatives considered
-
-| Candidate | Source evidence / limitation | Decision |
-|---|---|---|
-| Workbench read lifetime and refresh continuity | Matching GETs in multiple consumers; conditional panel mounts; visible loading replacement; avoidable client waterfalls | Selected |
-| Reviewer Find warm bootstrap | Proposal POST, applicant ingestion/enrichment, durable roster, document identity and open F1–F4 follow-ups | Separate project; do not absorb it |
-| Server read coalescing | Existing tests already pin merged person reads; earlier coalescing is not new work | Preserve; only revisit with new timing evidence |
-| Global server cache / new aggregate data API | Adds permission, invalidation, and partial-response contracts; no measured justification here | Excluded |
-| App Router / authentication migration | Large blast radius; current navigation already shallow | Excluded |
-| Virtualize every list | No measured DOM/render bottleneck yet | Reconsider only if Stage 0 proves one |
+| Alternative | Decision |
+|---|---|
+| Same-key RequestList/Reviews refresh retention | First implementation arm; no dependency |
+| Explicit-URL dashboard waterfall removal | First arm, only when program context is unambiguous |
+| Proposal/Overview GUID-only parallel reads and rendering | First arm; preserve independent API guards |
+| Shared browser cache | Conditional incremental arm after local fixes; no adoption by default |
+| Lazy tab imports | Separate measured experiment, independent of caching |
+| Server cache, App Router/auth rewrite, Find bootstrap, list virtualization | Excluded without a new measured problem; do not expand this task |
 
 ## 2. Source baseline and evidence ledger
 
@@ -102,611 +84,354 @@ grant-request adapter + fail-soft Co-PI junction read → full context DTO → h
 Overview, Status, Proposal, management display. Proposal listing independently
 reads request scope and SharePoint document listings; reviewer rollup reads the
 engagement ledger. Reviews consumes the existing reviewer-service DTO, including
-question/answer and synthesis projections. Cache those DTOs, not invented entities.
+question/answer and synthesis projections. Any later cache must preserve those DTOs, not invented entities.
 
 **[PLANNED] Persistence change: none.** Dataverse/SharePoint/Postgres ownership and
-all writes remain where they are. The added client cache is disposable browser
+all writes remain where they are. Any conditional client cache would be disposable browser
 memory only, containing authorized GET responses; no localStorage, IndexedDB,
 service worker, persisted cache, signed document bytes, or server singleton.
 
-## 3. Target contract — freeze before implementation
+## 3. Behavioral contracts
 
-### 3.1 Library and owner
+### Local reads and refreshes
 
-**[PLANNED]** Use `@tanstack/react-query` v5, one dependency, with an exact version
-pinned in `package.json` and lockfile during Stage 1. Re-check its React 18 peer
-compatibility before installation. Use its query lifecycle, cancellation and
-garbage collection rather than building a new query engine. No devtools, persistence
-plugin, SSR dehydration, or mutation-framework conversion is needed.
+- Retain successful data only for the exact same request or server-input tuple.
+  An empty successful result counts as loaded. Changed request/program/cycle/scope
+  must not show the prior context even for one render. Use existing generation
+  guards plus a keyed successful snapshot, not a generic previous-data fallback.
+- For readers changed in S1–S3, ordinary refresh failure may retain same-key data with an explicit error/retry
+  message. HTTP 401/403 and invalid/wrong-context payloads clear or suppress the
+  protected projection. Test denial **after seeded success**, including controls.
+- Keep initial loading separate from updating. Preserving children changes their
+  lifetime: draft, clipboard/export, synthesis and manual-entry tests are mandatory
+  before retaining Reviews children. Do not preserve inactive workflow tabs.
+- No new focus/reconnect refresh, polling, automatic command retry or GET on local
+  search/sort/filter changes. Keep existing poll ownership/timing/stop conditions.
+- Keep every response envelope and partial-success behavior. `liveQuestions` is
+  part of the reviewer response. Candidates/referrals and confirmed invite overlays
+  remain in their existing owner. No changes to reviewer Find or its F1–F4 backlog.
 
-Place a proposed `WorkbenchDataBoundary` inside the existing authenticated
-Profile/AppAccess providers in `_app.js`. It must remain the same mounted boundary
-between `/workbench` and `/workbench/[requestId]`, survive shallow navigation, and
-discard its client on leaving the Workbench. Never instantiate a server-global
-QueryClient. Existing `RequireAuth` and `RequireAppAccess` remain authoritative UI
-guards; every API keeps its own authorization and DAL context.
+The unchanged Follow-up panel currently retains rows on any read failure, including
+denial. That pre-existing behavior is outside these stages; its retention pattern
+is not proof that denial-after-success is already handled. The denial assertion
+above applies to modified readers and any later selected cache resource.
 
-Partition the boundary by session principal (Azure identity/profile ID), nullable
-session Dynamics actor ID, current profile ID when associated with that principal,
-sorted app grants, superuser status, and preview-read-only mode. Only non-secret
-identity values belong in the partition. **Known-null actor is valid**: auth can
-emit `dynamicsSystemuserId:null` and current guards still allow reads. Do not require
-every key field to be truthy or turn a preferences/profile-loading failure into a
-new app-access rule. Use an explicit unresolved-profile sentinel instead of treating
-a previous session's still-rendered profile as the new principal's profile.
+### Callback contracts are per caller
 
-During initial session resolution, preserve mounted children as RequireAuth does,
-but expose no cached protected data. Authenticated session plus a completed,
-successful existing access check enables reads; the existing approved auth-disabled
-local mode uses the shared `getAuthEnabled` result and an isolated local partition,
-not an invented truthy session requirement. On a real principal change, synchronously
-disconnect the old query client before rendering any query consumer; cancel/discard
-it. Call existing `refreshAccess()` once for that transition (not on ordinary route
-changes). Hold the new client unavailable until that refresh completes successfully
-and current access state is no longer loading/error. Guard its completion by the
-principal/transition generation; a late A refresh cannot release B. Initial provider
-mount already fetches access: do not duplicate that read. This boundary does not
-prove grants belong to a principal simply by copying them into a key. If implementing
-the transition requires changing provider contracts beyond this callback integration,
-stop and re-scope instead of rewriting authentication.
+`ReviewersTab.refreshAll` starts candidates/reviewers/referrals and returns void;
+keep it fire-and-forget, never rejecting. `ReviewsTab.load` and manual-submission
+handling are asynchronous, catch read errors, and settle after the reload; preserve
+that await before clearing manual entry. Follow-up's load is also asynchronous and
+catches errors; inspect its actual host adapter before changing it. Do not globally
+convert all callbacks to void or expose query-library throw semantics to callers.
+A confirmed write followed by a failed refresh remains a confirmed write.
 
-Sign-out, confirmed access loss, and boundary disposal discard cached responses.
-Ordinary same-principal access loading hides protected query projections while
-existing guards show their normal loading/retry UI. Do not infer server authority
-from this client partition. API authorization is unchanged.
+Triage stays one command, one list reload and one generation-guarded count patch.
+No cycles GET is added by triage. If cycles are cached later, patch the active
+matching entry once and mark other variants stale with `refetchType: 'none'`;
+explicitly refetch only sources the original callback actually refreshed.
 
-### 3.2 Explicit policy
+### Request context and Primer
 
-The proposed `shared/components/workbench/data/query-policy.js` owns these
-engineering defaults (not a new staff-facing settings system):
+Keep context outside the proposed cache. Add request isolation where needed for
+independent rendering: a response/error/finally for A cannot affect B, and context
+must match the current route before reaching child props or canManage. Retain the
+current once-per-request fetch policy. Do not introduce focus, reconnect or tab-
+navigation context refetch, action suppression leases or a principal-transition
+state machine.
 
-- `staleTime: 0`; `gcTime: 300000`; `retry: false`; `refetchOnMount: true`;
-  `refetchOnWindowFocus: true`; `refetchOnReconnect: true`.
-- No query-level interval by default. Existing workflow polling keeps its timing,
-  stop conditions, attempt limits and owner; do not add a second poller.
-- Pass the query's AbortSignal into GET fetch. Cancellation prevents obsolete
-  client publication; it does **not** prove server/provider work stopped.
-- No `keepPreviousData`/placeholder reuse across different keys. A successful
-  empty array is loaded data. Only the exact same scoped key can reuse data.
-- Background HTTP/network failure retains the same-key snapshot with a visible
-  retry/stale message. Initial failure shows the existing error/Retry affordance.
-  Authorization denial or malformed/wrong-context payload must not retain a
-  misleading successful projection. Test both HTTP and application envelopes.
-- Do not automatically retry any mutation, stream, email, generation or upload.
-  Domain forms, selections, confirmations, notices, overlays and action locks stay
-  with their existing owners. Do not keep inactive tabs mounted.
+Primer generation/export is unchanged by these local improvements. Its returned
+local envelope can be valid with `persisted:false`; do not refetch/replace it as a
+side effect of this task. Updating Overview's Primer chips after generation is a
+separate existing freshness defect, not prerequisite performance work. If a later
+stage needs a new context-refresh policy, stop that stage for a bounded design
+review instead of reconstructing the removed lifecycle protocol.
 
-These policies favor immediate visual reuse and bounded freshness. Positive TTLs,
-prefetching, long-lived offline data, and suppression of broad mutation refreshes
-are excluded. There is no automatic reload on every keystroke or visual filter:
-query keys include only actual server input.
+## 4. Measurement and branch acceptance
 
-### 3.3 Resource catalog and exact cache equivalence
+Luna owns test/build execution; reviewers do not run competing builds or fixture-
+writing gates. Use isolated Mode A only: no `.env*` secrets or `.vercel`, minimal
+allowlisted child environment, throwaway test auth secret and localhost URLs.
+Route-mock every browser `/api/**` call and fail unmatched routes. This does not
+isolate instrumentation by itself: verify no real credentials enter server startup.
+Do not copy main-checkout environment files to make tests pass.
 
-All keys start with `['workbench', partition, resource, parameters]`. Normalize
-validated GUIDs to lowercase; preserve non-GUID opaque keys byte-for-byte.
-The partition is fixed by the boundary; parameters below are plain serializable
-objects. Distinguish missing/default program from an explicit program. Do not seed
-an explicit-program cache entry from a default-program response without a tested
-aliasing contract (none is proposed).
+Reuse the real-page/auth fixture pattern in
+`tests/e2e/program-director-invite.spec.js`. Proposed new harness:
+`tests/e2e/workbench-responsiveness.spec.js` and a helper only if needed. Record
+baseline and candidate commit, build flavor, browser/Node version, fixtures and
+fixed synthetic API delays. Use held responses for deterministic ordering and
+fixed delays for comparative timing; these are distinct assertions.
 
-| Resource | Server parameters / full envelope | Planned owner |
-|---|---|---|
-| dashboard-cycles | `{programId: explicit GUID or null}`; whole response incl. cycles/defaults/programs | `useWorkbenchDashboard.js` |
-| dashboard-requests | `{programId, cycleCode, scope, includeSetAside}`; whole response incl. rollup | `useWorkbenchDashboard.js` |
-| request-context | `{requestId}`; entire resolve DTO | `useWorkbenchRequestContext.js` |
-| reviewer-rollup | `{requestId}`; counts, needed, hint, workRemaining | `useWorkbenchRequestReads.js` |
-| proposal-documents | `{requestId}`; entire document envelope incl. partial errors | `useWorkbenchRequestReads.js` |
-| request-reviewers | `{proposalId}`; entire `{success, proposals, liveQuestions, ...}` | `useWorkbenchReviewers.js` |
-| cycle-reviewers | `{cycleCode, scope, programId}`; whole reviewers response | `useWorkbenchDashboard.js` |
-| cycle-initial-assessments | `{cycleCode}`; disabled for D26 or absent cycle | `useWorkbenchCycleReads.js` |
-| cycle-staff-deliberations | `/api/workbench/staff-deliberations` with `{cycleCode, scope}`; both are server inputs | `useWorkbenchCycleReads.js` |
-| cycle-final-writeups | `{selector}` where uncycled uses existing `NO_CYCLE`, not empty cycle | `useWorkbenchCycleReads.js` |
-| cycle-awardees / awardee-cycles | Exact cycle/all server inputs / no-query mode respectively; distinct keys | `useWorkbenchCycleReads.js` |
+Compare arms:
 
-Preserve JSON envelopes in cache; project them in existing consumer functions.
-Never use the dashboard row as a complete request-context response. Never turn
-`reviewer-rollup` into the expensive reviewer-detail GET. Never conflate cycle and
-request variants of an endpoint. Search/PD/status filters that are local today
-remain local and create no cache variants.
+1. A: unchanged runtime at `2e611d9a` (test-only commits allowed).
+2. B: local improvements from S1–S3.
+3. C: only if warranted, a bounded cache experiment for a specific revisit journey.
 
-### 3.4 Refresh and mutation contract
+Record useful-content and fresh-content time, blank duration, endpoint/method counts,
+initial JS transfer and active pollers. Use the same delay/data/environment for A/B,
+multiple repeated samples (target 20 for timing conclusions), median and exploratory
+p95. Do not assert production latency from these fixtures. Existing deployed
+observability may inform route selection if read-only telemetry is already available;
+record unavailability rather than provisioning observability or accessing production
+data to satisfy this task. Production revisit frequency remains unknown without data.
 
-Initially preserve each existing explicit loader callback and every broad refresh.
-Implement the callback with query cancellation/refetch when its read is migrated;
-do not merely return cached data from a callback that callers expect to refresh.
-Invalidate inactive matching entries as well as refreshing active ones.
-
-| Producer | Mandatory handling; legacy reads remain until their own stage |
+| Journey | Required result |
 |---|---|
-| RequestList triage | Keep exact server command and generation-guarded count patch. Refresh active request list; invalidate all dashboard cycle/list variants, not just current filters. Do not double-apply deltas to both a local copy and query data. |
-| Reviewer Follow-up embedded ReviewerManagePanel actions | Its onRefresh currently calls the two-source loadProposals. Preserve both forced GETs and invalidate cached request-reviewers/rollup entries as well; use the exact affected request when known, otherwise conservatively all cached variants of those resources. Test Follow-up action → previously visited request. |
-| ReviewersTab refreshAll callbacks | Preserve three-source refresh, overlay shape validation, delayed reconciliation and poll behavior. Refresh shared request-reviewers; invalidate rollup and dashboard/cycle-reviewers views. Candidates/referrals stay locally owned. |
-| Reviews manual receipt / reminder / synthesis callbacks | Preserve current command/result handling and required reload. Invalidate request-reviewers, rollup and affected list projections; never infer a row success from aggregate counts. |
-| Proposal Field Primer actions | Preserve the command/export semantics and confirmed local envelope. Use the request/mount/action-owned context suppression protocol in S2, including cancellation before action, teardown fencing and a separate post-commit hold. Invalidate without refetch after confirmed generation; revalidate on subsequent tab navigation or explicit idle refresh. Never reset action locks through a new initialRaw prop mid-action. |
-| Other document/awardee mutations outside migrated readers | Their local refresh remains. Cached list reads are stale and always revalidate on remount/focus; do not claim an immediate cross-tab signal from an unintegrated writer. |
-| Other staff, cron, external reviewer, direct CRM edits | No push signal exists in this plan. Revalidate on mount/focus/reconnect and offer manual refresh. State this consistency limit. |
+| Same-key triage/list refresh | Rows or successful empty state stay visible while reload held; one POST + one list GET, zero new cycles GETs |
+| Explicit program+cycle dashboard entry / Back | List starts before held cycles response; no wrong-program fallback, preserved default-path behavior |
+| Direct Proposal/Overview with held context | Document/rollup GET and useful section appear independently; no extra analysis/generation/download |
+| Reviews refresh / manual receipt | Same-request content and allowed drafts survive; manual completion keeps its existing await; full DTO retained |
+| A→B, filter/program changes, stale failures | No wrong-context content or late writes; newer owner wins |
+| S1/S3 changed reader success then 401/403 | Protected rows/actions disappear; ordinary network failure is distinct |
+| Focus/reconnect during open dialogs/actions | No new GET or automatic state reset |
 
-Before executing a migrated command's existing refresh: cancel older matching GETs
-and fence their publication, then force the required reads. Mutation HTTP failure,
-partial success, and unknown outcome keep the existing domain handling; refresh is
-not evidence that a write failed or permission to resubmit it. Do not put confirmed
-invite overlays into the raw reviewer DTO or invent a shared engagement state machine.
+Cold-path API counts may not increase from A. No >10% repeatable cold useful/fresh
+latency regression without root acceptance of a named tradeoff. A held-response
+snapshot beating the response is correctness evidence, not proof of net benefit.
+At S3, stop expansion if B addresses the observed problem; C must add demonstrated
+benefit beyond B for an identified journey. Unmeasured revisit frequency cannot
+justify migrating every panel. Bundle splitting must reduce initial bytes without
+materially delaying first use; omit it otherwise.
 
-An invalidated snapshot may still appear while revalidation runs, explicitly marked
-updating; invalidation does not erase data. Never describe it as confirmed current
-state. Confirmed invite overlays and other existing command-result projections take
-precedence in their existing owners. §4 tests must distinguish “old data marked
-updating” from a forbidden regression that enables an already-completed action.
+## 5. Stages and prerequisite tests
 
-## 4. Measurement and acceptance contract
+Each stage begins with existing passing characterization tests. Add discriminating
+new behavior tests and show they fail for the intended old behavior before the fix;
+commit only the green stage. Run the §9 gate and fresh Sol review before proceeding.
+No stage assumes a proposed file already exists.
 
-Stage 0 must create a committed, synthetic fixture-driven browser harness using
-the real pages. Reuse the authentication/API mocking pattern from
-`tests/e2e/program-director-invite.spec.js`; abort every unhandled `/api/**` request.
-No real sends, generation, Dataverse reads, or upload calls. Record that route mocks
-do not isolate server startup/background work: `instrumentation.js` invokes
-auth-bypass and migration-drift checks which can write alerts. Use an isolated
-tracked-files-only worktree, no copied `.env*` secrets or `.vercel` files, and a
-minimal allowlisted child environment (PATH, CI=1, throwaway NEXTAUTH_SECRET,
-local NEXTAUTH_URL and E2E_PORT). Do not inherit cloud/provider/database credentials.
-Verify the isolated tree's env-file names before launch; do not print values.
-CI=1 prevents reuse of an unrelated running Playwright server. Reuse the existing
-test JWT and route-mock seam, not a production auth bypass. Missing-credential
-startup warnings are expected; an attempted live dependency call is a failed
-isolation preflight, not a reason to load production credentials.
+### S0 — Reconnaissance, baseline and fixtures
 
-Use production builds for timing, fixed browser/viewport/CPU/network settings, a
-fixed seeded data fixture, and the same machine. Record commit, Node/browser/library
-versions and build command. Measure at least 20 alternating baseline/candidate runs
-per journey and report median plus p95 (exploratory, not an SLA), cold separately
-from warm. Warm-up runs do not enter the sample. Record traces, failures and counts,
-not only successful durations. Measure click→useful content, click→fresh confirmed
-content, milliseconds of full-panel blank/loading, HTTP requests by exact endpoint,
-transferred JS bytes, long tasks and active poll timers.
+Prerequisites: clean intended branch, baseline HEAD, existing Workbench/Reviews/
+Primer test suites. Run all current `check:*` scripts sequentially, baseline Jest,
+lint/types and canonical build. Add route-mocked browser characterization and an
+endpoint census for the §4 journeys; keep baseline expected behavior explicit.
+No runtime moves. Root revises this plan using reconnaissance, then fresh Sol
+reviews plan/source assumptions before runtime changes begin.
 
-| Journey | Deterministic acceptance / proposed timing target |
-|---|---|
-| Requests → Follow-up → Requests, unchanged program/cycle/scope | Exact matching dashboard key reused; simultaneous consumers one GET. Warm render appears before held response is released; no full-list blank. |
-| Dashboard → request → browser Back | Same-key data visible before background response, URL filters restored by existing history; no hard reload. Do not promise the explicit “Back to dashboard” link preserves filters; its current URL is `/workbench`. |
-| Direct Proposal / Overview | Hold context response: independently authorized documents/rollup request starts before context resolves. Render independent section when available; header can still show loading. |
-| Reviewers Track → Reviews → Track | Full shared reviewer envelope survives; no data loss, duplicate poller, automatic POST, lost question set, or widened permissions. |
-| Triage/manual receipt/invite with delayed GET | Existing success/partial/error semantics preserved; same-context rows remain visible; stale pre-command GET cannot overwrite newer confirmation. |
-| A→B→A and program/scope/account changes | Zero frames with another context's data; aborted/late success, error and finally do not affect active context. |
-| Slow/offline/403 response | Prior exact-key read survives ordinary background failure with notice; access denial clears protected data; retry works. |
+Exit: baseline evidence recorded, production unknowns explicit, local stage scope
+frozen. Missing runtime/browser tooling is a reported verification blocker, not a
+reason to claim success from unit tests alone.
 
-**[PLANNED targets]** For eligible warm journeys: useful-content p95 ≤100 ms under
-the controlled fixture, and no full-panel blank between click and revalidation.
-Cold Proposal/Overview should remove one serialized dependency: concurrent total
-approaches `max(context, section)` rather than their sum. No >10% regression in
-cold useful/fresh-content p95 or total route requests on the agreed fixture without
-explicitly accepting the measured tradeoff. Bundle stage needs a real reduction
-in initial transferred JS after including the query-library cost; otherwise omit it.
-Never convert synthetic timing into a production latency claim.
+### S1 — Retain RequestList and remove the explicit-URL waterfall
 
-## 5. Ordered implementation stages
+Prerequisites: existing workbench-shell, request-number-lookup, reviewer-follow-up
+and dashboard service tests. Add cases for same-key held refresh, successful empty,
+network error, 403 after success, changed-key late success/error, triage counts and
+focus. Pin explicit program+cycle versus missing/default program, program switch,
+unlisted cycle and cycles failure. Preserve server-dependent default resolution.
 
-Every stage has a prerequisite-test commit, then its bounded implementation commit.
-New behavior tests may start red only on the working branch during that stage;
-do not commit a red milestone. First add passing characterization tests; add the
-new-contract tests immediately before implementation and demonstrate their intended
-failure, then commit the green result together. No stage may begin until its named
-prerequisites exist and the prior stage's full gate/review receipt is accepted.
+Order: tests → `RequestListPanel.js` exact-key loaded state/render guard →
+`WorkbenchShell.js` early explicit-cycle dispatch only with safe program scope →
+counts/callback parity tests. No file relocations, hook extraction or dependencies.
+Do not treat URL cycle alone as proof that the default program is resolved.
+Pass only cycle metadata belonging to the current program. During an early list
+read, show rows but defer cycle-derived counts and triage controls until the
+matching cycles GET succeeds; this preserves their existing prerequisite rather
+than inventing a new permission rule. Test A→B Back navigation with the same cycle,
+held cycles → rows visible/no old counts or triage → cycles success → one triage
+POST/list reload/count patch. A cycles error must retain retry and must not strand
+an unexplained disabled control. If this requires broader coordination, omit the
+early URL arm and retain the list-continuity change.
 
-All paths below marked **new** are proposed files, not existing implementation.
-Public page/component paths and exports stay stable. “Move” means extract the named
-logical region, update its imports, and remove the old duplicate owner in the same
-green commit; do not copy whole components or leave two live fetch effects.
+Exit: same-context list stays visible, explicit safe URL begins independent work,
+triage counts/requests unchanged, default path stays correct. Revert S1 commit to
+rollback; no durable writes/schema changes introduced.
 
-### S0 — Characterize, benchmark and freeze the boundary
+### S2 — Independent Proposal and Overview reads
 
-**Before starting:** run the existing §9 suites; verify baseline SHA, no unrelated
-WIP, and current release posture. No source moves.
+Prerequisites: Proposal documents, Overview status, request-resolution and Primer
+export suites. Add held context, missing/failed context, wrong request context,
+A-slow/B-fast, unmount, partial document errors, 403 and exact GET-count tests.
+Characterize context-only component callers before changing signatures.
 
-**Add first:** `tests/e2e/workbench-responsiveness.spec.js` and
-`tests/e2e/helpers/workbench-responsiveness.js` (**new**) with §4 journeys, held
-responses and endpoint census. Add `tests/unit/workbench-read-contracts.test.js`
-(**new**) to pin full consumer envelopes, empty/partial/error distinctions, default
-program/cycle normalization, and per-request vs cycle reviewer projections.
-Record baseline measurements in a companion execution receipt (**new**, created
-only during implementation). Keep the three existing reviewer reconciliation suites.
+Order: tests → request-page context identity/generation fence → explicit route GUID
+prop to `ProposalTab` (tested context-only fallback) → separate document rendering
+from context loading guard → `OverviewTab` independent rollup rendering. Keep
+existing pure GET owners in the components; no shared query layer is needed.
+Fence document/rollup snapshots at render time by request identity or key their
+owners by request. Parent context fencing alone is insufficient: old child state
+survives until effects clear it. Assert A→B synchronously before effects settle,
+including A document links and reviewer counts, not merely after B responds.
 
-**Exit:** browser baseline reproduced; exact duplicate GET equivalence documented;
-before/after targets frozen; choose the smallest stage set justified by evidence.
-If provider/server latency dominates and warm reuse is rare, re-scope instead of
-executing a large client rewrite. Fresh review checks scope against source.
+Exit: independent reads and useful sections render before context, request A never
+supplies B's fields/permissions, no new automatic commands, Primer tests unchanged.
+No context refresh callback is added. Revert this stage independently of S1.
 
-### S1 — Add an unused, tested query boundary
+### S3 — Reviews refresh continuity and comparison checkpoint
 
-**Prerequisites:** S0 baseline plus tests for account A→B, logout, failed/loading
-access, permission changes, preview mode, server render isolation, boundary disposal,
-successful empty data, inactive garbage collection, and abort/no stale publication.
-Use `tests/unit/workbench-data-boundary.test.js` and
-`tests/unit/workbench-query-contracts.test.js` (**new**).
-Include known-null Dynamics actor, delayed profile replacement, auth-disabled local
-mode, initial access-fetch count, and A→B→C with out-of-order access-refresh completion.
+Prerequisites: reviews-tab, reviewer stale-request, post-send, document-refresh,
+manual-review and synthesis tests applicable to the changed logical regions.
+Add mounted-child tests for ManualReviewEntryForm, SynthesisCard, ExportMenu,
+WriteupParagraphsCard and ConsultantFeedbackSection; preserve drafts and held
+clipboard/export work, manual submit/reload ordering, success then 403, changed
+request and late callbacks. Use existing child-specific suites when they cover
+these cases rather than building decorative duplicate tests.
 
-**Order:** (1) exact dependency + lockfile; (2) **new** `data/query-policy.js`;
-(3) **new** `data/query-keys.js`; (4) **new** `data/read-json.js`;
-(5) **new** `data/WorkbenchDataBoundary.js`; (6) mount boundary in `pages/_app.js`.
-The `data/` directory is under `shared/components/workbench/`.
-`read-json.js` handles GET/AbortSignal/HTTP parsing only; resource-specific success
-validation stays explicit. No existing consumer uses the cache yet.
+Order: tests → `ReviewsTab.js` exact-request loaded identity and separate updating
+state → error/denial handling → lifecycle fixes only when directly necessary for
+retention. `ReviewersTab`, its polls/three-source refresh and candidates remain
+unchanged. If retention needs a new workflow state machine, keep the affected child
+behavior and narrow the improvement instead.
 
-**Exit:** navigation preserves one client; identity change replaces it before child
-render; public routes perform no query work; no extra business GETs. Canonical build
-proves the new dependency stays client-compatible. Rollback is dependency/boundary revert.
+Exit: useful content stays during same-request refresh, callbacks preserve timing
+and error behavior, no duplicate operation/poller. Compare arm B to A. Root and Sol
+record whether caching or code splitting earns a bounded experiment. A documented
+omit decision is a completed conditional gate, not authorization to expand scope.
 
-### S2 — Make request context isolated and reusable
+### S4 — Conditional shared-cache experiment, not blanket migration
 
-**Prerequisites:** S1 tests plus request A slow/B fast, A→B→A, failed B after successful
-A, late finally, unmount, GUID case, no `n` parameter, malformed/wrong-ID DTO, and
-server-derived `canManage` display parity. Add
-`tests/unit/workbench-request-context-lifecycle.test.js` (**new**).
+Start only if S3 demonstrates residual revisit delay worth addressing beyond B.
+Before any dependency or provider change, name the one target resource/journey,
+benefit threshold, full consumers and mutation producers in the execution receipt.
+Keep request-context, auth providers, Find, and the single-consumer cycle panels
+outside this experiment. If no justified resource is identified, mark S4 omitted.
 
-**Order:** (1) **new** `data/useWorkbenchRequestContext.js` with full DTO and GUID key;
-(2) replace only `ctx/error/loadCtx` ownership in `pages/workbench/[requestId].js`;
-(3) preserve tab aliases, app guards, request-keyed remounts, and all props;
-(4) add optional action-lifecycle callbacks to the local FieldPrimer owner in
-ProposalTab, threading only to this context hook. This is a local read-suppression
-contract, not a shared mutation framework:
+If selected, use TanStack Query v5 with exact compatible version verified before
+installing, not a custom query engine. Defaults: staleTime 0, bounded gcTime,
+retry false, focus/reconnect false, no new polling. Preserve full DTOs. Identity
+partition uses stable session Azure/profile identity; dispose on real principal
+change/logout/leaving Workbench, preserve same-principal transient loading without
+cross-principal data. Existing guards remain authoritative; no refreshAccess
+orchestration or new grants/preview authority gate. Explicit denial clears the
+scoped entry and render projection. A test must seed success before denial.
 
-- Suppression belongs to a token containing the partition, request ID, Proposal
-  mount generation and action generation. Before generation/export starts,
-  synchronously acquire that token and suppress context publication/automatic
-  refresh, then await cancellation of the matching context GET before the action.
-  Keep displayed context; only the current token may complete or release its hold.
-- Confirmed generation invalidates context without refetch and retains a separate
-  post-commit hold until this Proposal mount ends or the user explicitly refreshes
-  while idle. Action `finally` releases busy but **not** the post-commit hold.
-  Focus/reconnect/re-enabling must not overwrite the confirmed local envelope.
-- Unmount, request change and partition disposal retire the token and that mount's
-  holds. Fence late callbacks: they cannot release, invalidate or publish for a
-  newer owner. Tab navigation releases the departing mount's holds and revalidates
-  destination context. Preserve context-only ProposalTab callers using optional
-  callbacks with the same original command/export behavior.
+Prerequisite tests: identity A→B/logout/loading; exact key params and empty response;
+403/malformed after success; obsolete GET cancellation/publication; required
+mutation invalidation; callback void versus await contracts; no extra focus GETs.
+If reviewer sharing is selected also test implicit sub-tab stability across
+snapshot→fresh, pending-document poll limits and all confirmed-invite overlays.
+Do not freeze sub-tabs without pinning intended post-mutation navigation behavior.
 
-These are prerequisite tests before changing ownership: focus/late GET during
-both generation and export; held action → leave Proposal → remount/start a second
-action → settle the old action; confirmed generation → focus/reconnect/re-enable
-before navigation; request/partition changes during each callback path; and
-Overview revisit after leaving Proposal. The existing local token has no unmount
-cleanup, so a boolean busy callback alone does not satisfy the contract.
+Order only after selection: package+lock → policy/keys/GET helper → scoped boundary
+→ one resource hook → first consumer → second consumer → invalidation adapters.
+Proposed files under `shared/components/workbench/data/`; no server imports or
+barrel importing UI trees. Active invalidation uses `refetchType: 'none'` where
+existing behavior requires no GET; explicitly start only required reloads. Revert
+consumer commits before boundary/dependency. Stop experiment if no incremental
+benefit; no automatic S6-style migration of all remaining panels.
 
-**Exit:** warm header renders before refetch; context never belongs to the wrong
-request; old context cannot feed a new request's Proposal or manage projection.
-Test current owner/unknown/non-owner/superuser cases. No endpoint change.
+### S5 — Conditional lazy-import experiment
 
-### S3 — Share dashboard reads and keep the request list visible
+Prerequisites: production bundle measurement, deep-link/back/forward and first-tab
+use tests. Independent of S4. If initial transfer/parse is not a demonstrated
+problem, omit. Change one import at a time using supported `next/dynamic`, default
+SSR, no background mounts/prefetch workflow side effects. Order: request page
+ReviewPanelTab → ReviewersTab → ReviewsTab; then dashboard FinalWriteupsPanel named
+export → AwardeesPanel. Other tabs only if the same measurement proves benefit.
+No file moves; preserve exports and useful loading/failure behavior. Revert splits
+that merely move delay to first use. Sol reviews each accepted slice.
 
-**Prerequisites:** existing shell/request-number/follow-up suites plus exact-key
-equivalence, default-vs-explicit program, D26/J27, unlisted cycle, cycle-fetch failure,
-my/all, include-set-aside, A→B→A, and triage-in-flight with filter/program changes.
-Add `tests/unit/workbench-dashboard-query-lifecycle.test.js` (**new**).
+### S6 — Final verification and release handoff
 
-**Order:** (1) **new** `data/useWorkbenchDashboard.js` cycle and request definitions;
-(2) move cycle fetch ownership from WorkbenchShell without moving URL state;
-(3) move RequestListPanel loadProposals GET into hook, keep setTriage;
-(4) preserve count-patch generation semantics with a single count owner;
-(5) move Follow-up's two GETs to independently keyed queries, retain the existing
-merge/filter/summary functions and combined error semantics;
-(6) wire triage and Follow-up refreshes to required invalidation/refetch.
+Prerequisites: every selected stage green; explicit decisions for S4/S5; no open
+correctness finding. Run §9 final gates, browser journeys and compare evidence.
+Update execution receipt and source docs only where ownership actually changed.
+Root reviews final diff after Sol acceptance and may fix concrete findings.
+Deliver branch/commits, evidence, limitations, deliberate promotion requirements
+and rollback. No merge/push to main or live rehearsal in this task.
 
-Do not show half a newly selected Follow-up context as a complete successful join.
-Its prior same-key merged projection may remain while either request revalidates.
-Do not reuse a dashboard variant with `includeSetAside=true` for one without it.
+## 6. File order and boundaries
 
-**Exit:** held-response test proves same-context rows/focus persist; filter changes
-never display wrong-context rows; count patch applied exactly once; follow-up empty,
-degraded and partial constituent responses match the specified contract. Query
-counts prove concurrent dedupe, not fictional zero sequential requests.
-
-### S4 — Remove the two independent-read waterfalls
-
-**Prerequisites:** S2 plus Overview/Proposal document and primer-export suites.
-Add `tests/unit/workbench-independent-reads.test.js` (**new**): hold resolve-request,
-prove both target GETs need only GUID; preserve 403/404, partial document-library
-errors, missing context, mismatched IDs, and superseded response behavior.
-
-**Order:** (1) **new** `data/useWorkbenchRequestReads.js` with rollup/documents queries;
-(2) pass explicit route `requestId` to ProposalTab, retaining a tested fallback for
-existing context-only callers; (3) start docs query independently and split only
-the context-dependent rendering guard from the documents section;
-(4) move Overview's rollup read to the hook, render its section independently of
-header/context; (5) preserve document download scope and AI/editor boundaries.
-
-**Exit:** both queries start before held context resolves; available independent
-section actually renders early (starting a hidden request alone is not acceptance).
-No download, analysis, ingestion or generation is initiated automatically.
-
-### S5 — Share the full reviewer GET between tracking and reviews
-
-**Prerequisites:** S0 reviewer envelopes and all post-send/stale-request/poll tests;
-add `tests/unit/workbench-reviewer-query-lifecycle.test.js` (**new**) with full
-`liveQuestions`, synthesis, empty accepted list, accepted+removed candidate,
-confirmed partial invite, lagging GET, manual receipt, unknown mutation outcome,
-and navigation during reconciliation. Demonstrate old in-flight GET rejection.
-Also characterize **mounted** refresh of SynthesisCard, ExportMenu,
-WriteupParagraphsCard, ConsultantFeedbackSection and ManualReviewEntryForm: preserved
-drafts, a held clipboard/export promise, synthesis result, manual submit/close, and
-request switch. These children previously unmounted under ReviewsTab's loading
-guard; keeping them mounted changes lifetime and needs direct tests. Existing
-`tests/unit/reviews-tab.test.js` and primer/export suites remain required.
-
-**Order:** (1) **new** `data/useWorkbenchReviewers.js`, cache full response;
-(2) adapt ReviewersTab.loadReviewers only; leave candidate/referral loaders and
-confirmed-invite overlay/timer in place; (3) adapt ReviewsTab.load;
-(4) adapt existing refresh/poll callbacks to force fresh reads and preserve timing;
-(5) add the invalidation matrix from §3.4, preserving all three refreshAll calls;
-(6) separate initial loading from background updating in Reviews' render guard.
-
-Keep raw server DTO and local action-derived projection separate. Do not use
-query focus refresh to overwrite candidate overlays, open materials dialogs,
-manual-entry forms, or user edits. Do not move Find loaders or `search/*` owners.
-Unknown callbacks still invoke conservative existing refresh; do not introduce
-selective invalidation without a complete producer/consumer proof.
-
-**Exit:** one full-response owner across Track/Reviews, no lost questions, no
-duplicate poller, and successful invites cannot reappear as unsent because of this
-migration. Scope excludes suppressing expensive Find POSTs and F1–F4 fixes.
-
-### S6 — Migrate remaining cycle read panels in four green slices
-
-**Prerequisites:** shell tests plus each panel's current test suite. Before each
-slice add exact parameters, empty-success, same-key background failure, changed-key
-late response and inactive-remount tests to
-`tests/unit/workbench-cycle-query-lifecycle.test.js` (**new**).
-Existing suites by slice: S6a `workbench-shell.test.js` and
-`workbench-initial-assessment-route.test.js`; S6b `staff-deliberations-panel.test.js`
-and `workbench-staff-deliberations-route.test.js`; S6c `final-writeups-views.test.js`
-and `workbench-final-writeups-route.test.js`; S6d `awardees-page.test.js` and
-`grantee-awardees-route.test.js` (all under `tests/unit/`).
-
-**Order, with the full exit gate and fresh review between slices:**
-
-1. **S6a:** create **new** `data/useWorkbenchCycleReads.js`; migrate
-   `InitialAssessmentsPanel.js` GET effect. D26 remains a zero-call path.
-2. **S6b:** migrate `StaffDeliberationsPanel.js` GET effect; retain existing stage
-   grouping and server `scope` parameter. No StaffDeliberationsTab command/poller migration.
-3. **S6c:** migrate only `FinalWriteupsPanel` GET in
-   `shared/components/final-writeups/FinalWriteupsViews.js`; preserve named exports,
-   uncycled selector, PD/search filtering and queues. Leave focused-view mutations.
-4. **S6d:** migrate `AwardeesPanel.js` cycle-data and empty-state cycle-options GETs;
-   preserve context-key/version protections until their query equivalents are tested,
-   lazy cycle-options condition, my/all and last-decided-cycle behavior.
-
-**Exit per slice:** same-key immediate redisplay, scoped failure recovery, no new
-GET on local filtering, no invented program filtering, no per-request governed
-document state-machine changes. Preserve each old public component facade.
-
-### S7 — Load inactive tab code on demand, only if the experiment wins
-
-**Prerequisites:** all migrated reader tests and browser deep-link/back/forward/
-keyboard scenarios; record initial compressed JS and first-use tab latency.
-Add `tests/e2e/workbench-tab-loading.spec.js` (**new**) for cold direct links,
-chunk failure/retry, request switches during chunk load, and no background mounts.
-
-**Order:** (1) in `pages/workbench/[requestId].js`, replace static imports one at a
-time with top-level `next/dynamic` imports in this order: ReviewPanelTab,
-ReviewersTab, ReviewsTab, StaffDeliberationsTab, FinalWriteupTab, AwardeeTab,
-InitialAssessmentTab, ProposalTab. Keep Overview/Status eager;
-(2) in WorkbenchShell, defer FinalWriteupsPanel via its named export, then Awardees,
-StaffDeliberations, InitialAssessments and Follow-up; keep RequestList eager.
-Use normal SSR support; do not add `ssr:false` indiscriminately. Preserve public
-exports and meaningful loading/error state; do not pre-mount or hover-prefetch
-workflows with effects. No file relocation is required in this stage.
-
-**Exit:** measured initial JS benefit exceeds query-library overhead; direct tabs
-work; first-use tab latency stays within §4 regression bound. Drop/revert any
-individual split that merely trades useful-content delay for a smaller number.
-
-### S8 — Integration acceptance and release handoff
-
-**Prerequisites:** all preceding selected stage receipts green; no open P0/P1;
-complete invalidation/consumer census and retained correctness tests.
-
-**Order:** reconcile source headers/catalog ownership as needed; run the entire
-journey matrix and canonical build; produce before/after traces and all §9 gates;
-fresh review of actual final diff and evidence; record release tier, proposed
-cohort/preview, known-good deployment and rollback. No route/schema deletion or
-workflow cleanup is part of acceptance. Old release remains deployable.
-
-**Exit:** owner can approve a concrete release. If a deterministic runtime cohort
-is required by the campaign strategy, design and review that seam before promotion;
-do not invent a client-controlled authorization flag. Implementation authorization
-does not silently authorize production reads, sends or a main-branch deployment.
-
-## 6. File move/dependency order for the implementer
-
-```text
-S0  existing public consumers → characterization/browser fixtures (no moves)
-S1  package + policy → keys → GET parser → data boundary → _app integration
-S2  request page loadCtx → useWorkbenchRequestContext → page consumes hook
-S3  shell cycles → dashboard queries → RequestList GET → Follow-up GET pair
-S4  Proposal documents / Overview rollup → request read hooks → independent render
-S5  Reviewers loadReviewers → shared full-DTO hook → Reviews load → refresh adapters
-S6a InitialAssessmentsPanel read → cycle hook
-S6b StaffDeliberationsPanel read → cycle hook
-S6c FinalWriteupsPanel read → cycle hook
-S6d AwardeesPanel two reads → cycle hook
-S7  static imports → dynamic imports, one component per verification slice
-S8  ownership documentation + final receipt; no additional runtime refactor
+```
+S0 tests/fixtures only
+S1 RequestListPanel → WorkbenchShell
+S2 request page isolation → ProposalTab props/render → OverviewTab rollup render
+S3 ReviewsTab loading/refresh → directly implicated child lifetime corrections
+S4 optional package → policy/keys/parser → boundary → hook → consumers → invalidation
+S5 optional one dynamic import at a time
+S6 execution receipt and changed ownership documentation
 ```
 
-Dependencies point from components → domain query hooks → keys/policy/GET parser.
-The boundary imports only client-safe identity/context and query-library modules.
-No hook imports a server service, adapter, credential module or another UI panel.
-Do not introduce a catch-all barrel that eagerly imports all panels again.
+Public filenames and exports stay stable. No wholesale file relocation is justified.
+A later extraction removes its old live fetch effect in the same green commit so
+there are never two owners. No API, database, provider or domain-service rewrite.
 
-## 7. Fresh-context review protocol
+## 7. Review cadence and loop budget
 
-Planning checkpoints: **P1** source census/scope; **P2** target contracts and stage
-boundaries; **P3** final executable work order and tests. Each uses a new reviewer
-with no conversation history. Root continues independent evidence/test inspection
-while review runs. Reusing the author's context is not a fresh review.
+Fresh Sol context reviews the revised plan before implementation, then each stage
+against current HEAD, tests and actual source. Re-resolve E1–E13 at that HEAD;
+record inherited assumptions checked, including unchanged contract consumers.
+Review stage changes, not the author's summary. Trace caller/state/API/guard/
+service/persistence/response/consumer where relevant. Distinguish existing defects
+from regressions and correctness blockers from style preferences.
 
-During implementation: review at the end of **every stage and S6 slice**, before
-starting the next. Review again after any scope expansion or failed assumption.
-Limit one implementer to the named surface. Reviewer is read-only and reports
-findings; root independently confirms/fixes the plan or implementation, then obtains
-a fresh review of substantive changes. No paid review product is authorized.
+Luna owns changes and test/build commands; Sol is read-only. Sol can send concrete
+findings to Luna, but root controls stage advancement. At most two correction
+rounds per stage before root adjudicates/takes over. No optional stylistic finding
+blocks progress; do not weaken a correctness test to end a loop. After substantive
+root changes obtain a bounded Sol recheck, then root final acceptance.
 
-Pass this prompt to the reviewer:
+Review receipts live separately in the execution receipt: model/reviewer ID,
+reviewed HEAD/diff and SHA-256 of this plan **before `## 11.`**, inherited assumptions
+re-verified, files read, tests actually run, findings/dispositions, residual unknowns
+and next stage. Receipt text cannot silently change the reviewed specification.
+No paid review product. Runtime correctness and measured benefit are separate gates.
 
-> Read CLAUDE.md, the latency-plan postmortem, this plan, the accepted previous
-> receipt, and the actual staged diff at BASE..HEAD. Use CodeGraph first and read
-> uncovered logical regions/callers. Do not trust the author's summary. Re-trace
-> caller → state → API → guard → service → persistence → response → every consumer.
-> Attempt to disprove cache-key equivalence, identity isolation, mutation freshness,
-> partial-success handling, cancellation claims, and benefit measurements. Check
-> the full response envelope and all failure/finally paths. Identify pre-existing
-> behavior separately from new defects. Confirm prerequisite tests would fail for
-> the discriminating broken implementation. Return cited findings with severity,
-> disconfirming cases, missing evidence, and READY / NEEDS REWORK. Do not edit files,
-> call live systems, or substitute a paid review product.
+## 8. Contract audit scope
 
-Receipt fields: checkpoint/stage, reviewer ID, baseline and reviewed content hash,
-source files independently inspected, tests/measurements actually run, findings,
-author dispositions, residual assumptions, and next permitted stage. A statement
-“reviewed” without a source-anchored receipt is insufficient.
+Whole-flow and partial-success: preserve existing authenticated reads, DTOs,
+confirmed writes and local envelopes; no new writes. Async audit covers every
+changed post-await success/error/finally and changed-context render. Extraction
+audit is N/A unless S4 earns a hook; then prove consumer equivalence first.
+Durable-state/schema/enum changes are N/A. Documentation reconciliation covers
+this revised plan and its execution receipt; old decisions remain only in git
+history, not contradictory live stages. Excluded domain plans remain independent.
 
-## 8. Contract-reconcile audit disposition
+## 9. Verification commands
 
-| Audit | Scope and acceptance |
-|---|---|
-| Whole flow | §2 traces existing source/persistence/consumers; stage tests exercise real UI boundaries and route contracts |
-| Partial success | Preserve invite IDs, candidates/referrals semantics, full reviewer DTO, document-list partial errors and fail-soft Co-PI read; no new batch writer |
-| Async/stale state | S1/S2 identity and key isolation; S3/S5 pre-command read fencing; all post-await success/error/finally paths tested |
-| Helper extraction | Query hooks own GET lifetimes only; no mutation/result transformation, authority, business filters or state-machine consolidation |
-| Durable surface | New plan now; future client memory only. No new tables, columns, migrations, API routes or server cache. API matrix/Atlas only change if later scope actually changes |
-| Documentation | New proposal does not mark any runtime stage built. Existing performance/decomposition work remains historical or independently scoped |
-| Symbol fan-out | No new persisted enum/status. Preserve full existing envelopes and all consumers, especially liveQuestions, canManage, counts and selectors |
+Baseline targeted suites: workbench-shell, workbench-request-number-lookup,
+workbench-dashboard-service, workbench-resolve-request-service,
+workbench-overview-status, workbench-proposal-tab-documents, reviewer-follow-up,
+reviewers-tab-stale-request, reviewers-tab-post-send-refresh,
+reviewers-tab-review-document-refresh, workbench-read-coalescing-stage2-characterization,
+workbench-read-coalescing-stage2-callcounts, reviews-tab and primer-export (resolve
+exact existing filenames before invocation).
 
-## 9. Commands and green-stage gate
+Each selected implementation stage:
 
-Run from the stage checkout. A green stage requires all applicable steps below,
-not a green test subset with an unrun build. Never run fixture-writing gates or
-their self-tests concurrently. Only one build may own a checkout at a time.
+1. Run its prerequisite and changed-surface suites; prove newly introduced behavior
+   fails on the baseline when feasible without overwriting another agent's work.
+2. Full `npm test -- --runInBand --silent`, `npm run lint`, `npm run check:types`,
+   and canonical `npm run build`. Only one build owner per checkout. An environment
+   failure remains distinct from a green build; escalate canonical Turbopack sandbox
+   issues rather than substituting Webpack success.
+3. Run applicable route-mocked browser journeys with `npm run test:e2e --
+   tests/e2e/workbench-responsiveness.spec.js --project=chromium`. Record whether
+   Playwright uses its configured Webpack build. Never concurrently overwrite `.next`.
+4. Relevant documentation/security/boundary gates for touched surfaces; every gate
+   and self-test run sequentially. At S0/S6 run all current `check:*` scripts.
+5. Sol review → bounded corrections → root acceptance → green stage commit.
 
-Baseline subset (executed during planning, 12 suites / 128 tests):
+No new production claim follows from mocked tests. Record all skipped/blocked
+verification honestly with its impact. Do not call a red stage complete.
 
-```bash
-npm test -- --runInBand --silent \
-  tests/unit/workbench-shell.test.js \
-  tests/unit/workbench-request-number-lookup.test.js \
-  tests/unit/workbench-dashboard-service.test.js \
-  tests/unit/workbench-resolve-request-service.test.js \
-  tests/unit/workbench-overview-status.test.js \
-  tests/unit/workbench-proposal-tab-documents.test.js \
-  tests/unit/reviewer-follow-up.test.js \
-  tests/unit/reviewers-tab-stale-request.test.js \
-  tests/unit/reviewers-tab-post-send-refresh.test.js \
-  tests/unit/reviewers-tab-review-document-refresh.test.js \
-  tests/unit/workbench-read-coalescing-stage2-characterization.test.js \
-  tests/unit/workbench-read-coalescing-stage2-callcounts.test.js
-```
+## 10. Stop and rollback
 
-At each implementation stage:
+Stop the affected change on wrong-context rendering, denied data retention,
+changed command semantics, lost confirmed result, duplicate polling/requests,
+new client authority gate or unmeasured expansion. Keep the smallest working
+improvement, not a framework justified by its own complexity. Production telemetry
+and campaign timing remain unknown until separately established before promotion.
 
-1. Run the named new prerequisite/contract tests and all existing tests for touched
-   consumers. Check negative fixtures contain the data they claim to exclude.
-2. `npm test -- --runInBand --silent` (full Jest); `npm run lint`;
-   `npm run check:types`; `npm run build` (canonical).
-3. Run the stage's route-mocked browser journeys against that production build:
-   `npm run test:e2e -- tests/e2e/workbench-responsiveness.spec.js --project=chromium`.
-   S7 adds its tab-loading spec; S5 adds the existing program-director-invite spec.
-   Playwright's configured Webpack build is separate from the canonical build;
-   record which artifact each measurement used and never run two builders together.
-4. Run `check:api-routes`, `check:atlas`, `check:doc-currency`,
-   `check:fact-consistency`, `check:canonical-pointers`, `check:doc-symbol-refs`,
-   `check:build-claim-freshness`, `check:route-service-boundary`,
-   `check:dataverse-access-layer`, `check:reviewer-engagement-boundary`,
-   `check:request-document-writers`, `check:status-enum-parity`,
-   `check:trust-boundary-guid`, `check:harness-framing`, `check:secret-scan`, and
-   `check:scaffolding-tokens`, each followed by its defined self-test; also
-   `check:docs-catalog`. S1 runs `check:agent-invariants` too if harness files change
-   (none are planned). At S0/S8 discover and run every current `check:*` script as
-   `/start` requires; do not freeze this list as the future inventory.
-5. Inspect full diff for server-side/write/authority drift, run fresh review,
-   reconcile findings, commit only the stage's working changes, record receipt.
+Revert stage commits in reverse dependency order; local S1–S3 require no database
+repair. If S4 is selected, revert its consumers before its boundary/dependency.
+Do not merge main to rescue an incomplete stage, and do not deploy from this work.
 
-If canonical build fails with the documented sandbox Turbopack permission signature,
-retry the same command via the approved host mechanism. A Webpack success alone does
-not close that gate. Do not delete shared build artifacts or kill other agents' jobs.
+## 11. Revision and execution receipts
 
-## 10. Stop, rollback and non-goals
+Original plan at `2e611d9a` received four planning reviews. Claude's subsequent
+independent review correctly challenged cache-first scope and default automatic
+refresh. This revision replaces those stages rather than appending exceptions.
+It adopts local-first comparison, callback-specific contracts, explicit no-refetch
+invalidation, denial-after-success tests and evidence-gated expansion. It does not
+adopt unconditional post-generation refetch (unpersisted envelopes are valid), a
+universal void callback, or the claim that `_app` cannot receive page props.
 
-Stop the affected stage on an uncharacterized envelope, wrong-user/request render,
-missing invalidation producer, duplicate action/poller, loss of a confirmed invite,
-new permission gate, changed document identity, growing GET storm, or absent measured
-benefit. Fix the bounded contract or return to the last green stage; do not expand
-into backend authority, persistent caches or provider migration to rescue the plan.
-
-Rollback each consumer slice by reverting its commit while leaving additive unused
-hooks harmless. Roll back S1 only after consumer commits are reverted. Keep baseline
-SHA and accepted stage SHAs in the execution receipt. Browser caches disappear on
-reload/deployment; no durable state repair is needed for pure read code. If a later
-rehearsal performs writes, code rollback does not undo them.
-
-Excluded: redesign/typography, broad component cleanup, positive cache TTLs,
-selective replacement of refreshAll, request schema/projection changes, app-access
-policy rewrites, client authorization receipts, external portal reload removal,
-Find proposal/enrichment/roster caching, and reviewer follow-ups F1–F4. Deletion of
-old infrastructure is not proposed.
-
-## 11. Planning review receipts and remaining unknowns
-
-P1 — fresh reviewer `/root/planning_review_1`, no inherited conversation, baseline
-`7c18b622`. Verdict: READY WITH NAMED CHANGES as a planning direction. Independently
-confirmed E1–E9; required full DTO caching, request-context isolation first, retention
-of keyed workflow remounts and three-source refresh, no universal blanking claim,
-and exclusion of Find POST/enrichment. All incorporated above. No live measurements.
-
-P2 — fresh reviewer `/root/planning_review_2`, no inherited conversation, baseline
-`7c18b622`; reviewed draft SHA-256
-`1ac9c8a78150cda5203334190fdec9a58bd40fecfdede325ab7c816ee3876af8`.
-Verdict on that draft: NEEDS REWORK. Four findings: Primer action locks could be
-reset by context refresh (P1); missing Follow-up mutation invalidation (P2);
-nullable identity/access-transition ambiguity (P2); retained Reviews child-lifetime
-coverage missing (P2). Root confirmed each in source and revised §§3, S1/S2/S5.
-Root separately corrected StaffDeliberations' endpoint/server scope and specified
-isolated browser startup because instrumentation can write alerts. These are plan
-corrections; the proposed implementations have not been tested.
-
-P3 — fresh reviewer `/root/planning_review_3`, no inherited conversation, baseline
-`7c18b622`; reviewed draft SHA-256
-`0269da4a8b5cd5492007942a03c1a2b07d0f6623046b7471a157d5d320ed65fe`.
-Verdict: NEEDS REWORK on one P2 finding: Primer callbacks needed explicit mount/action
-ownership, teardown fencing and a post-commit hold. Root incorporated the exact
-bounded protocol and discriminating tests in S2. No other planning blockers found.
-
-P4 — fresh reviewer `/root/planning_review_4`, no inherited conversation;
-reviewed draft SHA-256
-`419e304073a2fca0a6be6090704f55626ffdc19a0e27e3bb13402a1733207746`.
-Verdict: READY as a planning document. Independently inspected Primer, request-page
-tab lifecycle, Overview consumer, resolve-request service and generation persistence.
-Confirmed the S2 protocol addresses lock resets, unmount fencing and post-commit
-refresh. No edits, tests or live calls by reviewer. Implementation must preserve
-returned local envelopes even with `persisted:false` and check token retirement
-after each added cancellation await; these are existing preservation/fencing
-obligations, not additional scope. No new planning blocker. The reviewed hash
-predates this receipt-only update. Next permitted action: deliver this document;
-runtime implementation remains subject to owner authorization and S0 prerequisites.
-
-Planning validation: 12 existing relevant Jest suites passed (128 tests). Documentation
-currency, fact consistency, canonical pointers, symbol references, build-claim
-freshness, catalogue, harness framing and scaffolding checks passed, with each
-available self-test run sequentially. No application build, browser benchmark or
-proposed lifecycle test has been run; this change is a plan only.
-
-Remaining unknowns: actual production latency/frequency, browser bundle savings,
-exact dependency version at implementation, and campaign release window. They are
-measurement/release gates, not permission for a cheaper model to guess.
-
-Official implementation references (checked during planning):
-[TanStack query defaults](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults),
-[cancellation](https://tanstack.com/query/latest/docs/framework/react/guides/query-cancellation),
-[invalidation](https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation),
-and [Next.js Pages Router lazy loading](https://nextjs.org/docs/pages/guides/lazy-loading).
-These support the library mechanisms; the policy and stages above are this plan's
-proposals, not library defaults or measured results.
+User subsequently authorized this revised implementation and the Luna/Sol/root
+workflow. Execution status, hashes, review records, command results and conditional
+stage decisions belong in a companion execution receipt created during S0. The
+prior 128-test planning baseline is historical; new execution evidence must identify
+its own HEAD and commands. Nothing in this revision claims runtime changes shipped.
