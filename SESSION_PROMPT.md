@@ -1,4 +1,40 @@
-# Session 521 Prompt: Local document refactor complete; release decision pending
+# Session 522 Prompt: Governed document refactor deployed; handoff complete
+
+## Session 521 Summary
+
+**[VERIFIED via GitHub PR/deployment records and signed-in production checks.]**
+All migration stages (0–8) and review hardening shipped through PR #315, merge
+`8d3ad3a7`, production deployment `6535352663`. The documentation follow-up shipped
+through PR #316, merge `74066c53`, deployment `6535429238` (success
+2026-09-19T00:57:35Z). Its runtime tree is unchanged from PR #315.
+CI passed 958 suites / 14,195 tests, canonical build and required checks.
+Post-deploy reads confirmed IA Ready/Draft with version 1.0, Final leadership
+state, and five signed-out redirects. The final documentation deployment was
+also reloaded successfully in the signed-in production Workbench.
+
+The owner confirmed receipt of the approved test email. Final and leadership
+exact retries passed in the controlled rehearsal. Wrong-app access and
+review-bundle rebuild remain mock-only by explicit owner decision; unrun fault
+cases are not claimed as live passes. No further smoke or data cleanup is queued.
+Test rows remain retained evidence; do not delete or retire them without approval.
+Both local rehearsal servers are stopped. Claude's shared checkout was untouched.
+
+### Commits and durable records
+
+- `aff3049d`: integrate the deployed IA budget fix with the refactor.
+- `c17e2a0f`: Final/leadership rehearsal and exact-retry receipt.
+- `8d3ad3a7`: PR #315 production release.
+- `839f4218` / `74066c53`: release documentation and PR #316 merge.
+- Execution and smoke receipts: `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`
+  and `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md`.
+- Milestone already recorded in `DEVELOPMENT_LOG.md`: “Governed document lifecycle
+  decomposition promoted (Session 521)”; no duplicate milestone is needed.
+- Rollback reference: commit `7a335e27`, deployment `6534771071`; rolling code back
+  does not reverse retained rehearsal data.
+- Stop-time claim-evidence report could not read local state; no observation was inferred.
+
+The summaries below are historical evidence. Current next-session guidance is
+under **Next Items**; historical restrictions and fixture snapshots do not override it.
 
 ## Prior Session 519 Summary
 
@@ -112,22 +148,26 @@ is intended to remain unchanged; no schema or migration change was included. The
 production milestone is recorded for deployment `6535352663`. The optional
 claim-evidence report could not read its local state; no observation was inferred.
 The unrelated carryovers below retain their prior evidence and need fresh checks
-before any live work; this refactor did not re-probe production.
+before any live work; this release did not re-probe those unrelated carryovers.
 
 
 ### Verified Open
 
-1. **Bundle rebuild after a new review** was never smoked in Production (unchanged from
-   S517). Evidence: `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §12 step
-   table ("NOT RUN — no third review submitted"). Needs a third ZZTEST-03 reviewer submission
-   via the portal, then "Download all reviews (PDF)" on the briefing page should rebuild.
-2. **Memory deep-audit remainder.** Evidence: `docs/audits/memory-routine-audit-2026-09-17.md`
+None for the released document refactor. Deployment and the agreed smoke scope
+are complete; no additional implementation or release is queued.
+
+### Unrelated carryovers — verify before scheduling
+
+These prior-session items were not revalidated during this release and are not
+an automatic worklist.
+
+1. **Memory deep-audit remainder.** Evidence: `docs/audits/memory-routine-audit-2026-09-17.md`
    "Unknowns". Shrink `project-site-visit-materials-planning-handoff` (7.6 KB; its line 42
    "Open (plan §12)" list still names "reminder cadence", now decided). The other four
    oversize-routed leaves are accepted. `check:memory-health` is advisory and prints 7 flags:
    5 oversize-routed plus 2 accepted shadow-atlas false positives.
 
-### Owner Decision Needed
+### Prior owner-decision carryovers — verify before acting
 
 1. **Whether to delete the unscheduled reminder-cron code.** Evidence: commit `28d719d9`
    kept `pages/api/cron/site-visit-materials-reminders.js`, `reminder-sweep.js`, and
@@ -158,16 +198,20 @@ before any live work; this refactor did not re-probe production.
 
 ### Verify Before Acting
 
-1. ZZTEST-03 residue: the prior regenerated brief remains locked and previewed (not sent) as the
-   current share; the 9:20 AM sent row and shared briefing link remain. The 2026-09-18
-   controlled rehearsal stopped after the IA generation/restore failures recorded above;
-   review the Failed row and keep the bounded restore reconciliation evidence with any future smoke.
+1. ZZTEST-03 retained evidence: last verified IA `7d00fffd`, PSV `205da1cd`
+   in Final, and current Final `473c9160` in leadership. Earlier failed and superseded
+   IA rows and the older Board snapshot remain. Re-read authoritative state before
+   any future writes; cleanup requires a new owner decision.
 2. The #311/#312 conflict resolution (`dcc9c796`) and the fixture fix (`8f8cfc1b`) are
    test-verified but were never Codex-reviewed.
 3. Worktree `../WMKF_Apps-codex` was left clean on `codex/parked` at `6ed14ae9` by S518;
    S519 did not touch it. Confirm before delegating to Codex.
 
 ### Do Not Reopen Without New Decision
+
+0. **Wrong-app access and review-bundle rebuild live fixtures** are mock-only by
+   the owner's explicit choice. Do not solicit a third review or another staff
+   account as unfinished work for this release.
 
 1. **Applicant-materials reminder cron is retired** (owner, 2026-09-17). Staff monitor
    arrivals manually. Do not add `/api/cron/site-visit-materials-reminders` to
