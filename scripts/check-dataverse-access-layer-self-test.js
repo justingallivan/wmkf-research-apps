@@ -155,7 +155,7 @@ function setupFixtures() {
   write(tempRoot, 'pages/api/dynamics-explorer/chat.js', `
     import { DynamicsService } from '../../../lib/services/dynamics-service.js';
     export default async function handler() {
-      return DynamicsService.queryRecords('should_not_count', {});
+      return DynamicsService.queryRecords('now_counted', {});
     }
   `);
 }
@@ -215,7 +215,7 @@ function runFixtureAssertions() {
     method: 'executeChangeset',
   }), 'unparseable changeset operations were not marked unresolved');
 
-  expect(!entries.some((entry) => entry.entity === 'should_not_count'), 'permanent exempt file was scanned');
+  expect(entries.some((entry) => entry.entity === 'now_counted'), 'pages/api/dynamics-explorer/ route dir is no longer census-exempt');
 
   const reportRun = runGate(['--report']);
   expect(reportRun.status === 0, `--report exited ${reportRun.status}\n${reportRun.output}`);
@@ -335,13 +335,6 @@ function runLawExemptPathAssertion() {
     }
   `);
 
-  write(tempRoot, 'pages/api/dynamics-explorer/chat.js', `
-    import { DynamicsService } from '../../../lib/services/dynamics-service.js';
-    export default async function handler() {
-      return DynamicsService.queryRecords('should_not_count', {});
-    }
-  `);
-
   write(tempRoot, 'lib/dataverse/adapters/contact.js', `
     import { DynamicsService } from '../../services/dynamics-service.js';
     export async function getById(id) {
@@ -356,7 +349,23 @@ function runLawExemptPathAssertion() {
     }
   `);
 
-  expectGreen('exempt power-tool and DAL-internal paths still pass');
+  expectGreen('remaining exempt power-tool and DAL-internal paths still pass');
+
+  // S9: pages/api/dynamics-explorer/ is no longer census-exempt or law-exempt --
+  // a raw DynamicsService call there must now fail the gate like any other route.
+  cleanup();
+
+  write(tempRoot, 'pages/api/dynamics-explorer/chat.js', `
+    import { DynamicsService } from '../../../lib/services/dynamics-service.js';
+    export default async function handler() {
+      return DynamicsService.queryRecords('now_counted', {});
+    }
+  `);
+
+  expectRed('pages/api/dynamics-explorer/ is no longer law-exempt', (output) => {
+    expect(output.includes('LAW VIOLATION'), output);
+    expect(output.includes('pages/api/dynamics-explorer/chat.js'), output);
+  });
 }
 
 function runLawCrossModuleReexportAssertion() {

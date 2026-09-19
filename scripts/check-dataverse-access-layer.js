@@ -74,7 +74,6 @@ const EXEMPT_FILES = new Set([
 ]);
 
 const EXEMPT_DIRS = [
-  'pages/api/dynamics-explorer/',
   'pages/api/dataverse-export/',
   'lib/services/dataverse-export/',
   // Explorer power-tool: arbitrary-table explorer; no entity adapter can exist.
