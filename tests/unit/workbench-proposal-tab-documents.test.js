@@ -142,3 +142,20 @@ test('still warns when the API reports a real folder-read failure', async () => 
     expect(screen.getByText('Some document folders couldn’t be read.')).toBeInTheDocument();
   });
 });
+
+test('fetches and renders documents from an explicit requestId while context is pending', async () => {
+  render(<ProposalTab requestId={REQUEST_ID} context={null} />);
+
+  await waitFor(() => expect(screen.getByText('Proposal Narrative')).toBeInTheDocument());
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(`/api/workbench/proposal-documents?requestId=${REQUEST_ID}`));
+  expect(screen.getByText('Loading proposal…')).toBeInTheDocument();
+});
+
+
+test.each([false, undefined])('does not expose documents from malformed success=%s', async (success) => {
+  global.fetch.mockResolvedValue({ ok: true, status: 200, json: async () => responseBody({ success }) });
+  render(<ProposalTab requestId={REQUEST_ID} context={null} />);
+  await screen.findByText(/Failed to load documents/);
+  expect(screen.queryByText('Proposal_1002379.pdf')).not.toBeInTheDocument();
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
+});

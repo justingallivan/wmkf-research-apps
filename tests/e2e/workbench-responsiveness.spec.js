@@ -50,6 +50,7 @@ async function installStaffSession(context, baseURL) {
 
 function contextBody(requestId = REQUEST_ID) {
   return {
+    success: true,
     requestId,
     requestNumber: '1002788',
     title: 'A Study of Workbench Responsiveness',
@@ -195,21 +196,25 @@ test.describe('Workbench responsiveness baseline characterization', () => {
     expect(fixture.unexpected).toEqual([]);
   });
 
-  test('request context baseline holds Overview rollup and Proposal documents behind context', async ({ page, context }, testInfo) => {
+  test('Overview rollup and Proposal documents render while request context is held', async ({ page, context }, testInfo) => {
     const baseURL = testInfo.project.use.baseURL || 'http://localhost:3100';
     await installStaffSession(context, baseURL);
     const fixture = await installApiFixture(page, { holdContext: true });
 
     await page.goto(`${baseURL}/workbench/${REQUEST_ID}?tab=overview&n=1002788`);
-    await expect(page.getByText('Loading overview…')).toBeVisible();
+    await expect(page.getByText('Request snapshot', { exact: true })).not.toBeVisible();
     await expect.poll(() => fixture.counts().contextReads).toBe(1);
-    await expect.poll(() => fixture.requests.some((entry) => entry.path === '/api/workbench/reviewer-rollup')).toBe(false);
+    await expect.poll(() => fixture.requests.filter((entry) => entry.path === '/api/workbench/reviewer-rollup')).toHaveLength(1);
+    await expect(page.getByText('One reviewer still needed.')).toBeVisible();
 
     const proposalPage = await context.newPage();
     await proposalPage.goto(`${baseURL}/workbench/${REQUEST_ID}?tab=proposal&n=1002788`);
     await expect(proposalPage.getByText('Loading proposal…')).toBeVisible();
     await expect.poll(() => fixture.counts().contextReads).toBe(2);
-    await expect.poll(() => fixture.requests.some((entry) => entry.path === '/api/workbench/proposal-documents')).toBe(false);
+    await expect(page.getByText('One reviewer still needed.')).toBeVisible();
+    await expect(proposalPage.getByText('baseline.pdf')).toBeVisible();
+    expect(fixture.requests.filter((entry) => entry.path === '/api/workbench/reviewer-rollup')).toHaveLength(1);
+    expect(fixture.requests.filter((entry) => entry.path === '/api/workbench/proposal-documents')).toHaveLength(1);
 
     fixture.releaseContext();
     await expect(page.getByText('One reviewer still needed.')).toBeVisible();

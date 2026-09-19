@@ -30,7 +30,7 @@ files; installed dependencies are reused locally, not provider credentials.
 | Plan revision | Fresh Sol review READY | Sol plan review below; local-first stages replace original cache-first plan |
 | S0 baseline | Accepted | Baseline evidence below |
 | S1 list continuity | Accepted | Same-key retention and scoped early rows; evidence below |
-| S2 independent reads | Not started | Requires S1 acceptance |
+| S2 independent reads | Accepted | Independent sections and request-owned context; evidence below |
 | S3 Reviews continuity | Not started | Requires S2 acceptance |
 | S4 cache experiment | Conditional; not selected | Requires incremental benefit over local fixes |
 | S5 code splitting | Conditional; not selected | Requires bundle and first-use evidence |
@@ -131,3 +131,33 @@ matching cycle metadata is held, count/triage controls wait for that metadata, a
 triage retains rows with one POST + one row reload and no extra cycles GET. Other
 panels retain their prior cycle loading path. This is deterministic behavior
 proof, not a production latency claim. Next: Luna S2, fresh Sol review.
+
+
+## S2 accepted
+
+[VERIFIED via source and local gates] Proposal documents and Overview rollup now
+start and render from the route GUID while request context is pending. The request
+page fences every context consumer and program-director control by normalized
+request identity and route generation; effect cleanup invalidates obsolete loads.
+Overview/Proposal owners are keyed by route request. Context-only Proposal callers
+remain supported. Primer generation/export behavior is unchanged.
+
+Luna implemented; fresh Sol `/root/sol_s2` found raw context props on three tabs,
+return-navigation stale context, and non-discriminating tests. Luna corrected them.
+After the second review, root took over two bounded response-contract checks:
+context/documents require the existing server `success:true` discriminator. Root
+also replaced a transient browser spinner assertion with a stable held-context
+assertion. Sol's final verdict was READY WITH those named checks, now implemented
+and tested; no further architectural scope was added.
+
+Final tracked runtime/test diff SHA-256 before receipt edit:
+`54414f4645fca553fbaad526c1bdb01ab53d08c2a8425af6c529bcf76e745fb5`;
+new page-test SHA-256:
+`47514cccb8e45671253d91b822bb0b21f4bfce27bf294fa6505fd626d097903f`.
+Root re-read changed consumers, resolver/document response contracts and tests.
+Final verification: **28 focused tests**, **974 Jest suites / 14,304 tests**, lint,
+types, canonical build and **2/2 browser tests** passed. Local log:
+`/tmp/workbench-s2-accepted.log`. The passing S3 baseline characterization is
+included in this commit so S3 begins with a green prerequisite. The browser proves
+one documents GET and one rollup GET produce useful content while context is held;
+no timing or production speedup is claimed. No API/service/schema changes.

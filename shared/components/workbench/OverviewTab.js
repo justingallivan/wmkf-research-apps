@@ -70,14 +70,15 @@ function aiArtifacts(ai = {}) {
 }
 
 function ReviewerProgress({ requestId }) {
-  const [state, setState] = useState({ status: 'loading', data: null });
+  const requestKey = String(requestId || '').toLowerCase();
+  const [state, setState] = useState({ status: 'loading', data: null, requestKey: '' });
   const reqRef = useRef(0);
 
   useEffect(() => {
     if (!requestId) return undefined;
     const token = (reqRef.current += 1);
     let cancelled = false;
-    setState({ status: 'loading', data: null });
+    setState({ status: 'loading', data: null, requestKey });
     // Lightweight per-request rollup (counts only, no person/researcher fan-out —
     // Codex S260). Returns { counts, needed, workRemaining, hint }.
     fetch(`/api/workbench/reviewer-rollup?requestId=${encodeURIComponent(requestId)}`)
@@ -86,15 +87,15 @@ function ReviewerProgress({ requestId }) {
         if (cancelled || token !== reqRef.current) return;
         if (!res.ok || !body.success) throw new Error(body.error || `Failed (${res.status})`);
         const counts = body.counts && typeof body.counts === 'object' ? body.counts : {};
-        setState({ status: 'ready', data: { counts, needed: body.needed, hint: body.hint } });
+        setState({ status: 'ready', data: { counts, needed: body.needed, hint: body.hint }, requestKey });
       })
       .catch(() => {
-        if (!cancelled && token === reqRef.current) setState({ status: 'error', data: null });
+        if (!cancelled && token === reqRef.current) setState({ status: 'error', data: null, requestKey });
       });
     return () => { cancelled = true; };
-  }, [requestId]);
+  }, [requestId, requestKey]);
 
-  if (state.status === 'loading') return <p className="text-sm text-gray-500">Loading reviewer progress…</p>;
+  if (state.requestKey !== requestKey || state.status === 'loading') return <p className="text-sm text-gray-500">Loading reviewer progress…</p>;
   if (state.status === 'error') return <p className="text-sm text-amber-600">Couldn’t load reviewer progress.</p>;
 
   const { counts, needed, hint } = state.data;
@@ -114,23 +115,15 @@ function ReviewerProgress({ requestId }) {
 }
 
 export default function OverviewTab({ context, requestId, onSelectTab }) {
-  if (!context) {
-    return (
-      <Card hover={false}>
-        <p className="text-sm text-gray-500">Loading overview…</p>
-      </Card>
-    );
-  }
-
-  const info = context.proposalInfo || {};
+  const info = context?.proposalInfo || {};
   const coPIs = Array.isArray(info.coPIs) ? info.coPIs : [];
-  const artifacts = aiArtifacts(context.aiContent);
+  const artifacts = aiArtifacts(context?.aiContent);
   const anyArtifact = artifacts.some((a) => a.present);
 
   return (
     <div className="space-y-4">
       {/* Snapshot */}
-      <Section
+      {context && <Section
         title="Request snapshot"
         action={<TabLink onSelectTab={onSelectTab} tab="proposal">Open proposal →</TabLink>}
       >
@@ -151,10 +144,10 @@ export default function OverviewTab({ context, requestId, onSelectTab }) {
             ) : '—'}
           </Field>
         </dl>
-      </Section>
+      </Section>}
 
       {/* AI artifacts */}
-      <Section
+      {context && <Section
         title="AI content"
         action={<TabLink onSelectTab={onSelectTab} tab="proposal">View / generate →</TabLink>}
       >
@@ -184,7 +177,7 @@ export default function OverviewTab({ context, requestId, onSelectTab }) {
         ) : (
           <p className="text-sm text-gray-500">No AI content generated yet — open the Proposal tab to generate it.</p>
         )}
-      </Section>
+      </Section>}
 
       {/* Reviewers */}
       <Section
