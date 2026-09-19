@@ -6,8 +6,10 @@
  * @jest-environment node
  */
 import {
+  buildBriefingUrl,
   computeBriefingExpiry,
   ensureLiveBriefingLink,
+  getBriefingBaseUrl,
   getLiveBriefingLink,
   projectBriefingLink,
   reissueBriefingLink,
@@ -18,6 +20,36 @@ const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const ACTOR_ID = '33333333-3333-4333-8333-333333333333';
 const NOW = new Date('2026-09-10T17:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
+
+describe('briefing public base URL', () => {
+  test('uses the public override while leaving NEXTAUTH_URL available for auth', () => {
+    const env = {
+      NEXTAUTH_URL: 'http://localhost:3000',
+      DELIBERATION_BRIEFING_PUBLIC_BASE_URL: 'https://briefing.example.test/',
+    };
+    expect(getBriefingBaseUrl(env)).toBe('https://briefing.example.test');
+    expect(buildBriefingUrl('jwt', env)).toBe('https://briefing.example.test/external/briefing/jwt');
+  });
+
+  test('falls back to NEXTAUTH_URL for existing deployments', () => {
+    expect(getBriefingBaseUrl({ NEXTAUTH_URL: 'https://apps.example.test/' })).toBe('https://apps.example.test');
+  });
+
+  test.each([
+    'briefing.example.test',
+    'https://user:password@briefing.example.test',
+    'https://briefing.example.test/path',
+    'https://briefing.example.test/?token=leak',
+    'http://briefing.example.test',
+  ])('rejects unsafe public override %s', (value) => {
+    expect(() => getBriefingBaseUrl({ DELIBERATION_BRIEFING_PUBLIC_BASE_URL: value, NEXTAUTH_URL: 'http://localhost:3000' }))
+      .toThrow();
+  });
+
+  test('fails closed when neither origin is configured', () => {
+    expect(() => getBriefingBaseUrl({})).toThrow('public briefing base URL is required');
+  });
+});
 
 beforeAll(() => { process.env.NEXTAUTH_URL = 'https://apps.test'; });
 
@@ -57,6 +89,37 @@ describe('computeBriefingExpiry', () => {
   test('returns 60 days when no schedule data is provided', () => {
     expect(computeBriefingExpiry({ now: NOW }).toISOString()).toBe(new Date(NOW.getTime() + 60 * DAY).toISOString());
   });
+});
+
+test('ensure rejects malformed public configuration before insert or replace', async () => {
+  const previous = process.env.DELIBERATION_BRIEFING_PUBLIC_BASE_URL;
+  process.env.DELIBERATION_BRIEFING_PUBLIC_BASE_URL = 'https://briefing.example.test/path';
+  const deps = harness();
+  try {
+    await expect(ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps))
+      .rejects.toThrow('origin without credentials');
+    expect(deps.insertLink).not.toHaveBeenCalled();
+    expect(deps.replaceLiveLink).not.toHaveBeenCalled();
+  } finally {
+    if (previous === undefined) delete process.env.DELIBERATION_BRIEFING_PUBLIC_BASE_URL;
+    else process.env.DELIBERATION_BRIEFING_PUBLIC_BASE_URL = previous;
+  }
+});
+
+test('reissue rejects malformed public configuration before replacement', async () => {
+  const deps = harness();
+  const first = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
+  const previous = process.env.DELIBERATION_BRIEFING_PUBLIC_BASE_URL;
+  process.env.DELIBERATION_BRIEFING_PUBLIC_BASE_URL = 'https://briefing.example.test/?bad=1';
+  deps.replaceLiveLink.mockClear();
+  try {
+    await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: first.link.id }, deps))
+      .rejects.toThrow('origin without credentials');
+    expect(deps.replaceLiveLink).not.toHaveBeenCalled();
+  } finally {
+    if (previous === undefined) delete process.env.DELIBERATION_BRIEFING_PUBLIC_BASE_URL;
+    else process.env.DELIBERATION_BRIEFING_PUBLIC_BASE_URL = previous;
+  }
 });
 
 test('ensure mints once for 60 days and returns the same live link on the second call', async () => {

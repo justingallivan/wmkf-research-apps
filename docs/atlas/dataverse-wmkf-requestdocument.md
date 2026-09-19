@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-16
+last_verified: 2026-09-18
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave16-request-document-registry/zz_akoya_request_pre_rp_brief_pointer.json
@@ -25,6 +25,15 @@ related:
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
+  - lib/services/pre-site-visit/distribution/retained-snapshot.js
+  - lib/services/pre-site-visit/distribution/prepare.js
+  - lib/services/pre-site-visit/distribution/send.js
+  - lib/services/pre-site-visit/distribution/history.js
+  - lib/services/pre-site-visit/distribution/email-recovery.js
+  - lib/services/pre-site-visit/distribution/model.js
+  - lib/services/pre-site-visit/distribution/composition.js
+  - lib/services/pre-site-visit/distribution/context.js
+  - lib/services/pre-site-visit/distribution/dependencies.js
   - lib/services/pre-site-visit/cycle-list-service.js
   - lib/services/pre-site-visit/artifact-service.js
   - lib/services/pre-site-visit/proposal-core-service.js
@@ -40,6 +49,11 @@ related:
 # `wmkf_requestdocument`
 
 ## Status
+
+## Local decomposition ownership
+
+**[SOURCE-BUILT ON THIS LOCAL BRANCH; NOT DEPLOYED.]** IA `artifact-model.js`, `artifact-reader.js`, `artifact-lineage.js`, and `artifact-upload-recovery.js`; Pre-Site distribution/model/context/dependency/reader/lineage/recovery leaves; and Final `transition-model.js`, `transition-dependencies.js`, `transition-state.js`, and `transition-claims.js` own the extracted implementation. The original facades remain compatibility entry points and preserve existing public exports, actor seams, and positional callers.
+
 
 **[VERIFIED 2026-07-29 via repository source]** Schema-as-code, adapter, producer,
 read API, Workbench panel, and cycle-wide pilot locator are implemented on the
@@ -305,6 +319,15 @@ Production Request Document row was created by this release smoke.
   namespace is excluded from editable Pre-Site status, activation cardinality,
   supersession, and guarded-reopen downstream/competing-generation checks;
   missing or lookalike producers retain ordinary fail-closed lifecycle behavior.
+- **[SOURCE-BUILT ON THIS LOCAL BRANCH; NOT DEPLOYED.]** The Stage1–7 decomposition owner paths below are local source state; the compatibility facade and registry behavior remain the documented public contract.
+- **[VERIFIED 2026-09-18 via local branch source; not deployed]** Distribution
+  snapshot creation and review-bundle retention are physically owned by
+  `lib/services/pre-site-visit/distribution/retained-snapshot.js`. The writer
+  registry points to its single create call with the unchanged REQUIRED actor
+  policy and bounded actor context; the one adapter binding remains in
+  `distribution/dependencies.js`. The distribution leaves (`distribution/prepare.js`, `send.js`, `history.js`, `email-recovery.js`, `model.js`, `composition.js`, `context.js`, `dependencies.js`, and `retained-snapshot.js`) own the decomposed implementation. The existing `distribution-service.js` facade
+  retains the public `retainReviewBundle` entry point and positional actor argument
+  used by the briefing-page rebuild consumer. No row/file identity or schema changed.
 - **[PRODUCTION-PROVED 2026-08-21]** the Site Visit transition
   resolves that current pointer, requires Ready/Draft Word state and a matching
   expected artifact id, verifies one stable SharePoint publication version
@@ -495,7 +518,7 @@ in `docs/API_ROUTE_SECURITY_MATRIX.md` as source-built, deployment pending.
 Slice 4 (built, same branch) swaps the distribution source to the current
 brief (`akoya_request._wmkf_currentprerpbrief_value`; distribution snapshot
 rows created by `ensureSnapshot` now carry artifact type `100000009`) and adds
-the prepare-time gate in `lib/services/pre-site-visit/distribution-service.js`:
+the prepare-time gate in `lib/services/pre-site-visit/distribution/prepare.js` (entered through the `distribution-service.js` compatibility facade):
 zero received reviews in the stored generation snapshot fails closed as
 `brief_reviews_required`; live-input drift returns 409 `brief_inputs_stale`
 with both fingerprints and a bounded delta, retryable only with

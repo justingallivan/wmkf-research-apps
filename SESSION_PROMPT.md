@@ -1,6 +1,6 @@
-# Session 520 Prompt: Fix the red J27 register gate, then Pre-RP Brief bundle smoke
+# Session 521 Prompt: Local document refactor complete; release decision pending
 
-## Session 519 Summary
+## Prior Session 519 Summary
 
 Session 519 was short. It started on `main` in sync with origin, ran every `check:*` gate
 (one red: `check:j27-register`, see below), explained the open applicant-materials
@@ -29,27 +29,100 @@ cron. No code behaviour changed.
 ### Commits (main)
 - `28d719d9` - docs: retire the applicant-materials reminder cron (owner decision 2026-09-17)
 
+## Session 520 Summary
+
+1. **J27 register citation repair.** The four rows in
+   `docs/J27_TRANSITION_REGISTER.md` (J27-053 line 97, J27-057 line 101, J27-062 line 111,
+   J27-064 line 113) now bind to exact excerpts in
+   `.claude-memory/project-reviewer-apps-redesign-history.md` (lines 369, 303, 319, and
+   329 respectively). J27-062 retains its separate `project-grant-phasing-evolution.md`
+   plan fragment; J27-064 retains the current owner decision in the register disposition
+   while using the historical allowlist-removal sentence as its source excerpt. The gate
+   and self-test pass: 61 ok, 0 stale, 6 unverifiable, 11 closed. The six unverifiable
+   rows (J27-034, -061, -067, -075, -076, -077) are advisory and pre-existing.
+
+2. **Governed document lifecycle refactor — local execution authorized 2026-09-18.** The owner requested
+   a staged plan, with fresh-context assumption reviews, for the largest defensible
+   remaining refactor. The plan is
+   `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_DECOMPOSITION_PLAN_2026-09-17.md`.
+   It covers four document service coordinators, preserves separate state machines
+   and public facades, and specifies prerequisite tests, ordered symbol/file moves,
+   stage gates, review receipts and rollback. Planning was committed as `02c41a08`.
+   The owner subsequently authorized local execution: Luna implements and builds,
+   Sol reviews, and the orchestrator performs final acceptance, taking over stalled
+   correction loops. Branch: `codex/document-lifecycle-decomposition`. Stage 0
+   accepted in `7a2ed504`: 955 suites / 14,075 tests, lint/types/canonical build and
+   required gates passed; Sol approved and root verified the real-route tests.
+   Stage 1 accepted in `8a7060b9` after prerequisite commit `c58237c4`: neutral
+   hash leaf, ten consumer imports, unchanged public hash API; 955 suites / 14,076
+   tests and all required checks passed. Stage 2 accepted in `e4c10355` after test
+   prerequisite `de875d68`: IA model/read modules; fresh Sol review and root checks
+   passed, 955 suites / 14,078 tests plus all required checks. Stage 3 accepted in
+   `2f7668b6` after test prerequisite `fbede538`: IA lineage/upload-recovery modules;
+   fresh Sol review and root checks passed with the same full test count and all
+   required checks. Stage 4 accepted in `569ab797`: Pre-Site model/defaults/read/
+   lineage/recovery, with populated/historical fixtures verified on both old and new
+   code; fresh Sol and root approval, 955 suites / 14,085 tests and required checks.
+   Stage 5a accepted in `d673afc6`: distribution model/composition/defaults/context,
+   unchanged public facade and writer; fresh Sol and root approval, 957 suites /
+   14,100 tests and required checks. Calendar-send prerequisites passed on old/new code.
+   Stage 5b accepted in `555a7bda`: retained snapshot module and atomic writer-registry
+   move; fresh Sol/root approval, 957 suites / 14,101 tests and required checks.
+   Stage 6 accepted in `c76703eb`: prepare/send/history/email recovery separated,
+   unchanged facade exports and sequencing; fresh Sol/root approval, 957 suites /
+   14,113 tests and required checks. Stage 7 accepted in `a9d4b0e8`: Final model/
+   defaults/state/claims separated, both commands and five public names preserved;
+   fresh Sol/root approval, 957 suites / 14,121 tests and required checks. Stage 8
+   accepted in `588fd382` (boundary prerequisites) and `7ed52a45` (closure): AST
+   import/cycle/export/writer enforcement, source headers and ownership docs; fresh
+   Sol/root approval, 958 suites / 14,151 tests and required checks. All stages 0–8
+   are complete locally; no migration stage remains to build. Receipts:
+   `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`. No push, deployment or live data
+   writes are authorized. See the plan's review record and evidence limits before acting.
+
+3. **Post-review hardening (2026-09-18).** Claude reviewed `5f069b32` as READY
+   with three low findings. Removed four unused imports, corrected the facade/leaf
+   export receipt wording, and extended boundary mutation tests for cross-domain
+   imports, adapter aliases, optional/call/apply writes and hash-consumer ownership.
+   [VERIFIED via local commands] Core smoke: 18 suites / 478 tests; auth routes:
+   9 suites / 64 tests; full Jest: 958 suites / 14,174 tests. Lint/types pass.
+   Operator smoke stages, fixtures, evidence and stop criteria are in
+   `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md`.
+   Fresh Sol acceptance and root final review passed after one bounded correction
+   round. A subsequent source-mode read-only smoke on ZZTEST-03 passed signed-in
+   IA/version/Pre-Site/history/Final reads and signed-out redirects; S1 is partial.
+   The subsequent read-only S1 subset and incomplete S2 rehearsal are recorded separately; bounded service reconciliation completed the restore metadata. The later guarded Pre-Site reopen and return-to-Review succeeded; the exact retry/stale/fault matrix remains unrun, while S3 passed separately and S4 was NOT RUN at that earlier run. No fresh canonical build for the earlier hardening import/test/docs follow-up; prior build evidence remains historical. The current restore fix has 4 suites / 42 tests plus a successful canonical build recorded in the execution receipt. No push/deploy authorized.
+
+   A separately owner-authorized controlled rehearsal on ZZTEST-03 was stopped after two IA failures. Generation returned HTTP 500 `claude_output_truncated` (run `7d8b647c-abb3-f111-aaac-000d3a361c1f`) and created one Failed row `ea6e4768-abb3-f111-aaac-6045bd04539e`; request state, 24 pre-existing Dataverse Request Document rows and 13 distribution attempts were unchanged; the SharePoint restore effect is recorded separately. Restore selected version 1.0 from current 2.0; Graph produced stable current 3.0 with historical 1.0/2.0 retained and equal governed hashes, but the API returned `initial_assessment_restore_bytes_mismatch` before registry metadata persistence. Readback is `/tmp/wmkf-restore-readback.json`; raw package differences were limited to custom XML/properties/trash parts. No PSV, distribution prepare/send, email, Final or leadership action ran. The initial browser restore failure is historical. A bounded PATCH-only service recovery then returned `restored:false`, `reconciled:true` with one registry update and zero Graph restores; independent readback confirmed the existing IA row at version 3.0, preserved history and the same governed hash. The recovery process exited 0. This is not a global database audit, and the browser restore was not rerun; S2 remains incomplete and S3–S4 were NOT RUN at that earlier run.
+
+   Production follow-up attributed to the Claude handoff: PR #314 merge `0b240f0a` deployed the IA thinking-budget fix, and the signed-in production rerun on request 1003222 reported PASS at 23:38Z. Run `7770d508-bab3-f111-aaac-7ced8d3c3a59` ended `end_turn` with 1,065 output tokens, `thinkingTokens=0`, and `maxTokens=12000`; Ready row `7d00fffd-b9b3-f111-aaac-000d3a361c1f` became the current IA pointer, superseding `a6876ad6-3b94-f111-8075-70a8a59cded0`, and the exact retry reused the row without a new run. Root independently verified the sanitized pointer/reconciliation readbacks: 28 Request Document rows, one new Ready row, only the prior IA lifecycle/modified fields changed among 27 prior rows, current PSV `205da1cd-b7b3-f111-aaac-6045bd04539e` unchanged in Review, Final null, and all 14 attempts unchanged. Provider tokens, stop reason and exact retry remain Claude-attributed evidence; the isolated candidate now integrates prompt v2 and has passed local validation; it has not been live-rerun.
+
+   Follow-up smoke continuation on isolated candidate `f45581ed`: the 269-route build passed; Board snapshot returned row `dc7558c4-b2b3-f111-aaac-7ced8d3c3a59` for IA artifact `a6876ad6-3b94-f111-8075-70a8a59cded0` at v3.0 with governed hash `gdc1:yGi7ISeqZspD0PwIecM9bbGPZQhn7hJpEV_k6Qgv4Yk` and distinct item `01G4GVMS5XTETQIS3JPNEIXAKRDZPRBY35`. The earlier pre-override distribution prepare returned 503 `distribution_briefing_required`, and the earlier guarded reopen returned 503 because `GUARDED_REOPEN_SCHEMA_READY` was unset; those readbacks were unchanged.
+
+   On accepted code `cbad8a8d`, migration 038 was verified already applied; process-only briefing readiness, `DELIBERATION_BRIEFING_PUBLIC_BASE_URL`, and impersonation configuration enabled the approved S3 rehearsal while local `NEXTAUTH_URL=http://localhost:3000` remained the staff-auth origin. Prepare passed, the first send failed closed before claim, and the same preview then returned `Sent for delivery`; Dynamics later reached status 3 with `senton` (initial status 6), the user confirmed inbox receipt on 2026-09-18; this does not infer that the user clicked the public briefing link. Request and 26 Request Document rows were unchanged; 13 prior attempts remained unchanged and total attempts became 14. S3 approved happy-path email smoke passed and inbox receipt was user-confirmed. The later PSV reopen and return-to-Review happy path passed; the exact retry/stale/fault matrix remains unrun. No AI regeneration ran. S4 Final and leadership happy paths subsequently passed on the same PSV fixture; the remaining fault matrix and wrong-app account case remain unrun/mock-only.
+
+   S4 controlled production smoke from local candidate `aff3049d` on the approved ZZTEST-03 request passed after the PSV successor was in Review. Final row `473c9160-c0b3-f111-aaac-000d3a361c1f` was created on the same SharePoint item, group review started at `2026-09-19T00:23:51Z`, leadership at `2026-09-19T00:24:37Z`, and both transitions used the session-derived actor `29b0de0d-4ff7-ee11-a1fd-000d3a3621c7`. Exact start and leadership retries returned HTTP 200 with `reused:true` and equal DTOs. Independent reconciliation showed 28→29 Request Document rows, only the prior source lifecycle/modified fields changed plus the four expected Final leadership fields, and all 14 distribution attempts unchanged; no AI, email or SharePoint upload/copy calls were observed in the bounded dependency capture, and no schema action ran. Three Dataverse writes first rejected impersonation and then succeeded through the supported service-principal fallback; this does not claim native CreatedBy impersonation. Sanitized evidence is in `/tmp/wmkf-final-smoke-{before,group,leadership,reconciliation,graph-before,graph-after,unauth,inventory,dependency-summary}.json` and the HTTP/proxy captures. The UI showed leadership after reload, and five signed-out route checks returned 307. Final fault cases and the wrong-app account case remain unrun/mock-only.
+
+Current fixture: IA `7d00fffd` remains unchanged; PSV `205da1cd` is now Final; current Final `473c9160` is in leadership review. Both rehearsal servers are stopped. The owner chose mock-only coverage for wrong-app access and review-bundle rebuild. Sol accepted the sanitized S4 evidence and root completed final review.
+
 ## Next Items
+
+**Local refactor release boundary:** all stages are committed on
+`codex/document-lifecycle-decomposition`; do not push, merge or deploy without a
+new release instruction. UI behavior is intended to remain unchanged. No production
+milestone entry was required because the branch has not shipped. The optional
+claim-evidence report could not read its local state; no observation was inferred.
+The unrelated carryovers below retain their prior evidence and need fresh checks
+before any live work; this refactor did not re-probe production.
+
 
 ### Verified Open
 
-1. **RED GATE `check:j27-register` (P0 candidate first task).** Four register rows in
-   `docs/J27_TRANSITION_REGISTER.md` (J27-053 line 97, J27-057 line 101, J27-062 line 111,
-   J27-064 line 113) cite excerpts at memory `project-reviewer-apps-redesign-direction.md`.
-   The S518 split (`03bf0d8a`) moved those lines verbatim into
-   `.claude-memory/project-reviewer-apps-redesign-history.md`; S519 grep confirmed the
-   J27-053 and J27-064 excerpts are present in the history leaf and absent from the active
-   leaf. Fix: re-point the four rows' site path and line numbers to the history leaf (verify
-   each excerpt fragment with grep first; J27-062's fragment `Plan an upstream per-PD triage`
-   matched neither leaf, so read that row's full excerpt before editing). The gate is listed
-   as advisory in `/start` and is not wired into a CI workflow, but it prints FAILED. Also
-   6 rows print `unverifiable` (J27-034, -061, -067, -075, -076, -077); those are not
-   failures and were unverifiable before S518.
-2. **Bundle rebuild after a new review** was never smoked in Production (unchanged from
+1. **Bundle rebuild after a new review** was never smoked in Production (unchanged from
    S517). Evidence: `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §12 step
    table ("NOT RUN — no third review submitted"). Needs a third ZZTEST-03 reviewer submission
    via the portal, then "Download all reviews (PDF)" on the briefing page should rebuild.
-3. **Memory deep-audit remainder.** Evidence: `docs/audits/memory-routine-audit-2026-09-17.md`
+2. **Memory deep-audit remainder.** Evidence: `docs/audits/memory-routine-audit-2026-09-17.md`
    "Unknowns". Shrink `project-site-visit-materials-planning-handoff` (7.6 KB; its line 42
    "Open (plan §12)" list still names "reminder cadence", now decided). The other four
    oversize-routed leaves are accepted. `check:memory-health` is advisory and prints 7 flags:
@@ -86,9 +159,10 @@ cron. No code behaviour changed.
 
 ### Verify Before Acting
 
-1. ZZTEST-03 residue: the regenerated brief is locked and previewed (not sent) as the
-   current share; the 9:20 AM sent row and shared briefing link remain; abstract restored
-   by the owner. A future smoke should start from this state.
+1. ZZTEST-03 residue: the prior regenerated brief remains locked and previewed (not sent) as the
+   current share; the 9:20 AM sent row and shared briefing link remain. The 2026-09-18
+   controlled rehearsal stopped after the IA generation/restore failures recorded above;
+   review the Failed row and keep the bounded restore reconciliation evidence with any future smoke.
 2. The #311/#312 conflict resolution (`dcc9c796`) and the fixture fix (`8f8cfc1b`) are
    test-verified but were never Codex-reviewed.
 3. Worktree `../WMKF_Apps-codex` was left clean on `codex/parked` at `6ed14ae9` by S518;
@@ -109,8 +183,8 @@ cron. No code behaviour changed.
 
 | File | Purpose |
 |---|---|
-| `docs/J27_TRANSITION_REGISTER.md` | Lines 97, 101, 111, 113 are the stale rows behind the red gate |
-| `.claude-memory/project-reviewer-apps-redesign-history.md` | Where the cited J27 excerpts now live |
+| `docs/J27_TRANSITION_REGISTER.md` | Lines 97, 101, 111, 113 carry the repaired J27 citations |
+| `.claude-memory/project-reviewer-apps-redesign-history.md` | Authoritative historical excerpts for J27-053, -057, -062, and -064 |
 | `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.6 | Reminder-cron retirement decision, item 1 |
 | `.claude-memory/project-ops-meeting-2026-09-16-agenda.md` | Closed ops-meeting record, all items decided |
 | `pages/api/cron/site-visit-materials-reminders.js` | Built, unscheduled, header records the retirement |
@@ -120,7 +194,7 @@ cron. No code behaviour changed.
 ## Testing
 
 ```bash
-npm run check:j27-register           # currently FAILED: 4 stale rows (see Verified Open 1)
+npm run check:j27-register           # 61 ok / 0 stale / 6 unverifiable / 11 closed
 npm test -- --runInBand --silent
 npm run lint
 npm run check:memory-router && npm run check:memory-router:self-test

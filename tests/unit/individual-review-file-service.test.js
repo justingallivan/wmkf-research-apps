@@ -21,7 +21,7 @@ jest.mock('../../lib/services/graph-service', () => ({
 }));
 
 const hashGovernedDocxContent = jest.fn();
-jest.mock('../../lib/services/initial-assessment/artifact-service', () => ({
+jest.mock('../../lib/services/documents/governed-docx-hash', () => ({
   hashGovernedDocxContent: (...args) => hashGovernedDocxContent(...args),
 }));
 

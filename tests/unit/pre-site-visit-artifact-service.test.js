@@ -408,6 +408,13 @@ function createHarness({
   };
 }
 
+function orderedDependencyCalls(dependencies, entries) {
+  return entries
+    .flatMap(([label, name]) => dependencies[name].mock.invocationCallOrder.map((order) => ({ label, order })))
+    .sort((left, right) => left.order - right.order)
+    .map(({ label }) => label);
+}
+
 test('generation cannot replace a draft that becomes the Site Visit workspace in flight', async () => {
   const harness = createHarness({
     currentPointerRow: {
@@ -571,6 +578,34 @@ test('persists eight sections and snapshots, renders the Dataverse read-back, th
   expect(harness.row.wmkf_renderinputfingerprint).toMatch(/^[a-f0-9]{64}$/);
   expect(harness.request._wmkf_currentpresitevisit_value).toBe(ARTIFACT_ID);
   expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+  expect(orderedDependencyCalls(harness.dependencies, [
+    ['inputs', 'loadInputs'],
+    ['request', 'getRequest'],
+    ['prompt-config', 'getCurrentPrompt'],
+    ['generation-read', 'findByGenerationKey'],
+    ['bucket', 'getBuckets'],
+    ['create', 'createDocument'],
+    ['proposal-core', 'runProposalCore'],
+    ['update', 'updateDocument'],
+    ['render', 'renderDocx'],
+    ['hash', 'hashDocx'],
+    ['folder', 'ensureFolderPath'],
+    ['upload', 'uploadFile'],
+    ['request-documents', 'findByRequest'],
+    ['commit', 'commitChangeset'],
+  ])).toEqual([
+    'request', 'request-documents', 'inputs', 'prompt-config',
+    'generation-read', 'bucket', 'create',
+    'generation-read', 'proposal-core',
+    'generation-read', 'update',
+    'generation-read', 'render', 'hash',
+    'generation-read', 'update',
+    'generation-read', 'folder',
+    'generation-read', 'upload',
+    'generation-read', 'request-documents',
+    'request', 'commit', 'generation-read',
+    'request', 'request-documents',
+  ]);
 });
 
 test('fails closed when named fields diverge from the audited proposal-core envelope', async () => {
@@ -708,9 +743,14 @@ test('read-only status returns the current Ready artifact without generation sid
   const sideEffectCounts = {
     create: harness.dependencies.createDocument.mock.calls.length,
     update: harness.dependencies.updateDocument.mock.calls.length,
+    commit: harness.dependencies.commitChangeset.mock.calls.length,
     run: harness.dependencies.runProposalCore.mock.calls.length,
     render: harness.dependencies.renderDocx.mock.calls.length,
+    ensureFolder: harness.dependencies.ensureFolderPath.mock.calls.length,
     upload: harness.dependencies.uploadFile.mock.calls.length,
+    delete: harness.dependencies.deleteFile.mock.calls.length,
+    metadata: harness.dependencies.getFileMetadataByPath.mock.calls.length,
+    download: harness.dependencies.downloadFile.mock.calls.length,
   };
 
   const status = await getPreSiteVisitArtifactStatus(
@@ -727,9 +767,161 @@ test('read-only status returns the current Ready artifact without generation sid
   });
   expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(sideEffectCounts.create);
   expect(harness.dependencies.updateDocument).toHaveBeenCalledTimes(sideEffectCounts.update);
+  expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(sideEffectCounts.commit);
   expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(sideEffectCounts.run);
   expect(harness.dependencies.renderDocx).toHaveBeenCalledTimes(sideEffectCounts.render);
+  expect(harness.dependencies.ensureFolderPath).toHaveBeenCalledTimes(sideEffectCounts.ensureFolder);
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(sideEffectCounts.upload);
+  expect(harness.dependencies.deleteFile).toHaveBeenCalledTimes(sideEffectCounts.delete);
+  expect(harness.dependencies.getFileMetadataByPath).toHaveBeenCalledTimes(sideEffectCounts.metadata);
+  expect(harness.dependencies.downloadFile).toHaveBeenCalledTimes(sideEffectCounts.download);
+});
+
+test('read-only status projects current Ready plus milestone and newer pending rows while ignoring frozen and superseded rows', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const current = {
+    ...harness.row,
+    createdon: '2026-08-20T12:00:00Z',
+    wmkf_filename: 'Fixed Pre-Site Visit.docx',
+    wmkf_inputfingerprint: 'input-fingerprint',
+    wmkf_renderinputfingerprint: 'render-fingerprint',
+    wmkf_milestoneversionid: '2.0',
+    wmkf_milestonecontenthash: 'gdc1:milestone',
+    wmkf_milestonecreatedat: '2026-08-20T12:00:00Z',
+    _wmkf_milestonecreatedby_value: '88888888-8888-4888-8888-888888888888',
+    _wmkf_milestonecreatedby_value_formatted: 'Test Staff',
+  };
+  const pending = {
+    ...current,
+    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_sharepointitemid: null,
+    wmkf_sharepointweburl: null,
+    createdon: '2026-08-21T12:00:00Z',
+  };
+  const frozen = {
+    ...current,
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+    wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx`,
+    createdon: '2026-08-22T12:00:00Z',
+  };
+  const superseded = {
+    ...current,
+    wmkf_requestdocumentid: '88888888-8888-4888-8888-888888888888',
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+    createdon: '2026-08-23T12:00:00Z',
+  };
+  harness.dependencies.findByRequest.mockResolvedValueOnce({
+    records: [pending, frozen, superseded, current],
+  });
+  const before = Object.fromEntries([
+    ['create', harness.dependencies.createDocument],
+    ['update', harness.dependencies.updateDocument],
+    ['changeset', harness.dependencies.commitChangeset],
+    ['ai', harness.dependencies.runProposalCore],
+    ['render', harness.dependencies.renderDocx],
+    ['folder', harness.dependencies.ensureFolderPath],
+    ['upload', harness.dependencies.uploadFile],
+    ['delete', harness.dependencies.deleteFile],
+  ].map(([key, mock]) => [key, mock.mock.calls.length]));
+
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+
+  const warnings = [
+    { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Overview.', rosterDisplayName: 'Ada Principal', section: 'personnelOverview' },
+    { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Overview.', rosterDisplayName: 'Casey Collaborator', section: 'personnelOverview' },
+    { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Details.', rosterDisplayName: 'Ada Principal', section: 'personnelDetails' },
+    { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Details.', rosterDisplayName: 'Casey Collaborator', section: 'personnelDetails' },
+    { code: 'referee_section_manual', message: 'The Reviews paragraph was not filled automatically (no submitted reviews at generation, or generated before the Dataverse fill). Check that it is completed in Word; this note stays until the document is regenerated.' },
+  ];
+  const provenance = {
+    inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
+    promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
+    runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '7',
+    contentHash: 'gdc1:governed-hash',
+  };
+  const milestone = {
+    versionId: '2.0', contentHash: 'gdc1:milestone', createdAt: '2026-08-20T12:00:00Z',
+    actorId: '88888888-8888-4888-8888-888888888888', actorName: 'Test Staff',
+  };
+  const currentFile = {
+    siteId: 'site-id', driveId: 'drive-id', itemId: 'uploaded-item',
+    webUrl: 'https://sharepoint.test/pre-site.docx', versionId: '1.0', eTag: 'file-etag',
+    folderPath: 'Requests/1002379/Artifacts/Pre-Site Visit', name: 'Fixed Pre-Site Visit.docx',
+    size: 1234, lastModified: '2026-08-17T12:00:00Z',
+  };
+  const common = {
+    requestId: REQUEST_ID, lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    retryable: false, warnings, provenance, correction: null, lastError: null,
+  };
+  expect(status).toEqual({
+    currentArtifact: {
+      ...common, artifactId: ARTIFACT_ID,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, file: currentFile, milestone,
+    },
+    pendingArtifact: {
+      ...common, artifactId: pending.wmkf_requestdocumentid,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING, file: null, milestone,
+    },
+    reopenHistory: [],
+  });
+  expect(status.reopenHistory).toEqual([]);
+  for (const [key, count] of Object.entries(before)) {
+    const mock = {
+      create: harness.dependencies.createDocument,
+      update: harness.dependencies.updateDocument,
+      changeset: harness.dependencies.commitChangeset,
+      ai: harness.dependencies.runProposalCore,
+      render: harness.dependencies.renderDocx,
+      folder: harness.dependencies.ensureFolderPath,
+      upload: harness.dependencies.uploadFile,
+      delete: harness.dependencies.deleteFile,
+    }[key];
+    expect(mock).toHaveBeenCalledTimes(count);
+  }
+});
+
+test.each([
+  ['unknown content type', { wmkf_contenttype: 'application/octet-stream' }, 'pre_site_visit_content_type_unknown'],
+  ['malformed core envelope', { wmkf_presiteproposalcorejson: '{bad json' }, null],
+  ['unknown core schema', { wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 99, proposalCore }) }, 'pre_site_visit_core_version_unsupported'],
+])('read-only status fails closed for a populated %s row without side effects', async (_label, overrides, code) => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const malformed = {
+    ...harness.row,
+    ...overrides,
+    wmkf_requestdocumentid: '99999999-9999-4999-8999-999999999999',
+  };
+  harness.request._wmkf_currentpresitevisit_value = malformed.wmkf_requestdocumentid;
+  harness.dependencies.findByRequest.mockResolvedValueOnce({ records: [malformed] });
+  const before = [
+    harness.dependencies.createDocument,
+    harness.dependencies.updateDocument,
+    harness.dependencies.commitChangeset,
+    harness.dependencies.runProposalCore,
+    harness.dependencies.renderDocx,
+    harness.dependencies.ensureFolderPath,
+    harness.dependencies.uploadFile,
+    harness.dependencies.deleteFile,
+  ].map((mock) => mock.mock.calls.length);
+
+  const expectedError = code ? { code } : { httpStatus: 500, message: 'The Pre-Site proposal core JSON is invalid.' };
+  await expect(getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies))
+    .rejects.toMatchObject(expectedError);
+  const after = [
+    harness.dependencies.createDocument,
+    harness.dependencies.updateDocument,
+    harness.dependencies.commitChangeset,
+    harness.dependencies.runProposalCore,
+    harness.dependencies.renderDocx,
+    harness.dependencies.ensureFolderPath,
+    harness.dependencies.uploadFile,
+    harness.dependencies.deleteFile,
+  ].map((mock) => mock.mock.calls.length);
+  expect(after).toEqual(before);
 });
 
 test('schema-v2 proposal cores remain readable and derive available warnings', async () => {
@@ -750,6 +942,70 @@ test('schema-v2 proposal cores remain readable and derive available warnings', a
   ]));
   expect(status.currentArtifact.warnings)
     .not.toEqual(expect.arrayContaining([expect.objectContaining({ code: 'proposal_input_truncated' })]));
+});
+
+test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s retain the exact read projection', async (schemaVersion) => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  Object.assign(harness.row, {
+    wmkf_filename: 'Fixed Pre-Site Visit.docx',
+    wmkf_inputfingerprint: 'input-fingerprint',
+    wmkf_renderinputfingerprint: 'render-fingerprint',
+  });
+  const core = JSON.parse(harness.row.wmkf_presiteproposalcorejson);
+  const snapshot = JSON.parse(harness.row.wmkf_presiteinputsnapshotjson);
+  harness.row.wmkf_presiteproposalcorejson = JSON.stringify({
+    schemaVersion,
+    proposalCore: core.proposalCore,
+    ...(schemaVersion >= 3 ? { diagnostics: [] } : {}),
+  });
+  harness.row.wmkf_presiteinputsnapshotjson = JSON.stringify({
+    ...snapshot,
+    schemaVersion,
+    request: {
+      ...snapshot.request,
+      ...(schemaVersion === 2 ? { institutionalFundingHistory: undefined } : {}),
+      ...(schemaVersion === 4
+        ? { refereeSection: { text: 'We received one review.', names: ['Dr. A'] } }
+        : { refereeSection: undefined }),
+    },
+  });
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  const personnelWarnings = [
+    { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Overview.', rosterDisplayName: 'Ada Principal', section: 'personnelOverview' },
+    { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Overview.', rosterDisplayName: 'Casey Collaborator', section: 'personnelOverview' },
+    { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Details.', rosterDisplayName: 'Ada Principal', section: 'personnelDetails' },
+    { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Details.', rosterDisplayName: 'Casey Collaborator', section: 'personnelDetails' },
+  ];
+  const legacyWarnings = schemaVersion === 2 ? [{ code: 'funding_history_manual', message: 'Institutional Funding History was not filled automatically (this document was generated before the Dataverse fill). Check that it is completed in Word; this note stays until the document is regenerated.' }] : [];
+  const refereeWarnings = schemaVersion === 4 ? [] : [{ code: 'referee_section_manual', message: 'The Reviews paragraph was not filled automatically (no submitted reviews at generation, or generated before the Dataverse fill). Check that it is completed in Word; this note stays until the document is regenerated.' }];
+  expect(status).toEqual({
+    pendingArtifact: null,
+    currentArtifact: {
+      artifactId: ARTIFACT_ID,
+      requestId: REQUEST_ID,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      retryable: false,
+      warnings: [...personnelWarnings, ...legacyWarnings, ...refereeWarnings],
+      file: {
+        siteId: 'site-id', driveId: 'drive-id', itemId: 'uploaded-item',
+        webUrl: 'https://sharepoint.test/pre-site.docx', versionId: '1.0', eTag: 'file-etag',
+        folderPath: 'Requests/1002379/Artifacts/Pre-Site Visit', name: 'Fixed Pre-Site Visit.docx',
+        size: 1234, lastModified: '2026-08-17T12:00:00Z',
+      },
+      provenance: {
+        inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
+        promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
+        runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '7',
+        contentHash: 'gdc1:governed-hash',
+      },
+      milestone: null,
+      correction: null,
+      lastError: null,
+    },
+    reopenHistory: [],
+  });
 });
 
 test('snapshot-v2 Ready documents surface the manual funding-history task; v3 documents do not', async () => {
@@ -1207,6 +1463,26 @@ test('post-upload finalization retry recovers the same item without Claude or a 
   expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(1);
   expect(harness.dependencies.downloadFile).toHaveBeenCalledTimes(1);
+  expect(orderedDependencyCalls(harness.dependencies, [
+    ['inputs', 'loadInputs'],
+    ['request', 'getRequest'],
+    ['generation-read', 'findByGenerationKey'],
+    ['metadata-path', 'getFileMetadataByPath'],
+    ['download', 'downloadFile'],
+    ['request-documents', 'findByRequest'],
+    ['update', 'updateDocument'],
+    ['commit', 'commitChangeset'],
+  ])).toEqual([
+    'request', 'request-documents', 'inputs', 'generation-read',
+    'generation-read', 'generation-read', 'update', 'generation-read',
+    'generation-read', 'update', 'generation-read', 'generation-read',
+    'generation-read', 'request-documents', 'request', 'commit',
+    'generation-read', 'request', 'request-documents', 'generation-read',
+    'update', 'request', 'request-documents', 'inputs', 'generation-read',
+    'update', 'generation-read', 'metadata-path', 'download',
+    'generation-read', 'request-documents', 'request', 'commit',
+    'generation-read', 'request', 'request-documents',
+  ]);
 });
 
 test('prompt race marks the claimed row Failed before render or upload', async () => {
