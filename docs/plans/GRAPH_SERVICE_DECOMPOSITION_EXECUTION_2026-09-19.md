@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S5 ACCEPTED — S6 NEXT]**. Root accepted S3 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S3 are accepted below and S4 is recorded below. No push, deployment or live rehearsal is authorized.
+Status: **[S6 ACCEPTED]**. Root accepted S0–S6 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S6 are accepted below; S7 is next. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -283,3 +283,37 @@ Result: **19 suites / 304 tests passed**, zero snapshots. The focused S5 charact
 Every current `check:*` parent and available immediate self-test ran sequentially. The retained log is `/private/tmp/wmkf-graph-decomposition-logs/s5-all-checks.log`; it contains **67 status lines, all exit code 0**. Final syntax and whitespace checks after the receipt-only cleanup were `node --check lib/services/graph-service.js`, `node --check lib/services/graph/versions.js`, and `git diff --check`, all passing. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
 
 No unresolved S5 contract finding remains. Root final review and G acceptance are complete; the next allowed stage is S6. The commit introducing this receipt is the accepted S5 checkpoint; rollback is accepted S4 commit `c20b6538`.
+
+## S6 execution receipt
+
+Status: **[S6 ACCEPTED]**. Baseline is accepted S5 commit `ac4a03b4`; this candidate keeps the public GraphService facade and download callers unchanged while moving the download transport owner into `lib/services/graph/downloads.js`. No dependency, environment, persistence, policy, registry caller, live-service, deployment, or later-stage change was made.
+
+### Owned move and exact bounds
+
+The ranges below were derived from `git show ac4a03b4:lib/services/graph-service.js` and the candidate AST/source bounds. The private redirect helper was compared byte-for-byte by root.
+
+| Symbol | Baseline facade range | Candidate module range | Facade delegate |
+|---|---:|---:|---:|
+| `downloadRedirectBody` | lines 897–916 | `lib/services/graph/downloads.js:171–190` | N/A |
+| `downloadFile` | lines 196–268 | `lib/services/graph/downloads.js:31–103` | `lib/services/graph-service.js:181–183` |
+| `downloadFileVersion` | lines 275–288 | `lib/services/graph/downloads.js:110–123` | `lib/services/graph-service.js:187–189` |
+| `downloadFileAsPdf` | lines 295–307 | `lib/services/graph/downloads.js:130–142` | `lib/services/graph-service.js:193–195` |
+| `downloadFileByPath` | lines 313–333 | `lib/services/graph/downloads.js:148–168` | `lib/services/graph-service.js:199–201` |
+
+The four public methods were moved from exact source slices with only the receiver parameter and `this.`→`svc.` boundary changes. Raw signatures and default evaluation points remain unchanged. `downloadFile` retains its presigned URL attempt and manual redirect fallback; CDN follow requests still omit Graph authorization. Version and PDF routes still return buffers through the private redirect helper with the original error/status behavior. `downloadFileByPath` keeps path validation, stable drive resolution, metadata lookup, and its final `svc.downloadFile(driveId, item.id)` dispatch. No cache/reset or unrelated facade method changed.
+
+The explicit real-source boundary inventory in `tests/unit/graph-service-boundary.test.js` assigns all four public methods to `graph/downloads.js` and names their facade delegates. The private helper remains module-local and has no public owner inventory entry. Fresh Sol review **`sol_s6`** accepted the public bodies and dedicated private-helper parity conditional on G; root independently verified all 13 moved declarations and the unchanged download-review/Workbench consumer contracts.
+
+### S6 G evidence
+
+The exact required download and consumer command was:
+
+```text
+npx jest --runInBand tests/unit/artifact-version-history.test.js tests/unit/graph-service-auth-cache.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/graph-service-downloads.test.js tests/unit/graph-service-folders.test.js tests/unit/graph-service-observability.test.js tests/unit/graph-service-public-contract.test.js tests/unit/graph-service-read-contract.test.js tests/unit/graph-service-resolution.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-versions.test.js tests/unit/graph-service-write-contract.test.js tests/unit/document-lifecycle-boundary.test.js tests/integration/review-manager-download-review.test.js tests/unit/download-review-service.test.js tests/unit/individual-review-file-service.test.js tests/unit/review-upload.test.js tests/unit/review-upload-response.test.js tests/unit/workbench-download-proposal-document-route.test.js tests/unit/workbench-download-proposal-document-service.test.js
+```
+
+Result: **22 suites / 380 tests passed**, zero snapshots. Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed. Lint reported the repository's existing **114 warnings and 0 errors**. The canonical Next.js **16.3.5 Turbopack** build completed with the two known dynamic-filesystem tracing warnings and no compile errors.
+
+Every current `check:*` parent and available immediate self-test ran sequentially. The retained log is `/private/tmp/wmkf-graph-decomposition-logs/s6-all-checks.log`; it contains **67 commands, all exit code 0**. Final syntax and whitespace checks after the generated-file cleanup were `node --check lib/services/graph-service.js`, `node --check lib/services/graph/downloads.js`, and `git diff --check`, all passing. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
+
+No unresolved S6 contract finding remains. Root final review and G acceptance are complete. The commit introducing this receipt is the accepted S6 checkpoint; rollback is `ac4a03b4`; S7 is next.
