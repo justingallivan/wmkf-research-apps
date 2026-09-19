@@ -6,6 +6,9 @@ metadata:
   type: feedback
   originSessionId: a0f720d1-2f6f-4926-bf29-612e5e4647ae
   modified: 2026-09-19T10:17:10.615Z
+status: active
+scope: docs
+last_verified: 2026-09-19 via Explorer extraction S9 full gate run (spurious reds re-run green alone) and j27-register fix 542b0892
 ---
 
 Two lessons from the Dynamics Explorer chat-service extraction (branch `claude/explorer-chat-extraction`, 2026-09-19):
