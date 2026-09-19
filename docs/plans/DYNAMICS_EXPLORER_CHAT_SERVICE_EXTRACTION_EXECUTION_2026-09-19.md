@@ -194,3 +194,135 @@ maximum per stage), root (Fable) performs the final review and any last edits.
 - Corrections: `tool-executor.js` header and plan §3.2/§6 range now
   670–775 (last code line). Plan §1–§10 hash at acceptance: `5aff8767c2fac9b9…`.
 - Next permitted stage: S9.
+
+## S9, Gate flip and docs
+
+Commits (branch `claude/explorer-chat-extraction`, all after `a2c7ab35`):
+
+- `8cc19b20` — retire `pages/api/dynamics-explorer/` from
+  `check:route-service-boundary`'s `EXEMPT_ROUTE_DIRS`; self-test relocates
+  the two green dynamics-explorer fixtures to `pages/api/dataverse-export/`
+  and adds a RED fixture (`red-adapter-import.js`) proving a raw adapter
+  import under `dynamics-explorer/` now fails.
+- `8cec69dd` — retire `pages/api/dynamics-explorer/` from
+  `check:dataverse-access-layer`'s `EXEMPT_DIRS`; self-test flips the
+  census fixture assertion to positive (renamed `should_not_count` →
+  `now_counted`) and splits the dynamics-explorer chat fixture out of the
+  law exempt-path green batch into its own `expectRed`.
+- `b62b7a13` — empty `check:odata-escape`'s `EXEMPT_DIRS` (was
+  `['pages/api/dynamics-explorer/']`, now `[]`); the single-file exemption
+  for `tools/get-entity.js` is unaffected. Self-test moves the
+  dynamics-explorer chat fixture from the green base set into the RED
+  batch and flips the narrowed assertion positive.
+- `fe626042` — docs reconcile: `CI_GATES_REFERENCE.md`,
+  `SERVICE_AND_UTILITY_CATALOG.md` (16 new module entries),
+  `atlas/dataverse-wmkf-ai-run-and-prompt.md`,
+  `API_ROUTE_SECURITY_MATRIX.md`, `ROUTE_SERVICE_CONSOLIDATION_PLAN.md`,
+  `CHUNK_CONSOLIDATION_PLAN.md`, `ODATA_ESCAPE_CONSOLIDATION_PLAN.md`,
+  `agent-wiki/topics/dataverse-dynamics.md`; also fixed
+  `scripts/check-application-state-atlas.js`'s
+  `ALLOWED_UNDOCUMENTED_ENTITIES` for the `should_not_count`→`now_counted`
+  self-test fixture rename (`check:atlas` was red without it).
+
+Exit grep (§6):
+
+```
+$ grep -n "dynamics-explorer" scripts/check-dataverse-access-layer.js scripts/check-odata-escape.js scripts/check-route-service-boundary.js
+scripts/check-odata-escape.js:15: *   - a single-file exemption for lib/services/dynamics-explorer/tools/get-entity.js
+scripts/check-odata-escape.js:18: *     dynamics-explorer route directory lost its carried-over exemption at
+scripts/check-odata-escape.js:54:  // one legacy escape, today at pages/api/dynamics-explorer/chat.js:1253, moving here at S5; retire with option (b)
+scripts/check-odata-escape.js:55:  'lib/services/dynamics-explorer/tools/get-entity.js',
+scripts/check-dataverse-access-layer.js:67:  'pages/dynamics-explorer.js',
+scripts/check-dataverse-access-layer.js:71:  // lib/services/dynamics-explorer/chat-session.js (exempt dir); its one raw
+scripts/check-dataverse-access-layer.js:73:  'lib/services/dynamics-explorer-taxonomy.js',
+scripts/check-dataverse-access-layer.js:80:  'lib/services/dynamics-explorer/',
+```
+
+No `pages/api/dynamics-explorer/` remains in any `EXEMPT_DIRS`/`EXEMPT_ROUTE_DIRS`
+list; all remaining hits are the still-legitimate single-file exemptions,
+the taxonomy entry/comment, and the still-exempt DAL-internal
+`lib/services/dynamics-explorer/` directory.
+
+Gate results (36 gates discovered via `grep -o '"check:[a-z0-9:-]*"' package.json`,
+each run then its self-test where one exists, sequentially):
+
+| Gate | Exit |
+|---|---|
+| check:agent-invariants | 1 (known pre-existing red — per-machine memory-store symlink; not fixed, per brief) |
+| check:agent-wiki / :self-test | 0 / 0 |
+| check:api-routes / :self-test | 0 / 0 |
+| check:atlas / :self-test | 0 / 0 |
+| check:build-claim-freshness / :self-test | 0 / 0 |
+| check:canonical-pointers / :self-test | 0 / 0 |
+| check:dataverse-access-layer / :self-test | 0 / 0 |
+| check:doc-currency / :self-test | 0 / 0 |
+| check:doc-symbol-refs / :self-test | 0 / 0 |
+| check:docs-catalog | 0 |
+| check:drain-table-mentions / :self-test | 0 / 0 |
+| check:dynamics-context-boundary / :self-test | 0 / 0 |
+| check:fact-consistency / :self-test | 0 / 0 |
+| check:harness-framing / :self-test | 0 / 0 |
+| check:instruction-architecture | 0 |
+| check:j27-register / :self-test | 1 / 1 (pre-existing, out of S9 scope — see note below) |
+| check:memory-drift | 0 |
+| check:memory-health | 0 |
+| check:memory-router / :self-test | 0 / 0 |
+| check:migrations-manifest | 0 |
+| check:model-override-warming / :self-test | 0 / 0 |
+| check:model-registry / :self-test | 0 / 0 |
+| check:odata-escape / :self-test | 0 / 0 |
+| check:prompt-injection-tagging / :self-test | 0 / 0 |
+| check:prompt-storage-mentions / :self-test | 0 / 0 |
+| check:request-document-writers / :self-test | 0 / 0 |
+| check:reviewer-engagement-boundary / :self-test | 0 / 0 |
+| check:reviewer-reminder-hold / :self-test | 0 / 0 |
+| check:route-lifecycle-auth / :self-test | 0 / 0 |
+| check:route-service-boundary / :self-test | 0 / 0 |
+| check:scaffolding-tokens / :self-test | 0 / 0 |
+| check:script-suggestion-writers / :self-test | 0 / 0 |
+| check:secret-scan / :self-test | 0 / 0 |
+| check:status-enum-parity / :self-test | 0 / 0 |
+| check:trust-boundary-guid / :self-test | 0 / 0 |
+| check:types | 0 |
+
+**check:j27-register note (not fixed — out of S9 brief scope):** `J27-026`
+(register line 65) cites `pages/api/dynamics-explorer/chat.js:1170` with
+excerpt `wmkf_phaseistatus,wmkf_phaseiistatus`. That excerpt moved verbatim
+to `lib/services/dynamics-explorer/tools/get-entity.js:27` at S1–S8 of this
+extraction plan, *before* S9. Confirmed pre-existing: `git show
+a2c7ab35:pages/api/dynamics-explorer/chat.js` no longer contains the
+excerpt, while `git show a2c7ab35:lib/services/dynamics-explorer/tools/get-entity.js`
+already does — this gate was already red at the S8 baseline this stage
+started from. S9's brief does not cover `J27_TRANSITION_REGISTER.md`; per
+the brief's "stop and report rather than widen scope" instruction, this is
+reported, not fixed.
+
+Full Jest: `973 suites / 14307 tests`, exit 0 (`npm test -- --runInBand --silent`).
+
+Build: `npm run build` (Turbopack) fails with the documented sandbox
+symlink signature — `Symlink [project]/node_modules is invalid, it points
+out of the filesystem root` — matching the S8 note above. Fallback per the
+brief: `npx next build --webpack` succeeded, exit 0, full route manifest
+emitted. The canonical Turbopack build still needs owner evidence on a
+checkout with a real (non-symlinked) `node_modules` before merge.
+
+## Release
+
+Tier 1 runtime change (per
+`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`). Branch
+`claude/explorer-chat-extraction` stays unmerged. Before merge, the owner:
+
+1. Runs a Preview smoke of the Explorer chat: one query, one tool round,
+   one export, one disconnect.
+2. Runs the canonical Turbopack build (`npm run build`) on a real-`node_modules`
+   checkout (not this worktree's symlinked one) to confirm the Turbopack
+   panic above is sandbox-specific, not a real regression.
+3. Merges `claude/explorer-chat-extraction` into `main`.
+
+Rollback: revert the branch merge commit. Every stage (S0–S9) is a pure
+code/gate/doc move — no migrations, no schema changes, no env-var changes
+— so a revert is safe and complete.
+
+Known env red accepted into this release: `check:agent-invariants`
+(per-machine memory-store symlink) — pre-existing, machine-local, not part
+of this plan's surface.
