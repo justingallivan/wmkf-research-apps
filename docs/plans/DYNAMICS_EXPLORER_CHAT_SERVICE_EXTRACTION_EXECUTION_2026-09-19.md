@@ -263,7 +263,7 @@ each run then its self-test where one exists, sequentially):
 | check:fact-consistency / :self-test | 0 / 0 |
 | check:harness-framing / :self-test | 0 / 0 |
 | check:instruction-architecture | 0 |
-| check:j27-register / :self-test | 1 / 1 (pre-existing, out of S9 scope — see note below) |
+| check:j27-register / :self-test | 0 / 0 (red at `cb9ac6e9`; fixed by root in the S9 fix-up — see note below) |
 | check:memory-drift | 0 |
 | check:memory-health | 0 |
 | check:memory-router / :self-test | 0 / 0 |
@@ -285,17 +285,16 @@ each run then its self-test where one exists, sequentially):
 | check:trust-boundary-guid / :self-test | 0 / 0 |
 | check:types | 0 |
 
-**check:j27-register note (not fixed — out of S9 brief scope):** `J27-026`
-(register line 65) cites `pages/api/dynamics-explorer/chat.js:1170` with
+**check:j27-register note (fixed in the S9 fix-up commit):** `J27-026`
+(register line 65) cited `pages/api/dynamics-explorer/chat.js:1170` with
 excerpt `wmkf_phaseistatus,wmkf_phaseiistatus`. That excerpt moved verbatim
-to `lib/services/dynamics-explorer/tools/get-entity.js:27` at S1–S8 of this
-extraction plan, *before* S9. Confirmed pre-existing: `git show
-a2c7ab35:pages/api/dynamics-explorer/chat.js` no longer contains the
-excerpt, while `git show a2c7ab35:lib/services/dynamics-explorer/tools/get-entity.js`
-already does — this gate was already red at the S8 baseline this stage
-started from. S9's brief does not cover `J27_TRANSITION_REGISTER.md`; per
-the brief's "stop and report rather than widen scope" instruction, this is
-reported, not fixed.
+to `lib/services/dynamics-explorer/tools/get-entity.js:27` at S5, so the
+gate went red at `cc313861` and stayed red through `cb9ac6e9` because the
+S5–S8 stage runs only covered the plan's 13 gate pairs, not the full set.
+The builder correctly stopped and reported it as outside the S9 brief. The
+red is caused by this extraction, so it blocks completion (CLAUDE.md rule
+4): root repointed the register row's site and excerpt path to
+`get-entity.js:27`; gate then self-test green (61 ok, 0 stale).
 
 Full Jest: `973 suites / 14307 tests`, exit 0 (`npm test -- --runInBand --silent`).
 
