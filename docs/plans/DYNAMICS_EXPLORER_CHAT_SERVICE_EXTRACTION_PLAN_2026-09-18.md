@@ -229,9 +229,9 @@ contract (E8) and are pinned by the Stage 0 test:
 | `response` | loop terminal without stream, max rounds | `content` |
 | `complete` | loop terminal, max rounds | `requestId`, `rounds`, `outcome`, `suggestFeedback`, optional `maxRoundsReached` |
 | `error` | route | `message`, `requestId`, dev-only `details`; the body-invalid path at `chat.js:117` emits `message` only |
-| `document_links` | list_documents, search_documents | `files`, optional `requestNumber` |
+| `document_links` | list_documents, search_documents | `{ requestNumber, files }` from list_documents (`chat.js:751`), `{ files }` from search_documents (`chat.js:763`) |
 | `export_progress` | batch processing | `processed`, `total`, `failed` |
-| `file_ready` | export | `base64`, `filename`, `recordCount`, `totalCount`, `capped`, `columns`, and the remaining keys at `chat.js:2444-2452` |
+| `file_ready` | export | exactly `base64`, `filename`, `recordCount`, `totalCount`, `capped`, `columns` (`chat.js:2444-2451`) |
 
 `runExplorerChat` signature (frozen at Stage 0, implemented at S8):
 
@@ -328,10 +328,16 @@ Characterization, driven through the real handler with the E12 mock set:
    mocks make `GraphService` and `exceljs` empty objects (E21), so this test
    must override them per test with a minimal `GraphService` stub, an
    `ExcelJS.Workbook` stub whose `xlsx.writeBuffer` returns a fixed buffer, an
-   `LLMClient` override whose `complete` resolves `{ text: <JSON string>, usage:
-   { inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens } }` (the
-   batch path calls `complete`, `chat.js:2483`, and the harness mock exposes
-   only `stream`), and `queryAllRecords` rows for the export.
+   `LLMClient` override whose `complete` resolves, in order, an object-JSON
+   text for the sample step (`chat.js:2533`) and then an array-JSON text for
+   the batch step (`chat.js:2622`), each with
+   `usage: { inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens }`
+   (the batch path calls `complete`, `chat.js:2483`, and the harness mock
+   exposes only `stream`), `queryAllRecords` rows for the export, a
+   `queryRecords` override returning a row whose `akoya_requestnum` matches
+   the scripted `request_number` (both document tools resolve the request
+   through `getEntity` first, `chat.js:1949,2139`), and a `searchFiles` stub
+   whose rows carry both `folder` and `library` (`chat.js:2280-2281`).
    Label the stubs as S0 scaffolding; the base64 in `file_ready` is
    deterministic only under the stub, so the snapshot hash is defined only
    with it.
@@ -357,7 +363,9 @@ Characterization, driven through the real handler with the E12 mock set:
      alone lets a duplicate `onTerminal` pass.
    - **4c, disconnect observed during tool execution.** Trigger the disconnect
      while a tool promise is pending so the polling check at `chat.js:369`
-     fires, not the abort path. Script a second model response with final text
+     fires, not the abort path: the backing service mock for the tool must
+     return a promise the test holds open, the abort is emitted while it is
+     pending, then the test resolves it. Script a second model response with final text
      so a service that drops the poll would produce `completed` and a
      `complete` event. Assert exactly two `client_disconnected` finalize calls
      (the listener's and the poll's, the pre-existing count), no other outcome,
@@ -794,7 +802,7 @@ gate scripts, and the harness mocks, and incorporated all three: test 11
 (scope-tracking context mock, required at S0 and S8), exact-file OData
 exemption plus S9 removal of both route-dir exemptions with red fixtures, and
 4b covering `response` as well as `complete` with exact call arrays for every
-terminal. Revised sections 1 to 10 hash: `489d8c584dbd8e46ac718027e92a8aa20d8948822d0096397e179136573e5725` at `52059e6b`.
+terminal. Revised sections 1 to 10 hash: `a319418dd3e9c1c99ce3efa340f3c8d8c607d0e6c592c6bd7eb1908daa5ea97e` at `52059e6b`.
 
 Next: execution of S0 to S9 on branch `claude/explorer-chat-extraction`
 (worktree `../WMKF_Apps-explorer`), owner-authorized 2026-09-18.
