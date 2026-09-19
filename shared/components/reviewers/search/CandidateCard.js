@@ -954,4 +954,3 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
     </div>
   );
 }
-
