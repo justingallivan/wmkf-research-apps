@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S0 ACCEPTED — S1 NEXT]**. Root accepted the tests-only freeze after Sol review, full G and final diff audit. User authorization covers all local stages; S1 may begin from the accepted S0 commit. No push, deployment or live rehearsal is authorized.
+Status: **[S1 ACCEPTED — S2 NEXT]**. Root accepted the tests-only freeze after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1 is accepted below. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -119,3 +119,52 @@ Findings / code evidence / resolution / recheck:
 Unresolved assumptions and release blockers:
 Accepted commit / rollback commit / next allowed stage:
 ```
+
+## S1 execution receipt
+
+Status: **[S1 ACCEPTED]**. S1 is the first runtime extraction after the accepted S0 commit. The public `lib/services/graph-service.js` facade remains the only caller-facing entry point; no caller, dependency, environment, persistence, or deployment change was made.
+
+### Stage, baseline, and owned paths
+
+| Field | Evidence |
+|---|---|
+| Baseline | Accepted S0 commit `546efff8aa107c130333dff51fe30343e5c7cf41` |
+| Candidate | Commit introducing this S1 receipt on `codex/graph-service-decomposition`; rollback baseline `546efff8` |
+| Builder-owned runtime paths | `lib/services/graph-service.js`, `lib/services/graph/constants.js`, `lib/services/graph/paths.js`, `lib/services/graph/http.js` |
+| Documentation path | This receipt and the S1 status line in `docs/plans/GRAPH_SERVICE_DECOMPOSITION_PLAN_2026-09-19.md` |
+| Runtime callers | Unchanged; no imports of the new internals were added outside the facade |
+| State owners | `tokenCache`, `tokenPromise`, `tokenGeneration`, `siteCache`, `driveCache`, `searchCooldownUntil`, and `searchCooldownStatus` remain in the facade |
+
+### Exact mechanical move
+
+The following declarations moved from the S0 facade into the listed modules. Baseline ranges below are from `git show 546efff8:lib/services/graph-service.js`; destination ranges are from the candidate working tree.
+
+| Destination | Symbols | S0 source range | Candidate range |
+|---|---|---:|---:|
+| `lib/services/graph/constants.js` | `GRAPH_BASE`, `API_TIMEOUT`, `DOWNLOAD_TIMEOUT`, `CACHE_TTL`, `SHAREPOINT_CANONICAL_SITE_URL`, `ALLOWED_SHAREPOINT_HOSTS`, `ALLOWED_LIBRARIES` | lines 19–22, 87, 93–95, 100–114 | lines 7–39 |
+| `lib/services/graph/paths.js` | `validatePath` | lines 130–144 | lines 7–21 |
+| `lib/services/graph/http.js` | `clampApiTimeout`, `deadlineTimeoutError`, `remainingTimeoutMs`, `waitForPromiseWithin`, `safeEmitDependencyEvent`, `fetchWithTimeout` | lines 1547–1555, 1578–1641 | lines 5–77 |
+
+`downloadRedirectBody` remains in the facade, as required for S1. The facade now imports the extracted helpers and re-exports `SHAREPOINT_CANONICAL_SITE_URL`; all operation methods, caches, search policy/state, and public statics remain in the facade.
+
+### Body comparison and allowed boundary differences
+
+Root independently compared the 14 moved declaration bodies against the S0 baseline and found all 14 exact, excluding source positions and comments. The allowed differences are module imports/exports, the facade re-export, declaration relocation, and comment relocation. No operation body, error string, timeout value, cache state owner, request construction, response mapping, or public method changed. The focused public and boundary suites also verify the facade export and delegate boundary after extraction.
+
+### G evidence
+
+The exact focused S1 command was `npx jest --runInBand --silent --runTestsByPath tests/unit/artifact-version-history.test.js tests/unit/graph-service-auth-cache.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/graph-service-downloads.test.js tests/unit/graph-service-folders.test.js tests/unit/graph-service-observability.test.js tests/unit/graph-service-public-contract.test.js tests/unit/graph-service-read-contract.test.js tests/unit/graph-service-resolution.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-versions.test.js tests/unit/graph-service-write-contract.test.js tests/unit/document-lifecycle-boundary.test.js tests/unit/drain-record-failure.test.js`.
+
+Result: **16 suites / 260 tests passed**, with zero snapshots. This covers all 14 Graph/contract suites plus the lifecycle and drain boundary consumers. The explicit route boundary checker and its self-test were run sequentially and passed, including the live repository census: `npm run check:route-service-boundary`, followed by `npm run check:route-service-boundary:self-test`.
+
+Type check, lint, and canonical build were run sequentially: `npm run check:types`, `npm run lint`, and `npm run build`. All passed. Lint reported the repository's existing **114 warnings and 0 errors**. The Next.js **16.3.5 Turbopack** build compiled, generated all 32 static pages, and completed with the two known dynamic-filesystem tracing warnings in the pre-RP/pre-site-visit DOCX renderers. Prebuild retained the existing reviewer-reminder hold advisory and wrote the existing 52-file migration manifest without a tracked diff.
+
+Every current `check:*` parent and available immediate self-test was then run sequentially from `package.json`. The complete output is retained at `/private/tmp/wmkf-graph-decomposition-logs/s1-all-checks.log`; the log contains **67 commands, 67 exit code 0, 0 failures**.
+
+### Reviewer and handoff
+
+Fresh Sol review **`sol_s1`** accepted the exact 14-leaf body comparison and whole-facade preservation, conditional on the G results. Root independently matched the moved leaves and reviewed the remaining facade, including `downloadRedirectBody`. No unresolved S1 contract finding remains. Root final review and G acceptance are complete. Next allowed stage is S2; no S0 mutation runner was rerun because its source anchors are baseline-specific.
+
+### Unresolved assumptions and release blockers
+
+No S1 test or gate failure remains. The worktree has no live-service or provider-API evidence, by design. No release, push, deployment, dependency change, migration, or later-stage extraction is authorized by this receipt.
