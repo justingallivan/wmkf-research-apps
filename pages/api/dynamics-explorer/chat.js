@@ -23,7 +23,6 @@
 import crypto from 'crypto';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { withDynamicsContext } from '../../../lib/services/dynamics-context';
 import { buildSystemPrompt, TOOL_DEFINITIONS } from '../../../shared/config/prompts/dynamics-explorer';
 import {
@@ -43,17 +42,12 @@ import {
 } from '../../../lib/services/dynamics-explorer-request-telemetry';
 import { describeChatFailure, detectPossibleFailure } from '../../../lib/services/dynamics-explorer/failure-copy';
 import { trimConversation, compactMessages } from '../../../lib/services/dynamics-explorer/conversation';
-import { MAX_RESULT_CHARS, TOOL_CHAR_LIMITS, sanitizeSelect, applyActiveOnlyFilter, stripEmpty, truncateResult, deriveRecordCount, getThinkingMessage } from '../../../lib/services/dynamics-explorer/result-shaping';
+import { MAX_RESULT_CHARS, TOOL_CHAR_LIMITS, truncateResult, deriveRecordCount, getThinkingMessage } from '../../../lib/services/dynamics-explorer/result-shaping';
 import { checkRestriction } from '../../../lib/services/dynamics-explorer/restriction-guard';
 import { getUserRole, getActiveRestrictions, logQuery } from '../../../lib/services/dynamics-explorer/explorer-store';
 import { callClaude } from '../../../lib/services/dynamics-explorer/model-call';
-import { findReportsDue, searchRecords } from '../../../lib/services/dynamics-explorer/tools/composite';
-import { describeTable } from '../../../lib/services/dynamics-explorer/tools/describe-table';
-import { getEntity } from '../../../lib/services/dynamics-explorer/tools/get-entity';
-import { getRelated } from '../../../lib/services/dynamics-explorer/tools/get-related';
-import { listDocuments, searchDocuments } from '../../../lib/services/dynamics-explorer/tools/documents';
-import { validateEffectiveODataCall, validatorReject, classifyToolError } from '../../../lib/services/dynamics-explorer/tool-errors';
-import { exportCsv } from '../../../lib/services/dynamics-explorer/tools/export';
+import { classifyToolError } from '../../../lib/services/dynamics-explorer/tool-errors';
+import { executeTool } from '../../../lib/services/dynamics-explorer/tool-executor';
 
 export const config = {
   api: {
@@ -393,111 +387,3 @@ export default async function handler(req, res) {
     if (!res.writableEnded && !res.destroyed) res.end();
   }
 }
-
-async function executeTool(name, input, sendEvent, userProfileId, restrictions = [], toolContext = {}) {
-  switch (name) {
-    case 'search':
-      return await searchRecords(input);
-
-    case 'get_entity':
-      {
-        const validation = await validateEffectiveODataCall(name, input, restrictions);
-        if (validation.reject) return validatorReject(validation.reject);
-      }
-      return await getEntity(input);
-
-    case 'get_related':
-      {
-        const validation = await validateEffectiveODataCall(name, input, restrictions);
-        if (validation.reject) return validatorReject(validation.reject);
-      }
-      return await getRelated(input);
-
-    case 'describe_table':
-      return await describeTable(input, restrictions);
-
-    case 'query_records': {
-      const effectiveInput = {
-        ...input,
-        select: sanitizeSelect(input.select),
-        filter: applyActiveOnlyFilter(input.filter, input.include_inactive),
-      };
-      const validation = await validateEffectiveODataCall(name, effectiveInput, restrictions);
-      if (validation.reject) return validatorReject(validation.reject);
-      const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
-      const result = await DynamicsService.queryRecords(entitySet, {
-        select: effectiveInput.select,
-        filter: effectiveInput.filter,
-        orderby: input.orderby,
-        top: input.top || 50,
-        expand: input.expand,
-      });
-      result.records = result.records.map(stripEmpty);
-      return result;
-    }
-
-    case 'count_records': {
-      const effectiveInput = {
-        ...input,
-        filter: applyActiveOnlyFilter(input.filter, input.include_inactive),
-      };
-      const validation = await validateEffectiveODataCall(name, effectiveInput, restrictions);
-      if (validation.reject) return validatorReject(validation.reject);
-      const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
-      const count = await DynamicsService.countRecords(
-        entitySet,
-        effectiveInput.filter,
-      );
-      return { count };
-    }
-
-    case 'aggregate': {
-      const effectiveInput = {
-        ...input,
-        filter: applyActiveOnlyFilter(input.filter, input.include_inactive),
-      };
-      const validation = await validateEffectiveODataCall(name, effectiveInput, restrictions);
-      if (validation.reject) return validatorReject(validation.reject);
-      const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
-      const result = await DynamicsService.aggregateRecords(entitySet, {
-        field: input.field,
-        operation: input.operation,
-        filter: effectiveInput.filter,
-        groupBy: input.group_by,
-      });
-      if (result.results) result.results = result.results.map(stripEmpty);
-      return result;
-    }
-
-    case 'find_reports_due':
-      return await findReportsDue(input);
-
-    case 'list_documents': {
-      const docResult = await listDocuments(input);
-      if (docResult._files?.length > 0) {
-        sendEvent('document_links', {
-          requestNumber: docResult.requestNumber,
-          files: docResult._files,
-        });
-        delete docResult._files; // Don't send structured data to Claude
-      }
-      return docResult;
-    }
-
-    case 'search_documents': {
-      const searchResult = await searchDocuments(input, toolContext);
-      if (searchResult._files?.length > 0) {
-        sendEvent('document_links', { files: searchResult._files });
-        delete searchResult._files;
-      }
-      return searchResult;
-    }
-
-    case 'export_csv':
-      return await exportCsv(input, sendEvent, userProfileId, restrictions);
-
-    default:
-      throw new Error(`Unknown tool: ${name}`);
-  }
-}
-
