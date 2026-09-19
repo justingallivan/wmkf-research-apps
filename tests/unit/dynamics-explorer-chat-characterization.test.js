@@ -163,6 +163,12 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
     // set up below.
     mockStream.mockReset();
     mockComplete.mockReset();
+    // Same reasoning for the two mocks individual tests mockReset(): re-arm
+    // their defaults here so a failing test cannot leave them stripped for
+    // the rest of the file (the in-test restores below are then belt and braces).
+    require('../../lib/services/model-override-loader').loadModelOverrides
+      .mockReset().mockImplementation(() => Promise.resolve());
+    mockBuildResolvedTaxonomyPromptBlock.mockReset().mockImplementation(() => Promise.resolve('resolved taxonomy'));
     process.env.CLAUDE_API_KEY = 'test-key';
     mockStartRequest.mockResolvedValue(true);
     mockFinalizeRequest.mockResolvedValue(true);
