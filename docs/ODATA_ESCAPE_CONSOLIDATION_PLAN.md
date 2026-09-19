@@ -484,3 +484,10 @@ everywhere the other gates are; if declined — record the decision in the Stage
     8 mechanical swaps against `git show 5477a226`, fresh census 0 in-scope, CJS/ESM direct-load
     clean. Jest could not run in the reviewer's read-only sandbox (EPERM on temp writes); test
     greens rest on this session's runs recorded above.
+- 2026-09-19 (S9 of `docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_PLAN_2026-09-18.md`):
+  **`pages/api/dynamics-explorer/` EXEMPT_DIRS entry retired.** `EXEMPT_DIRS` in
+  `scripts/check-odata-escape.js` is now `[]` — the dynamics-explorer route dir's Dataverse
+  calls moved to `lib/services/dynamics-explorer/`, so the gate's carve-out for it no longer
+  applies. The single-file exemption for `lib/services/dynamics-explorer/tools/get-entity.js`
+  (the moved legacy escape) is unaffected. See `docs/CI_GATES_REFERENCE.md` for the current gate
+  description.

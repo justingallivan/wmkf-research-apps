@@ -66,7 +66,7 @@ The prompt link is always written for governed prompt execution; the request
 link is caller-supplied and must be passed by request-bound producers.
 Migration plans touching either entity must preserve these foreign keys.
 
-**Migration disposition:** stays in Dataverse. No Postgres counterpart. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `pages/api/dynamics-explorer/chat.js` denies direct schema requests for the table and strips `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude.
+**Migration disposition:** stays in Dataverse. No Postgres counterpart. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `isOperationalLogTable` in `lib/services/dynamics-explorer/result-shaping.js` (matching against `OPERATIONAL_LOG_TABLES = new Set(['wmkf_ai_run', 'wmkf_ai_runs'])`) backs both `tools/describe-table.js`'s denial of direct schema requests for the table and `tools/composite.js`'s stripping of `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude — moved out of the former `pages/api/dynamics-explorer/chat.js` monolith at S9 of the chat-service-extraction plan (2026-09-19).
 
 ## `wmkf_ai_prompt`
 

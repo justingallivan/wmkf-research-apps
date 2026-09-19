@@ -109,9 +109,11 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   services touch adapters/`DynamicsService`). Enforced by
   `check:route-service-boundary` in law mode (no baseline, no ratchet)
   `[VERIFIED via scripts/check-route-service-boundary.js checkLaw + the live
-  gate run at census 0, 2026-07-05]`; exempt dirs remain
-  `pages/api/dynamics-explorer/` + `pages/api/dataverse-export/`. See
-  `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md`.
+  gate run at census 0, 2026-07-05]`; the sole remaining exempt dir is
+  `pages/api/dataverse-export/` — `pages/api/dynamics-explorer/` lost its
+  exemption at S9 of `docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_PLAN_2026-09-18.md`
+  (2026-09-19) now that its route is a thin shell over
+  `lib/services/dynamics-explorer/`. See `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md`.
 - Entity/table schemas, read/write paths, source-of-truth, and drop status live in the Atlas.
 - Existing databases use `node scripts/apply-migrations.js`; `scripts/setup-database.js` is fresh-install-only.
 
