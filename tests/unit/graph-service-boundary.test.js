@@ -41,6 +41,11 @@ const REAL_SOURCE_OPTIONS = {
     listFiles: `${GRAPH}/files.js`,
     getFileMetadataById: `${GRAPH}/files.js`,
     getFileMetadataByPath: `${GRAPH}/files.js`,
+    MAX_VERSION_PAGES: `${GRAPH}/versions.js`,
+    MIN_VERSION_PAGE_BUDGET_MS: `${GRAPH}/versions.js`,
+    listFileVersions: `${GRAPH}/versions.js`,
+    getFileVersionMetadata: `${GRAPH}/versions.js`,
+    restoreFileVersion: `${GRAPH}/versions.js`,
   },
   delegates: {
     getAccessToken: { target: `${GRAPH}/auth.js`, binding: 'getAccessToken' },
@@ -49,6 +54,9 @@ const REAL_SOURCE_OPTIONS = {
     listFiles: { target: `${GRAPH}/files.js`, binding: 'listFiles' },
     getFileMetadataById: { target: `${GRAPH}/files.js`, binding: 'getFileMetadataById' },
     getFileMetadataByPath: { target: `${GRAPH}/files.js`, binding: 'getFileMetadataByPath' },
+    listFileVersions: { target: `${GRAPH}/versions.js`, binding: 'listFileVersions' },
+    getFileVersionMetadata: { target: `${GRAPH}/versions.js`, binding: 'getFileVersionMetadata' },
+    restoreFileVersion: { target: `${GRAPH}/versions.js`, binding: 'restoreFileVersion' },
   },
 };
 

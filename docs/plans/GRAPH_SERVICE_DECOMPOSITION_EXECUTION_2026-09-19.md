@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S4 ACCEPTED — S5 NEXT]**. Root accepted S3 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S3 are accepted below and S4 is recorded below. No push, deployment or live rehearsal is authorized.
+Status: **[S5 ACCEPTED — S6 NEXT]**. Root accepted S3 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S3 are accepted below and S4 is recorded below. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -250,3 +250,36 @@ Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed. Li
 Every current `check:*` parent and available immediate self-test ran sequentially. Complete output is `/private/tmp/wmkf-graph-decomposition-logs/s4-all-checks.log`: **67 commands, all exit code 0**.
 
 Fresh Sol review **`sol_s4`** accepted the six moved body comparisons and explicit boundary inventory conditional on G. Root independently verified all six extracted functions and facade delegates after correcting the `listFiles` source header/body shape. No unresolved S4 finding remains. Root final review and G acceptance are complete; next allowed stage is S5; the S0 mutation runner remains baseline-specific and was not rerun.
+
+## S5 execution receipt
+
+Status: **[S5 ACCEPTED]**. Baseline is accepted S4 commit `c20b6538`; this candidate keeps the public GraphService facade and callers unchanged while moving version-history reads and restore into `lib/services/graph/versions.js`. No policy, registry caller, dependency, environment, persistence, live-service, deployment, or later-stage change was made.
+
+### Owned move and exact bounds
+
+The exact source ranges below were derived from `git show c20b6538:lib/services/graph-service.js` and `nl -ba` on the candidate after the final whitespace cleanup.
+
+| Symbol | Baseline facade range | Candidate module range | Facade delegate |
+|---|---:|---:|---:|
+| `MAX_VERSION_PAGES`, `MIN_VERSION_PAGE_BUDGET_MS` | lines 97, 99 | `lib/services/graph/versions.js:21,23` | N/A |
+| `listFileVersions` | lines 194–388 | `lib/services/graph/versions.js:56–250` | `lib/services/graph-service.js:158–164` |
+| `getFileVersionMetadata` | lines 391–419 | `lib/services/graph/versions.js:252–280` | `lib/services/graph-service.js:167–169` |
+| `restoreFileVersion` | lines 425–449 | `lib/services/graph/versions.js:286–310` | `lib/services/graph-service.js:174–176` |
+
+The three method bodies were moved from exact source slices with only the receiver parameter and `this.`→`svc.` boundary changes. The facade preserves the original `listFileVersions` destructured options signature and reconstructs `{ siteId, timeoutMs, limit }` for its sole delegate return. The exact metadata and restore methods retain their raw argument signatures and forward those arguments directly. Current-version-first materialization, bounded pagination, continuation salvage/security checks, sorting/capping, Graph error mapping, and restore POST/204 enforcement remain unchanged. The facade import is the only additional runtime edge; `clearCaches()` and all other cache reset order remain unchanged.
+
+The explicit real-source boundary inventory in `tests/unit/graph-service-boundary.test.js` assigns both version bounds and all three methods to `graph/versions.js`, and names all three facade delegates. Generic fixture ownership options remain separate. Fresh Sol review **`sol_s5`** accepted the source parity and dedicated restore review conditional on G; root independently matched all nine moved declarations and confirmed the restore caller/registry boundary was unchanged.
+
+### S5 G evidence
+
+The exact required consumer-inclusive Jest command was:
+
+```text
+npx jest --runInBand tests/unit/artifact-version-history.test.js tests/unit/graph-service-auth-cache.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/graph-service-downloads.test.js tests/unit/graph-service-folders.test.js tests/unit/graph-service-observability.test.js tests/unit/graph-service-public-contract.test.js tests/unit/graph-service-read-contract.test.js tests/unit/graph-service-resolution.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-versions.test.js tests/unit/graph-service-write-contract.test.js tests/unit/document-lifecycle-boundary.test.js tests/unit/drain-record-failure.test.js tests/unit/initial-assessment-artifact-versions.test.js tests/unit/workbench-initial-assessment-versions-route.test.js tests/unit/initial-assessment-controls-service.test.js
+```
+
+Result: **19 suites / 304 tests passed**, zero snapshots. The focused S5 characterization set was **7 suites / 118 tests passed** before the full run. Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed. The canonical Next.js **16.3.5 Turbopack** build compiled successfully with the two known dynamic-filesystem tracing warnings; lint completed without errors.
+
+Every current `check:*` parent and available immediate self-test ran sequentially. The retained log is `/private/tmp/wmkf-graph-decomposition-logs/s5-all-checks.log`; it contains **67 status lines, all exit code 0**. Final syntax and whitespace checks after the receipt-only cleanup were `node --check lib/services/graph-service.js`, `node --check lib/services/graph/versions.js`, and `git diff --check`, all passing. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
+
+No unresolved S5 contract finding remains. Root final review and G acceptance are complete; the next allowed stage is S6. The commit introducing this receipt is the accepted S5 checkpoint; rollback is accepted S4 commit `c20b6538`.
