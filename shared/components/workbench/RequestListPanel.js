@@ -210,6 +210,9 @@ export default function RequestListPanel({
     : undefined;
   const currentKey = requestDataKey(programId, cycleCode, scope, includeSetAside);
   const currentKeyRef = useRef(currentKey);
+  // Context transitions invalidate command errors; same-context GETs do not.
+  const contextEpochRef = useRef(0);
+  if (currentKeyRef.current !== currentKey) contextEpochRef.current += 1;
   currentKeyRef.current = currentKey;
   const hasCurrentSnapshot = loadedKey === currentKey;
   const visibleProposals = hasCurrentSnapshot ? proposals : [];
@@ -224,7 +227,7 @@ export default function RequestListPanel({
     const triageStatus = key === 'advancing' ? TRIAGE_STATUS.ADVANCING : TRIAGE_STATUS.SET_ASIDE;
     const triageFilters = filtersRef.current;
     const triageKey = currentKey;
-    const triageGeneration = reqIdRef.current;
+    const triageContextEpoch = contextEpochRef.current;
     const proposal = visibleProposals.find((item) => item.requestId === requestId);
     const wasSetAside = proposal?.setAside === true;
     const isSetAside = triageStatus === TRIAGE_STATUS.SET_ASIDE;
@@ -254,7 +257,7 @@ export default function RequestListPanel({
         await loadProposals(current.cycleCode, current.scope, current.includeSetAside, current.programId);
       }
     } catch (e) {
-      if (!mountedRef.current || currentKeyRef.current !== triageKey || reqIdRef.current !== triageGeneration) return;
+      if (!mountedRef.current || currentKeyRef.current !== triageKey || contextEpochRef.current !== triageContextEpoch) return;
       setError(e.message);
       setErrorKey(currentKey);
     } finally {

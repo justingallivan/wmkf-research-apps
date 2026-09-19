@@ -53,6 +53,12 @@ function response(body, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => payload };
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   jest.useRealTimers();
   global.fetch = jest.fn();
@@ -98,6 +104,40 @@ test('retains same-key rows and shows an error when the refresh fails ordinarily
   release();
   await waitFor(() => expect(screen.getByText('temporary outage')).toBeInTheDocument());
   expect(screen.getByText('#1001')).toBeInTheDocument();
+});
+
+test('surfaces a concurrent triage error after another row starts a replacement load', async () => {
+  const firstPost = deferred();
+  const secondPost = deferred();
+  const rows = [
+    row(),
+    row({ requestId: 'request-b', requestNumber: '1002' }),
+  ];
+  global.fetch
+    .mockResolvedValueOnce(response({ proposals: rows, rollup: { total: 2, stages: { find: 2 } } }))
+    .mockImplementationOnce(() => firstPost.promise)
+    .mockImplementationOnce(() => secondPost.promise)
+    .mockResolvedValueOnce(response({ proposals: rows, rollup: { total: 2, stages: { find: 2 } } }));
+  renderPanel();
+  await waitFor(() => expect(screen.getByText('#1002')).toBeInTheDocument());
+
+  const controls = screen.getAllByTitle('Set triage status');
+  fireEvent.change(controls[0], { target: { value: 'advancing' } });
+  fireEvent.change(controls[1], { target: { value: 'advancing' } });
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+
+  await act(async () => {
+    firstPost.resolve(response({ success: true }));
+    await firstPost.promise;
+  });
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
+
+  await act(async () => {
+    secondPost.resolve(response({ error: 'B failed' }, 500));
+    await secondPost.promise;
+  });
+  await waitFor(() => expect(screen.getByText('B failed')).toBeInTheDocument());
+  expect(screen.getByText('#1002')).toBeInTheDocument();
 });
 
 test('clears same-key rows for a protected refresh response', async () => {
@@ -242,4 +282,29 @@ test.each(['programId', 'cycleCode', 'scope', 'includeSetAside'])('clears a seed
   expect(screen.queryByText('#1001')).not.toBeInTheDocument();
   expect(screen.queryByText('#wrong-context')).not.toBeInTheDocument();
   expect(screen.queryByTitle('Set triage status')).not.toBeInTheDocument();
+});
+
+
+test('suppresses an obsolete triage failure after a filter A→B→A round trip', async () => {
+  const post = deferred();
+  global.fetch.mockImplementation((url, options) => {
+    if (options?.method === 'POST') return post.promise;
+    const scope = new URL(url, 'http://test').searchParams.get('scope');
+    return Promise.resolve(response({ scope, proposals: [row()], rollup: { total: 1 } }));
+  });
+  const props = {
+    programId: 'program-a', cycleCode: 'J26', cycles: [CYCLE], cyclesGeneration: 1,
+    patchCycleCounts: jest.fn(), loadingCycles: false, includeSetAside: false,
+    onScopeChange: jest.fn(), onIncludeSetAsideChange: jest.fn(),
+  };
+  const view = render(<RequestListPanel {...props} scope="my" />);
+  await screen.findByText('#1001');
+  fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'advancing' } });
+  view.rerender(<RequestListPanel {...props} scope="all" />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+  view.rerender(<RequestListPanel {...props} scope="my" />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
+  await act(async () => { post.resolve(response({ error: 'Obsolete command error' }, 500)); });
+  expect(screen.queryByText('Obsolete command error')).not.toBeInTheDocument();
+  expect(screen.getByText('#1001')).toBeInTheDocument();
 });
