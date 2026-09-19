@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Explorer chat service extraction and Workbench responsiveness promoted (Session 523)
+
+**Milestone:** The 2,983-line Dynamics Explorer chat route is now a 197-line shell over `lib/services/dynamics-explorer/` (17 verbatim-moved modules behind a callback contract), its three route-dir gate exemptions are retired, and the Workbench request page keeps rows, sections and reviews visible during refreshes.
+**Sessions:** 523; Claude orchestrated (Sonnet build, Opus stage review, Codex OAuth plan review) and owned integration; Codex built Workbench and reviewed read-only.
+**Ship state:**
+- `main` fast-forwarded `7c18b622` → `3f4a1068` (merges `4c3ce24d` Explorer, `35610f64` Workbench), deployed as `dpl_2zkcS5GMKaadkjJNdzujZTj5mLda`. No schema, API or dependency change.
+- Combined tree: 38 gates + 29 self-tests, 976 suites / 14,358 tests, canonical build, 9/9 mocked browser journeys; SSE census snapshot unchanged since S0.
+- Preview smoke (query, parallel tools, Excel export, Workbench read paths) and production read-only check passed; one transient 503 not reproduced.
+**Why it matters:** Explorer tools and the agentic loop are now unit-addressable service modules under the Route→Service law, and Workbench refreshes no longer blank the page.
+**Pointers:** `docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_EXECUTION_2026-09-19.md`; `docs/plans/WORKBENCH_RESPONSIVENESS_EXECUTION_2026-09-18.md`; Preview CSRF alias follow-up in `docs/CURRENT_WORK_QUEUE.md`. Rollback `dpl_6paPmnhgjdZ6bu23b57Q5A7XpGXK`.
+
 ## September 2026 — Reviewer search workspace decomposition promoted (Session 522)
 
 **Milestone:** Reviewer Find now composes 19 focused presentation/workflow modules behind its preserved public facade, with generation-owned async safety fixes and permanent boundary tests.

@@ -1,4 +1,145 @@
-# Session 523 Prompt: Reviewer search refactor deployed; follow-ups separated
+# Session 524 Prompt: Explorer chat service extraction and Workbench responsiveness promoted
+
+## Session 523 Summary
+
+[VERIFIED via source, tests, gates, Git, Vercel CLI, Preview and production
+signed-in browser checks] Two Tier 1 refactors were built on separate branches,
+integrated on a throwaway integration branch, verified together, validated on a
+Preview deployment, and promoted to production as one fast-forward of `main`.
+
+### What Was Completed
+
+1. **Dynamics Explorer chat-service extraction (Claude, S0–S9)**
+   - `pages/api/dynamics-explorer/chat.js` 2,983 → 197 lines; logic moved verbatim
+     into 17 modules under `lib/services/dynamics-explorer/` (`chat-session.js`,
+     `tool-executor.js`, `model-call.js`, `explorer-store.js`, `tools/*`, …).
+   - S0 characterization suite (18 tests) and SSE census snapshot pinned behaviour;
+     the snapshot never changed after S0. Restriction-guard suite (17 tests).
+   - Three gate exemptions for `pages/api/dynamics-explorer/` retired
+     (route-service-boundary, dataverse-access-layer, odata-escape) with red
+     fixtures proven by mutation. Registries repointed; J27-026 register row moved.
+   - Orchestration: Sonnet built and scouted, Opus reviewed each stage (two rounds
+     max), root fixed small findings itself. Codex adversarial review of the plan
+     used OAuth only. Receipt: `docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_EXECUTION_2026-09-19.md`.
+
+2. **Workbench responsiveness (Codex, local-first S0–S3)**
+   - Request list rows retained during refresh; independent request sections load
+     before context; Reviews tab retains children during refresh. No API, service,
+     schema, dependency or auth change. Cache experiment omitted; code splitting
+     trial rejected below its 5% gate. Receipt:
+     `docs/plans/WORKBENCH_RESPONSIVENESS_EXECUTION_2026-09-18.md`.
+
+3. **Integration and promotion (Claude owned; Codex read-only)**
+   - `integration/2026-09-19`: merges `4c3ce24d` (Explorer), `35610f64`
+     (Workbench), `71a1ae4f` (memory frontmatter). No conflicts; changed-file sets
+     did not overlap. Combined tree: 38 gates + 29 self-tests green, Jest 976
+     suites / 14,358 tests, lint 0 errors, types, canonical Turbopack build, 9/9
+     route-mocked browser journeys.
+   - Preview validation on the alias with branch-scoped `DATAVERSE_ALLOW_PROD_READS`
+     and `NEXTAUTH_URL`: Explorer query, parallel two-tool round, UI list + Excel
+     export (209 rows) all `completed`; Workbench list/request/Overview/Proposal/
+     Reviews rendered live data. One transient 503 on the first invocation after a
+     redeploy, not reproducible. Disconnect test inconclusive (answer finished
+     before the abort landed); wiring is byte-identical and pinned by S0 tests.
+   - Production: `main` fast-forwarded `7c18b622` → `3f4a1068`, deployed as
+     `dpl_2zkcS5GMKaadkjJNdzujZTj5mLda` (`wmkfresearchapps-g8484ufro`). Read-only
+     production check passed (sign-in, Workbench list and request 1002852, Explorer
+     query completed in 3 rounds). Rollback: `dpl_6paPmnhgjdZ6bu23b57Q5A7XpGXK`
+     (`7c18b622`); revert `4c3ce24d` or `35610f64` individually.
+   - Cleanup done: alias removed, branch-scoped env vars removed, integration
+     worktree and local branch removed, `origin/integration/2026-09-19` deleted,
+     Explorer worktree and branch removed. Seven `smoke-*` telemetry rows remain in
+     production Postgres as retained residue.
+
+### Commits
+- `52059e6b`…`bdb2bd00` - Explorer extraction plan and its review revisions.
+- `4c3ce24d` - Merge `claude/explorer-chat-extraction` (39 stage commits, `ca56aa36`).
+- `35610f64` - Merge `codex/workbench-responsiveness` (8 commits, `9f0d1b55`).
+- `3f4a1068` - Merge `main` (memory) into integration; the promoted commit.
+- `4ed2dbea` - Queue: Preview CSRF alias-origin follow-up.
+- `ba060914` - Release record appended to the Explorer execution receipt.
+
+## Next Items
+
+### Verified Open
+
+1. Preview CSRF origin check rejects alias-hosted POSTs.
+   Evidence: `lib/utils/auth.js validateOrigin` derives the Preview origin from
+   `VERCEL_URL`; observed 403 on the Explorer chat POST via the alias, cleared by a
+   branch-scoped `NEXTAUTH_URL`. Logged in `docs/CURRENT_WORK_QUEUE.md` (Audit
+   follow-ups). Prefer documenting the runbook step first; widening the allowlist
+   goes through `/contract-reconcile`. Pre-existing, not a regression.
+2. Remove two stale Entra callbacks for retired Codex branch aliases.
+   Evidence: `az ad app show` redirect URIs on 2026-09-19 list
+   `…git-codex-pau-5b4bef…` and `…git-codex-wor-464bcd…`. Owner-run tenant write.
+
+### Owner Decision Needed
+
+1. Reviewer search functional follow-ups (carried from Session 523; unchanged).
+   Evidence: `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md`. Choose one scope.
+
+### Parked
+
+1. Impeccable 11px exception scoped to CandidateCard and IdentityComparisonPanel
+   (carried; `.impeccable/config.json`). Re-open on a readability review.
+2. Memory router diet debt (router at 7,054 bytes / 67 lines after this session's
+   one added pointer; gate green). Re-open when the router gate advises.
+
+### Verify Before Acting
+
+1. Graph drive-item 4xx dependency events on the Workbench Proposal tab in Preview
+   (three, page still rendered every document). Unclassified against production;
+   check fresh logs before treating as new.
+2. The transient Explorer 503 (first invocation after redeploy `e6b2sn5dd`). Not
+   reproduced across four subsequent requests; re-check only if it recurs in
+   production logs.
+3. Explorer disconnect path on a long-running request has not been live-proven
+   post-extraction; S0 tests 4b–4g pin it. Only test live if a report suggests
+   telemetry outcomes are wrong.
+
+### Do Not Reopen Without New Decision
+
+1. The Explorer extraction is complete through S9; do not re-add route-dir gate
+   exemptions or re-export helpers from the route shell.
+2. Workbench cache experiment (S4) and code-splitting trial (S5) were omitted or
+   rejected by measured gates; do not resurrect without a new measurement.
+3. Do not rerun paid Explorer smokes or Preview promotions as routine verification.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_PLAN_2026-09-18.md` | Staged plan, §3.2 module map, §11 review log |
+| `docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_EXECUTION_2026-09-19.md` | Per-stage receipts, final acceptance, release record |
+| `docs/plans/WORKBENCH_RESPONSIVENESS_EXECUTION_2026-09-18.md` | Codex execution and review receipt |
+| `lib/services/dynamics-explorer/chat-session.js` | `runExplorerChat` agentic loop behind the callback contract |
+| `lib/services/dynamics-explorer/tool-executor.js` | `executeTool` dispatcher |
+| `pages/api/dynamics-explorer/chat.js` | 197-line route shell (auth, SSE, lifecycle, telemetry) |
+| `docs/CURRENT_WORK_QUEUE.md` | Preview CSRF alias follow-up |
+| `.claude-memory/feedback-one-session-runs-gates-per-worktree.md` | Gate concurrency and stage-gate-list lessons |
+
+## Testing
+
+```bash
+npx jest tests/unit/dynamics-explorer-chat-characterization.test.js tests/unit/dynamics-explorer-restriction-guard.test.js --silent
+npm run check:route-service-boundary && npm run check:route-service-boundary:self-test
+npm run check:odata-escape && npm run check:odata-escape:self-test
+npm test -- --runInBand --silent
+```
+
+## Stop-time notes
+
+Claim-evidence pilot: one universal-shape advisory (session key `966249cee7dcca4a`)
+on the Explorer plan document; classified in
+`docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md`. Milestone entry added to
+`DEVELOPMENT_LOG.md`. Lesson memory committed: only one session runs gates per
+worktree; per-stage gate lists must include every gate that scans moved paths.
+This handoff push may trigger a documentation-only production deployment.
+
+## Historical handoffs — not current instructions
+
+Everything below preserves prior-session evidence. The Session 524 guidance above
+controls current next steps. The Session 523 prompt body follows unchanged.
 
 ## Session 522 Summary
 
