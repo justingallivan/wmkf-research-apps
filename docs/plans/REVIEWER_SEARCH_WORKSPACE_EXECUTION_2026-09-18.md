@@ -632,3 +632,24 @@ guards and awaited roster persistence remain unchanged.
   `/private/tmp/reviewer-stage-4-gates-resume/results.json`.
 
 **Stage 4 verdict:** accepted by root. Starting/rollback reference: `f650c035`.
+
+
+## Applicant/contact prerequisites before Stages 5–6
+
+[VERIFIED via source, tests and fresh review] Luna added twelve component-level
+cases in `reviewer-search-applicant-contact-contract.test.js`. Cache fixtures
+exercise ineligible canonical rows, excluded/saved terminals, handled applicants
+and same-context rerenders. Four independently deferred streams prove discovery
+can render while applicant enrichment remains pending. Contact cases preserve
+draft-before-verification ordering, partial authoritative receipts and retryable
+confirmation; deferred record, confirmation, draft and verification responses
+cannot overwrite a new request's same-key candidate or issue stale follow-up calls.
+
+- Fresh Sol `/root/sol_p5_p6_delta`: **READY** after one correction round; it
+  verified populated preconditions and coverage shared with existing cache,
+  history, rescue, reconciliation and callback suites.
+- Final focused run: **5 suites / 61 tests passed**. Strict new-test lint passed.
+- No runtime changes were made for these tests. Stages 5–6 still require their
+  own extraction reviews and full G.
+
+**Prerequisite verdict:** accepted by root before Stage 5.
