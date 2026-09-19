@@ -186,11 +186,11 @@ source header naming its owner, contract, and the route section it came from.
 | `conversation.js` | 499–595 | `trimConversation`, `compactMessages`, `summarizeToolResult` | nothing |
 | `result-shaping.js` | 69, 74–86, 641–669, 796–919, 2936–2955 | `MAX_RESULT_CHARS`, `TOOL_CHAR_LIMITS`, `OPERATIONAL_LOG_TABLES`, `sanitizeSelect`, `applyActiveOnlyFilter`, `isOperationalLogTable`, `stripEmpty`, `truncateResult`, `deriveRecordCount`, `getThinkingMessage` | nothing |
 | `restriction-guard.js` | 926–950, 2870–2935 | `checkRestriction`, `splitChatExpandSegments`, `restrictedFieldsForTable`, `redactRestrictedFieldNames` | nothing |
-| `tool-errors.js` (moves at S5, after `get-entity`) | 777–795, 951–1046 | `validateEffectiveODataCall`, `validatorReject`, `classifyToolError`, `closestFieldNames` | `dynamics-odata-validator`, `DynamicsService` (metadata reads), prompt module `TABLE_ANNOTATIONS`, `result-shaping`, `restriction-guard`, `tools/get-entity` for `ENTITY_TYPE_CONFIGS` (`chat.js:788`) |
+| `tool-errors.js` (moves at S5, after `get-entity`) | 777–794, 951–1046 | `validateEffectiveODataCall`, `validatorReject`, `classifyToolError`, `closestFieldNames` | `dynamics-odata-validator`, `DynamicsService` (metadata reads), prompt module `TABLE_ANNOTATIONS`, `result-shaping`, `restriction-guard`, `tools/get-entity` for `ENTITY_TYPE_CONFIGS` (`chat.js:788`) |
 | `explorer-store.js` | 2956–2983 | `getUserRole`, `getActiveRestrictions`, `logQuery` | `@vercel/postgres` |
 | `model-call.js` | 596–640, 2472–2498 | `callClaude`, `callClaudeBatch` | `LLMClient`, `baseConfig` (`getModelForApp`, `chat.js:2479`) |
 | `tools/describe-table.js` | 920–925 (marker and orphaned JSDoc), 1047–1158 | `describeTable` | `DynamicsService`, prompt module annotations, `restriction-guard`, `result-shaping`, `dynamics-odata-validator` |
-| `tools/get-entity.js` | 1159–1363 | `getEntity`, `ENTITY_TYPE_CONFIGS` | `DynamicsService`, `result-shaping` (`stripEmpty`) |
+| `tools/get-entity.js` | 1159–1362 | `getEntity`, `ENTITY_TYPE_CONFIGS` | `DynamicsService`, `result-shaping` (`stripEmpty`) |
 | `tools/get-related.js` | 1364–1921 | `getRelated`, `resolveEntity`, relationship handlers | `DynamicsService`, `tools/get-entity` (`getEntity`, `ENTITY_TYPE_CONFIGS`) |
 | `tools/documents.js` | 1922–2310 | `listDocuments`, `searchDocuments` | `GraphService`, `sharepoint-buckets`, `DynamicsService`, `tools/get-entity` (`chat.js:1949,2139`) |
 | `tools/export.js` | 2311–2469, 2661–2727 | `exportCsv`, `generateExcelExport`, `recordsToExcel`, `cleanColumnName` | `ExcelJS`, `DynamicsService`, `batch-processing`, `tool-errors`, `result-shaping`, serializer, `getModelForApp`, `estimateCostCents` |
@@ -599,7 +599,7 @@ S5  chat.js 1253 escape swap if owner option (b), own commit
     chat.js 2728–2867 → tools/composite.js
     chat.js 920–925, 1047–1158 → tools/describe-table.js
     chat.js 1159–1363 → tools/get-entity.js
-    chat.js 777–795, 951–1046 → tool-errors.js
+    chat.js 777–794, 951–1046 → tool-errors.js
     chat.js 1364–1921 → tools/get-related.js
 S6  chat.js 1922–2310 → tools/documents.js
 S7  chat.js 70–73, 2470–2471, 2499–2660 → tools/batch-processing.js (+ A7 registry)
@@ -830,7 +830,7 @@ the branch, since this plan never edits the prompt file); the campaign release
 window for a Tier 1 promotion.
 
 S2 stage review (2026-09-19, Opus, READY at `056d5a00`) required two
-line-range corrections above: `tool-errors` is 777–795 (796–797 is the
+line-range corrections above: `tool-errors` is 777–794 (796–797 is the
 `ENTITY_LOOKUP_TOOLS` comment that moved with `result-shaping`), and
 `result-shaping` starts at 641 and 796 per the marker rule. Applied in §3.2
 and §6; the execution receipt records the stage evidence.
@@ -839,3 +839,7 @@ S3/S4 stage review (2026-09-19, Opus, READY at `76c9eff0`) required the
 `model-call` range 2472–2498, the batch marker 2470–2471 reassigned to
 `batch-processing` at S7, and the synthetic-marker exception named in §3.1.
 Applied above.
+
+S5 stage review (2026-09-19, Opus, READY at `21a45727`) ruled the `tool-errors`
+first span 777–794 (794 is the closing brace, 795 blank) and `get-entity`
+1159–1362; applied above and in the two module headers.

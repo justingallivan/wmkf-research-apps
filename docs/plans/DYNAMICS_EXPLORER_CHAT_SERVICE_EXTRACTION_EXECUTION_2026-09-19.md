@@ -112,3 +112,21 @@ maximum per stage), root (Fable) performs the final review and any last edits.
 - Not followed: the plan's red-first step for the call-config repoint (test
   and move landed in one green commit). Recorded, not repeated as a defect.
 - Next permitted stage: S5.
+
+## S5, Read tools — ACCEPTED
+
+- Commits: `9d23dc2d` composite, `916a24b0` describe-table (multi-span),
+  `cc313861` get-entity, `45e87335` tool-errors (multi-span), `21a45727`
+  get-related; root header-citation fix below. Route 2,426 → 1,288 lines.
+- Opus reconstruction: all five modules identical to baseline regions
+  (2728–2866; 920–925 + 1047–1157; 1159–1362; 777–794 + 951–1045;
+  1364–1920). The get-entity escape line is byte-identical and the file path
+  matches the odata-escape exemption exactly; the gate is green over 1,053
+  files with no directory exemption. Import graph is a DAG with exactly the
+  two declared edges; no name declared twice; nineteen moved names absent
+  from the route; route adds only import lines; tests byte-unchanged.
+- Verification: 14 suites 186 tests, 1 snapshot; lint 0 errors; types clean;
+  13 gate pairs and docs-catalog green sequentially.
+- Corrections: two module headers were off by one code line (fixed by root);
+  plan §3.2/§6 `tool-errors` range now 777–794.
+- Next permitted stage: S6.
