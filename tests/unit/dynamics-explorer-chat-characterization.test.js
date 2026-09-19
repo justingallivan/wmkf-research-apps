@@ -19,7 +19,7 @@ import {
   mockAuthenticatedUser,
   setMockSqlResults,
 } from '../helpers/auth-mock';
-import { withDynamicsContext, getDynamicsContext } from '../../lib/services/dynamics-context';
+import { withDynamicsContext } from '../../lib/services/dynamics-context';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const mockStream = jest.fn();
@@ -155,6 +155,14 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
   beforeEach(() => {
     clearAppAccessCache();
     jest.clearAllMocks();
+    // jest.clearAllMocks() clears call history but NOT a queued
+    // .mockResolvedValueOnce() chain or a .mockImplementation(); without an
+    // explicit reset here, once-values a prior test scripted beyond what it
+    // consumed (or a test's own mockReset()+mockImplementationOnce()) would
+    // silently accumulate onto — or blow away — the default two-call chain
+    // set up below.
+    mockStream.mockReset();
+    mockComplete.mockReset();
     process.env.CLAUDE_API_KEY = 'test-key';
     mockStartRequest.mockResolvedValue(true);
     mockFinalizeRequest.mockResolvedValue(true);
@@ -416,8 +424,14 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
 
   // ─── Item 3: tool throw path ───
 
-  test('item 3: a rejected tool is classified and the tool_result keeps the original tool_use_id', async () => {
-    mockQueryRecords.mockRejectedValue(new Error('boom'));
+  test('item 3: a rejected tool is classified (A5 unknown_field, A7-wrapped) and the tool_result keeps the original tool_use_id', async () => {
+    // A raw error alone only proves classifyToolError's fallback branch. Match
+    // UNKNOWN_FIELD_RE (chat.js:960) so the enrichment branch actually runs
+    // and produces the typed { errorType: 'unknown_field', ... } shape, and
+    // assert the A7 sentinel wrapper that carries it to the model.
+    mockQueryRecords.mockRejectedValue(new Error(
+      "Could not find a property named 'bogus_field' on type 'Microsoft.Dynamics.CRM.akoya_request'.",
+    ));
     mockStream.mockReset()
       .mockResolvedValueOnce({
         content: [{ type: 'tool_use', id: 'tool-throws', name: 'query_records', input: { table_name: 'akoya_requests' } }],
@@ -442,6 +456,12 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
     );
     expect(toolResultMessage.content).toHaveLength(1);
     expect(toolResultMessage.content[0].tool_use_id).toBe('tool-throws');
+    const content = toolResultMessage.content[0].content;
+    expect(content).toContain('"errorType":"unknown_field"');
+    expect(content).toContain('bogus_field');
+    // A7 Part 3: the classified error still goes out through the same
+    // wrapUntrustedContent sentinel as every other tool_result.
+    expect(content).toContain('WMKF-UNTRUSTED-CONTENT');
   });
 
   // ─── Item 5: logQuery fallback on 42703 ───
@@ -466,18 +486,23 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
   test('item 5: any other logQuery error warns once and does not retry', async () => {
     const { sql } = require('@vercel/postgres');
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    setMockSqlResults({ request_round: new Error('some other db error') });
+    try {
+      setMockSqlResults({ request_round: new Error('some other db error') });
 
-    const req = createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'show requests' }] } });
-    const res = createMockRes();
-    await handler(req, res);
-    await new Promise(resolve => setTimeout(resolve, 0));
-    await new Promise(resolve => setTimeout(resolve, 0));
+      const req = createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'show requests' }] } });
+      const res = createMockRes();
+      await handler(req, res);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-    const logCalls = sql.mock.calls.filter(call => call[0].join(' ').includes('INSERT INTO dynamics_query_log'));
-    expect(logCalls).toHaveLength(1);
-    expect(warn).toHaveBeenCalledTimes(1);
-    warn.mockRestore();
+      const logCalls = sql.mock.calls.filter(call => call[0].join(' ').includes('INSERT INTO dynamics_query_log'));
+      expect(logCalls).toHaveLength(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      // A failed assertion above must not leave console.warn spied-on for
+      // later tests.
+      warn.mockRestore();
+    }
   });
 
   // ─── Item 6: getUserRole fail-soft ───
@@ -500,18 +525,24 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       }
       return original(...args);
     });
-    const promptModule = require('../../shared/config/prompts/dynamics-explorer');
+    try {
+      const promptModule = require('../../shared/config/prompts/dynamics-explorer');
 
-    const req = createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'show requests' }] } });
-    const res = createMockRes();
-    await handler(req, res);
+      const req = createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'show requests' }] } });
+      const res = createMockRes();
+      await handler(req, res);
 
-    expect(promptModule.buildSystemPrompt.mock.calls[0][0].userRole).toBe('read_only');
-    // This test's custom sql.mockImplementation is not cleared by
-    // jest.clearAllMocks() (only call history is); restore the default
-    // matcher so later tests' dynamics_user_roles reads are not permanently
-    // wired to reject.
-    sql.mockImplementation(original);
+      expect(promptModule.buildSystemPrompt.mock.calls[0][0].userRole).toBe('read_only');
+      // Proves both reads actually happened — auth's own check (pass-through)
+      // and chat.js's getUserRole (rejected) — not just that one of them did.
+      expect(userRolesCalls).toBe(2);
+    } finally {
+      // This test's custom sql.mockImplementation is not cleared by
+      // jest.clearAllMocks() (only call history is); restore the default
+      // matcher so later tests' dynamics_user_roles reads are not
+      // permanently wired to reject, even if an assertion above throws.
+      sql.mockImplementation(original);
+    }
   });
 
   // ─── Item 7: model resolution order ───
@@ -536,6 +567,12 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
     resolveOverrides();
     await running;
     expect(getModelForApp).toHaveBeenCalled();
+
+    // mockReset() wiped the module factory's default resolved-promise
+    // implementation; restore it so a later test's default beforeEach flow
+    // (which never re-configures loadModelOverrides itself) still awaits a
+    // real resolved value rather than an unconfigured mock's `undefined`.
+    loadModelOverrides.mockReset().mockImplementation(() => Promise.resolve());
   });
 
   // ─── Item 4b-4g: terminal-outcome ordering, disconnect, and error-stage attribution ───
@@ -708,10 +745,36 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       resolveQuery({ records: [{ akoya_requestnum: 'REQ-123' }], count: 1, totalCount: 1 });
       await running;
 
-      const outcomes = mockFinalizeRequest.mock.calls.map(call => call[0].outcome);
-      expect(outcomes).toEqual(['client_disconnected', 'client_disconnected']);
       expect(mockStream).toHaveBeenCalledTimes(1);
       expect(rawSse(res)).not.toContain('event: complete');
+      // Full ordered array, not objectContaining: the listener's finalize
+      // (chat.js:151) and the post-tool-execution poll's finalize
+      // (chat.js:369) must fire with IDENTICAL payloads (round 1 already
+      // completed the model call before the tool promise was left pending,
+      // so completedRounds/lastModel/lastStopReason are unchanged between
+      // them) — a duplicate or divergent call is exactly what this pins.
+      expect(mockFinalizeRequest.mock.calls).toEqual([
+        [{
+          requestId: expect.any(String),
+          userProfileId: 9,
+          sessionId: null,
+          outcome: 'client_disconnected',
+          roundsUsed: 1,
+          model: 'claude-test',
+          stopReason: null,
+          errorStage: null,
+        }],
+        [{
+          requestId: expect.any(String),
+          userProfileId: 9,
+          sessionId: null,
+          outcome: 'client_disconnected',
+          roundsUsed: 1,
+          model: 'claude-test',
+          stopReason: null,
+          errorStage: null,
+        }],
+      ]);
     });
 
     test('4d: a rejected buildResolvedTaxonomyPromptBlock finalizes with errorStage context and model null', async () => {
@@ -721,12 +784,21 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       const res = createMockRes();
       await handler(req, res);
 
-      expect(mockFinalizeRequest).toHaveBeenCalledTimes(1);
-      expect(mockFinalizeRequest.mock.calls[0][0]).toEqual(expect.objectContaining({
+      expect(mockFinalizeRequest.mock.calls).toEqual([[{
+        requestId: expect.any(String),
+        userProfileId: 9,
+        sessionId: null,
         outcome: 'error',
-        errorStage: 'context',
+        roundsUsed: 0,
         model: null,
-      }));
+        stopReason: null,
+        errorStage: 'context',
+      }]]);
+
+      // mockReset() wiped the default resolved implementation; restore it so
+      // later tests in this describe block and item 11 get the real taxonomy
+      // block rather than an unconfigured mock's `undefined`.
+      mockBuildResolvedTaxonomyPromptBlock.mockReset().mockImplementation(() => Promise.resolve('resolved taxonomy'));
     });
 
     test('4e: a model response with undefined content throws after resolving, finalizing with errorStage model', async () => {
@@ -736,11 +808,16 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       const res = createMockRes();
       await handler(req, res);
 
-      expect(mockFinalizeRequest).toHaveBeenCalledTimes(1);
-      expect(mockFinalizeRequest.mock.calls[0][0]).toEqual(expect.objectContaining({
+      expect(mockFinalizeRequest.mock.calls).toEqual([[{
+        requestId: expect.any(String),
+        userProfileId: 9,
+        sessionId: null,
         outcome: 'error',
+        roundsUsed: 1,
+        model: 'claude-test',
+        stopReason: null,
         errorStage: 'model',
-      }));
+      }]]);
     });
 
     test('4f(a): a round-1 model rejection finalizes with the resolved model and roundsUsed 0', async () => {
@@ -750,13 +827,16 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       const res = createMockRes();
       await handler(req, res);
 
-      expect(mockFinalizeRequest).toHaveBeenCalledTimes(1);
-      expect(mockFinalizeRequest.mock.calls[0][0]).toEqual(expect.objectContaining({
+      expect(mockFinalizeRequest.mock.calls).toEqual([[{
+        requestId: expect.any(String),
+        userProfileId: 9,
+        sessionId: null,
         outcome: 'error',
-        errorStage: 'model',
         roundsUsed: 0,
         model: 'claude-test',
-      }));
+        stopReason: null,
+        errorStage: 'model',
+      }]]);
     });
 
     test('4f(b): an abort observed before the model call is attempted produces two finalize calls, listener with model null and loop-top with the resolved model', async () => {
@@ -783,12 +863,32 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       await handler(req, res);
 
       expect(mockStream).not.toHaveBeenCalled();
-      expect(mockFinalizeRequest.mock.calls.map(call => call[0].outcome)).toEqual([
-        'client_disconnected',
-        'client_disconnected',
+      expect(mockFinalizeRequest.mock.calls).toEqual([
+        [{
+          requestId: expect.any(String),
+          userProfileId: 9,
+          sessionId: null,
+          outcome: 'client_disconnected',
+          roundsUsed: 0,
+          model: null,
+          stopReason: null,
+          errorStage: null,
+        }],
+        [{
+          requestId: expect.any(String),
+          userProfileId: 9,
+          sessionId: null,
+          outcome: 'client_disconnected',
+          roundsUsed: 0,
+          model: 'claude-test',
+          stopReason: null,
+          errorStage: null,
+        }],
       ]);
-      expect(mockFinalizeRequest.mock.calls[0][0].model).toBeNull();
-      expect(mockFinalizeRequest.mock.calls[1][0].model).toBe('claude-test');
+
+      // mockReset() wiped the default resolved implementation; restore it for
+      // the rest of the suite (item 11 in particular).
+      mockBuildResolvedTaxonomyPromptBlock.mockReset().mockImplementation(() => Promise.resolve('resolved taxonomy'));
     });
 
     test('4g: a restriction row with table_name null plus an $expand input throws in the pre-flight guard, producing an outer-catch tool-stage error', async () => {
@@ -813,13 +913,16 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       const res = createMockRes();
       await handler(req, res);
 
-      expect(mockFinalizeRequest).toHaveBeenCalledTimes(1);
-      expect(mockFinalizeRequest.mock.calls[0][0]).toEqual(expect.objectContaining({
+      expect(mockFinalizeRequest.mock.calls).toEqual([[{
+        requestId: expect.any(String),
+        userProfileId: 9,
+        sessionId: null,
         outcome: 'error',
-        errorStage: 'tool',
         roundsUsed: 1,
         model: 'claude-test',
-      }));
+        stopReason: null,
+        errorStage: 'tool',
+      }]]);
     });
   });
 
@@ -837,7 +940,10 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
         active = true;
         return Promise.resolve(fn()).finally(() => { active = false; });
       });
-      getDynamicsContext.mockImplementation(() => (active ? recordedCtx : null));
+      // Nothing in chat.js calls getDynamicsContext directly (grep confirms;
+      // the mocked DynamicsService methods here are guarded by the `active`
+      // closure variable instead), so an override of it here would be dead
+      // and misleading — dropped rather than kept unused.
 
       const guard = impl => (...args) => {
         if (!active) return Promise.reject(new Error('DynamicsService read attempted outside a loaded restriction context'));
@@ -870,6 +976,19 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       // mock object for the rest of THIS file's run, but nothing else here
       // calls getRecord.
       DynamicsService.getRecord = jest.fn(guard(() => Promise.resolve({})));
+    });
+
+    afterEach(() => {
+      // None of this describe block's per-test overrides are cleared by
+      // jest.clearAllMocks() (only call history is), and mockCountRecords /
+      // mockAggregateRecords have no default re-established by the outer
+      // beforeEach (unlike mockQueryRecords etc.), so a guarded
+      // implementation left in place here would silently persist onto any
+      // later test in the file that happened to call them.
+      withDynamicsContext.mockImplementation((ctx, fn) => fn());
+      mockCountRecords.mockReset();
+      mockAggregateRecords.mockReset();
+      delete DynamicsService.getRecord;
     });
 
     test('DynamicsService reads happen only inside the withDynamicsContext-loaded scope, with the exact restrictions rows by identity', async () => {
@@ -907,7 +1026,24 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       expect(recordedCtx.requestId).toBe(completeBlock.data.requestId);
       expect(mockQueryRecords).toHaveBeenCalled();
       expect(completeBlock.data.outcome).toBe('completed');
-      expect(rawSse(res)).not.toContain('DynamicsService read attempted outside');
+
+      // The SSE-wide negative is vacuous — the guard's rejection message
+      // only ever reaches the MODEL-facing tool_result text, never a
+      // route-level SSE event, so asserting it's absent from the whole
+      // stream proves nothing about whether the context boundary actually
+      // wrapped the loop. Assert directly on the round-2 tool_result payload
+      // instead: it must carry the guarded read's real success content
+      // (proving the read ran with `active` true) and must NOT carry the
+      // guard's rejection text (proving it wasn't served the error instead —
+      // the only way a broken context boundary, e.g. a service invoked
+      // outside withDynamicsContext, would still show up here).
+      const secondCall = mockStream.mock.calls[1][0];
+      const toolResultMessage = secondCall.messages.find(
+        m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+      );
+      const toolResultContent = toolResultMessage.content[0].content;
+      expect(toolResultContent).toContain('REQ-123');
+      expect(toolResultContent).not.toContain('DynamicsService read attempted outside');
     });
 
     test('guard sanity: with no active context, a DynamicsService read rejects', async () => {
