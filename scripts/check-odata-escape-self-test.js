@@ -23,9 +23,12 @@
  *       Stages 0-2 removed).
  *   (b) GREEN -- removing the hand-rolled escapes turns the gate green again.
  *   (c) DECOYS NOT FLAGGED -- an HTML entity escape (`&#39;`), an XML entity
- *       escape (`&apos;`), a doc-comment mention of the pattern, the
- *       canonical odata.js file, and the dynamics-explorer exempt dir are all
- *       present in the fixture tree and NONE of them trip the gate.
+ *       escape (`&apos;`), a doc-comment mention of the pattern, and the
+ *       canonical odata.js file are all present in the fixture tree and NONE
+ *       of them trip the gate. The single-file get-entity.js exemption is
+ *       also present and clean; pages/api/dynamics-explorer/ has no
+ *       directory-level exemption as of S9 and a hand-rolled escape there is
+ *       now a RED fixture (see (a3) below).
  *   (d) cleanup per the registerRepoFixture contract (cleans on entry, best-
  *       effort crash/exit insurance, explicit disposal in `finally`).
  *
@@ -102,9 +105,9 @@ function setupBaseFixtures() {
     module.exports = { escape };
   `);
 
-  // Exempt dynamics-explorer dir -- a direct hand-rolled escape here must
-  // still not be flagged.
-  write('pages/api/dynamics-explorer/chat.js', `
+  // Single-file exemption (S1): the moved get-entity.js legacy escape must
+  // still not be flagged, even though its directory is not exempt.
+  write('lib/services/dynamics-explorer/tools/get-entity.js', `
     const escaped = identifier.replace(/'/g, "''");
     module.exports = { escaped };
   `);
@@ -126,11 +129,29 @@ function writeRedFixtures() {
     }
     module.exports = { findRow };
   `);
+  // S1: a second dynamics-explorer service file with its own hand-rolled
+  // escape must still be flagged -- the single-file exemption above covers
+  // only get-entity.js, not the whole lib/services/dynamics-explorer/ dir.
+  write('lib/services/dynamics-explorer/tools/other.js', `
+    function findRow(key) {
+      const filter = \`wmkf_settingkey eq '\${key.replace(/'/g, "''")}'\`;
+      return filter;
+    }
+    module.exports = { findRow };
+  `);
+  // (a3) S9: pages/api/dynamics-explorer/ lost its directory-level exemption --
+  // a hand-rolled escape there must now be flagged like any other route.
+  write('pages/api/dynamics-explorer/chat.js', `
+    const escaped = identifier.replace(/'/g, "''");
+    module.exports = { escaped };
+  `);
 }
 
 function removeRedFixtures() {
   fs.rmSync(path.join(tempRoot, 'lib/services/hand-rolled-escape.js'), { force: true });
   fs.rmSync(path.join(tempRoot, 'lib/services/hand-rolled-escape-variant.js'), { force: true });
+  fs.rmSync(path.join(tempRoot, 'lib/services/dynamics-explorer/tools/other.js'), { force: true });
+  fs.rmSync(path.join(tempRoot, 'pages/api/dynamics-explorer/chat.js'), { force: true });
 }
 
 function runRedAssertion() {
@@ -143,13 +164,19 @@ function runRedAssertion() {
     `expected the mechanical .replace(/'/g, "''") fixture to be named:\n${run.output}`);
   expect(run.output.includes('lib/services/hand-rolled-escape-variant.js'),
     `expected the single-quoted-replacement / String(x) variant fixture to be named:\n${run.output}`);
+  expect(run.output.includes('lib/services/dynamics-explorer/tools/other.js'),
+    `expected the non-exempt dynamics-explorer service file to be named:\n${run.output}`);
   expect(!run.output.includes('html-escape-decoy.js'), `HTML decoy wrongly flagged:\n${run.output}`);
   expect(!run.output.includes('xml-escape-decoy.js'), `XML decoy wrongly flagged:\n${run.output}`);
   expect(!run.output.includes('comment-only-decoy.js'), `comment-only decoy wrongly flagged:\n${run.output}`);
   expect(!run.output.includes('+ lib/dataverse/core/odata.js'), `canonical odata.js wrongly flagged:\n${run.output}`);
-  expect(!run.output.includes('dynamics-explorer'), `dynamics-explorer exempt dir wrongly flagged:\n${run.output}`);
+  // S9: pages/api/dynamics-explorer/ lost its directory-level exemption --
+  // a hand-rolled escape there must now be flagged, same as any other route.
+  // get-entity.js remains the one live single-file exemption and stays clean.
+  expect(run.output.includes('pages/api/dynamics-explorer/chat.js'), `dynamics-explorer route file should now be flagged (no directory exemption remains):\n${run.output}`);
+  expect(!run.output.includes('lib/services/dynamics-explorer/tools/get-entity.js'), `single-file exempt get-entity.js wrongly flagged:\n${run.output}`);
 
-  console.log('PASS red assertion (mechanical + variant hand-rolled escapes flagged; decoys, canonical file, and exempt dir clean)');
+  console.log('PASS red assertion (mechanical + variant + non-exempt dynamics-explorer escapes flagged; decoys, canonical file, and single-file exemption clean)');
 }
 
 function runGreenAssertion() {

@@ -48,8 +48,8 @@
  *
  * GREEN fixtures: a clean shell route; a route importing only a per-domain
  * lib/services/<domain>/ service (which USES an adapter internally but does
- * not re-export it); the exempt dirs (pages/api/dynamics-explorer/,
- * pages/api/dataverse-export/) which are never counted; (l) a route
+ * not re-export it); the exempt dir (pages/api/dataverse-export/) which is
+ * never counted; (l) a route
  * importing a service that itself imports an adapter and exports its OWN
  * wrapper function (NOT the imported binding) -- the false-positive guard that
  * keeps binding-level taint from firing on legitimate services; and (q) a
@@ -85,16 +85,19 @@ const RED_ROUTES = [
   'pages/api/admin/red-alias-chain.js',
   // S338 Stage 0 (Q4/C5): lib/services/dynamics/ submodule matcher extension.
   'pages/api/review-manager/red-dynamics-submodule.js',
+  // S9: pages/api/dynamics-explorer/ is no longer an exempt dir -- a raw
+  // boundary import there must now be flagged like any other route.
+  'pages/api/dynamics-explorer/red-adapter-import.js',
 ];
 
 const GREEN_ROUTES = [
   'pages/api/workbench/green-shell.js',
   'pages/api/review-manager/green-service.js',
-  'pages/api/dynamics-explorer/chat.js',
+  'pages/api/dataverse-export/adapter-import.js',
   'pages/api/dataverse-export/thing.js',
   'pages/api/review-manager/green-own-wrapper.js',
   // S338 Stage 0: exempt route dir still passes with a dynamics/ submodule import.
-  'pages/api/dynamics-explorer/chat-submodule.js',
+  'pages/api/dataverse-export/submodule-import.js',
 ];
 
 // Disposer from the shared helper (cleans a prior orphan at registration and
@@ -264,8 +267,8 @@ function setupFixtures() {
     export default async function handler(req, res) { return fetchThing(req.query.id); }
   `);
 
-  // GREEN: exempt dirs are never counted, even with a direct boundary import
-  write(tempRoot, 'pages/api/dynamics-explorer/chat.js', `
+  // GREEN: the exempt dir is never counted, even with a direct boundary import
+  write(tempRoot, 'pages/api/dataverse-export/adapter-import.js', `
     import { getById } from '../../../lib/dataverse/adapters/reviewer-suggestion.js';
     export default function handler() { return getById('x'); }
   `);
@@ -284,9 +287,16 @@ function setupFixtures() {
 
   // GREEN: exempt route dir still passes with a dynamics/ submodule import,
   // confirming EXEMPT_ROUTE_DIRS is unaffected by the matcher extension.
-  write(tempRoot, 'pages/api/dynamics-explorer/chat-submodule.js', `
+  write(tempRoot, 'pages/api/dataverse-export/submodule-import.js', `
     import { createRecord } from '../../../lib/services/dynamics/write-core.js';
     export default function handler() { return createRecord('contacts', {}); }
+  `);
+
+  // RED: pages/api/dynamics-explorer/ is no longer an exempt dir (S9) -- a
+  // raw boundary import there must be flagged like any other route.
+  write(tempRoot, 'pages/api/dynamics-explorer/red-adapter-import.js', `
+    import { getById } from '../../../lib/dataverse/adapters/reviewer-suggestion.js';
+    export default function handler() { return getById('x'); }
   `);
 }
 

@@ -294,7 +294,7 @@ const SURFACES = [
     inv: 17,
     status: 'migrated',
     promptFiles: ['shared/config/prompts/dynamics-explorer.js'],
-    callSiteFiles: ['pages/api/dynamics-explorer/chat.js'],
+    callSiteFiles: ['lib/services/dynamics-explorer/chat-session.js'],
   },
   {
     // Executor-driven (summarize-v2). Hardening lives in execute-prompt.js
@@ -337,7 +337,8 @@ const SURFACES = [
     id: 'dynamics-explorer-export',
     inv: 23,
     status: 'migrated',
-    callSiteFiles: ['pages/api/dynamics-explorer/chat.js'],
+    // Call site moved with the S6/S7 tool extraction (Stage 7).
+    callSiteFiles: ['lib/services/dynamics-explorer/tools/batch-processing.js'],
   },
   {
     // Route-local prompt — wrap + preamble live in the route.

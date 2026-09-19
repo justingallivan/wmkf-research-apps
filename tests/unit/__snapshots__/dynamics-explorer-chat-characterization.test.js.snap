@@ -1,0 +1,38 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`/api/dynamics-explorer/chat characterization (Stage 0) item 1: full SSE event census across document, export, blocked, and final-answer rounds: sse-census-normalized 1`] = `
+"event: thinking
+data: {"message":"Analyzing your question..."}
+
+event: thinking
+data: {"message":"Listing documents for request REQ-123..."}
+
+event: document_links
+data: {"requestNumber":"REQ-123","files":[{"name":"doc1.pdf","size":1234,"mimeType":"application/pdf","lastModified":"2026-01-01T00:00:00Z","library":"akoya_request","folder":"REQ-123_ABCDE","subfolder":"","downloadUrl":"/api/dynamics-explorer/download-document?requestId=a1b2c3d4-0000-0000-0000-000000000001&library=akoya_request&folder=REQ-123_ABCDE&filename=doc1.pdf"}]}
+
+event: thinking
+data: {"message":"Searching documents for \\"budget\\"..."}
+
+event: document_links
+data: {"files":[{"name":"search-result.pdf","size":222,"mimeType":"application/pdf","lastModified":"2026-01-02T00:00:00Z","library":"akoya_request","folder":"REQ-123_ABCDE","downloadUrl":"/api/dynamics-explorer/download-document?requestId=a1b2c3d4-0000-0000-0000-000000000001&library=akoya_request&folder=REQ-123_ABCDE&filename=search-result.pdf"}]}
+
+event: thinking
+data: {"message":"Processing and exporting akoya_requests with AI analysis..."}
+
+event: export_progress
+data: {"processed":1,"total":1,"failed":0}
+
+event: file_ready
+data: {"base64":"Zml4ZWQteGxzeC1ieXRlcw==","filename":"akoya_requests-export.xlsx","recordCount":1,"totalCount":1,"capped":false,"columns":["akoya_requestnum","normal_field","ai_summary"]}
+
+event: thinking
+data: {"message":"Blocked: Table \\"blocked_table\\" is restricted"}
+
+event: response
+data: {"content":"All done."}
+
+event: complete
+data: {"requestId":"<REQUEST_ID>","rounds":5,"outcome":"completed","suggestFeedback":false}
+
+"
+`;

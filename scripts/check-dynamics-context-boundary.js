@@ -32,7 +32,7 @@
  *      other non-literal-array expression this gate cannot prove is
  *      non-empty (fail CLOSED), EXCEPT the sanctioned Explorer loaded-
  *      restrictions caller under `pages/api/dynamics-explorer/`
- *      (`chat.js:124`, restrictions from `getActiveRestrictions()`) —
+ *      (`chat.js:150`, restrictions from `getActiveRestrictions()`) —
  *      mirroring check-dataverse-access-layer.js's EXEMPT_DIRS precedent,
  *      for THIS rule only (the Explorer is not exempt from rules 1 or 3).
  *   3. Any import/require/dynamic-import/inline-member-access of

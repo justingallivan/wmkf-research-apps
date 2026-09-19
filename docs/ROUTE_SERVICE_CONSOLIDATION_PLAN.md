@@ -52,7 +52,7 @@ here; anything not pre-made is marked **STOP-AND-ASK**.
 | Existing per-route tests | partial — e.g. `tests/integration/withdraw-sufficient-route.test.js` `[VERIFIED 2026-07-04 via ls]`, `send-emails-route.test.js` `[VERIFIED 2026-07-04 via grep, this session]` | full inventory is a Stage 0 deliverable |
 | Adapters | 18 files in `lib/dataverse/adapters/` | `[VERIFIED 2026-07-04 via ls]` |
 | Services layout | flat `lib/services/` (~60 files) + one subdir precedent (`lib/services/dataverse-export/`) | `[VERIFIED 2026-07-04 via ls]` |
-| DAL-gate exempt dirs to carry over | `pages/api/dynamics-explorer/`, `pages/api/dataverse-export/` | `[VERIFIED 2026-07-04 via scripts/check-dataverse-access-layer.js:35-41 EXEMPT_DIRS]` |
+| DAL-gate exempt dirs to carry over | `pages/api/dynamics-explorer/`, `pages/api/dataverse-export/` | `[VERIFIED 2026-07-04 via scripts/check-dataverse-access-layer.js:35-41 EXEMPT_DIRS]` — Note (2026-09-19): the `pages/api/dynamics-explorer/` half of this carry-over was retired at S9 of `docs/plans/DYNAMICS_EXPLORER_CHAT_SERVICE_EXTRACTION_PLAN_2026-09-18.md` once its Dataverse calls moved to `lib/services/dynamics-explorer/`; `pages/api/dataverse-export/` remains exempt. |
 
 ## Architecture decisions (pre-made — executors do not relitigate)
 

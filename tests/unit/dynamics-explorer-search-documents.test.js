@@ -57,7 +57,7 @@ function file(name, library = 'akoya_request') {
 let searchDocuments;
 
 beforeAll(async () => {
-  ({ searchDocuments } = await import('../../pages/api/dynamics-explorer/chat'));
+  ({ searchDocuments } = await import('../../lib/services/dynamics-explorer/tools/documents'));
 });
 
 beforeEach(() => {

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const routeSource = fs.readFileSync(
-  path.join(process.cwd(), 'pages/api/dynamics-explorer/chat.js'),
+  path.join(process.cwd(), 'lib/services/dynamics-explorer/model-call.js'),
   'utf8',
 );
 
