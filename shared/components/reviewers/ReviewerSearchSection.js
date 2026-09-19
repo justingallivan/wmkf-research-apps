@@ -46,11 +46,6 @@
  */
 
 import { Card } from '../Layout';
-import { REDISCOVERED_STAGE_LABELS } from '../../utils/reviewer-rediscovery';
-import { buildGoogleSearchUrl } from '../../../lib/utils/google-search-url';
-import {
-  activeInstitutionStage2Presentation,
-} from '../../utils/institution-stage2-presentation';
 import { CandidateCard } from './search/CandidateCard';
 import { addressTrustFailureMessage } from './search/presentation';
 import SearchControls from './search/SearchControls';
