@@ -266,7 +266,7 @@ cannot advance past attachment recovery without that receipt. The calendar is
 rebuilt from the stored bounded snapshot and byte-hash checked before send;
 selected links and the live Site Visit ETag are re-resolved under the lease.
 `sent_at` means Dynamics accepted or status readback proved the transport
-request, not inbox delivery. Read/write paths (**Stage1–7 owner paths are source-built on this local branch; not deployed**):
+request, not inbox delivery. Read/write paths (**Stages 1–8 owner paths deployed via PR #315 `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`, deployment `6535352663`; persistence authority and migration facts below are unchanged**):
 `lib/services/pre-site-visit/distribution-store.js`,
 `distribution/prepare.js`, `send.js`, `history.js`, and `email-recovery.js`
 (entered through the `distribution-service.js` compatibility facade).

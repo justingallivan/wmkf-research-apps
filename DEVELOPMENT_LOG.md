@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Governed document lifecycle decomposition promoted (Session 521)
+
+**Milestone:** PR #315 promoted the accepted Stages 0–8 document lifecycle decomposition while preserving the existing compatibility facades and governed retry/read/write contracts.
+**Sessions:** 521; PR #315.
+**Ship state:** Merge `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`; Production deployment `6535352663` succeeded at 2026-09-19T00:48:45Z. CI passed 958 suites / 14,195 tests and the canonical build passed; no schema or migration change was included.
+**Why it matters:** Lifecycle ownership is separated behind permanent boundary tests and existing public contracts, with production verification recorded for Final/leadership same-item transitions.
+**Pointers:** `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_EXECUTION_2026-09-18.md`, `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_SMOKE_TESTS_2026-09-18.md`, `docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_DECOMPOSITION_PLAN_2026-09-17.md`; PR #315.
+
 ## September 2026 — Frozen Word snapshots re-identified by governed content hash after a SharePoint rewrite incident (Session 517)
 
 **Milestone:** The first full Production smoke of the Pre-RP Brief exposed that every brief shared without a Word save could not be resent and its Board download returned 409: SharePoint rewrites a generated `.docx` after upload, so the frozen distribution's package byte hash never matched what Graph served. Retained Word snapshots are now identified by the governed content hash (every `word/` part, full OPC traversal, digest unchanged) across snapshot reuse, recovery, re-capture, send attachments, and the ledger-bound Board download.

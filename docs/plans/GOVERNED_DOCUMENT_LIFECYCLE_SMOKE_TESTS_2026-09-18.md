@@ -3,7 +3,7 @@ title: Governed Document Lifecycle Smoke Tests
 domain: operations
 kind: runbook
 status: active
-summary: Local, mocked, sandbox, read-only, and separately owner-authorized controlled rehearsal evidence for the governed document lifecycle. This runbook does not authorize production writes or sends.
+summary: Local, mocked, sandbox, read-only, controlled-rehearsal, and post-PR315 production verification evidence for the governed document lifecycle. This runbook is an evidence record and does not authorize additional production writes or sends.
 owner: product-engineering
 related:
   - docs/plans/GOVERNED_DOCUMENT_LIFECYCLE_DECOMPOSITION_PLAN_2026-09-17.md
@@ -17,9 +17,9 @@ related:
 This runbook defines the evidence required to smoke the Initial Assessment,
 Pre-Site, distribution, and Final Writeup flows after the staged decomposition.
 It separates repeatable local automation from sandbox integration, controlled
-read-only checks, and separately approved rehearsal evidence. It does not authorize
-a deployment, production write, email, SharePoint upload, Blob operation, or
-Dataverse action.
+read-only checks, and separately approved rehearsal evidence. It records PR315
+production verification but does not authorize additional deployment, production
+write, email, SharePoint upload, Blob operation, or Dataverse action.
 
 The source and route pointers below are **[VERIFIED via repository source and
 tests on 2026-09-18]**. Live deployment state, fixture readiness, and external
@@ -458,3 +458,10 @@ preconditions, sanitized request/response, ordered external-call trace, durable
 row/file/activity identities, cleanup result, and final status. This runbook
 must never be changed to turn an unrun live case into a pass without that
 evidence.
+
+
+## PR315 production verification receipt — 2026-09-19
+
+[VERIFIED via GitHub deployment `6535352663`, CI checks, `/tmp/wmkf-pr315-production-unauth.json`, and root's signed-in production readback] PR #315 merged at `2026-09-19T00:48:02Z` as `8d3ad3a7670220f09ebd7828bfd7ea14d2ac3942`; deployment `6535352663` succeeded at `2026-09-19T00:48:45Z`. The signed-in production application reloaded with Final still in leadership and the expected actor/time/file identity; the current IA read returned Ready Draft filename `1003222 Initial Assessment a6b2ef92-1f1335c9.docx` and the expanded v1.0 history. Five unauthenticated route checks returned 307. CI passed 958 suites / 14,195 tests, the canonical build passed, and required security/preview checks passed. This verification performed no new writes, paid calls, email, schema, migration, or environment changes.
+
+Rollback reference: last-known-good merge `7a335e27`, deployment `6534771071`.
