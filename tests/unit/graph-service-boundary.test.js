@@ -59,6 +59,7 @@ const REAL_SOURCE_OPTIONS = {
     downloadFileVersion: `${GRAPH}/downloads.js`,
     downloadFileAsPdf: `${GRAPH}/downloads.js`,
     downloadFileByPath: `${GRAPH}/downloads.js`,
+    ensureFolderPath: `${GRAPH}/writes.js`,
     searchFiles: `${GRAPH}/search.js`,
     searchCooldownUntil: `${GRAPH}/search.js`,
     searchCooldownStatus: `${GRAPH}/search.js`,
@@ -84,6 +85,7 @@ const REAL_SOURCE_OPTIONS = {
     downloadFileVersion: { target: `${GRAPH}/downloads.js`, binding: 'downloadFileVersion' },
     downloadFileAsPdf: { target: `${GRAPH}/downloads.js`, binding: 'downloadFileAsPdf' },
     downloadFileByPath: { target: `${GRAPH}/downloads.js`, binding: 'downloadFileByPath' },
+    ensureFolderPath: { target: `${GRAPH}/writes.js`, binding: 'ensureFolderPath' },
     searchFiles: { target: `${GRAPH}/search.js`, binding: 'searchFiles' },
   },
 };

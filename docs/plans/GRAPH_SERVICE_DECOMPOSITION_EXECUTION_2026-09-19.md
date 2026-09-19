@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S7 ACCEPTED]**. Root accepted S0–S7 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S7 are accepted below; S8 is next. No push, deployment or live rehearsal is authorized.
+Status: **[S8 ACCEPTED]**. Root accepted S0–S8 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S8 are accepted below; S9 is next. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -357,3 +357,29 @@ npx jest --runInBand tests/unit/graph-service-boundary.test.js tests/unit/graph-
 It passed **5 suites / 80 tests**, one snapshot. Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed; lint reported **114 warnings and 0 errors**, and the canonical Next.js **16.3.5 Turbopack** build retained the two known DOCX dynamic-filesystem tracing warnings. Every current `check:*` parent and available immediate self-test passed sequentially: `/private/tmp/wmkf-graph-decomposition-logs/s7-all-checks.log` records **67 commands, all exit code 0**. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
 
 No unresolved S7 contract finding remains. Root final review and G acceptance are complete. The commit introducing this receipt is the S7 checkpoint; rollback is `0f5c90db`; S8 is next. Runtime files remain unchanged after the source-ready review; the final correction changed only the boundary characterization fixture.
+
+## S8 execution receipt
+
+Status: **[S8 ACCEPTED]**. Baseline is accepted S7 commit `4c6191d6`; this candidate moves only `ensureFolderPath` into `lib/services/graph/writes.js` and keeps the public facade and callers unchanged. No upload, replacement, delete, dependency, environment, persistence, policy, live-service, deployment, or later-stage change was made.
+
+### Owned move and exact bounds
+
+The declaration bounds below were derived from `git show 4c6191d6:lib/services/graph-service.js` and `nl -ba` on the candidate. The extracted body matches the baseline after the permitted receiver substitution (`this.`→`svc.`) and indentation change; the normalized body comparison returned zero differences.
+
+| Symbol | Baseline facade declaration | Candidate declaration | Facade delegate |
+|---|---:|---:|---:|
+| `ensureFolderPath` | `lib/services/graph-service.js:176–256` | `lib/services/graph/writes.js:19–100` | `lib/services/graph-service.js:177–187` |
+
+The facade keeps the original destructured options signature and default evaluation, reconstructing `{ siteId, driveId, signal }` for the single delegate call. The extracted owner preserves the per-segment traversal, path validation, pinned site/drive and credential resolution order, cancellation checks between operations, partial creation behavior, unguarded 409 recovery read, exact cumulative-path reread, and all existing error strings. The explicit real-source inventory maps `ensureFolderPath` to `graph/writes.js` and its facade delegate; the generic fixture inventory remains separate. Fresh Sol review **`sol_s8`** accepted the source move conditional on G; root staged the runtime and boundary files for tracked-source review.
+
+### S8 G evidence
+
+The exact required Graph/lifecycle/site-visit/Cycle Dossier/controls command was:
+
+```text
+npx jest --runInBand --silent --runTestsByPath tests/unit/artifact-version-history.test.js tests/unit/graph-service-auth-cache.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/graph-service-downloads.test.js tests/unit/graph-service-folders.test.js tests/unit/graph-service-observability.test.js tests/unit/graph-service-public-contract.test.js tests/unit/graph-service-read-contract.test.js tests/unit/graph-service-resolution.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-versions.test.js tests/unit/graph-service-write-contract.test.js tests/unit/document-lifecycle-boundary.test.js tests/unit/document-lifecycle-public-contract.test.js tests/unit/site-visit-materials-contributor-service.test.js tests/unit/site-visit-material-file.test.js tests/unit/site-visit-materials-card.test.js tests/unit/site-visit-materials-collection-service.test.js tests/unit/site-visit-materials-collection-store.test.js tests/unit/site-visit-materials-line.test.js tests/unit/site-visit-materials-summary-reader.test.js tests/unit/site-visit-materials-upload-cap.test.js tests/unit/cycle-dossier-sharepoint.test.js tests/unit/cycle-dossier-worker.test.js tests/unit/initial-assessment-controls-service.test.js tests/unit/workbench-initial-assessment-controls-routes.test.js
+```
+
+Result: **28 unique suites / 375 tests passed**, zero snapshots (`/private/tmp/wmkf-graph-decomposition-logs/s8-jest-final.log`). This corrected run supersedes an earlier command that listed the contributor suite twice. The focused prerequisite set (`graph-service-folders`, `graph-service-write-contract`, `graph-service-boundary`, and `graph-service-consumer-contract`) passed **4 suites / 65 tests**. Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed; lint reported **114 warnings and 0 errors**, and the canonical Next.js **16.3.5 Turbopack** build retained the two known DOCX dynamic-filesystem tracing warnings. Every current `check:*` parent and available immediate self-test passed sequentially: `/private/tmp/wmkf-graph-decomposition-logs/s8-all-checks.log` records **67 commands, all exit code 0**. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
+
+No unresolved S8 contract finding remains. Root final review and G acceptance are complete. The commit introducing this receipt is the accepted S8 checkpoint; rollback is `4c6191d6`; S9 is next.
