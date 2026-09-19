@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S6 ACCEPTED]**. Root accepted S0–S6 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S6 are accepted below; S7 is next. No push, deployment or live rehearsal is authorized.
+Status: **[S7 ACCEPTED]**. Root accepted S0–S7 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1–S7 are accepted below; S8 is next. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -317,3 +317,43 @@ Result: **22 suites / 380 tests passed**, zero snapshots. Sequential `npm run ch
 Every current `check:*` parent and available immediate self-test ran sequentially. The retained log is `/private/tmp/wmkf-graph-decomposition-logs/s6-all-checks.log`; it contains **67 commands, all exit code 0**. Final syntax and whitespace checks after the generated-file cleanup were `node --check lib/services/graph-service.js`, `node --check lib/services/graph/downloads.js`, and `git diff --check`, all passing. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
 
 No unresolved S6 contract finding remains. Root final review and G acceptance are complete. The commit introducing this receipt is the accepted S6 checkpoint; rollback is `ac4a03b4`; S7 is next.
+
+## S7 execution receipt
+
+Status: **[S7 ACCEPTED]**. Baseline is accepted S6 commit `0f5c90db`; this candidate moves the search retry policy, cooldown state, and search method into `lib/services/graph/search.js` while preserving the public facade and all consumers. S0–S6 remain accepted. No upload retry behavior, dependency, environment, persistence, policy, live-service, deployment, or later-stage change was made.
+
+### Owned move and exact bounds
+
+The ranges below were derived from `git show 0f5c90db:lib/services/graph-service.js` and `nl -ba` on the candidate; the moved bodies are exact source slices with only `this.`→`svc.` receiver injection where required.
+
+| Symbol | Baseline facade range | Candidate module range | Facade delegate/reset |
+|---|---:|---:|---:|
+| `isRetryableSearchStatus` | lines 48–50 | `lib/services/graph/search.js:24–26` | N/A |
+| `SEARCH_MAX_ATTEMPTS` | line 51 | `lib/services/graph/search.js:27` | N/A |
+| `SEARCH_BACKOFF_CAP_MS` | line 54 | `lib/services/graph/search.js:30` | N/A |
+| `SEARCH_MAX_RETRY_WAIT_MS` | line 59 | `lib/services/graph/search.js:35` | N/A |
+| `searchCooldownUntil`, `searchCooldownStatus` | lines 65–66 | `lib/services/graph/search.js:41–42` | N/A |
+| `parseRetryAfterMs` | lines 69–76 | `lib/services/graph/search.js:45–52` | N/A |
+| `planSearchRetry` | lines 83–92 | `lib/services/graph/search.js:59–68` | N/A |
+| `resetSearchCooldown` | lines 756–757 (clearCaches assignments) | `lib/services/graph/search.js:70–73` | `lib/services/graph-service.js:565–569` call order |
+| `searchFiles` | lines 323–455 | `lib/services/graph/search.js:86–218` | `lib/services/graph-service.js:263–265` |
+
+`clearCaches()` preserves the required search → auth → resolution reset order. The real-source boundary inventory names all four private helpers/reset symbols, all three search constants, both cooldown state variables, and the public delegate. Its duplicate test first analyzes the actual source map with `REAL_SOURCE_OPTIONS`, then appends duplicate declarations to an in-memory facade copy and asserts the named owner errors; no runtime source is mutated. Fresh Sol review **`sol_s7`** accepted the source move and inventory conditional on G; root independently matched the moved declarations and retry state against the baseline.
+
+### S7 G evidence
+
+The exact required Graph/lifecycle/Explorer command was:
+
+```text
+npx jest --runInBand tests/unit/artifact-version-history.test.js tests/unit/graph-service-auth-cache.test.js tests/unit/graph-service-boundary.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/graph-service-downloads.test.js tests/unit/graph-service-folders.test.js tests/unit/graph-service-observability.test.js tests/unit/graph-service-public-contract.test.js tests/unit/graph-service-read-contract.test.js tests/unit/graph-service-resolution.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-upload-large.test.js tests/unit/graph-service-versions.test.js tests/unit/graph-service-write-contract.test.js tests/unit/document-lifecycle-boundary.test.js tests/unit/drain-record-failure.test.js tests/unit/dynamics-explorer-search-documents.test.js tests/unit/dynamics-explorer-chat-characterization.test.js
+```
+
+Result: **18 suites / 291 tests passed**, one snapshot passed. After the final boundary-fixture correction, the affected rerun was:
+
+```text
+npx jest --runInBand tests/unit/graph-service-boundary.test.js tests/unit/graph-service-search-retry.test.js tests/unit/graph-service-consumer-contract.test.js tests/unit/dynamics-explorer-search-documents.test.js tests/unit/dynamics-explorer-chat-characterization.test.js
+```
+
+It passed **5 suites / 80 tests**, one snapshot. Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed; lint reported **114 warnings and 0 errors**, and the canonical Next.js **16.3.5 Turbopack** build retained the two known DOCX dynamic-filesystem tracing warnings. Every current `check:*` parent and available immediate self-test passed sequentially: `/private/tmp/wmkf-graph-decomposition-logs/s7-all-checks.log` records **67 commands, all exit code 0**. The S0 mutation runner was not rerun because its source anchors are baseline-specific.
+
+No unresolved S7 contract finding remains. Root final review and G acceptance are complete. The commit introducing this receipt is the S7 checkpoint; rollback is `0f5c90db`; S8 is next. Runtime files remain unchanged after the source-ready review; the final correction changed only the boundary characterization fixture.

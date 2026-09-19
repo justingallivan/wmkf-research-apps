@@ -28,7 +28,16 @@ const options = { facade: FACADE, graphDir: GRAPH, inventory: { methods: METHODS
 const REAL_SOURCE_OPTIONS = {
   facade: FACADE,
   graphDir: GRAPH,
-  inventory: { methods: METHODS, state: STATE },
+  inventory: {
+    methods: [
+      ...METHODS,
+      'isRetryableSearchStatus', 'parseRetryAfterMs', 'planSearchRetry', 'resetSearchCooldown',
+    ],
+    state: [
+      ...STATE,
+      'SEARCH_MAX_ATTEMPTS', 'SEARCH_BACKOFF_CAP_MS', 'SEARCH_MAX_RETRY_WAIT_MS',
+    ],
+  },
   movedOwners: {
     getAccessToken: `${GRAPH}/auth.js`,
     tokenCache: `${GRAPH}/auth.js`,
@@ -50,6 +59,16 @@ const REAL_SOURCE_OPTIONS = {
     downloadFileVersion: `${GRAPH}/downloads.js`,
     downloadFileAsPdf: `${GRAPH}/downloads.js`,
     downloadFileByPath: `${GRAPH}/downloads.js`,
+    searchFiles: `${GRAPH}/search.js`,
+    searchCooldownUntil: `${GRAPH}/search.js`,
+    searchCooldownStatus: `${GRAPH}/search.js`,
+    isRetryableSearchStatus: `${GRAPH}/search.js`,
+    parseRetryAfterMs: `${GRAPH}/search.js`,
+    planSearchRetry: `${GRAPH}/search.js`,
+    resetSearchCooldown: `${GRAPH}/search.js`,
+    SEARCH_MAX_ATTEMPTS: `${GRAPH}/search.js`,
+    SEARCH_BACKOFF_CAP_MS: `${GRAPH}/search.js`,
+    SEARCH_MAX_RETRY_WAIT_MS: `${GRAPH}/search.js`,
   },
   delegates: {
     getAccessToken: { target: `${GRAPH}/auth.js`, binding: 'getAccessToken' },
@@ -65,6 +84,7 @@ const REAL_SOURCE_OPTIONS = {
     downloadFileVersion: { target: `${GRAPH}/downloads.js`, binding: 'downloadFileVersion' },
     downloadFileAsPdf: { target: `${GRAPH}/downloads.js`, binding: 'downloadFileAsPdf' },
     downloadFileByPath: { target: `${GRAPH}/downloads.js`, binding: 'downloadFileByPath' },
+    searchFiles: { target: `${GRAPH}/search.js`, binding: 'searchFiles' },
   },
 };
 
@@ -253,6 +273,21 @@ test('duplicate state, receiver access, and direct fetch outside http are reject
     expect.stringContaining('state owner tokenCache'),
     expect.stringContaining('receiver access in Graph module'),
     expect.stringContaining('raw fetch outside graph http owner'),
+  ]));
+});
+
+test('the real search inventory rejects duplicate retry helpers and cooldown constants', () => {
+  const sources = sourceMapFromRoot(path.resolve(__dirname, '../..'));
+  expect(analyzeSources(sources, REAL_SOURCE_OPTIONS).errors).toEqual([]);
+  const mutatedSources = new Map(sources);
+  mutatedSources.set(FACADE, `${sources.get(FACADE)}
+    function isRetryableSearchStatus() {} function parseRetryAfterMs() {}
+    function planSearchRetry() {}
+    const SEARCH_MAX_ATTEMPTS = 3; const SEARCH_BACKOFF_CAP_MS = 5000; const SEARCH_MAX_RETRY_WAIT_MS = 10000;`);
+  const errors = analyzeSources(mutatedSources, REAL_SOURCE_OPTIONS).errors;
+  expect(errors).toEqual(expect.arrayContaining([
+    expect.stringContaining('method owner isRetryableSearchStatus: expected one owner'),
+    expect.stringContaining('state owner SEARCH_MAX_ATTEMPTS: expected one owner'),
   ]));
 });
 
