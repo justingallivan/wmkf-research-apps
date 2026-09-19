@@ -42,8 +42,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card } from '../Layout';
 import { readSseStream } from './sse';
-import ReviewerPromptOverridePanel from './ReviewerPromptOverridePanel';
-import CandidateEditModal from './CandidateEditModal';
 import {
   mergeEnrichment,
   parseExcludeList,
@@ -54,8 +52,8 @@ import {
   isCandidateSelectable,
   canConfirmCandidateForPromotion,
   getCandidatePromotionDecision,
-  correlateSaveResultsToRosterCandidates,
   getCandidateEmailReadiness,
+  correlateSaveResultsToRosterCandidates,
   pruneCandidateForRoster,
   dedupeReviewerCandidates,
   reviewerCandidateKey,
@@ -82,27 +80,14 @@ import {
 } from '../../utils/institution-stage2-presentation';
 import { CandidateCard } from './search/CandidateCard';
 import { addressTrustFailureMessage, formatSaveFailureDetails } from './search/presentation';
-import { Spinner, Pill } from './search/SearchPrimitives';
-import { IdentityComparisonPanel } from './search/IdentityComparisonPanel';
 import { candKey, dedupeByName, isApplicantOriginCandidate } from './search/candidateKeys';
+import SearchControls from './search/SearchControls';
+import SearchResults from './search/SearchResults';
+import SearchContactModals from './search/SearchContactModals';
+import HandledReviewers from './search/HandledReviewers';
+import ApplicantReviewerStatus from './search/ApplicantReviewerStatus';
 
 export { CandidateCard, addressTrustFailureMessage };
-
-// The four literature sources the discover endpoint understands. The user picks
-// which to query (parity with the standalone Reviewer Finder); at least one must
-// stay selected or there's nothing to search.
-const SEARCH_SOURCES = [
-  { key: 'pubmed', label: 'PubMed', icon: '📚', desc: 'Biomedical' },
-  { key: 'arxiv', label: 'ArXiv', icon: '📄', desc: 'Physics, math, CS' },
-  { key: 'biorxiv', label: 'BioRxiv', icon: '🧬', desc: 'Life sciences' },
-  { key: 'chemrxiv', label: 'ChemRxiv', icon: '🧪', desc: 'Chemistry' },
-];
-
-const BLOCKED_REFERRAL_REASON = {
-  already_surfaced_or_excluded: 'already surfaced or excluded',
-  proposal_author: 'proposal author',
-  institution_coi: 'PI institution conflict',
-};
 
 export default function ReviewerSearchSection({
   requestId,
@@ -1929,709 +1914,127 @@ export default function ReviewerSearchSection({
 
   return (
     <>
-    <Card hover={false}>
-      <div className="flex items-center justify-between mb-2">
-        <p className="font-medium text-gray-900">Search for reviewers</p>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowPromptEditor((s) => !s)}
-            className="text-xs text-gray-500 hover:text-gray-800"
-            title="Edit your personal copy of the analysis / scoring prompts"
-          >
-            ✎ {showPromptEditor ? 'Hide prompt editor' : 'Edit prompts'}
-          </button>
-          {busy && <Spinner />}
-        </div>
-      </div>
-
-      {showPromptEditor && (
-        <div className="mb-3">
-          <ReviewerPromptOverridePanel onClose={() => setShowPromptEditor(false)} />
-        </div>
-      )}
-
-      {!blobUrl && (
-        <p className="text-sm text-gray-600">Load a proposal document above to search for new reviewers. Candidates already found for this request appear below.</p>
-      )}
-
-      {blobUrl && (phase === 'idle' || phase === 'error') && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                Searches the selected literature sources using the loaded proposal, verifies expertise, and flags conflicts.
-              </p>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Search sources:</label>
-                <div className="flex gap-2 flex-wrap">
-                  {SEARCH_SOURCES.map(({ key, label, icon, desc }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setSearchSources((prev) => ({ ...prev, [key]: !prev[key] }))}
-                      aria-pressed={searchSources[key]}
-                      className={`px-3 py-1.5 rounded-lg border text-xs transition-colors flex flex-col items-center min-w-[80px] ${
-                        searchSources[key]
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
-                          : 'bg-gray-50 border-gray-200 text-gray-400'
-                      }`}
-                    >
-                      <span className="text-base leading-none">{icon}</span>
-                      <span className="font-medium">{label}</span>
-                      <span className="opacity-75">{desc}</span>
-                    </button>
-                  ))}
-                </div>
-                {noSourcesSelected && (
-                  <p className="text-xs text-amber-700 mt-1">Select at least one source to search.</p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="reviewer-count" className="block text-xs text-gray-500 mb-1">
-                  Number of candidates to find: <span className="font-medium text-gray-700">{reviewerCount}</span>
-                </label>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400 w-4">1</span>
-                  <input
-                    id="reviewer-count"
-                    type="range"
-                    min="1"
-                    max="25"
-                    step="1"
-                    value={reviewerCount}
-                    onChange={(e) => setReviewerCount(parseInt(e.target.value, 10))}
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                  <span className="text-xs text-gray-400 w-6 text-right">25</span>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="additional-notes" className="block text-xs text-gray-500 mb-1">
-                  Additional context for Claude (optional):
-                </label>
-                <textarea
-                  id="additional-notes"
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
-                  rows={2}
-                  value={additionalNotes}
-                  onChange={(e) => setAdditionalNotes(e.target.value)}
-                  placeholder="e.g. prioritize clinical trialists; avoid industry-affiliated reviewers"
-                />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[1fr_220px]">
-                <div>
-                  <label htmlFor="referred-seeds" className="block text-xs text-gray-500 mb-1">
-                    Externally-referred reviewers (optional):
-                  </label>
-                  <textarea
-                    id="referred-seeds"
-                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
-                    rows={2}
-                    value={referredSeedsText}
-                    onChange={(e) => setReferredSeedsText(e.target.value)}
-                    placeholder="e.g. Jane Smith, jane@uni.edu, University of Example"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="referred-by" className="block text-xs text-gray-500 mb-1">
-                    Referred by (optional):
-                  </label>
-                  <input
-                    id="referred-by"
-                    type="text"
-                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
-                    value={referredBy}
-                    onChange={(e) => setReferredBy(e.target.value)}
-                    placeholder="Reviewer name"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Exclude these reviewers (one per line or comma-separated){exclusionsUnavailable ? ' — applicant list unavailable, add any by hand' : ''}:
-                </label>
-                <textarea
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
-                  rows={2}
-                  value={excludeText}
-                  onChange={onExcludeChange}
-                  placeholder="e.g. Thomas K. Wood, Jens Hör"
-                />
-                {exclusionsUnavailable && (
-                  <p className="text-xs text-amber-700 mt-1">The applicant exclusion list couldn't be loaded — add exclusions manually above.</p>
-                )}
-                {excludedRaw && (
-                  <details className="mt-2">
-                    <summary className="text-xs text-gray-500 cursor-pointer">Applicant's original text</summary>
-                    <pre className="text-xs bg-gray-50 text-gray-700 rounded p-2 mt-1 whitespace-pre-wrap">{excludedRaw}</pre>
-                  </details>
-                )}
-              </div>
-              {error && !promotionNotice && (
-                <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-                  {errorMeta?.status === 'analysis_invalid' ? (
-                    <>
-                      The proposal analysis response was incomplete or unreliable. Please retry the analysis.
-                      {errorMeta.retryable && <span className="block text-xs mt-1">Use Try again to rerun the analysis.</span>}
-                    </>
-                  ) : errorMeta?.status === 'analysis_refused' ? (
-                    <>
-                      The analysis model declined this request.
-                      <span className="block text-xs mt-1">Retrying is unlikely to help. This proposal needs an alternate analysis path; please contact an administrator.</span>
-                    </>
-                  ) : (
-                    <>
-                      {error}
-                      {previousSearchKeys.size > 0 && (
-                        <span className="block text-xs mt-1">
-                          The previously found candidates below are unchanged; this attempt did not replace them.
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
-                disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
-                className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {rosterLoadFailed
-                  ? 'Retry reviewer state'
-                  : !rosterLoaded
-                  ? 'Loading existing candidates…'
-                  : errorMeta?.status === 'analysis_refused'
-                    ? 'Alternate analysis required'
-                    : phase === 'error' ? 'Try again' : 'Run reviewer search'}
-              </button>
-            </div>
-          )}
-
-          {phase === 'running' && (
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">Searching… this can take several minutes — please keep this tab open.</p>
-              <ul className="text-xs text-gray-500 space-y-0.5">
-                {progress.map((m, i) => <li key={i}>{m}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {/* Durable roster + this-run results — rendered INDEPENDENT of `phase`
-              so the per-request candidate list (active + the collapsed Excluded
-              set) shows on reload and even when no proposal is loaded. */}
-          {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
-            <div className="space-y-3 mt-3">
-              <IdentityComparisonPanel comparison={identityComparison} />
-              {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
-              {incompleteCoiCandidates.length > 0 && (
-                <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
-                  PubMed coauthor checks were incomplete after automatic retries for {incompleteCoiLabel}.
-                  {' '}A missing coauthor warning is not conclusive for {incompleteCoiCandidates.length === 1 ? 'that reviewer' : 'those reviewers'}.
-                </div>
-              )}
-              {rosterNote && rosterNote !== promotionNotice?.message && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{rosterNote}</div>}
-              {previousSearchKeys.size > 0 && (
-                <div className="flex items-center justify-between gap-3 p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
-                  <span>
-                    {previousSearchKeys.size} candidate{previousSearchKeys.size === 1 ? '' : 's'} below {previousSearchKeys.size === 1 ? 'was' : 'were'} restored from an earlier search.
-                  </span>
-                  {canManage && (
-                    <button
-                      type="button"
-                      onClick={removePreviousResults}
-                      disabled={removingPrevious || busy || previousSearchRefs.length !== previousSearchKeys.size}
-                      title={previousSearchRefs.length !== previousSearchKeys.size ? 'Reload this request before removing prior results.' : undefined}
-                      className="shrink-0 text-xs font-medium underline disabled:opacity-50"
-                    >
-                      {removingPrevious ? 'Removing…' : 'Remove previous results'}
-                    </button>
-                  )}
-                </div>
-              )}
-              {excludedRemoved > 0 && (
-                <p className="text-xs text-gray-500">
-                  {excludedRemoved} already-surfaced or excluded {excludedRemoved === 1 ? 'reviewer was' : 'reviewers were'} filtered out of the results.
-                </p>
-              )}
-              {blockedReferredSeeds.length > 0 && (
-                <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
-                  <p className="font-medium">Externally-referred reviewer{blockedReferredSeeds.length === 1 ? '' : 's'} blocked</p>
-                  <ul className="mt-1 text-xs space-y-0.5">
-                    {blockedReferredSeeds.map((seed, idx) => (
-                      <li key={`${seed.name || 'seed'}-${idx}`}>
-                        {seed.name || 'Unnamed referral'}: {BLOCKED_REFERRAL_REASON[seed.reason] || seed.reason || 'not selectable'}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {displayCandidates.length === 0 && rosterExcluded.length === 0 && rosterIneligible.length === 0 && rosterBlocked.length === 0 && unverifiedToShow.length === 0 ? (
-                <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
-              ) : (
-                <>
-                  {displayCandidates.length > 0 && (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600">
-                          {displayCandidates.length} candidate{displayCandidates.length === 1 ? '' : 's'} for this request
-                          {selected.size > 0 && <> · {selected.size} selected</>}
-                        </p>
-                        <div className="flex items-center gap-3">
-                          <span className="inline-flex items-center rounded border border-gray-200 overflow-hidden text-xs" role="group" aria-label="Sort order">
-                            <button
-                              type="button"
-                              onClick={() => setSortMode('relevance')}
-                              aria-pressed={sortMode === 'relevance'}
-                              className={`px-2 py-0.5 ${sortMode === 'relevance' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                              title="Order by confidence / relevance rank (default)"
-                            >
-                              Rank
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setSortMode('alpha')}
-                              aria-pressed={sortMode === 'alpha'}
-                              className={`px-2 py-0.5 border-l border-gray-200 ${sortMode === 'alpha' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                              title="Order alphabetically by name within each group"
-                            >
-                              A–Z
-                            </button>
-                          </span>
-                          <button type="button" onClick={toggleAll} className="text-xs text-blue-600 underline">
-                            {allSelected ? 'Clear all' : 'Select all'}
-                          </button>
-                        </div>
-                      </div>
-                      <div data-testid="reviewer-candidate-list" className="space-y-4">
-                        {readinessSections.map((section) => {
-                          return (
-                          <div key={section.key}>
-                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                              {section.title} ({section.items.length})
-                            </p>
-                            {section.key === 'needs_review' && (
-                              <p className="text-xs text-gray-600 mb-1.5">
-                                These reviewers need an identity, address, eligibility, or record issue resolved before they can be added to Invite. Use the primary action shown on each card.
-                              </p>
-                            )}
-                            <div className="space-y-2">
-                              {section.items.map((c) => {
-                                // A PD-confirmed needs-review row flips to a normal selectable
-                                // card; unconfirmed ones stay read-only but get the "confirm
-                                // identity" affordance so a PD can rescue a real reviewer.
-                                const selectableNow = isCandidateSelectable(c);
-                                const promotionDecision = getCandidatePromotionDecision(c);
-                                const canConfirmForPromotion = canConfirmCandidateForPromotion(c);
-                                if (selectableNow) {
-                                  return <CandidateCard
-                                    key={candKey(c)}
-                                    candidate={c}
-                                    previousResult={previousSearchKeys.has(candKey(c))}
-                                    checked={selected.has(candKey(c))}
-                                    onToggle={() => toggle(candKey(c))}
-                                    onAddToInvite={canManage ? () => saveSelected(new Set([candKey(c)])) : undefined}
-                                    addingToInvite={phase === 'saving'}
-                                    onExclude={excludeCandidate}
-                                    onUseLead={useLead}
-                                    onEdit={setEditingContact}
-                                    onRetryInstitution={isApplicantOriginCandidate(c) ? enrichRecommended : undefined}
-                                    canManage={canManage}
-                                    repairAttention={repairCandidateKey === candKey(c)}
-                                    repairRequest={repairRequestsByCandidateKey[candKey(c)] || null}
-                                    repairRequestsUnavailable={repairRequestsUnavailable}
-                                    onRetryRepairStatus={retryRosterLoad}
-                                  />;
-                                }
-                                return <CandidateCard
-                                  key={candKey(c)}
-                                  candidate={c}
-                                  previousResult={previousSearchKeys.has(candKey(c))}
-                                  readOnly
-                                  onExclude={excludeCandidate}
-                                  onEdit={(
-                                    promotionDecision?.decision === 'ready'
-                                    || promotionDecision?.reason === 'contact_claim_mismatch'
-                                    || c.applicantContactMismatch === true
-                                    || activeInstitutionStage2Presentation(c)?.kind === 'current_conflict'
-                                  ) ? setEditingContact : undefined}
-                                  onRequestRepair={requestAddressRepair}
-                                  onReviewAddressConflict={reviewAddressConflict}
-                                  onRetryAddressCheck={retryAddressCheck}
-                                  onRetryInstitution={isApplicantOriginCandidate(c) ? enrichRecommended : undefined}
-                                  onConfirmIdentity={canConfirmForPromotion ? openIdentityConfirmation : undefined}
-                                  canManage={canManage}
-                                  repairAttention={repairCandidateKey === candKey(c)}
-                                  repairRequest={repairRequestsByCandidateKey[candKey(c)] || null}
-                                  repairRequestsUnavailable={repairRequestsUnavailable}
-                                  onRetryRepairStatus={retryRosterLoad}
-                                />;
-                              })}
-                            </div>
-                          </div>
-                          );
-                        })}
-                      </div>
-                      <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
-                        <button
-                          type="button"
-                          onClick={() => saveSelected()}
-                          disabled={selected.size === 0 || phase === 'saving'}
-                          aria-busy={phase === 'saving'}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          {phase === 'saving' ? (
-                            <>
-                              <span aria-hidden="true" className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                              Adding {savingCount} reviewer{savingCount === 1 ? '' : 's'} to Invite…
-                            </>
-                          ) : (
-                            <>Add {selected.size > 0 ? selected.size : ''} selected to Invite</>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={exportSelected}
-                          disabled={selected.size === 0 || exporting}
-                          title={selected.size === 0 ? 'Select candidates — or use Select all — to export' : undefined}
-                          className="px-4 py-2 bg-white text-gray-900 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          {exporting ? 'Exporting…' : `Export ${selected.size > 0 ? selected.size : ''} to Excel`}
-                        </button>
-                        <button type="button" onClick={runSearch} disabled={!blobUrl || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
-                      </div>
-                      {exportError && (
-                        <p className="text-sm text-amber-700">Export failed: {exportError}</p>
-                      )}
-                      <p className="text-xs text-gray-400">
-                        Saved candidates join this request's pool and appear in the Invite tab once you invite and they accept. Excluded and already-surfaced candidates are skipped by the next search.
-                      </p>
-                    </>
-                  )}
-
-                  {/* Collapsed, recoverable Excluded set (durable per request). */}
-                  {rosterExcluded.length > 0 && (
-                    <details open={excludedOpen} onToggle={(e) => setExcludedOpen(e.currentTarget.open)} className="border border-gray-200 rounded-lg p-2">
-                      <summary className="text-xs font-medium text-gray-500 cursor-pointer">
-                        Excluded ({rosterExcluded.length}) — set aside for this request; not re-surfaced by a search. Use Reconsider to return one to the active list.
-                      </summary>
-                      <div className="space-y-2 mt-2">
-                        {rosterExcluded.map((c) => (
-                          <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={promoteCandidate} />
-                        ))}
-                      </div>
-                    </details>
-                  )}
-
-                  {rosterIneligible.length > 0 && (
-                    <details className="border border-red-200 bg-red-50 rounded-lg p-2">
-                      <summary className="text-xs font-medium text-red-800 cursor-pointer">
-                        Not eligible ({rosterIneligible.length}) — official institutional evidence reports these people are deceased
-                      </summary>
-                      <ul className="mt-2 space-y-1 text-xs text-red-800">
-                        {rosterIneligible.map((candidate) => {
-                          const evidence = candidate.eligibilityEvidence
-                            || candidate.contactEnrichment?.eligibilityEvidence;
-                          return (
-                            <li key={`ineligible-${candKey(candidate)}`}>
-                              <span className="font-medium">{candidate.name}</span>
-                              {evidence?.url && (
-                                <>
-                                  {' · '}
-                                  <a
-                                    href={evidence.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="underline"
-                                  >
-                                    official source
-                                  </a>
-                                </>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </details>
-                  )}
-
-                  {rosterBlocked.length > 0 && (
-                    <details className="border border-amber-200 bg-amber-50 rounded-lg p-2">
-                      <summary className="text-xs font-medium text-amber-900 cursor-pointer">
-                        Cannot add to Invite ({rosterBlocked.length}) — applicant-excluded for this request
-                      </summary>
-                      <div className="space-y-2 mt-2">
-                        {rosterBlocked.map((candidate) => (
-                          <CandidateCard
-                            key={`blocked-${candKey(candidate)}`}
-                            candidate={candidate}
-                            readOnly
-                          />
-                        ))}
-                      </div>
-                    </details>
-                  )}
-
-                  {unverifiedToShow.length > 0 && (
-                    <details className="border border-gray-200 rounded-lg p-2">
-                      <summary className="text-xs font-medium text-gray-500 cursor-pointer">
-                        Unverified suggestions ({unverifiedToShow.length}) — couldn't confirm these in the literature; not selectable until you confirm one
-                      </summary>
-                      <p className="text-xs text-gray-400 mt-1.5">
-                        If you recognize one, use “Confirm identity” to confirm their
-                        identity and correct the contact — that adds them to the candidate
-                        list. Exclude sets one aside so searches stop suggesting the name.
-                      </p>
-                      <div className="space-y-2 mt-2">
-                        {unverifiedToShow.map((c) => {
-                          // Same rescue gate as the needs-identity-review section, minus the
-                          // promotion-decision check (an unverified row is by definition
-                          // unresolved + email-less, which that check always admits).
-                          const canRescue = !c.hasInstitutionCOI
-                            && (c.eligibilityStatus || c.contactEnrichment?.eligibilityStatus) !== 'deceased';
-                          return <CandidateCard
-                            key={`unv-${candKey(c)}`}
-                            candidate={c}
-                            readOnly
-                            onExclude={excludeUnverifiedCandidate}
-                            onConfirmIdentity={canRescue ? openIdentityConfirmation : undefined}
-                            canManage={canManage}
-                          />;
-                        })}
-                      </div>
-                    </details>
-                  )}
-                </>
-              )}
-              {(phase === 'saving' || promotionNotice) && (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                  className={`sticky bottom-3 z-20 flex items-center gap-2 rounded-lg border p-3 text-sm shadow-md ${
-                    phase === 'saving'
-                      ? 'border-blue-200 bg-blue-50 text-blue-800'
-                      : promotionNotice?.tone === 'success'
-                        ? 'border-green-200 bg-green-50 text-green-800'
-                        : promotionNotice?.tone === 'error'
-                          ? 'border-red-200 bg-red-50 text-red-800'
-                          : 'border-amber-200 bg-amber-50 text-amber-800'
-                  }`}
-                >
-                  {phase === 'saving' && (
-                    <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-full border-2 border-blue-300 border-t-blue-700 animate-spin" />
-                  )}
-                  <div>
-                    <p>
-                      {phase === 'saving'
-                        ? `Adding ${savingCount} reviewer${savingCount === 1 ? '' : 's'} to Invite…`
-                        : promotionNotice?.message}
-                    </p>
-                    {phase === 'saving' && progress.length > 0 && (
-                      <ul className="mt-1 space-y-0.5 text-xs text-blue-700">
-                        {progress.map((message, index) => <li key={index}>{message}</li>)}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-      {/* On-card contact editor. Plain edits are local; exact-address verification
-          durably updates the request roster. Name is locked here. */}
-      {editingContact && (
-        <CandidateEditModal
-          candidate={editingContact}
-          nameEditable={false}
-          onApply={(updates) => persistManualContact(editingContact, updates)}
-          onVerifyAddress={(updates, evidence) => verifyAddressContact(editingContact, updates, evidence)}
-          requireAddressVerification={getCandidateEmailReadiness(editingContact).action !== 'ready'}
-          onClose={() => setEditingContact(null)}
-        />
-      )}
-      {/* PD identity-override editor for a needs-identity-review row: correct the
-          contact + tick "I've verified this person" → row becomes selectable and
-          saves with the manual contact (bibliometrics dropped server-side). */}
-      {confirmingContact && (
-        <CandidateEditModal
-          candidate={confirmingContact}
-          nameEditable={false}
-          confirmMode
-          onVerifyAddress={() => {}}
-          requireAddressVerification
-          onConfirm={(updates, evidence) => confirmIdentityContact(confirmingContact, updates, evidence)}
-          onClose={() => setConfirmingContact(null)}
-        />
-      )}
-    </Card>
-
-    {/* Manual reviewer add — slot rendered BELOW the search and ABOVE the optional
-        verify card (state + handlers live in ReviewerFindPanel). */}
-    {manualAddSlot}
-
-    {handledReviewers.length > 0 && (
       <Card hover={false}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-medium text-gray-900">Already handled</p>
-          <span className="text-xs text-gray-500">Not actionable in Find</span>
-        </div>
-        <ul className="space-y-2">
-          {handledReviewers.map((reviewer) => (
-            <li key={reviewer.candidateKey || reviewer.suggestionId || reviewer.name} className="flex items-center justify-between gap-3 text-sm border border-gray-200 rounded p-2">
-              <span className="min-w-0">
-                <span className="font-medium text-gray-900">{reviewer.name}</span>
-                {reviewer.rediscovered && <Pill tone="blue">Re-found by search</Pill>}
-                <span className="ml-2 text-gray-500">
-                  {reviewer.rediscovered
-                    ? (REDISCOVERED_STAGE_LABELS[reviewer.stage] || String(reviewer.stage || 'handled').replaceAll('_', ' '))
-                    : String(reviewer.stage || 'handled').replaceAll('_', ' ')}
-                </span>
-                {reviewer.rediscovered && reviewer.affiliation && (
-                  <span className="block text-xs text-gray-400 truncate">{reviewer.affiliation}</span>
-                )}
-              </span>
-              <button
-                type="button"
-                onClick={() => onNavigate?.(['selected', 'declined', 'invited'].includes(reviewer.stage) ? 'candidates' : 'track')}
-                disabled={!onNavigate}
-                className="text-xs text-amber-900 underline whitespace-nowrap"
-              >
-                {['selected', 'invited'].includes(reviewer.stage)
-                  ? 'Open Invite'
-                  : reviewer.stage === 'declined'
-                    ? 'Open Removed'
-                    : 'Open Track'}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <SearchControls
+          busy={busy}
+          showPromptEditor={showPromptEditor}
+          onTogglePromptEditor={() => setShowPromptEditor((s) => !s)}
+          onClosePromptEditor={() => setShowPromptEditor(false)}
+          blobUrl={blobUrl}
+          phase={phase}
+          searchSources={searchSources}
+          noSourcesSelected={noSourcesSelected}
+          onToggleSource={(key) => setSearchSources((prev) => ({ ...prev, [key]: !prev[key] }))}
+          reviewerCount={reviewerCount}
+          onReviewerCountChange={setReviewerCount}
+          additionalNotes={additionalNotes}
+          onAdditionalNotesChange={setAdditionalNotes}
+          referredSeedsText={referredSeedsText}
+          onReferredSeedsChange={setReferredSeedsText}
+          referredBy={referredBy}
+          onReferredByChange={setReferredBy}
+          excludeText={excludeText}
+          onExcludeChange={onExcludeChange}
+          exclusionsUnavailable={exclusionsUnavailable}
+          excludedRaw={excludedRaw}
+          error={error}
+          errorMeta={errorMeta}
+          promotionNotice={promotionNotice}
+          previousSearchKeys={previousSearchKeys}
+          rosterLoadFailed={rosterLoadFailed}
+          retryRosterLoad={retryRosterLoad}
+          runSearch={runSearch}
+          rosterLoaded={rosterLoaded}
+          removingPrevious={removingPrevious}
+          progress={progress}
+        />
+        <SearchResults
+          rosterNote={rosterNote}
+          displayCandidates={displayCandidates}
+          rosterExcluded={rosterExcluded}
+          rosterIneligible={rosterIneligible}
+          rosterBlocked={rosterBlocked}
+          phase={phase}
+          identityComparison={identityComparison}
+          enrichNote={enrichNote}
+          incompleteCoiCandidates={incompleteCoiCandidates}
+          incompleteCoiLabel={incompleteCoiLabel}
+          promotionNotice={promotionNotice}
+          previousSearchKeys={previousSearchKeys}
+          canManage={canManage}
+          removePreviousResults={removePreviousResults}
+          removingPrevious={removingPrevious}
+          previousSearchRefs={previousSearchRefs}
+          excludedRemoved={excludedRemoved}
+          blockedReferredSeeds={blockedReferredSeeds}
+          unverifiedToShow={unverifiedToShow}
+          selected={selected}
+          sortMode={sortMode}
+          onSortModeChange={setSortMode}
+          allSelected={allSelected}
+          toggleAll={toggleAll}
+          readinessSections={readinessSections}
+          toggle={toggle}
+          saveSelected={saveSelected}
+          savingCount={savingCount}
+          exportSelected={exportSelected}
+          exporting={exporting}
+          blobUrl={blobUrl}
+          busy={busy}
+          rosterLoaded={rosterLoaded}
+          exportError={exportError}
+          excludedOpen={excludedOpen}
+          onExcludedToggle={setExcludedOpen}
+          promoteCandidate={promoteCandidate}
+          excludeCandidate={excludeCandidate}
+          excludeUnverifiedCandidate={excludeUnverifiedCandidate}
+          openIdentityConfirmation={openIdentityConfirmation}
+          enrichRecommended={enrichRecommended}
+          repairCandidateKey={repairCandidateKey}
+          repairRequestsByCandidateKey={repairRequestsByCandidateKey}
+          repairRequestsUnavailable={repairRequestsUnavailable}
+          retryRosterLoad={retryRosterLoad}
+          requestAddressRepair={requestAddressRepair}
+          reviewAddressConflict={reviewAddressConflict}
+          retryAddressCheck={retryAddressCheck}
+          useLead={useLead}
+          setEditingContact={setEditingContact}
+          runSearch={runSearch}
+          progress={progress}
+        />
+        <SearchContactModals
+          editingContact={editingContact}
+          confirmingContact={confirmingContact}
+          persistManualContact={persistManualContact}
+          verifyAddressContact={verifyAddressContact}
+          setEditingContact={setEditingContact}
+          confirmIdentityContact={confirmIdentityContact}
+          setConfirmingContact={setConfirmingContact}
+        />
       </Card>
-    )}
 
-    {/* Applicant-referred reviewer status card — ingestion + enrichment state.
-        Enriched candidates surface in the Applicant-referred provenance section
-        of the main candidate list above; this card is a status surface only.
-        Enrichment fires automatically when both the proposal and the ingested
-        recommendations are ready (no manual trigger required). */}
-    <Card hover={false}>
-      <div className="flex items-center justify-between mb-2">
-        <p className="font-medium text-gray-900">Applicant-referred reviewers</p>
-        {(ingestLoading || recPhase === 'running') && <Spinner />}
-      </div>
+      {manualAddSlot}
 
-      {ingestError ? (
-        <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-          Couldn't ingest applicant reviewers: {ingestError}{' '}
-          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
-        </div>
-      ) : ingestLoading ? (
-        <p className="text-sm text-gray-500">Materializing the applicant's recommended reviewers…</p>
-      ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === 0) ? (
-        <p className="text-sm text-gray-600">The applicant did not list any recommended reviewers for this request.</p>
-      ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === null) ? (
-        <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-          Couldn't confirm the applicant's recommended reviewers.{' '}
-          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {recommendedFailed.length > 0 && (
-            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-              {recommendedFailed.length} of {slotsPopulated ?? (recommended.length + recommendedFailed.length)}{' '}
-              applicant-recommended reviewer{recommendedFailed.length === 1 ? '' : 's'} failed to ingest
-              {recommendedFailed.some((f) => f.name) && (
-                <> ({recommendedFailed.map((f) => f.name).filter(Boolean).join(', ')})</>
-              )}
-              . They are <span className="font-medium">not</span> saved as candidates.{' '}
-              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
-            </div>
-          )}
-          {knownLookupFailed.length > 0 && (
-            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-              {knownLookupFailed.length} materialized reviewer record{knownLookupFailed.length === 1 ? '' : 's'} could not be safely hydrated from Dataverse.{' '}
-              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
-            </div>
-          )}
-          {recommended.length > 0 && (
-            <ul className="space-y-2">
-              {recommended.map((row) => {
-                const known = row.applicantKnownReviewer;
-                return (
-                  <li key={row.suggestionId || row.potentialReviewerId} className="p-2 border border-gray-200 rounded text-xs text-gray-700">
-                    <div className="font-medium">{known?.name || row.name || 'Applicant-recommended reviewer'}</div>
-                    {known?.status === 'known' ? (
-                      <>
-                        <div className="text-emerald-700">✓ Existing linked reviewer record</div>
-                        {known.affiliation && <div>{known.affiliation}</div>}
-                        {known.orcid && <div>ORCID {known.orcid}</div>}
-                        <div>
-                          {known.email || 'No stored email'}
-                          {known.emailReadiness?.action ? ` · ${known.emailReadiness.action}` : ''}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-amber-700">
-                        Existing linked record needs repair ({known?.code || 'person_unavailable'}).
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {recPhase === 'idle' && !blobUrl && recCount > 0 && (
-            <p className="text-sm text-gray-500">
-              {recCount} applicant-referred reviewer{recCount === 1 ? '' : 's'} ingested — waiting for the proposal to load before verifying.
-            </p>
-          )}
-          {recPhase === 'running' && (
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">Verifying applicant-referred reviewers — this can take a minute or two, please keep this tab open.</p>
-              <ul className="text-xs text-gray-500 space-y-0.5">
-                {recProgress.map((m, i) => <li key={i}>{m}</li>)}
-              </ul>
-            </div>
-          )}
-          {recPhase === 'done' && (
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">
-                {recVerifiedCount === 0 && recIdentityReviewCount === 0
-                  ? 'No applicant-referred reviewers could be verified.'
-                  : <>
-                      {recVerifiedCount > 0
-                        ? `${recVerifiedCount} applicant-referred reviewer${recVerifiedCount === 1 ? '' : 's'} verified — see the Applicant-referred section above`
-                        : 'No reviewers added to the Applicant-referred section'}
-                      {recIdentityReviewCount > 0 && <>; {recIdentityReviewCount} could not be confirmed — see the Identity review section</>}.
-                    </>
-                }
-              </p>
-              {recCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => enrichRecommended()}
-                  disabled={!blobUrl || !proposalKey}
-                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Update applicant suggestions
-                </button>
-              )}
-            </div>
-          )}
-          {recPhase === 'error' && (
-            <div className="space-y-2">
-              <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>
-              <button
-                type="button"
-                onClick={() => enrichRecommended()}
-                disabled={!blobUrl || !proposalKey}
-                className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Try again
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </Card>
+      <HandledReviewers handledReviewers={handledReviewers} onNavigate={onNavigate} />
+
+      <ApplicantReviewerStatus
+        ingestLoading={ingestLoading}
+        recPhase={recPhase}
+        ingestError={ingestError}
+        onRetryIngestion={onRetryIngestion}
+        recommended={recommended}
+        recommendedFailed={recommendedFailed}
+        slotsPopulated={slotsPopulated}
+        knownLookupFailed={knownLookupFailed}
+        blobUrl={blobUrl}
+        recCount={recCount}
+        recProgress={recProgress}
+        recVerifiedCount={recVerifiedCount}
+        recIdentityReviewCount={recIdentityReviewCount}
+        enrichRecommended={enrichRecommended}
+        proposalKey={proposalKey}
+        recError={recError}
+      />
     </>
   );
 }

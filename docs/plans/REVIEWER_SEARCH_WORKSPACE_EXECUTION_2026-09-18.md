@@ -3,7 +3,7 @@ title: Reviewer Search Workspace Decomposition Execution Receipt
 domain: reviewers
 kind: execution-receipt
 status: active
-summary: Stage 0 source-to-target inventory, lifecycle defect disposition, and prerequisite coverage for the staged ReviewerSearchSection decomposition.
+summary: Staged ReviewerSearchSection decomposition inventory, prerequisite coverage, and implementation acceptance evidence.
 canonical: false
 owner: product-engineering
 related:
@@ -39,14 +39,15 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stage 0 source/test work is authorized by
-the accepted revised plan; Stage 1 remains blocked pending fresh Sol review.
+provider or external-state call was made. Stages 0–2 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
+from historical checkpoints.
 
 ## Source-to-target map
 
-The following map is derived from the current source symbols and AST-assisted
-capture analysis, then checked against the function bodies. Line numbers are
-navigation evidence only; symbol ownership controls implementation.
+The following map was derived from the pre-extraction source symbols and
+AST-assisted capture analysis, then checked against the function bodies. Line
+numbers refer to that baseline; stage receipts record completed moves. Symbol
+ownership controls implementation.
 
 | Stage | Target | Current symbols / source region | Return or ownership contract |
 |---|---|---|---|
@@ -407,8 +408,8 @@ by broad snapshots.
   stale A messages render; its log is
   `/private/tmp/reviewer-search-stage0-progress-unguarded.log`. The source was
   restored from `/private/tmp/ReviewerSearchSection.stage0-wip.final.js` after
-  that falsification run. Gate G and fresh Sol Stage 0 review remain required
-  before Stage 1.
+  that falsification run. At this historical checkpoint Gate G and fresh Sol Stage 0 review were still
+  pending; the Stage 0 acceptance below records their completion.
 - `[VERIFIED via command]` The focused suite now passes 9/9 after adding an
   unmounted export completion check and a StrictMode remount lifecycle check.
   Temporarily removing only the conditional search/export lock cleanup makes the
@@ -490,4 +491,38 @@ unchanged workflow/defaults. Existing server-shared logic stayed in place.
 - The full run includes eight draft Stage 7 contract tests in separate files. They
   are not part of this extraction acceptance and do not yet satisfy P7's UI cases.
 
-**Current verdict:** Stage 1 accepted by root. Stage 2 awaits its drift check.
+**Stage 1 verdict:** accepted by root; commit `307aa914`.
+
+
+## Stage 2 acceptance — workspace views
+
+[VERIFIED via source, commands and fresh review] Luna `/root/luna_stage2` extracted
+`SearchControls`, `SearchResults`, `SearchContactModals`, `HandledReviewers` and
+`ApplicantReviewerStatus`. Search constants moved with their consuming views.
+State, commands, outer Card and manual-add placement remain facade-owned.
+
+- Starting/rollback reference: `307aa914`. Upstream remained `b400c97d` at both
+  the pre-stage check and the next-stage fetch.
+- Fresh Sol `/root/sol_stage2_review`: **READY**; focused P1/R2–R7 **11 suites /
+  101 tests**, strict targeted lint and diff checks passed. No effects, fetching
+  or workflow state were introduced in views.
+- Root AST comparison: facade parameters and every non-render statement match
+  `307aa914` exactly. Root also inspected named prop and modal callback bindings.
+- Clean full Jest: **964 suites / 14,226 tests passed**, 128.094 seconds,
+  `/private/tmp/reviewer-stage-2-gates/full-test-clean.log`. This includes four
+  then-current draft P4 cases; unfinished P7 drafts were parked outside discovery.
+- Initial full run failed on two concurrently edited future prerequisite tests;
+  `/private/tmp/reviewer-stage-2-gates/full-test.log` preserves that failure.
+  It was not accepted as a green extraction run.
+- Root rejected an initial evidence handoff citing Stage 1 logs. All 18 remaining
+  Gate G commands were then executed afresh on Stage 2, serially, with exit 0:
+  `/private/tmp/reviewer-stage-2-gates/results.json` records timestamps and logs.
+  Canonical `npm run build` compiled successfully with Turbopack; lint, types,
+  strict hook-dependency check, boundary and document gates/self-tests passed.
+- Sol's next-stage review identified missing roster lifecycle/complement tests.
+  P3 wording now explicitly preserves the existing failed-active-exclusion
+  behavior: a pruned row is restored into `rosterActive`, even for transient input.
+  This clarifies the test obligation and does not authorize a behavior change.
+
+**Stage 2 verdict:** accepted by root. Stage 3 runtime movement remains blocked
+until its missing prerequisite tests are committed and freshly reviewed.
