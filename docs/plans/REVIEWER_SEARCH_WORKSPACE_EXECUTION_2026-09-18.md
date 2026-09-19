@@ -39,7 +39,7 @@ review's free-variable, controller-order, and Stage 0 disposition findings.
 `/private/tmp/wmkf-reviewer-search`, branch `codex/reviewer-search-decomposition`,
 source baseline `71d36f37`. `npm ci` completed without changing `package.json` or
 `package-lock.json`; `.agents/skills` is a symlink to `../.claude/skills`. No live
-provider or external-state call was made. Stages 0–7 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
+provider or external-state call was made. Stages 0–8 are accepted; later stages remain planned. Stage receipts below distinguish completed evidence
 from historical checkpoints.
 
 ## Source-to-target map
@@ -708,3 +708,21 @@ remain unchanged.
   canonical build. Evidence: `/private/tmp/reviewer-stage-7-gates/results.json`.
 
 **Stage 7 verdict:** accepted by root. Starting/rollback reference: `692ef7ff`.
+
+
+## Stage 8 acceptance — export and projection
+
+[VERIFIED via source, commands and fresh review] Luna extracted
+`useReviewerExport.js` and `useReviewerSearchProjection.js`. Root AST checks
+against `3038184d` match the export callback and all twenty projection initializers,
+including the destructured merge memo, synchronous sorting and applicant counts.
+Selection callbacks, state/reset and the generation owner remain in the facade.
+
+- Fresh Sol `/root/sol_stage8_final`: **READY**, **4 suites / 16 tests passed**;
+  strict dependency lint passed. It checked DTO precedence, export lifecycle,
+  merge order, handled filtering, unverified suppression and readiness grouping.
+- Luna focused run: **9 suites / 167 tests passed**.
+- Full G: **19 commands passed**, including **970 suites / 14,270 tests** and
+  canonical build. Evidence: `/private/tmp/reviewer-stage-8-gates/results.json`.
+
+**Stage 8 verdict:** accepted by root. Starting/rollback reference: `3038184d`.

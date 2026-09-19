@@ -44,25 +44,18 @@ import { Card } from '../Layout';
 import {
   isCandidateSelectable,
 } from './reviewer-search-logic';
-import { reviewerEngagementProjection } from '../../utils/reviewer-engagement';
 import {
   buildEngagedSavedIndex,
-  partitionRediscoveredCandidates,
   REDISCOVERED_STAGE_LABELS,
 } from '../../utils/reviewer-rediscovery';
-import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { buildGoogleSearchUrl } from '../../../lib/utils/google-search-url';
-import {
-  provenanceGroupOf,
-  withReviewerProvenance,
-} from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
 import {
   activeInstitutionStage2Presentation,
 } from '../../utils/institution-stage2-presentation';
 import { CandidateCard } from './search/CandidateCard';
 import { addressTrustFailureMessage, formatSaveFailureDetails } from './search/presentation';
-import { candKey, dedupeByName, isApplicantOriginCandidate } from './search/candidateKeys';
+import { candKey } from './search/candidateKeys';
 import SearchControls from './search/SearchControls';
 import SearchResults from './search/SearchResults';
 import SearchContactModals from './search/SearchContactModals';
@@ -74,6 +67,8 @@ import useReviewerDiscovery from './search/useReviewerDiscovery';
 import useApplicantReviewerEnrichment from './search/useApplicantReviewerEnrichment';
 import useReviewerContactActions from './search/useReviewerContactActions';
 import useReviewerPromotion from './search/useReviewerPromotion';
+import useReviewerExport from './search/useReviewerExport';
+import useReviewerSearchProjection from './search/useReviewerSearchProjection';
 
 export { CandidateCard, addressTrustFailureMessage };
 
@@ -332,109 +327,42 @@ export default function ReviewerSearchSection({
     setRosterIneligible,
   });
 
-  // The selectable list = the durable active roster ∪ this run's results, deduped
-  // by normalized name (run results win — freshest enrichment). Renders + ranks
-  // independent of `phase` so the roster shows on reload without a fresh search.
-  // recCandidates (enriched applicant-referred) prepend so fresh enrichment wins
-  // over any stale roster copy of the same person.
-  const displayRosterActive = useMemo(() => rosterActive.filter((c) => (
-    !isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey)
-  )), [rosterActive, proposalKey]);
-  const visibleRecCandidates = useMemo(() => recCandidates.filter((candidate) => (
-    !terminalApplicantKeys.has(candKey(candidate))
-  )), [recCandidates, terminalApplicantKeys]);
-  const currentRunKeys = useMemo(() => new Set(
-    [...visibleRecCandidates, ...candidates].map(candKey).filter(Boolean)
-  ), [visibleRecCandidates, candidates]);
-  const previousSearchCandidates = useMemo(() => (
-    displayRosterActive
-      .filter((c) => !isApplicantOriginCandidate(c) && !currentRunKeys.has(candKey(c)))
-  ), [displayRosterActive, currentRunKeys]);
-  const previousSearchKeys = useMemo(() => new Set(
-    previousSearchCandidates
-      .map(candKey)
-      .filter(Boolean)
-  ), [previousSearchCandidates]);
-  const previousSearchRefs = useMemo(() => previousSearchCandidates
-    .filter((candidate) => candKey(candidate) && candidate.rosterUpdatedAt)
-    .map((candidate) => ({
-      candidateKey: candKey(candidate),
-      updatedAt: candidate.rosterUpdatedAt,
-    })), [previousSearchCandidates]);
-  // Re-discovery reconciliation (S401): a merged candidate whose identity
-  // anchors (or normalized name) match an ENGAGED saved-pool row leaves the
-  // actionable list here and joins the Already-handled section below as a
-  // "re-found by search" entry. Everything downstream (selection, save,
-  // provenance sections, unverified suppression) sees only the kept list.
-  const { kept: displayCandidates, rediscovered: rediscoveredEngaged } = useMemo(() => {
-    const merged = dedupeByName([...visibleRecCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
-    return partitionRediscoveredCandidates(merged, engagedSavedIndex);
-  }, [visibleRecCandidates, candidates, displayRosterActive, engagedSavedIndex]);
-  const handledReviewers = useMemo(() => dedupeByName([
-    ...recHandled,
-    ...rosterHandled,
-    ...recommended
-      .filter((row) => reviewerEngagementProjection(row).handled)
-      .map((row) => ({
-        suggestionId: row.suggestionId,
-        candidateKey: row.suggestionId ? `suggestion:${row.suggestionId}` : null,
-        name: row.applicantKnownReviewer?.name || row.name || 'Applicant-recommended reviewer',
-        stage: reviewerEngagementProjection(row).stage,
-      })),
-    // Keyed by the SAVED row's suggestion anchor (dedupe collapses on exact
-    // keys, not names) and appended LAST, so when the same person already has a
-    // suggestion-anchored handled entry above, that entry wins first-occurrence
-    // and this twin folds into it instead of listing the person twice.
-    ...rediscoveredEngaged.map(({ candidate, saved }) => ({
-      suggestionId: saved.suggestionId,
-      candidateKey: saved.suggestionId ? `suggestion:${saved.suggestionId}` : candKey(candidate),
-      name: saved.name || candidate.name,
-      affiliation: saved.affiliation || candidate.affiliation || null,
-      stage: saved.stage,
-      rediscovered: true,
-    })),
-  ]), [recHandled, rosterHandled, recommended, rediscoveredEngaged]);
-  const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...rosterIneligible])
-    .filter((candidate) => candidate.coauthorCheckStatus === 'incomplete');
-  const incompleteCoiNames = incompleteCoiCandidates.map((candidate) => candidate.name).filter(Boolean);
-  const incompleteCoiLabel = incompleteCoiNames.length === 0
-    ? `${incompleteCoiCandidates.length} reviewer${incompleteCoiCandidates.length === 1 ? '' : 's'}`
-    : incompleteCoiNames.length <= 3
-      ? incompleteCoiNames.join(', ')
-      : `${incompleteCoiNames.slice(0, 3).join(', ')} and ${incompleteCoiNames.length - 3} others`;
-
-  // Slice E: a candidate the system could not identity-resolve (deferred Track-B or
-  // an unresolved verdict) is visible but NOT selectable/savable as a vetted reviewer
-  // (anchor-or-abstain at the UI boundary). It renders read-only in its own section
-  // and is excluded from select-all + the save set. The server (save-candidates) also
-  // hard-rejects these rows, so this is the friendly gate, not the only one.
-  // Not selectable if identity needs review OR there's a current same-institution COI
-  // (S240 Chunk 2a hard drop): discovery already drops these, but enrichment can promote
-  // a current affiliation that matches the PI's institution after the fact — those rows
-  // become unselectable + unsavable (the save-candidates API also hard-rejects them).
-  // The UI marker `pdIdentityConfirmed` makes an otherwise unverifiable row
-  // selectable only after the authenticated roster action returned an opaque
-  // server confirmation id. Save-candidates re-verifies it; the marker has no
-  // server authority. Institution COI is never waived.
-  const selectableCandidates = displayCandidates.filter(isCandidateSelectable);
-
-  // A Claude suggestion the server couldn't verify can ALSO surface — and verify —
-  // from a database search, in this run or a prior one (it then lives in
-  // displayCandidates / the active roster). Drop those from the "Unverified
-  // suggestions" set so one reviewer can't appear under both headings; the
-  // verified row always wins over its unverified twin. Excluded names drop too —
-  // they already have their own collapsed section.
-  const knownNameKeys = new Set(
-    [
-      ...displayCandidates.map(candKey),
-      // Re-discovered engaged rows left displayCandidates but are still known
-      // people — their unverified twins must stay suppressed.
-      ...rediscoveredEngaged.map(({ candidate }) => candKey(candidate)),
-      ...rosterExcluded.map(candKey),
-      ...rosterIneligible.map(candKey),
-    ].filter(Boolean)
-  );
-  const unverifiedToShow = unverified.filter((c) => !knownNameKeys.has(candKey(c)));
+  const {
+    displayRosterActive,
+    visibleRecCandidates,
+    currentRunKeys,
+    previousSearchCandidates,
+    previousSearchKeys,
+    previousSearchRefs,
+    displayCandidates,
+    rediscoveredEngaged,
+    handledReviewers,
+    incompleteCoiCandidates,
+    incompleteCoiNames,
+    incompleteCoiLabel,
+    selectableCandidates,
+    knownNameKeys,
+    unverifiedToShow,
+    readinessSections,
+    recCount,
+    applicantDisplayCandidates,
+    recVerifiedCount,
+    recIdentityReviewCount,
+  } = useReviewerSearchProjection({
+    proposalKey,
+    recommended,
+    rosterActive,
+    recCandidates,
+    candidates,
+    rosterExcluded,
+    rosterIneligible,
+    rosterHandled,
+    recHandled,
+    unverified,
+    sortMode,
+    terminalApplicantKeys,
+    engagedSavedIndex,
+  });
 
   const toggle = (key) => {
     setSelected((prev) => {
@@ -529,117 +457,20 @@ export default function ReviewerSearchSection({
 
 
 
-  // Export the SELECTED candidates to an Excel workbook (Request Info + Candidates
-  // sheets, built server-side). Slim DTO per row resolves the same fields the card
-  // shows (email/orcid/scholar fall back to contactEnrichment); the server fetches
-  // request metadata (number/institution/PI) authoritatively by requestId.
-  const exportSelected = useCallback(async () => {
-    const myGen = genRef.current;
-    if (exportingRef.current !== null) return;
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
-    if (chosen.length === 0) return;
-    exportingRef.current = myGen;
-    setExporting(true);
-    setExportError(null);
-    try {
-      const rows = chosen.map((c) => {
-        const enr = c.contactEnrichment || {};
-        const realScholar = c.googleScholarUrl || enr.googleScholarUrl || null;
-        return {
-          name: c.name,
-          affiliation: c.affiliation || null,
-          email: c.email || enr.email || null,
-          reasoning: c.reasoning || c.generatedReasoning || null,
-          keywords: Array.isArray(c.expertiseAreas) && c.expertiseAreas.length
-            ? c.expertiseAreas.join(', ')
-            : (c.expertise || c.keywords || null),
-          isApplicantRecommended: !!c.isApplicantRecommended,
-          provenance: c.provenance || null,
-          orcidUrl: c.orcidUrl || enr.orcidUrl || null,
-          scholarUrl: realScholar || buildScholarSearchUrl(c.name, c.affiliation),
-          hasRealScholar: isRealScholarProfileUrl(realScholar),
-          hasInstitutionCOI: !!c.hasInstitutionCOI,
-          institutionCOIDetails: c.institutionCOIDetails || null,
-          hasCoauthorCOI: !!c.hasCoauthorCOI,
-          coauthorCOIStrength: c.coauthorCOIStrength || null,
-          coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
-          hIndex: c.hIndex ?? enr.hIndex ?? null,
-          publicationCount5yr: c.publicationCount5yr ?? (Array.isArray(c.publications) ? c.publications.length : null),
-          seniorityEstimate: c.seniorityEstimate || null,
-        };
-      });
-      const res = await fetch('/api/workbench/export-candidates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, candidates: rows }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Export failed (${res.status})`);
-      }
-      const blob = await res.blob();
-      if (genRef.current !== myGen || !mountedRef.current) return;
-      const disposition = res.headers.get('Content-Disposition') || '';
-      const match = disposition.match(/filename="?([^"]+)"?/);
-      const filename = match ? match[1] : 'reviewer-candidates.xlsx';
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      if (genRef.current === myGen && mountedRef.current) setExportError(e.message);
-    } finally {
-      if (exportingRef.current === myGen) {
-        exportingRef.current = null;
-        if (genRef.current === myGen && mountedRef.current) setExporting(false);
-      }
-    }
-  }, [displayCandidates, selected, requestId]);
+  const { exportSelected } = useReviewerExport({
+    requestId,
+    selected,
+    displayCandidates,
+    exportingRef,
+    genRef,
+    mountedRef,
+    setExporting,
+    setExportError,
+  });
 
   const onExcludeChange = (ev) => { excludeEditedRef.current = true; setExcludeText(ev.target.value); };
 
-  // Decision-readiness sections are VIEWS over displayCandidates; selection is
-  // keyed by candKey(c) (stable normalized name), so a roster splice can't
-  // corrupt it (S224 — replaces the former flat-index invariant).
-  // Default order is confidence/relevance rank (server-ranked, preserved). The
-  // alpha toggle re-sorts within each readiness group by display name. Provenance
-  // remains available in each card's Details disclosure without driving the
-  // staffer's attention order.
-  const sortForDisplay = (items) =>
-    sortMode === 'alpha'
-      ? [...items].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }))
-      : items;
-  const readinessSections = [
-    {
-      key: 'ready_to_invite',
-      title: 'Ready to add to Invite',
-      items: sortForDisplay(displayCandidates.filter((c) => isCandidateSelectable(c))),
-    },
-    {
-      key: 'needs_review',
-      title: 'Needs review',
-      items: sortForDisplay(displayCandidates.filter((c) => !isCandidateSelectable(c))),
-    },
-  ].filter((section) => section.items.length > 0);
 
-  // Applicant rows now default to selected=false until explicit PD promotion;
-  // removed-by-staff vs not-yet-promoted is not a distinct displayed state.
-  const recCount = recommended.length;
-  // Candidates with needsIdentification:true route to needs_identity_review, not
-  // applicant_suggested — split the done-message count accordingly.
-  const applicantDisplayCandidates = displayCandidates.filter(isApplicantOriginCandidate);
-  const recVerifiedCount = applicantDisplayCandidates.filter((c) => (
-    provenanceGroupOf(withReviewerProvenance(c)) === 'applicant_suggested'
-      || c?.pdIdentityConfirmed === true
-  )).length;
-  const recIdentityReviewCount = applicantDisplayCandidates.filter((c) => (
-    provenanceGroupOf(withReviewerProvenance(c)) === 'needs_identity_review'
-      && c?.pdIdentityConfirmed !== true
-  )).length;
 
   return (
     <>
