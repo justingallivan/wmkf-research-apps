@@ -378,8 +378,9 @@ Characterization, driven through the real handler with the E12 mock set:
      resolved `model` and `roundsUsed: 0`. A disconnect observed at
      `chat.js:221` in round 1 produces two finalize calls: the listener's at
      `:153` with `model: null` and the loop's with the resolved `model`. Assert
-     the full finalize objects with `toHaveBeenCalledWith`, not
-     `objectContaining`.
+     the entire ordered `finalizeRequest.mock.calls` array with `toEqual`:
+     exactly one call for the model-error case and exactly two ordered calls
+     for the disconnect case, each with its full payload.
    - **4g, tool-stage outer-catch error.** Ordinary tool rejections never reach
      the outer catch; use a restriction row with `table_name: null` plus an
      `$expand` input so the local guard throws at `chat.js:2895`, and assert
@@ -566,9 +567,12 @@ restatement, including the historical line anchors in
 `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md:55`; (7) full §9 gate run; (8) release
 receipt with tier, Preview smoke evidence, and rollback deployment.
 **Exit:** `check:route-service-boundary`, `check:dataverse-access-layer`, and
-`check:odata-escape` green with no `pages/api/dynamics-explorer/` exemption
-(`grep -n 'dynamics-explorer/' scripts/check-*.js` shows only the
-`dynamics-context-boundary` rule-2 sanction and the new service entries);
+`check:odata-escape` green with no `pages/api/dynamics-explorer/` exemption:
+`grep -n "dynamics-explorer" scripts/check-dataverse-access-layer.js scripts/check-odata-escape.js`
+shows no `pages/api/dynamics-explorer/` entry in either `EXEMPT_DIRS` array,
+only the `lib/services/dynamics-explorer/` dir entry, the `tools/get-entity.js`
+file entry, and the `pages/dynamics-explorer.js` page entry. Self-test files
+legitimately keep the route path as red fixtures and are not part of this check;
 `check:doc-currency`, `check:doc-symbol-refs`, `check:build-claim-freshness`,
 `check:atlas`, `check:api-routes` green.
 
@@ -803,6 +807,12 @@ gate scripts, and the harness mocks, and incorporated all three: test 11
 exemption plus S9 removal of both route-dir exemptions with red fixtures, and
 4b covering `response` as well as `complete` with exact call arrays for every
 terminal. Revised sections 1 to 10 hash: `a319418dd3e9c1c99ce3efa340f3c8d8c607d0e6c592c6bd7eb1908daa5ea97e` at `52059e6b`.
+
+Codex re-review, 2026-09-19, same model and auth, base `52059e6b`. Verdict:
+NEEDS REWORK on two text items: the S9 exit grep would match the red fixtures
+it requires, and test 4f still said `toHaveBeenCalledWith`. Both corrected;
+no further Codex pass is planned for the plan text, since the remaining items
+are builder-verifiable. Revised sections 1 to 10 hash: `449950deaeee7925b64987cedcb51ba9b0203ebe20e3d645a86afb43e9920d1b`.
 
 Next: execution of S0 to S9 on branch `claude/explorer-chat-extraction`
 (worktree `../WMKF_Apps-explorer`), owner-authorized 2026-09-18.
