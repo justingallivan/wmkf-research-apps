@@ -1,6 +1,6 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S1 ACCEPTED — S2 NEXT]**. Root accepted the tests-only freeze after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1 is accepted below. No push, deployment or live rehearsal is authorized.
+Status: **[S2 ACCEPTED — S3 NEXT]**. Root accepted S1 after Sol review, full G and final diff audit. User authorization covers all local stages; S0 is `546efff8`; S1 is accepted below and S2 is recorded below. No push, deployment or live rehearsal is authorized.
 
 ## Contract-reconcile Step 0
 
@@ -168,3 +168,28 @@ Fresh Sol review **`sol_s1`** accepted the exact 14-leaf body comparison and who
 ### Unresolved assumptions and release blockers
 
 No S1 test or gate failure remains. The worktree has no live-service or provider-API evidence, by design. No release, push, deployment, dependency change, migration, or later-stage extraction is authorized by this receipt.
+
+## S2 execution receipt
+
+Status: **[S2 ACCEPTED]**. Baseline is accepted S1 commit `77e94c0d`; the accepted candidate is the commit introducing this S2 receipt on `codex/graph-service-decomposition`.
+
+### Owned move and parity
+
+S2 changed only the authentication owner and explicit boundary inventory:
+
+- `lib/services/graph/auth.js` now owns `tokenCache`, `tokenPromise`, `tokenGeneration`, `getAccessToken`, and `resetAuthCache` (candidate lines 14–17, 29–86, and 88–92).
+- The baseline auth implementation was `lib/services/graph-service.js:100–177`; its three cache declarations, token method body, and generation-fenced shared promise were moved verbatim apart from the receiver parameter and module imports.
+- The baseline `clearCaches()` auth reset statements were `lib/services/graph-service.js:1497–1499`. The facade now calls `resetAuthCache()` at the same position after the two search reset statements and before site/drive reset statements (`lib/services/graph-service.js:1426–1432`).
+- The facade preserves the original public signature `static async getAccessToken({ timeoutMs = API_TIMEOUT } = {})` and has a sole return delegate: `return getAccessToken(this, { timeoutMs });` (`lib/services/graph-service.js:107–109`). This preserves receiver spies/subclasses, getter/default evaluation, async rejection behavior, and call-time environment reads.
+
+Root's source comparison found the auth method body and three reset assignments exact against `77e94c0d`, with only permitted module-boundary changes: imports, the receiver parameter, explicit facade delegate, reset-owner call, and declaration relocation. No caller or other cache owner changed. The explicit real-source boundary inventory in `tests/unit/graph-service-boundary.test.js` names the S2 method owner, three state owners, and delegate; generic fixture options remain separate.
+
+### S2 G evidence
+
+The exact focused command was the 16-suite Graph/lifecycle/drain command recorded in the S1 receipt, rerun unchanged after S2. Result: **16 suites / 260 tests passed**, zero snapshots. The targeted auth, boundary, folders, and observability proof passed **4 suites / 64 tests** before the full run.
+
+Sequential `npm run check:types`, `npm run lint`, and `npm run build` passed. Lint reported **114 warnings and 0 errors**. The canonical Next.js **16.3.5 Turbopack** build completed with the same two known DOCX dynamic-filesystem tracing warnings and existing reviewer-reminder hold advisory.
+
+Every current `check:*` parent and available immediate self-test ran sequentially. Complete output is `/private/tmp/wmkf-graph-decomposition-logs/s2-all-checks.log`: **67 commands, all exit code 0**.
+
+Fresh Sol review **`sol_s2`** accepted the auth body/reset parity and explicit boundary inventory conditional on G. Root independently verified the body, reset replacement, and wrapper shape. No unresolved S2 finding remains. Root final review and G acceptance are complete; next allowed stage is S3; the S0 mutation runner remains baseline-specific and was not rerun.

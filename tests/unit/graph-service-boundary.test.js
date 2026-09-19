@@ -22,6 +22,23 @@ const STATE = [
   'searchCooldownUntil', 'searchCooldownStatus',
 ];
 const options = { facade: FACADE, graphDir: GRAPH, inventory: { methods: METHODS, state: STATE } };
+// Explicit real-source stage inventory. Keep this separate from the generic
+// fixture options above so fixture ownership cannot silently bless the live
+// migration. Each later stage updates only its named owner/delegate entries.
+const REAL_SOURCE_OPTIONS = {
+  facade: FACADE,
+  graphDir: GRAPH,
+  inventory: { methods: METHODS, state: STATE },
+  movedOwners: {
+    getAccessToken: `${GRAPH}/auth.js`,
+    tokenCache: `${GRAPH}/auth.js`,
+    tokenPromise: `${GRAPH}/auth.js`,
+    tokenGeneration: `${GRAPH}/auth.js`,
+  },
+  delegates: {
+    getAccessToken: { target: `${GRAPH}/auth.js`, binding: 'getAccessToken' },
+  },
+};
 
 const relative = (from, to) => {
   const result = path.posix.relative(path.posix.dirname(from), to);
@@ -44,14 +61,14 @@ function validSources() {
 
 test('the unchanged monolith has one public owner for every staged method/state item', () => {
   const sources = sourceMapFromRoot(path.resolve(__dirname, '../..'));
-  const result = analyzeSources(sources, options);
+  const result = analyzeSources(sources, REAL_SOURCE_OPTIONS);
   expect(result.errors).toEqual([]);
   expect(sources.has(FACADE)).toBe(true);
 });
 
 test('tracked runtime census has no direct imports of nonexistent Graph internals', () => {
   const sources = loadTrackedRuntimeSources(path.resolve(__dirname, '../..'));
-  const result = analyzeSources(sources, options);
+  const result = analyzeSources(sources, REAL_SOURCE_OPTIONS);
   expect(result.errors).toEqual([]);
 });
 
