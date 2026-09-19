@@ -32,9 +32,9 @@ files; installed dependencies are reused locally, not provider credentials.
 | S1 list continuity | Accepted | Same-key retention and scoped early rows; evidence below |
 | S2 independent reads | Accepted | Independent sections and request-owned context; evidence below |
 | S3 Reviews continuity | Accepted | Retained children, guarded callbacks and response validation; evidence below |
-| S4 cache experiment | Conditional; not selected | Requires incremental benefit over local fixes |
-| S5 code splitting | Conditional; not selected | Requires bundle and first-use evidence |
-| S6 final acceptance | Not started | All selected stage gates and root review |
+| S4 cache experiment | Omitted | No demonstrated incremental resource/journey beyond S1–S3 |
+| S5 code splitting | Trial rejected; import restored | 0.7135% initial gzip reduction, below predeclared 5% gate |
+| S6 final acceptance | In verification | Final checks and OAuth Claude adversarial review pending |
 
 ## Review and command records
 
@@ -197,3 +197,41 @@ held clipboard/export with one download, seeded failure/denial/malformed results
 uppercase GUID response matching, valid empty results, stale/unmounted callbacks,
 and duplicate command prevention. The browser holds the actual same-mount reload.
 This demonstrates continuity and removed serial waits, not production timing.
+
+
+## S4/S5 conditional decisions
+
+S4 is omitted. [VERIFIED via browser fixtures] S1–S3 remove the observed refresh
+blanking and context/cycle serial prerequisites without introducing shared state.
+Production revisit frequency and residual latency remain UNKNOWN; no one resource
+has demonstrated the incremental benefit required to add a cache boundary,
+dependency and mutation invalidation. This closes the conditional stage; it is not
+an instruction to resume a blanket cache migration.
+
+S5 was one bounded ReviewPanelTab trial. Root declared a minimum **5% reduction
+in request initial-entry gzip bytes before the trial**; first-use/deep-link/history
+checks would also have been required to keep a candidate passing that first gate.
+Luna replaced only its static import with `next/dynamic` and SSR enabled, built
+with `npx next build --webpack`, then used the committed read-only probe:
+`node scripts/measure-workbench-bundle.js`.
+
+| S3 baseline vs one-import candidate | Raw JS bytes | gzip bytes |
+|---|---:|---:|
+| Baseline initial entry | 1,651,530 | 490,965 |
+| Candidate initial entry | 1,637,231 | 487,462 |
+| Saved | 14,299 | 3,503 (0.7135%) |
+
+[VERIFIED via production manifest/files] Initial entry is the deduplicated union
+of route, `_app`, root-main and low-priority JS assets, compressed per file at gzip
+level 9. Nomodule polyfills are separately reported; these are file-size estimates,
+not browser transfer/parse/latency measurements. Local raw outputs:
+`/tmp/workbench-s5-before.json`, `/tmp/workbench-s5-after.json`.
+The baseline is runtime commit `c083a7d7`; reproduction uses that source then the
+one ReviewPanelTab dynamic-import change. The candidate build passed but its
+0.7135% saving failed the first gate. Luna restored exactly the import change;
+root confirmed the page has no remaining diff. No first-use timing assertion or
+broader splitting is justified. The probe remains for reproducibility.
+
+No 20-run timing comparison or production speedup is claimed. Deterministic
+held-response behavior is the accepted evidence for S1–S3; actual user timing is
+an explicit release-validation unknown. Neither conditional stage changes that.
