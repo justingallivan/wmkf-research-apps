@@ -7,7 +7,7 @@
  * status-interpolated fallback. Migrated onto requestEnvelope with
  * tolerantBody: true, preserving both fallback texts verbatim.
  */
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import ReviewerFollowUpPanel from '../../shared/components/workbench/ReviewerFollowUpPanel';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -92,4 +92,63 @@ test('reviewer-manager axis (e): non-2xx unparseable body falls to the status fa
   ));
   renderPanel();
   expect(await screen.findByText('Failed to load reviewer tracking (502)')).toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// Axis (d): a malformed or empty 2xx body on either endpoint, under
+// tolerantBody:true, is tolerated (that side merges as an empty proposal
+// list, no error banner), never a thrown/visible parse error. loadProposals
+// fires on mount with no user trigger, so — as with the "renders no error"
+// test above — the assertion is taken after a macrotask flush, not
+// immediately, to let the tolerant parse actually settle first.
+// ---------------------------------------------------------------------------
+
+test('dashboard axis (d): malformed 2xx body is tolerated silently (no error banner)', async () => {
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/api/workbench/dashboard')
+      ? Promise.resolve({ ok: true, status: 200, json: unparseable })
+      : Promise.resolve(ok({ proposals: [] }))
+  ));
+  renderPanel();
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+  expect(screen.queryByText(/Failed to load/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Unexpected token <')).not.toBeInTheDocument();
+});
+
+test('dashboard axis (d): empty 2xx body is tolerated silently (no error banner)', async () => {
+  const emptyBody = () => Promise.reject(new SyntaxError('Unexpected end of JSON input'));
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/api/workbench/dashboard')
+      ? Promise.resolve({ ok: true, status: 200, json: emptyBody })
+      : Promise.resolve(ok({ proposals: [] }))
+  ));
+  renderPanel();
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+  expect(screen.queryByText(/Failed to load/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Unexpected end of JSON input')).not.toBeInTheDocument();
+});
+
+test('reviewer-manager axis (d): malformed 2xx body is tolerated silently (no error banner)', async () => {
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/api/review-manager/reviewers')
+      ? Promise.resolve({ ok: true, status: 200, json: unparseable })
+      : Promise.resolve(ok({ proposals: [] }))
+  ));
+  renderPanel();
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+  expect(screen.queryByText(/Failed to load/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Unexpected token <')).not.toBeInTheDocument();
+});
+
+test('reviewer-manager axis (d): empty 2xx body is tolerated silently (no error banner)', async () => {
+  const emptyBody = () => Promise.reject(new SyntaxError('Unexpected end of JSON input'));
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/api/review-manager/reviewers')
+      ? Promise.resolve({ ok: true, status: 200, json: emptyBody })
+      : Promise.resolve(ok({ proposals: [] }))
+  ));
+  renderPanel();
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+  expect(screen.queryByText(/Failed to load/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Unexpected end of JSON input')).not.toBeInTheDocument();
 });
