@@ -13,7 +13,7 @@ metadata:
 Read before composing any Codex companion invocation (`adversarial-review`, `review`, `task`) or writing a brief that names a Codex model.
 
 Do: pass `--model gpt-5.6-sol`; run from the branch worktree (`-C`/`--cwd <worktree> --base origin/main`).
-Do not: substitute another catalog model when Sol is refused (stop and show the catalog); edit `~/.codex/config.toml`.
+Do not: substitute another catalog model when Sol is refused (stop and show the catalog); edit `~/.codex/config.toml`; pass `--help` or any unrecognized flag to `codex-companion.mjs review`/`adversarial-review` — it treats it as focus text and starts a full review immediately on the config default model (S528, 2026-09-19: cost one adversarial cycle). `--model`/`-m` IS accepted by review and adversarial-review, not only `task`.
 Ground truth: `~/.codex/models_cache.json` (catalog), `~/.codex/config.toml` (default), `codex doctor` (auth mode). Not covered: Claude-side model choice.
 
 Owner directive (2026-09-08, Session 496): pass `--model gpt-5.6-sol` on every
