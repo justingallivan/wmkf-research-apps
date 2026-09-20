@@ -308,3 +308,88 @@ test('disables new selections when the server-provided directory cap is reached'
   expect(checkbox).toBeDisabled();
   expect(screen.getByText('3 of 3 selected recipients')).toBeInTheDocument();
 });
+
+// T3 matrix (Stage 3, group A) ahead of migrating all four fetch sites onto
+// shared/utils/api-request.js. Each is tolerant-`.json()`, `!ok` throw of
+// data.error || a site-specific fallback message.
+function unparseable(status) {
+  return { ok: status >= 200 && status < 300, status, json: async () => { throw new SyntaxError('bad json'); } };
+}
+
+test('(b) initial load (mount): non-2xx {error} shows that message verbatim', async () => {
+  global.fetch = jest.fn(async () => response({ error: 'Admin access required' }, 403));
+  render(<SiteVisitRecipientsSection />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Admin access required');
+});
+
+test('(c) initial load (mount): a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch = jest.fn(async () => { throw new Error('network down'); });
+  render(<SiteVisitRecipientsSection />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+});
+
+test('(d) initial load (mount): a malformed 2xx body (tolerant) becomes {} -> empty directory, no error', async () => {
+  global.fetch = jest.fn(async () => unparseable(200));
+  render(<SiteVisitRecipientsSection />);
+  await waitFor(() => expect(screen.queryByText('Loading recipient directory…')).not.toBeInTheDocument());
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('(e) initial load (mount): a non-2xx unparseable body (502) shows the fallback message, never silent', async () => {
+  global.fetch = jest.fn(async () => unparseable(502));
+  render(<SiteVisitRecipientsSection />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('The recipient directory could not be loaded.');
+});
+
+test('(b) Retry (load): non-2xx {error} shows that message verbatim', async () => {
+  global.fetch = jest.fn(async () => response({ error: 'Load failed on mount' }, 500));
+  render(<SiteVisitRecipientsSection />);
+  await screen.findByRole('alert');
+  global.fetch = jest.fn(async () => response({ error: 'Admin access required' }, 403));
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Admin access required');
+});
+
+test('(c) searchContacts: a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch = jest.fn(async (url) => (String(url).includes('search=')
+    ? Promise.reject(new Error('network down'))
+    : response({ staff: [], entries: [], config: { version: 1, entries: [] } })));
+  render(<SiteVisitRecipientsSection />);
+  await waitFor(() => expect(screen.queryByText('Loading recipient directory…')).not.toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Find a Dataverse Contact'), { target: { value: 'ada' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+});
+
+test('(e) searchContacts: a non-2xx unparseable body (502) shows the fallback message, never silent', async () => {
+  global.fetch = jest.fn(async (url) => (String(url).includes('search=')
+    ? unparseable(502)
+    : response({ staff: [], entries: [], config: { version: 1, entries: [] } })));
+  render(<SiteVisitRecipientsSection />);
+  await waitFor(() => expect(screen.queryByText('Loading recipient directory…')).not.toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Find a Dataverse Contact'), { target: { value: 'ada' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Contact search failed.');
+});
+
+test('(c) save: a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch = jest.fn(async (url, options = {}) => (options.method === 'PUT'
+    ? Promise.reject(new Error('network down'))
+    : response({ staff: [{ profileId: 7, name: 'Alice Staff', email: 'alice@example.org' }], entries: [], config: { version: 1, entries: [] } })));
+  render(<SiteVisitRecipientsSection />);
+  await waitFor(() => expect(screen.queryByText('Loading recipient directory…')).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('checkbox', { name: /Alice Staff/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+});
+
+test('(e) save: a non-2xx unparseable body (502) shows the fallback message, never silent', async () => {
+  global.fetch = jest.fn(async (url, options = {}) => (options.method === 'PUT'
+    ? unparseable(502)
+    : response({ staff: [{ profileId: 7, name: 'Alice Staff', email: 'alice@example.org' }], entries: [], config: { version: 1, entries: [] } })));
+  render(<SiteVisitRecipientsSection />);
+  await waitFor(() => expect(screen.queryByText('Loading recipient directory…')).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('checkbox', { name: /Alice Staff/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The recipient directory could not be saved.');
+});
