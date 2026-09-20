@@ -279,7 +279,7 @@ test('the Staff deliberations view lists the cycle\'s pre-site drafts with its i
   routerState.asPath = '/workbench?view=staff-deliberations&cycleCode=D26';
   render(<WorkbenchShell />);
   expect(await screen.findByText(/#1002959 — Drafted proposal/)).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/staff-deliberations?cycleCode=D26&scope=my');
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/staff-deliberations?cycleCode=D26&scope=my', expect.objectContaining({ method: 'GET' }));
   expect(screen.getByRole('heading', { name: 'Staff deliberations' })).toBeInTheDocument();
   expect(screen.getByText('Track pre-site draft writeups and their stage for the selected cycle.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Staff deliberations' })).toHaveAttribute('aria-current', 'page');
@@ -297,7 +297,7 @@ test('the Staff deliberations view lists the cycle\'s pre-site drafts with its i
 
   fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
   expect(replace).toHaveBeenLastCalledWith('/workbench?view=staff-deliberations&cycleCode=D26&scope=all', undefined, expect.any(Object));
-  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/staff-deliberations?cycleCode=D26&scope=all'));
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/staff-deliberations?cycleCode=D26&scope=all', expect.objectContaining({ method: 'GET' })));
 });
 
 test('the Initial assessments view renders the D26 card without calling the API, and loads artifacts for a later cycle', async () => {
@@ -314,7 +314,7 @@ test('the Initial assessments view renders the D26 card without calling the API,
   routerState.asPath = '/workbench?view=initial-assessments&cycleCode=J27';
   render(<WorkbenchShell />);
   expect(await screen.findByText(/#1003001 — Assessed proposal/)).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/initial-assessment?cycleCode=J27');
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/initial-assessment?cycleCode=J27', expect.objectContaining({ method: 'GET' }));
   expect(screen.getByRole('link', { name: 'Initial assessments' })).toHaveAttribute('aria-current', 'page');
 });
 
@@ -334,7 +334,7 @@ test('the Reviewer follow-up view carries its reviewer-state view and search in 
     await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J26'));
     expect(screen.getByRole('link', { name: 'Reviewer follow-up' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'All in program' })).toHaveAttribute('aria-pressed', 'true');
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/reviewers?cycleCode=J26&scope=all&programId=p1'));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/reviewers?cycleCode=J26&scope=all&programId=p1', expect.objectContaining({ method: 'GET' })));
 
     fireEvent.click(screen.getByRole('button', { name: 'All (0)' }));
     expect(replace).toHaveBeenLastCalledWith('/workbench?view=reviewer-follow-up&cycleCode=J26&scope=all&reviewers=all', undefined, expect.any(Object));
@@ -455,7 +455,7 @@ test('opening the locator on a non-Request-list view mounts the body, and it sur
   routerState.asPath = '/workbench?view=reviewer-follow-up';
   const { rerender } = render(<WorkbenchShell />);
   await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/reviewers?cycleCode=D26&scope=my&programId=p1'));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/reviewers?cycleCode=D26&scope=my&programId=p1', expect.objectContaining({ method: 'GET' })));
   fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
   expect(screen.getByTestId('request-locator-mock')).toBeInTheDocument();
 
