@@ -6,6 +6,7 @@ import ErrorAlert from '../shared/components/ErrorAlert';
 import RosterContactField from '../shared/components/expertise-finder/RosterContactField';
 import { conventionalCycles, resolveWorkingCycle, cycleCodeToLabel } from '../lib/utils/cycle-code.js';
 import { buildRosterSubmitPayload } from '../shared/utils/roster-contact-link.js';
+import { requestEnvelope } from '../shared/utils/api-request';
 
 // ─── Tab Component ───
 
@@ -192,19 +193,16 @@ function MatchTab() {
     setError(null);
 
     try {
-      const response = await fetch('/api/expertise-finder/match', {
+      const { ok, status, data } = await requestEnvelope('/api/expertise-finder/match', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           file: { url: selectedFiles[0].url, filename: selectedFiles[0].filename },
           additionalNotes: additionalNotes.trim() || undefined,
-        }),
+        },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}`);
+      if (!ok) {
+        throw new Error(data.error || `HTTP ${status}`);
       }
 
       setResults(data.results);
@@ -278,10 +276,9 @@ function RosterTab() {
       if (roleFilter) params.set('roleType', roleFilter);
       params.set('limit', '500');
 
-      const response = await fetch(`/api/expertise-finder/roster?${params}`);
-      const data = await response.json();
+      const { ok, data } = await requestEnvelope(`/api/expertise-finder/roster?${params}`);
 
-      if (!response.ok) throw new Error(data.error);
+      if (!ok) throw new Error(data.error);
       setMembers(data.members);
     } catch (err) {
       setError(err.message);
@@ -303,13 +300,11 @@ function RosterTab() {
   const handleSaveEdit = async (formData) => {
     setSaving(true);
     try {
-      const response = await fetch('/api/expertise-finder/roster', {
+      const { ok, data } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: formData,
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      if (!ok) throw new Error(data.error);
 
       setMembers(prev => prev.map(m => m.id === formData.id ? data.member : m));
       setEditingId(null);
@@ -325,13 +320,11 @@ function RosterTab() {
     if (!confirm(`Deactivate "${name}"? This can be undone.`)) return;
 
     try {
-      const response = await fetch('/api/expertise-finder/roster', {
+      const { ok, data } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
+        body: { id },
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      if (!ok) throw new Error(data.error);
 
       setMembers(prev => prev.filter(m => m.id !== id));
     } catch (err) {
@@ -342,13 +335,11 @@ function RosterTab() {
   const handleAdd = async (formData) => {
     setSaving(true);
     try {
-      const response = await fetch('/api/expertise-finder/roster', {
+      const { ok, data } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: formData,
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      if (!ok) throw new Error(data.error);
 
       setMembers(prev => [...prev, data.member]);
       setShowAddForm(false);
@@ -707,10 +698,9 @@ function BatchTab() {
 
     try {
       const params = new URLSearchParams({ cycleCode, program });
-      const response = await fetch(`/api/expertise-finder/proposals?${params}`);
-      const data = await response.json();
+      const { ok, status, data } = await requestEnvelope(`/api/expertise-finder/proposals?${params}`);
 
-      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      if (!ok) throw new Error(data.error || `HTTP ${status}`);
       setProposals(data.proposals || []);
     } catch (err) {
       setError(err.message);
@@ -734,18 +724,15 @@ function BatchTab() {
       setProgress({ current: i + 1, total: unprocessed.length });
 
       try {
-        const response = await fetch('/api/expertise-finder/batch-match', {
+        const { ok, data } = await requestEnvelope('/api/expertise-finder/batch-match', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             requestId: proposal.requestId,
             requestNumber: proposal.requestNumber,
-          }),
+          },
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
+        if (!ok) {
           setResults(prev => ({
             ...prev,
             [proposal.requestId]: { error: data.error, availableFiles: data.availableFiles },
@@ -1024,9 +1011,8 @@ function HistoryTab() {
   useEffect(() => {
     async function fetchHistory() {
       try {
-        const response = await fetch('/api/expertise-finder/history');
-        const data = await response.json();
-        if (response.ok) {
+        const { ok, data } = await requestEnvelope('/api/expertise-finder/history');
+        if (ok) {
           setMatches(data.matches || []);
         }
       } catch (err) {
