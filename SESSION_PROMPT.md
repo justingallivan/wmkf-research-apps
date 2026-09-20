@@ -1,4 +1,191 @@
-# Session 527 Prompt: Production Graph release complete; Test Request Factory handoff pending
+# Session 528 Prompt: Executor cache telemetry read; post-fix cross-document read still pending
+
+## Session 527 Summary
+
+[VERIFIED via owner-run production Dataverse reads, source, gates, Git, GitHub CI,
+and the Vercel API] Session 527 ran in the worktree `worktree-claude-s525` while
+Codex finished the Graph release on `main`. It took handoff item 1 (prove realized
+cache reads for the S524 Executor prefix fix) as far as production traffic allows:
+built a read-only run-row telemetry probe, had the owner run it three times, and
+reconciled the durable docs against what the rows actually show. Sonnet wrote the
+probe; interpretation, corrections, and docs were the orchestrator's.
+
+### What Was Completed
+
+1. **Read-only `wmkf_ai_run` cache-telemetry probe**
+   - `scripts/probe-ai-run-cache-reads.js`: lists recent Executor run rows with
+     `--prompt <name>`, `--request <num>`, `--since <ISO>`, `--limit N`; parses
+     `cache_create`/`cache_read`/`cacheHit`/latency out of `wmkf_ai_notes`; prints
+     the prompt name per row. Owner-run (reads whichever Dataverse `.env.local`
+     points at). The `_wmkf_ai_prompt_value` lookup filter is now
+     [VERIFIED via live query 2026-09-20].
+   - Gates run sequentially after each change: dataverse-access-layer,
+     dynamics-context-boundary, trust-boundary-guid, odata-escape, secret-scan,
+     scaffolding-tokens (+ self-tests), all green.
+
+2. **What production telemetry showed (rows since 2026-09-16)**
+   - `phase-i.summary`, the prompt S524 planned to test with, has had no runs
+     since 2026-04-25. The original test plan was moot.
+   - The Executor prompts that batch within the TTL are `cycle-dossier.entry`
+     (Opus 5; 3 documents in 28 s on 09-17, 2 in 4 s on 09-16; marked prefix
+     610–618 tokens) and `review-synthesis.generate` (Sonnet 5; documents 4 min
+     apart on 09-18; 1841–2258 tokens). Pre-fix rows show every document writing
+     its own entry and none reading: the R4 write-no-read pattern, observed.
+   - `cache_create` on a fresh run is the measured marked-block size for the live
+     prompt row, which supersedes the chars/4 seed estimates. Review panel: seat v2
+     552, chair v3 801, both on Opus 5, so the panel DOES cache its system block.
+     The audit doc's "panel caches nothing" claim is withdrawn. The seat resolved to
+     Opus 5 in the 09-17 row although source defaults it to Fable 5.1
+     (`shared/config/baseConfig.js` `review-panel.seat.claude`); override config
+     not read.
+   - The fix landed on `main` at 2026-09-19 19:48Z. The only post-fix row is one
+     `initial-assessment.generate` document (prefix 645 vs 677 pre-fix on the same
+     row/version, consistent with the nonce line gone). **The post-fix
+     cross-document read is not yet observed.**
+
+3. **Durable reconciliation**
+   - `docs/PROMPT_CACHING_AUDIT.md` §0 R4 (telemetry table, withdrawn panel claim,
+     closing check), §3 R4 qualifier, §4 verification (script invocation),
+     frontmatter. `.claude-memory/project-cache-hit-rate-review.md`, agent-wiki
+     `prompt-executor.md` (telemetry bullet). Docs catalog regenerated.
+   - `scripts/audit-system-prompt-sizes.js` could not run as documented: the bare
+     `node scripts/...` form fails on the app's extensionless imports (S524's
+     "re-verified" was a mocked-rows check). Added `npm run audit:prompt-sizes`
+     (uses `scripts/lib/use-extensionless.mjs`) and fixed the docblock. It has
+     still not been run end-to-end; it is owner-run (production prompt rows).
+   - Handoff correction: Executor cache telemetry lives in Dataverse
+     `wmkf_ai_run` notes (`aiRunAdapter.create` in `execute-prompt.js`
+     `writeRunRow`), not Postgres.
+
+4. **Release**
+   - Branch rebased onto Codex's Graph closeout (`d9cf70b5`; no file overlap),
+     then `main` fast-forwarded `d9cf70b5` → `7c729379` with owner approval and
+     pushed from the worktree. Vercel production `dpl_6Z3Fv3mYxpkSYiQCjqmUQrbsQvbd`
+     READY at `7c729379` (docs + scripts only, no runtime change). All five CI
+     workflows passed. Rollback: `dpl_ExUrFDvxPXPfSrzYzhJVL7ieeQWJ` (`a24a02d5`).
+   - Per-machine worktree setup: `.agents/skills` symlink, `node_modules` symlink,
+     memory symlinks at both the harness slug (`--claude-worktrees-`) and the
+     `check-agent-invariants` slug (`-.claude-worktrees-`); the two disagree on the
+     dot, so a worktree needs both. `check:agent-invariants` was the only red at
+     `/start` and cleared once the symlink existed.
+
+### Commits
+- `c6280aa1` - chore(scripts): add read-only wmkf_ai_run cache-telemetry probe
+- `ea72f07a` - chore(scripts): show prompt name per run in the cache-telemetry probe
+- `7c729379` - docs: record production cache telemetry for the Executor prefix fix
+
+## Next Items
+
+### Verified Open
+
+1. **Observe the post-fix cross-document cache read (item 1 closing step).**
+   Evidence: `docs/PROMPT_CACHING_AUDIT.md` §0 R4 telemetry table; only one
+   post-fix row as of 2026-09-20 03:14Z. Owner-run:
+   `node scripts/probe-ai-run-cache-reads.js --since 2026-09-19T19:48:00Z --limit 25`.
+   Expect later documents of a `cycle-dossier.entry` or `review-synthesis.generate`
+   batch to show `cache_read` ≈ the first document's `cache_create`. If they still
+   show create-only, read that prompt row's system template in Dataverse for
+   interpolated variables (S524's grep covered bundled seeds only). No deliberate
+   test needed unless the owner wants it closed before the next natural batch.
+2. **Await Connor's platform-owner evidence for the Test Request Factory** (carried
+   from Session 526, unchanged). Evidence:
+   `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`. Production
+   enablement stays blocked; no clone route, schema apply, creation, or send.
+3. **Preview CSRF origin check rejects alias-hosted POSTs** (carried from S523,
+   unchanged). Evidence: `lib/utils/auth.js` `validateOrigin`;
+   `docs/CURRENT_WORK_QUEUE.md` entry. Prefer the runbook step first.
+
+### Owner Decision Needed
+
+1. **Review-panel user-turn cache breakpoint, premise corrected.** The system
+   block already caches on Opus 5 (seat 552, chair 801). The only open lever is
+   the unmarked user turn holding the proposal + question set; it pays only if
+   the same proposal is re-sent within the TTL (seat retries, chair rerun). Read
+   panel run-row cadence with the probe (`--prompt review-panel.seat`,
+   `--prompt review-panel.chair`) before deciding; if gaps exceed 5 minutes the
+   lever is `ttl: '1h'`, not a breakpoint.
+2. **R5 items** (`composeScorePrompt` batch loop, `process-phase-i-writeup` static
+   block, ~10 single-shot callers with a random nonce at byte 0). Still gated on
+   the `api_usage_log` hit-rate query per app; unchanged.
+3. **Test Request Factory enablement boundary** (carried from Session 526).
+   Decide only after Connor's evidence and the bounded rehearsal results.
+4. **Reviewer search functional follow-ups** (carried;
+   `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md`).
+
+### Parked
+
+1. Dynamics Explorer history caching (carried; re-open only if the Explorer moves
+   off Haiku). Impeccable 11px exception (carried). Memory router diet debt
+   (router unchanged this session; `check:memory-router` reports 7054 bytes, under
+   the 8 KiB trigger).
+
+### Verify Before Acting
+
+1. **`npm run audit:prompt-sizes` has never completed end-to-end.** The invocation
+   is fixed but unproven past the first prompt module; it reads production prompt
+   rows and spends `count_tokens` calls, so the owner runs it. For Executor rows
+   prefer the measured `cache_create` from the probe.
+2. **Remove two stale Entra callbacks for retired Codex branch aliases** (carried;
+   owner-run tenant write). Destructive: list and confirm the exact redirect URIs
+   before touching anything.
+3. **Refresh production deployment and rollback facts before another release
+   action** (carried from Session 526). Current: `dpl_6Z3Fv3mYxpkSYiQCjqmUQrbsQvbd`
+   at `7c729379`; runtime evidence is sampled, not continuous.
+4. **Worktree gate runs:** the harness memory slug and the gate's slug differ for
+   dotted paths (`.claude/worktrees/...`); if `check:agent-invariants` is red in a
+   worktree, create the symlink at both slugs before assuming a repo problem.
+
+### Do Not Reopen Without New Decision
+
+1. Do not re-add the nonce list to the Executor preamble; do not add a cache marker
+   without a verified floor and repeat-within-TTL use (carried).
+2. Do not reopen the completed GraphService decomposition or promote Test Request
+   Factory capability from `codex/test-request-design` without Connor's evidence
+   and release approval (carried from Session 526).
+3. The "review panel caches nothing" claim is withdrawn on measured data; do not
+   restore it from the older seed estimates.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `scripts/probe-ai-run-cache-reads.js` | Owner-run read-only run-row cache telemetry (prompt/request/since filters) |
+| `docs/PROMPT_CACHING_AUDIT.md` | §0 R4 telemetry table, closing check, withdrawn panel claim |
+| `.claude-memory/project-cache-hit-rate-review.md` | Cache remaining-work pointer with the measured prefixes |
+| `docs/agent-wiki/topics/prompt-executor.md` | Executor hazards incl. where cache telemetry lives |
+| `scripts/audit-system-prompt-sizes.js` + `npm run audit:prompt-sizes` | Bundled-app prefix-size audit (loader-required invocation) |
+| `lib/services/execute-prompt.js` | `composeMessages` (nonce-free preamble), `callProvider` (system-only marker), `writeRunRow` / `buildSuccessNotes` (notes format) |
+| `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md` | Test Request Factory blockers (Codex, Session 526) |
+
+## Testing
+
+```bash
+# Owner-run (production Dataverse read): post-fix cross-document read check
+node scripts/probe-ai-run-cache-reads.js --since 2026-09-19T19:48:00Z --limit 25
+# Owner-run: bundled-app prefix sizes (count_tokens + production prompt rows)
+npm run audit:prompt-sizes
+# Gates touched this session (sequential; each with its self-test)
+npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test
+npm run check:odata-escape && npm run check:odata-escape:self-test
+npm run check:doc-currency && npm run check:doc-currency:self-test
+npm run check:docs-catalog
+```
+
+## Stop-time notes
+
+Claim-evidence pilot: the current-session report shows zero recorded advisory
+events and no eligible plan/design edit, so no observation row was added. No
+milestone entry: telemetry read and docs reconciliation, not a new capability or
+cutover. Session docs were written on `worktree-claude-s525` and land on `main`
+by fast-forward.
+
+## Historical handoffs — not current instructions
+
+Everything below preserves prior-session evidence. The Session 528 guidance above
+controls current next steps. The Session 527 prompt body (Codex's Session 526
+Graph release summary) follows unchanged, then older handoffs.
+
+## Prior Session 527 Prompt: Production Graph release complete; Test Request Factory handoff pending
 
 ## Session 526 Summary
 
