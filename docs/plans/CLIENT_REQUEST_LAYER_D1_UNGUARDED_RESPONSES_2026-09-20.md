@@ -193,3 +193,32 @@ component receives `error: undefined` and shows nothing [VERIFIED via grep,
 Fix: rename the prop at each call site to `error=`; add one render assertion
 per site that the message text appears. Tier 1. Same user-facing family as D1
 (an error that never reaches the user); ship it with the D1 fixes.
+
+## 9. D1 fixes — admin batch (built 2026-09-20; fresh review pending)
+
+Trailing lane, run after Stage 3 acceptance on files disjoint from Stage 4.
+Tests committed first (red against the accepted Stage 3 code by design), fix
+second (green). Each site routes `envelope.error.message` to the surface the
+file already had; the 2xx path is unchanged.
+
+| Site | Old on non-2xx | New | Commits |
+|---|---|---|---|
+| `pages/admin.js` HealthSection (~:215) | non-2xx body rendered as health data | thrown into the existing network-failure catch → `overall:'error'`; `health.error` now rendered beside the timestamp (was set, never shown) | `c72e72ce` / `4d9a5fd9` |
+| `pages/admin.js` RoleManagement roles (~:1586) | only 401/403 handled | 401/403 verbatim; other `!ok` → existing `message` banner; banner relocated so the section no longer vanishes for non-superusers on load failure | same |
+| `pages/admin.js` user-profiles (~:1609) | body used as list | `!ok` → existing `message` banner | same |
+| `DynamicsExplorerRestrictionsSection.js` GET/POST | silent | `setError(envelope.error.message)` via a minimal new `error` state + inline `<p>` (the section had no surface; sibling PoliciesSection pattern) | `5f85a0ef` / `47456bf8` |
+| `DynamicsExplorerRestrictionsSection.js` DELETE | row removed optimistically | row stays; error shown | same |
+| `PoliciesSection.js` POST | `onOutcome(data)` with `status` undefined → blank banner | structured `data.status` outcomes unchanged; no-`status` non-2xx → `onOutcome({ status:'failed', warnings:[message] })` (the existing catch shape); `parseError` rethrow removed per D3 | `e4e220bc` / `16719450` |
+| `PromptTemplatesSection.js` PUT | same as above | same as above | `aae33102` / `a03160e8` |
+| D9 `pages/expertise-finder.js` :250/:388/:851 | `message=` prop ignored → blank | `error=`; new `tests/unit/expertise-finder-error-alert.test.js` renders the real `ErrorAlert` | `b9ae8f47` / `0bd8d81d` |
+
+Two previously passing Stage 3 pins (raw parse text on an unparseable non-2xx
+at the policies and prompts sites) were updated to `Request failed (502)`,
+consistent with owner decision D3. Gates at `0bd8d81d`: `npm test` 1001 suites /
+14986 tests green; lint 0 errors; `check:types` clean.
+
+Remaining D1 sites by stage: Stage 4 (InviteEmailModal :292, ReviewerFindPanel
+:281, ReviewersTab :210, useReviewerPromotion :188 per census) after Stage 4
+acceptance; Stage 5a (dynamics-explorer :153, virtual-review-panel :1030) and
+5b (scheduled-emails :59, :61, campaign-critical, Tier 2) after theirs. D9's
+other three sites ride with Stage 5a.
