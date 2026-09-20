@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { requestJson } from '../../utils/api-request';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../config/requestDocument';
 import ArtifactFileMetadata from './ArtifactFileMetadata';
@@ -28,10 +28,16 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
     generationSequence.current += 1;
     (async () => {
       try {
-        const body = await requestJson(
+        const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(
           `/api/workbench/initial-assessment?requestId=${encodeURIComponent(requestId)}`,
-          { fallbackMessage: 'Failed to load artifact', tolerantBody: true },
+          { tolerantBody: true },
         );
+        if (!resOk) {
+          const responseError = body && typeof body === 'object' ? body.error : null;
+          const requestError = new Error(responseError || `Failed to load artifact (${resStatus})`);
+          requestError.status = resStatus;
+          throw requestError;
+        }
         if (loadSequence.current !== sequence) return;
         setArtifact(body.artifacts?.[0] || null);
         setLatestAttempt(body.latestAttempts?.[0] || null);
@@ -58,10 +64,16 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
       const id = requestId;
       const sequence = ++loadSequence.current;
       try {
-        const body = await requestJson(
+        const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(
           `/api/workbench/initial-assessment?requestId=${encodeURIComponent(id)}`,
-          { fallbackMessage: 'Failed to refresh artifact', tolerantBody: true },
+          { tolerantBody: true },
         );
+        if (!resOk) {
+          const responseError = body && typeof body === 'object' ? body.error : null;
+          const requestError = new Error(responseError || `Failed to refresh artifact (${resStatus})`);
+          requestError.status = resStatus;
+          throw requestError;
+        }
         if (loadSequence.current !== sequence || id !== requestId) return;
         setArtifact(body.artifacts?.[0] || null);
         setLatestAttempt(body.latestAttempts?.[0] || null);
@@ -81,13 +93,18 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
     setGenerating(true);
     setError(null);
     try {
-      const body = await requestJson('/api/workbench/initial-assessment', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/initial-assessment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: { requestId: id },
-        fallbackMessage: 'Generation failed',
         tolerantBody: true,
       });
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        const requestError = new Error(responseError || `Generation failed (${resStatus})`);
+        requestError.status = resStatus;
+        throw requestError;
+      }
       if (generationSequence.current !== sequence || id !== requestId) return;
       const returned = body.artifact || null;
       if (returned?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY) {
@@ -118,7 +135,7 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
     setSnapshotting(true);
     setError(null);
     try {
-      const body = await requestJson('/api/workbench/initial-assessment/board-snapshot', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/initial-assessment/board-snapshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: {
@@ -126,9 +143,14 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
           expectedArtifactId,
           expectedCurrentVersionId,
         },
-        fallbackMessage: 'Board snapshot failed',
         tolerantBody: true,
       });
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        const requestError = new Error(responseError || `Board snapshot failed (${resStatus})`);
+        requestError.status = resStatus;
+        throw requestError;
+      }
       if (snapshotSequence.current !== sequence || id !== requestId) return;
       if (body.snapshot) {
         setMilestones((current) => [
