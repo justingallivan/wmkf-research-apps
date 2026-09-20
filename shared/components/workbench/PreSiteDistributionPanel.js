@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { requestJson, requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
 import CuratedRecipientPicker from './CuratedRecipientPicker';
@@ -369,12 +370,10 @@ export default function PreSiteDistributionPanel({
   const defaultsSeededRequestRef = useRef(null);
 
   const loadHistory = useCallback(async (id, signal, expectedSequence) => {
-    const response = await fetch(
+    const body = await requestJson(
       `/api/workbench/pre-site-visit/distribution/history?requestId=${encodeURIComponent(id)}`,
-      { signal },
+      { signal, fallbackMessage: 'Email history could not be loaded.', tolerantBody: true },
     );
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error || 'Email history could not be loaded.');
     if (sequence.current !== expectedSequence || id !== requestId) return;
     setHistory(body.attempts || []);
     setBriefingLink(body.briefingLink || null);
@@ -489,22 +488,22 @@ export default function PreSiteDistributionPanel({
       // version, so the lock happens here, before prepare, never after.
       if (beforePrepare) await beforePrepare();
       if (sequence.current !== currentSequence || id !== requestId) return;
-      const response = await fetch('/api/workbench/pre-site-visit/distribution/prepare', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/pre-site-visit/distribution/prepare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId: id,
           expectedArtifactId: sourceArtifact.artifactId,
           operationId: newOperationId(),
           ...form,
           siteVisitId: siteVisit?.activityId || null,
           ...(acknowledgeStaleInputs ? { acknowledgeStaleInputs } : {}),
-        }),
+        },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
       if (body.inProgress) throw new Error(body.error || 'Preview preparation is already in progress.');
-      if (!response.ok && body.code === 'brief_inputs_stale') {
+      if (!resOk && body.code === 'brief_inputs_stale') {
         if (sequence.current === currentSequence && id === requestId) {
           setStaleInputs({
             generatedFingerprint: body.generatedFingerprint,
@@ -520,13 +519,13 @@ export default function PreSiteDistributionPanel({
       // separately from the generic failure below so staff see why, not a
       // bare "Preview preparation failed" — and Regenerate Brief (allowed
       // while Review, B12) is the recovery path, not a stuck brief.
-      if (!response.ok && body.code === 'brief_snapshot_invalid') {
+      if (!resOk && body.code === 'brief_snapshot_invalid') {
         if (sequence.current === currentSequence && id === requestId) {
           setError('The brief\'s stored input record could not be read, so it cannot be shared. Regenerate the brief and try again.');
         }
         return;
       }
-      if (!response.ok && body.code === 'brief_reviews_required') {
+      if (!resOk && body.code === 'brief_reviews_required') {
         if (sequence.current === currentSequence && id === requestId) {
           setError('This brief has no received reviews yet, so it cannot be shared. Wait for at least one review to come in, or regenerate the brief once one has.');
         }
@@ -536,25 +535,25 @@ export default function PreSiteDistributionPanel({
       // rather than silently omitting a review from the bundle or serving
       // an unbounded one. Named so staff see the actionable reason, not a
       // bare "Preview preparation failed".
-      if (!response.ok && body.code === 'review_bundle_incomplete') {
+      if (!resOk && body.code === 'review_bundle_incomplete') {
         if (sequence.current === currentSequence && id === requestId) {
           setError(body.error || 'A received review has no retained file yet, so the review bundle could not be assembled.');
         }
         return;
       }
-      if (!response.ok && body.code === 'review_bundle_part_invalid') {
+      if (!resOk && body.code === 'review_bundle_part_invalid') {
         if (sequence.current === currentSequence && id === requestId) {
           setError('One of the retained reviews is not a valid PDF, so the review bundle could not be assembled. Check the review file and try again.');
         }
         return;
       }
-      if (!response.ok && body.code === 'review_bundle_unavailable') {
+      if (!resOk && body.code === 'review_bundle_unavailable') {
         if (sequence.current === currentSequence && id === requestId) {
           setError('The review bundle could not be assembled from SharePoint right now. Try again shortly.');
         }
         return;
       }
-      if (!response.ok && body.code === 'review_bundle_too_large') {
+      if (!resOk && body.code === 'review_bundle_too_large') {
         if (sequence.current === currentSequence && id === requestId) {
           setError(body.error || 'The review bundle is too large to assemble. Reduce the review set or re-upload smaller review files.');
         }
@@ -564,13 +563,13 @@ export default function PreSiteDistributionPanel({
       // regeneration is live for this request's brief (`resolveCurrentPreRpBriefForDistribution`,
       // lib/services/pre-rp-brief/artifact-service.js). Named, not the
       // generic failure below, so staff know to wait rather than retry.
-      if (!response.ok && body.code === 'brief_regeneration_in_progress') {
+      if (!resOk && body.code === 'brief_regeneration_in_progress') {
         if (sequence.current === currentSequence && id === requestId) {
           setError('A replacement brief is being generated; sharing is paused until it is ready.');
         }
         return;
       }
-      if (!response.ok) throw new Error(body.error || `Preview preparation failed (${response.status})`);
+      if (!resOk) throw new Error(body.error || `Preview preparation failed (${resStatus})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setPreview(body.attempt || null);
       setStaleInputs(null);
@@ -597,20 +596,20 @@ export default function PreSiteDistributionPanel({
     setReissuing(true);
     setBriefingError(null);
     try {
-      const response = await fetch('/api/workbench/pre-site-visit/briefing-link', {
+      const { ok: resOk, status: resStatus, data: body, error: envelopeError } = await requestEnvelope('/api/workbench/pre-site-visit/briefing-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: id, action: 'reissue', expectedLinkId: briefingLink?.id || undefined }),
+        body: { requestId: id, action: 'reissue', expectedLinkId: briefingLink?.id || undefined },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok && (body.code === 'briefing_link_superseded' || body.code === 'briefing_send_in_progress')) {
+      if (!resOk && (body.code === 'briefing_link_superseded' || body.code === 'briefing_send_in_progress')) {
         // The link changed under us or a send still carries it: refresh the
         // header from history instead of retrying blindly.
         await loadHistory(id, controller.signal, currentSequence);
-        throw new Error(body.error);
+        throw new Error(body.error || envelopeError.message);
       }
-      if (!response.ok) throw new Error(body.error || `The new link could not be issued (${response.status})`);
+      if (!resOk) throw new Error(body.error || `The new link could not be issued (${resStatus})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setBriefingLink(body.link || null);
       // Any prepared preview carried the old link; it can no longer be sent.
@@ -639,17 +638,17 @@ export default function PreSiteDistributionPanel({
     setError(null);
     setSendFeedback(null);
     try {
-      const response = await fetch('/api/workbench/pre-site-visit/distribution/send', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/pre-site-visit/distribution/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId: id,
           operationId: preview.operationId,
           previewHash: preview.previewHash,
-        }),
+        },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
       if (body.code === 'distribution_send_unconfirmed' && body.pendingSend) {
         if (sequence.current === currentSequence && id === requestId) {
           setPreview(body.pendingSend);
@@ -659,7 +658,7 @@ export default function PreSiteDistributionPanel({
         return;
       }
       if (body.inProgress) throw new Error(body.error || 'This exact send is already in progress.');
-      if (!response.ok && STALE_PREVIEW_CODES.has(body.code)) {
+      if (!resOk && STALE_PREVIEW_CODES.has(body.code)) {
         if (sequence.current === currentSequence && id === requestId) {
           setPreview(null);
           setConfirmed(false);
@@ -676,14 +675,14 @@ export default function PreSiteDistributionPanel({
       // regeneration that started after this preview was prepared blocks
       // completion here too. Named, and the existing (still valid) preview
       // is kept rather than discarded, since nothing about it is stale.
-      if (!response.ok && body.code === 'brief_regeneration_in_progress') {
+      if (!resOk && body.code === 'brief_regeneration_in_progress') {
         if (sequence.current === currentSequence && id === requestId) {
           setError('A replacement brief is being generated; sharing is paused until it is ready.');
         }
         return;
       }
-      if (!response.ok) {
-        const sendFailure = new Error(body.error || `Send failed (${response.status})`);
+      if (!resOk) {
+        const sendFailure = new Error(body.error || `Send failed (${resStatus})`);
         sendFailure.outcome = body.outcome || 'failed';
         throw sendFailure;
       }
