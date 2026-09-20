@@ -1003,3 +1003,36 @@ pages in the route manifest. Commits: `3cb3fa4a9`/`0c93e0467`
 `ae082b079` (+ test) (grant-reporting), `56f225cb4` (+ test) (phase-ii-writeup).
 Process note: the group 2 implementer split its 12 remaining files across three
 parallel sub-agents it supervised; commits are per file as required.
+
+## Stage 5b — external token pages, upload-adjacent forms, email pages (Tier 2)
+
+Logged 2026-09-20; fresh review pending. 10 files, 19 JSON sites migrated;
+only the annotated `GranteeDeliverableForm.js:154` keepalive beacon remains raw.
+One test-then-refactor commit pair per file (8 pairs; the two one-site external
+components share pairs).
+
+| File | Sites | Form / policy | Tests |
+|---|---|---|---|
+| `pages/external/briefing/[token].js` | 1 | function-form `() => ({ ok:false, reason:'server_error' })`; non-2xx unparseable mapped via `parseError` to the same fallback | +4 in `external-briefing-page.test.js` |
+| `pages/external/grantee/[token].js` | 1 | strict (bare `.json()` today); non-2xx unparseable → `parseError` → outer catch `server_error` | new `external-grantee-portal-page.test.js` (8) |
+| `pages/external/review/[token].js` | 1 | strict; non-2xx unparseable → `parseError` → `reason:'network'` as today | new `external-review-page.test.js` (7) |
+| `pages/external/materials/[token].js` | 4 | `load` and mount-effect GETs function-form (same fallback as briefing); `finalize`/`upload-token` POSTs envelope tolerant | +11 in `external-materials-routes-client.test.js` |
+| `shared/components/external/DeclineFormView.js` | 1 | envelope tolerant | +9 |
+| `shared/components/external/Stage2aView.js` | 1 | envelope tolerant | new `stage2a-view-accept-fetch.test.js` (10) |
+| `shared/components/external/GranteeDeliverableForm.js` | 2 + beacon | envelope tolerant; beacon annotated | +10 |
+| `shared/components/external/ReviewAuthoringForm.js` | 3 | envelope tolerant; the draft PUT reads no body today, so tolerant was required to avoid a new failure mode on an empty 2xx (documented inline) | new `review-authoring-form-fetch.test.js` (16) |
+| `pages/scheduled-emails.js` | 6 | :59/:61 D1-preserve GETs envelope tolerant, `.data` used unguarded as today; PUTs and list GET `requestJson` tolerant with `fallbackMessage`; action PATCH envelope tolerant, `data.outcome` branch before `!ok` verbatim | new `scheduled-emails-page.test.js` (14; first test for this page) |
+| `pages/test-email.js` | 1 | strict; non-2xx unparseable → `parseError` → the page's existing `uncertain` path, parse message in the parenthetical (AwardeeTab precedent) | new `test-email-page.test.js` (7) |
+
+The three §2.6 function-form sites (`briefing :75`, `materials :214/:227`) each
+pin malformed 2xx, empty 2xx, and non-2xx unparseable → the "retry later"
+`server_error` state. GET call-shape assertion flips bundled into migration
+commits (Stage 3/4 precedent). Deviations flagged by the implementer: a test
+file was created for `test-email.js` though the plan's T5 list omitted it
+(required by tests-first); the ReviewAuthoringForm PUT tolerant choice above.
+
+Gates at the group's final commit: full suite 1024/1025 suites (the one red,
+`workbench-request-number-lookup.test.js` against `RequestLocator.js`, is a
+Stage 5a group 1 file mid-migration); lint 0 errors (one expected unused
+eslint-disable warning on the beacon until Stage 6); `check:types` clean;
+`check:api-routes` + self-test pass.
