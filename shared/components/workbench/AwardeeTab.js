@@ -28,6 +28,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { ApiRequestError, requestJson, requestEnvelope } from '../../utils/api-request';
 import EmailSendFeedback from '../EmailSendFeedback';
 import { GRANTEE_DELIVERABLE_LABEL, GRANTEE_DELIVERABLE_STATUS } from '../../config/granteeDeliverableStatus';
 import { useProfile } from '../../context/ProfileContext';
@@ -235,13 +236,8 @@ export default function AwardeeTab({ requestId, context }) {
     const seq = defaultLoadSeqRef.current + 1;
     defaultLoadSeqRef.current = seq;
     try {
-      const res = await fetch('/api/email-defaults/grantee-invite');
-      const data = await res.json().catch(() => ({}));
+      const data = await requestJson('/api/email-defaults/grantee-invite', { tolerantBody: true });
       if (defaultLoadSeqRef.current !== seq) return;
-      if (!res.ok) {
-        setEmailDefaults({ subject: '', body: '', configured: false, unavailable: true, loaded: true });
-        return;
-      }
       const next = {
         subject: String(data.subject || ''),
         body: String(data.body || ''),
@@ -260,35 +256,30 @@ export default function AwardeeTab({ requestId, context }) {
     if (!requestId) return;
     const loadRequestId = requestId;
     try {
-      const res = await fetch(`/api/workbench/grantee-deliverables/recipients?requestId=${encodeURIComponent(loadRequestId)}`);
-      const data = await res.json();
+      const data = await requestJson(`/api/workbench/grantee-deliverables/recipients?requestId=${encodeURIComponent(loadRequestId)}`);
       if (currentRequestIdRef.current !== loadRequestId) return;
-      if (res.ok) {
-        setRecipients(data);
-        setToEmail(data.pi?.email || '');
-        setCcEmail(data.liaison?.email || '');
-      }
+      setRecipients(data);
+      setToEmail(data.pi?.email || '');
+      setCcEmail(data.liaison?.email || '');
     } catch { /* recipients are optional context; staff can still type them */ }
   }, [requestId]);
 
   const loadVipFlags = useCallback(async () => {
     try {
-      const res = await fetch('/api/scheduled-emails/vip-flags');
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) setVipContactIds(new Set((data.flags || []).map((flag) => flag.contactId)));
+      const data = await requestJson('/api/scheduled-emails/vip-flags', { tolerantBody: true });
+      setVipContactIds(new Set((data.flags || []).map((flag) => flag.contactId)));
     } catch { /* flags are an optional affordance; the tab still works */ }
   }, []);
 
   const toggleVipFlag = useCallback(async (contactId, flagged) => {
     setSavingVipContactId(contactId);
     try {
-      const res = await fetch('/api/scheduled-emails/vip-flags', {
+      const { ok, data } = await requestEnvelope('/api/scheduled-emails/vip-flags', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contactId, flagged }),
+        body: { contactId, flagged },
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
+      if (ok) {
         setVipContactIds((current) => {
           const next = new Set(current || []);
           if (data.flagged) next.add(data.contactId);
@@ -319,10 +310,9 @@ export default function AwardeeTab({ requestId, context }) {
     // showing another grant's names is the false clear the panel must not make.
     setByline(null);
     try {
-      const res = await fetch(`/api/workbench/grantee-deliverables/abstract?requestId=${encodeURIComponent(loadRequestId)}`);
-      const data = await res.json();
+      const data = await requestJson(`/api/workbench/grantee-deliverables/abstract?requestId=${encodeURIComponent(loadRequestId)}`);
       if (abstractLoadSeqRef.current !== seq || currentRequestIdRef.current !== loadRequestId) return;
-      if (res.ok) {
+      {
         setAbstractText(data.effective || '');
         setAbstractHtml(data.effectiveHtml || '');
         setSavedAbstractText(data.effective || '');
@@ -378,13 +368,11 @@ export default function AwardeeTab({ requestId, context }) {
     const seq = abstractLoadSeqRef.current + 1;
     abstractLoadSeqRef.current = seq;
     try {
-      const res = await fetch(`/api/workbench/grantee-deliverables/abstract?requestId=${encodeURIComponent(loadRequestId)}`);
-      const data = await res.json().catch(() => ({}));
+      const data = await requestJson(`/api/workbench/grantee-deliverables/abstract?requestId=${encodeURIComponent(loadRequestId)}`, {
+        tolerantBody: true,
+        fallbackMessage: 'The abstract changed, but the current server version could not be loaded. Your unsaved text remains in the editor.',
+      });
       if (abstractLoadSeqRef.current !== seq || currentRequestIdRef.current !== loadRequestId) return;
-      if (!res.ok) {
-        setAbstractError('The abstract changed, but the current server version could not be loaded. Your unsaved text remains in the editor.');
-        return;
-      }
       setAbstractConflict({
         requestId: loadRequestId,
         text: data.effective || '',
@@ -455,17 +443,16 @@ export default function AwardeeTab({ requestId, context }) {
   async function generate(regenerate = false) {
     setGenerating(true); setError(null); setAbstractMsg(null);
     try {
-      const res = await fetch('/api/workbench/grantee-deliverables/generate', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, regenerate }),
+      const data = await requestJson('/api/workbench/grantee-deliverables/generate', {
+        method: 'POST', body: { requestId, regenerate }, fallbackMessage: 'Abstract generation failed.',
       });
-      const data = await res.json();
-      if (!res.ok) setError(data.error || 'Abstract generation failed.');
       // Reload the effective abstract so the editor + etag reflect the persisted
       // state (the write target may be the grantee-approved field, which generate
       // does not return).
-      else { setStatus(data.status); await loadAbstract(); }
-    } catch { setError('Abstract generation failed.'); }
+      setStatus(data.status); await loadAbstract();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Abstract generation failed.');
+    }
     setGenerating(false);
   }
 
@@ -478,27 +465,25 @@ export default function AwardeeTab({ requestId, context }) {
     abstractSaveSeqRef.current = saveSeq;
     setSavingAbstract(true); setError(null); setAbstractError(null); setAbstractMsg(null);
     try {
-      const res = await fetch('/api/workbench/grantee-deliverables/abstract', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: saveRequestId, text: saveText, etag: saveEtag, baseField: saveField }),
+      const data = await requestJson('/api/workbench/grantee-deliverables/abstract', {
+        method: 'PUT',
+        body: { requestId: saveRequestId, text: saveText, etag: saveEtag, baseField: saveField },
+        tolerantBody: true,
+        fallbackMessage: 'Could not save the abstract.',
       });
-      const data = await res.json().catch(() => ({}));
       if (abstractSaveSeqRef.current !== saveSeq || currentRequestIdRef.current !== saveRequestId) return;
-      if (!res.ok) {
-        setAbstractError(data.error || 'Could not save the abstract.');
-        if (data.code === 'stale') await loadAbstractConflict();
-      } else {
-        setSavedAbstractText(saveText);
-        if (data.field) setAbstractField(data.field);
-        if (data.etag) setAbstractEtag(data.etag);
-        if (data.status !== undefined) setStatus(data.status);
-        setAbstractConflict(null);
-        setAbstractError(null);
-        setAbstractMsg('Abstract saved.');
-      }
-    } catch {
+      setSavedAbstractText(saveText);
+      if (data.field) setAbstractField(data.field);
+      if (data.etag) setAbstractEtag(data.etag);
+      if (data.status !== undefined) setStatus(data.status);
+      setAbstractConflict(null);
+      setAbstractError(null);
+      setAbstractMsg('Abstract saved.');
+    } catch (err) {
       if (abstractSaveSeqRef.current === saveSeq && currentRequestIdRef.current === saveRequestId) {
-        setAbstractError('Could not save the abstract.');
+        const isApi = err instanceof ApiRequestError;
+        setAbstractError(isApi ? err.message : 'Could not save the abstract.');
+        if (isApi && err.payload?.code === 'stale') await loadAbstractConflict();
       }
     } finally {
       if (abstractSaveSeqRef.current === saveSeq && currentRequestIdRef.current === saveRequestId) {
@@ -540,12 +525,12 @@ export default function AwardeeTab({ requestId, context }) {
     setSendReceipt(null);
     setSending(true); setError(null);
     try {
-      const res = await fetch('/api/workbench/grantee-deliverables/send-invite', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, toEmail, ccEmail, subject: fillInviteSubject(subject, { title: awardTitle }), bodyText: body }),
+      const { ok: sendOk, data } = await requestEnvelope('/api/workbench/grantee-deliverables/send-invite', {
+        method: 'POST',
+        body: { requestId, toEmail, ccEmail, subject: fillInviteSubject(subject, { title: awardTitle }), bodyText: body },
+        fallbackMessage: 'The invitation was not sent.',
       });
-      const data = await res.json();
-      if (!res.ok) {
+      if (!sendOk) {
         setSendReceipt({
           status: data.outcome === 'uncertain' ? 'uncertain' : 'failed',
           message: data.error || 'The invitation was not sent.',
@@ -580,12 +565,10 @@ export default function AwardeeTab({ requestId, context }) {
   async function previewEmail() {
     setError(null);
     try {
-      const res = await fetch('/api/workbench/grantee-deliverables/preview-invite', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, bodyText: body }),
+      const data = await requestJson('/api/workbench/grantee-deliverables/preview-invite', {
+        method: 'POST', body: { requestId, bodyText: body }, tolerantBody: true,
+        fallbackMessage: 'Could not render the preview.',
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error || 'Could not render the preview.'); return; }
       const w = window.open('', '_blank');
       if (!w) { setError('Allow pop-ups to preview the email in a new tab.'); return; }
       const safeSubject = fillInviteSubject(subject, { title: awardTitle }).replace(/[&<>"']/g, (c) =>
@@ -600,7 +583,9 @@ export default function AwardeeTab({ requestId, context }) {
         `<div style="padding:20px;max-width:680px">${data.html}</div>` +
         '</body></html>');
       w.document.close();
-    } catch { setError('Could not render the preview.'); }
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not render the preview.');
+    }
   }
 
   // Output (b): fetch the single-award website HTML and copy it to the clipboard.
@@ -610,20 +595,20 @@ export default function AwardeeTab({ requestId, context }) {
     if (!requestId) return;
     setFetchingHtml(true); setError(null); setCopyMsg(null);
     try {
-      const res = await fetch(`/api/workbench/grantee-deliverables/website-html?requestId=${encodeURIComponent(requestId)}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || 'Could not build the website HTML.');
-      } else {
-        setWebsiteHtml(data.html || '');
-        try {
-          await navigator.clipboard.writeText(data.html || '');
-          setCopyMsg('Website HTML copied to the clipboard.');
-        } catch {
-          setCopyMsg('Website HTML ready — select the text below to copy.');
-        }
+      const data = await requestJson(`/api/workbench/grantee-deliverables/website-html?requestId=${encodeURIComponent(requestId)}`, {
+        tolerantBody: true,
+        fallbackMessage: 'Could not build the website HTML.',
+      });
+      setWebsiteHtml(data.html || '');
+      try {
+        await navigator.clipboard.writeText(data.html || '');
+        setCopyMsg('Website HTML copied to the clipboard.');
+      } catch {
+        setCopyMsg('Website HTML ready — select the text below to copy.');
       }
-    } catch { setError('Could not build the website HTML.'); }
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not build the website HTML.');
+    }
     setFetchingHtml(false);
   }
 
@@ -657,6 +642,7 @@ export default function AwardeeTab({ requestId, context }) {
       const status = Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599
         ? httpStatus
         : null;
+      // raw fetch: fire-and-forget beacon; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       void fetch('/api/workbench/grantee-deliverables/replacement-upload-failure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -674,21 +660,23 @@ export default function AwardeeTab({ requestId, context }) {
     try {
       let staged = replaceStagedUpload;
       if (replaceFile && !staged) {
-        const tokenRes = await fetch('/api/workbench/grantee-deliverables/replacement-upload-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requestId: saveRequestId,
-            etag: submission.deliverableEtag || '',
-            filename: replaceFile.name,
-            contentType: replacementContentType(replaceFile),
-            size: replaceFile.size,
-          }),
-        });
-        const tokenData = await tokenRes.json().catch(() => ({}));
+        const { ok: tokenOk, status: tokenStatus, data: tokenData } = await requestEnvelope(
+          '/api/workbench/grantee-deliverables/replacement-upload-token',
+          {
+            method: 'POST',
+            body: {
+              requestId: saveRequestId,
+              etag: submission.deliverableEtag || '',
+              filename: replaceFile.name,
+              contentType: replacementContentType(replaceFile),
+              size: replaceFile.size,
+            },
+            tolerantBody: true,
+          },
+        );
         if (currentRequestIdRef.current !== saveRequestId) return;
-        if (!tokenRes.ok || !tokenData.ok) {
-          if (tokenRes.status === 413) reportUploadFailure('http_rejected', tokenRes.status);
+        if (!tokenOk || !tokenData.ok) {
+          if (tokenStatus === 413) reportUploadFailure('http_rejected', tokenStatus);
           setReplaceError(tokenData.error || 'Could not prepare the image upload.');
           setReplacing(false);
           return;
@@ -714,15 +702,13 @@ export default function AwardeeTab({ requestId, context }) {
       if (replaceCaptionChanged) payload.caption = replaceCaption;
 
       activeStage = 'finalize';
-      const res = await fetch('/api/workbench/grantee-deliverables/replace-submission', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
+      const { ok: replaceOk, status: replaceStatus, data } = await requestEnvelope(
+        '/api/workbench/grantee-deliverables/replace-submission',
+        { method: 'POST', body: payload, tolerantBody: true },
+      );
       if (currentRequestIdRef.current !== saveRequestId) return;
-      if (!res.ok) {
-        if (res.status === 413) reportUploadFailure('http_rejected', res.status);
+      if (!replaceOk) {
+        if (replaceStatus === 413) reportUploadFailure('http_rejected', replaceStatus);
         const terminalStaging = new Set([
           'staging_expired', 'staging_not_found', 'staged_upload_missing',
           'staging_publicly_readable', 'image_invalid', 'image_too_large',
