@@ -416,8 +416,9 @@ test('timeout-only budget display names the timeout and leaves output tokens on 
 //    required for Executor budgets' pinned verbatim.
 //  - executor-budgets PUT (:469): status/body-flag branches, already covered
 //    for (a)/(b); this adds (c)/(d)/(e).
-//  - prompt publish PUT (:741): D1 PRESERVE, no ok check, reads data.status
-//    regardless of HTTP status.
+//  - prompt publish PUT (:741): D1 fix — a non-2xx body with a recognized
+//    `status` is still read as before; a non-2xx body with no `status`
+//    now surfaces the server error via the existing failed-outcome banner.
 function unparseable(status) {
   return { ok: status >= 200 && status < 300, status, json: jest.fn(async () => { throw new SyntaxError('bad json'); }) };
 }
@@ -540,7 +541,7 @@ test('(e) executor-budgets PUT: a non-2xx unparseable body (502) never silent', 
   expect(await screen.findByText('bad json')).toBeInTheDocument();
 });
 
-describe('prompt publish (PublishForm, D1 preserve)', () => {
+describe('prompt publish (PublishForm, D1 fix)', () => {
   beforeEach(() => {
     global.fetch.mockImplementation(async (url, options = {}) => {
       if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
@@ -577,7 +578,7 @@ describe('prompt publish (PublishForm, D1 preserve)', () => {
     expect(JSON.parse(putCall[1].body)).toMatchObject({ body: 'body edited', systemPrompt: prompt.systemPrompt, model: prompt.model, expectedVersion: prompt.version });
   });
 
-  test('(b) a well-formed non-2xx body (409 concurrency_conflict) is read regardless of status (D1)', async () => {
+  test('(b) a well-formed non-2xx body (409 concurrency_conflict) is read regardless of status (unchanged, not a D1 defect)', async () => {
     await openPublishForm();
     global.fetch.mockImplementation(async (url, options = {}) => {
       if (options.method === 'PUT') return response({ status: 'concurrency_conflict' }, false, 409);
@@ -585,6 +586,17 @@ describe('prompt publish (PublishForm, D1 preserve)', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
     expect(await screen.findByText('Another admin published while you were editing. Reload and re-apply.')).toBeInTheDocument();
+  });
+
+  test('(b) D1 fix: non-2xx {error} with no status field surfaces the server error message, not a blank banner', async () => {
+    await openPublishForm();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') return response({ error: 'Prompt store unavailable' }, false, 500);
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
+    expect(await screen.findByText('Publish failed. Check server logs.')).toBeInTheDocument();
+    expect(screen.getByText('Prompt store unavailable')).toBeInTheDocument();
   });
 
   test('(c) a network rejection is caught and rendered as a failed outcome', async () => {
@@ -617,6 +629,9 @@ describe('prompt publish (PublishForm, D1 preserve)', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
     expect(await screen.findByText('Publish failed. Check server logs.')).toBeInTheDocument();
-    expect(screen.getByText('bad json')).toBeInTheDocument();
+    // D1 fix: the api-request helper's public default surfaces the fallback
+    // message for a non-2xx unparseable body, not the raw parse error text
+    // (shared/utils/api-request.js deriveErrorMessage, owner decision (3)).
+    expect(screen.getByText('Request failed (502)')).toBeInTheDocument();
   });
 });
