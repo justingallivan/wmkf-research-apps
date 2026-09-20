@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
+import { requestJson, requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ReviewerStatusIndicator from './ReviewerStatusIndicator';
 import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
@@ -133,13 +134,14 @@ export default function RequestListPanel({
     setError(null);
     setErrorKey(null);
     try {
-      const res = await fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(code)}&scope=${sc}&programId=${encodeURIComponent(selectedProgramId)}${incl ? '&includeSetAside=1' : ''}`);
-      const body = await res.json().catch(() => ({}));
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(code)}&scope=${sc}&programId=${encodeURIComponent(selectedProgramId)}${incl ? '&includeSetAside=1' : ''}`, {
+        tolerantBody: true,
+      });
       if (reqIdRef.current !== myReq) return; // a newer request superseded this one
-      if (!res.ok) {
+      if (!resOk) {
         const responseError = body && typeof body === 'object' ? body.error : null;
-        const requestError = new Error(responseError || `Failed to load requests (${res.status})`);
-        requestError.status = res.status;
+        const requestError = new Error(responseError || `Failed to load requests (${resStatus})`);
+        requestError.status = resStatus;
         throw requestError;
       }
       if (!body || typeof body !== 'object' || !Array.isArray(body.proposals) || !body.rollup || typeof body.rollup !== 'object') {
@@ -238,13 +240,13 @@ export default function RequestListPanel({
     });
     setError(null);
     try {
-      const res = await fetch('/api/workbench/triage', {
+      await requestJson('/api/workbench/triage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, triageStatus }),
+        body: { requestId, triageStatus },
+        fallbackMessage: 'Failed to set triage status',
+        tolerantBody: true,
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `Failed to set triage status (${res.status})`);
       const current = filtersRef.current;
       if (proposal?.isMine === true && wasSetAside !== isSetAside && triageFilters.cycleCode) {
         patchCycleCounts(
