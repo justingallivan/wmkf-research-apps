@@ -75,6 +75,53 @@ test('saveSelected: save-candidates POST sends exact body bytes/headers; a malfo
   expect(await screen.findByText(/Save failed \(200\)/)).toBeInTheDocument();
 });
 
+// D1 confirmation (not a fix): the plan's §3/§3a confirmed set classifies this
+// site `guarded-elsewhere`, not `unguarded` — `if ((!sOk || !sData.success) &&
+// saved === 0)` already gates the failure path (source line ~267) before the
+// function returns. These two pins characterize that existing guard: a
+// non-2xx {error} body surfaces the server message verbatim, and a
+// non-2xx unparseable body falls back to the status-embedded message — both
+// already true on unmodified code, so no source change was made here.
+test('saveSelected: D1 confirmation — a non-2xx {error} body is already surfaced verbatim (guarded-elsewhere, no fix needed)', async () => {
+  const c = candidate('Ada Lovelace', 'ada@example.edu');
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({ success: true, active: [c], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [c.name] }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') {
+      return Promise.resolve(response({ error: 'save-candidates service down' }, false, 500));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${c.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
+
+  expect(await screen.findByText(/save-candidates service down/)).toBeInTheDocument();
+});
+
+test('saveSelected: D1 confirmation — a 502 unparseable body already falls back to the status-embedded message (guarded-elsewhere, no fix needed)', async () => {
+  const c = candidate('Ada Lovelace', 'ada@example.edu');
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({ success: true, active: [c], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [c.name] }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') {
+      return Promise.resolve({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${c.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
+
+  expect(await screen.findByText(/Save failed \(502\)/)).toBeInTheDocument();
+});
+
 test('applicant promotion: POST sends exact body bytes/headers; a malformed 2xx body falls back to the status-embedded message', async () => {
   const suggestionId = '44444444-4444-4444-4444-444444444444';
   const c = candidate('Referred Person', 'ref@example.edu', {
