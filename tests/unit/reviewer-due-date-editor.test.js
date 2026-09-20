@@ -210,7 +210,7 @@ test('minimum extension date is the later of today and the day after the origina
   expect(minimumExtensionDate('2020-09-01', '2099-08-01')).toBe('2099-08-01');
 });
 
-test('T4 axis (d): a malformed 2xx body falls back to the generic extension-failed message', async () => {
+test('D10 fix: a malformed 2xx body reports the uncertain receipt, not the generic extension-failed message', async () => {
   global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
   render(
     <ReviewerDueDateEditor
@@ -222,7 +222,8 @@ test('T4 axis (d): a malformed 2xx body falls back to the generic extension-fail
   fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
   fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
   fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-  expect(await screen.findByText('The extension could not be saved.')).toBeInTheDocument();
+  expect(await screen.findByText('I could not complete the deadline update.')).toBeInTheDocument();
+  expect(screen.queryByText('The extension could not be saved.')).not.toBeInTheDocument();
 });
 
 test('T4 axis (e): a non-2xx body that fails to parse is never silent (reports the generic extension-failed message)', async () => {
