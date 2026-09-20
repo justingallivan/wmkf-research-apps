@@ -346,7 +346,7 @@ export/signature/message-string change; thrown values stay plain `Error`.
 
 | Adapter | File | Before | After |
 |---|---|---|---|
-| `readResponse` | `shared/components/review-panel/review-panel-ui.js:62-66` | `const body = await response.json().catch(() => ({}));` | `const body = await readJsonBody(response, { tolerantBody: true });` |
+| `readResponse` | `shared/components/review-panel/review-panel-ui.js:64-68` (was :62-66; +2 for the added import and blank line) | `const body = await response.json().catch(() => ({}));` | `const body = await readJsonBody(response, { tolerantBody: true });` |
 | `readResponse` (local copy) | `pages/cycle-dossier.js:73-77` (was :72-75; +1 line for the added import elsewhere in the file, no adapter body change) | `const body = await response.json().catch(() => ({}));` | `const body = await readJsonBody(response, { tolerantBody: true });` |
 | `readJson` | `shared/components/meeting-tracker/SessionEditor.js:23-25` (was :22-24; +1 line for the added import elsewhere in the file) | `return response.json().catch(() => ({}));` | `return readJsonBody(response, { tolerantBody: true });` |
 | `sendJson` | `shared/components/meeting-tracker/SessionEditor.js:27-36` (was :26-35; +1 line, same shift) | unchanged — still calls the file-local `readJson`, which now folds over `readJsonBody` | unchanged expression; behavior folds through `readJson`'s new body |
@@ -357,7 +357,7 @@ change) so `tests/unit/client-request-stage1-adapters.test.js` (T1) can
 import them directly, matching each file's existing convention of exporting
 its other pure helpers (e.g. `groupedCandidates`, `reorderSessionSlots`).
 
-**17 raw sites confirmed** [VERIFIED via grep against each file, this
+**17 raw sites confirmed** (line numbers are pre-edit, Stage 0 census; each is +1 in the migrated files after the added import) [VERIFIED via grep against each file, this
 session]:
 - `shared/components/review-panel/review-panel-ui.js` `readResponse` (6
   sites): `pages/review-panel.js:44,89,111` (the pair at :110-111 is
@@ -407,7 +407,22 @@ Stage 1 now has callers; `check:doc-currency` + self-test: OK; `check:secret-sca
 + self-test: OK (3904 files); `check:scaffolding-tokens` + self-test: OK
 (3888 files); `npm run build`: compiled successfully.
 
-Fresh review: pending.
+Fresh review (Opus, no inherited context, at `c3a84a41`): **READY WITH NAMED
+CHANGES, doc-only.** Per-adapter thrown expressions byte-identical and plain
+`Error`; no consumer line changed (exports landed in the T1 commit `45907489`,
+additive; `pages/cycle-dossier.js` already had 7 named exports and the repo has
+precedent for tests importing page-module exports); T1's five message pins
+shown discriminating against a `deriveErrorMessage` swap; two introduced
+semantic differences, both unobservable here (abort-during-body rethrow: 0
+`signal`/`AbortController` hits in the four consumer files; the helper's
+try/await also tolerates a synchronous `json()` throw, which a real Response
+never does). Named changes applied by the orchestrator: this row's line shift,
+T1 header refs, census pre-edit label, `\bsignal\b` tripwire. Reviewer's
+scope note recorded: Stage 1 adds a seam and removes no duplication; the
+slimming payoff is in Stages 2-6.
+
+**Stage 1 ACCEPTED 2026-09-20 by the orchestrator (Fable).** Rollback: revert
+`c3a84a41`, `a38b085f`, `45907489` (tests, adapters, log; consumers untouched).
 
 ## Verification log
 

@@ -3,9 +3,9 @@
  * characterization pins for the four Stage 1 adapters BEFORE and AFTER they
  * are reimplemented over `readJsonBody(response, { tolerantBody: true })`
  * (plan §3 "Stage 1 adapters keep their legacy expressions verbatim"):
- *   - readResponse (shared/components/review-panel/review-panel-ui.js:62-66)
- *   - readResponse (pages/cycle-dossier.js:72-75, local copy)
- *   - sendJson (shared/components/meeting-tracker/SessionEditor.js:26-35)
+ *   - readResponse (shared/components/review-panel/review-panel-ui.js:64-68; was :62-66 before the import)
+ *   - readResponse (pages/cycle-dossier.js:73-77, local copy; was :72-75)
+ *   - readJson + sendJson (shared/components/meeting-tracker/SessionEditor.js:23-25, :27-36; were :22-24, :26-35)
  *
  * This file must pass unchanged against BOTH the unmigrated (legacy
  * `response.json().catch(() => ({}))`) and migrated adapters — it pins
@@ -183,7 +183,7 @@ describe('Stage 1 abort rethrow is unobservable (T1 static assertion)', () => {
 
   test.each(consumerFiles)('%s has no signal / AbortController usage', (relativePath) => {
     const source = fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
-    expect(source).not.toMatch(/signal/);
+    expect(source).not.toMatch(/\bsignal\b/);
     expect(source).not.toMatch(/AbortController/);
   });
 });
