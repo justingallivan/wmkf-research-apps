@@ -2353,8 +2353,8 @@ function DynamicsIdentitySection() {
 
   const fetchUsers = () => {
     setLoading(true);
-    fetch('/api/user-profiles?all=true')
-      .then(r => (r.ok ? r.json() : null))
+    requestEnvelope('/api/user-profiles?all=true')
+      .then(envelope => (envelope.ok ? envelope.data : null))
       .then(data => {
         if (!data) return;
         setUsers((data.profiles || []).filter(u => u.isActive));
@@ -2369,13 +2369,13 @@ function DynamicsIdentitySection() {
     setReconciling(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/admin/reconcile-identities', {
+      const envelope = await requestEnvelope('/api/admin/reconcile-identities', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all }),
+        body: { all },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || 'Reconcile failed');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      const data = envelope.data;
+      if (!envelope.ok) throw new Error(data.error || data.message || 'Reconcile failed');
       const s = data.summary || {};
       const parts = [];
       if (s.linked) parts.push(`${s.linked} linked`);
