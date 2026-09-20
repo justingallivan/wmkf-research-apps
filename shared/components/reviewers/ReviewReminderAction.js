@@ -21,6 +21,12 @@ const REVIEW_REMINDER_ERROR_MESSAGE = {
   ineligible: 'This reviewer is no longer eligible for a reminder. Refresh the list.',
 };
 
+// Sentinel for handleSend's POST: distinguishes "2xx body failed to parse"
+// (most likely sent — the app just couldn't confirm) from a legitimately
+// empty/null 2xx body, without losing envelope.ok/status the way a thrown
+// parse error under strict tolerantBody would. See handleSend below.
+const MALFORMED_BODY = Symbol('malformed-body');
+
 export function ReviewReminderAction({
   requestId,
   reviewer,
@@ -107,10 +113,17 @@ export function ReviewReminderAction({
           requestId,
           suggestionId: reviewer.suggestionId,
         },
-        tolerantBody: true,
+        tolerantBody: () => MALFORMED_BODY,
       });
       const data = envelope.data;
       if (generation !== generationRef.current || !isCurrent(epoch)) return;
+      if (envelope.ok && data === MALFORMED_BODY) {
+        setFeedback({
+          status: 'uncertain',
+          message: 'The app could not confirm the result. Check reviewer activity before trying again.',
+        });
+        return;
+      }
       if (!envelope.ok || !data.ok) {
         setFeedback({
           status: data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed',
