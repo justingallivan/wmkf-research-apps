@@ -25,7 +25,7 @@ test('(a) a 2xx ok body with view=edit renders the edit form', async () => {
   }));
   render(<GranteePortalPage />);
   await screen.findByText('edit-form');
-  expect(global.fetch).toHaveBeenCalledWith('/api/external/grantee/tok/context');
+  expect(global.fetch).toHaveBeenCalledWith('/api/external/grantee/tok/context', { method: 'GET', signal: undefined });
 });
 
 test('(a) view=submitted renders the thank-you notice', async () => {
