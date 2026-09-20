@@ -27,7 +27,7 @@ test('(a) a 2xx ok body with a server view dispatches to that view', async () =>
   global.fetch = jest.fn().mockResolvedValue(response({ ok: true, engagementState: { view: 'stage2a' } }));
   render(<ExternalReviewPage />);
   await screen.findByText('stage2a');
-  expect(global.fetch).toHaveBeenCalledWith('/api/external/review/tok/context');
+  expect(global.fetch).toHaveBeenCalledWith('/api/external/review/tok/context', { method: 'GET', signal: undefined });
 });
 
 test('(b) non-2xx {ok:false, reason} shows the mapped error message', async () => {

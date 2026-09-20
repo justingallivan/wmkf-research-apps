@@ -25,6 +25,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { requestEnvelope } from '../../../shared/utils/api-request';
 import Stage2aView from '../../../shared/components/external/Stage2aView';
 import DeclineFormView from '../../../shared/components/external/DeclineFormView';
 import AcceptedConfirmationView from '../../../shared/components/external/AcceptedConfirmationView';
@@ -49,9 +50,18 @@ export default function ExternalReviewPage() {
 
   const fetchContext = useCallback(async () => {
     try {
-      const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/context`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
+      const envelope = await requestEnvelope(`/api/external/review/${encodeURIComponent(token)}/context`);
+      // Today's bare `.json()` (no catch) throws on ANY malformed body,
+      // regardless of HTTP status, landing in the outer catch's 'network'
+      // reason. The helper only parses strictly on 2xx; a non-2xx unparseable
+      // body is always tolerant, so reproduce the throw-to-catch outcome here
+      // via the recorded parseError.
+      if (envelope.error?.parseError) {
+        setState({ status: 'error', reason: 'network' });
+        return;
+      }
+      const json = envelope.data;
+      if (!envelope.ok || !json.ok) {
         setState({ status: 'error', reason: json.reason || 'server_error' });
         return;
       }
