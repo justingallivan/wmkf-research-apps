@@ -210,11 +210,17 @@ export default function ReviewersTab({
     const isCurrent = () => rid === currentRequestIdRef.current && gen === candidatesGenRef.current;
     setCandidatesLoading(true);
     try {
-      const { data } = await requestEnvelope(
+      const { ok, data, error } = await requestEnvelope(
         `/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(rid)}`,
         { tolerantBody: true },
       );
       if (!isCurrent()) return; // request changed or a newer load superseded this one
+      if (!ok) {
+        setError(error.message);
+        setCandidates([]);
+        setRemovedCandidates([]);
+        return;
+      }
       const prop = (data.proposals && data.proposals[0]) || null;
       const rows = (prop && prop.candidates) || [];
       const removed = (prop && prop.removedCandidates) || [];
