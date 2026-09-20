@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 function fallbackContext(alert) {
   const metadata = alert?.metadata && typeof alert.metadata === 'object' ? alert.metadata : {};
@@ -52,15 +53,15 @@ export default function ReviewerRepairAlertDetails({ alert }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/admin/alerts?repairContext=${encodeURIComponent(alert.id)}`, {
+    requestEnvelope(`/api/admin/alerts?repairContext=${encodeURIComponent(alert.id)}`, {
       signal: controller.signal,
+      tolerantBody: true,
     })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok || !body.context) {
-          throw new Error(body.error || `Could not load repair context (${response.status})`);
+      .then(({ ok, status, data }) => {
+        if (!ok || !data.context) {
+          throw new Error(data.error || `Could not load repair context (${status})`);
         }
-        return body.context;
+        return data.context;
       })
       .then((context) => setRemote({ alertId: alert.id, loading: false, context, error: null }))
       .catch((error) => {
