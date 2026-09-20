@@ -69,7 +69,7 @@ function formatUsd(value) {
   return Number.isFinite(value) ? value.toFixed(2) : '0.00';
 }
 
-async function readResponse(response) {
+export async function readResponse(response) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
   return body;

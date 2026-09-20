@@ -19,11 +19,11 @@ const EMPTY_FORM = {
   attendees: [],
 };
 
-async function readJson(response) {
+export async function readJson(response) {
   return response.json().catch(() => ({}));
 }
 
-async function sendJson(url, method, body, fetchImpl = fetch) {
+export async function sendJson(url, method, body, fetchImpl = fetch) {
   const response = await fetchImpl(url, {
     method,
     headers: { 'Content-Type': 'application/json' },
