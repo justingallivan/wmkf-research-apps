@@ -1,8 +1,8 @@
 # GraphService release preparation — 2026-09-19
 
-Status: **BOUNDED REHEARSAL PASSED — NOT APPROVED FOR PROMOTION**.
+Status: **BOUNDED REHEARSAL PASSED — OWNER APPROVED PRODUCTION RELEASE**.
 
-Scope: prepare release of `codex/graph-service-decomposition`, reviewed candidate `7f59afbafdc9f7eb6687c679cfc13ac80fae71b6`, from `/private/tmp/wmkf-graph-decomposition`. The owner authorized release preparation after local implementation acceptance. This packet does not authorize live writes, sending email, pushing `main`, or deployment. Release policy: `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, Tier 2; prior verification: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`.
+Scope: prepare release of `codex/graph-service-decomposition`, reviewed candidate `7f59afbafdc9f7eb6687c679cfc13ac80fae71b6`, from `/private/tmp/wmkf-graph-decomposition`. The owner authorized release preparation after local implementation acceptance. The owner subsequently authorized pushing this reviewed refactor to production on 2026-09-20 UTC, after the bounded rehearsals and stated coverage limits. No additional test writes or sends are included. Release policy: `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, Tier 2; prior verification: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`.
 
 ## Verified candidate and production baseline
 
@@ -23,7 +23,7 @@ The owner authorized one bounded synthetic rehearsal against request `1003220` (
 
 One Cloudmersive scan was explicitly authorized for this rehearsal and the flow enforced a clean outcome. This is evidence of the exercised scan path, not an independent billing or quota receipt. The sanitized runtime evidence records the rehearsal route fence rejecting `/api/cron/maintenance` and `/api/auth/session`; it does not prove every possible UI, route, or chunked upload journey. Receipt: `/private/tmp/1003220-cloud-runtime-sanitized.jsonl`.
 
-The synthetic current file and restored IA evidence remain retained for Justin's later restore decision. No production promotion, push, email send, or additional provider generation is authorized by this packet. The production baseline remains the previously recorded deployment and must be refreshed before any future release action.
+The synthetic current file and restored IA evidence remain retained for Justin's later restore decision. The owner now authorizes the deliberate production push; no additional test upload, email send, or provider generation is included. The production baseline remains the previously recorded deployment and must be refreshed before any future release action.
 
 The rehearsal covered these bounded journeys:
 
@@ -83,3 +83,26 @@ request switching in history, every search/empty-state UI, supported PDF convers
 live chunked transfer, or injected recovery failures. Existing automated evidence
 covers its stated cases; no unperformed scenario is silently treated as a pass or
 waived. Reconcile required coverage and release timing before promotion approval.
+
+## Owner-authorized release operation — 2026-09-20 UTC
+
+Owner instruction: “Great. Proceed with pushing this to prod.” Timing: now, as
+requested. Operator: Codex acting for Justin; Codex will restore the recorded
+baseline if immediate post-release checks reveal a regression. This authorizes the
+original Graph branch only, never the rehearsal-only overlay.
+
+Fresh checks at 04:47 UTC: candidate `669d4eff` is clean; remote main is still
+`f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`; local main is its two-planning-commit
+descendant and an ancestor of the candidate. Tested runtime is unchanged since
+`7f59afba`; subsequent edits are documentation only. Sol independently accepted
+this exact scope. Production baseline remains READY at
+`dpl_Aui3x7NtH3MoKARNHZQB5YUyJLZS`, with protection unchanged. The signed-in
+staff visit/read path passed during the preceding rehearsal verification.
+
+Action: fast-forward local main to this approved branch, push main without force,
+wait for the exact new production SHA, then verify authenticated staff access,
+proposal-document read/download, external link context without another upload, and
+bounded runtime errors. Retain the baseline for rollback. No migrations or production
+environment changes are required. Deployment results are retained in the local
+release receipt `/private/tmp/graph-production-release-receipt.json` and reported
+in the release task. An approved push is not itself evidence of successful deployment.
