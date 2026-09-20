@@ -669,3 +669,45 @@ group B's interleaved commits); lint 0 errors; `check:types` clean. Commits
 f13f9e82→623fa25e, 3b7646ad→1f96a97a, daadfbfb→e1ca3c19, bbb6fdf3→57c821a0,
 0566951e→4f1c2275, b7e07d6e→b6d27985, a87fe90b→e22a8dad, cd114413→3a459d54,
 cd245a8d→1fa9eb46.
+
+### Group B: `pages/admin.js` (logged 2026-09-20; fresh review pending)
+
+Seam commit `ef605f78`: named `export` added to `OperationsWorkspace`,
+`WorkflowsWorkspace`, `AiWorkspace`, `PeopleWorkspace`; each mounts directly
+with `view` as a prop (none needs router or session; only `AdminDashboard`
+does), so no mocking. `admin-dynamics-feedback-filters.test.js` fixture gained
+`status: 200`; its `toHaveBeenNthCalledWith(1, url)` was loosened to read
+`fetch.mock.calls[0][0]` because the helper always passes a second init arg
+(URL asserted unchanged). Four new test files: admin-operations-workspace (36),
+admin-workflows-workspace (44), admin-ai-workspace (16), admin-people-workspace
+(23) = 119 tests, green before and after every migration commit.
+
+32 sites migrated, census matched; `grep -n "fetch(" pages/admin.js` is empty.
+Operations (11, `df98cc0a`): :212 health (D1 preserve), :323 health-history,
+:497/:509 alerts, :640 maintenance (signal), :763/:791 secrets, :2131/:2154
+feedback, :2479/:2569 alert-recipients (`.details`-join derivation verbatim).
+Workflows (8, `fd30c767`): Honorarium :2703/:2724, ReleaseAttachments
+:2796/:2814, CampaignTimeline :2877/:2919, TimeBudget :3054/:3076. AI (3,
+`4f66a3dd`): Usage :938 and ModelConfig :1249 (403 → 'Admin access required'
+verbatim), ModelConfig PUT loop :1335 (`requestJson`, tolerant, 'Failed to
+save'). People (10, `9d61cdb0` RoleManagement :1583 D1 / :1602 D1 / :1619 /
+:1642; `4c33c8d5` AppAccess :1788 / :1888 / :1896 / :1953; `6615ef08`
+DynamicsIdentity :2349 / :2365). All `requestEnvelope` except the PUT loop.
+
+Parse-error idiom: at ~13 sites whose pre-image parsed with bare `.json()`
+before or without an `ok` check, `if (envelope.error?.parseError) throw
+envelope.error.parseError;` reproduces today's native parse-error text on a
+malformed non-2xx body. Deliberately NOT applied at AppAccess grant :1888 and
+revoke :1896, which now show 'Grant failed' / 'Revoke failed' on a 502 HTML
+body instead of the raw parse-error text (D3-permitted; flagged for review).
+
+Group B gates at `6615ef08`: `npm test` 993 suites / 14871 tests green; lint 0
+errors; `check:types` clean; `npm run build` compiled with the new page exports.
+
+**Observation O4 (for the owner).** Across Stage 3 both groups reproduced
+today's native `SyntaxError` text at ~16 sites via the parse-error rethrow,
+which is more conservative than accepted decision D3 permits and adds a line
+per site. Options: (a) keep as is; (b) in the D1 follow-up, drop the rethrow
+where the site's fallback message is acceptable (recommended: the raw parse
+text is never useful to a user); (c) add a helper option so the choice is one
+flag, not a hand-written line. No change made in Stage 3.
