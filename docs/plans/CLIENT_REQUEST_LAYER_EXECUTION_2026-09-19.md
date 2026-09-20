@@ -587,3 +587,38 @@ Documented in the new test; candidate for the D1 follow-up family.
 beacon, 3 verify-only files confirmed on the Stage 1 adapters. T2 tests added:
 75 (21+12+12+9+21). Form split: `requestJson` 11, `requestEnvelope` 31. Fresh
 review and full Gate G by the orchestrator: pending below.
+
+### Stage 2 acceptance — 2026-09-20, orchestrator (Fable), at `3472bcbc`
+
+Fresh Opus review of the ten Stage 2 commits (`4655b937..07470083`): READY WITH
+NAMED CHANGES. Tests-before-code order and one-source-file-per-migration-commit
+confirmed for all five files; request bytes, `signal` forwarding, status and
+body-flag branches, and the `saveAbstract` `stale` handling confirmed
+PRESERVED; only the allowlisted beacon remains raw. Material finding: because
+the helper parses every non-2xx body tolerantly, bare-`.json()` sites' "non-2xx
+with unparseable body" input moved from the catch block to the `!ok` branch,
+and at three sites those paths meant different things (send-invite `uncertain`
+→ `failed`; four expertise-finder roster sites → empty message hidden by the
+`{error && ...}` guard; `runBatch` → empty per-proposal cell). Three T2 gaps
+named (body-bytes assertion at send, the plain `failed` pin, fixtures lacking
+`status`).
+
+One Sonnet correction round (`7c77d39c` tests, `3472bcbc` fix): six new
+axis-(e) tests red before the fix and green after; send-invite maps
+`error.parseError` to `uncertain`; roster sites and `runBatch` use
+`data.error || error.message`; body-bytes and `failed`-branch pins and fixture
+statuses added. `handleMatch`/`loadProposals` already had a non-empty fallback
+and were left alone. The orchestrator read the 21-line fix diff in full against
+the finding and accepted it without a further fresh cycle. Plan amended
+(`597981bf`): T2 axis (e) and the never-silent / `parseError` rules for later
+stages.
+
+Full Gate G at `3472bcbc` [VERIFIED via this run]: every `check:*` gate and
+self-test 0 red; `npm test` 986 suites / 14662 tests green; lint 0 errors;
+`check:types` clean; `npm run build` compiled.
+
+Verdict: **Stage 2 ACCEPTED.** 42 sites migrated across 5 files; T2 tests
+added 85 (75 + 10 in the correction round). Rollback: revert `3472bcbc`,
+`7c77d39c`, then the five migration commits (`ab64f35d`, `d5f7cb6c`,
+`231842a9`, `8785a9bf`, `07470083`) and their test commits in reverse order.
+Stage 3 next.
