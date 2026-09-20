@@ -1185,7 +1185,8 @@ each triggering a Fast Refresh.
   dev-server log `POST /api/review-manager/withdraw-sufficient 200 in 956ms`;
   rows unchanged afterward, so the interlock denied the write and the service
   reported per-row `write_failed` in a 200 body (`withdraw-sufficient-service.js`
-  ~:291-297). The dialog stayed at "Releasing…" with no banner. FINDING under
+  ~:291-297 at the time; now ~:321, where the row also carries a `failure`
+  code [RECHECKED after lib/services/review-manager/withdraw-sufficient-service.js change: :321]). The dialog stayed at "Releasing…" with no banner. FINDING under
   investigation. The T4 suite had no pin for this exact 200 + `write_failed`
   outcome; added three (`a2e71560`: write_failed, not_pending, missing_result),
   all PASS in isolation: the dialog renders the amber partial banner and Done.
