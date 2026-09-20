@@ -83,7 +83,11 @@ test('a deferred roster response for request A cannot clobber the active request
   const { rerender } = render(
     <ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" />,
   );
-  expect(global.fetch).toHaveBeenCalledWith(`/api/workbench/reviewer-roster?requestId=${REQ_A}`);
+  // GET-shape matcher (call-shape only, Stage 4): the roster GET now always
+  // goes through requestEnvelope, whose doFetch always sets an explicit
+  // `method`/`signal` in the fetch init, so this call's second arg is no
+  // longer omitted post-migration.
+  expect(global.fetch).toHaveBeenCalledWith(`/api/workbench/reviewer-roster?requestId=${REQ_A}`, expect.anything());
 
   await act(async () => {
     rerender(<ReviewerSearchSection requestId={REQ_B} blobUrl="blob-b" proposalKey="proposal-b" />);
@@ -91,7 +95,7 @@ test('a deferred roster response for request A cannot clobber the active request
     await rosterB.promise;
   });
   expect(await screen.findByLabelText('Select Request B reviewer')).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith(`/api/workbench/reviewer-roster?requestId=${REQ_B}`);
+  expect(global.fetch).toHaveBeenCalledWith(`/api/workbench/reviewer-roster?requestId=${REQ_B}`, expect.anything());
 
   await act(async () => {
     rosterA.resolve(response(rosterSnapshot([candidateA])));
