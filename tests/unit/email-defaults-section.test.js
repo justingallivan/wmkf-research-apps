@@ -191,7 +191,7 @@ const defaults = [
 
 beforeEach(() => {
   global.fetch = jest.fn(async (url, opts = {}) => {
-    if (String(url) === '/api/admin/email-defaults' && !opts.method) {
+    if (String(url) === '/api/admin/email-defaults' && (!opts.method || opts.method === 'GET')) {
       return { ok: true, json: async () => ({ defaults }) };
     }
     if (String(url) === '/api/admin/email-defaults' && opts.method === 'PUT') {

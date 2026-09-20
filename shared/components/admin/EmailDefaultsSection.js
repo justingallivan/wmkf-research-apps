@@ -5,6 +5,7 @@ import OutcomeBanner from './OutcomeBanner';
 import { StatusChip } from './AdminWorkspaceNavigation';
 import { Button } from '../Layout';
 import { EDITABLE_TEXT_GROUPS } from '../../config/editableTextDefaults';
+import { requestJson } from '../../utils/api-request';
 
 const INPUT_CLASS = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-500 disabled:bg-gray-50 disabled:text-gray-500';
 
@@ -69,9 +70,10 @@ export default function EmailDefaultsSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/email-defaults');
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Failed to load email defaults.');
+      const data = await requestJson('/api/admin/email-defaults', {
+        tolerantBody: true,
+        fallbackMessage: 'Failed to load email defaults.',
+      });
       const nextDefaults = data.defaults || [];
       const values = Object.fromEntries(nextDefaults.map((entry) => [entry.key, String(entry.value ?? '')]));
       setDefaults(nextDefaults);
@@ -107,13 +109,12 @@ export default function EmailDefaultsSection() {
     const value = drafts[key] ?? '';
     setSavingKey(key);
     try {
-      const res = await fetch('/api/admin/email-defaults', {
+      await requestJson('/api/admin/email-defaults', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
+        body: { key, value },
+        tolerantBody: true,
+        fallbackMessage: 'Save failed.',
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Save failed.');
       setDefaults((prev) => (prev || []).map((item) => (
         item.key === key ? { ...item, value, unavailable: false } : item
       )));
