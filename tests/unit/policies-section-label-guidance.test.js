@@ -279,7 +279,10 @@ describe('PoliciesSection — unique-label guidance', () => {
       : Promise.resolve({ ok: true, status: 200, json: async () => makeState({ versions: [version('v1', { isActive: true })] }) })));
     fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
     expect(await screen.findByText('Publishing failed. Try again; if it keeps failing, contact an administrator.')).toBeInTheDocument();
-    expect(screen.getByText('Unexpected token < in JSON')).toBeInTheDocument();
+    // D1 fix: the api-request helper's public default surfaces the fallback
+    // message for a non-2xx unparseable body, not the raw parse error text
+    // (shared/utils/api-request.js deriveErrorMessage, owner decision (3)).
+    expect(screen.getByText('Request failed (502)')).toBeInTheDocument();
   });
 
   test('request bytes: POST sends the same method/headers/body shape', async () => {

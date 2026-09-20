@@ -361,11 +361,14 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
   const submit = async () => {
     setSubmitting(true);
     try {
-      // D1 PRESERVE: no ok check today; `data.status` is read regardless of
-      // HTTP status. A non-2xx unparseable body (a gateway page) is parsed
-      // tolerantly by the helper instead of throwing like a bare `.json()`
-      // would today, so it is rethrown here to keep routing to the same
-      // failed-outcome catch below (never silent, plan §6 Stage 2 rule ii).
+      // D1 fix: a non-2xx body still carries a structured `data.status`
+      // (label_conflict, concurrency_conflict, etc.) that STATUS_COPY
+      // already renders correctly, so that path is unchanged. The bug was a
+      // non-2xx body with NO `status` field (a plain `{error}` body, or an
+      // unparseable gateway page) falling through to `onOutcome(data)` with
+      // `status: undefined`, rendering a blank banner. That case now routes
+      // to the same failed-outcome shape the catch below already uses
+      // (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
       const envelope = await requestEnvelope('/api/admin/policies', {
         method: 'POST',
         body: {
@@ -377,12 +380,11 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
           parentEtag: slot.parentEtag,
         },
       });
-      if (envelope.error?.parseError) {
-        throw envelope.error.parseError;
-      }
       const { data } = envelope;
       if (data.status === 'completed' || data.status === 'already_published') {
         onSuccess(data);
+      } else if (!envelope.ok && !data.status) {
+        onOutcome({ status: 'failed', warnings: [envelope.error.message] });
       } else {
         onOutcome(data);
       }
