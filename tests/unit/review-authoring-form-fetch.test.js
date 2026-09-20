@@ -33,7 +33,7 @@ test('(a) a loaded draft overlays the prefill', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true, draftJson: { affiliation: 'Saved Uni' } }) });
   renderForm();
   await waitFor(() => expect(screen.getByLabelText('Affiliation', { exact: false })).toHaveValue('Saved Uni'));
-  expect(global.fetch).toHaveBeenCalledWith('/api/external/review/tok/draft');
+  expect(global.fetch).toHaveBeenCalledWith('/api/external/review/tok/draft', { method: 'GET', signal: undefined });
 });
 
 test('(b) a non-2xx draft response leaves the prefill untouched', async () => {
