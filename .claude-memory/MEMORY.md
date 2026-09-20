@@ -18,7 +18,7 @@
 - Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-run-harness-framing-before-handoff-commit.md; feedback-one-session-runs-gates-per-worktree.md
 - External systems / literals: feedback-verify-external-platform-claims.md; feedback-no-fabricated-placeholder-values.md
 - Delegated work: ../docs/AGENT_COLLABORATION_PLAN.md; ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-codex-model-gpt56-sol.md; feedback-codex-worktree-owner-runs-it.md
-- Environment / deployment / Vercel env+logs / require(esm) hazard: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-verify-deploy-is-the-merge-build.md; project-vercel-node22-no-require-esm.md
+- Environment / deployment / Vercel env+logs / require(esm) hazard: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-verify-deploy-is-the-merge-build.md; project-vercel-node22-no-require-esm.md; project-preview-rehearsal-venue-limits.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
 
