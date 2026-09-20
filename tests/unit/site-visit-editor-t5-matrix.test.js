@@ -57,3 +57,17 @@ test('load axis (e): non-2xx unparseable body on the recipients GET falls to its
   render(<SiteVisitEditor />);
   expect(await screen.findByRole('alert')).toHaveTextContent('The attendee directory could not be loaded.');
 });
+
+test('load: both fetch sites fail, recipients rejecting first — the visit error always wins (finding 4 precedence)', async () => {
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/recipients')
+      // Resolves immediately with a distinct error, before the visit fetch below.
+      ? Promise.resolve({ ok: false, status: 500, json: async () => ({ error: 'recipients failed' }) })
+      // Resolves on a later microtask/macrotask so it would lose a same-tick race.
+      : new Promise((resolve) => {
+          setTimeout(() => resolve({ ok: false, status: 500, json: async () => ({ error: 'visit failed' }) }), 0);
+        })
+  ));
+  render(<SiteVisitEditor />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('visit failed');
+});
