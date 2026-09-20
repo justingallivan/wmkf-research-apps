@@ -2,11 +2,11 @@
  * @jest-environment jsdom
  *
  * DynamicsExplorerRestrictionsSection — T3 per-call-site matrix (Stage 3,
- * group A) ahead of migrating its three fetch sites onto
- * shared/utils/api-request.js. All three sites are D1-preserve: none checks
- * `response.ok` today (plan §9 D1; execution doc Stage 3), so migration must
- * keep reading the parsed body regardless of status, and the DELETE site
- * never reads a body at all.
+ * group A), migrated onto shared/utils/api-request.js. D1 fix
+ * (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md):
+ * all three sites now check `envelope.ok` and surface the server's error
+ * message instead of reading the body as data; the DELETE site no longer
+ * removes the row optimistically on a failed delete.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import DynamicsExplorerRestrictionsSection from '../../shared/components/admin/DynamicsExplorerRestrictionsSection';
@@ -56,10 +56,10 @@ describe('DynamicsExplorerRestrictionsSection', () => {
       expect(global.fetch.mock.calls[0][0]).toBe('/api/dynamics-explorer/restrictions');
     });
 
-    test('(b) non-2xx {error} is read regardless of status (D1 silent)', async () => {
+    test('(b) D1 fix: non-2xx {error} now surfaces the server error message', async () => {
       global.fetch.mockResolvedValueOnce(jsonResponse(403, { error: 'Admin access required' }));
       render(<DynamicsExplorerRestrictionsSection userProfileId="u1" />);
-      expect(await screen.findByText('No Explorer safeguards configured.')).toBeInTheDocument();
+      expect(await screen.findByText('Admin access required')).toBeInTheDocument();
     });
 
     test('(c) network rejection leaves list empty, stops loading', async () => {
@@ -74,10 +74,10 @@ describe('DynamicsExplorerRestrictionsSection', () => {
       expect(await screen.findByText('No Explorer safeguards configured.')).toBeInTheDocument();
     });
 
-    test('(e) non-2xx unparseable body (502 gateway page) stays silent (D1 pin)', async () => {
+    test('(e) D1 fix: non-2xx unparseable body (502 gateway page) surfaces the fallback message', async () => {
       global.fetch.mockResolvedValueOnce(unparseableResponse(502));
       render(<DynamicsExplorerRestrictionsSection userProfileId="u1" />);
-      expect(await screen.findByText('No Explorer safeguards configured.')).toBeInTheDocument();
+      expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
     });
   });
 
@@ -107,20 +107,20 @@ describe('DynamicsExplorerRestrictionsSection', () => {
       expect(postCall[1].body).toBe(JSON.stringify({ table_name: 'contact', field_name: 'email', reason: 'PII', userProfileId: 'u1' }));
     });
 
-    test('(b) non-2xx {error} has no restriction field, so nothing is appended (D1 silent)', async () => {
+    test('(b) D1 fix: non-2xx {error} surfaces the message and appends nothing', async () => {
       await setup();
       global.fetch.mockResolvedValueOnce(jsonResponse(403, { error: 'Admin access required' }));
       fireEvent.click(screen.getByText('Add safeguard'));
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+      expect(await screen.findByText('Admin access required')).toBeInTheDocument();
       expect(screen.getByText('No Explorer safeguards configured.')).toBeInTheDocument();
       expect(screen.getByLabelText('Table name')).toHaveValue('contact');
     });
 
-    test('(e) non-2xx unparseable body (502) also appends nothing (D1 pin)', async () => {
+    test('(e) D1 fix: non-2xx unparseable body (502) surfaces the fallback message and appends nothing', async () => {
       await setup();
       global.fetch.mockResolvedValueOnce(unparseableResponse(502));
       fireEvent.click(screen.getByText('Add safeguard'));
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+      expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
       expect(screen.getByText('No Explorer safeguards configured.')).toBeInTheDocument();
     });
   });
@@ -147,11 +147,12 @@ describe('DynamicsExplorerRestrictionsSection', () => {
       expect(deleteCall[1].body).toBe(JSON.stringify({ id: 'r1', userProfileId: 'u1' }));
     });
 
-    test('(b) non-2xx {error} still removes the row locally (D1: no ok check, no body read)', async () => {
+    test('(b) D1 fix: non-2xx {error} surfaces the message and the row stays on a failed DELETE', async () => {
       await setupWithOne();
       global.fetch.mockResolvedValueOnce(jsonResponse(403, { error: 'Admin access required' }));
       fireEvent.click(screen.getByText('Remove'));
-      await waitFor(() => expect(screen.getByText('No Explorer safeguards configured.')).toBeInTheDocument());
+      expect(await screen.findByText('Admin access required')).toBeInTheDocument();
+      expect(screen.getByText('contact')).toBeInTheDocument();
     });
 
     test('(c) network rejection leaves the row in place (throws before the filter)', async () => {
@@ -162,11 +163,12 @@ describe('DynamicsExplorerRestrictionsSection', () => {
       expect(screen.getByText('contact')).toBeInTheDocument();
     });
 
-    test('(e) non-2xx unparseable body (502) still removes the row (D1: body never read)', async () => {
+    test('(e) D1 fix: non-2xx unparseable body (502) surfaces the fallback message and the row stays', async () => {
       await setupWithOne();
       global.fetch.mockResolvedValueOnce(unparseableResponse(502));
       fireEvent.click(screen.getByText('Remove'));
-      await waitFor(() => expect(screen.getByText('No Explorer safeguards configured.')).toBeInTheDocument());
+      expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
+      expect(screen.getByText('contact')).toBeInTheDocument();
     });
   });
 });
