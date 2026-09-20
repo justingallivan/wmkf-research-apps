@@ -1581,13 +1581,16 @@ function RoleManagementSection() {
   const [message, setMessage] = useState(null);
 
   const fetchRoles = () => {
-    fetch('/api/dynamics-explorer/roles')
-      .then(r => {
-        if (r.status === 403 || r.status === 401) {
+    // D1 PRESERVE: only 401/403 are guarded; any other non-2xx status still
+    // has its body read as if it were success. Kept as-is; see plan §9.
+    requestEnvelope('/api/dynamics-explorer/roles')
+      .then(envelope => {
+        if (envelope.status === 403 || envelope.status === 401) {
           setCallerRole('denied');
           return null;
         }
-        return r.json();
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        return envelope.data;
       })
       .then(data => {
         if (!data) return;
@@ -1600,8 +1603,14 @@ function RoleManagementSection() {
 
   useEffect(() => {
     fetchRoles();
-    fetch('/api/user-profiles?all=true')
-      .then(r => r.json())
+    // D1 PRESERVE: bare .json() unconditionally, so a non-2xx with a
+    // parseable body is still read as if it were success. Kept as-is; see
+    // plan §9.
+    requestEnvelope('/api/user-profiles?all=true')
+      .then(envelope => {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        return envelope.data;
+      })
       .then(data => setUsers(data.profiles || []))
       .catch(() => {});
   }, []);
@@ -1617,15 +1626,12 @@ function RoleManagementSection() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/dynamics-explorer/roles', {
+      await requestJson('/api/dynamics-explorer/roles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userProfileId: parseInt(selectedUser), role: selectedRole }),
+        body: { userProfileId: parseInt(selectedUser), role: selectedRole },
+        tolerantBody: true,
+        fallbackMessage: 'Failed to assign role',
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to assign role');
-      }
       setMessage({ type: 'success', text: 'Role assigned' });
       setSelectedUser('');
       fetchRoles();
@@ -1640,14 +1646,14 @@ function RoleManagementSection() {
     if (!confirm(`Remove role from ${userName}? They will revert to read-only.`)) return;
     setMessage(null);
     try {
-      const res = await fetch('/api/dynamics-explorer/roles', {
+      const envelope = await requestEnvelope('/api/dynamics-explorer/roles', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userProfileId }),
+        body: { userProfileId },
+        tolerantBody: true,
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to remove role');
+      if (!envelope.ok) {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        throw new Error(envelope.data?.error || 'Failed to remove role');
       }
       setMessage({ type: 'success', text: `Role removed from ${userName}` });
       fetchRoles();
