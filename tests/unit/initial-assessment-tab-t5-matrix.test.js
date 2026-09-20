@@ -8,12 +8,12 @@
  * `tolerantBody: true`. This file adds network-rejection and axis-(e)
  * coverage.
  *
- * Parse-error policy / D3 note: each site's original fallback interpolated
- * the HTTP status (e.g. `Failed to load artifact (${response.status})`).
- * `requestJson`'s `fallbackMessage` is a static string, so the migrated
- * fallback text drops the status suffix (`'Failed to load artifact'`) —
- * the same accepted D3 deviation Stage 3 recorded at the four `pages/admin.js`
- * fallback sites: user-visible, never silent, not the raw parse text.
+ * Parse-error policy: each site's original fallback interpolated the HTTP
+ * status (e.g. `Failed to load artifact (${response.status})`). The Stage
+ * 5a review (finding 1) restored that suffix by moving these sites onto
+ * `requestEnvelope` with an explicit `data.error || \`... (${status})\`
+ * throw, matching `RequestListPanel.js`. The status suffix is pinned below
+ * with a 500 + `{}` body per site.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import InitialAssessmentTab from '../../shared/components/workbench/InitialAssessmentTab';
@@ -48,10 +48,16 @@ test('load: network rejection is never silent', async () => {
   expect(await screen.findByText('offline')).toBeInTheDocument();
 });
 
-test('load axis (e): non-2xx unparseable body falls to the fallback text, never silent', async () => {
+test('load axis (e): non-2xx unparseable body falls to the fallback text with status suffix, never silent', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: unparseable });
   render(<InitialAssessmentTab requestId={REQUEST_ID} />);
-  expect(await screen.findByText('Failed to load artifact')).toBeInTheDocument();
+  expect(await screen.findByText('Failed to load artifact (502)')).toBeInTheDocument();
+});
+
+test('load: non-2xx empty body ({}) falls to the fallback text with status suffix (finding 1 parity)', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+  render(<InitialAssessmentTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText('Failed to load artifact (500)')).toBeInTheDocument();
 });
 
 async function readyPanel() {
@@ -71,7 +77,7 @@ test('generate: network rejection is never silent', async () => {
   expect(await screen.findByText('offline')).toBeInTheDocument();
 });
 
-test('generate axis (e): non-2xx unparseable body falls to the fallback text, never silent', async () => {
+test('generate axis (e): non-2xx unparseable body falls to the fallback text with status suffix, never silent', async () => {
   await readyPanel();
   global.fetch = jest.fn((url, opts) => (
     (opts?.method === 'POST')
@@ -79,7 +85,18 @@ test('generate axis (e): non-2xx unparseable body falls to the fallback text, ne
       : Promise.resolve({ ok: true, json: async () => ({ artifacts: [readyArtifact()], latestAttempts: [] }) })
   ));
   fireEvent.click(screen.getByRole('button', { name: 'Refresh from current inputs' }));
-  expect(await screen.findByText('Generation failed')).toBeInTheDocument();
+  expect(await screen.findByText('Generation failed (502)')).toBeInTheDocument();
+});
+
+test('generate: non-2xx empty body ({}) falls to the fallback text with status suffix (finding 1 parity)', async () => {
+  await readyPanel();
+  global.fetch = jest.fn((url, opts) => (
+    (opts?.method === 'POST')
+      ? Promise.resolve({ ok: false, status: 500, json: async () => ({}) })
+      : Promise.resolve({ ok: true, json: async () => ({ artifacts: [readyArtifact()], latestAttempts: [] }) })
+  ));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh from current inputs' }));
+  expect(await screen.findByText('Generation failed (500)')).toBeInTheDocument();
 });
 
 async function readyPanelSuperuser() {
@@ -100,7 +117,7 @@ test('createBoardSnapshot: network rejection is never silent', async () => {
   expect(await screen.findByText('offline')).toBeInTheDocument();
 });
 
-test('createBoardSnapshot axis (e): non-2xx unparseable body falls to the fallback text, never silent', async () => {
+test('createBoardSnapshot axis (e): non-2xx unparseable body falls to the fallback text with status suffix, never silent', async () => {
   await readyPanelSuperuser();
   global.fetch = jest.fn((url) => (
     String(url).includes('board-snapshot')
@@ -108,5 +125,16 @@ test('createBoardSnapshot axis (e): non-2xx unparseable body falls to the fallba
       : Promise.resolve({ ok: true, json: async () => ({ artifacts: [readyArtifact()], latestAttempts: [], milestones: [] }) })
   ));
   fireEvent.click(screen.getByRole('button', { name: 'Create Board snapshot' }));
-  expect(await screen.findByText('Board snapshot failed')).toBeInTheDocument();
+  expect(await screen.findByText('Board snapshot failed (502)')).toBeInTheDocument();
+});
+
+test('createBoardSnapshot: non-2xx empty body ({}) falls to the fallback text with status suffix (finding 1 parity)', async () => {
+  await readyPanelSuperuser();
+  global.fetch = jest.fn((url) => (
+    String(url).includes('board-snapshot')
+      ? Promise.resolve({ ok: false, status: 500, json: async () => ({}) })
+      : Promise.resolve({ ok: true, json: async () => ({ artifacts: [readyArtifact()], latestAttempts: [], milestones: [] }) })
+  ));
+  fireEvent.click(screen.getByRole('button', { name: 'Create Board snapshot' }));
+  expect(await screen.findByText('Board snapshot failed (500)')).toBeInTheDocument();
 });
