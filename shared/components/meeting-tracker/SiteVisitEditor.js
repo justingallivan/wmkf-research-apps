@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { requestEnvelope } from '../../utils/api-request';
 import Layout, { Button } from '../Layout';
 import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL } from '../../config/siteVisit';
 import SiteVisitMaterialsCard from './SiteVisitMaterialsCard';
@@ -59,12 +60,12 @@ function refKey(ref) {
   return `${ref.kind}-${ref.profileId ?? ref.rosterId ?? ref.email}`;
 }
 
-async function readJson(response, fallback) {
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
+async function readJson(url, options, fallback) {
+  const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(url, { ...options, tolerantBody: true });
+  if (!resOk) {
     const error = new Error(body.error || fallback);
     error.code = body.code;
-    error.status = response.status;
+    error.status = resStatus;
     throw error;
   }
   return body;
@@ -110,12 +111,10 @@ export default function SiteVisitEditor() {
     setLoading(true);
     setError(null);
     try {
-      const [visitResponse, recipientsResponse] = await Promise.all([
-        fetch(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`),
-        fetch('/api/meeting-tracker/recipients'),
+      const [visitBody, recipientBody] = await Promise.all([
+        readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The site visit could not be loaded.'),
+        readJson('/api/meeting-tracker/recipients', undefined, 'The attendee directory could not be loaded.'),
       ]);
-      const visitBody = await readJson(visitResponse, 'The site visit could not be loaded.');
-      const recipientBody = await readJson(recipientsResponse, 'The attendee directory could not be loaded.');
       setVisit(visitBody.siteVisit || null);
       setForm(formFromVisit(visitBody.siteVisit, requestNumber));
       setRecipients({ staff: recipientBody.staff || [], board: recipientBody.board || [] });
@@ -169,12 +168,11 @@ export default function SiteVisitEditor() {
         requiredAttendees: form.requiredAttendees,
         optionalAttendees: form.optionalAttendees,
       };
-      const response = await fetch(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, {
+      const body = await readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const body = await readJson(response, 'The site visit could not be saved.');
+        body: payload,
+      }, 'The site visit could not be saved.');
       setVisit(body.siteVisit);
       setForm(formFromVisit(body.siteVisit, requestNumber));
       setNotice('Site visit saved.');
