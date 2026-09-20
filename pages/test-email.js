@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import EmailSendFeedback from '../shared/components/EmailSendFeedback';
+import { requestEnvelope } from '../shared/utils/api-request';
 
 export default function TestEmail() {
   const { data: session } = useSession();
@@ -23,18 +24,28 @@ export default function TestEmail() {
     setResult(null);
 
     try {
-      const resp = await fetch('/api/test-email', {
+      const envelope = await requestEnvelope('/api/test-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject, body, sendMode, from: senderEmail }),
+        body: { to, subject, body, sendMode, from: senderEmail },
       });
-      const data = await resp.json();
+      // Today's bare `.json()` (no catch) throws on ANY malformed body,
+      // regardless of HTTP status, landing in the outer catch's 'uncertain'
+      // result below. The helper only parses strictly on 2xx; a non-2xx
+      // unparseable body is always tolerant, so reproduce the throw-to-catch
+      // outcome here via the recorded parseError (same shape as the
+      // AwardeeTab send-invite precedent).
+      if (envelope.error?.parseError) {
+        setResult({ status: 'uncertain', message: `The connection ended before the result could be confirmed. Check Dynamics before trying again. (${envelope.error.parseError.message})` });
+        return;
+      }
+      const data = envelope.data;
       if (data.outcome === 'uncertain') {
         setResult({ ...data, status: 'uncertain' });
         return;
       }
-      if (!resp.ok) {
-        setResult({ ...data, status: data.outcome || 'failed', message: data.error || `Request failed (${resp.status})` });
+      if (!envelope.ok) {
+        setResult({ ...data, status: data.outcome || 'failed', message: data.error || `Request failed (${envelope.status})` });
       } else {
         setResult(data);
       }
