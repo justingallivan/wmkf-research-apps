@@ -957,3 +957,49 @@ D10's three send sites. Stages 5a, 5b, and the D1 Stage-4 batch start next.
   (returns the alias to unassigned), `vercel env rm NEXTAUTH_URL preview
   feature/client-request-layer`, and `vercel env rm DATAVERSE_ALLOW_PROD_READS
   preview feature/client-request-layer`. None touches production.
+
+## Stage 5a — internal long tail (Tier 1)
+
+### Group 2: internal pages (logged 2026-09-20; fresh review pending with group 1)
+
+Census corrections found by reading: the nine Executor tool pages
+(batch-phase-i-summaries, batch-proposal-summaries, expense-reporter,
+funding-gap-analyzer, integrity-screener, literature-analyzer,
+multi-perspective-evaluator, peer-review-summarizer, phase-i-writeup) have ONE
+fetch each, consumed via `getReader()`; their `!response.ok` branch reads
+`response.json()` on that same Response, which the census had counted as a
+separate JSON site. Zero JSON sites migrated there; each stream site annotated
+(`735d1ebcb`). `pages/phase-ii-writeup.js` has 1 JSON site (:161 refine) plus 2
+whole-fetch streams (`/api/process`, `/api/qa`); the census "4 JSON" count and
+the plan's ":263 /api/qa" were a comment line and the stream, not JSON sites.
+
+Migrated: `pages/profile-settings.js:147` (requestJson tolerant; outer catch
+collapses all failures to `unavailable:true`); `pages/workbench/[requestId].js:127`
+(envelope, status-templated fallback verbatim); `pages/dynamics-explorer.js:153`
+roles GET (D1-preserve, envelope tolerant, unguarded as today) and :476 feedback
+POST (fire-and-forget shape preserved), :204 chat stream annotated;
+`pages/virtual-review-panel.js:1030` (D1-preserve, envelope tolerant), :1072
+stream annotated; `pages/phase-i-dynamics.js` :76 and :104 (envelope strict; D3
+fallback policy); `pages/dataverse-bulk-export.js` :208 and :328 (envelope;
+parseError-rethrow policy because every site parses before its ok check), :366
+stream annotated; `pages/grant-reporting.js` 4 sites (envelope; parseError-rethrow);
+`pages/phase-ii-writeup.js:161` (envelope; parseError-rethrow).
+
+Tests: new `virtual-review-panel`, `phase-i-dynamics`, `dataverse-bulk-export`,
+`grant-reporting`, `phase-ii-writeup` test files; extended
+`dynamics-explorer-terminal-state`, `workbench-request-page-context`,
+`profile-settings-email-signature`. All green against unmigrated code and
+unchanged after. Only annotated stream sites remain raw in the 17 files.
+
+Gates at the group's final commit: targeted 77/77; full suite 1020/1021 suites
+(one unrelated red in `workbench-request-number-lookup.test.js` against
+`RequestLocator.js`, a group 1 file mid-migration at that moment); eslint 0
+errors on the 17 files; `check:types` clean; `npm run build` compiled with all
+pages in the route manifest. Commits: `3cb3fa4a9`/`0c93e0467`
+(profile-settings), `59583bd59` (+ test) (workbench/[requestId]), `735d1ebcb`
+(Executor annotations), `d6bcd1e01`/`957abc387` (dynamics-explorer),
+`46ea7b093` (+ test) (virtual-review-panel), `76e294b88`/`e8a943037`
+(phase-i-dynamics), `ab91984c8`/`3a49e4d55` (dataverse-bulk-export),
+`ae082b079` (+ test) (grant-reporting), `56f225cb4` (+ test) (phase-ii-writeup).
+Process note: the group 2 implementer split its 12 remaining files across three
+parallel sub-agents it supervised; commits are per file as required.
