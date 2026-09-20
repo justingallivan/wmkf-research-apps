@@ -899,3 +899,30 @@ routes a malformed/unparseable 2xx most likely means the email DID go out, yet
 `RespondReminderModal.js:122`, `ReviewReminderAction.js:114`, and
 `ReviewerDueDateEditor.js:129` render `failed` and invite a resend. Faithfully
 preserved here; recorded as D10 in the D1 follow-up doc.
+
+### Stage 4 acceptance (code) — 2026-09-20, orchestrator (Fable), at `d82f24df4`; Tier 2 rehearsal pending
+
+Correction round (`c6b47178f`/`4e7238bd8` invite-timing GET migrated ungated;
+`7d0abb13d` annotations normalized to the eslint-disable form, `useReviewerExport.js:58`
+annotated; `d82f24df4` exact request-bytes pins for the terminal-transition
+release POST and withdraw-sufficient). All nine remaining raw `fetch(` sites in
+`shared/components/reviewers/**` carry the ratchet-compatible annotation
+[VERIFIED by the implementer's grep]. Transient: those annotations register as
+"unused eslint-disable directive" warnings until Stage 6 wires the rule (lint
+0 errors, 123 warnings vs 114 baseline; returns to baseline at Stage 6).
+
+Full Gate G at `d82f24df4` [VERIFIED via this run]: every `check:*` gate and
+self-test 0 red; `npm test` 1007 suites / 15077 tests green; lint 0 errors;
+`check:types` clean; `npm run build` compiled.
+
+Branch pushed to `origin/feature/client-request-layer` at `d82f24df4` for the
+Vercel preview (owner authorized 2026-09-20). **Tier 2 rehearsal (owner
+decision 2/4/5): the owner's click-through of invite preview, reminder
+preview, release, closeout, and due-date flows in the preview, Mode A
+(route-mocked data). Record the result here when done.** Code is accepted;
+Stage 4 closes when the rehearsal is recorded.
+
+Stage 4 totals: 65 JSON sites migrated across 23 files (64 + the invite-timing
+GET); 9 SSE/blob sites allowlisted; 3 D1-preserve sites carried to the D1 lane
+(ReviewerFindPanel :281, ReviewersTab :210, useReviewerPromotion :188) plus
+D10's three send sites. Stages 5a, 5b, and the D1 Stage-4 batch start next.
