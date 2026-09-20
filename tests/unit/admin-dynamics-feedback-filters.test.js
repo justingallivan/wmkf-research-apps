@@ -23,10 +23,7 @@ test('selecting All statuses overrides the default new status filter', async () 
   render(<DynamicsFeedbackSection />);
 
   await screen.findByText('No feedback records found.');
-  expect(fetch).toHaveBeenNthCalledWith(
-    1,
-    '/api/dynamics-explorer/feedback?status=new',
-  );
+  expect(fetch.mock.calls[0][0]).toBe('/api/dynamics-explorer/feedback?status=new');
 
   fireEvent.change(screen.getAllByRole('combobox')[0], {
     target: { value: '' },

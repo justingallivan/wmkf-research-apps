@@ -26,6 +26,7 @@ import {
   resolveAdminLocation,
 } from '../shared/components/admin/AdminWorkspaceNavigation';
 import { APP_REGISTRY } from '../shared/config/appRegistry';
+import { requestJson, requestEnvelope } from '../shared/utils/api-request';
 
 const PERIOD_OPTIONS = [
   { value: '1d', label: '1 day' },
@@ -209,8 +210,13 @@ function HealthSection() {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/health')
-      .then(r => r.json())
+    // D1 PRESERVE: no ok check today, so a non-2xx response with a parseable
+    // body is still read as if it were success. Kept as-is; see plan §9.
+    requestEnvelope('/api/health')
+      .then((envelope) => {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        return envelope.data;
+      })
       .then(setHealth)
       .catch(err => setHealth({ overall: 'error', services: {}, error: err.message }))
       .finally(() => setLoading(false));
@@ -320,8 +326,8 @@ function HealthHistorySection() {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/admin/health-history?hours=${hours}`)
-      .then(r => r.ok ? r.json() : null)
+    requestEnvelope(`/api/admin/health-history?hours=${hours}`)
+      .then(envelope => envelope.ok ? envelope.data : null)
       .then(setHistory)
       .catch(() => setHistory(null))
       .finally(() => setLoading(false));
@@ -494,8 +500,8 @@ function SystemAlertsSection() {
   const [expandedId, setExpandedId] = useState(null);
 
   const fetchAlerts = () => {
-    fetch('/api/admin/alerts')
-      .then(r => r.ok ? r.json() : null)
+    requestEnvelope('/api/admin/alerts')
+      .then(envelope => envelope.ok ? envelope.data : null)
       .then(data => setAlerts(data?.alerts || []))
       .catch(() => setAlerts([]))
       .finally(() => setLoading(false));
@@ -506,12 +512,11 @@ function SystemAlertsSection() {
   const handleAction = async (id, action) => {
     setActionInProgress(id);
     try {
-      const res = await fetch('/api/admin/alerts', {
+      const envelope = await requestEnvelope('/api/admin/alerts', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action }),
+        body: { id, action },
       });
-      if (res.ok) fetchAlerts();
+      if (envelope.ok) fetchAlerts();
     } catch {}
     setActionInProgress(null);
   };
@@ -637,10 +642,10 @@ function MaintenanceSection() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/admin/maintenance', { signal: controller.signal })
-      .then(r => {
-        if (!r.ok) throw new Error('Maintenance status could not be loaded.');
-        return r.json();
+    requestEnvelope('/api/admin/maintenance', { signal: controller.signal })
+      .then(envelope => {
+        if (!envelope.ok) throw new Error('Maintenance status could not be loaded.');
+        return envelope.data;
       })
       .then(setData)
       .catch((loadError) => {
@@ -760,10 +765,10 @@ function SecretExpirationSection() {
   const [error, setError] = useState(null);
 
   const fetchSecrets = () => {
-    fetch('/api/admin/secrets')
-      .then(r => {
-        if (!r.ok) throw new Error('Credential expiration data could not be loaded.');
-        return r.json();
+    requestEnvelope('/api/admin/secrets')
+      .then(envelope => {
+        if (!envelope.ok) throw new Error('Credential expiration data could not be loaded.');
+        return envelope.data;
       })
       .then(data => setSecrets(data?.secrets || []))
       .catch((loadError) => {
@@ -788,17 +793,16 @@ function SecretExpirationSection() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/secrets', {
+      const envelope = await requestEnvelope('/api/admin/secrets', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: editingKey, ...editValues }),
+        body: { key: editingKey, ...editValues },
+        tolerantBody: true,
       });
-      if (res.ok) {
+      if (envelope.ok) {
         setEditingKey(null);
         fetchSecrets();
       } else {
-        const err = await res.json().catch(() => ({}));
-        setError(err.error || 'The credential dates could not be saved.');
+        setError(envelope.data?.error || 'The credential dates could not be saved.');
       }
     } catch (err) {
       setError(err.message || 'The credential dates could not be saved.');
@@ -2128,10 +2132,10 @@ export function DynamicsFeedbackSection() {
     if (type) qs.set('type', type);
     const query = qs.toString();
     setError(null);
-    fetch(`/api/dynamics-explorer/feedback${query ? `?${query}` : ''}`)
-      .then(r => {
-        if (!r.ok) throw new Error('Feedback could not be loaded.');
-        return r.json();
+    requestEnvelope(`/api/dynamics-explorer/feedback${query ? `?${query}` : ''}`)
+      .then(envelope => {
+        if (!envelope.ok) throw new Error('Feedback could not be loaded.');
+        return envelope.data;
       })
       .then(data => {
         setFeedback(data?.feedback || []);
@@ -2151,12 +2155,12 @@ export function DynamicsFeedbackSection() {
   const handleAction = async (id, status) => {
     setActionInProgress(id);
     try {
-      const res = await fetch('/api/dynamics-explorer/feedback', {
+      const envelope = await requestEnvelope('/api/dynamics-explorer/feedback', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status }),
+        body: { id, status },
+        tolerantBody: true,
       });
-      if (!res.ok) throw new Error('The feedback status could not be updated.');
+      if (!envelope.ok) throw new Error('The feedback status could not be updated.');
       fetchFeedback();
     } catch (actionError) {
       setError(actionError.message);
@@ -2476,9 +2480,10 @@ function AlertRecipientsSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/alert-recipients');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      const envelope = await requestEnvelope('/api/admin/alert-recipients');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      const data = envelope.data;
       const seedCats = data.seedCategories || [];
       const config = data.config || {};
       setSeed(seedCats);
@@ -2566,13 +2571,13 @@ function AlertRecipientsSection() {
       for (const r of rows) {
         if (r.emails.length) config[r.category] = r.emails;
       }
-      const res = await fetch('/api/admin/alert-recipients', {
+      const envelope = await requestEnvelope('/api/admin/alert-recipients', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config }),
+        body: { config },
       });
-      const data = await res.json();
-      if (!res.ok) {
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) {
+        const data = envelope.data;
         const detail = Array.isArray(data?.details) ? `: ${data.details.join('; ')}` : '';
         throw new Error((data?.error || 'Save failed') + detail);
       }
