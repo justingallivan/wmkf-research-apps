@@ -162,7 +162,7 @@ test('T4 axis (network, send): a send network rejection reports the uncertain ou
   expect(screen.queryByText(/Sent for delivery/)).not.toBeInTheDocument();
 });
 
-test('T4 axis (d, send): a malformed 2xx send body reports failed, not sent', async () => {
+test('D10 fix: a malformed 2xx send body reports the uncertain receipt, not failed or sent', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ data: { ok: true, draft } }))
     .mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
@@ -170,8 +170,10 @@ test('T4 axis (d, send): a malformed 2xx send body reports failed, not sent', as
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={onSent} />);
   await screen.findByDisplayValue('Original subject');
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
-  expect(await screen.findByText('Could not send the reminder. Refresh and try again.')).toBeInTheDocument();
+  expect(await screen.findByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
   expect(onSent).not.toHaveBeenCalled();
+  expect(screen.queryByText(/Sent for delivery/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Could not send the reminder. Refresh and try again.')).not.toBeInTheDocument();
 });
 
 test('T4 axis (e, send): a non-2xx send body that fails to parse is never silent', async () => {
