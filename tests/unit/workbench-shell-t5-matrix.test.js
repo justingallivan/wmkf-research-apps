@@ -4,9 +4,10 @@
  * WorkbenchShell — T5 gap-fill (Stage 5a). tests/unit/workbench-shell.test.js
  * already pins 2xx success and (after this stage's GET call-shape fix) exact
  * request shape for the dashboard cycles GET. This file adds non-2xx,
- * network-rejection, and axis-(e) coverage for that fetch site (migrated to
- * requestJson with a static `fallbackMessage`; no existing test pins the
- * prior status-interpolated fallback text).
+ * network-rejection, and axis-(e) coverage for that fetch site, which now
+ * uses requestEnvelope with an explicit body.error || `... (${status})`
+ * throw (Stage 5a review finding 1), restoring the old code's
+ * status-interpolated fallback text.
  */
 import { render, screen } from '@testing-library/react';
 import { WorkbenchShell } from '../../shared/components/workbench/WorkbenchShell';
@@ -42,8 +43,14 @@ test('cycles load: network rejection is never silent', async () => {
   expect(await screen.findByText(/offline/)).toBeInTheDocument();
 });
 
-test('cycles load axis (e): non-2xx unparseable body falls to the fallback text, never silent', async () => {
+test('cycles load axis (e): non-2xx unparseable body falls to the fallback text with status suffix, never silent', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: unparseable });
   render(<WorkbenchShell />);
-  expect(await screen.findByText(/Failed to load cycles/)).toBeInTheDocument();
+  expect(await screen.findByText('Failed to load cycles (502)')).toBeInTheDocument();
+});
+
+test('cycles load: non-2xx empty body ({}) falls to the fallback text with status suffix (finding 1 parity)', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+  render(<WorkbenchShell />);
+  expect(await screen.findByText('Failed to load cycles (500)')).toBeInTheDocument();
 });
