@@ -7,8 +7,9 @@
  *   - runIngestion       GET  /api/workbench/applicant-reviewers
  *   - loadProposal       POST /api/reviewer-finder/load-proposal
  *   - lookupReviewer     POST /api/workbench/reviewer-lookup
- *   - lookupOrcid        POST /api/workbench/orcid-lookup   (D1: no !ok guard
- *     today — preserved as-is, not fixed here)
+ *   - lookupOrcid        POST /api/workbench/orcid-lookup   (D1 fixed: a
+ *     non-2xx response now routes envelope.error.message to lookupMsg
+ *     instead of being read for .found/.ambiguous)
  *   - submitManualReviewer POST /api/workbench/manual-reviewer
  *
  * All five sites already parse with `.json().catch(() => ({}))`.
@@ -85,14 +86,44 @@ test('loadProposal: POST sends exact body bytes and headers; a 404 + {allFiles} 
   await waitFor(() => expect(screen.getByText(/not found/)).toBeTruthy());
 });
 
-test('lookupOrcid: preserves the D1 no-!ok-guard — a non-2xx response is still read for .found/.ambiguous', async () => {
+test('lookupOrcid: D1 fix — a non-2xx {error} body surfaces the server message instead of "no match"', async () => {
+  global.fetch = mkFetch({
+    orcid: () => response({ error: 'ORCID service unavailable' }, { ok: false, status: 500 }),
+  });
+  await act(async () => { render(<ReviewerFindPanel requestId={REQ} savedPool={[]} />); });
+  fireEvent.change(screen.getByLabelText(/^Name$/i), { target: { value: 'Fred Guengerich' } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /find orcid/i })); });
+  await waitFor(() => expect(screen.getByText('ORCID service unavailable')).toBeTruthy());
+});
+
+test('lookupOrcid: D1 fix — a non-2xx body with no .error field falls back to the status-embedded message (not "no match")', async () => {
   global.fetch = mkFetch({
     orcid: () => response({ found: false, reason: 'server hiccup' }, { ok: false, status: 500 }),
   });
   await act(async () => { render(<ReviewerFindPanel requestId={REQ} savedPool={[]} />); });
   fireEvent.change(screen.getByLabelText(/^Name$/i), { target: { value: 'Fred Guengerich' } });
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /find orcid/i })); });
-  await waitFor(() => expect(screen.getByText('server hiccup')).toBeTruthy());
+  await waitFor(() => expect(screen.getByText('Request failed (500)')).toBeTruthy());
+});
+
+test('lookupOrcid: D1 fix — a 502 unparseable body surfaces the status-embedded fallback', async () => {
+  global.fetch = mkFetch({
+    orcid: () => ({ ok: false, status: 502, json: async () => { throw new Error('bad'); } }),
+  });
+  await act(async () => { render(<ReviewerFindPanel requestId={REQ} savedPool={[]} />); });
+  fireEvent.change(screen.getByLabelText(/^Name$/i), { target: { value: 'Fred Guengerich' } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /find orcid/i })); });
+  await waitFor(() => expect(screen.getByText('Request failed (502)')).toBeTruthy());
+});
+
+test('lookupOrcid: 2xx "no match" behavior is unchanged', async () => {
+  global.fetch = mkFetch({
+    orcid: () => response({ found: false, reason: 'no confident match' }),
+  });
+  await act(async () => { render(<ReviewerFindPanel requestId={REQ} savedPool={[]} />); });
+  fireEvent.change(screen.getByLabelText(/^Name$/i), { target: { value: 'Fred Guengerich' } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /find orcid/i })); });
+  await waitFor(() => expect(screen.getByText('no confident match')).toBeTruthy());
 });
 
 test('lookupOrcid: network rejection surfaces the generic warn message', async () => {
