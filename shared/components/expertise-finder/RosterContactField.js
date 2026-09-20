@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { requestJson } from '../../utils/api-request';
 
 const REASON_LABELS = Object.freeze({
   contact_missing: 'Contact no longer exists',
@@ -48,11 +49,10 @@ export default function RosterContactField({
     resolutionControllerRef.current = controller;
     (async () => {
       try {
-        const response = await fetch(`/api/expertise-finder/contact-search?contactId=${encodeURIComponent(normalizedContactId)}`, {
+        const data = await requestJson(`/api/expertise-finder/contact-search?contactId=${encodeURIComponent(normalizedContactId)}`, {
           signal: controller.signal,
+          fallbackMessage: 'Linked contact read failed.',
         });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Linked contact read failed.');
         if (generation === resolutionGenerationRef.current) {
           setResolvedContact({ contactId: normalizedContactId, contact: data.contact });
         }
@@ -86,11 +86,10 @@ export default function RosterContactField({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/expertise-finder/contact-search?q=${encodeURIComponent(clean)}`, {
+      const data = await requestJson(`/api/expertise-finder/contact-search?q=${encodeURIComponent(clean)}`, {
         signal: controller.signal,
+        fallbackMessage: 'Contact search failed.',
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Contact search failed.');
       if (generation !== generationRef.current) return;
       setResults(data.contacts || []);
       setTruncated(Boolean(data.truncated));
