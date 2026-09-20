@@ -51,6 +51,7 @@ import {
   visitExpected,
 } from '../../utils/deliberation-stage';
 import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
+import { requestJson, requestEnvelope } from '../../utils/api-request';
 import {
   PRE_SITE_REOPEN_CONTRACT,
   PRE_SITE_REOPEN_REASON_LABEL,
@@ -63,24 +64,27 @@ const STATUS_POLL_ATTEMPTS = 20;
 const EMPTY_LIST = Object.freeze([]);
 const EMPTY_STAGE_LABELS = DELIBERATION_STAGE_DEFAULT_LABELS;
 
+// Both use requestEnvelope, not requestJson: the fallback message embeds
+// `response.status` in the site's own wording ("Status check failed (${n})"),
+// which is not the helper's `deriveErrorMessage` fallback rule (a static
+// `fallbackMessage`, else `Request failed (${status})`) — so the derivation
+// stays verbatim on `envelope.data`/`envelope.status` per plan §3/§6.
 async function readStatus(requestId, signal) {
-  const response = await fetch(
+  const { ok, status, data } = await requestEnvelope(
     `/api/workbench/pre-site-visit?requestId=${encodeURIComponent(requestId)}`,
-    { method: 'GET', signal },
+    { method: 'GET', signal, tolerantBody: true },
   );
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Status check failed (${response.status})`);
-  return body;
+  if (!ok) throw new Error(data.error || `Status check failed (${status})`);
+  return data;
 }
 
 async function readBriefStatus(requestId, signal) {
-  const response = await fetch(
+  const { ok, status, data } = await requestEnvelope(
     `/api/workbench/pre-rp-brief?requestId=${encodeURIComponent(requestId)}`,
-    { method: 'GET', signal },
+    { method: 'GET', signal, tolerantBody: true },
   );
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Brief status check failed (${response.status})`);
-  return body;
+  if (!ok) throw new Error(data.error || `Brief status check failed (${status})`);
+  return data;
 }
 
 function waitForNextPoll(signal) {
@@ -399,33 +403,37 @@ export default function StaffDeliberationsTab({
 
     let receivedResponse = false;
     try {
-      const response = await fetch('/api/workbench/pre-site-visit', {
+      // requestEnvelope: this site branches deep into a custom failure-
+      // recovery flow (re-reads status, composes a runId/artifactId-aware
+      // message) rather than a plain throw/set, so both the ok and !ok
+      // branches read the same parsed body via `envelope.data` (plan §3/§6
+      // per-site rule).
+      const envelope = await requestEnvelope('/api/workbench/pre-site-visit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: id }),
+        body: { requestId: id },
         signal: controller.signal,
+        tolerantBody: true,
       });
       receivedResponse = true;
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        const fallback = body.error || `Generation failed (${response.status})`;
-        let status = null;
+      const body = envelope.data;
+      if (!envelope.ok) {
+        const fallback = body.error || `Generation failed (${envelope.status})`;
+        let pollStatus = null;
         try {
-          status = await readStatus(id, controller.signal);
+          pollStatus = await readStatus(id, controller.signal);
         } catch (statusError) {
           if (statusError?.name === 'AbortError') throw statusError;
           throw new Error(failureMessage(null, fallback, body.runId || body.artifactId));
         }
         if (generationSequence.current !== sequence || id !== requestId) return;
-        setArtifact(status.currentArtifact || null);
-        setPendingArtifact(status.pendingArtifact || null);
-        const failed = status.pendingArtifact?.operationStatus
+        setArtifact(pollStatus.currentArtifact || null);
+        setPendingArtifact(pollStatus.pendingArtifact || null);
+        const failed = pollStatus.pendingArtifact?.operationStatus
           === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED
-          ? status.pendingArtifact
+          ? pollStatus.pendingArtifact
           : null;
         throw new Error(failureMessage(failed, fallback, body.runId || body.artifactId));
       }
-      const body = await response.json().catch(() => ({}));
       if (generationSequence.current !== sequence || id !== requestId) return;
       if (!body.artifact) throw new Error('Generation returned no artifact identity.');
       if (body.artifact.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
@@ -518,14 +526,13 @@ export default function StaffDeliberationsTab({
     setBriefPendingArtifact(null);
     setBriefRecoveryMessage(null);
     try {
-      const response = await fetch('/api/workbench/pre-rp-brief', {
+      const { ok, status, data: body } = await requestEnvelope('/api/workbench/pre-rp-brief', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: id, clientOperationId: newClientOperationId() }),
+        body: { requestId: id, clientOperationId: newClientOperationId() },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `Brief generation failed (${response.status})`);
+      if (!ok) throw new Error(body.error || `Brief generation failed (${status})`);
       if (briefSequence.current !== sequence || id !== requestId) return;
       if (!body.artifact) throw new Error('Brief generation returned no artifact identity.');
       if (body.artifact.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
@@ -683,14 +690,13 @@ export default function StaffDeliberationsTab({
     const controller = new AbortController();
     briefController.current = controller;
     try {
-      const response = await fetch('/api/workbench/pre-rp-brief/lock-for-share', {
+      const { ok, status, data: body } = await requestEnvelope('/api/workbench/pre-rp-brief/lock-for-share', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: id, expectedArtifactId }),
+        body: { requestId: id, expectedArtifactId },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `The brief could not be locked for sharing (${response.status})`);
+      if (!ok) throw new Error(body.error || `The brief could not be locked for sharing (${status})`);
       if (briefSequence.current !== sequence || id !== requestId) {
         throw new Error('The request changed while the brief was being locked.');
       }
@@ -722,14 +728,13 @@ export default function StaffDeliberationsTab({
     setStartingSiteVisit(true);
     setError(null);
     try {
-      const response = await fetch('/api/workbench/pre-site-visit/start-site-visit', {
+      const { ok, status, data: body } = await requestEnvelope('/api/workbench/pre-site-visit/start-site-visit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: id, expectedArtifactId }),
+        body: { requestId: id, expectedArtifactId },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `The Site Visit could not be started (${response.status})`);
+      if (!ok) throw new Error(body.error || `The Site Visit could not be started (${status})`);
       if (generationSequence.current !== sequence || id !== requestId) {
         throw new Error('The request changed while the Site Visit was being started.');
       }
@@ -784,21 +789,20 @@ export default function StaffDeliberationsTab({
     setReopenError(null);
     setReopenForm((current) => (current ? { ...current, submitted: true } : current));
     try {
-      const response = await fetch('/api/workbench/pre-site-visit/reopen', {
+      const { ok, status, data: body } = await requestEnvelope('/api/workbench/pre-site-visit/reopen', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId: id,
           expectedArtifactId,
           clientOperationId: reopenForm.clientOperationId,
           requestNumber: reopenForm.typedRequestNumber,
           reasonCode: reopenForm.reasonCode,
           reasonNote: reopenForm.reasonNote.trim(),
-        }),
+        },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `Guarded reopen failed (${response.status})`);
+      if (!ok) throw new Error(body.error || `Guarded reopen failed (${status})`);
       if (generationSequence.current !== sequence || id !== requestId) return;
 
       const refreshed = await readStatus(id, controller.signal);
@@ -806,7 +810,7 @@ export default function StaffDeliberationsTab({
       setArtifact(refreshed.currentArtifact || body.artifact || null);
       setPendingArtifact(refreshed.pendingArtifact || null);
       setReopenHistory(refreshed.reopenHistory || EMPTY_LIST);
-      if (response.status === 202 || body.inProgress) {
+      if (status === 202 || body.inProgress) {
         setReopenError('This guarded reopen is already in progress. Keep this dialog open and retry to check the same operation.');
         return;
       }
@@ -862,21 +866,20 @@ export default function StaffDeliberationsTab({
     setBriefReopenError(null);
     setBriefReopenForm((current) => (current ? { ...current, submitted: true } : current));
     try {
-      const response = await fetch('/api/workbench/pre-rp-brief/reopen', {
+      const { ok, status, data: body } = await requestEnvelope('/api/workbench/pre-rp-brief/reopen', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId: id,
           expectedArtifactId,
           clientOperationId: briefReopenForm.clientOperationId,
           requestNumber: briefReopenForm.typedRequestNumber,
           reasonCode: briefReopenForm.reasonCode,
           reasonNote: briefReopenForm.reasonNote.trim(),
-        }),
+        },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `Guarded brief regeneration failed (${response.status})`);
+      if (!ok) throw new Error(body.error || `Guarded brief regeneration failed (${status})`);
       if (briefSequence.current !== sequence || id !== requestId) return;
 
       // Refreshes brief status (the new artifact) and, by updating the
@@ -906,7 +909,7 @@ export default function StaffDeliberationsTab({
         setCurrentSourceEverSent(false);
         setLatestSendFailure(null);
       }
-      if (response.status === 202
+      if (status === 202
         || body.artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
         setBriefReopenError(
           'This guarded regeneration is already in progress. Keep this dialog open and retry to check the same operation.',
