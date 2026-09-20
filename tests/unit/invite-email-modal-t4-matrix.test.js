@@ -52,12 +52,12 @@ const okDraft = {
   body: 'Body',
 };
 
-function baseHandlers({ renderEmails = mockJson({ drafts: [okDraft] }), campaignTimeline, campaignConfig } = {}) {
+function baseHandlers({ renderEmails = mockJson({ drafts: [okDraft] }), campaignTimeline, campaignConfig, inviteTiming } = {}) {
   return async (url, options = {}) => {
     const u = String(url);
     if (u.startsWith('/api/user-preferences')) {
       if (options.method === 'POST') return mockJson({});
-      return mockJson({});
+      return inviteTiming || mockJson({});
     }
     if (u === '/api/review-manager/campaign-timeline-defaults') {
       return campaignTimeline || mockJson({ timeline: {}, isDefault: true });
@@ -351,6 +351,57 @@ describe('update-abstract (:648)', () => {
     renderWithFlaggedAbstract(() => Promise.resolve({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } }));
     await openEditorAndSave();
     expect(await screen.findByText('Failed to save abstract')).toBeInTheDocument();
+  });
+});
+
+describe('invite-timing GET (:293, D1-preserve, unguarded — not migrated here)', () => {
+  test('T4 axis (a): a 2xx body with a value overlays the sticky respondOffsetDays', async () => {
+    global.fetch = jest.fn(baseHandlers({ inviteTiming: mockJson({ value: { respondOffsetDays: 14 } }) }));
+    render(<InviteEmailModal candidates={CANDIDATES} settings={{}} onClose={jest.fn()} onSent={jest.fn()} />);
+    await screen.findByDisplayValue('Invitation');
+    fireEvent.click(screen.getByText('Reviewer campaign timeline').closest('button'));
+    expect(await screen.findByDisplayValue('14')).toBeInTheDocument();
+  });
+
+  test('T4 axis (b): a non-2xx {error} body is still read (unguarded, no ok check) and overlays timing as-is', async () => {
+    global.fetch = jest.fn(baseHandlers({
+      inviteTiming: mockJson({ error: 'nope', value: { respondOffsetDays: 21 } }, { ok: false, status: 400 }),
+    }));
+    render(<InviteEmailModal candidates={CANDIDATES} settings={{}} onClose={jest.fn()} onSent={jest.fn()} />);
+    await screen.findByDisplayValue('Invitation');
+    fireEvent.click(screen.getByText('Reviewer campaign timeline').closest('button'));
+    expect(await screen.findByDisplayValue('21')).toBeInTheDocument();
+  });
+
+  test('T4 axis (c): a network rejection is swallowed; default respondOffsetDays (7) stays put', async () => {
+    global.fetch = jest.fn(async (url, options) => {
+      if (String(url).startsWith('/api/user-preferences') && options?.method !== 'POST') throw new Error('offline');
+      return baseHandlers()(url, options);
+    });
+    render(<InviteEmailModal candidates={CANDIDATES} settings={{}} onClose={jest.fn()} onSent={jest.fn()} />);
+    await screen.findByDisplayValue('Invitation');
+    fireEvent.click(screen.getByText('Reviewer campaign timeline').closest('button'));
+    expect(await screen.findByDisplayValue('7')).toBeInTheDocument();
+  });
+
+  test('T4 axis (d): a malformed 2xx body falls back to {} (default respondOffsetDays stays put)', async () => {
+    global.fetch = jest.fn(baseHandlers({
+      inviteTiming: { ok: true, status: 200, json: async () => { throw new Error('bad json'); } },
+    }));
+    render(<InviteEmailModal candidates={CANDIDATES} settings={{}} onClose={jest.fn()} onSent={jest.fn()} />);
+    await screen.findByDisplayValue('Invitation');
+    fireEvent.click(screen.getByText('Reviewer campaign timeline').closest('button'));
+    expect(await screen.findByDisplayValue('7')).toBeInTheDocument();
+  });
+
+  test('T4 axis (e): an unparseable 502 body falls back to {} (default respondOffsetDays stays put)', async () => {
+    global.fetch = jest.fn(baseHandlers({
+      inviteTiming: { ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } },
+    }));
+    render(<InviteEmailModal candidates={CANDIDATES} settings={{}} onClose={jest.fn()} onSent={jest.fn()} />);
+    await screen.findByDisplayValue('Invitation');
+    fireEvent.click(screen.getByText('Reviewer campaign timeline').closest('button'));
+    expect(await screen.findByDisplayValue('7')).toBeInTheDocument();
   });
 });
 
