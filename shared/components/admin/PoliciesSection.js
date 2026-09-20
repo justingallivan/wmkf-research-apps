@@ -16,6 +16,7 @@
 
 import { useState, useEffect } from 'react';
 import { renderPolicyMarkdown } from '../../utils/policy-markdown-client';
+import { requestEnvelope } from '../../utils/api-request';
 import { Button } from '../Layout';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
 import DisclosureRow from './DisclosureRow';
@@ -72,11 +73,11 @@ export default function PoliciesSection() {
   const fetchState = () => {
     setLoading(true);
     setError(null);
-    fetch('/api/admin/policies')
-      .then(r => {
-        if (r.status === 403) throw new Error('Admin access required');
-        if (!r.ok) throw new Error('Failed to load policies');
-        return r.json();
+    requestEnvelope('/api/admin/policies')
+      .then(({ ok, status, data }) => {
+        if (status === 403) throw new Error('Admin access required');
+        if (!ok) throw new Error('Failed to load policies');
+        return data;
       })
       .then(data => setState(data))
       .catch(err => setError(err.message))
@@ -360,19 +361,26 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
   const submit = async () => {
     setSubmitting(true);
     try {
-      const r = await fetch('/api/admin/policies', {
+      // D1 PRESERVE: no ok check today; `data.status` is read regardless of
+      // HTTP status. A non-2xx unparseable body (a gateway page) is parsed
+      // tolerantly by the helper instead of throwing like a bare `.json()`
+      // would today, so it is rethrown here to keep routing to the same
+      // failed-outcome catch below (never silent, plan §6 Stage 2 rule ii).
+      const envelope = await requestEnvelope('/api/admin/policies', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           slotCode: slot.code,
           versionLabel,
           title,
           body,
           effectiveDate,
           parentEtag: slot.parentEtag,
-        }),
+        },
       });
-      const data = await r.json();
+      if (envelope.error?.parseError) {
+        throw envelope.error.parseError;
+      }
+      const { data } = envelope;
       if (data.status === 'completed' || data.status === 'already_published') {
         onSuccess(data);
       } else {
