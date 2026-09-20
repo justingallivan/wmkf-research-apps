@@ -52,6 +52,12 @@ reviewer-finder prompt migration.
   body, which is what defeats forgery. Do not re-add the nonce list to the preamble "for
   explicitness" — that puts unique bytes at position 0 and makes every cross-document call a
   cache write with no read. Pinned by `tests/unit/execute-prompt-payload-boundary.test.js`.
+- **Executor cache telemetry lives in `wmkf_ai_run` notes, not `api_usage_log` (S525):**
+  owner-run `scripts/probe-ai-run-cache-reads.js` (read-only, production Dataverse) parses
+  `cache_create`/`cache_read` per run row. On a fresh run `cache_create` IS the measured size
+  of the marked system block for that live prompt row, so it beats chars/4 estimates of the
+  bundled seeds. Prompts that batch within the TTL: `cycle-dossier.entry`,
+  `review-synthesis.generate` (see `docs/PROMPT_CACHING_AUDIT.md` §0 R4 table).
 - **Route-owned A7 when passing pre-wrapped text (S344):** `applyVariableBoundaries` only
   wraps + emits a nonce for a variable declared `untrusted:true` + `dataClass`/`maxChars`, and
   `composeMessages` only injects the `buildUntrustedContentPreamble` when `untrustedNonces>0`.

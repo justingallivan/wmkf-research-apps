@@ -13,6 +13,15 @@
  * FLOORS keyed by the tier that app resolves to in BASE_CONFIG.APP_MODELS
  * (dynamics-explorer is Haiku, the rest below are Sonnet). Re-check both
  * when a model tier or floor changes.
+ *
+ * Run: `npm run audit:prompt-sizes`
+ *   (= node --import ./scripts/lib/use-extensionless.mjs scripts/audit-system-prompt-sizes.js).
+ *   The prompt modules use the app's extensionless relative imports, which plain
+ *   `node scripts/...` cannot resolve. Reads `.env.local` (CLAUDE_API_KEY for
+ *   count_tokens) and fetches prompt rows from the configured Dataverse
+ *   environment (production when .env.local points there): owner-run.
+ * For Executor prompt rows, prefer the measured `cache_create` in wmkf_ai_run
+ * notes (scripts/probe-ai-run-cache-reads.js) over a count_tokens estimate.
  */
 
 const fs = require('fs');

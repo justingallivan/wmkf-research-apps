@@ -240,7 +240,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [PROMPT_CACHING_AUDIT.md](PROMPT_CACHING_AUDIT.md) | plan | active |  | July 2026 cache audit: R1/R3 shipped; R4 closed 2026-09-19 (nonce-free Executor preamble, no schema split); R5 and a panel user-turn marker stay data-gated. | 2026-09-19 |
+| [PROMPT_CACHING_AUDIT.md](PROMPT_CACHING_AUDIT.md) | plan | active |  | July 2026 cache audit: R1/R3/R4 shipped; 2026-09-20 run-row telemetry confirms pre-fix write-no-read, post-fix read pending; R5 and panel user turn data-gated. | 2026-09-20 |
 
 ## observability
 

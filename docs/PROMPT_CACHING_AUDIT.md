@@ -3,8 +3,8 @@ title: Prompt Caching Audit and Standardized Remediation
 domain: llm-platform
 kind: plan
 status: active
-summary: "July 2026 cache audit: R1/R3 shipped; R4 closed 2026-09-19 (nonce-free Executor preamble, no schema split); R5 and a panel user-turn marker stay data-gated."
-last_verified: 2026-09-19
+summary: "July 2026 cache audit: R1/R3/R4 shipped; 2026-09-20 run-row telemetry confirms pre-fix write-no-read, post-fix read pending; R5 and panel user turn data-gated."
+last_verified: 2026-09-20
 ---
 
 # Prompt Caching Audit and Standardized Remediation
@@ -54,13 +54,37 @@ remain owner decisions.
   `applyVariableBoundaries` stays (identical reruns remain byte-identical in the user body)
   [RECHECKED after lib/services/execute-prompt.js change: comment-only edit at the
   `deriveStableNonce` call site; behaviour unchanged].
-  Realized reads remain a telemetry question: the marker only writes when the system block
-  clears the concrete model's floor — of the seeded system templates only `phase-i-dynamics`
-  (~1.5k tokens incl. preamble) and `pre-site-visit-proposal-core` (~1.4k) clear Sonnet 5's
-  1024; `review-panel` chair (~510) is borderline at Opus 5's 512 and the seat (~360) is
-  below Fable 5.1's 512, so the review panel caches nothing today. A user-turn breakpoint for
-  the panel is an owner decision that needs run-row cadence data first (it is net-negative
-  unless the same proposal is re-sent within the TTL).
+  **Production telemetry (Session 525, 2026-09-20; owner-run
+  `scripts/probe-ai-run-cache-reads.js` over `wmkf_ai_run` rows since 2026-09-16):** the
+  marked system block already clears the floor on every Executor prompt that carries batch
+  traffic. `cache_create` on a fresh run is the measured size of the live Dataverse row's
+  marked block, which supersedes the earlier chars/4 estimates of the bundled seeds:
+
+  | Prompt row (version) | Model in run rows | Measured marked prefix | Batch pattern seen |
+  |---|---|---|---|
+  | `cycle-dossier.entry` (v2) | Opus 5 | 610–618 | 3 documents in 28 s (09-17), 2 in 4 s (09-16) |
+  | `review-synthesis.generate` (v4/v5) | Sonnet 5 | 1841–1843 (v5), 2254–2258 (v4) | 2 documents 4 min apart (09-18) |
+  | `initial-assessment.generate` (v2) | Opus 5 | 677 pre-fix, 645 post-fix | single documents |
+  | `review-panel.seat` (v2) | Opus 5 in the 09-17 row (source default is Fable 5.1; override config not read) | 552 | one run |
+  | `review-panel.chair` (v3) | Opus 5 | 801 | rerun read 801 |
+  | `cycle-dossier.research-plan` (v2) | Opus 5 | 0 (below floor or unmarked) | batched, nothing cacheable |
+
+  Pre-fix rows show the R4 write-no-read pattern exactly: every document in a batch wrote
+  its own entry (a 2–8 token spread per document, consistent with the nonce line) and no
+  document read another's, while same-request reruns did read (1841, 801, 610). The July
+  belief that the Executor batch path was idle was wrong for these rows; `phase-i.summary`
+  itself has had no runs since 2026-04-25. **Realized cross-document reads after the fix
+  are still pending** the first post-fix batch of two or more documents through any of the
+  first three prompts; the only post-fix row as of 2026-09-20 03:14Z is a single document.
+  Closing check (owner-run): `node scripts/probe-ai-run-cache-reads.js
+  --since 2026-09-19T19:48:00Z --limit 25`; second and later documents in a batch should show
+  `cache_read` roughly equal to the first document's `cache_create`. If they still show
+  create-only, read that prompt row's system template for interpolated variables (the S524
+  disconfirming grep covered the bundled seeds under `shared/config/prompts/`, not the live
+  Dataverse rows). The earlier statement that "the review panel caches nothing today" is
+  withdrawn: the seat and chair system blocks cache on Opus 5. The open panel question is
+  only the unmarked user turn (proposal + question set), which still needs run-row cadence
+  data first (net-negative unless the same proposal is re-sent within the TTL).
 - **R5 — NOT DONE (verify-then-fix; left for owner).** `composeScorePrompt` and
   `process-phase-i-writeup` both require confirming the current model-specific prefix floor and
   real repeat-within-TTL usage first.
@@ -157,8 +181,9 @@ template/variable split backed by prompt-seed schema work. Re-verification on 20
 showed the per-document bytes were only the preamble's nonce list; dropping that list from
 `composeMessages` (the preamble helper documents it as optional) was sufficient. The
 two-block split is no longer planned. Highest-volume path; batch flows pushing many
-documents through the same prompt within the TTL now hit on the shared template where the
-system block clears the concrete model's floor (§0 R4 lists which seeded prompts do).
+documents through the same prompt within the TTL should now hit on the shared template
+where the system block clears the concrete model's floor (§0 R4 lists the measured live
+rows; the post-fix cross-document read is pending the first post-fix batch).
 
 **R5 — Conditional, verify-then-fix items.**
 - `composeScorePrompt` batch loop (`claude-reviewer-service.js:708`;
@@ -194,8 +219,14 @@ are 1024; Opus 4.6/4.5 and Haiku 4.5 are 4096. See
 
 ## 4. Verification for the remediation session
 
-- Before/after: `scripts/audit-system-prompt-sizes.js` for prefix sizes (per-tier floors since
-  2026-09-19: Sonnet 1024, Haiku 4096, Opus 512 — [RECHECKED after scripts/audit-system-prompt-sizes.js change: FLOORS table + `verdict(n, tier)`]); Anthropic console
-  cache metrics (or `usage.cache_read_input_tokens` in responses) for realized hit rate.
+- Before/after: `npm run audit:prompt-sizes` (= `node --import ./scripts/lib/use-extensionless.mjs
+  scripts/audit-system-prompt-sizes.js`; the bare `node scripts/...` form fails on the
+  app's extensionless imports, found 2026-09-20 on the first real run) for bundled-app
+  prefix sizes (per-tier floors since 2026-09-19: Sonnet 1024, Haiku 4096, Opus 512; the
+  S524 check of the FLOORS table used mocked rows, not a live run). For Executor prompt
+  rows, owner-run `scripts/probe-ai-run-cache-reads.js` reads `cache_create` /
+  `cache_read` out of `wmkf_ai_run` notes; `cache_create` on a fresh run is the measured
+  marked-block size. Anthropic console cache metrics (or `usage.cache_read_input_tokens`
+  in responses) for realized hit rate elsewhere.
 - Gates: `check:prompt-injection-tagging` (+ self-test) after any `ai-payload-boundary`
   change; full `npm test`; `/contract-reconcile` for the R1 security review.
