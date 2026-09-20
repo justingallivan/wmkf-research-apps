@@ -169,4 +169,105 @@ describe('PoliciesSection — unique-label guidance', () => {
     expect(postCalls).toHaveLength(1);
     expect(JSON.parse(postCalls[0][1].body)).toMatchObject({ slotCode: 'grantee-waiver', title: 'New title' });
   });
+
+  // T3 matrix (Stage 3, group A) ahead of migrating both fetch sites onto
+  // shared/utils/api-request.js. fetchState (GET) branches on status before
+  // reading the body (403 -> exact pinned message, plan §2.3); PublishForm's
+  // submit (POST, PoliciesSection.js:363) is D1 PRESERVE — no ok check, reads
+  // data.status regardless of HTTP status.
+  test('(b) GET 403 shows "Admin access required" verbatim', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false, status: 403, json: async () => ({ error: 'ignored' }) });
+    render(<PoliciesSection />);
+    expect(await screen.findByText('Admin access required')).toBeInTheDocument();
+  });
+
+  test('(b) GET non-403 non-2xx shows the generic load failure, body never read', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false, status: 500, json: async () => { throw new Error('should not be called'); } });
+    render(<PoliciesSection />);
+    expect(await screen.findByText('Failed to load policies')).toBeInTheDocument();
+  });
+
+  test('(c) GET network rejection surfaces the rejection\'s own message', async () => {
+    jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('network down'));
+    render(<PoliciesSection />);
+    expect(await screen.findByText('network down')).toBeInTheDocument();
+  });
+
+  test('(d) GET malformed 2xx body (strict, bare .json()) rejects into the same error state', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } });
+    render(<PoliciesSection />);
+    expect(await screen.findByText('bad json')).toBeInTheDocument();
+  });
+
+  test('(b) POST: a well-formed non-2xx body (409 label_conflict) is read regardless of status (D1)', async () => {
+    mockGet(makeState({ versions: [version('v1', { isActive: true, title: 'Waiver Title', body: 'y'.repeat(60) })] }));
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'New title' } });
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    global.fetch.mockImplementationOnce((url, opts) => (opts?.method === 'POST'
+      ? Promise.resolve({ ok: false, status: 409, json: async () => ({ status: 'label_conflict', warnings: [] }) })
+      : Promise.resolve({ ok: true, status: 200, json: async () => makeState({ versions: [version('v1', { isActive: true })] }) })));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    expect(await screen.findByText(/pick a new label/i)).toBeInTheDocument();
+  });
+
+  test('(c) POST: a network rejection is caught and rendered as a failed outcome', async () => {
+    mockGet(makeState({ versions: [version('v1', { isActive: true, title: 'Waiver Title', body: 'y'.repeat(60) })] }));
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'New title' } });
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    global.fetch.mockImplementationOnce((url, opts) => (opts?.method === 'POST'
+      ? Promise.reject(new Error('network down'))
+      : Promise.resolve({ ok: true, status: 200, json: async () => makeState({ versions: [version('v1', { isActive: true })] }) })));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    expect(await screen.findByText('Publishing failed. Try again; if it keeps failing, contact an administrator.')).toBeInTheDocument();
+    expect(screen.getByText('network down')).toBeInTheDocument();
+  });
+
+  test('(d) POST: a malformed 2xx body (bare .json()) is caught and rendered as a failed outcome', async () => {
+    mockGet(makeState({ versions: [version('v1', { isActive: true, title: 'Waiver Title', body: 'y'.repeat(60) })] }));
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'New title' } });
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    global.fetch.mockImplementationOnce((url, opts) => (opts?.method === 'POST'
+      ? Promise.resolve({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } })
+      : Promise.resolve({ ok: true, status: 200, json: async () => makeState({ versions: [version('v1', { isActive: true })] }) })));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    expect(await screen.findByText('Publishing failed. Try again; if it keeps failing, contact an administrator.')).toBeInTheDocument();
+    expect(screen.getByText('bad json')).toBeInTheDocument();
+  });
+
+  test('(e) POST: a non-2xx unparseable body (502 gateway page) is rendered as a failed outcome, never silent', async () => {
+    mockGet(makeState({ versions: [version('v1', { isActive: true, title: 'Waiver Title', body: 'y'.repeat(60) })] }));
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'New title' } });
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    global.fetch.mockImplementationOnce((url, opts) => (opts?.method === 'POST'
+      ? Promise.resolve({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token < in JSON'); } })
+      : Promise.resolve({ ok: true, status: 200, json: async () => makeState({ versions: [version('v1', { isActive: true })] }) })));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    expect(await screen.findByText('Publishing failed. Try again; if it keeps failing, contact an administrator.')).toBeInTheDocument();
+    expect(screen.getByText('Unexpected token < in JSON')).toBeInTheDocument();
+  });
+
+  test('request bytes: POST sends the same method/headers/body shape', async () => {
+    mockGet(makeState({ versions: [version('v1', { isActive: true, title: 'Waiver Title', body: 'y'.repeat(60) })] }));
+    const getSpy = global.fetch;
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'New title' } });
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    getSpy.mockImplementation((url, opts) => (opts?.method === 'POST'
+      ? Promise.resolve({ ok: true, json: async () => ({ status: 'completed' }) })
+      : Promise.resolve({ ok: true, status: 200, json: async () => makeState({ versions: [version('v1', { isActive: true })] }) })));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    await waitFor(() => expect(getSpy).toHaveBeenCalledWith('/api/admin/policies', expect.objectContaining({ method: 'POST' })));
+    const postCall = getSpy.mock.calls.find(([, opts]) => opts?.method === 'POST');
+    expect(postCall[1].headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(postCall[1].body)).toMatchObject({ slotCode: 'grantee-waiver', title: 'New title', versionLabel: TODAY, parentEtag: 'W/"1"' });
+  });
 });
