@@ -3,6 +3,7 @@ import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import FileUploaderSimple from '../shared/components/FileUploaderSimple';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
+import { requestEnvelope } from '../shared/utils/api-request';
 
 /**
  * Test page: single-request Phase I summarization with Dynamics writeback.
@@ -73,17 +74,16 @@ function PhaseIDynamics() {
     setResult(null);
 
     try {
-      const resp = await fetch('/api/grant-reporting/lookup-grant', {
+      const envelope = await requestEnvelope('/api/grant-reporting/lookup-grant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestNumber: requestNumber.trim() }),
       });
-      const data = await resp.json();
-      if (!resp.ok) {
-        throw new Error(data.error || `Lookup failed (${resp.status})`);
+      if (!envelope.ok) {
+        throw new Error(envelope.data.error || `Lookup failed (${envelope.status})`);
       }
-      setLookup(data);
-      if (data.documents?.proposalBestGuess) setPick(data.documents.proposalBestGuess);
+      setLookup(envelope.data);
+      if (envelope.data.documents?.proposalBestGuess) setPick(envelope.data.documents.proposalBestGuess);
     } catch (err) {
       setError(err.message || 'Lookup failed');
     } finally {
@@ -101,7 +101,7 @@ function PhaseIDynamics() {
       const endpoint = useDynamicsPrompt
         ? '/api/phase-i-dynamics/summarize-v2'
         : '/api/phase-i-dynamics/summarize';
-      const resp = await fetch(endpoint, {
+      const envelope = await requestEnvelope(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -112,17 +112,16 @@ function PhaseIDynamics() {
           overwrite,
         }),
       });
-      const data = await resp.json();
-      if (resp.status === 409 && data.conflict) {
+      if (envelope.status === 409 && envelope.data.conflict) {
         // Pre-flight detected existing content. Surface a confirm dialog.
-        setConflict(data.conflict);
+        setConflict(envelope.data.conflict);
         return;
       }
-      if (!resp.ok) {
-        const detail = data.details ? `: ${data.details}` : '';
-        throw new Error(`${data.error || `Summarize failed (${resp.status})`}${detail}`);
+      if (!envelope.ok) {
+        const detail = envelope.data.details ? `: ${envelope.data.details}` : '';
+        throw new Error(`${envelope.data.error || `Summarize failed (${envelope.status})`}${detail}`);
       }
-      setResult(data);
+      setResult(envelope.data);
     } catch (err) {
       setError(err.message || 'Summarize failed');
     } finally {

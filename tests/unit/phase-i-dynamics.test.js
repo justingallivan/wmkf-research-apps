@@ -92,7 +92,7 @@ describe(':76 lookup-grant POST', () => {
     global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('<html>Bad gateway</html>'); } }));
     render(<PhaseIDynamics />);
     lookup();
-    expect(await screen.findByRole('alert')).toHaveTextContent('<html>Bad gateway</html>'); // pre-migration: bare .json() parses before the ok check, so the raw SyntaxError surfaces (D3 exposure)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Lookup failed (502)'); // post-migration (D3-accept): requestEnvelope always parses non-2xx tolerantly, so the fallback message surfaces instead of the raw SyntaxError
   });
 });
 
@@ -151,6 +151,6 @@ describe(':104 summarize POST', () => {
     await renderReadyToSummarize();
     global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('<html>Bad gateway</html>'); } }));
     fireEvent.click(screen.getByRole('button', { name: /Run summary/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('<html>Bad gateway</html>'); // pre-migration: bare .json() parses before the ok check, so the raw SyntaxError surfaces (D3 exposure)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Summarize failed (502)'); // post-migration (D3-accept): requestEnvelope always parses non-2xx tolerantly, so the fallback message surfaces instead of the raw SyntaxError
   });
 });
