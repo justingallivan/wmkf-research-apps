@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 
+import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReleaseEmailModal from '../../shared/components/reviewers/ReleaseEmailModal';
 
@@ -487,4 +488,35 @@ test('switching back to No longer needed re-arms the courtesy note default', () 
   expect(screen.getByRole('checkbox', { name: 'Also send a courtesy note' })).not.toBeChecked();
   fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
   expect(screen.getByRole('checkbox', { name: 'Send a courtesy note' })).toBeChecked();
+});
+
+test('under React.StrictMode the send still settles (double-invoked effects must not leave the mounted guard false)', async () => {
+  // Pin for the dev-only hang found in the Stage 4 local rehearsal: StrictMode runs
+  // effect cleanup once at mount, and a cleanup-only mounted guard never flips back.
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first] }))
+    .mockResolvedValueOnce(response({
+      withdrawn: 0,
+      results: [{ suggestionId: FIRST_ID, status: 'write_failed' }],
+    }, { status: 200 }));
+  render(
+    <StrictMode>
+      <ReleaseEmailModal
+        requestId={REQUEST_ID}
+        suggestionIds={[FIRST_ID]}
+        onClose={jest.fn()}
+        onReleased={jest.fn()}
+      />
+    </StrictMode>,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+
+  await screen.findByText(/1 issue/);
+  expect(screen.getByText(/Dr\. First Reviewer — The invitation could not be closed/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  expect(screen.queryByText(/Releasing/)).not.toBeInTheDocument();
 });

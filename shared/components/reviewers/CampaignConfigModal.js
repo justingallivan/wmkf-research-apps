@@ -31,7 +31,11 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
 
   // Guards post-await setState on the save path if the modal unmounts mid-request.
   const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  useEffect(() => {
+    // StrictMode (dev) runs this cleanup once at mount, so re-arm the guard here.
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

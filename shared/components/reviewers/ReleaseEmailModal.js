@@ -126,9 +126,13 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     return () => { cancelled = true; };
   }, [showPreviews, requestId, suggestionIds]);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    sendGenerationRef.current += 1;
+  useEffect(() => {
+    // StrictMode (dev) runs this cleanup once at mount, so re-arm the guard here.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      sendGenerationRef.current += 1;
+    };
   }, []);
 
   const sendable = useMemo(() => (drafts || []).filter((d) => d.status === 'ok'), [drafts]);

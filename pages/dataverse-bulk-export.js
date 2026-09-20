@@ -248,10 +248,14 @@ function DataverseBulkExport() {
 
   // P3 — on unmount: mark unmounted, abort an in-flight SSE fetch, clear the
   // expiry timer. The mounted flag makes the post-await setState guards fire.
-  useEffect(() => () => {
-    mountedRef.current = false;
-    if (abortRef.current) abortRef.current.abort();
-    if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+  useEffect(() => {
+    // StrictMode (dev) runs this cleanup once at mount, so re-arm the guard here.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (abortRef.current) abortRef.current.abort();
+      if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+    };
   }, []);
 
   const patchRow = (id, patch) => {
