@@ -11,6 +11,7 @@ import {
   GRANTEE_INVITE_SEED_BODY,
   GRANTEE_INVITE_SEED_SUBJECT,
 } from '../../lib/seed/email-defaults/grantee-invite';
+import { fillInviteBody, fillInviteSubject } from '../../shared/config/granteeInviteEmail';
 
 // AwardeeTab reads the logged-in PD's saved custom invite body + profile identity
 // via useProfile. Mock the context so the component renders in isolation;
@@ -133,9 +134,9 @@ function wireFetch({
           }
           // Mirrors the route's 409 stale body, which drives the separate
           // conflict-snapshot load without replacing the working editor value.
-          return { ok: false, json: async () => ({ error: 'The abstract changed since you loaded it.', code: 'stale' }) };
+          return { ok: false, status: 409, json: async () => ({ error: 'The abstract changed since you loaded it.', code: 'stale' }) };
         }
-        if (!saveOk) return { ok: false, json: async () => ({ error: 'Could not save the abstract.' }) };
+        if (!saveOk) return { ok: false, status: 500, json: async () => ({ error: 'Could not save the abstract.' }) };
         const b = JSON.parse(opts.body);
         state.effective = b.text;
         state.effectiveHtml = `<p>${b.text}</p>`;
@@ -206,7 +207,7 @@ function wireFetch({
       }
       return generateOk
         ? { ok: true, json: async () => ({ abstractFormatted: state.effective, status: 100000000 }) }
-        : { ok: false, json: async () => ({ error: 'no applicant abstract' }) };
+        : { ok: false, status: 500, json: async () => ({ error: 'no applicant abstract' }) };
     }
     if (u.includes('/grantee-deliverables/send-invite')) {
       if (sendOk) {
@@ -216,7 +217,7 @@ function wireFetch({
       }
       return sendOk
         ? { ok: true, json: async () => ({ ok: true, status: 100000001 }) }
-        : { ok: false, json: async () => ({ error: 'send failed' }) };
+        : { ok: false, status: 500, json: async () => ({ error: 'send failed' }) };
     }
     if (u.includes('/grantee-deliverables/preview-invite')) {
       return { ok: true, json: async () => ({ html: '<p>Dear Professor [Name],</p><a>Open the Grantee Portal</a>' }) };
@@ -224,7 +225,7 @@ function wireFetch({
     if (u.includes('/grantee-deliverables/website-html')) {
       return websiteOk
         ? { ok: true, json: async () => ({ requestId: REQ, html: '<article class="grantee-award"><strong>Emory University</strong></article>' }) }
-        : { ok: false, json: async () => ({ error: 'no request found' }) };
+        : { ok: false, status: 500, json: async () => ({ error: 'no request found' }) };
     }
     throw new Error(`unexpected fetch ${u}`);
   });
@@ -518,7 +519,7 @@ test('a late stale-save response from a previous request cannot install conflict
   rerender(<AwardeeTab requestId={requestB} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Request B draft.'));
   await act(async () => {
-    resolveSaveA({ ok: false, json: async () => ({ code: 'stale', error: 'stale A' }) });
+    resolveSaveA({ ok: false, status: 409, json: async () => ({ code: 'stale', error: 'stale A' }) });
     await saveA;
   });
 
@@ -1848,6 +1849,31 @@ test('T2 send: non-2xx with outcome:"uncertain" keeps the uncertain step (body-f
   await waitFor(() => expect(within(screen.getByRole('dialog')).getByText(/gateway hiccup/i)).toBeInTheDocument());
 });
 
+// T2 axis (e) (Stage 2 review, correction round 1): a non-2xx response whose
+// body is unparseable (e.g. a 502 HTML gateway page) must keep the same
+// "may have sent" meaning as the catch-block network-rejection path, not
+// silently become a plain `failed` receipt.
+test('T2 send: non-2xx with an unparseable body (502 gateway page) keeps the uncertain receipt', async () => {
+  await readyRender({ send: async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(within(screen.getByRole('dialog')).getByText(/could not confirm the result/i)).toBeInTheDocument());
+});
+
+test('T2 send: plain non-2xx {error} without outcome is a failed receipt with the body message', async () => {
+  await readyRender({ send: async () => ({ ok: false, status: 400, json: async () => ({ error: 'X' }) }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(within(screen.getByRole('dialog')).getByText('X')).toBeInTheDocument());
+});
+
+test('T2 send: plain non-2xx {} (parseable, no error field) is a failed receipt with the default message', async () => {
+  await readyRender({ send: async () => ({ ok: false, status: 400, json: async () => ({}) }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(within(screen.getByRole('dialog')).getByText('The invitation was not sent.')).toBeInTheDocument());
+});
+
 test('T2 send: request bytes are exact (POST, headers, body)', async () => {
   await readyRender();
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
@@ -1855,6 +1881,15 @@ test('T2 send: request bytes are exact (POST, headers, body)', async () => {
   await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   const call = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/send-invite') && o?.method === 'POST');
   expect(call[1].headers).toMatchObject({ 'Content-Type': 'application/json' });
+  const expectedSubject = fillInviteSubject(GRANTEE_INVITE_SEED_SUBJECT, { title: undefined });
+  const expectedBody = fillInviteBody(GRANTEE_INVITE_SEED_BODY, { piName: 'Monika Raj', title: undefined });
+  expect(call[1].body).toBe(JSON.stringify({
+    requestId: REQ,
+    toEmail: 'monika.raj@emory.edu',
+    ccEmail: 'lorena.mclaren@emory.edu',
+    subject: expectedSubject,
+    bodyText: expectedBody,
+  }));
 });
 
 test('T2 previewEmail: non-2xx sets the error from the body', async () => {

@@ -146,6 +146,17 @@ test('T2: MatchTab handleMatch — malformed 2xx body (json() rejects) surfaces 
   expect(await screen.findByText('Unexpected end of JSON input')).toBeInTheDocument();
 });
 
+// T2 axis (e) (Stage 2 review, correction round 1): a 502 with an unparseable
+// body. handleMatch already falls back to `HTTP <status>` (never empty), so
+// this site was never silent — pinning that it stays that way.
+test('T2: MatchTab handleMatch — non-2xx with an unparseable body (502) falls back to "HTTP <status>"', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }));
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('mock-upload'));
+  fireEvent.click(screen.getByText('Find Matches'));
+  expect(await screen.findByText('HTTP 502')).toBeInTheDocument();
+});
+
 const MEMBER = {
   id: 'm1', name: 'Ada Lovelace', role: 'Professor', affiliation: 'Test U',
   role_type: 'Board', preferred_email: 'ada@example.org', dataverse_contact_id: null,
@@ -170,6 +181,16 @@ test('T2: RosterTab fetchRoster — non-2xx surfaces data.error verbatim', async
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('Roster'));
   expect(await screen.findByText('Roster lookup failed.')).toBeInTheDocument();
+});
+
+// T2 axis (e): a 502 with an unparseable body previously produced an empty
+// `throw new Error(data.error)` message, hidden by the `{error && <ErrorAlert>}`
+// guard. Fixed to fall back to the helper's own message.
+test('T2: RosterTab fetchRoster — non-2xx with an unparseable body (502) surfaces "Request failed (502)"', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }));
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('Roster'));
+  expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
 });
 
 test('T2: RosterTab fetchRoster — network rejection surfaces the native message', async () => {
@@ -210,6 +231,19 @@ test('T2: RosterTab handleSaveEdit — non-2xx surfaces data.error verbatim', as
   expect(await screen.findByText('Save conflict.')).toBeInTheDocument();
 });
 
+test('T2: RosterTab handleSaveEdit — non-2xx with an unparseable body (502) surfaces "Request failed (502)"', async () => {
+  global.fetch = routeFetch([
+    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [MEMBER] }) },
+    { test: (u, m) => m === 'PATCH' && u.includes('/api/expertise-finder/roster'), respond: () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) },
+  ]);
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('Roster'));
+  fireEvent.click(await screen.findByText('Ada Lovelace'));
+  fireEvent.click(screen.getByText('Edit'));
+  fireEvent.click(screen.getByText('Save Changes'));
+  expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
+});
+
 test('T2: RosterTab handleDelete — DELETE posts exact body and removes the member on success', async () => {
   window.confirm = jest.fn(() => true);
   global.fetch = routeFetch([
@@ -239,6 +273,19 @@ test('T2: RosterTab handleDelete — non-2xx surfaces data.error verbatim', asyn
   fireEvent.click(await screen.findByText('Ada Lovelace'));
   fireEvent.click(screen.getByText('Deactivate'));
   expect(await screen.findByText('Cannot deactivate.')).toBeInTheDocument();
+});
+
+test('T2: RosterTab handleDelete — non-2xx with an unparseable body (502) surfaces "Request failed (502)"', async () => {
+  window.confirm = jest.fn(() => true);
+  global.fetch = routeFetch([
+    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [MEMBER] }) },
+    { test: (u, m) => m === 'DELETE' && u.includes('/api/expertise-finder/roster'), respond: () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) },
+  ]);
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('Roster'));
+  fireEvent.click(await screen.findByText('Ada Lovelace'));
+  fireEvent.click(screen.getByText('Deactivate'));
+  expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
 });
 
 test('T2: RosterTab handleAdd — POST posts exact headers and adds the member on success', async () => {
@@ -272,12 +319,33 @@ test('T2: RosterTab handleAdd — non-2xx surfaces data.error verbatim', async (
   expect(await screen.findByText('Duplicate name.')).toBeInTheDocument();
 });
 
+test('T2: RosterTab handleAdd — non-2xx with an unparseable body (502) surfaces "Request failed (502)"', async () => {
+  global.fetch = routeFetch([
+    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [] }) },
+    { test: (u, m) => m === 'POST' && u.includes('/api/expertise-finder/roster'), respond: () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) },
+  ]);
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('Roster'));
+  fireEvent.click(await screen.findByText('+ Add Member'));
+  fireEvent.change(within(screen.getByText('Name *').closest('div')).getByRole('textbox'), { target: { value: 'Grace Hopper' } });
+  fireEvent.click(screen.getByText('Add Member'));
+  expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
+});
+
 test('T2: BatchTab loadProposals — non-2xx surfaces data.error verbatim', async () => {
   global.fetch = jest.fn(async () => fail({ error: 'Cycle lookup failed.' }, 500));
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('Batch'));
   fireEvent.click(screen.getByText('Load Proposals'));
   expect(await screen.findByText('Cycle lookup failed.')).toBeInTheDocument();
+});
+
+test('T2: BatchTab loadProposals — non-2xx with an unparseable body (502) falls back to "HTTP <status>"', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }));
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('Batch'));
+  fireEvent.click(screen.getByText('Load Proposals'));
+  expect(await screen.findByText('HTTP 502')).toBeInTheDocument();
 });
 
 test('T2: BatchTab loadProposals — network rejection surfaces the native message', async () => {
@@ -307,6 +375,19 @@ test('T2: BatchTab runBatch (batch-match) — success and non-2xx both record pe
   expect(firstOptions.headers).toEqual({ 'Content-Type': 'application/json' });
   expect(JSON.parse(firstOptions.body)).toEqual({ requestId: 'r1', requestNumber: '1001' });
   expect(await screen.findByTitle('No file found.')).toBeInTheDocument();
+});
+
+test('T2: BatchTab runBatch (batch-match) — non-2xx with an unparseable body (502) records "Request failed (502)" per-proposal', async () => {
+  global.fetch = routeFetch([
+    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/proposals'), respond: () => ok({ proposals: [{ requestId: 'r1', requestNumber: '1001' }] }) },
+    { test: (u, m) => m === 'POST' && u.includes('/api/expertise-finder/batch-match'), respond: () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) },
+  ]);
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('Batch'));
+  fireEvent.click(screen.getByText('Load Proposals'));
+  await screen.findAllByText(/1001/);
+  fireEvent.click(screen.getByText('Run All'));
+  expect(await screen.findByTitle('Request failed (502)')).toBeInTheDocument();
 });
 
 test('T2: BatchTab runBatch (batch-match) — network rejection is recorded per-proposal, not thrown', async () => {
