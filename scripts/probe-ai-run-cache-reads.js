@@ -215,8 +215,23 @@ async function main() {
     682090002: 'needs-review',
   };
 
+  // Resolve prompt row ids -> names with one extra read so each row shows
+  // which Executor prompt produced it (the lookup's formatted value is the
+  // prompt row's primary name, which may not be wmkf_ai_promptname).
+  const promptNameById = new Map();
+  const promptIds = [...new Set(runs.records.map((r) => r._wmkf_ai_prompt_value).filter(Boolean))];
+  if (promptIds.length > 0) {
+    const res = await DynamicsService.queryRecords('wmkf_ai_prompts', {
+      select: 'wmkf_ai_promptid,wmkf_ai_promptname',
+      filter: odata.or(promptIds.map((id) => odata.eqGuid('wmkf_ai_promptid', id))),
+      top: promptIds.length,
+    });
+    for (const p of res.records) promptNameById.set(p.wmkf_ai_promptid, p.wmkf_ai_promptname);
+  }
+
   const header = [
     'createdon'.padEnd(24),
+    'prompt'.padEnd(30),
     'request'.padEnd(14),
     'model'.padEnd(24),
     'ver'.padEnd(4),
@@ -249,9 +264,14 @@ async function main() {
     if (parsed.cacheRead) cacheReadCount++;
     if (parsed.cacheCreate) cacheCreateCount++;
 
+    const promptLabel = promptNameById.get(r._wmkf_ai_prompt_value)
+      || r._wmkf_ai_prompt_value_formatted
+      || fmt(r._wmkf_ai_prompt_value);
+
     console.log(
       [
         when.padEnd(24),
+        String(promptLabel).slice(0, 29).padEnd(30),
         requestLabel.padEnd(14),
         String(r.wmkf_ai_model || '?').padEnd(24),
         fmt(r.wmkf_ai_promptversion).padEnd(4),
