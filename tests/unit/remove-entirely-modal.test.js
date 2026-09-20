@@ -96,6 +96,7 @@ test('T4 request bytes: the preflight GET uses the exact URL', async () => {
   await screen.findByText(/Submitted-review Dataverse rows/);
   expect(global.fetch).toHaveBeenCalledWith(
     `/api/reviewer-finder/my-candidates?mode=removal-preflight&suggestionId=${encodeURIComponent(SUGGESTION_ID)}`,
+    expect.objectContaining({ method: 'GET' }),
   );
 });
 

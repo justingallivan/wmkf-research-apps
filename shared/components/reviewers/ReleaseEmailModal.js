@@ -29,6 +29,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RELEASE_REASONS } from '../../config/reviewerLifecycle';
 import EmailSendFeedback from '../EmailSendFeedback';
+import { requestEnvelope } from '../../utils/api-request';
 
 const EXCLUDED_REASON = {
   not_found: 'No longer in this request',
@@ -109,15 +110,15 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     previewsRequestedRef.current = true;
     let cancelled = false;
     setLoading(true);
-    fetch('/api/review-manager/render-withdraw-emails', {
+    requestEnvelope('/api/review-manager/render-withdraw-emails', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId, suggestionIds }),
+      body: { requestId, suggestionIds },
+      tolerantBody: true,
     })
-      .then(async (resp) => {
-        const data = await resp.json().catch(() => ({}));
+      .then((envelope) => {
         if (cancelled) return;
-        if (!resp.ok) setLoadError(data.error || `Could not render the emails (${resp.status})`);
+        const data = envelope.data;
+        if (!envelope.ok) setLoadError(data.error || `Could not render the emails (${envelope.status})`);
         else setDrafts(data.drafts || []);
       })
       .catch((err) => { if (!cancelled) setLoadError(`Network error: ${err.message}`); })
@@ -189,21 +190,21 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
         }
       }
 
-      const resp = await fetch('/api/review-manager/withdraw-sufficient', {
+      const envelope = await requestEnvelope('/api/review-manager/withdraw-sufficient', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionIds: releaseableIds,
           reason,
           sendEmail: sendCourtesyEmail,
           ...(Object.keys(overrides).length > 0 ? { overrides } : {}),
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await resp.json().catch(() => ({}));
+      const data = envelope.data;
       if (!mountedRef.current || sendGeneration !== sendGenerationRef.current) return;
-      if (!resp.ok) {
-        setSendError(data.error || `Release failed (${resp.status})`);
+      if (!envelope.ok) {
+        setSendError(data.error || `Release failed (${envelope.status})`);
         return;
       }
 
