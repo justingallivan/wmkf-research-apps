@@ -293,6 +293,10 @@ test('does not apply a delayed triage count patch after returning to the origina
   const mainProgram = () => screen.getByLabelText('Grant program');
   fireEvent.change(mainProgram(), { target: { value: 'p2' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p2'));
+  // Let p2's cycle list land and be adopted into the URL before switching
+  // back. Switching in the same tick races the URL-adoption effect, which
+  // then writes p2's cycle into the p1 URL (seen only on the CI runner).
+  await waitFor(() => expect(routerState.query.cycleCode).toBe('B'));
   fireEvent.change(mainProgram(), { target: { value: 'p1' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p1'));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());

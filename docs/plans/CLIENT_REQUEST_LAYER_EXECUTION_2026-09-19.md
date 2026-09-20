@@ -1488,3 +1488,26 @@ the local rehearsal. Rollback: redeploy `wmkfresearchapps-kwgubwobw`
 (docs-only build of pre-merge `main`). Preview env cleanup (alias + three
 branch-scoped variables) remains the owner's call now that the branch is
 merged.
+
+### Post-merge CI red — 2026-09-20 (fixed)
+
+GitHub Actions `Tests` (Node 20, `jest --ci --coverage`) failed on `main` at
+`23901d5da` and `2936dc68a` (3/3 incl. a rerun) on ONE test:
+`workbench-request-number-lookup.test.js` "does not apply a delayed triage
+count patch after returning to the original program"; local Gate G (Node 26,
+no coverage) was green, and the file passed in isolation under Node 20 too;
+the full suite under Node 20 + coverage reproduced it locally 1 in 2 runs. A
+throwaway diagnostic PR (#318, closed, branch deleted) captured the failing
+state in CI: router query `{ programId: p1, cycleCode: B }` — the shell's
+URL-adoption effect for p2's cycle list flushed after the test had already
+switched back to p1 (same tick), writing p2's cycle into the p1 URL; p1's list
+has no `B`, so the count stayed 0. Not a migration defect: the adoption effect
+and loader logic are unchanged; the extra awaits in `requestEnvelope` shifted
+timing enough for the CI runner to land in a window no user hits. Fix
+(test-only): wait for p2's cycle to be adopted (`routerState.query.cycleCode
+=== 'B'`) before switching back. Verified: green under Node 20 and 26; full
+suite under Node 20 + coverage 1042/15430 green; the test still goes RED when
+the `patchCycleCounts` generation guard is removed. Observation, not acted on:
+the adoption effect navigates from a stale render closure and could in
+principle write a superseded cycle into a URL whose program changed within the
+same tick; harmless in practice.
