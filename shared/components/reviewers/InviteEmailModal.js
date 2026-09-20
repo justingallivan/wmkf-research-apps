@@ -290,11 +290,12 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     (async () => {
       const nextTiming = {};
       try {
-        const { data } = await requestEnvelope(
+        const envelope = await requestEnvelope(
           `/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.INVITE_TIMING)}`,
           { tolerantBody: true },
         );
-        if (data?.value) {
+        const data = envelope.data;
+        if (envelope.ok && data?.value) {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           // Pick only the known keys (a pre-Phase-1 sticky value carries the retired
           // `respondByDate` date — ignore it; respondOffsetDays falls back to default 7).
