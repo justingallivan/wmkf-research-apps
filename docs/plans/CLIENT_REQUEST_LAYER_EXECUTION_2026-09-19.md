@@ -1373,3 +1373,22 @@ That is the rollback target for any merge of this branch: redeploy it
 (`vercel redeploy <url>` or promote in the dashboard); no data rollback exists
 or is needed. Merge to `main` is the owner's explicit decision (Tier 2 work on
 the branch).
+
+### Gate G (full, Stage 6 scope) — 2026-09-20, orchestrator (Fable), at `c9dd84e2e`
+
+Every defined `check:*` gate and its self-test sequentially (37 gates,
+`check:memory-drift` write-mode excluded; advisory gates included): RED count
+0. `npm run lint`: 0 errors, 13 warnings. `check:types`: clean. Full suite
+(`npx jest`, not `tests/unit` only): **1042 suites / 15430 tests passed**.
+`npm run build`: compiled. Log:
+`scratchpad/gates-stage6.log` (session-local). This run covers Stage 5
+(all corrections + residuals), the release-copy follow-up, the deviation-6
+fallback, and Stage 6 code; commits after it are docs-only.
+
+### Stage 5 acceptance — 2026-09-20, orchestrator (Fable)
+
+5a (groups 1–2) and 5b accepted: fresh review READY at `976458f9a` (second
+pass), residuals R1–R4 fixed (`135f11d9e`), owner decisions recorded
+(steps 3–6 and 9 test-covered; steps 7–8 passed on the preview; deviation
+(6) closed; release copy approved), Gate G green above. Stage 6 acceptance
+follows its fresh review.
