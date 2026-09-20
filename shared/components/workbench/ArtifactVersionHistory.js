@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 // The statuses this component knows how to render. Kept as an allowlist so an
 // unrecognized value falls into the visible gap branch, not into silence.
@@ -55,17 +56,17 @@ export default function ArtifactVersionHistory({
   }, [expectedArtifactId, requestId]);
 
   const loadHistory = async (sequence) => {
-    const response = await fetch(
+    const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(
       `/api/workbench/initial-assessment/versions?requestId=${encodeURIComponent(requestId)}`
         + `&expectedArtifactId=${encodeURIComponent(expectedArtifactId)}`,
+      { tolerantBody: true },
     );
-    const body = await response.json().catch(() => ({}));
     if (loadSequence.current !== sequence) return null;
-    if (!response.ok) {
-      if (response.status === 409) {
+    if (!resOk) {
+      if (resStatus === 409) {
         throw new Error('This document was replaced. Refresh the page before viewing version history.');
       }
-      throw new Error(body.error || `Failed to load version history (${response.status})`);
+      throw new Error(body.error || `Failed to load version history (${resStatus})`);
     }
     setState(body);
     return body;
@@ -104,19 +105,19 @@ export default function ArtifactVersionHistory({
     setRestoringVersion(targetVersionId);
     setError(null);
     try {
-      const response = await fetch('/api/workbench/initial-assessment/restore-version', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/initial-assessment/restore-version', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           expectedArtifactId,
           targetVersionId,
           expectedCurrentVersionId: current.versionId,
-        }),
+        },
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
       if (loadSequence.current !== sequence) return;
-      if (!response.ok) throw new Error(body.error || `Version restore failed (${response.status})`);
+      if (!resOk) throw new Error(body.error || `Version restore failed (${resStatus})`);
       if (body.artifact && typeof onRestored === 'function') onRestored(body.artifact);
       await loadHistory(sequence);
     } catch (restoreError) {
