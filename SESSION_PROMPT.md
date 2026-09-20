@@ -17,7 +17,7 @@ it that way. Plan status is `complete`. **Nothing is merged to `main`; the
 branch carries Tier 2 work (Stages 4 and 5b), so merge is an explicit owner
 decision.** **Update 16:20 PT: the owner said "merge"; merge commit
 `23901d5da` is on `main` and deployed as `dpl_7PMh3nf1w5fiUNst2pmAQZdUvtUR`
-(Gate G rerun green on the merged head; DEVELOPMENT_LOG entry written).**
+(Gate G rerun green on the merged head; DEVELOPMENT_LOG entry written). GitHub `Tests` went red on `main` for one CI-only race in `workbench-request-number-lookup.test.js`; test-only fix `b65a392be`, all five workflows green on it — see the execution log "Post-merge CI red".**
 
 ### What Was Completed
 
