@@ -1,6 +1,39 @@
 # GraphService release preparation — 2026-09-19
 
-Status: **BOUNDED REHEARSAL PASSED — OWNER APPROVED PRODUCTION RELEASE**.
+Status: **RELEASED TO PRODUCTION — VERIFIED**.
+
+## Completed production release
+
+[VERIFIED via Git, Vercel project metadata, authenticated browser checks, deployment
+logs, and GitHub Actions] On September 19 Pacific / September 20 UTC, main was
+fast-forwarded and pushed at `a24a02d588be728ade199069e7b953dbafdce96e`.
+Deployment `dpl_ExUrFDvxPXPfSrzYzhJVL7ieeQWJ` reached READY and served
+`applications.wmkeck.org`, `reviews.wmkeck.org`, `grantees.wmkeck.org`, and
+`submissions.wmkeck.org`. All five workflows passed: Tests, E2E (Playwright),
+Security Scan, Dependency Scan, and Secret Scanning.
+
+Post-release verification passed for the signed-in staff visit/read page, proposal
+PDF download (HTTP 200), and existing contributor-link context/checklist (HTTP 200).
+The bounded 100-record deployment log sample contained no errors or 5xx responses;
+this is not continuous monitoring or proof of every application path. No additional
+upload, email, scan, generation, schema or environment change was part of promotion.
+Rollback deployment remains `dpl_Aui3x7NtH3MoKARNHZQB5YUyJLZS` (`f4d0a33f`).
+Code rollback does not undo retained remote rehearsal state.
+
+Release evidence: [Tests workflow](https://github.com/justingallivan/wmkf-research-apps/actions/runs/35490056819),
+[E2E workflow](https://github.com/justingallivan/wmkf-research-apps/actions/runs/35490056830),
+and local `/private/tmp/graph-production-release-receipt.json` (completed
+2026-09-20T04:54:26Z). Local receipts are supplementary and may not survive cleanup;
+this checked-in summary retains the outcome and identifiers for another computer.
+No Graph implementation or release blocker remains. The independent test-request
+factory awaits platform evidence; see `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`.
+
+## Historical preparation and rehearsal record
+
+The remaining sections record the preparation-time baseline, requirements, and
+approved operation before deployment. Their future-tense instructions and earlier
+not-promoted statements are historical, not outstanding release tasks. Current
+ship state and verification are above.
 
 Scope: prepare release of `codex/graph-service-decomposition`, reviewed candidate `7f59afbafdc9f7eb6687c679cfc13ac80fae71b6`, from `/private/tmp/wmkf-graph-decomposition`. The owner authorized release preparation after local implementation acceptance. The owner subsequently authorized pushing this reviewed refactor to production on 2026-09-20 UTC, after the bounded rehearsals and stated coverage limits. No additional test writes or sends are included. Release policy: `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, Tier 2; prior verification: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`.
 

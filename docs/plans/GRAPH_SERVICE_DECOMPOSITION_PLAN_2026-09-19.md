@@ -2,9 +2,9 @@
 title: GraphService and SharePoint transport decomposition
 domain: architecture
 kind: plan
-status: active
+status: complete
 owner: product-engineering
-summary: "S0–S11 accepted locally: GraphService extracted behind its existing facade; stage evidence retained, promotion blocked pending approved rehearsals and owner decision."
+summary: "GraphService decomposition shipped to Production at a24a02d5; S0–S11 stage specifications and local acceptance evidence remain historical."
 ---
 
 # GraphService and SharePoint transport decomposition
@@ -13,9 +13,9 @@ summary: "S0–S11 accepted locally: GraphService extracted behind its existing 
 
 **Accepted scope:** decompose `lib/services/graph-service.js` into responsibility-specific modules behind its existing public facade. This is the largest justified **unplanned shared-service refactor found in the bounded survey**, measured by cross-capability impact, unrelated responsibilities, and migration risk—not the longest file or an assertion that every possible refactor has been ranked.
 
-**Status: [S0–S11 ACCEPTED LOCALLY — RELEASE BLOCKED].** The local migration is complete on `codex/graph-service-decomposition`, with Luna builds, fresh Sol reviews, and root acceptance at each stage. The original planning specifications below remain an execution record; no migration stage remains. The public facade is now 288 lines with 21 unchanged static methods and 11 internal ownership modules. Verification and the blocked promotion packet are in the execution receipt. No push, merge, deployment, live rehearsal, infrastructure, dependency, or data migration was performed.
+**Status: [RELEASED TO PRODUCTION — VERIFIED].** The S0–S11 migration was accepted on `codex/graph-service-decomposition` and shipped on `main` at `a24a02d588be728ade199069e7b953dbafdce96e` on September 19 Pacific / September 20 UTC. Production deployment `dpl_ExUrFDvxPXPfSrzYzhJVL7ieeQWJ` reached READY. All five CI workflows passed; authenticated staff and contributor read checks and a proposal PDF download (HTTP 200) passed. A bounded sample of 100 deployment log records contained zero errors or 5xx responses. These checks do not establish every Graph path or continuous health. The public facade remains 288 lines with 21 unchanged static methods and 11 internal ownership modules. The stage specifications below and their local-only language are historical; the release outcome and coverage limits are recorded in the [release preparation packet](GRAPH_SERVICE_RELEASE_PREPARATION_2026-09-19.md). No infrastructure, dependency, schema, or data migration was part of the production promotion.
 
-Evidence baseline: `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`, 2026-09-19. Line references below refer to that baseline; symbols control if lines drift. The stage specifications and target labels below are historical baseline proposal text. Current completed modules/tests and acceptance evidence are recorded in `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`; S0–S11 are accepted locally.
+Evidence baseline: `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`, 2026-09-19. Line references below refer to that baseline; symbols control if lines drift. The stage specifications and target labels below are historical baseline proposal text. Completed modules and local acceptance evidence are recorded in `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`; production release evidence is in the linked release packet above.
 
 ### Why this scope — historical survey
 
@@ -79,9 +79,9 @@ Whole-flow: representative critical consumers traced above; S0 builds the full c
 
 ## 3. Target ownership and mechanical move rules — historical baseline specification
 
-The ownership table and mechanical rules in this section describe the accepted S0 proposal and staged implementation boundaries. The local migration has now completed S0–S11; the current physical ownership is verified in source and the S11 execution receipt.
+The ownership table and mechanical rules in this section describe the accepted S0 proposal and staged implementation boundaries. S0–S11 were completed and shipped; the current physical ownership is verified in source and the S11 execution receipt.
 
-All destinations below were the **[PLANNED]** baseline beneath `lib/services/graph/`; they are now implemented locally. The original facade path remains permanently supported. No barrel module was added.
+All destinations below were the **[PLANNED]** baseline beneath `lib/services/graph/`; they are now implemented in Production. The original facade path remains permanently supported. No barrel module was added.
 
 | Destination | Exact ownership | First stage |
 |---|---|---|
@@ -200,7 +200,7 @@ Body-comparison procedure: save the previous accepted file with `git show <accep
 
 If a stage is too large for the implementation agent, split it **before editing**, at a named method boundary, preserving the same prerequisites, G, R and rollback rules for each substage. Never split a state owner from its mutation/reset code across accepted commits.
 
-## 6. Rehearsal, promotion, and rollback
+## 6. Historical rehearsal, promotion, and rollback protocol
 
 S0 and S11 require full Jest; all stages require the complete Graph contract suite and canonical build. Full suite failures are not dismissed as unrelated without an independently reproduced baseline and explicit disposition; relevant failures block progression.
 
@@ -218,7 +218,7 @@ Automated coverage is bounded to the §4 suites and three real-facade bridges: j
 
 Before promotion, record branch/head, accepted receipts, current campaign window, approved rehearsal mode, last-known-good deployment, expected side effects, and rollback operator. An isolated Dataverse target does **not** isolate Graph/SharePoint. No live write rehearsal is authorized by this plan; any needed live verification requires separately named target, synthetic files, expected writes and cleanup ownership. Keep paid calls out of routine verification.
 
-Tier 2 staff and external-user rehearsal requirements still apply. A missing authorized environment or required rehearsal means **release blocked**, not “tests passed, therefore production proved.” No env/config/schema changes are needed for extraction. No dual-running writes for comparison.
+At the historical S11 checkpoint, Tier 2 staff and external-user rehearsal requirements still applied, and missing authorization or rehearsal meant **release blocked**. The subsequent bounded rehearsals, owner approval, and production release are recorded in the release packet; their scope does not turn the unexercised browser, chunked-upload, or search journeys into tested paths. No env/config/schema changes were needed for extraction. No dual-running writes were used for comparison.
 
 Before release, rollback is reverting the most recent stage commit and rerunning G; subsequent stages must not depend on a rejected stage. After release, first restore the recorded previous deployment, then reconcile any files/versions or downstream receipts produced during the interval. Code rollback does not undo SharePoint/Dataverse/Postgres state. Never delete uploaded files or version history as an automatic rollback step. Retain the facade; no later facade-removal stage is part of this plan.
 
@@ -290,4 +290,4 @@ Amendment checkpoint P4: fresh `amendment_review`, no inherited history, returne
 | Freeze metadata/error differences | Source branches C5–C11 exist today | Existing version/observability tests, additional cases required | Differential fixtures that disagree after permitted rewrites block stage. **[PLANNED]** |
 | Promote after isolated rehearsal | Release policy requires Tier 2 evidence; tenant rehearsal availability unknown | No release experiment performed | Missing safe target/rehearsal/owner promotion means release blocked. **[UNKNOWN until release preparation]** |
 
-Final planning verdict (historical): **READY TO IMPLEMENT after implementation authorization and S0 prerequisites**. The original three planning checkpoints and fresh amendment checkpoint P4 completed; their named corrections are incorporated, with Opus dispositions recorded above. Current execution status is S0–S11 accepted locally; promotion remains blocked pending the separate requirements in the S11 release packet. No release, push, deployment, or live rehearsal is authorized by this local execution.
+Final planning verdict (historical): **READY TO IMPLEMENT after implementation authorization and S0 prerequisites**. The original three planning checkpoints and fresh amendment checkpoint P4 completed; their named corrections are incorporated, with Opus dispositions recorded above. The later S0–S11 local acceptance, bounded rehearsals, owner-approved production push, and production verification are recorded in the execution and release packets. This original plan by itself authorized no live rehearsal or release.

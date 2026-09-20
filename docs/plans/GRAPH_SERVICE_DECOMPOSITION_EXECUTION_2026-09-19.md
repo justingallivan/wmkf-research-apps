@@ -1,12 +1,12 @@
 # GraphService decomposition execution receipt — 2026-09-19
 
-Status: **[S0–S11 ACCEPTED LOCALLY — BOUNDED REHEARSALS PASSED — PROMOTION BLOCKED]**. Luna built each stage, fresh Sol reviews accepted the work, and root completed final review and verified the recorded gates. The migration is complete on `codex/graph-service-decomposition`; no migration stage remains. The release packet now records the bounded staff/external rehearsal evidence and conditional PUT proof. Production promotion still requires the owner release decision; no push, merge, or production promotion was performed.
+Status: **[RELEASED TO PRODUCTION — VERIFIED]**. S0–S11 were accepted locally, then the owner approved promotion of the original Graph refactor. `main` was fast-forwarded and pushed at `a24a02d588be728ade199069e7b953dbafdce96e` on September 19 Pacific / September 20 UTC; deployment `dpl_ExUrFDvxPXPfSrzYzhJVL7ieeQWJ` reached READY. All five CI workflows passed. Authenticated staff and contributor read checks and a proposal PDF download (HTTP 200) passed; a bounded 100-record deployment log sample had zero errors or 5xx responses. These checks do not prove every Graph path or continuous health. The S0–S11 receipts below preserve local checkpoint evidence and earlier release blockers as history.
 
-Current release preparation and bounded rehearsal evidence: [release preparation packet](GRAPH_SERVICE_RELEASE_PREPARATION_2026-09-19.md). Promotion remains blocked; the recorded rehearsal was confined to the dedicated synthetic request/environment and does not imply production promotion.
+Production release, rollback deployment `dpl_Aui3x7NtH3MoKARNHZQB5YUyJLZS`, bounded rehearsal evidence, and coverage limits: [release preparation packet](GRAPH_SERVICE_RELEASE_PREPARATION_2026-09-19.md). Release receipt: `/private/tmp/graph-production-release-receipt.json` (supplementary local evidence). No rehearsal-only guard or configuration overlay was promoted.
 
 ## Historical S0–S11 stage evidence
 
-The stage sections below preserve the code and verification at each accepted checkpoint. The post-Opus follow-up receipt at the end records the current mutation-runner behavior.
+The stage sections below preserve the code and verification at each accepted checkpoint. Statements such as “release blocked,” “no push,” and “next allowed stage” describe their dated local checkpoints, not the shipped state above. The post-Opus follow-up receipt at the end records the mutation-runner behavior accepted before release.
 
 ## Contract-reconcile Step 0
 
@@ -518,7 +518,7 @@ Fresh Sol review **`sol_s10`** accepted the source extraction conditional on G, 
 
 ## S11 closure receipt
 
-Status: **[S11 ACCEPTED LOCALLY — RELEASE BLOCKED]**. Baseline is accepted S10 commit `7bf1ce2d`; this closure pass performs only proven source cleanup, boundary-inventory tightening, stale Graph documentation reconciliation, and release-packet evidence. No runtime behavior, public signature, dependency, environment, persistence, policy, live-service, deployment, merge, or push change is included. Accepted S11 checkpoint: `76cfbbcb`. The subsequent handoff commit changes documentation only.
+Historical checkpoint status: **[S11 ACCEPTED LOCALLY — RELEASE BLOCKED AT THAT CHECKPOINT]**. Baseline is accepted S10 commit `7bf1ce2d`; this closure pass performs only proven source cleanup, boundary-inventory tightening, stale Graph documentation reconciliation, and release-packet evidence. No runtime behavior, public signature, dependency, environment, persistence, policy, live-service, deployment, merge, or push change was included in S11 itself. Accepted S11 checkpoint: `76cfbbcb`. Later documentation, rehearsals, owner approval, and production promotion are recorded above and in the release packet.
 
 ### Closure surface and source ownership
 
@@ -569,7 +569,7 @@ npx playwright test tests/e2e/workbench-responsiveness.spec.js --project=chromiu
 
 It passed **3 tests**, exit 0, in 1.6 seconds. The server log records missing Postgres/Azure credentials while the app enforced auth; no external provider or live route was used. The first restricted-shell attempt was blocked before page execution by the host Chromium `MachPortRendezvousServer` permission boundary; the same test passed outside that boundary. Evidence: `/private/tmp/wmkf-graph-decomposition-logs/s11-modea-browser-escalated.log` and the initial bounded failure log `/private/tmp/wmkf-graph-decomposition-logs/s11-modea-browser.log`.
 
-### Five Mode A journeys and release limits
+### Five Mode A journeys and historical S11 release limits
 
 1. **History and stale-request handling:** `tests/unit/artifact-version-history.test.js`, `tests/unit/document-lifecycle-boundary.test.js`, `tests/unit/graph-service-versions.test.js`, and the Initial Assessment artifact/version/control/route suites passed. Consumer suites use mocked dependencies; the dedicated Graph suites and `graph-service-consumer-contract.test.js` provide the real-facade transport bridge. Browser stale-request rendering remains outside these mocked checks.
 2. **Downloads and review bytes:** `tests/integration/review-manager-download-review.test.js`, `tests/unit/individual-review-file-service.test.js`, `tests/unit/workbench-download-proposal-document-service.test.js`, `tests/unit/review-upload.test.js`, and `tests/unit/graph-service-downloads.test.js` passed. Browser byte/content-header behavior remains unproven for live storage.
@@ -577,9 +577,11 @@ It passed **3 tests**, exit 0, in 1.6 seconds. The server log records missing Po
 4. **Restore and publication identity:** `tests/unit/initial-assessment-controls-service.test.js`, `tests/unit/artifact-version-history.test.js`, `tests/unit/graph-service-versions.test.js`, and `tests/unit/graph-service-write-contract.test.js` passed. **Historical S11 checkpoint:** tenant-level restore rehearsal was not performed then; the later bounded staff restore is recorded in the release packet and `/private/tmp/1003220-ia-restored-proof.json`.
 5. **Search throttle and incomplete response:** `tests/unit/dynamics-explorer-search-documents.test.js`, `tests/unit/dynamics-explorer-chat-characterization.test.js`, `tests/unit/graph-service-search-retry.test.js`, and `tests/unit/graph-service-consumer-contract.test.js` passed. No live browser/provider throttle loop was run.
 
-The available browser check covers mocked Workbench responsiveness only; no existing E2E harness covers all five Graph journeys. The later bounded evidence spans three contexts: the external upload and clean scan ran in the dedicated Vercel `graph-rehearsal` deployment; the conditional PUT was a standalone disposable-file probe; and the authenticated staff restore ran on the localhost candidate. It does not establish every possible UI, chunked upload, or Tier 2 campaign path. Local migration is complete and accepted by root; release remains blocked pending the owner decision, campaign timing, and named rollback operator. No production promotion or `main` push occurred.
+The available browser check covered mocked Workbench responsiveness only; no existing E2E harness covered all five Graph journeys. The later bounded evidence spans three contexts: the external upload and clean scan ran in the dedicated Vercel `graph-rehearsal` deployment; the conditional PUT was a standalone disposable-file probe; and the authenticated staff restore ran on the localhost candidate. It does not establish every possible UI, chunked upload, or Tier 2 campaign path. At this historical S11 checkpoint, release still awaited the owner decision, timing, and named rollback operator. Those conditions were resolved for the later production release recorded at the top of this receipt and in the release packet.
 
-### Blocked promotion packet — plan §6
+### Historical blocked promotion packet — plan §6
+
+The table records the S11 checkpoint before the later rehearsals and owner-approved production release. Its UNKNOWN/REQUIRED cells are not current release blockers; their resolution and the actual deployment are recorded in the release packet.
 
 | Required field | Recorded state / action before promotion |
 |---|---|
@@ -590,8 +592,8 @@ The available browser check covers mocked Workbench responsiveness only; no exis
 | Campaign window and promotion approval | **UNKNOWN / REQUIRED**: owner must choose timing and explicitly approve release after the required staff/external Tier 2 evidence is complete. |
 | Last-known-good deployment and rollback operator | **UNKNOWN / REQUIRED**: record the exact deployment/commit and named operator before promotion. Prior-session deployment records are not current evidence for this release. |
 
-Release is **BLOCKED** until these fields and required rehearsals are resolved.
-After a future release, rollback first restores the recorded previous deployment,
+At this historical checkpoint, release was **BLOCKED** until these fields and required rehearsals were resolved.
+After release, rollback first restores the recorded previous deployment,
 then reconciles files, versions, and downstream receipts produced during the
 release interval. Code rollback does not reverse persisted state. Never delete
 uploaded files or version history automatically as part of rollback. Before any
@@ -603,9 +605,9 @@ Accepted stage commits: S0 `546efff8`, S1 `77e94c0d`, S2 `7ff2f90f`, S3 `2addf72
 
 Fresh Sol review **`sol_s11`** accepted the S11 source/test closure and, after inspecting the completed evidence, accepted the final receipt and blocked-promotion packet with no material finding. Root's independent parity and forwarding checks are recorded above. Root completed final review and accepts S11. No unresolved local source or gate finding remains; external rehearsals and promotion remain separate owner-controlled work.
 
-## Post-Opus verification-tool follow-ups — current
+## Historical post-Opus verification-tool follow-ups
 
-Status: **[ACCEPTED LOCALLY — RELEASE STILL BLOCKED]**. Claude Opus 5 reviewed candidate `f6eb06d2` through the OAuth/subscription CLI and returned ACCEPT with two optional tooling findings. The owner explicitly authorized those two follow-ups. Luna implemented them, fresh Sol `sol_followups` accepted the final changes, and root completed source/log review. The review transcript is retained locally at `/private/tmp/graph-opus-review-f6eb06d2/REVIEW.md`; Opus did not review these subsequent edits.
+Historical follow-up status: **[ACCEPTED LOCALLY — RELEASE STILL BLOCKED AT THAT CHECKPOINT]**. Claude Opus 5 reviewed candidate `f6eb06d2` through the OAuth/subscription CLI and returned ACCEPT with two optional tooling findings. The owner explicitly authorized those two follow-ups. Luna implemented them, fresh Sol `sol_followups` accepted the final changes, and root completed source/log review. The review transcript is retained locally at `/private/tmp/graph-opus-review-f6eb06d2/REVIEW.md`; Opus did not review these subsequent edits.
 
 ### Contract and bounded invariants
 
@@ -626,4 +628,4 @@ Change surface: mutation proof runner and static boundary tests only. Entry poin
 - Seven sequential document/security checks passed: doc-currency and self-test, fact-consistency and self-test, docs-catalog, secret-scan and self-test. Log: `/private/tmp/wmkf-graph-decomposition-logs/followups-doc-gates.log`.
 - Scoped ESLint and `node --check` passed on the three changed source/test files; `git diff --check` passed. Full Jest/build evidence above remains the S11 checkpoint evidence and was not rerun for this tooling-only follow-up.
 
-Scoped `/sweep` Mode A searched runner and baseline-specific claims across the plan, execution receipt, source/tests, session handoff, memory, and wiki. Prior stage statements are historical evidence under the explicit S0–S11 boundary; the S0 runner paragraph now directs current use here. The plan's original S0 mutation requirements remain historical specifications. No remaining live stale claim was found within this bounded scope. The analyzer remains deliberately limited; this follow-up does not claim complete JavaScript dataflow analysis. Promotion remains blocked by the unchanged S11 packet.
+Scoped `/sweep` Mode A searched runner and baseline-specific claims across the plan, execution receipt, source/tests, session handoff, memory, and wiki. Prior stage statements are historical evidence under the explicit S0–S11 boundary; the S0 runner paragraph now directs current use here. The plan's original S0 mutation requirements remain historical specifications. No remaining live stale claim was found within this bounded scope at that checkpoint. The analyzer remains deliberately limited; this follow-up does not claim complete JavaScript dataflow analysis. The S11 promotion block described here was later resolved by the bounded rehearsals, owner decision, and verified production release above.

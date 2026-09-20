@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — GraphService decomposition promoted behind the preserved facade (Session 526)
+
+**Milestone:** The 1,641-line GraphService was decomposed into 11 ownership modules behind its unchanged 21-method public facade, with contract and boundary tests protecting the existing SharePoint read, write, cache, and error behavior.
+**Sessions:** 526; Luna built S0–S11, Sol reviewed the stages, and the owner approved production promotion after bounded staff and external rehearsals.
+**Ship state:** `main` at `a24a02d5` deployed as `dpl_ExUrFDvxPXPfSrzYzhJVL7ieeQWJ`; all five CI workflows passed. Signed-in staff and contributor reads and a proposal PDF download (HTTP 200) passed. A bounded 100-record runtime sample had zero errors or 5xx responses. The isolated rehearsal guard was not promoted; no schema or environment change accompanied the refactor.
+**Why it matters:** Graph responsibilities now have one explicit owner each while callers keep the same facade; the production checks establish the exercised paths, not every browser, chunked-upload, or search journey.
+**Pointers:** `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`, `docs/plans/GRAPH_SERVICE_RELEASE_PREPARATION_2026-09-19.md`; prior deployment for rollback `dpl_Aui3x7NtH3MoKARNHZQB5YUyJLZS`.
+
 ## September 2026 — Explorer chat service extraction and Workbench responsiveness promoted (Session 523)
 
 **Milestone:** The 2,983-line Dynamics Explorer chat route is now a 197-line shell over `lib/services/dynamics-explorer/` (17 verbatim-moved modules behind a callback contract), its three route-dir gate exemptions are retired, and the Workbench request page keeps rows, sections and reviews visible during refreshes.

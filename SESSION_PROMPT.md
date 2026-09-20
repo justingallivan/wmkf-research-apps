@@ -1,82 +1,64 @@
-# Session 526 Prompt: GraphService decomposition complete locally; release requires a separate decision
+# Session 527 Prompt: Production Graph release complete; Test Request Factory handoff pending
 
-## Session 525 Summary
+## Session 526 Summary
 
-[VERIFIED via local source, Git, stage tests/builds/gates, and fresh Sol reviews]
-The owner authorized the GraphService decomposition plan, then authorized local
-S0–S11 execution with Luna building, Sol reviewing each stage, and root performing
-final acceptance. All work is isolated on `codex/graph-service-decomposition` at
-`/private/tmp/wmkf-graph-decomposition`. No push, merge, deployment, live rehearsal,
-provider call, or infrastructure change was performed for this migration.
+[VERIFIED via `/private/tmp/graph-production-release-receipt.json`, production smoke, CI results, and bounded runtime logs]
+The GraphService release was promoted to `main` at `a24a02d588be728ade199069e7b953dbafdce96e` and deployed as `dpl_ExUrFDvxPXPfSrzYzhJVL7ieeQWJ`. All four custom domains are listed on the verified release. Authenticated staff, contributor, and proposal-download smoke checks passed. A bounded sample of 100 sanitized runtime records contained zero errors or 5xx responses. All five CI workflows passed. Rollback deployment: `dpl_Aui3x7NtH3MoKARNHZQB5YUyJLZS`.
 
-### Completed and current work
+### What Was Completed
 
-- Planning and amendment: `877b84c9`, `710892ac`; Claude Opus adversarial planning
-  review used the subscription/OAuth session. The accepted plan records the
-  dispositions and fresh-context review method.
-- S0–S11 are accepted: characterization prerequisites, shared leaves, authentication,
-  resolution, file reads, versions/restore, downloads, search/cooldown, folders,
-  simple writes, and large-upload sessions. The public facade and caller contracts
-  remain; source comparisons preserve existing behavior differences.
-- S11 closure is accepted in `76cfbbcb`: the 288-line facade retains 21 static
-  methods, with 11 internal modules and complete ownership checks. Fresh Sol
-  source and release-packet reviews passed; root accepted the final evidence.
-- Runtime commits, in order: `546efff8`, `77e94c0d`, `7ff2f90f`, `2addf72a`,
-  `c20b6538`, `ac4a03b4`, `0f5c90db`, `4c6191d6`, `c8bf1848`, `1dad580e`,
-  `7bf1ce2d`, `76cfbbcb`. Each accepted stage has its own verification receipt.
+1. **GraphService production release**
+   - `main` was fast-forwarded and pushed with owner approval.
+   - Secret Scanning, Dependency Scan, Security Scan, E2E (Playwright), and Tests all completed successfully.
+   - Production smoke covered the authenticated staff page, expected contributor checklist/receipt, and proposal download HTTP 200.
+   - Runtime evidence is bounded, not exhaustive monitoring: `/private/tmp/graph-production-runtime-sanitized.jsonl`.
+
+2. **Test Request Factory handoff preparation**
+   - The separate design/implementation branch is `codex/test-request-design` in `/Users/gallivan/.codex/worktrees/test-request-design/WMKF_Apps`.
+   - Current factory status remains **production enablement blocked**. Offline policy/isolation work is accepted; no clone route, schema apply, live request creation, deployment, or email send is enabled.
+   - Connor was emailed; response is pending. Handoff details are in `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`.
+
+3. **Concurrent worktree boundary**
+   - Claude's active clean worktree is `worktree-claude-s525` at `aed0337d`. Do not touch it from this session.
 
 ## Next Items
 
 ### Verified Open
 
-None for local implementation. S0–S11 and final review are complete; the
-execution receipt records acceptance and the separate blocked promotion packet.
+1. **Await Connor's platform-owner response for Test Request Factory suppression and provisioning.**
+   Evidence: `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md` and the Stage 0 contract in the test-request-design worktree.
+   Required evidence covers create/update automation suppression, narrative/package/status consumers, SharePoint location provisioning, numbering/defaults, and isolated fixture readback.
 
 ### Owner Decision Needed
 
-Promotion is outside the local authorization. Before any release, choose an
-approved rehearsal environment and synthetic fixtures, complete the required
-staff/external Tier 2 rehearsals, and record campaign timing, last-known-good
-deployment, rollback operator, and release approval. Those live facts were not
-queried in this task. Code rollback does not undo remote file or registry state.
+1. **Test Request Factory enablement boundary.**
+   Evidence: `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` and `TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md` in the separate branch.
+   Decide only after Connor supplies named owner/config evidence and the required bounded rehearsal results; unknown suppression or folder provisioning keeps production disabled.
 
 ### Verify Before Acting
 
-The prior session's unrelated cache-telemetry, Preview CSRF, Entra callback,
-reviewer-search and memory-audit items are preserved below as historical routing
-context. They were not revalidated here and are not an automatic worklist.
-Main may have advanced independently; compare it before proposing integration.
+1. **Refresh production deployment and rollback facts before another release action.**
+   Evidence: `/private/tmp/graph-production-release-receipt.json` is the current bounded receipt; runtime log review is sampled, not continuous monitoring.
 
 ### Do Not Reopen Without New Decision
 
-Keep the GraphService facade and existing operation-specific behavior. This
-migration does not authorize transport unification, cache-race fixes, additional
-upload retries, live provider calls, or removal of retained rehearsal data.
+1. Do not reopen the completed GraphService decomposition or promote Test Request Factory capability from `codex/test-request-design` without the explicit platform-owner evidence and release approval above.
 
 ## Key Files Reference
 
-- Plan: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_PLAN_2026-09-19.md`
-- Stage evidence and release packet: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`
-- Consumer census: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_CONSUMER_MANIFEST_2026-09-19.md`
-- Public facade: `lib/services/graph-service.js`; internal owners: `lib/services/graph/`
-- Boundary enforcement: `tests/unit/graph-service-boundary.test.js`
+| File | Purpose |
+|---|---|
+| `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md` | Connor's required platform-owner evidence and factory blockers |
+| `/Users/gallivan/.codex/worktrees/test-request-design/WMKF_Apps/docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Separate factory design and stage boundary |
+| `/Users/gallivan/.codex/worktrees/test-request-design/WMKF_Apps/docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md` | Stage 0 metadata, automation, provisioning and suppression evidence |
+| `/private/tmp/graph-production-release-receipt.json` | Production release, smoke, CI and rollback receipt |
+| `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md` | Historical Graph stage evidence and release boundary |
 
-## Final local verification
+## Testing
 
-[VERIFIED via local command logs] Full Jest: 984 suites / 14,482 tests / one
-snapshot; named consumer regression set: 37 suites / 607 tests; types, lint,
-canonical Next.js 16.3.5 Turbopack build, and all 67 check/self-test commands
-passed. Three fully mocked Workbench browser scenarios passed; the local test
-servers were stopped. Existing lint/build warnings remain documented in the
-receipt. These checks do not establish live Graph or Tier 2 rehearsal coverage.
-
-## Handoff notes
-
-Owner: Codex root; builders Luna; independent reviewers Sol. This handoff stays
-on the isolated local branch under the owner's existing authorization. The
-claim-evidence pilot report could not read local state; no observation was
-inferred. No DEVELOPMENT_LOG milestone entry is required: this candidate has
-not shipped. The stage receipt is the authoritative verification record.
+- Production receipt: authenticated staff/contributor/download smoke passed; 100 sampled sanitized runtime records had zero errors/5xx.
+- CI: Secret Scanning, Dependency Scan, Security Scan, E2E (Playwright), and Tests passed.
+- No additional live calls or writes are authorized by this handoff.
 
 ## Historical handoffs — not current instructions
 
