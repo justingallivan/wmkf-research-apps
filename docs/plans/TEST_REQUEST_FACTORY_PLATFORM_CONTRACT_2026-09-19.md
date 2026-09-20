@@ -1,6 +1,6 @@
 # Test Request Factory — Stage 0 platform contract
 
-Status: **PARTIAL: source census and read-only tenant metadata verified; platform automation and provisioning unresolved.** No request creation, schema apply, deployment or business-record query was performed. The offline census is reproducible with `node scripts/probe-test-request-factory-preflight.js --json`; it does not verify tenant state.
+Status: **PARTIAL: source census, tenant schema metadata and visible automation registrations verified; suppression behavior and provisioning unresolved.** No request creation, schema apply, deployment or business-record query was performed. The offline census is reproducible with `node scripts/probe-test-request-factory-preflight.js --json`; it does not verify tenant state.
 
 ## Source contract
 
@@ -43,6 +43,31 @@ Both registered hosts returned HTTP 200 for request attribute metadata, with no 
 `SystemRequired` metadata also includes platform-owned fields and name projections. Requiredness alone does not define a valid POST: noncreateable projections must never be copied, and defaults for createable system fields require evidence. Metadata createability is not authorization, plug-in behavior, number allocation, flow suppression or successful end-to-end creation.
 
 Sanitized probe receipts are checked in alongside this document under `evidence/test-request-factory/`; the probe scripts used the existing Dataverse client and only metadata GETs after application authentication. Development-agent sessions remain OAuth-only. No credential values or tokens are in the receipts.
+
+## Visible automation and provisioning metadata
+
+[VERIFIED via `scripts/probe-test-request-platform.js`, receipt `evidence/test-request-factory/platform-2026-09-20.json`, 2026-09-20 UTC]
+
+Both targets returned complete paginated HTTP-200 collections for the application user's visible process definitions and registered request/location plug-in steps. Production exposed 1,244 process definitions (114 cloud flows), sandbox 1,075 (109 cloud flows); 134/97 definitions matched the bounded request/location/content-term census. All visible cloud definitions had a parseable definition. This is not a tenant-wide visibility guarantee.
+
+- Both targets report `IsDocumentManagementEnabled: true` and request-number `AutoNumberFormat: {SEQNUM:7}` with maximum length 100. This verifies configured capability, not successful numbering, effective create privileges, plugin defaults or location creation.
+- Production has eight activated classic request processes with the Create flag; sandbox has twelve. Named production examples: `WMKF_Set Payee Payment Contact from Request`, `WMKF_Update Payment Contact from Org`, `WMKF_Set Co-PI Field on Contact`, `WMKF_Create SoCal draft Phase II Ack`. Sandbox additionally exposes `WMKF_Research Application Received Email Flow` with Create enabled. Conditions/action bodies were not evaluated, so names and trigger flags do not prove an effect occurs for a fixture.
+- Enabled vendor registrations differ: production includes `AkoyaGo.RequestSetGrantAndStatus`, `AkoyaGo.CalculatedFieldsAsync`, and `AkoyaGo.AsyncEntityCreated`; sandbox includes `AkoyaGo.RequestUpdate`. Sandbox results cannot certify production behavior.
+- Production `AkoyaGo.SharePointDocumentLocationHealthEvaluator` is registered on document-location Create/Update. This does not identify the request-to-location provisioner. The matching GOfund move-documents cloud flow is draft in both targets, so it is not evidence of active provisioning.
+- No visible definition matched the narrative/package or proposed marker terms. The documented PA writers remain unresolved, not disproved. A cloud flow referencing requests in its actions is not necessarily triggered by request creation; the receipt records parsed trigger entity/message where available.
+
+The reproducible probe exports selected metadata and definition hashes, not raw flow definitions, action inputs, connection parameters, credentials or document content. It rejects malformed pages, cross-origin/collection continuations and unbounded pagination. No flow execution, business-record read, schema change or request create occurred.
+
+### Concrete platform-owner handoff
+
+Use the receipt IDs/names to obtain the following evidence, without sending messages or changing platform configuration as part of this task:
+
+1. For activated request Create workflows and enabled vendor Create/Update hooks: identify the owner, required internal branches and outbound effects; specify how the initial marker and every later pointer/status PATCH are handled. Do not disable mandatory vendor hooks wholesale.
+2. Identify/export the actual narrative/package and status-recompute flow definitions (or authoritative retirement evidence), including their environment, triggers and marker exclusion. App-user-visible metadata alone is incomplete.
+3. Identify the location provisioner and trigger, expected library/parents, whether UI navigation is required, maximum wait and duplicate-location recovery. Document-management enabled is insufficient.
+4. Provide effective creation/field privileges and the smallest approved isolated rehearsal proving server numbering, preservation of marker/run/reminder fields, location readback and absence of unwanted sends/payments/provider work.
+
+The [schema proposal](TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md) specifies additive fields, rollout order, resolver truth table, reader/transport inventory and tests. No schema is applied by this proposal.
 
 ## Remaining gates
 

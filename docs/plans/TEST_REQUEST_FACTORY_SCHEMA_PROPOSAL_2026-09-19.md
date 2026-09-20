@@ -1,0 +1,166 @@
+# Test Request Factory — schema proposal
+
+Status: **PROPOSAL ONLY; no schema apply, live write, route wiring, deployment, or push.** This document proposes the additive Dataverse schema needed for Stage 1 isolation. Metadata observations below are taken from the existing read-only receipts; they do not prove create permission, plugin behavior, Power Automate suppression, number allocation, or a safe end-to-end create.
+
+## Proposed schema wave
+
+Use a new isolated `extensions-on-existing` wave, proposed name `wave29-test-request-isolation`, containing only the two new `akoya_request` attributes. This follows the repository's isolated-wave convention in `wave2-triagestatus`, `wave2-fieldprimer`, and `wave7-reviewer-engagement`: the JSON declares `kind`, `entityLogicalName`, an explicit no-automation/no-duplicate warning, and creation-only semantics. The wave must be dry-run and metadata-preflighted before any target apply. Schema application is creation-only and does not reconcile a divergent pre-existing field.
+
+### `wmkf_IsTestRequest`
+
+| Property | Proposed value |
+|---|---|
+| Logical name | `wmkf_istestrequest` (lowercase derived from SchemaName convention) |
+| Type | `Boolean` |
+| Display name | `Synthetic Test Request` |
+| Required level | `None` |
+| Default | `false` |
+| Createable | Preflight absence/spec first; verify `IsValidForCreate` in post-apply target metadata before enabling any factory write |
+| True/false labels | `Test request` / `Ordinary request` |
+| Initial create value | `true`, supplied by the server-side factory in the same request INSERT |
+| Update policy | No ordinary client PATCH; factory/admin service rejects marker changes after create |
+
+The default false is a compatibility proposal for ordinary rows, not proof that existing rows will return false. Schema preflight and post-apply readback must establish that behavior before guard rollout. Readers must distinguish an authoritative selected value from a missing projection, absent schema or failed query. Test-only operations require marker true plus valid matching run ownership; verified ordinary false rows do not require a run ID. The default does not suppress plugins or flows.
+
+### `wmkf_TestCreationRunId`
+
+| Property | Proposed value |
+|---|---|
+| Logical name | `wmkf_testcreationrunid` |
+| Type | `String` |
+| Display name | `Test Creation Run ID` |
+| Max length | `36` (canonical UUID text) |
+| Required level | `None`; the factory supplies it at create time |
+| Default | none |
+| Createable | Preflight absence/spec first; verify `IsValidForCreate` in post-apply target metadata before enabling any factory write |
+| Initial create value | server-owned run UUID, same INSERT as the marker |
+| Update policy | Immutable by service policy; never accepted from a browser payload |
+
+The field is a correlation/ownership key, not an alternate request number or an authorization token. The operation ledger remains the durable authority for the run; this request field is only a bounded Dataverse-side join. No alternate key is proposed: uniqueness is per factory ledger/run and must not be inferred from a Dataverse field without an explicit concurrency design.
+
+The marker and run ID must be written together in the initial request POST. A later PATCH is too late for create-triggered plugins or Power Automate. After create, the service must reread the exact GUID, verify marker `true`, exact run ID and server-returned `akoya_requestnum`, then continue. A mismatch becomes `needs_attention`; it must not be repaired by blindly PATCHing the marker.
+
+## Existing fields and environment gaps
+
+The existing metadata receipt at `docs/plans/evidence/test-request-factory/metadata-2026-09-20.json` reports the following. These are metadata facts, not authorization/default proof.
+
+| Field/control | Production receipt | Sandbox receipt | Schema implication |
+|---|---|---|---|
+| `wmkf_istestrequest` | absent | absent | New additive field required in both targets |
+| `wmkf_testcreationrunid` | absent | absent | New additive field required in both targets |
+| `wmkf_respondreminderenabled` | Boolean, createable | absent | Do not invent a second name; sandbox must receive the existing reviewer-engagement field or all factory recipes stay blocked |
+| `wmkf_reviewduereminderenabled` | Boolean, createable | absent | Same gap; a Basic create cannot proceed until explicit false is representable |
+| `wmkf_triagestatus` | Picklist, createable | absent | Not part of marker wave; triage-dependent recipes remain target-blocked |
+| `akoya_applicantid` | ApplicationRequired | ApplicationRequired | Existing lookup must be supplied through verified `akoya_applicantid@odata.bind` → `accounts`; intake's `akoya_Account@odata.bind` is not the factory contract |
+| Other create requiredness | Fiscal year in receipt | Request type and meeting date in receipt | Policy compiler supplies only explicit, verified recipe values; it never copies source lifecycle/cycle automatically |
+
+The production reminder fields are existing schema, with documented default `true` in `wave7-reviewer-engagement`. Therefore the factory must explicitly write both to `false` on every supported create. Sandbox absence is a rollout blocker, not a reason to silently omit the fields. Metadata presence does not prove that an ordinary staff update, plugin, or flow will preserve the values.
+
+The marker wave must not add reminder fields or triage fields by copy. If sandbox needs the existing reviewer-engagement fields, apply the already-owned reviewer-engagement schema contract in a separately reviewed additive step, preflight it independently, and verify no Power Automate trigger. Do not mix unrelated drifted relationships into the new wave.
+
+## Marker semantics and unknown state
+
+The resolver must return an explicit classification; it must never interpret `undefined` as ordinary:
+
+| Authoritative read | Classification / behavior |
+|---|---|
+| Marker true, valid matching run | Synthetic: exclude from ordinary lists/actions; permitted test action still needs admin/ownership authorization. |
+| Marker true, missing/invalid run | Synthetic anomaly: exclude and deny; never ordinary. |
+| Marker false, no run | Ordinary: preserve normal authorized behavior; no run ID required. |
+| Marker false or null with a run | Inconsistent: exclude/deny and report for investigation. |
+| Explicit null, no run, verified pre-factory legacy row | Compatibility classification for lists only, after schema and selected projection/read behavior are established. Do not infer legacy status from null alone. |
+| Missing property, missing schema, failed query, malformed value or unproven null | Unknown: fail closed. A projection omission must not expose a marked row or allow dispatch. |
+
+Transport/provider actions require a positively verified ordinary classification. Before guard rollout, prove existing rows yield literal false or establish a separately reviewed legacy normalization; do not blindly enable a guard that breaks every historical row. There is no client `testMode`, `verified` or bypass flag. Exclusion fragments must preserve this classification in OData, FetchXML, direct-ID and Search; a paged client filter is not a complete query.
+
+## Metadata versus permission/default proof
+
+Metadata GET proves logical names, types, createability flags, required-level declarations, lookup relationships and (where returned) defaults. It does not prove:
+
+- that the authenticated app principal may create or update the field;
+- that a vendor plugin accepts `wmkf_istestrequest=true` in the initial INSERT;
+- that Power Automate/status-driven flows exclude the row;
+- that `akoya_requestnum` is allocated and returned as expected;
+- that reminder false values survive plugin/default processing;
+- that the target SharePoint location is provisioned;
+- that Dataverse Search, FetchXML, exports, workers and email/payment paths honor the marker.
+
+The first controlled rehearsal therefore remains blocked until a platform owner supplies create/update permission evidence, trigger inventory/suppression evidence, and a bounded sandbox rehearsal plan. A schema default of false is a compatibility default, not a security control.
+
+The reproducible census receipt is `docs/plans/evidence/test-request-factory/platform-2026-09-20.json` (probe: `scripts/probe-test-request-platform.js`). Both targets report `{SEQNUM:7}` request-number metadata and document management enabled; neither proves a create or provisioning outcome.
+
+The read-only process-definition census also found environment differences in active request/location definitions and vendor hooks. Production and sandbox must not be treated as equivalent: a production Request create/update hook set differs from the sandbox set, and a SharePoint-location health evaluator on location create/update does not prove that a request create provisions a location. The lack of a narrative/package match in the visible definitions does not prove those flows absent. The platform owner must identify which hooks are mandatory, how a marked initial INSERT is handled, and whether any request/status update can still produce narrative, package, email, payment, or location side effects.
+
+## Minimum Stage 1 ordinary consumer inventory
+
+Stage 1 must add marker-aware reads/guards at the following exact source surfaces. `shared/config/workbenchVisibility.js` remains the business eligibility contract and should not be changed to hide tests; marker exclusion is a separate filter/resolver layer.
+
+### Lists, search, aggregates and exports
+
+| File | Current surface | Required Stage 1 treatment |
+|---|---|---|
+| `lib/services/workbench/dashboard-service.js` | Workbench OData list and aggregate reads via `queryAllRequests` | Add server-built synthetic exclusion to list and aggregate paths; preserve complete counts |
+| `lib/services/workbench/program-scope-service.js` | Program-scoped Workbench request query | Add the same exclusion fragment; do not alter `buildVisibilityFilter` eligibility |
+| `lib/services/workbench/request-search-service.js` | OData filter leg, FetchXML cycle aggregation, Dataverse Search leg, ID hydration | Apply marker filtering independently to each leg; prove Search/index support or keep that leg blocked |
+| `lib/services/reviewer-finder/my-proposals-service.js` | Request discovery scans | Exclude marked rows from ordinary reviewer-finder lists |
+| `lib/services/reviewer-finder/contact-history-service.js` | Request history scan | Exclude marked rows from ordinary contact history |
+| `lib/services/reviewer-finder/save-candidates-service.js` | Request-scoped discovery/read path | Exclude marked rows before candidate persistence decisions |
+| `lib/services/reviewer-finder/remove-candidate-service.js` | Request query used by candidate removal | Preserve ordinary semantics and deny marked request actions |
+| `lib/services/reviewer-merge.js` | Request scans used during merge | Exclude marked rows and reject direct marked-request merge |
+| `lib/services/workbench/grantee-deliverables/awardees-service.js` | Awardee discovery | Exclude marked rows from awardee/report surfaces |
+| `lib/services/workbench/grantee-deliverables/cycle-export-service.js` | Cycle export scan | Exclude marked rows while keeping true totals honest |
+| `lib/services/cron/generate-grantee-titles-service.js` | Background request scan | Skip marked rows before provider work |
+
+### Synchronous and scheduled transport/provider actions
+
+| File | Current surface | Required Stage 1 treatment |
+|---|---|---|
+| `lib/services/site-visit-materials/collection-service.js` | `inviteMaterialsContributors` and `remindMaterialsContributors` send paths | Resolve marker before dispatch; deny marked requests in V1 |
+| `pages/api/meeting-tracker/visits/[requestId]/materials.js` | Route dispatches invite/remind actions | Preserve route auth and map marked-request denial; service remains authoritative |
+| `lib/services/site-visit/logistics-service.js` | Site-visit scheduling eligibility | Do not alter ordinary eligibility; deny synthetic scheduling unless a later recipe explicitly permits it |
+| `lib/services/reviewer-reminder-sweep.js` | Scheduled reviewer reminder worker | Add marker to request projection and skip marked rows before claims/token mint/send |
+| `lib/services/reviewer-manual-reminder.js` | Staff-triggered reviewer reminders | Resolve marker and deny marked requests before claim/send |
+| `lib/services/review-manager/send-emails-service.js` | Reviewer invitation transport | Resolve parent request marker before any email activity; deny marked rows in V1 |
+| `lib/services/initial-assessment/artifact-service.js` | Provider-backed IA generation | Deny generic paid generation for marked rows; future IA preset uses a separate synthetic artifact path |
+| `pages/api/phase-i-dynamics/summarize-v2.js` | Phase-I provider route | Resolve marker before provider invocation; deny marked rows in V1 |
+| `lib/bill/honorarium-onboard-orchestrator.js` | Honorarium/request creation and reminder defaults | Reject marked source requests from ordinary honorarium flow; no payment fixture in V1 |
+| `lib/services/grantee-submit-notification.js` | Grantee email notification | Resolve marker before email dispatch; deny marked rows |
+
+This is the minimum Stage 1 inventory from current source fan-out. It is not a claim that off-platform flows, vendor plugins, Power Automate, or every report have been proven safe. Stage 1 must add a symbol/field census gate so newly found raw `akoya_request` readers cannot silently bypass the marker.
+
+## Rollout and rollback order
+
+1. **Preflight only:** validate both targets' metadata, relationship `akoya_applicantid@odata.bind` → `accounts`, create/update permissions, field defaults and trigger ownership. Keep production enablement disabled.
+2. **Expand schema:** apply the isolated marker/run wave only after preflight approval, first to the approved sandbox. Verify exact logical names and no Power Automate trigger. Provision the existing reminder controls separately where absent; do not proceed with factory creation until both false writes are supported.
+3. **Read compatibility:** deploy marker resolver and ordinary read exclusion code with no create UI. Verified false rows remain ordinary; any legacy-null compatibility must meet the resolver evidence rule; marked rows are excluded/denied according to the inventory above. Verify direct-ID, Search, FetchXML, exports and worker projections.
+4. **Guard and rehearsal:** enable marked-request transport/provider denials, then run a bounded sandbox create only after suppression owner evidence and permission checks. Verify initial marker/run/reminder values, number readback, no trigger side effects, and exact downstream read behavior.
+5. **Production promotion:** promote schema and guards deliberately under the campaign release strategy, with a last-known-good deployment and platform-owner evidence. Production clone creation remains disabled until the SharePoint provisioner and isolation gates close.
+
+Rollback is additive and leaves fields in place. First disable new factory creation and UI exposure. Keep marker-aware read exclusions and marked-request transport denials active so existing synthetic rows cannot leak or send while code is being reverted. Retire/reconcile owned synthetic rows through the future ledger before considering removal of guards. Never drop the fields, reset marker values globally, or remove the marker-aware reader before all marked rows are accounted for. A code rollback cannot undo Dataverse, SharePoint, email, or flow side effects.
+
+## Required tests and gates before rollout
+
+- Schema JSON shape test: exact logical names, types, max length/defaults, isolated wave, no unrelated files.
+- Metadata preflight: both targets; createability, required levels, relationship target, reminder availability, and no unexpected existing divergent fields.
+- Marker truth table: true/false/null/missing/invalid marker and valid/invalid/mismatched run ID.
+- Initial INSERT contract test: marker true, run ID present, both reminder flags false, applicant binding to accounts, no source number/contact/annotation/workflow fields.
+- Reader fan-out tests for every file in the Stage 1 inventory; direct-ID and aggregate totals must remain complete after exclusion.
+- Transport/provider negative tests proving marked rows cannot invite, remind, generate, pay, notify or mint links; ordinary unmarked regressions remain unchanged.
+- Trigger/flow disconfirming rehearsal owned by the platform owner; source tests cannot substitute for this evidence.
+- Run sequentially: focused policy/consumer Jest tests, relevant gate and its self-test, `check:api-routes` and self-test for new routes, `check:atlas` and self-test after Atlas updates, `check:fact-consistency` and self-test, `check:doc-currency` and self-test, scoped lint, then build. No schema apply or production promotion until all relevant gates and platform evidence pass.
+
+## Open decisions and blockers
+
+- Verify publisher/solution metadata using the existing schema tooling. `wave29-test-request-isolation` is the engineering choice, subject to a collision check before creating the directory; its name does not require an owner decision.
+- Sandbox needs the two existing reviewer-engagement reminder controls before creation. Prepare a narrow additive step under that existing contract; do not run the entire wave or change ordinary defaults as an incidental repair.
+- Platform-owner suppression contract for initial create and every status/pointer update.
+- SharePoint request-location provisioner and uniqueness/recovery contract.
+- Permission proof for the app principal and server-owned marker/run writes.
+
+Until these are resolved, the schema remains a reviewed proposal and the offline compiler remains disabled for runtime use. No metadata/default observation in this proposal is a claim that the Test Request Factory is production-ready.
+
+## Review disposition
+
+Sol reviewed the source contract and proposal. Root incorporated the material corrections: absent projections never classify ordinary; requiredness/createability of new fields are checked after schema apply; verified ordinary rows need no run ID; wave naming is engineering work, not a user blocker. Schema remains un-applied. The platform census rejects malformed/partial pages, bounds pagination and tests cross-origin/collection continuation rejection and omission of credential-bearing action inputs.
+
+Final bounded review: Sol **ACCEPTED the proposal/evidence scope** after the corrections. Root verified 35 focused tests (existing offline policy plus new probe), scoped ESLint, probe syntax and `git diff --check`. Doc-currency and fact-consistency with sequential self-tests, plus docs-catalog, passed. No runtime files were changed; the previous offline-slice build remains the last build evidence, not a fresh build claim for this proposal.
