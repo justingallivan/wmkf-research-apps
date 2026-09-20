@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { requestEnvelope } from '../../../shared/utils/api-request';
 
 const REASON_MESSAGE = {
   no_token: 'This link is missing its access token.',
@@ -71,8 +72,15 @@ export default function BriefingPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/external/briefing/${encodeURIComponent(token)}/context`);
-        const data = await res.json().catch(() => ({ ok: false, reason: 'server_error' }));
+        const envelope = await requestEnvelope(`/api/external/briefing/${encodeURIComponent(token)}/context`, {
+          tolerantBody: () => ({ ok: false, reason: 'server_error' }),
+        });
+        // Today's `.catch(() => ({ ok: false, reason: 'server_error' }))` applies
+        // to both 2xx and non-2xx malformed bodies; the function-form
+        // tolerantBody only runs for 2xx (a non-2xx body is always parsed
+        // tolerantly to `{}`), so a non-2xx unparseable body is mapped back to
+        // the same fallback here via the recorded parseError.
+        const data = envelope.error?.parseError ? { ok: false, reason: 'server_error' } : envelope.data;
         if (cancelled) return;
         setState(data.ok ? { status: 'ok', data } : { status: 'error', reason: data.reason });
       } catch {

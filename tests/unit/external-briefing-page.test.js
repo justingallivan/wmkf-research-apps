@@ -20,7 +20,7 @@ test('a revoked link shows the replacement message', async () => {
   global.fetch = jest.fn().mockResolvedValue(response({ ok: false, reason: 'revoked' }, 401));
   render(<BriefingPage />);
   await screen.findByText(/This link was replaced/);
-  expect(global.fetch).toHaveBeenCalledWith('/api/external/briefing/tok/context');
+  expect(global.fetch).toHaveBeenCalledWith('/api/external/briefing/tok/context', { method: 'GET', signal: undefined });
 });
 
 // T5 (e): a malformed 2xx body falls back to { ok: false, reason: 'server_error' }
