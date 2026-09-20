@@ -31,3 +31,5 @@ worktree the tree is shared mutable state.
 **How to apply:** for mutation checks, revert only the owned file —
 `git show <base>:<file> > <file>` (restore after) or `git stash push -- <file>`
 — and say so explicitly in builder briefs. Related: [[feedback-verify-branch-before-git-action]].
+
+**S528 (2026-09-20) hazard:** `git stash push -- <path>` when that path has NO uncommitted changes stashes nothing and prints no error; the following `git stash pop` then applies whatever OLD stash is on top (here `codex-startup-reconciliation-report`), leaving an unrelated conflict. Before any stash/pop, run `git diff --quiet -- <path> || echo dirty` and `git stash list | head -1`; for a mutation check, prefer editing the line and `git checkout -- <path>` over stash.

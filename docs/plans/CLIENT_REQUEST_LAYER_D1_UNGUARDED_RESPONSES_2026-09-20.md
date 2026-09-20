@@ -222,3 +222,27 @@ Remaining D1 sites by stage: Stage 4 (InviteEmailModal :292, ReviewerFindPanel
 acceptance; Stage 5a (dynamics-explorer :153, virtual-review-panel :1030) and
 5b (scheduled-emails :59, :61, campaign-critical, Tier 2) after theirs. D9's
 other three sites ride with Stage 5a.
+
+### Admin batch fresh review (Opus, no inherited context) — READY WITH NAMED CHANGES; accepted 2026-09-20 at `f136781a8`
+
+Confirmed: all eight 2xx paths byte-identical; each `!ok` path routes to an
+existing surface (health catch → `overall:'error'`; RoleManagement `message`
+banner; PoliciesSection/PromptTemplatesSection `failed` outcome, an existing
+`STATUS_COPY` key with `warnings[]` rendered; restrictions section's new
+minimal `error` state + `<p>` judged the smallest thing that works, matching
+sibling sections); structured non-2xx outcomes with a `status` still flow
+unchanged; the DELETE keeps the row; D9 renames live and the new test asserts
+real `ErrorAlert` copy; Tier 1 holds (no email/invite/external route).
+
+Required change, applied by the orchestrator (`25ca82502`, test strengthened in
+`f136781a8`): the relocated RoleManagement banner would have shown 'Superuser
+access required' to non-superusers reaching `/admin?workspace=people`, because
+`pages/api/user-profiles.js` returns 403 for `?all=true` and the page has no
+client-side superuser guard. The user-profiles branch now skips the banner on
+401/403, mirroring the roles fetch; a 403/403 pin fails under mutation and
+passes with the fix.
+
+Informational: `16719450` carried a one-line pin change that belonged in its
+test commit; four pins deliberately flipped silent → visible (the intended
+change); none of these sites passes a `fallbackMessage`, so the D3 text is the
+bare `Request failed (<status>)` (owner may want friendlier strings later).
