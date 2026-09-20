@@ -280,7 +280,7 @@ export default function ReviewerFindPanel({
     });
 
     try {
-      const { data } = await requestEnvelope('/api/workbench/orcid-lookup', {
+      const { ok, data, error } = await requestEnvelope('/api/workbench/orcid-lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -291,6 +291,10 @@ export default function ReviewerFindPanel({
         tolerantBody: true,
       });
       if (requestIdRef.current !== submittedRequestId) return;
+      if (!ok) {
+        apply(() => ({ lookupMsg: { tone: 'warn', text: error.message } }));
+        return;
+      }
       if (data.found && data.orcid) {
         // If staff typed an email and the matched ORCID record's public email
         // disagrees, that's a wrong-person signal — do NOT auto-fill. Surface it
