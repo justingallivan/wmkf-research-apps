@@ -1124,7 +1124,21 @@ that is falsy and so renders no banner at all
 `SessionAgendaPanel.js:319`, pre-migration at `47298cb2e^:316`). Migrated
 code now shows `Request failed (<status>)` in that case instead of nothing —
 pending owner acceptance that a visible generic message is preferable to a
-silent one at these two sites.
+silent one at these two sites. **Closed 2026-09-20 (owner: "do it").**
+`PreSiteDistributionPanel.js` reissue: per-code client fallbacks mirroring
+the server sentences for `briefing_link_superseded` /
+`briefing_send_in_progress` (`f3e396db` tests RED first, `4462f05d` code);
+`body.error` still wins; the generic text no longer reaches that banner.
+`SessionAgendaPanel.js` send: **left unchanged, claim above corrected** — a
+DOM probe showed the thrown message is never rendered at this site: the
+`catch` (`SessionAgendaPanel.js:376-384`) maps a throw without `.outcome` to
+the static "Send status is uncertain / The app could not confirm the result"
+feedback, and the `agenda_send_unresolved` branch already calls `setNotice`
+with its own explicit sentence. So neither the old empty message nor the new
+generic one was ever visible there; no fallback map was added because no test
+could go red. Observation for the owner, not acted on: a 409
+`agenda_send_unresolved` is a definite refusal, and the "uncertain" banner is
+arguably the wrong outcome class for it (pre-existing, outside this plan).
 
 ## Stage 5b — external token pages, upload-adjacent forms, email pages (Tier 2)
 
