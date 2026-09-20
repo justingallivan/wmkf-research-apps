@@ -1036,3 +1036,24 @@ Gates at the group's final commit: full suite 1024/1025 suites (the one red,
 Stage 5a group 1 file mid-migration); lint 0 errors (one expected unused
 eslint-disable warning on the beacon until Stage 6); `check:types` clean;
 `check:api-routes` + self-test pass.
+
+### Stage 4 rehearsal, part 1 — owner click-through on the Vercel preview (2026-09-20)
+
+Result: the Reviewers tab, the Invite Reviewers panel, and the synthesis
+"invited, awaiting response" panel for request 1002788 all rendered from
+production reads through migrated sites (roster, my-candidates, invited
+dates, status chips, VIP/prefs reads) with no visible difference from
+production. The reminder, release, closeout, and due-date dialogs were NOT
+reachable: `pages/workbench/[requestId].js:303` sets `previewReadOnly` when
+`VERCEL_ENV === 'preview'`, and `ReviewersTab.js:113` derives
+`canEdit = canManage && !previewReadOnly`, which the invite and manage panels
+receive as `canManage` [VERIFIED by reading both]. That is a pre-existing,
+deliberate fail-closed design for previews backed by production Dataverse,
+not a Stage 4 effect. Consequence for the Tier 2 control: a Vercel preview
+can rehearse Stage 4's read paths only.
+
+Part 2 (write-path dialogs): rehearse on a local `npm run dev` of the branch,
+where `previewReadOnly` is false and the target interlock still denies
+production writes from local, so confirm buttons return a denial banner. Owner
+decision pending on whether to run it now or record the write-path dialogs as
+covered by the T4 request-bytes and receipt pins plus post-merge observation.
