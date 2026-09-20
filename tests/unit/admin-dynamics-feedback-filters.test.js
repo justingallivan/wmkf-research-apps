@@ -7,6 +7,7 @@ import { DynamicsFeedbackSection } from '../../pages/admin';
 
 const feedbackResponse = () => ({
   ok: true,
+  status: 200,
   json: async () => ({ feedback: [], summary: {} }),
 });
 

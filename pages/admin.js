@@ -3136,7 +3136,7 @@ function ReviewerTimeBudgetSection() {
   );
 }
 
-function OperationsWorkspace({ view }) {
+export function OperationsWorkspace({ view }) {
   switch (view) {
     case 'incidents':
       return (
@@ -3195,7 +3195,7 @@ function OperationsWorkspace({ view }) {
   }
 }
 
-function WorkflowsWorkspace({ view }) {
+export function WorkflowsWorkspace({ view }) {
   switch (view) {
     case 'review-form':
       return (
@@ -3332,7 +3332,7 @@ function WorkflowsWorkspace({ view }) {
   }
 }
 
-function AiWorkspace({ view }) {
+export function AiWorkspace({ view }) {
   switch (view) {
     case 'models':
       return (
@@ -3372,7 +3372,7 @@ function AiWorkspace({ view }) {
   }
 }
 
-function PeopleWorkspace({ view }) {
+export function PeopleWorkspace({ view }) {
   switch (view) {
     case 'app-access':
       return (
