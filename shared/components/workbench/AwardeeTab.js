@@ -651,7 +651,7 @@ export default function AwardeeTab({ requestId, context }) {
       const status = Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599
         ? httpStatus
         : null;
-      // raw fetch: fire-and-forget beacon; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: fire-and-forget beacon; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       void fetch('/api/workbench/grantee-deliverables/replacement-upload-failure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
