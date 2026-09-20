@@ -1437,3 +1437,13 @@ to the owner; rollback deployment recorded above. Preview env cleanup list
 (owner call, after merge or abandonment): alias
 `wmkfresearchapps-preview.vercel.app`; branch-scoped `NEXTAUTH_URL`,
 `DATAVERSE_ALLOW_PROD_READS`, `DELIBERATION_BRIEFING_SCHEMA_READY`.
+
+### Codex adversarial review of the built code — 2026-09-20, at `4007d420e`
+
+Owner asked whether Codex had reviewed the builds (it had reviewed only the
+plan). Full base-branch adversarial review (`--base main`, gpt-5.6-sol,
+222 files / +17114 −1502) with the challenge framing on envelope-vs-throwing
+forms, tolerant/strict policy, D3, the allowlist ratchet, per-site regressions
+(request bytes, error precedence, stale guards, body-level `ok`/`success`),
+and tests that cannot fail. **Verdict: approve, no material findings.**
+Receipt in the plan §10 table (cycle 4).
