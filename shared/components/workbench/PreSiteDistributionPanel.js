@@ -596,7 +596,7 @@ export default function PreSiteDistributionPanel({
     setReissuing(true);
     setBriefingError(null);
     try {
-      const { ok: resOk, status: resStatus, data: body, error: envelopeError } = await requestEnvelope('/api/workbench/pre-site-visit/briefing-link', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/pre-site-visit/briefing-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: { requestId: id, action: 'reissue', expectedLinkId: briefingLink?.id || undefined },
@@ -607,7 +607,11 @@ export default function PreSiteDistributionPanel({
         // The link changed under us or a send still carries it: refresh the
         // header from history instead of retrying blindly.
         await loadHistory(id, controller.signal, currentSequence);
-        throw new Error(body.error || envelopeError.message);
+        const REISSUE_REFUSAL_FALLBACKS = {
+          briefing_link_superseded: 'The briefing link was replaced by another action. Refresh to see the current link.',
+          briefing_send_in_progress: 'A send that carries the current briefing link has not finished. Retry it (or wait for it to reconcile) before issuing a new link.',
+        };
+        throw new Error(body.error || REISSUE_REFUSAL_FALLBACKS[body.code]);
       }
       if (!resOk) throw new Error(body.error || `The new link could not be issued (${resStatus})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
