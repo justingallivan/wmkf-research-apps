@@ -1241,3 +1241,23 @@ Stage 4 rehearsal result: steps 2, 4, 5, 6 passed in the browser; step 7
 test-covered; steps 1 and 3 (invite send, reminder send) were preview-only by
 design (Mode A, no outbound mail from local). **Stage 4 closes** with this
 record; the Tier 2 merge condition (owner merge after preview) still applies.
+
+### Stage 5b rehearsal — owner click-through on the Vercel preview (2026-09-20, in progress)
+
+Venue: `wmkfresearchapps-preview.vercel.app` → `wmkfresearchapps-6l5suly2f`
+(branch head `a41d37162`), production reads on, briefing flag on at branch
+scope, writes denied by the interlock. Links are minted in production and
+opened on the preview host (same `EXTERNAL_LINK_SECRET`, confirmed by the
+valid load below).
+
+- Step 3 (`pages/external/briefing/[token].js`): the request 1003222 link
+  first shown on the Staff Deliberations card returned "This link is
+  invalid." on the preview; the owner issued a new link in production
+  (revoking the old one for this test request) and that link **rendered the
+  briefing**. One character altered → "This link is malformed." — the page's
+  own copy, not blank, not a spinner, not `server_error`. **PASSED** [owner].
+  The first link's rejection is consistent with a stale or superseded row for
+  a test request and is not attributed to the migration; not investigated
+  further.
+- Steps 4–6 (review, grantee, materials token pages) and 7–8
+  (`scheduled-emails`, `test-email`): pending owner links / decision.
