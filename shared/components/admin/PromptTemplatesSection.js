@@ -746,11 +746,13 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
       if (requestRef.current.payloadKey !== payloadKey) {
         requestRef.current = { payloadKey, requestId: newRequestId() };
       }
-      // D1 PRESERVE: no ok check today; `data.status` is read regardless of
-      // HTTP status. A non-2xx unparseable body is rethrown (rather than
-      // resolved to {}) to keep routing through the same failed-outcome
-      // catch a bare .json() would have hit (never silent, plan §6 Stage 2
-      // rule ii).
+      // D1 fix: a non-2xx body with a recognized structured `data.status`
+      // (concurrency_conflict, etc.) is still read as before — STATUS_COPY
+      // already renders those correctly. A non-2xx body with NO `status`
+      // field (a plain {error} body, or an unparseable body) now routes to
+      // the same failed-outcome shape the catch below already uses, instead
+      // of onOutcome(data) with status: undefined rendering a blank banner
+      // (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
       const envelope = await requestEnvelope(`/api/admin/prompts/${encodeURIComponent(prompt.name)}`, {
         method: 'PUT',
         body: {
@@ -762,11 +764,9 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
           requestId: requestRef.current.requestId,
         },
       });
-      if (envelope.error?.parseError) {
-        throw envelope.error.parseError;
-      }
       const { data } = envelope;
       if (data.status === 'completed' || data.status === 'already_published') onSuccess(data);
+      else if (!envelope.ok && !data.status) onOutcome({ status: 'failed', warnings: [envelope.error.message] });
       else onOutcome(data);
     } catch (err) {
       onOutcome({ status: 'failed', warnings: [err.message] });
