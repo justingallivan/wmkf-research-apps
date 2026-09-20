@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { requestJson } from '../../utils/api-request';
+import { requestEnvelope } from '../../utils/api-request';
 import Layout from '../Layout';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 import ToolbarSelect, { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
@@ -662,10 +662,13 @@ export function FinalWriteupsPanel({
     setLoading(true);
     setError(null);
     try {
-      const body = await requestJson(`/api/workbench/final-writeups?cycleCode=${encodeURIComponent(selector)}`, {
-        fallbackMessage: 'Failed to load Final Writeups',
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/workbench/final-writeups?cycleCode=${encodeURIComponent(selector)}`, {
         tolerantBody: true,
       });
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        throw new Error(responseError || `Failed to load Final Writeups (${resStatus})`);
+      }
       if (requestIdRef.current !== requestId) return;
       setData(body);
     } catch (loadError) {
@@ -1057,10 +1060,13 @@ export function FinalWriteupFocusedView({ requestId }) {
     setLoading(true);
     setError(null);
     try {
-      const body = await requestJson(`/api/workbench/final-writeups?requestId=${encodeURIComponent(requestId)}`, {
-        fallbackMessage: 'Failed to load Final Writeup',
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/workbench/final-writeups?requestId=${encodeURIComponent(requestId)}`, {
         tolerantBody: true,
       });
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        throw new Error(responseError || `Failed to load Final Writeup (${resStatus})`);
+      }
       if (requestIdRef.current !== loadId) return;
       setData(body);
     } catch (loadError) {
@@ -1088,16 +1094,19 @@ export function FinalWriteupFocusedView({ requestId }) {
     setSaving(true);
     setSaveError(null);
     try {
-      await requestJson('/api/workbench/final-writeup/acknowledgement', {
+      const { ok: resOk, status: resStatus, data: ackBody } = await requestEnvelope('/api/workbench/final-writeup/acknowledgement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: {
           requestId: writeup.requestId,
           expectedFinalArtifactId: writeup.finalArtifactId,
         },
-        fallbackMessage: 'Failed to record review',
         tolerantBody: true,
       });
+      if (!resOk) {
+        const responseError = ackBody && typeof ackBody === 'object' ? ackBody.error : null;
+        throw new Error(responseError || `Failed to record review (${resStatus})`);
+      }
       if (requestIdRef.current !== generation) return;
       setSaving(false);
       await load();
