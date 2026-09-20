@@ -307,11 +307,11 @@ test('does not apply a delayed triage count patch after returning to the origina
 
 test('the locator search-options fetch does not fire until the disclosure is opened', async () => {
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workbench/dashboard'));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workbench/dashboard', expect.objectContaining({ method: 'GET' })));
   expect(global.fetch.mock.calls.some(([url]) => String(url).includes('search-requests'))).toBe(false);
 
   fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workbench/search-requests?mode=options&programId=program-1'));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workbench/search-requests?mode=options&programId=program-1', expect.objectContaining({ method: 'GET' })));
 });
 
 test('opens an exact historical Research request through the scoped search', async () => {
@@ -328,6 +328,7 @@ test('opens an exact historical Research request through the scoped search', asy
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/workbench/search-requests?q=1002379&programId=program-1',
+    expect.objectContaining({ method: 'GET' }),
   ));
   await waitFor(() => expect(push).toHaveBeenCalledWith(
     `/workbench/${REQUEST_ID}?n=1002379`,
