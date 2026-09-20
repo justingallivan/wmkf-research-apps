@@ -1269,3 +1269,156 @@ test('the applicant-materials line renders from the status payload at draft and 
   await screen.findByText('Working document:');
   expect(screen.getByTestId('deliberations-materials-line')).toHaveTextContent(/^Materials: 1 of 3 received · due /);
 });
+
+// ── T2 (client-request-layer Stage 2, plan §5) gap-fill: per-call-site
+// matrix cases not already covered above by the pre-existing suite. Every
+// case below is asserted against the UNMIGRATED component first (T2 tests
+// precede the Stage 2 migration commit), then must stay green afterward
+// unchanged. ───────────────────────────────────────────────────────────────
+
+test('T2: generateBrief non-2xx surfaces the body error verbatim (POST /pre-rp-brief)', async () => {
+  queueRoute('briefPost', response({ error: 'The brief route is temporarily unavailable.' }, 503));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Generate Brief' }));
+  expect(await screen.findByText('The brief route is temporarily unavailable.')).toBeInTheDocument();
+});
+
+test('T2: generateBrief network rejection surfaces the native rejection message', async () => {
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'briefPost') throw new TypeError('Failed to fetch');
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Generate Brief' }));
+  expect(await screen.findByText('Failed to fetch')).toBeInTheDocument();
+});
+
+test('T2: generateBrief malformed 2xx body (json() rejects) reads as "no artifact identity" (tolerant -> {})', async () => {
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'briefPost') {
+      return { ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected end of JSON input'); } };
+    }
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Generate Brief' }));
+  expect(await screen.findByText('Brief generation returned no artifact identity.')).toBeInTheDocument();
+});
+
+test('T2: startSiteVisitAction non-2xx surfaces the body error verbatim (POST /pre-site-visit/start-site-visit)', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  queueRoute('startSiteVisit', response({ error: 'The Pre-Site row changed underneath this request.' }, 409));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Start Site Visit' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The Pre-Site row changed underneath this request.');
+});
+
+test('T2: startSiteVisitAction network rejection surfaces the native rejection message', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'startSiteVisit') throw new TypeError('Failed to fetch');
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Start Site Visit' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Failed to fetch');
+});
+
+test('T2: submitReopen non-2xx (readStatus route bytes unaffected) posts exact headers/body for the reopen call', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
+  queueRoute('reopen', response({ error: 'boom' }, 500));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByRole('link', { name: 'Open working document' });
+  fireEvent.click(screen.getByText(/Administration — guarded reopen/));
+  fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
+  fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The handoff was started too early.' } });
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create Draft Successor' }));
+
+  expect(await screen.findByText('boom')).toBeInTheDocument();
+  const [, options] = calls('reopen')[0];
+  expect(options.method).toBe('POST');
+  expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+});
+
+test('T2: readStatus (GET /pre-site-visit) non-2xx thrown message during pollForArtifact propagates verbatim', async () => {
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'presitePost') {
+      return response({ success: true, artifact: { ...preSiteArtifact(DRAFT), operationStatus: GENERATING } });
+    }
+    if (route?.key === 'presiteGet') {
+      return response({ error: 'Status lookup is temporarily unavailable.' }, 503);
+    }
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Status lookup is temporarily unavailable.');
+});
+
+test('T2: readBriefStatus (GET /pre-rp-brief) non-2xx thrown message during pollForBrief propagates verbatim', async () => {
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'briefPost') {
+      return response({ success: true, artifact: { ...briefArtifact(DRAFT), operationStatus: GENERATING } });
+    }
+    if (route?.key === 'briefGet') {
+      return response({ error: 'Brief status lookup is temporarily unavailable.' }, 503);
+    }
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Generate Brief' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Brief status lookup is temporarily unavailable.');
+});
+
+test('T2: an abort mid-poll (readStatus rejects with AbortError) is swallowed by the existing AbortError branch, not surfaced as an error', async () => {
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const route = ROUTE_DEFS.find((r) => r.test(url, method));
+    if (route?.key === 'presitePost') {
+      return response({ success: true, artifact: { ...preSiteArtifact(DRAFT), operationStatus: GENERATING } });
+    }
+    if (route?.key === 'presiteGet') {
+      const abortError = new Error('The operation was aborted.');
+      abortError.name = 'AbortError';
+      throw abortError;
+    }
+    const queue = queues[route.key];
+    if (queue.length) return queue.shift();
+    return defaultFor[route.key]();
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
+  await waitFor(() => expect(calls('presiteGet').length).toBeGreaterThan(0));
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
