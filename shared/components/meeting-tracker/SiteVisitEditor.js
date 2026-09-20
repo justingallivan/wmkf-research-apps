@@ -111,10 +111,8 @@ export default function SiteVisitEditor() {
     setLoading(true);
     setError(null);
     try {
-      const [visitBody, recipientBody] = await Promise.all([
-        readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The site visit could not be loaded.'),
-        readJson('/api/meeting-tracker/recipients', undefined, 'The attendee directory could not be loaded.'),
-      ]);
+      const visitBody = await readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The site visit could not be loaded.');
+      const recipientBody = await readJson('/api/meeting-tracker/recipients', undefined, 'The attendee directory could not be loaded.');
       setVisit(visitBody.siteVisit || null);
       setForm(formFromVisit(visitBody.siteVisit, requestNumber));
       setRecipients({ staff: recipientBody.staff || [], board: recipientBody.board || [] });
