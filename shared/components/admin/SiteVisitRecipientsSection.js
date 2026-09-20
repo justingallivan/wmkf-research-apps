@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useAdminUnsavedChangesGuard from './useAdminUnsavedChangesGuard';
+import { requestJson } from '../../utils/api-request';
 
 const VERSION = 1;
 const UNSAVED_CHANGES_WARNING = 'You have unsaved Site Visit recipient changes. Leave without saving?';
@@ -58,9 +59,10 @@ export default function SiteVisitRecipientsSection() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/site-visit-recipients');
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'The recipient directory could not be loaded.');
+      const data = await requestJson('/api/admin/site-visit-recipients', {
+        tolerantBody: true,
+        fallbackMessage: 'The recipient directory could not be loaded.',
+      });
       if (loadSequence.current !== sequence) return;
       applyState(data);
     } catch (loadError) {
@@ -72,12 +74,10 @@ export default function SiteVisitRecipientsSection() {
 
   useEffect(() => {
     const sequence = ++loadSequence.current;
-    fetch('/api/admin/site-visit-recipients')
-      .then(async (response) => {
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || 'The recipient directory could not be loaded.');
-        return data;
-      })
+    requestJson('/api/admin/site-visit-recipients', {
+      tolerantBody: true,
+      fallbackMessage: 'The recipient directory could not be loaded.',
+    })
       .then((data) => {
         if (loadSequence.current === sequence) applyState(data);
       })
@@ -156,9 +156,10 @@ export default function SiteVisitRecipientsSection() {
     setSearchPerformed(false);
     setSearchTruncated(false);
     try {
-      const response = await fetch(`/api/admin/site-visit-recipients?search=${encodeURIComponent(search.trim())}`);
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Contact search failed.');
+      const data = await requestJson(`/api/admin/site-visit-recipients?search=${encodeURIComponent(search.trim())}`, {
+        tolerantBody: true,
+        fallbackMessage: 'Contact search failed.',
+      });
       if (searchSequence.current !== sequence) return;
       setSearchResults(data.contacts || []);
       setSearchTruncated(data.truncated === true);
@@ -176,13 +177,12 @@ export default function SiteVisitRecipientsSection() {
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch('/api/admin/site-visit-recipients', {
+      const data = await requestJson('/api/admin/site-visit-recipients', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: configFromEntries(draftEntries) }),
+        body: { config: configFromEntries(draftEntries) },
+        tolerantBody: true,
+        fallbackMessage: 'The recipient directory could not be saved.',
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'The recipient directory could not be saved.');
       setDraftEntries(data.config?.entries || []);
       setResolvedEntries(data.entries || []);
       setSavedKeys(new Set((data.config?.entries || []).map(entryKey)));
