@@ -277,12 +277,12 @@ test('no response without a courtesy note never requests a preview', async () =>
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   expect(global.fetch.mock.calls[0][0]).toBe('/api/review-manager/withdraw-sufficient');
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+  expect(global.fetch.mock.calls[0][1].body).toBe(JSON.stringify({
     requestId: REQUEST_ID,
     suggestionIds: [FIRST_ID],
     reason: 'no_response',
     sendEmail: false,
-  });
+  }));
   expect(onClose).toHaveBeenCalled();
 });
 

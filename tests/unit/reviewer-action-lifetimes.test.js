@@ -673,5 +673,31 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       expect(onRefresh).not.toHaveBeenCalled();
       expect(terminalFetch).toHaveBeenCalledTimes(1);
     });
+
+    test('T4 request bytes: the release dispatch sends exact method, headers, and body', async () => {
+      terminalFetch.mockImplementation((_url, options) => {
+        const body = JSON.parse(options.body);
+        if (body.preview === true) return Promise.resolve(acceptedDraftResponse());
+        return Promise.resolve(response({ transitioned: 1 }));
+      });
+      renderPanel();
+      release();
+      await screen.findByRole('checkbox', { name: 'Send a thank-you email' });
+      fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+      await act(async () => {});
+      const call = terminalFetch.mock.calls.find(([, options]) => JSON.parse(options.body).preview !== true);
+      expect(call[0]).toBe('/api/review-manager/terminal-transition');
+      expect(call[1].method).toBe('POST');
+      expect(call[1].headers).toEqual({ 'Content-Type': 'application/json' });
+      expect(call[1].body).toBe(JSON.stringify({
+        requestId: proposal.proposalId,
+        suggestionIds: [reviewer.suggestionId],
+        terminalStatus: 'released',
+        releaseReason: 'sufficient_reviews_received',
+        internalNotes: { [reviewer.suggestionId]: '' },
+        sendEmail: false,
+        overrides: { [reviewer.suggestionId]: { expectedNotes: '' } },
+      }));
+    });
   });
 });
