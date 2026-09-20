@@ -18,6 +18,10 @@ function response(body, { ok = true, status = 200 } = {}) {
   };
 }
 
+function containing(text) {
+  return new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+}
+
 function draft(suggestionId, name, to) {
   return {
     suggestionId,
@@ -419,12 +423,12 @@ test('a 200 withdraw-sufficient carrying write_failed rows still surfaces the am
   fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
 
   await screen.findByText(/2 issues:/);
-  expect(screen.getByText(
+  expect(screen.getByText(containing(
     'Dr. First Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
-  )).toBeInTheDocument();
-  expect(screen.getByText(
+  ))).toBeInTheDocument();
+  expect(screen.getByText(containing(
     'Dr. Second Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
-  )).toBeInTheDocument();
+  ))).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Releasing…' })).not.toBeInTheDocument();
 });
@@ -457,7 +461,7 @@ test.each([
   fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
 
   await screen.findByText(/1 issue/);
-  expect(screen.getByText(expectedText)).toBeInTheDocument();
+  expect(screen.getByText(containing(expectedText))).toBeInTheDocument();
   // The sentence itself names the reviewer once — no "<Name> — <Name> is..." doubling.
   expect(screen.queryByText(/Dr\. First Reviewer — Dr\. First Reviewer/)).not.toBeInTheDocument();
 });
@@ -553,9 +557,9 @@ test('under React.StrictMode the send still settles (double-invoked effects must
   fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
 
   await screen.findByText(/1 issue/);
-  expect(screen.getByText(
+  expect(screen.getByText(containing(
     'Dr. First Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
-  )).toBeInTheDocument();
+  ))).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
   expect(screen.queryByText(/Releasing/)).not.toBeInTheDocument();
 });
