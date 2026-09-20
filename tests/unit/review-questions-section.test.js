@@ -14,7 +14,7 @@ const GET_BODY = {
 
 function mockFetch({ postResponse } = {}) {
   return jest.fn(async (url, opts = {}) => {
-    if (String(url) === '/api/admin/review-questions' && !opts.method) {
+    if (String(url) === '/api/admin/review-questions' && (!opts.method || opts.method === 'GET')) {
       return { ok: true, status: 200, json: async () => GET_BODY };
     }
     if (String(url) === '/api/admin/review-questions' && opts.method === 'POST') {
@@ -60,7 +60,7 @@ test('save POSTs the full set + baseVersion, then reloads', async () => {
   });
   // Reload after success: a second GET fired.
   await waitFor(() => {
-    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method);
+    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method || o.method === 'GET');
     expect(gets.length).toBeGreaterThanOrEqual(2);
   });
 });
@@ -121,13 +121,13 @@ test('a 409 resync re-fetches the live set so the retry saves against a current 
   await waitFor(() => expect(screen.getByTestId('rq-message-conflict')).toBeInTheDocument());
   // The resync issued its own GET — without it the retry would 409 forever.
   await waitFor(() => {
-    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method);
+    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method || o.method === 'GET');
     expect(gets.length).toBeGreaterThanOrEqual(2);
   });
   // The explicit discard path still reloads from the server.
   fireEvent.click(screen.getByRole('button', { name: /discard my edits/i }));
   await waitFor(() => {
-    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method);
+    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method || o.method === 'GET');
     expect(gets.length).toBeGreaterThanOrEqual(3);
   });
 });
@@ -188,4 +188,56 @@ test('move buttons provide a keyboard-operable reorder path', async () => {
     const body = JSON.parse(post[1].body);
     expect(body.questions.map((question) => question.key)).toEqual(['q2', 'impact']);
   });
+});
+
+// T3 matrix (Stage 3, group A) ahead of migrating all three fetch sites onto
+// shared/utils/api-request.js. load (:99) and resyncPreservingEdits (:130)
+// branch on status/ok before the body; the 403 -> 'Admin access required'
+// message is pinned verbatim (plan §2.3). save (:205) is tolerant with
+// several status/body-flag branches.
+test('(b) load: 403 shows "Admin access required" verbatim', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 403, json: async () => ({ error: 'ignored' }) }));
+  render(<ReviewQuestionsSection />);
+  expect(await screen.findByText('Admin access required')).toBeInTheDocument();
+});
+
+test('(b) load: non-403 non-2xx shows the generic load failure', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 500, json: async () => ({ error: 'ignored' }) }));
+  render(<ReviewQuestionsSection />);
+  expect(await screen.findByText('Failed to load review questions')).toBeInTheDocument();
+});
+
+test('(c) load: a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch = jest.fn(async () => { throw new Error('network down'); });
+  render(<ReviewQuestionsSection />);
+  expect(await screen.findByText('network down')).toBeInTheDocument();
+});
+
+test('(d) load: a malformed 2xx body rejects into the same error state', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }));
+  render(<ReviewQuestionsSection />);
+  expect(await screen.findByText('bad json')).toBeInTheDocument();
+});
+
+test('(c) save: a network rejection shows "Save failed." with the rejection message', async () => {
+  global.fetch = mockFetch();
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  const postSpy = global.fetch;
+  global.fetch = jest.fn(async (url, opts = {}) => {
+    if (opts.method === 'POST') throw new Error('network down');
+    return postSpy(url, opts);
+  });
+  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'edited' } });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+  expect(await screen.findByTestId('rq-message-error')).toHaveTextContent('network down');
+});
+
+test('(e) save: a non-2xx unparseable body (502) shows "Save failed." (tolerant parse), never silent', async () => {
+  global.fetch = mockFetch({ postResponse: { ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } } });
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'edited' } });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+  expect(await screen.findByTestId('rq-message-error')).toHaveTextContent('Save failed.');
 });
