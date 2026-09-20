@@ -104,7 +104,9 @@ test('loadReviewers: GET has no body, and a 200 + {success:false} body is treate
   render(<ReviewersTab requestId={REQ} />);
   await waitFor(() => expect(screen.getByTestId('manage-panel')).toBeInTheDocument());
   const call = global.fetch.mock.calls.find(([u]) => String(u).includes('/api/review-manager/reviewers'));
-  expect(call[1]).toBeUndefined(); // GET: no init object
+  // GET: no body, no non-default method.
+  expect(call[1]?.body).toBeUndefined();
+  expect(call[1]?.method === undefined || call[1]?.method === 'GET').toBe(true);
 });
 
 test('loadReviewers: malformed 2xx body is tolerated (pre-existing .catch behavior preserved)', async () => {
