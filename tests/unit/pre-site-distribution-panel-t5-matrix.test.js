@@ -14,9 +14,21 @@
  * non-2xx response whose body cannot be parsed — for each site, pinned
  * never-silent. All four sites already parse with `.json().catch(() => ({}))`,
  * so this is a no-op behavior change.
+ *
+ * Test-teeth pass (Stage 5a review finding 2): adds axis (d) — a malformed
+ * or empty 2xx body under `tolerantBody: true` produces today's tolerant
+ * outcome, never a thrown/visible parse error — for all 4 sites, and exact
+ * request-bytes (URL, method, headers, exact body string) for the 3 POSTs.
+ * Each axis-(d) test is written to go RED under a `tolerantBody: true ->
+ * false` mutation in the component (see handback for the count).
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PreSiteDistributionPanel from '../../shared/components/workbench/PreSiteDistributionPanel';
+import {
+  DELIBERATION_SHARE_SEED_BODY,
+  DELIBERATION_SHARE_SEED_SUBJECT,
+  renderDeliberationShareSubject,
+} from '../../shared/config/deliberationShareEmail';
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -29,6 +41,7 @@ function response(body, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 const unparseable = () => Promise.reject(new SyntaxError('Unexpected token <'));
+const emptyBody = () => Promise.reject(new SyntaxError('Unexpected end of JSON input'));
 
 function preparedAttempt() {
   return {
@@ -151,4 +164,190 @@ test('reissueBriefingLink axis (e): non-2xx unparseable body falls to the status
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: unparseable });
   fireEvent.click(screen.getByText('Issue new link'));
   expect(await screen.findByText('The new link could not be issued (502)')).toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// Axis (d): a malformed or empty 2xx body under tolerantBody:true is tolerated
+// (today's fallback outcome), never a thrown/visible parse error.
+// ---------------------------------------------------------------------------
+
+// loadHistory fires on mount with no user trigger, and its "No email
+// previews" empty-state text is also the INITIAL pre-fetch state (history=[],
+// historyError=null), so a plain findByText would match before the fetch
+// even settles — a false pass under a tolerantBody mutation. Force the fetch
+// promise chain to fully settle (a macrotask boundary lets every pending
+// microtask, including the parse rejection and its .catch() handler, run)
+// before asserting.
+async function settleFetch() {
+  await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 0); }); });
+}
+
+test('loadHistory axis (d): malformed 2xx body is tolerated silently (no error, empty-state copy)', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: unparseable });
+  renderPanel();
+  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  await settleFetch();
+  expect(screen.getByText(/No email previews/)).toBeInTheDocument();
+  expect(screen.queryByText('Unexpected token <')).not.toBeInTheDocument();
+});
+
+test('loadHistory axis (d): empty 2xx body is tolerated silently (no error, empty-state copy)', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: emptyBody });
+  renderPanel();
+  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  await settleFetch();
+  expect(screen.getByText(/No email previews/)).toBeInTheDocument();
+  expect(screen.queryByText('Unexpected end of JSON input')).not.toBeInTheDocument();
+});
+
+test('prepare axis (d): malformed 2xx body is tolerated silently (no error, no preview panel)', async () => {
+  await readyPanel();
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/prepare')
+      ? Promise.resolve({ ok: true, status: 200, json: unparseable })
+      : Promise.resolve(response({ success: true, attempts: [] }))
+  ));
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Create preview' })).toBeEnabled());
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
+test('prepare axis (d): empty 2xx body is tolerated silently (no error, no preview panel)', async () => {
+  await readyPanel();
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/prepare')
+      ? Promise.resolve({ ok: true, status: 200, json: emptyBody })
+      : Promise.resolve(response({ success: true, attempts: [] }))
+  ));
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Create preview' })).toBeEnabled());
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
+test('send axis (d): malformed 2xx body is tolerated silently (no feedback banner, preview kept)', async () => {
+  await withPreparedPreview();
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/send')
+      ? Promise.resolve({ ok: true, status: 200, json: unparseable })
+      : Promise.resolve(response({ success: true, attempts: [] }))
+  ));
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  await settleFetch();
+  expect(screen.queryByTestId('distribution-send-feedback')).not.toBeInTheDocument();
+  expect(screen.getByText('Email preview')).toBeInTheDocument();
+});
+
+test('send axis (d): empty 2xx body is tolerated silently (no feedback banner, preview kept)', async () => {
+  await withPreparedPreview();
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/send')
+      ? Promise.resolve({ ok: true, status: 200, json: emptyBody })
+      : Promise.resolve(response({ success: true, attempts: [] }))
+  ));
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  await settleFetch();
+  expect(screen.queryByTestId('distribution-send-feedback')).not.toBeInTheDocument();
+  expect(screen.getByText('Email preview')).toBeInTheDocument();
+});
+
+test('reissueBriefingLink axis (d): malformed 2xx body is tolerated silently (link card unmounts, no error)', async () => {
+  await withBriefingLink();
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: unparseable });
+  fireEvent.click(screen.getByText('Issue new link'));
+  await waitFor(() => expect(screen.queryByText('https://apps.test/external/briefing/old')).not.toBeInTheDocument());
+  expect(screen.queryByText('Unexpected token <')).not.toBeInTheDocument();
+});
+
+test('reissueBriefingLink axis (d): empty 2xx body is tolerated silently (link card unmounts, no error)', async () => {
+  await withBriefingLink();
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: emptyBody });
+  fireEvent.click(screen.getByText('Issue new link'));
+  await waitFor(() => expect(screen.queryByText('https://apps.test/external/briefing/old')).not.toBeInTheDocument());
+  expect(screen.queryByText('Unexpected end of JSON input')).not.toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// Exact request bytes (URL, method, headers, exact body string) for the 3
+// POST sites.
+// ---------------------------------------------------------------------------
+
+test('prepare: request bytes (url, method, headers, exact body) unchanged', async () => {
+  const originalRandomUUID = globalThis.crypto.randomUUID;
+  globalThis.crypto.randomUUID = jest.fn().mockReturnValue('44444444-4444-4444-8444-444444444444');
+  try {
+  await readyPanel();
+  let captured;
+  global.fetch = jest.fn((url, opts) => {
+    if (String(url).includes('/prepare')) {
+      captured = [url, opts];
+      return Promise.resolve(response({ success: true, attempt: preparedAttempt() }));
+    }
+    return Promise.resolve(response({ success: true, attempts: [] }));
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await waitFor(() => expect(captured).toBeDefined());
+  const [url, opts] = captured;
+  expect(url).toBe('/api/workbench/pre-site-visit/distribution/prepare');
+  expect(opts.method).toBe('POST');
+  expect(opts.headers).toEqual(expect.objectContaining({ 'Content-Type': 'application/json' }));
+  expect(opts.body).toBe(JSON.stringify({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+    operationId: '44444444-4444-4444-8444-444444444444',
+    to: 'staff@example.org',
+    cc: '',
+    subject: renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, '1002379'),
+    bodyText: DELIBERATION_SHARE_SEED_BODY,
+    includeCalendar: false,
+    siteVisitId: null,
+  }));
+  } finally {
+    globalThis.crypto.randomUUID = originalRandomUUID;
+  }
+});
+
+test('reissueBriefingLink (briefing-link): request bytes (url, method, headers, exact body) unchanged', async () => {
+  await withBriefingLink();
+  let captured;
+  global.fetch = jest.fn((url, opts) => {
+    captured = [url, opts];
+    return Promise.resolve(response({ success: true, link: { id: 'l2', url: 'https://apps.test/external/briefing/new', expiresAt: null } }));
+  });
+  fireEvent.click(screen.getByText('Issue new link'));
+  await waitFor(() => expect(captured).toBeDefined());
+  const [url, opts] = captured;
+  expect(url).toBe('/api/workbench/pre-site-visit/briefing-link');
+  expect(opts.method).toBe('POST');
+  expect(opts.headers).toEqual(expect.objectContaining({ 'Content-Type': 'application/json' }));
+  expect(opts.body).toBe(JSON.stringify({ requestId: REQUEST_ID, action: 'reissue', expectedLinkId: 'l' }));
+});
+
+test('send: request bytes (url, method, headers, exact body) unchanged', async () => {
+  await withPreparedPreview();
+  let captured;
+  global.fetch = jest.fn((url, opts) => {
+    if (String(url).includes('/send')) {
+      captured = [url, opts];
+      return Promise.resolve(response({ success: true, attempt: preparedAttempt() }));
+    }
+    return Promise.resolve(response({ success: true, attempts: [] }));
+  });
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  await waitFor(() => expect(captured).toBeDefined());
+  const [url, opts] = captured;
+  expect(url).toBe('/api/workbench/pre-site-visit/distribution/send');
+  expect(opts.method).toBe('POST');
+  expect(opts.headers).toEqual(expect.objectContaining({ 'Content-Type': 'application/json' }));
+  expect(opts.body).toBe(JSON.stringify({
+    requestId: REQUEST_ID,
+    operationId: preparedAttempt().operationId,
+    previewHash: preparedAttempt().previewHash,
+  }));
 });
