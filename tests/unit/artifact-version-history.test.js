@@ -125,7 +125,7 @@ it('reports an artifact replacement conflict and never renders replacement histo
   expect(screen.queryByText('Replacement Editor')).not.toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(
     `expectedArtifactId=${ARTIFACT_ID}`,
-  ));
+  ), expect.objectContaining({ method: 'GET' }));
 });
 
 it('says an unrecognized status is a display gap rather than rendering silence', async () => {
