@@ -948,6 +948,12 @@ D10's three send sites. Stages 5a, 5b, and the D1 Stage-4 batch start next.
   previews (a production-data read decision the owner makes; prior smoke
   branches set it branch-scoped). Without it the Reviewers roster will not load
   from production Dataverse.
+- Owner authorized 2026-09-20 ("allow prod reads for this branch"):
+  branch-scoped Preview env `DATAVERSE_ALLOW_PROD_READS=yes` added (the literal
+  the interlock checks at `lib/dataverse/core/interlock.js:348`), redeployed →
+  `wmkfresearchapps-eclkwuj5b` (Ready), alias re-pointed to it. Production
+  WRITES from the preview remain denied by the target interlock.
 - Rollback of the setup: `vercel alias rm wmkfresearchapps-preview.vercel.app`
-  (returns the alias to unassigned) and `vercel env rm NEXTAUTH_URL preview
-  feature/client-request-layer`. Neither touches production.
+  (returns the alias to unassigned), `vercel env rm NEXTAUTH_URL preview
+  feature/client-request-layer`, and `vercel env rm DATAVERSE_ALLOW_PROD_READS
+  preview feature/client-request-layer`. None touches production.
