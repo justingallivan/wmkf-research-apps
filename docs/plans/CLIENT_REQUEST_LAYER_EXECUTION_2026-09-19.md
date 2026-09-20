@@ -14,7 +14,8 @@ related:
 
 ## Scope and status
 
-Stage 0 (baseline, helper, census) is in progress. Owner decision D3 (plan §9)
+Stage 0 (baseline, helper, census) was ACCEPTED 2026-09-20 at `e65b03a0` (see
+Stage 0 acceptance below); Stage 1 has not started. Owner decision D3 (plan §9)
 was accepted 2026-09-20: public default `preferParseError: false`; `parseError`
 is still always recorded on `ApiRequestError`.
 
