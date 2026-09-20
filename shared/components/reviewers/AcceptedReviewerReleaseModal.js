@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
+import { requestEnvelope } from '../../utils/api-request';
 
 const REASON = 'sufficient_reviews_received';
 
@@ -46,19 +47,19 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/review-manager/terminal-transition', {
+    requestEnvelope('/api/review-manager/terminal-transition', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         requestId,
         suggestionIds: [reviewer.suggestionId],
         terminalStatus: 'released',
         preview: true,
-      }),
-    }).then(async (response) => {
-      const data = await response.json().catch(() => ({}));
+      },
+      tolerantBody: true,
+    }).then((envelope) => {
       if (cancelled) return;
-      if (!response.ok) throw new Error(data.error || `Could not prepare the release (${response.status})`);
+      if (!envelope.ok) throw new Error(envelope.data.error || `Could not prepare the release (${envelope.status})`);
+      const data = envelope.data;
       const next = data.drafts?.[0];
       if (!next || !['ok', 'no_email', 'no_pd', 'defaults_unavailable'].includes(next.status)) {
         throw new Error(failureMessage(

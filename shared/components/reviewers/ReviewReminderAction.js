@@ -1,5 +1,6 @@
 import { useState, useLayoutEffect, useRef } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
+import { requestEnvelope } from '../../utils/api-request';
 
 const REVIEW_REMINDER_ERROR_MESSAGE = {
   conflict: 'Already claimed by another send. Refresh and try again.',
@@ -100,17 +101,17 @@ export function ReviewReminderAction({
     setSending(true);
     setFeedback(null);
     try {
-      const response = await fetch('/api/review-manager/send-review-reminder', {
+      const envelope = await requestEnvelope('/api/review-manager/send-review-reminder', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionId: reviewer.suggestionId,
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await response.json().catch(() => ({}));
+      const data = envelope.data;
       if (generation !== generationRef.current || !isCurrent(epoch)) return;
-      if (!response.ok || !data.ok) {
+      if (!envelope.ok || !data.ok) {
         setFeedback({
           status: data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed',
           message: REVIEW_REMINDER_ERROR_MESSAGE[data.reason] || 'The reminder could not be sent.',
