@@ -28,6 +28,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { buildGoogleSearchUrl } from '../../../lib/utils/google-search-url';
+import { requestEnvelope } from '../../utils/api-request';
 import {
   priorRequestReference,
   priorRequestRows,
@@ -276,14 +277,14 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         return;
       }
 
-      const response = await fetch('/api/reviewer-finder/my-candidates', {
+      const { ok, status, data } = await requestEnvelope('/api/reviewer-finder/my-candidates', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ suggestionId: candidate.suggestionId, ...updates }),
+        tolerantBody: true,
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
+      if (!ok) {
         setErrorRemediation(Array.isArray(data.remediation) ? data.remediation : []);
         // Duplicate-key 409 on a saved-candidate email edit → offer a record merge
         // (S289 chunk-4). Only in the saved-Candidates path: we need the edited
@@ -291,7 +292,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         // return before this PATCH so can never reach here — the guard is belt-and-
         // suspenders. `conflictingRecordId` is the OTHER person row owning the email.
         if (
-          response.status === 409 &&
+          status === 409 &&
           data.conflictingRecordId &&
           candidate.potentialReviewerId &&
           !onApply &&
@@ -319,13 +320,13 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
   // POST {keeperId, loserId} → read-only plan. Used for the initial plan, Swap
   // re-plans, and the post-confirm recovery re-read. Stale-guarded.
   const fetchPlan = async (keeperId, loserId, token) => {
-    const res = await fetch('/api/reviewer-finder/merge-candidates', {
+    const { ok, status, data } = await requestEnvelope('/api/reviewer-finder/merge-candidates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keeperId, loserId }),
+      tolerantBody: true,
     });
-    const data = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, data, token };
+    return { ok, status, data, token };
   };
 
   // Load (or re-load, e.g. after Swap) the plan into merge state.
@@ -426,15 +427,15 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     const { keeperId, loserId, conflictValue, fieldChoices } = merge;
     setMerge((m) => ({ ...m, loading: true, error: null }));
     try {
-      const res = await fetch('/api/reviewer-finder/merge-candidates', {
+      const { ok, status, data } = await requestEnvelope('/api/reviewer-finder/merge-candidates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keeperId, loserId, fieldChoices, confirm: true }),
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
       if (!guard(token)) return;
 
-      if (res.ok) {
+      if (ok) {
         const recovery = await detectRecovery(keeperId, loserId, conflictValue, token, false);
         if (!guard(token)) return;
         if (recovery) {
@@ -446,7 +447,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         return;
       }
 
-      if (res.status === 409) {
+      if (status === 409) {
         if (data.code === 'merge_retryable_replan') {
           await loadPlan(keeperId, loserId, conflictValue);
           if (!guard(token)) return;
@@ -462,7 +463,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         await loadPlan(keeperId, loserId, conflictValue);
         return;
       }
-      if (res.status === 400) {
+      if (status === 400) {
         // Validation (e.g. loser already inactive / already merged): not retryable.
         setMerge((m) => ({ ...m, loading: false, error: data.error || 'This merge is no longer valid. Refresh the list and try again.', staleValidation: true }));
         return;
