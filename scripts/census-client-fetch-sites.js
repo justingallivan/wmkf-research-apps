@@ -12,7 +12,10 @@
  * Usage:
  *   node scripts/census-client-fetch-sites.js --out <dir>
  * Writes, under <dir>:
- *   sites.csv     one row per fetch( call site
+ *   sites.csv     one row per fetch( call site — a line with N `fetch(`
+ *                 occurrences (e.g. two calls in one `Promise.all([...])`
+ *                 array) gets N rows, one per occurrence, distinguished by
+ *                 the `col` (1-based column) field.
  *   by-file.csv   one row per file (aggregate)
  *   summary.json  totals by method / body_kind / ok_check / error_surface / etc.
  *
@@ -60,7 +63,7 @@ const { execSync } = require('child_process');
 const REPO = path.join(__dirname, '..');
 
 const CAMPAIGN_CRITICAL_PATH_RE = /\/api\/(review-manager|external|scheduled-emails|upload)/i;
-const CAMPAIGN_CRITICAL_WORD_RE = /(send|invite|reminder|release|close)/i;
+const CAMPAIGN_CRITICAL_WORD_RE = /(send|invite|reminder|release|close|email)/i;
 
 function parseArgs(argv) {
   let out = null;
@@ -147,12 +150,29 @@ function census(files) {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const fetchMatch = line.match(/(?:^|[^A-Za-z0-9_.$])fetch\s*\(/);
-      if (!fetchMatch) continue;
+      // Find every `fetch(` occurrence on this line, not just the first —
+      // e.g. shared/components/meeting-tracker/SessionEditor.js:321 has two
+      // calls (`fetch('/api/meeting-tracker/recipients')`,
+      // `fetch('/api/meeting-tracker/sessions')`) on one line, and each is
+      // its own census row with a `col` (1-based) marking which one.
+      const occurrenceRe = /(?:^|[^A-Za-z0-9_.$])fetch\s*\(/g;
+      const fetchCols = [];
+      let occ;
+      while ((occ = occurrenceRe.exec(line))) {
+        const prefixLen = /^fetch/.test(occ[0]) ? 0 : 1;
+        fetchCols.push(occ.index + prefixLen);
+      }
+      if (fetchCols.length === 0) continue;
       const lineNo = i + 1;
 
+      for (const fetchCol of fetchCols) {
+      // This occurrence's own text, starting at its `fetch(` — so an
+      // earlier fetch( on the same line never bleeds into this row, and a
+      // later one is truncated below like any other next-site boundary.
+      const restOfLine = line.slice(fetchCol);
+
       // Window: this call's own lines, truncated at the next fetch( site.
-      let windowLines = lines.slice(i, Math.min(lines.length, i + 40));
+      let windowLines = [restOfLine, ...lines.slice(i + 1, Math.min(lines.length, i + 40))];
       for (let k = 1; k < windowLines.length; k++) {
         if (/(?:^|[^A-Za-z0-9_.$])fetch\s*\(/.test(windowLines[k])) {
           windowLines = windowLines.slice(0, k);
@@ -160,7 +180,7 @@ function census(files) {
         }
       }
       if (windowLines.length < 3) {
-        windowLines = lines.slice(i, Math.min(lines.length, i + 5));
+        windowLines = [restOfLine, ...lines.slice(i + 1, Math.min(lines.length, i + 5))];
       }
       const windowTextRaw = windowLines.join('\n');
       // Normalize optional chaining (?. -> .) so `data?.error` matches the
@@ -171,7 +191,7 @@ function census(files) {
 
       // --- endpoint ---
       let endpoint = 'dynamic';
-      const urlMatch = line.match(/fetch\s*\(\s*(`[^`]*`|'[^']*'|"[^"]*")/);
+      const urlMatch = restOfLine.match(/fetch\s*\(\s*(`[^`]*`|'[^']*'|"[^"]*")/);
       if (urlMatch) {
         endpoint = urlMatch[1].slice(0, 62);
       } else {
@@ -312,9 +332,36 @@ function census(files) {
       if (wrapperMatch) {
         wrapper = wrapperMatch[2];
       }
-      const pipedWrapperMatch = line.match(/([A-Za-z_$][A-Za-z0-9_$]*)\s*\(\s*await\s+fetch\s*\(/);
+      // Match against the text immediately preceding THIS occurrence's
+      // `fetch(` (not `restOfLine`, which starts at `fetch(` and would miss
+      // an identifier that wraps it, e.g. `readResponse(await fetch(...))`).
+      const pipedWrapperMatch = (line.slice(0, fetchCol) + 'fetch(').match(
+        /([A-Za-z_$][A-Za-z0-9_$]*)\s*\(\s*await\s+fetch\s*\(/
+      );
       if (pipedWrapperMatch) {
         wrapper = wrapper ? `${wrapper}+${pipedWrapperMatch[1]}` : pipedWrapperMatch[1];
+      }
+      // Same-statement, split-across-lines wrapper: `const X = await fetch(...)`
+      // followed within 2 lines by `identifier(X)`, e.g.
+      // pages/review-panel.js:110-111 (`const response = await fetch(...);`
+      // then `return readResponse(response);`). Same idea as
+      // `pipedWrapperMatch` above, just not on one line.
+      if (!wrapper) {
+        const assignPrefix = line.slice(0, fetchCol);
+        const assignMatch = assignPrefix.match(
+          /(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*await\s*$/
+        );
+        if (assignMatch) {
+          const varName = assignMatch[1];
+          const forwardText = lines.slice(i + 1, Math.min(lines.length, i + 3)).join('\n');
+          const varWrapRe = new RegExp(
+            `([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*${varName}\\s*\\)`
+          );
+          const varWrapMatch = forwardText.match(varWrapRe);
+          if (varWrapMatch) {
+            wrapper = varWrapMatch[1];
+          }
+        }
       }
 
       // --- campaign_critical (plan §1 release-tier rule) ---
@@ -323,6 +370,7 @@ function census(files) {
       rows.push({
         file: relFile,
         line: lineNo,
+        col: fetchCol + 1,
         endpoint,
         method,
         body_kind,
@@ -338,6 +386,7 @@ function census(files) {
         campaign_critical,
         is_page: isPage,
       });
+      }
     }
   }
 
@@ -346,7 +395,7 @@ function census(files) {
 
 function writeSitesCsv(outDir, rows) {
   const headerCols = [
-    'file', 'line', 'endpoint', 'method', 'body_kind', 'ok_check', 'error_extract',
+    'file', 'line', 'col', 'endpoint', 'method', 'body_kind', 'ok_check', 'error_extract',
     'status_branch', 'abort', 'headers', 'error_surface', 'in_server_side', 'retry',
     'wrapper', 'campaign_critical', 'is_page',
   ];

@@ -64,11 +64,16 @@ export class ApiRequestError extends Error {
 
 /**
  * Pure function computing the error message for a non-2xx response.
- * Message rule: a string `payload.error` wins; else an object
- * `payload.error.message`; else `payload.message`; else `fallbackMessage`;
- * else `Request failed (${status})`. When `preferParseError` is true and a
- * `parseError` was recorded, its message is used first, ahead of the body
- * rule (owner decision (3) "decline" branch; not the public default).
+ * Message rule: a non-empty string `payload.error` wins; else an object
+ * `payload.error.message` that is a non-empty string; else a non-empty
+ * string `payload.message`; else `fallbackMessage`; else
+ * `Request failed (${status})`. An empty string (`''`) at `payload.error` or
+ * `payload.message` is treated as absent, falling through to the next rule
+ * in the chain — this matches the legacy `body.error || fallback` pattern.
+ * A non-string `error.message` (e.g. `{error:{message:5}}`) is ignored and
+ * also falls through. When `preferParseError` is true and a `parseError`
+ * was recorded, its message is used first, ahead of the body rule (owner
+ * decision (3) "decline" branch; not the public default).
  */
 export function deriveErrorMessage(payload, parseError, fallbackMessage, status, { preferParseError = false } = {}) {
   if (preferParseError && parseError) {
@@ -76,9 +81,9 @@ export function deriveErrorMessage(payload, parseError, fallbackMessage, status,
   }
   if (typeof payload === 'object' && payload !== null) {
     const err = payload.error;
-    if (typeof err === 'string') return err;
-    if (err && typeof err === 'object' && typeof err.message === 'string') return err.message;
-    if (typeof payload.message === 'string') return payload.message;
+    if (typeof err === 'string' && err !== '') return err;
+    if (err && typeof err === 'object' && typeof err.message === 'string' && err.message !== '') return err.message;
+    if (typeof payload.message === 'string' && payload.message !== '') return payload.message;
   }
   if (fallbackMessage) return fallbackMessage;
   return `Request failed (${status})`;
@@ -90,6 +95,11 @@ function hasHeader(headers, name) {
   return Object.keys(headers).some((k) => k.toLowerCase() === lower);
 }
 
+// Excludes FormData, Blob, and URLSearchParams (checked below); everything
+// else object-typed — including arrays, Date, class instances,
+// ArrayBuffer/TypedArray, and ReadableStream — is treated as a plain object
+// and JSON.stringify'd. No live call site sends these body types today (plan
+// §2.1); this is documented behavior, not a deliberately widened contract.
 function isPlainObjectBody(body) {
   if (body === undefined || body === null) return false;
   if (typeof body !== 'object') return false;
@@ -177,8 +187,11 @@ export async function requestJson(url, {
 /**
  * Non-throwing form. For sites that don't check `ok`, that branch on a
  * status code before deciding whether it is an error, or that read `status`
- * on success. `data` is always the parsed body, never null. Never throws on
- * HTTP status (a body-parse failure can still reject; see invariant 4).
+ * on success. `data` is the parsed body: for a 2xx response whose body
+ * parses to `null`, a primitive, or an array, `data` is that value as-is
+ * (only a parse failure or empty body substitutes `{}`, and only under
+ * `tolerantBody`; see invariant 4). Never throws on HTTP status (a
+ * body-parse failure can still reject; see invariant 4).
  */
 export async function requestEnvelope(url, {
   method = 'GET', body, headers, signal, fallbackMessage, fetchImpl, tolerantBody,

@@ -22,35 +22,47 @@ is still always recorded on `ApiRequestError`.
 
 Run: `node scripts/census-client-fetch-sites.js --out <scratch-dir>`, 2026-09-20,
 against the working tree at branch `feature/client-request-layer` (HEAD
-`e1fe1906`).
+`1c0cc671` or later, round-1 review corrections).
+
+Round 1 correction: the scanner previously matched only the FIRST `fetch(` on
+a line (`line.match`, non-global). `shared/components/meeting-tracker/
+SessionEditor.js:321` has two calls on one line
+(`fetch('/api/meeting-tracker/recipients')`, `fetch('/api/meeting-tracker/
+sessions')`), so the true count is one higher than the prior run reported.
+The scanner now finds every `fetch(` occurrence per line (global match), one
+row per occurrence, with a `col` column added to `sites.csv`.
 
 | Fact | Plan §2.1 | This run | Delta |
 |---|---|---|---|
-| `shared/components/**` sites / files | 215 / 70 | 215 / 70 | none |
+| `shared/components/**` sites / files | 215 / 70 | 216 / 70 | +1 site (SessionEditor.js:321 double call) |
 | `pages/**` (non-api) sites / files | 93 / 27 | 93 / 27 | none |
-| Total sites / files | 308 / 97 | 308 / 97 | none |
-| Body kind | json 248, unknown 41, stream 14, blob 3, none 2 | json 248, unknown 41, stream 14, blob 3, none 2 | none |
-| Method | GET 127, POST 130, PUT 21, PATCH 20, DELETE 10 | GET 127, POST 130, PUT 21, PATCH 20, DELETE 10 | none |
-| `response.ok` checked | 254 yes, 54 no | 254 yes, 54 no | none |
-| Error surface | setError-state 190, swallowed 45, throw 36, unknown 27, toast/alert 8, console 2 | same | none |
+| Total sites / files | 308 / 97 | 309 / 97 | +1 |
+| Body kind | json 248, unknown 41, stream 14, blob 3, none 2 | json 248, unknown 42, stream 14, blob 3, none 2 | +1 unknown (the added occurrence) |
+| Method | GET 127, POST 130, PUT 21, PATCH 20, DELETE 10 | GET 128, POST 130, PUT 21, PATCH 20, DELETE 10 | +1 GET |
+| `response.ok` checked | 254 yes, 54 no | 254 yes, 55 no | +1 no (the added occurrence has no `.ok` check in its own window) |
+| Error surface | setError-state 190, swallowed 45, throw 36, unknown 27, toast/alert 8, console 2 | setError-state 190, swallowed 45, throw 36, unknown 28, toast/alert 8, console 2 | +1 unknown |
 | Abort signal passed | 35 | 35 | none |
 | Retry/poll wrapper | 19 | 19 | none |
-| Explicit status branches | 409(13), 403(11), 401(4), 413(4), 503(3), 400(3), 412(2), 202(2), 404(1) | identical | none |
+| Explicit status branches | 409(13), 403(11), 401(4), 413(4), 503(3), 400(3), 412(2), 202(2), 404(1) | same, plus `200: 1` | **new**: `200: 1` — `shared/components/reviewers/ReviewerManagePanel.js:743` (PATCH `/api/review-manager/reviewers`), a real `response.status === 200` branch at line 779, inside the site's 40-line census window; not a false positive. §2.1 predates this branch's inclusion in the window or undercounted it. |
 
-No delta against §2.1. All totals reproduce exactly; §2.1 is not edited.
+Two real deltas vs §2.1, both verified against source, not scanner artifacts:
+the one-per-occurrence fix (+1 site) and the `status_branch` `200: 1`
+(confirmed real code, not a window false positive — see above).
 
-New dimension not in §2.1 (added for this plan's release-tier rule, §1):
+New dimension not in §2.1 (added for this plan's release-tier rule, §1, now
+amended to include `email`):
 `campaign_critical` (endpoint matches `/api/review-manager/*`, `/api/external/*`,
 `/api/scheduled-emails*`, `/api/upload*`, or contains `send`/`invite`/
-`reminder`/`release`/`close`) — **65 sites across 28 files**. This is a new
-count, not a restatement of an existing §2.1 fact, so there is nothing to
-diff it against.
+`reminder`/`release`/`close`/`email`) — **71 sites across 31 files** (up from
+65/28 before the `email` keyword was added; `pages/test-email.js:26`
+`/api/test-email` now flags true).
 
-The census script (`scripts/census-client-fetch-sites.js`) is committed and
-can be re-run on demand; its CSV/JSON outputs are not checked in (they write
-under a required `--out <dir>`, never into the repo tree). The
-source-to-stage map below is the durable record of the census content the
-plan asks for (§6 Stage 0: "Write its by-file table into
+The census script (`scripts/census-client-fetch-sites.js`) is committed;
+CSV/JSON outputs are **not** committed — they write under a required
+`--out <dir>` outside the repo tree (plan §6 governs; §2.1's "committed"
+wording is being reconciled by the orchestrator). The source-to-stage map
+below is the durable record of the census content the plan asks for (§6
+Stage 0: "Write its by-file table into
 docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md as the
 source-to-stage map").
 
@@ -87,12 +99,19 @@ Per-site detail columns (added during migration, not at census time):
 
 ### Stage 1 — Fold existing helpers
 
-| File | Stage | Sites | Campaign-critical | RTL test | Adapter |
+Verified this round against source (file:line cites below). Four adapters
+fold into Stage 1, not three — `SessionEditor.js`'s local `readJson` (:22-24)
+is **not dead** and is folded as a fourth adapter, not deleted; the file's
+raw-fetch sites (4, not 3) flow through `readJson`/`sendJson`, not directly
+through the new helper.
+
+| File | Stage | Raw-fetch sites (census) | Campaign-critical | RTL test | Adapter |
 |---|---|---|---|---|---|
-| `pages/cycle-dossier.js` | 1 | 7 | false | yes | local `readResponse` copy at :72-75 (7 sites: :266,335,350,398,427,459,481) |
-| `pages/review-panel.js` | 1 | 3 | false | yes | `readResponse` import from `shared/components/review-panel/review-panel-ui.js` (3 sites) |
-| `shared/components/meeting-tracker/SessionEditor.js` | 1 | 3 | false | yes | `sendJson` (3 sites) |
-| `shared/components/workbench/ReviewPanelTab.js` | 1 | 3 | false | yes | `readResponse` import from `shared/components/review-panel/review-panel-ui.js` (3 sites) |
+| `pages/review-panel.js` + `shared/components/workbench/ReviewPanelTab.js` | 1 | 6 | false | yes | shared `readResponse` at `shared/components/review-panel/review-panel-ui.js:62-66`. Consumers: `pages/review-panel.js` :44, :89, :110-111 (the :110-111 pair is `const response = await fetch(...)` then `return readResponse(response);` on the next line — same-statement, not same-line); `shared/components/workbench/ReviewPanelTab.js` :251, :279, :289. |
+| `pages/cycle-dossier.js` | 1 | 7 | false | yes | local `readResponse` copy at :72-75 (7 sites: :266, :335, :350, :398, :427, :459, :481) |
+| `shared/components/meeting-tracker/SessionEditor.js` | 1 | 4 | false | yes | local `readJson` at :22-24. Raw-fetch sites: :305 (via `readJson` directly), :321 (two calls on one line — `fetch('/api/meeting-tracker/recipients')`, `fetch('/api/meeting-tracker/sessions')`), :322. `sendJson` (:26-27, issues its request through `fetchImpl` at :27) wraps `readJson` and is the fourth adapter in this file; it has 8 callers — `reorderSessionSlots` at :38, plus :380, :381, :385, :426, :514, :515, :516 — and contributes zero *additional* raw-fetch census sites (its own `fetchImpl(...)` call at :27 is not a literal `fetch(` call site the census scanner counts). |
+
+Total raw-fetch sites flowing through Stage 1 adapters: **17** (6 + 7 + 4).
 
 ### Stage 2 — Covered high-count files
 
@@ -212,31 +231,23 @@ table — census-derived rows only].)
 
 ### UNASSIGNED — needs Fable/owner disposition before any stage claims them
 
-| File | Sites | Campaign-critical | RTL test | Note (read this session) |
-|---|---|---|---|---|
-| `pages/profile-settings.js` | 1 | true | yes | read this session: self-service staff profile page (display name, avatar, email-signature/template prefs); not named in §4, not under an admin/workbench/reviewers/external directory |
-| `pages/test-email.js` | 1 | false | no | read this session: ad hoc Dynamics-email-integration test page; not named in §4 |
-| `pages/workbench/[requestId].js` | 1 | false | yes | read this session: Request Workbench shell (tab strip host for the Stage 2/4/5a tab components); not itself named in §4 |
-| `shared/components/Layout.js` | 1 | false | no | [NOT-READ: shared/components/Layout.js] — census flags one fetch site in this file; app-wide Layout/PageHeader/Card/Button shell imported by most pages; not a §4-named directory |
-| `shared/components/reviewers/search/useApplicantReviewerEnrichment.js` | 1 | false | no | [NOT-READ] reviewers/search/* hook, sibling to several Stage 4 hooks, but not individually named in §4's Stage 4 row |
-| `shared/components/reviewers/search/useReviewerRoster.js` | 1 | false | no | [NOT-READ] reviewers/search/* hook, sibling to several Stage 4 hooks, but not individually named in §4's Stage 4 row |
+Resolved this round per §4's catch-all: `pages/workbench/[requestId].js` and
+`shared/components/Layout.js` → **5a** (internal, no reviewer-engagement
+endpoint); `pages/test-email.js` → **5b** (email surface, Tier 2, and now
+also `campaign_critical: true` under the amended keyword rule — see Census
+baseline); `pages/profile-settings.js` → **owner decision (6)**, not
+auto-assigned (see below); the two `reviewers/search/*` hooks → **Stage 4**,
+marked ASSUMED pending orchestrator confirmation (directory/naming match to
+sibling Stage 4 hooks, not an explicit §4 name).
 
-`pages/profile-settings.js` is campaign-critical (keyword match) and
-UNASSIGNED — flagging explicitly since an unassigned campaign-critical file
-must not land in a Tier 1 stage by the §1 long-tail rule. On inspection
-(read this session) its sites are self-service profile-preference calls with
-no reviewer-engagement endpoint; the `campaign_critical` flag likely fired on
-a generic keyword match (e.g. "send") rather than a real reviewer-engagement
-endpoint, but this needs confirmation against the actual site lines, not an
-assumption, before the file is placed in a stage.
-
-The two `reviewers/search/*` orphans (`useApplicantReviewerEnrichment.js`,
-`useReviewerRoster.js`) most plausibly belong in Stage 4 alongside their
-sibling hooks, given the directory and naming pattern, but are left
-UNASSIGNED rather than silently folded into the Stage 4 table above, since
-Stage 4's file list in §4 is enumerated by name and these two are absent from
-it — that omission could be intentional (deferred) or an oversight in the
-plan.
+| File | Sites | Campaign-critical | RTL test | Disposition | Note |
+|---|---|---|---|---|---|
+| `pages/profile-settings.js` | 1 | true | yes | owner decision (6) | Verified this round: the flag fires on `invite`, not `send` — the site's literal endpoint is `/api/email-defaults/grantee-invite` (`pages/profile-settings.js:147`, GET; confirmed in both the census CSV and source). This is a self-service staff email-template-preference read, not a reviewer-engagement send/invite action; still not auto-assigned since it is a campaign-critical file absent from §4 by name (long-tail rule, §1). |
+| `pages/test-email.js` | 1 | true (as of this round; `email` keyword added) | no | 5b | Ad hoc Dynamics-email-integration test page; site is `/api/test-email` POST at :26. |
+| `pages/workbench/[requestId].js` | 1 | false | yes | 5a | Request Workbench shell (tab strip host for the Stage 2/4/5a tab components); site is `/api/workbench/resolve-request?requestId=...` GET at :127 (verified via census CSV). |
+| `shared/components/Layout.js` | 1 | false | no | 5a | App-wide Layout/PageHeader/Card/Button shell imported by most pages; its only site is an internal read, `/api/admin/alerts?summary=true` GET at :35 (verified via census CSV). |
+| `shared/components/reviewers/search/useApplicantReviewerEnrichment.js` | 1 | false | no | Stage 4 [ASSUMED] | reviewers/search/* hook, sibling to several Stage 4 hooks, but not individually named in §4's Stage 4 row; pending orchestrator confirmation. |
+| `shared/components/reviewers/search/useReviewerRoster.js` | 1 | false | no | Stage 4 [ASSUMED] | reviewers/search/* hook, sibling to several Stage 4 hooks, but not individually named in §4's Stage 4 row; pending orchestrator confirmation. |
 
 ## Stage 0 acceptance
 
@@ -287,6 +298,22 @@ test failed — `requestEnvelope › success keys on HTTP status only: body-leve
 {ok:false}/{success:false} is never interpreted`; reverted immediately and
 the suite re-ran green (47/47).
 
+### Round 1 review corrections — Gate G (full), run by the orchestrator at `1c0cc671`
+
+[ASSUMED — as instructed for this section; not independently re-run by the
+Stage 0 corrections pass, which ran its own narrower gate subset (see
+Verification log below) against the working tree after `1c0cc671`.]
+
+Every `check:*` gate and its self-test, run sequentially: all green, with one
+fact-consistency false positive on plan wording (a count that pattern-matched
+the api-route fact gate), reworded in `1c0cc671`. `npm test`: 985 suites /
+14533 tests, green. `npm run lint`: 0 errors. `npm run check:types`: clean.
+`npm run build`: compiled successfully, with 2 pre-existing Turbopack
+warnings on `/auth/error` (not introduced by this work).
+
+Reviewer verdict on this round's corrections: [left for the orchestrator to
+fill in].
+
 ## Verification log
 
 Commands actually run by the Stage 0 implementer (subset of Gate G; full Gate
@@ -306,3 +333,51 @@ G above is the orchestrator's responsibility per the plan):
   instead of `response.ok` alone): the test file was run, restored, and
   re-run green — failing test names recorded in this session's report, not
   duplicated here to avoid drift between two copies of the same fact.
+
+### Round 1 review corrections (2026-09-20)
+
+- Read `shared/utils/api-request.js` in full to verify `deriveErrorMessage`
+  (:73-84), the `requestEnvelope` "never null" docblock line (:180), and
+  `isPlainObjectBody` (:98-104) before editing any of them.
+- `npx jest tests/unit/api-request.test.js`: 62 passed, 62 total (up from
+  47; 15 new tests for the invariant-8 import pin, `requestJson` signal
+  forwarding, 2xx `null`/array/primitive bodies on both `requestJson` and
+  `requestEnvelope`, the `deriveErrorMessage` empty-string/non-string-message
+  edge cases, and Blob/string/URLSearchParams body passthrough).
+- `npm test -- --silent`: 985 suites / 14548 tests, green.
+- `npm run lint`: 0 errors (removed two `eslint-disable` comments this round
+  added that triggered "unused directive" warnings; re-ran to confirm 0
+  problems in the touched test file).
+- `npm run check:doc-symbol-refs`: OK, 295 docs / 1756 refs.
+- `npm run check:doc-currency`: OK, no drift markers.
+- `npm run check:fact-consistency`: OK.
+- `npm run check:scaffolding-tokens`: OK, 3886 files scanned.
+- Read `scripts/census-client-fetch-sites.js` in full before editing the
+  fetch-occurrence scanner (:148-165), the piped-wrapper match (:315-321),
+  and the campaign-critical keyword list (:63).
+- Verified `shared/components/meeting-tracker/SessionEditor.js:321` has two
+  `fetch(` calls on one line (read source directly) — the scanner's prior
+  non-global match undercounted this by one site.
+- Re-ran the census script against a scratch dir
+  (`.../scratchpad/census-r1`): 309 total sites (up from 308), `readResponse`
+  wrapper resolved to 6 (`pages/review-panel.js` :44, :89, :110-111;
+  `shared/components/workbench/ReviewPanelTab.js` :251, :279, :289) plus
+  cycle-dossier's local copy at 7 sites, `campaign_critical` 71 sites / 31
+  files with `email` added (`pages/test-email.js:26` now flags true).
+- Diffed the re-run's `summary.json` against a checkout of the pre-round-1
+  script (`git stash` / re-run / `git stash pop`) to derive each delta in
+  the Census baseline table above from an actual before/after comparison,
+  not by assumption.
+- Read `shared/components/reviewers/ReviewerManagePanel.js:735-782` to
+  confirm the `status_branch` `200: 1` at :743 is a real
+  `response.status === 200` branch at line 779 inside the site's window, not
+  a false positive.
+- Read `pages/profile-settings.js:60-150` (relevant slice) to confirm the
+  `campaign_critical` flag on that file fires on `invite` via
+  `/api/email-defaults/grantee-invite` (:147), not on `send`.
+- Read `shared/components/meeting-tracker/SessionEditor.js:1-40` and grepped
+  all `sendJson(` call sites in the file: found 8 callers, not 7 — the plan
+  round's brief omitted `reorderSessionSlots` at :38. Corrected in the Stage
+  1 table above.
+- Committed: `fix(client-request): stage 0 review corrections (census
+  one-per-occurrence, message rule edge cases, execution log facts)`.

@@ -81,6 +81,18 @@ describe('deriveErrorMessage', () => {
       deriveErrorMessage({ error: 'body message' }, null, 'fallback', 400, { preferParseError: true })
     ).toBe('body message');
   });
+
+  test('empty string payload.error is treated as absent, falls through to fallback', () => {
+    expect(deriveErrorMessage({ error: '' }, null, 'fallback', 400)).toBe('fallback');
+  });
+
+  test('empty string payload.message is treated as absent, falls through to fallback', () => {
+    expect(deriveErrorMessage({ message: '' }, null, 'fallback', 400)).toBe('fallback');
+  });
+
+  test('non-string error.message (e.g. a number) is ignored, falls through to fallback', () => {
+    expect(deriveErrorMessage({ error: { message: 5 } }, null, 'fallback', 400)).toBe('fallback');
+  });
 });
 
 describe('readJsonBody', () => {
@@ -292,6 +304,54 @@ describe('requestJson', () => {
     expect(callArgs.headers).toBeUndefined();
   });
 
+  test('Blob body passes through untouched, no content-type added', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk({}));
+    const blob = new Blob(['x'], { type: 'text/plain' });
+    await requestJson('/api/upload', { method: 'POST', body: blob, fetchImpl });
+    const callArgs = fetchImpl.mock.calls[0][1];
+    expect(callArgs.body).toBe(blob);
+    expect(callArgs.headers).toBeUndefined();
+  });
+
+  test('string body passes through untouched, no content-type added', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk({}));
+    await requestJson('/api/thing', { method: 'POST', body: 'raw text', fetchImpl });
+    const callArgs = fetchImpl.mock.calls[0][1];
+    expect(callArgs.body).toBe('raw text');
+    expect(callArgs.headers).toBeUndefined();
+  });
+
+  test('URLSearchParams body passes through untouched, no content-type added', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk({}));
+    const params = new URLSearchParams({ a: '1' });
+    await requestJson('/api/thing', { method: 'POST', body: params, fetchImpl });
+    const callArgs = fetchImpl.mock.calls[0][1];
+    expect(callArgs.body).toBe(params);
+    expect(callArgs.headers).toBeUndefined();
+  });
+
+  test('signal is forwarded to fetch', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk({}));
+    const controller = { signal: {} };
+    await requestJson('/api/thing', { fetchImpl, signal: controller.signal });
+    expect(fetchImpl.mock.calls[0][1].signal).toBe(controller.signal);
+  });
+
+  test('2xx body null returned as-is', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk(null));
+    await expect(requestJson('/api/thing', { fetchImpl })).resolves.toBeNull();
+  });
+
+  test('2xx body array returned as-is', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk([1, 2]));
+    await expect(requestJson('/api/thing', { fetchImpl })).resolves.toEqual([1, 2]);
+  });
+
+  test('2xx body primitive number returned as-is', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk(7));
+    await expect(requestJson('/api/thing', { fetchImpl })).resolves.toBe(7);
+  });
+
   test('If-Match header survives (caller headers merged over defaults)', async () => {
     const fetchImpl = jest.fn().mockResolvedValue(jsonOk({}));
     await requestJson('/api/thing', {
@@ -369,6 +429,24 @@ describe('requestEnvelope', () => {
     expect(result).toEqual({ ok: true, status: 200, data: { id: 7 }, error: null });
   });
 
+  test('2xx body null returned as-is as data', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk(null));
+    const result = await requestEnvelope('/api/thing', { fetchImpl });
+    expect(result.data).toBeNull();
+  });
+
+  test('2xx body array returned as-is as data', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk([1, 2]));
+    const result = await requestEnvelope('/api/thing', { fetchImpl });
+    expect(result.data).toEqual([1, 2]);
+  });
+
+  test('2xx body primitive number returned as-is as data', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonOk(7));
+    const result = await requestEnvelope('/api/thing', { fetchImpl });
+    expect(result.data).toBe(7);
+  });
+
   test('network rejection propagates unchanged (requestEnvelope does not catch it)', async () => {
     const networkErr = new TypeError('Failed to fetch');
     const fetchImpl = jest.fn().mockRejectedValue(networkErr);
@@ -394,5 +472,21 @@ describe('ApiRequestError', () => {
     expect(err.payload).toEqual({ a: 1 });
     expect(err.parseError).toBeNull();
     expect(err.message).toBe('boom');
+  });
+});
+
+describe('module import side effects (invariant 8)', () => {
+  test('importing the module performs no fetch call', () => {
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('the module source defines no React dependency', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.join(__dirname, '../../shared/utils/api-request.js'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/from ['"]react['"]/);
   });
 });
