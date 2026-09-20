@@ -619,12 +619,13 @@ describe('direct review follow-up action', () => {
     expect(await screen.findByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
   });
 
-  test('T4 axis (d): a malformed 2xx body reports the generic failure, not "sent"', async () => {
+  test('D10 fix: a malformed 2xx body reports the uncertain receipt, not "sent" or the generic failure', async () => {
     global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } }));
     render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
-    expect(await screen.findByText('The reminder could not be sent.')).toBeInTheDocument();
+    expect(await screen.findByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
     expect(screen.queryByText('Sent for delivery.')).not.toBeInTheDocument();
+    expect(screen.queryByText('The reminder could not be sent.')).not.toBeInTheDocument();
   });
 
   test('T4 axis (e): a non-2xx body that fails to parse is never silent (reports the generic failure)', async () => {
