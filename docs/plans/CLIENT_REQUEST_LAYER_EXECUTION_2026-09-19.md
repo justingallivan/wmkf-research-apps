@@ -1446,4 +1446,12 @@ plan). Full base-branch adversarial review (`--base main`, gpt-5.6-sol,
 forms, tolerant/strict policy, D3, the allowlist ratchet, per-site regressions
 (request bytes, error precedence, stale guards, body-level `ok`/`success`),
 and tests that cannot fail. **Verdict: approve, no material findings.**
-Receipt in the plan §10 table (cycle 4).
+Receipt in the plan §10 table (cycle 4). Weight (owner asked, orchestrator
+answered 2026-09-20): a ~40-command, pattern-driven sweep — helper, its
+tests, T6, adapters, manage panel, and the runtime diff at several context
+widths, plus tree-wide greps for the named regression classes — not a
+line-by-line read of every site. Of the diff, ~11.9k added lines are tests
+and ~2.6k docs; runtime is ~2.0k added / 1.4k removed across 101 files.
+Recorded as corroboration; the substantive assurance remains the per-stage
+fresh reviews (full source diffs, characterization runs, mutation checks)
+and Gate G. Owner declined further scoped Codex runs.
