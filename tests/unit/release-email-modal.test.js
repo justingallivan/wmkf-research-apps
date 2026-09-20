@@ -392,6 +392,94 @@ test('T4 axis (c, send): a release network rejection reports the uncertain outco
   expect(await screen.findByText(/The connection ended before the result could be confirmed.*offline/)).toBeInTheDocument();
 });
 
+test('a 200 withdraw-sufficient carrying write_failed rows still surfaces the amber banner and Done', async () => {
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  const second = draft(SECOND_ID, 'Dr. Second Reviewer', 'second@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first, second] }))
+    .mockResolvedValueOnce(response({
+      withdrawn: 0,
+      results: [
+        { suggestionId: FIRST_ID, status: 'write_failed' },
+        { suggestionId: SECOND_ID, status: 'write_failed' },
+      ],
+    }, { status: 200 }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID, SECOND_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
+
+  await screen.findByText(/2 issues:/);
+  expect(screen.getByText(/Dr\. First Reviewer — The invitation could not be closed/)).toBeInTheDocument();
+  expect(screen.getByText(/Dr\. Second Reviewer — The invitation could not be closed/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Releasing…' })).not.toBeInTheDocument();
+});
+
+test('a 200 withdraw-sufficient carrying not_pending rows surfaces the amber banner and Done', async () => {
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  const second = draft(SECOND_ID, 'Dr. Second Reviewer', 'second@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first, second] }))
+    .mockResolvedValueOnce(response({
+      withdrawn: 0,
+      results: [
+        { suggestionId: FIRST_ID, status: 'not_pending' },
+        { suggestionId: SECOND_ID, status: 'not_pending' },
+      ],
+    }, { status: 200 }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID, SECOND_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
+
+  await screen.findByText(/2 issues:/);
+  expect(screen.getByText(/Dr\. First Reviewer — The reviewer already responded or was already closed/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Releasing…' })).not.toBeInTheDocument();
+});
+
+test('a 200 withdraw-sufficient with no results array at all falls back to missing_result per row', async () => {
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  const second = draft(SECOND_ID, 'Dr. Second Reviewer', 'second@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first, second] }))
+    .mockResolvedValueOnce(response({ withdrawn: 0 }, { status: 200 }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID, SECOND_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
+
+  await screen.findByText(/2 issues:/);
+  expect(screen.getByText(/Dr\. First Reviewer — The server did not return a result for this reviewer/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Releasing…' })).not.toBeInTheDocument();
+});
+
 test('switching back to No longer needed re-arms the courtesy note default', () => {
   global.fetch.mockResolvedValue(response({ ok: true, drafts: [] }));
   render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
