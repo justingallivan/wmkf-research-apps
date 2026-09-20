@@ -1316,3 +1316,60 @@ valid load below).
   has submitted (no reminder row); inviting/accepting a new reviewer needs
   production writes. Both files' T5 matrices (axes a–e, request bytes on
   every POST) were mutation-verified in the Stage 5 fresh review, item 2.
+
+## Stage 6 — closeout ratchet (logged 2026-09-20; fresh review + Gate G pending)
+
+Commits: `5e5bfc0e7` (T1 pins for url-based adapters, RED), `c688cf655`
+(Part A fold), `027f2b44b` (T6 lint fixture, RED), `828a0a96c`
+(`no-restricted-syntax` block), `c9dd84e2e` (catalog + wiki).
+
+**Part A — Stage 1 fold finished.** The four adapters now take `(url,
+options)` and call `requestEnvelope` themselves, so the 16 consumer sites the
+Stage 5 reviewer flagged (`pages/review-panel.js` ×3, `pages/cycle-dossier.js`
+×7, `ReviewPanelTab.js` ×3, `SessionEditor.js` ×3) carry no raw `fetch(`:
+`review-panel-ui.js` readResponse and `cycle-dossier.js` readResponse keep
+their thrown `Error` (`data.error || Request failed (${status})`) and return
+value; `SessionEditor.js` readJson returns the envelope (both callers need
+`ok`/`status`), sendJson reimplemented over `requestEnvelope` with the same
+signature. `tests/unit/client-request-stage1-adapters.test.js` rewritten for
+the new signatures (+ per-site URL/method/header/body-byte pins, envelope
+shape suite, static zero-raw-fetch assertion): 28/44 RED against the
+pre-change adapters, 44/44 GREEN after. One fixture correction in
+`workbench-review-panel-tab.test.js` (the call now always carries an init
+object). Implementer deviation: RED was reproduced via `git stash push
+--keep-index` on the five source files after writing the code, not by writing
+the test first; committed history is still test-then-code; `git stash list`
+afterwards shows only the two pre-existing entries.
+
+**Part B — ratchet.** `eslint.config.mjs` gains one scoped block (`files:
+shared/components/**/*.js, pages/**/*.js`; `ignores: pages/api/**`) with two
+selectors (bare `fetch(`; `globalThis.fetch(`/`window.fetch(`). T6
+(`tests/unit/eslint-no-raw-fetch-ratchet.test.js`) runs the repo config via
+`npx eslint --stdin` (ESLint's `lintText` cannot import the ESM flat config
+under Jest); cases (a)–(d) per the plan plus member-call and `fetchImpl(`
+non-firing checks; 5/7 RED before the rule, 7/7 after. `npm run lint`: 0
+errors, 114 warnings (baseline unchanged; the transient "unused directive"
+warnings are gone). **No site needed migration or a new directive**: all 26
+remaining raw sites already carried the canonical §2.6 annotation. 26 vs the
+19 named in §2.6: the extra 7 are SSE consumers of `reviewers/sse.js`
+(`InviteEmailModal.js:736`, `useReviewerDiscovery.js:75,119,190`,
+`useReviewerPromotion.js:61`, `useApplicantReviewerEnrichment.js:47`, and one
+more) — same three allowlisted categories; to be confirmed site-by-site in
+the fresh review. Dead wrappers: none (every local `readJson`-style helper
+has live callers).
+
+**Docs.** `docs/SERVICE_AND_UTILITY_CATALOG.md` bullet for
+`shared/utils/api-request.js`; `docs/agent-wiki/topics/dev-environment.md`
+"Client Request Layer" heading (entry points, ratchet, annotation form;
+frontmatter extended). `check:docs-catalog` OK (302 docs);
+`check:doc-symbol-refs` + self-test OK; `check:agent-wiki` + self-test OK.
+Implementer's suite: 1009 suites / 14711 tests green; `check:types` clean.
+
+**Release record (refreshed 2026-09-20 ~15:30 PT).** Current production
+deployment: `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki`
+(`wmkfresearchapps-ocl7vs3ux`, created 2026-09-19 22:15 PT, aliases
+`reviews.wmkeck.org` + `grantees.wmkeck.org`; `origin/main` = `e269756ac`).
+That is the rollback target for any merge of this branch: redeploy it
+(`vercel redeploy <url>` or promote in the dashboard); no data rollback exists
+or is needed. Merge to `main` is the owner's explicit decision (Tier 2 work on
+the branch).
