@@ -1392,3 +1392,48 @@ pass), residuals R1–R4 fixed (`135f11d9e`), owner decisions recorded
 (steps 3–6 and 9 test-covered; steps 7–8 passed on the preview; deviation
 (6) closed; release copy approved), Gate G green above. Stage 6 acceptance
 follows its fresh review.
+
+### Stage 6 fresh review (Opus, no inherited context, isolated worktree at `c9dd84e2e`) — READY WITH NAMED CHANGES
+
+Scope: Stage 6 (Part A fold, Part B ratchet, docs), the release-copy
+follow-up, and the deviation-6 fallback. No behavior defect. Verified: all 16
+Part A sites byte-identical on the wire (plain-object bodies → same
+`JSON.stringify` + same single `Content-Type`; bare GETs now carry `{ method:
+'GET', signal: undefined }`, wire-identical); thrown error shapes and return
+values unchanged; no consumer reads a body-level `ok` as HTTP `ok`; the rule
+block's scope and both selectors; T6 runs the repo config; case (d) proves
+site-level exemption; the 7 extra allowlisted sites each read to their SSE
+consumer; no raw `e.message` reaches a response body; the removed row-level
+`error` from terminal-transition has zero readers; `outcome.error ===
+'write_failed'` traced through `ReviewerManagePanel.releaseAcceptedReviewer`;
+no stash-misfire artefacts in the committed diffs. Mutations: adapter fallback
+text → RED 3/44; adapter method → RED 1/44; rule block deleted → T6 RED 5/7
+(incl. the "not an unused directive" case); failure code string → service RED
+1/26; modal sentence → RED 1/15. Caveat: the 28/44 T1 red against pre-change
+adapters is signature-shape red, not characterization; preservation rests on
+the per-site diff trace plus the bytes pins.
+
+Findings: (1) plan §2.6 listed 19 sites vs 26 annotated, and plan status was
+still `active` — **fixed `9f64a364a`** (§2.6 amendment naming the 7 SSE
+sites; `status: complete`); (2) catalog, wiki, and the helper's own header
+still described `readJsonBody` as the adapters' seam after the fold moved them
+to `requestEnvelope` — **fixed `9f64a364a`** (readJsonBody documented as
+exported, caller-less). (3) informational: `ReviewerManagePanel.js:884` alert
+path still shows the literal `write_failed` status word; the new `failure`
+code is available there — left as is, noted for the owner. (4)
+maintainability: the five-code vocabulary is duplicated across two services
+and two modals with no shared constant / parity gate — noted, not changed
+(tests catch drift today). (5) nit: `REISSUE_REFUSAL_FALLBACKS` declared inside
+the branch body.
+
+### Stage 6 acceptance — 2026-09-20, orchestrator (Fable), at `9f64a364a`
+
+Accepted. Gate G green at `c9dd84e2e` (above); commits since are docs and
+comments only, re-checked with `check:docs-catalog`, `check:agent-wiki` (+
+self-test), `check:doc-symbol-refs` (+ self-test), `check:build-claim-freshness`
+(+ self-test), `check:doc-currency` (+ self-test), `api-request` unit tests
+(62), and lint on the helper. Plan status `complete`. Release decision handed
+to the owner; rollback deployment recorded above. Preview env cleanup list
+(owner call, after merge or abandonment): alias
+`wmkfresearchapps-preview.vercel.app`; branch-scoped `NEXTAUTH_URL`,
+`DATAVERSE_ALLOW_PROD_READS`, `DELIBERATION_BRIEFING_SCHEMA_READY`.
