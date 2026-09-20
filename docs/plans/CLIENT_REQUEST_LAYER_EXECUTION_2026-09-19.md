@@ -491,3 +491,48 @@ G above is the orchestrator's responsibility per the plan):
   1 table above.
 - Committed: `fix(client-request): stage 0 review corrections (census
   one-per-occurrence, message rule edge cases, execution log facts)`.
+
+## Stage 2 — covered high-count files
+
+Two disjoint groups built concurrently by Sonnet; tests committed before code
+per file and run unchanged after migration; the orchestrator fills this log.
+
+### Group B (logged 2026-09-20; fresh review pending with group A)
+
+**B1 `shared/components/workbench/StaffDeliberationsTab.js` — 8/8 sites → `requestEnvelope`, `tolerantBody: true`.**
+Every site keeps its own `data.error || "<verb> failed (${status})"` derivation
+because the fallback embeds the live status, which a static `fallbackMessage`
+cannot reproduce; `submitReopen`/`submitBriefReopen` keep their `status === 202`
+branches; `pollForArtifact`'s retry loop stays outside the helper; the file's
+synthesized `AbortError`s and `err?.name !== 'AbortError'` branches untouched.
+Tests `tests/unit/staff-deliberations-tab.test.js` 60 → 69 (9 T2 cases incl. an
+aborted mid-poll case). Commits `6607ba1f` (tests), `231842a9` (migration).
+
+**B2 `pages/expertise-finder.js` — 8/8 sites → `requestEnvelope`, strict body.**
+Sites throw `data.error || "HTTP ${status}"` or bare `throw new Error(data.error)`
+(no fallback; a missing `error` field still yields the message `"undefined"`,
+preserved). `runBatch` stores ok/!ok into per-proposal state without throwing;
+`fetchHistory` acts only on the truthy `ok` branch. Fixture `beforeEach` gained
+`status: 200`. Tests `tests/unit/expertise-finder-batch-cycle.test.js` 1 → 22.
+Commits `6ae896d2` (tests), `8785a9bf` (migration).
+
+**B3 verify-only:** `pages/cycle-dossier.js` (7), `pages/review-panel.js` (3;
+one is the two-statement `const response = await fetch(...); return
+readResponse(response)`), `ReviewPanelTab.js` (3): every site passes through
+the Stage 1 `readResponse` adapter; no raw unwrapped site. No edits.
+
+Group B gates at `8785a9bf`: `npm test` 986 suites / 14639 tests green; lint 0
+errors; `check:types` clean.
+
+**Observations for the plan (not defects in this stage):**
+- O1. Sixteen of sixteen group B sites chose `requestEnvelope` because their
+  fallback message embeds `response.status`. A `fallbackMessage` that accepts
+  a function `(status) => string` would let `requestJson` serve them and remove
+  the per-site derivation. Candidate helper enhancement; owner call, since it
+  widens the closed option contract.
+- O2. Pre-existing, user-facing: `shared/components/ErrorAlert.js:45` reads the
+  prop `error`, but six call sites pass `message=` (`pages/expertise-finder.js:250,388,851`,
+  `pages/dataverse-bulk-export.js:471`, `pages/virtual-review-panel.js:1296`,
+  `pages/phase-i-dynamics.js:152`), so those error banners render blank
+  [VERIFIED via grep]. Recorded as D9 in the D1 follow-up doc; not fixed here.
+

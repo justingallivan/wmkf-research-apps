@@ -181,3 +181,15 @@ a "D1 fixes" section listing site, old behavior, new behavior, test.
 ## 7. Confirmation pass log
 
 2026-09-20 confirmation pass: read 26 files (22 client call-site files, `shared/components/reviewers/sse.js`, and the 3 campaign-critical route handlers) to confirm all 38 §3 rows. Most surprising findings: (1) two rows (`PoliciesSection.js:363`, `PromptTemplatesSection.js:741`) look guarded — they always call `onOutcome(data)` on failure — but a non-2xx `{error}` body has no `status` field, so `STATUS_COPY[undefined]` renders an outcome banner with no visible text; the "guard" exists but the message is lost, so these are still `unguarded`. (2) Two files (`SiteVisitEditor.js`, `SessionEditor.js`) each define their own local, unshared `readJson`/`sendJson` helper that does check `.ok` and throw — the census's "13 sites pass through `readResponse`" exclusion missed these because they're not the shared helper, accounting for 5 of the 20 `guarded-elsewhere` sites. (3) `DynamicsExplorerRestrictionsSection.js:38` (DELETE) doesn't read a response body at all — it removes the row from the UI unconditionally after the `fetch`, regardless of whether the delete succeeded server-side — a distinct defect from the "misread error body" pattern this plan targets.
+
+## 8. Sibling defect D9: `ErrorAlert` prop mismatch (found Stage 2, 2026-09-20)
+
+`shared/components/ErrorAlert.js:45` is `function ErrorAlert({ error, onDismiss, className })`.
+Six client call sites render `<ErrorAlert message={error} ... />`, so the
+component receives `error: undefined` and shows nothing [VERIFIED via grep,
+2026-09-20]: `pages/expertise-finder.js:250,388,851`,
+`pages/dataverse-bulk-export.js:471`, `pages/virtual-review-panel.js:1296`,
+`pages/phase-i-dynamics.js:152`.
+Fix: rename the prop at each call site to `error=`; add one render assertion
+per site that the message text appears. Tier 1. Same user-facing family as D1
+(an error that never reaches the user); ship it with the D1 fixes.
