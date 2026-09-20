@@ -135,7 +135,7 @@ The census script and its CSV outputs are regenerated and committed in Stage 0
 - Body-level failure flags exist and are NOT equivalent to HTTP status:
   `pages/api/review-manager/materials-preflight.js:55` returns HTTP 200 with
   `{ ok: false, reason: 'materials_unavailable' }` on a sanitized lookup failure
-  [VERIFIED via that file, lines 45-58]; 9 sites across 5 route files return `{ success: false, ... }`
+  [VERIFIED via that file, lines 45-58]; 9 sites in 5 handlers under `pages/api` return `{ success: false, ... }`
   (some with 409, e.g. `pages/api/workbench/reviewer-roster.js:502`). Clients
   read body-level `.ok` at 22 sites and `.success` at 28 sites (8 in
   `shared/components/reviewers/search/useReviewerContactActions.js`).
