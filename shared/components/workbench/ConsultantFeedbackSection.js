@@ -21,6 +21,7 @@
  * visibility filters, and a searchable keyboard-first roster combobox.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { requestJson, requestEnvelope } from '../../utils/api-request';
 import RichReviewEditor from '../external/RichReviewEditor';
 import { SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT } from '../../config/siteVisitMaterials';
 
@@ -293,17 +294,15 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     setLoading(true);
     setError(null);
     try {
-      const [entriesRes, consultantsRes] = await Promise.all([
-        fetch(`/api/workbench/consultant-feedback?requestId=${encodeURIComponent(requestId)}`),
-        fetch('/api/workbench/consultant-feedback/consultants'),
+      const [entriesEnv, consultantsEnv] = await Promise.all([
+        requestEnvelope(`/api/workbench/consultant-feedback?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true }),
+        requestEnvelope('/api/workbench/consultant-feedback/consultants', { tolerantBody: true }),
       ]);
-      const entriesData = await entriesRes.json().catch(() => ({}));
-      const consultantsData = await consultantsRes.json().catch(() => ({}));
       if (fetchId !== fetchIdRef.current || loadRequestId !== currentRequestIdRef.current) return;
-      if (!entriesRes.ok) throw new Error(entriesData.error || `Failed to load consultant feedback (${entriesRes.status})`);
-      setItems(entriesData.items || []);
+      if (!entriesEnv.ok) throw new Error(entriesEnv.data.error || `Failed to load consultant feedback (${entriesEnv.status})`);
+      setItems(entriesEnv.data.items || []);
       setItemsRequestId(loadRequestId);
-      setConsultants(consultantsRes.ok ? (consultantsData.items || []) : []);
+      setConsultants(consultantsEnv.ok ? (consultantsEnv.data.items || []) : []);
     } catch (e) {
       if (fetchId !== fetchIdRef.current || loadRequestId !== currentRequestIdRef.current) return;
       setError(e.message);
@@ -441,14 +440,13 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     try {
       let stagingId = attachStagingId;
       if (attachFile && !stagingId) {
-        const tokenRes = await fetch('/api/workbench/consultant-feedback/upload-token', {
+        const { ok: tokenOk, data: tokenData } = await requestEnvelope('/api/workbench/consultant-feedback/upload-token', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestId, filename: attachFile.name, contentType: attachFile.type, size: attachFile.size }),
+          body: { requestId, filename: attachFile.name, contentType: attachFile.type, size: attachFile.size },
+          tolerantBody: true,
         });
-        const tokenData = await tokenRes.json().catch(() => ({}));
         if (stale()) return;
-        if (!tokenRes.ok || !tokenData.ok) throw new Error(tokenData.error || 'Could not prepare the attachment upload.');
+        if (!tokenOk || !tokenData.ok) throw new Error(tokenData.error || 'Could not prepare the attachment upload.');
         const { put } = await import('@vercel/blob/client');
         await put(tokenData.pathname, attachFile, {
           access: 'private',
@@ -481,40 +479,37 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
           && original.oneOffName === nextOneOffName
           && original.oneOffAffiliation === nextOneOffAffiliation;
 
-        const res = await fetch('/api/workbench/consultant-feedback', {
+        const { ok: patchOk, status: patchStatus, data } = await requestEnvelope('/api/workbench/consultant-feedback', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             id: editingId,
             requestId,
             ...(authorUnchanged ? {} : author),
             bodyHtml: form.bodyHtml,
             receivedOn: form.receivedOn,
             shared: form.shared,
-          }),
+          },
+          tolerantBody: true,
         });
-        const data = await res.json().catch(() => ({}));
         if (stale()) return;
-        if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
+        if (!patchOk) throw new Error(data.error || `Save failed (${patchStatus})`);
 
         if (attachFile && stagingId) {
-          const finalizeRes = await fetch('/api/workbench/consultant-feedback/finalize', {
+          await requestJson('/api/workbench/consultant-feedback/finalize', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requestId, stagingId, entryId: editingId }),
+            body: { requestId, stagingId, entryId: editingId },
+            tolerantBody: true,
+            fallbackMessage: 'The attachment could not be saved.',
           });
-          const finalizeData = await finalizeRes.json().catch(() => ({}));
           if (stale()) return;
-          if (!finalizeRes.ok) throw new Error(finalizeData.error || 'The attachment could not be saved.');
         }
       } else if (attachFile) {
         // Attachment-only (or attachment + body) create: the row does not
         // exist yet, so finalize creates it via `writeFeedbackEntry` with
         // `requestdocumentId` already bound — no separate POST.
-        const finalizeRes = await fetch('/api/workbench/consultant-feedback/finalize', {
+        await requestJson('/api/workbench/consultant-feedback/finalize', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             requestId,
             stagingId,
             newEntry: {
@@ -525,27 +520,26 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
               shared: form.shared,
               consultantName: consultantDisplayName(form, consultants),
             },
-          }),
+          },
+          tolerantBody: true,
+          fallbackMessage: 'The attachment could not be saved.',
         });
-        const finalizeData = await finalizeRes.json().catch(() => ({}));
         if (stale()) return;
-        if (!finalizeRes.ok) throw new Error(finalizeData.error || 'The attachment could not be saved.');
       } else {
-        const res = await fetch('/api/workbench/consultant-feedback', {
+        const { ok: createOk, status: createStatus, data } = await requestEnvelope('/api/workbench/consultant-feedback', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             requestId,
             mutationId: mutationIdRef.current,
             ...author,
             bodyHtml: form.bodyHtml,
             receivedOn: form.receivedOn,
             shared: form.shared,
-          }),
+          },
+          tolerantBody: true,
         });
-        const data = await res.json().catch(() => ({}));
         if (stale()) return;
-        if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
+        if (!createOk) throw new Error(data.error || `Save failed (${createStatus})`);
       }
 
       // Confirmed success: clear saving and rotate the mutation id/close the
@@ -573,19 +567,18 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     setDeletingId(id);
     const fetchId = fetchIdRef.current;
     try {
-      const res = await fetch('/api/workbench/consultant-feedback', {
+      const { ok, status, data } = await requestEnvelope('/api/workbench/consultant-feedback', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, requestId }),
+        body: { id, requestId },
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
       if (fetchId !== fetchIdRef.current) {
         // Same wedge risk as handleSave: clear the busy flag for a stale
         // generation instead of leaving "Deleting…" stuck.
         setDeletingId(null);
         return;
       }
-      if (!res.ok) {
+      if (!ok) {
         if (data.reason === 'attachment_removal_pending') {
           // §3.6 step 1 already committed: the entry is gone from every
           // `active` reader (the reload below will not show it — and the
@@ -597,7 +590,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
           await load();
           return;
         }
-        throw new Error(data.error || `Delete failed (${res.status})`);
+        throw new Error(data.error || `Delete failed (${status})`);
       }
       setConfirmingDeleteId(null);
       await load();
