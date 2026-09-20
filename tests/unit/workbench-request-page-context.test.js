@@ -157,3 +157,46 @@ test.each([false, undefined])('rejects a matching context without success=true (
   expect(screen.getByTestId('reviewers')).toHaveAttribute('data-can-manage', 'false');
   expect(screen.getByText(/Couldn’t load request details/)).toBeInTheDocument();
 });
+
+// ── T5 (client-request-layer Stage 5a, plan §5) matrix for the :127
+// resolve-request GET, ahead of migrating it onto requestEnvelope
+// (differing derivation: the fallback message is templated with the status
+// code, so it cannot go through requestJson's static fallbackMessage). ────
+
+test('T5(b) non-2xx with no body error falls back to the status-templated message, as today', async () => {
+  render(<WorkbenchRequest />);
+  await act(async () => {
+    pending.get('/api/workbench/resolve-request?requestId=request-a')({
+      ok: false, status: 503, json: async () => ({}),
+    });
+  });
+  await waitFor(() => expect(screen.getByText(/Failed to load request \(503\)/)).toBeInTheDocument());
+});
+
+test('T5(c) network rejection surfaces its own message, as today', async () => {
+  render(<WorkbenchRequest />);
+  await act(async () => {
+    pending.get('/api/workbench/resolve-request?requestId=request-a')(Promise.reject(new Error('network down')));
+  });
+  await waitFor(() => expect(screen.getByText(/network down/)).toBeInTheDocument());
+});
+
+test('T5(d) malformed 2xx body (tolerant) is treated as a mismatched context, as today', async () => {
+  render(<WorkbenchRequest />);
+  await act(async () => {
+    pending.get('/api/workbench/resolve-request?requestId=request-a')({
+      ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); },
+    });
+  });
+  await waitFor(() => expect(screen.getByText(/Request context did not match the requested request/)).toBeInTheDocument());
+});
+
+test('T5(e) unparseable non-2xx body (e.g. a 502 HTML page) falls back to the status-templated message, as today', async () => {
+  render(<WorkbenchRequest />);
+  await act(async () => {
+    pending.get('/api/workbench/resolve-request?requestId=request-a')({
+      ok: false, status: 502, json: async () => { throw new SyntaxError('<html>Bad gateway</html>'); },
+    });
+  });
+  await waitFor(() => expect(screen.getByText(/Failed to load request \(502\)/)).toBeInTheDocument());
+});
