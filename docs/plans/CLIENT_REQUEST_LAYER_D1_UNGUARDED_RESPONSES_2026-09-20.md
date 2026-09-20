@@ -217,9 +217,8 @@ at the policies and prompts sites) were updated to `Request failed (502)`,
 consistent with owner decision D3. Gates at `0bd8d81d`: `npm test` 1001 suites /
 14986 tests green; lint 0 errors; `check:types` clean.
 
-Remaining D1 sites by stage: Stage 4 (InviteEmailModal :292, ReviewerFindPanel
-:281, ReviewersTab :210, useReviewerPromotion :188 per census) after Stage 4
-acceptance; Stage 5a (dynamics-explorer :153, virtual-review-panel :1030) and
+Remaining D1 sites by stage: Stage 4 batch DONE (see §11; useReviewerPromotion
+:188 was guarded-elsewhere); Stage 5a (dynamics-explorer :153, virtual-review-panel :1030) and
 5b (scheduled-emails :59, :61, campaign-critical, Tier 2) after theirs. D9's
 other three sites ride with Stage 5a.
 
@@ -287,3 +286,24 @@ resolve.
 Remaining D1 sites: Stage 5a (`dynamics-explorer :153`, `virtual-review-panel
 :1030`) and 5b (`scheduled-emails :59, :61`, campaign-critical, Tier 2) after
 their stages; D9's three pages after Stage 5a.
+
+### Stage 4 batch fresh review (Opus, no inherited context) — READY; accepted 2026-09-20 at `fc3760edb`
+
+Confirmed: request init unchanged at all six sites; every 2xx-success path
+byte-identical; each new branch reaches a pre-existing surface
+(`ReviewerFindPanel` `lookupMsg` warn; `ReviewersTab` `setError` banner;
+`RespondReminderModal`/`ReviewReminderAction` `uncertain` feedback with copy
+verbatim from their catch blocks; `ReviewerDueDateEditor` throws into its own
+catch, whose `outcome`/`detail` handling pre-existed). No 401/403 leak: the
+orcid-lookup and my-candidates routes sit behind `requireAppAccess` and the
+host page behind `RequireAppAccess`, so a denied user never reaches them. D10
+sentinel fires only on a 2xx parse failure and is checked before any
+`data.reason`/`data.saved` read; `send_unconfirmed` still takes the
+pre-existing `uncertain` branch. Both send routes always return JSON on 2xx, so
+`uncertain` cannot hide a genuine failure; the due-date editor still withholds
+`onSaved()`. `useReviewerPromotion :188` confirmed guarded-elsewhere.
+
+Clarifications recorded: the `InviteEmailModal` invite-timing fix is a guard
+(the non-2xx body is no longer applied; nothing is shown), not a surfacing;
+the `ReviewersTab` banner's Retry re-fetches reviewers, not candidates
+(pre-existing affordance, not rewired).
