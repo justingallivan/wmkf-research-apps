@@ -1284,3 +1284,10 @@ valid load below).
   `{ error: 'Test email failed', outcome: 'failed' }` (`pages/api/test-email.js:64-70`)
   and the page rendered that body's `error` — the axis (b) path, no hang, no
   raw text. No mail was sent (by design in this venue).
+- Step 9 (Tier 2 additions from the Stage 5 review: `PreSiteDistributionPanel`
+  prepare/preview and `ReviewsTab` reminder): **recorded as test-covered**
+  (owner + orchestrator, 2026-09-20). The only ZZTEST request with a reviewer
+  (1003222) has moved to Final Writeup (Share action gone) and its reviewer
+  has submitted (no reminder row); inviting/accepting a new reviewer needs
+  production writes. Both files' T5 matrices (axes a–e, request bytes on
+  every POST) were mutation-verified in the Stage 5 fresh review, item 2.
