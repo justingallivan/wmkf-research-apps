@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 /**
  * Superuser-managed safeguards for the Dynamics Explorer query surface.
@@ -11,9 +12,10 @@ export default function DynamicsExplorerRestrictionsSection({ userProfileId }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/dynamics-explorer/restrictions')
-      .then((response) => response.json())
-      .then((data) => {
+    // D1 PRESERVE: no ok check today; the body is used regardless of status
+    // (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+    requestEnvelope('/api/dynamics-explorer/restrictions')
+      .then(({ data }) => {
         setRestrictions(data.restrictions || []);
         setLoading(false);
       })
@@ -22,12 +24,13 @@ export default function DynamicsExplorerRestrictionsSection({ userProfileId }) {
 
   const addRestriction = async () => {
     if (!newRestriction.table_name) return;
-    const response = await fetch('/api/dynamics-explorer/restrictions', {
+    // D1 PRESERVE: no ok check today; `data.restriction` is read regardless
+    // of status.
+    const { data } = await requestEnvelope('/api/dynamics-explorer/restrictions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newRestriction, userProfileId }),
+      body: { ...newRestriction, userProfileId },
     });
-    const data = await response.json();
     if (data.restriction) {
       setRestrictions((previous) => [...previous, data.restriction]);
       setNewRestriction({ table_name: '', field_name: '', reason: '' });
@@ -35,10 +38,13 @@ export default function DynamicsExplorerRestrictionsSection({ userProfileId }) {
   };
 
   const removeRestriction = async (id) => {
-    await fetch('/api/dynamics-explorer/restrictions', {
+    // D1 PRESERVE: the body is never read today; tolerantBody keeps a 2xx
+    // with an empty body from becoming a new rejection (plan §6 Stage 3).
+    await requestEnvelope('/api/dynamics-explorer/restrictions', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, userProfileId }),
+      body: { id, userProfileId },
+      tolerantBody: true,
     });
     setRestrictions((previous) => previous.filter((restriction) => restriction.id !== id));
   };

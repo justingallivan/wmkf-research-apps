@@ -53,7 +53,7 @@ describe('DynamicsExplorerRestrictionsSection', () => {
       }));
       render(<DynamicsExplorerRestrictionsSection userProfileId="u1" />);
       expect(await screen.findByText('contact')).toBeInTheDocument();
-      expect(global.fetch).toHaveBeenCalledWith('/api/dynamics-explorer/restrictions');
+      expect(global.fetch.mock.calls[0][0]).toBe('/api/dynamics-explorer/restrictions');
     });
 
     test('(b) non-2xx {error} is read regardless of status (D1 silent)', async () => {
