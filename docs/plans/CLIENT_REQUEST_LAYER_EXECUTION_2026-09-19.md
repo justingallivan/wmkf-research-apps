@@ -1459,3 +1459,16 @@ and ~2.6k docs; runtime is ~2.0k added / 1.4k removed across 101 files.
 Recorded as corroboration; the substantive assurance remains the per-stage
 fresh reviews (full source diffs, characterization runs, mutation checks)
 and Gate G. Owner declined further scoped Codex runs.
+
+## Release — owner decision "merge" (2026-09-20)
+
+Pre-merge per plan §7: `origin/main` had advanced by the docs-only handoff
+banner (`01ccf78f5`); merged into the branch (`1a19fc380`, clean; the four
+docs files were byte-identical on both sides). Gate G rerun on the merged head:
+every `check:*` gate + self-test green (RED count 0), lint 0 errors, types
+clean, **1042 suites / 15430 tests**, build compiled
+(`scratchpad/gates-premerge.log`). Rollback target: production deployment
+`wmkfresearchapps-kwgubwobw` (docs-only build of `01ccf78f5`, runtime identical
+to `ocl7vs3ux` / `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki`). Promotion: merge commit
+(no squash) of `feature/client-request-layer` into `main`, pushed; post-deploy
+smoke recorded below when done.
