@@ -807,3 +807,57 @@ pass. Commits (test/refactor): 65fd3b4a/83a74502, a9eeb5de8/55c3cf166,
 dba965df3/55a64325b, 9cbfdd367/1ba67d6da, d5671d940/959abd521,
 b5dd79218/b18cb2981, 5de279a62/a8b072848, 5d7c3bd79 (SSE comments),
 3bbc98282/86477449b, b917cc550 (test fix).
+
+### Group A: modals and panels (logged 2026-09-20; fresh review pending)
+
+11 files, 27 JSON sites migrated (all `requestEnvelope`, `tolerantBody: true`,
+except `ReviewerInvitePanel.js:249` VIP GET → `requestJson` strict, matching its
+bare `.json()`, and `ReviewerManagePanel.js:~743` updateStatus PATCH, see below).
+Allowlisted raw sites with the §2.6 comment: `InviteEmailModal.js` send-emails
+(SSE via `reviewers/sse.js`), `ReviewerInvitePanel.js:357` (blob export),
+`ReleaseMaterialsModal.js` send-emails (SSE `getReader`). D1-preserve:
+`InviteEmailModal.js:292` invite-timing GET untouched; :706 sticky save kept
+best-effort.
+
+One-site files (AcceptedReviewerReleaseModal preview POST, ReviewerCloseoutModal
+close-review, ReviewReminderAction send-review-reminder, ReviewerDueDateEditor
+review-due-extension): status-interpolated fallbacks kept via `envelope.status`.
+RespondReminderModal (preview, send; `send_unconfirmed` → `uncertain` and catch
+→ `uncertain` preserved), RemoveEntirelyModal (preflight GET, DELETE),
+ReleaseEmailModal (render-withdraw-emails, withdraw-sufficient), ReleaseMaterialsModal
+(4), ReviewerInvitePanel (VIP PUT/DELETE/PATCH tolerant), InviteEmailModal (7
+tolerant), ReviewerManagePanel (regenerate/revoke-token, my-candidates DELETE,
+reviewers PATCH, 2× terminal-transition).
+
+`ReviewerManagePanel.js` updateStatus PATCH: pre-image was a bare `.json()`
+whose own catch shows "Invalid response from the server (HTTP {status})." for a
+malformed body at ANY status, reading `response.status` inside the catch.
+Reproduced with a function-form `tolerantBody: () => MALFORMED_BODY` sentinel
+(keeps `envelope.status` on a malformed 2xx) plus rule (ii) mapping of
+`envelope.error?.parseError` for the non-2xx case. The axis-(e) T4 test caught
+the missing non-2xx half in the first draft.
+
+Tests added ≈112: extensions to the existing modal/action tests
+(reviewer-action-lifetimes, reviewer-status-mutation-characterization,
+reviewer-invite-panel-vip-toggle, reviewer-manage-proposal-attachment, and the
+one-site files' tests); new `reviewer-invite-panel-remove-restore.test.js` and
+`invite-email-modal-t4-matrix.test.js` (markManualInviteSent,
+requestAddressRepair, handleSaveAbstract had no coverage). Two first-draft
+pins were corrected against source before commit (malformed 2xx VIP PUT and
+render-emails bodies are NOT error states: those sites read the body only on
+`!ok`).
+
+Process notes: a shared-index race let group B's `a9eeb5de` sweep four of
+group A's staged test files into its commit (content correct; attribution off;
+history not rewritten). The orchestrator's stash misfire (see the memory note)
+briefly blocked a commit with an unrelated conflict; cleaned up.
+
+Gates at `6ac0e51c`: `npm test` 1007 suites / 15070 tests green; lint 0
+errors; `check:types` clean; `check:reviewer-engagement-boundary` + self-test
+pass; `npm run build` compiled. Commits: a9eeb5de (shared), 435ba78a, 0a6d65d2,
+ab29913c, d11647ae, 856a135e, fe293a62, 3aa7b84b, f878d44d, 6ac0e51c.
+
+**Stage 4 totals:** 64 JSON sites migrated across 23 files; 8 SSE/blob sites
+allowlisted; 4 D1-preserve sites carried; T4 tests added ≈180. Fresh review,
+full Gate G, and the Tier 2 preview rehearsal (owner authorized the branch push
+2026-09-20) pending below.
