@@ -1,4 +1,165 @@
-# Session 528 Prompt: Executor cache telemetry read; post-fix cross-document read still pending
+# Session 529 Prompt: Client Request Layer complete on branch; owner merge decision + D1 remainder
+
+## Session 528 Summary
+
+[VERIFIED via source, per-stage fresh Opus reviews, Gate G logs, owner browser
+click-throughs, `vercel env ls`/`vercel inspect`, Git] Session 528 (an
+overnight-into-afternoon orchestration: Fable orchestrating, Sonnet building,
+Opus reviewing fresh per stage, Codex adversarial on the plan) planned and
+built the **Client Request Layer** refactor end to end on
+`feature/client-request-layer` (~286 commits since `origin/main` `e269756ac`):
+`shared/utils/api-request.js` (`requestJson` / `requestEnvelope`) now carries
+every client JSON `fetch` in `shared/components/**` and `pages/**`
+(non-api); the 26 remaining raw `fetch(` sites are the §2.6 allowlist (21 SSE
+streams, 3 blob downloads, 2 beacons), each annotated, and an ESLint
+`no-restricted-syntax` ratchet (`eslint.config.mjs`, T6 fixture test) keeps
+it that way. Plan status is `complete`. **Nothing is merged to `main`; the
+branch carries Tier 2 work (Stages 4 and 5b), so merge is an explicit owner
+decision.**
+
+### What Was Completed
+
+1. **Plan + adversarial review** — `docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md`
+   (Codex 3 cycles on gpt-5.6-sol; owner decisions 1–6 recorded), execution log
+   `docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md` (census, per-stage
+   logs, fresh-review receipts, acceptances, rehearsal records).
+2. **Stages 0–6 built and accepted** (Stage 0 `e65b03a0`, 1 `c3a84a41`, 2
+   `3472bcbc`, 3 `a1aaec80`, 4 code `d82f24df4`, 5 accepted at `976458f9a`+
+   `135f11d9e`, 6 accepted at `9f64a364a`). Gate G at `c9dd84e2e`: every
+   `check:*` gate + self-test green, lint 0 errors, types clean, **1042 suites /
+   15430 tests**, build compiled.
+3. **Tier 2 rehearsals recorded** — Stage 4: owner click-through on localhost
+   (release, closeout passed; due date test-covered). Stage 5b: scheduled-emails
+   and test-email passed on the preview; token pages and pre-site/Reviews-tab
+   previews recorded test-covered (owner decision) because the preview's
+   `EXTERNAL_LINK_SECRET` differs from production's and the workbench manage
+   controls are hidden on preview. See memory
+   `project-preview-rehearsal-venue-limits`.
+4. **Defects found and fixed along the way** — StrictMode cleanup-only
+   `mountedRef` guard hung dialogs in dev (`1ce5587c9`, three components,
+   StrictMode pin); release dialogs' `write_failed` copy now names the cause
+   and a recovery ladder via a server `failure` code (owner-approved sentences;
+   `896796ed`, `ba3741db`, `250e7b9c`, `a41d3716`); `terminal-transition.js`
+   no longer forwards raw upstream error text; pre-site reissue per-code
+   fallbacks (`4462f05d`); D1/D10 admin and Stage 4 batches (accepted).
+5. **Preview environment for the branch** (owner-authorized): alias
+   `wmkfresearchapps-preview.vercel.app` → `wmkfresearchapps-6l5suly2f`;
+   branch-scoped preview env `NEXTAUTH_URL`, `DATAVERSE_ALLOW_PROD_READS=yes`,
+   `DELIBERATION_BRIEFING_SCHEMA_READY=on`. Rollback commands in the execution
+   log ("Stage 4 rehearsal setup").
+6. **Production rollback record** (refreshed 2026-09-20 15:30 PT):
+   `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki` (`wmkfresearchapps-ocl7vs3ux`, aliases
+   `reviews.wmkeck.org`, `grantees.wmkeck.org`; `origin/main` `e269756ac`).
+
+### Commits
+- ~286 on `feature/client-request-layer`; see `git log --oneline e269756ac..origin/feature/client-request-layer`
+  and the per-stage commit lists in the execution log. Docs-only banner commit on `main` for this handoff.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Merge `feature/client-request-layer` to `main`** (Tier 2 promotion).
+   Evidence: plan `status: complete`; Gate G green at `c9dd84e2e`; execution
+   log "Stage 6 acceptance". Before merging: `git fetch`, confirm `origin/main`
+   is still `e269756ac` (if it advanced, merge main into the branch and rerun
+   Gate G per plan §7); record the production deployment id again; merge with a
+   merge commit (not squash — the execution log cites hashes); watch the Vercel
+   production build; smoke the workbench release dialog and one external token
+   page in production. Rollback = redeploy `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki`.
+2. **Preview env cleanup** after merge or abandonment: `vercel alias rm
+   wmkfresearchapps-preview.vercel.app`; `vercel env rm <NEXTAUTH_URL |
+   DATAVERSE_ALLOW_PROD_READS | DELIBERATION_BRIEFING_SCHEMA_READY> preview
+   feature/client-request-layer`. Owner call (the flags grant prod reads).
+3. **`ReviewerManagePanel.js:884` alert path** still shows the literal
+   `write_failed` status word (Stage 6 review finding 3); the `failure` code is
+   on the same row. Route it through the same cause/recovery copy, or record the
+   asymmetry as deliberate.
+4. **`SessionAgendaPanel.js` send**: a 409 `agenda_send_unresolved` renders the
+   "Send status is uncertain" banner although it is a definite refusal
+   (pre-existing; execution log deviation (6) closure). Decide whether to
+   reclassify as `failed`.
+
+### Verified Open
+
+1. **D1 remainder** (owner priority 2026-09-20). Evidence:
+   `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` §11
+   "Remaining D1 sites"; `docs/CURRENT_WORK_QUEUE.md` row 13. Sites:
+   `pages/dynamics-explorer.js:153`, `pages/virtual-review-panel.js:1030`
+   (Tier 1); `pages/scheduled-emails.js:59,61` (Tier 2); D9 `ErrorAlert`
+   `message=` → `error=` at `dataverse-bulk-export.js:471`,
+   `virtual-review-panel.js:1296`, `phase-i-dynamics.js:152`. Fix pattern in §4;
+   tests-first; fresh review; do it on the feature branch if unmerged, else on a
+   new branch.
+2. **O4 observation** (execution log ~:707): ~16 sites keep the
+   `parseError` rethrow idiom (old bare-`.json()` behavior) while others took
+   D3's fallback text. Owner may want one policy; today both are within the bar.
+3. **Five-code `failure` vocabulary duplicated** in two services and two modals
+   (Stage 6 review finding 4). Add a shared constant + parity check if a sixth
+   code ever appears; not needed today.
+4. **SSE consolidation** — named sibling plan in plan §1; two parsers exist
+   (`shared/utils/sse-stream.js`, `shared/components/reviewers/sse.js`).
+
+### Parked
+
+1. Session 527/528-prompt items (Executor cache telemetry cross-document read,
+   Test Request Factory) — untouched this session; see the historical Session
+   528 prompt below for their evidence and state.
+
+### Verify Before Acting
+
+1. Any "delete `readJsonBody`" impulse: it is exported with no live caller by
+   design (plan: keep exports); its tests pin it. Verify callers before removal.
+2. The preview alias points at build `6l5suly2f` (branch head `a41d37162`),
+   not the final branch head; the git-integration build for later pushes was
+   not re-aliased. Re-alias before any further preview click-through.
+
+### Do Not Reopen Without New Decision
+
+1. D3 (fallback text, never raw parse text, on non-2xx unparseable) — accepted.
+2. Steps 3–6 and 9 of the 5b rehearsal recorded test-covered; production link
+   secret was deliberately NOT copied into the preview.
+3. Release-dialog `write_failed` sentences — owner-approved verbatim
+   2026-09-20 ("approve").
+4. Deviation (6) — closed (pre-site fallbacks; agenda-send claim corrected).
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `shared/utils/api-request.js` | The helper: `requestJson`, `requestEnvelope`, `readJsonBody`, `deriveErrorMessage`, `ApiRequestError` |
+| `eslint.config.mjs` | Closeout ratchet block (`no-restricted-syntax` on raw `fetch(`) |
+| `tests/unit/eslint-no-raw-fetch-ratchet.test.js` | T6 fixture proving the rule's scope and site-level exemption |
+| `docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md` | Plan (status complete), §2.6 allowlist (26 sites), D-ledger |
+| `docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md` | Per-stage logs, review receipts, rehearsals, rollback record |
+| `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` | D1 cold-start handoff and remaining sites |
+| `.claude-memory/project-preview-rehearsal-venue-limits.md` | What preview vs localhost can exercise; StrictMode guard hazard |
+
+## Testing
+
+```bash
+npx jest tests/unit/api-request.test.js tests/unit/eslint-no-raw-fetch-ratchet.test.js tests/unit/client-request-stage1-adapters.test.js
+npm run lint            # 0 errors expected; raw fetch outside the allowlist is an error
+npx jest --silent       # 1042 suites / 15430 tests at c9dd84e2e
+```
+
+## Stop-time notes
+
+Claim-evidence pilot: current-session report shows zero advisory events and
+no eligible plan/design edit recorded, so no observation row was added. No
+DEVELOPMENT_LOG entry: the refactor is complete on the branch but not merged
+or deployed; write the milestone entry when the owner merges. Session docs
+were committed on the feature branch and mirrored as a docs-only commit on
+`main` (per `feedback-feature-branch-handoff-lands-on-main`), written from a
+temporary worktree so the owner's running dev server on the branch checkout
+was not disturbed.
+
+## Historical handoffs — not current instructions
+
+Everything below preserves prior-session evidence. The Session 529 guidance above
+controls current next steps.
+
+## Prior Session 528 Prompt: Executor cache telemetry read; post-fix cross-document read still pending
 
 ## Session 527 Summary
 
