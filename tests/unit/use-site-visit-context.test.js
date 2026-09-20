@@ -94,3 +94,19 @@ test('does not fetch without a requestId', async () => {
   expect(global.fetch).not.toHaveBeenCalled();
   expect(screen.getByTestId('context').textContent).toBe('null');
 });
+
+// T5 gap-fill (Stage 5a): network rejection and axis (e) — a non-2xx
+// response whose body cannot be parsed — both stay fail-open, never throw.
+test('fails open on a network rejection', async () => {
+  global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
+  render(<Harness requestId={REQUEST_ID} />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+  expect(screen.getByTestId('context').textContent).toBe('null');
+});
+
+test('axis (e): fails open on a non-2xx unparseable body', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: () => Promise.reject(new SyntaxError('Unexpected token <')) });
+  render(<Harness requestId={REQUEST_ID} />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+  expect(screen.getByTestId('context').textContent).toBe('null');
+});
