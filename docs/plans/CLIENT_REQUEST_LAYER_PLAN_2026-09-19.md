@@ -2,7 +2,7 @@
 title: Client Request Layer Migration Plan
 domain: platform
 kind: plan
-status: draft
+status: active
 summary: Staged introduction of one shared client-side JSON request helper and migration of the raw fetch call sites in client components and pages onto it, preserving each call site's visible error behavior except owner decision D3 on non-2xx non-JSON bodies.
 canonical: false
 owner: product-engineering
