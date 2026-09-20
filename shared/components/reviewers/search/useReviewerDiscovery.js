@@ -14,6 +14,7 @@ import {
 import { rankByRelevance } from '../../../../lib/utils/relevance-score';
 import { withReviewerProvenance } from '../../../../lib/utils/reviewer-provenance';
 import { dedupeByName } from './candidateKeys';
+import { requestJson } from '../../../utils/api-request';
 
 export default function useReviewerDiscovery({
   blobUrl,
@@ -265,22 +266,20 @@ export default function useReviewerDiscovery({
           const pruned = dedupedEnriched.map(pruneCandidateForRoster);
           const prunedEligible = pruned.filter((candidate) => candidate.eligibilityStatus !== 'deceased');
           const prunedIneligible = pruned.filter((candidate) => candidate.eligibilityStatus === 'deceased');
-          const rRes = await fetch('/api/workbench/reviewer-roster', {
+          await requestJson('/api/workbench/reviewer-roster', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requestId, candidates: pruned }),
+            tolerantBody: true,
+            fallbackMessage: 'reviewer-roster save failed',
           });
           if (genRef.current !== myGen) return; // newer search started — don't touch roster state
-          if (rRes.ok) {
-            // Merge into the existing active roster (prior runs persist), pruned
-            // DTOs deduped by normalized name.
-            setRosterActive((prev) => dedupeByName([...prunedEligible, ...prev]));
-            setRosterIneligible((prev) => dedupeByName([...prunedIneligible, ...prev]));
-            setRosterNames((prev) => Array.from(new Set([...prev, ...dedupedEnriched.map((c) => c.name)])));
-            setRosterNote(null);
-          } else {
-            setRosterNote("Couldn't save this search to the request — these candidates may re-appear on a future search.");
-          }
+          // Merge into the existing active roster (prior runs persist), pruned
+          // DTOs deduped by normalized name.
+          setRosterActive((prev) => dedupeByName([...prunedEligible, ...prev]));
+          setRosterIneligible((prev) => dedupeByName([...prunedIneligible, ...prev]));
+          setRosterNames((prev) => Array.from(new Set([...prev, ...dedupedEnriched.map((c) => c.name)])));
+          setRosterNote(null);
         } catch {
           if (genRef.current === myGen) setRosterNote("Couldn't save this search to the request — these candidates may re-appear on a future search.");
         }
