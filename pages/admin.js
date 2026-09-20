@@ -2705,9 +2705,10 @@ function HonorariumAmountSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/honorarium-amount');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      const envelope = await requestEnvelope('/api/admin/honorarium-amount');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      const data = envelope.data;
       setAmount(String(data.amount ?? ''));
       setIsDefault(!!data.isDefault);
       setMalformed(!!data.malformed);
@@ -2726,13 +2727,12 @@ function HonorariumAmountSection() {
     try {
       const n = Number(String(amount).trim());
       if (!Number.isFinite(n) || n <= 0) throw new Error('Enter a positive number');
-      const res = await fetch('/api/admin/honorarium-amount', {
+      const envelope = await requestEnvelope('/api/admin/honorarium-amount', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: n }),
+        body: { amount: n },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Save failed');
       setSavedAt(new Date());
       await load();
     } catch (e) {
@@ -2798,10 +2798,10 @@ function ReviewerReleaseAttachmentsSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/review-manager/release-settings');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
-      setEnabled(!!data.attachProposalEmail);
+      const envelope = await requestEnvelope('/api/review-manager/release-settings');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      setEnabled(!!envelope.data.attachProposalEmail);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -2816,14 +2816,13 @@ function ReviewerReleaseAttachmentsSection() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/review-manager/release-settings', {
+      const envelope = await requestEnvelope('/api/review-manager/release-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachProposalEmail: next }),
+        body: { attachProposalEmail: next },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Save failed');
-      setEnabled(!!data.attachProposalEmail);
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Save failed');
+      setEnabled(!!envelope.data.attachProposalEmail);
       setSavedAt(new Date());
     } catch (e) {
       setError(e.message);
@@ -2879,9 +2878,10 @@ function ReviewerCampaignTimelineSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/review-manager/campaign-timeline-defaults');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      const envelope = await requestEnvelope('/api/review-manager/campaign-timeline-defaults');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      const data = envelope.data;
       setTimeline({
         cycleLabel: data.timeline?.cycleLabel || '',
         inviteStartDate: data.timeline?.inviteStartDate || '',
@@ -2921,19 +2921,18 @@ function ReviewerCampaignTimelineSection() {
       const desiredCount = timeline.desiredCount === ''
         ? null
         : Number(timeline.desiredCount);
-      const res = await fetch('/api/review-manager/campaign-timeline-defaults', {
+      const envelope = await requestEnvelope('/api/review-manager/campaign-timeline-defaults', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           timeline: {
             ...timeline,
             respondOffsetDays,
             desiredCount,
           },
-        }),
+        },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Save failed');
       setSavedAt(new Date());
       await load();
     } catch (e) {
@@ -3056,9 +3055,10 @@ function ReviewerTimeBudgetSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/reviewer-time-budget');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      const envelope = await requestEnvelope('/api/admin/reviewer-time-budget');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      const data = envelope.data;
       setSeconds(String(data.seconds ?? ''));
       setIsDefault(!!data.isDefault);
       setMalformed(!!data.malformed);
@@ -3078,13 +3078,12 @@ function ReviewerTimeBudgetSection() {
     try {
       const n = Number(String(seconds).trim());
       if (!Number.isFinite(n) || n <= 0) throw new Error('Enter a positive number of seconds');
-      const res = await fetch('/api/admin/reviewer-time-budget', {
+      const envelope = await requestEnvelope('/api/admin/reviewer-time-budget', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seconds: n }),
+        body: { seconds: n },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Save failed');
       setSavedAt(new Date());
       await load();
     } catch (e) {
