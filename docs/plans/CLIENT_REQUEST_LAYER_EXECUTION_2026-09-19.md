@@ -1272,4 +1272,9 @@ valid load below).
   mappings) were read and confirmed clean in the Stage 5 fresh review, item
   E. The production link secret was NOT copied into the preview.
 - Steps 5–6 (grantee, materials): test-covered per the decision above.
-  Steps 7–8 (`scheduled-emails`, `test-email`) pending owner.
+- Step 7 (`pages/scheduled-emails.js`, preview host): **PASSED** [owner]. The
+  three load requests (list, automation preferences, VIP flags) all settled:
+  empty state "No scheduled emails" rendered, the review-every-email
+  preference toggle rendered with a value, no error banner. The queue was
+  empty, so the per-message detail and action paths remain test-covered.
+- Step 8 (`pages/test-email.js`): pending owner (sends real mail).
