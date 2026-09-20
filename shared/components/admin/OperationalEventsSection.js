@@ -23,6 +23,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '../Layout';
 import { groupOperationalEvents } from '../../utils/operational-event-grouping';
+import { requestEnvelope } from '../../utils/api-request';
 
 const freshness = (event) => ({
   id: event.id,
@@ -64,8 +65,8 @@ export default function OperationalEventsSection() {
     if (filters.severityFilter) params.set('severity', filters.severityFilter);
     if (filters.sourceFilter) params.set('source', filters.sourceFilter);
     if (filters.search) params.set('search', filters.search);
-    fetch(`/api/admin/operational-events?${params.toString()}`)
-      .then(r => r.ok ? r.json() : null)
+    requestEnvelope(`/api/admin/operational-events?${params.toString()}`)
+      .then(({ ok, data }) => (ok ? data : null))
       .then(data => {
         if (gen !== fetchGenRef.current) return;
         setEvents(data?.events || []);
@@ -87,22 +88,24 @@ export default function OperationalEventsSection() {
     setActionResult(null);
     setBulkResult(null);
     try {
-      const res = await fetch('/api/admin/operational-events', {
+      // This site never reads a response body; tolerantBody keeps a 2xx
+      // empty body from becoming a new rejection (plan §6 Stage 3).
+      const { ok, status } = await requestEnvelope('/api/admin/operational-events', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           action,
           // Freshness precondition: the server refuses (409) if the row
           // changed since this list rendered, so a stale view can't close a
           // newly recurrent incident. A 409 just refetches the live state.
           ...freshness(event),
-        }),
+        },
+        tolerantBody: true,
       });
-      if (res.ok || res.status === 409) {
-        if (res.status === 409) setActionResult('Event changed since load; refreshed without applying the action.');
+      if (ok || status === 409) {
+        if (status === 409) setActionResult('Event changed since load; refreshed without applying the action.');
         fetchEvents();
       } else {
-        setActionResult(`Update failed (${res.status}). Reload the admin page and retry.`);
+        setActionResult(`Update failed (${status}). Reload the admin page and retry.`);
       }
     } catch {
       setActionResult('Update failed. Check the connection and retry.');
@@ -120,12 +123,11 @@ export default function OperationalEventsSection() {
     setBulkResult(null);
     setActionResult(null);
     try {
-      const res = await fetch('/api/admin/operational-events', {
+      const envelope = await requestEnvelope('/api/admin/operational-events', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'resolve', events: rows.map(freshness) }),
+        body: { action: 'resolve', events: rows.map(freshness) },
       });
-      const data = res.ok ? await res.json() : null;
+      const data = envelope.ok ? envelope.data : null;
       setBulkResult(data
         ? `Resolved ${data.updated} of ${data.requested}${data.stale ? ` · ${data.stale} changed since load (left open)` : ''}${data.notFound ? ` · ${data.notFound} not found` : ''}${data.invalid ? ` · ${data.invalid} invalid` : ''}${data.failed ? ` · ${data.failed} failed (retryable)` : ''}`
         : 'Bulk resolve failed');

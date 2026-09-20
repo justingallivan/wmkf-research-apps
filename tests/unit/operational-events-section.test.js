@@ -201,9 +201,9 @@ test('a batch completion refetches the current filters, not the filters captured
   fireEvent.change(screen.getByRole('combobox', { name: 'Status filter' }), {
     target: { value: 'resolved' },
   });
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-    expect.stringContaining('status=resolved'),
-  ));
+  await waitFor(() => expect(
+    global.fetch.mock.calls.some(([url]) => String(url).includes('status=resolved')),
+  ).toBe(true));
 
   finishPatch();
   await screen.findByText('Resolved 4 of 4');
