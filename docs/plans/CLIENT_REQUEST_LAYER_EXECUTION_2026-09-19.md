@@ -766,3 +766,44 @@ self-test 0 red; `npm test` 993 suites / 14885 tests green; lint 0 errors;
 Verdict: **Stage 3 ACCEPTED.** 62 admin sites migrated (30 sections + 32
 page); 4 workspace seams exported; tests added 215 (89 + 119 + 7). Stage 4
 (Tier 2) and the D1 trailing lane (admin batch) start next.
+
+## Stage 4 — reviewer engagement surface (Tier 2)
+
+### Group B: tabs, stores, search hooks (logged 2026-09-20; fresh review pending with group A)
+
+12 files, 37 sites migrated; 5 SSE sites confirmed by reading (response passed
+to `readSseStream`) and left raw with the §2.6 allowlist comment:
+`useReviewerPromotion.js` enrich-contacts (:62), `useReviewerDiscovery.js`
+analyze/discover/enrich-contacts (:76/:120/:191), `useApplicantReviewerEnrichment.js`
+enrich-recommended (:48).
+
+| File | Sites | Form | Tests added | Notes |
+|---|---|---|---|---|
+| `ReviewersTab.js` | 5 | envelope, tolerant | 9 (`reviewers-tab-t4-matrix.test.js`) | 409 + `data.lookup` and 200 + `{success:false}` pinned |
+| `ReviewerFindPanel.js` | 5 | envelope, tolerant | 6 | :281 orcid-lookup D1-preserved |
+| `CandidateEditModal.js` | 3 | envelope, tolerant | 4 | save PATCH now parses a body it never read; `{}` on malformed, unused on success |
+| `CampaignConfigModal.js` | 3 | envelope, tolerant | 6 | defaults GET best-effort swallow preserved |
+| `email-template-store.js` | 3 | envelope, tolerant | 8 | :109 best-effort preserved |
+| `prompt-override-store.js` | 3 | json strict (load/delete), envelope (save) | 10 | bare-`.json()` sites keep native parse rejection |
+| `search/useReviewerContactActions.js` | 8 | envelope, tolerant | 10 (new harness) | 409 + `{success:false, code, promotionAuthority}`, 200 + `{success:false}`, partial-success apply-before-throw pinned |
+| `search/useReviewerRosterActions.js` | 4 | json tolerant (exclude ×2, body discarded), envelope (promote, removePrevious) | 9 (new harness) | 409 `data.code` allowlist and `{success:false}` rollback pinned |
+| `search/useReviewerPromotion.js` | 3 of 4 | envelope, tolerant | 2 | :188 save-candidates D1-preserved |
+| `search/useReviewerDiscovery.js` | 1 of 4 | json, tolerant | 3 | roster-persist POST only |
+| `search/useApplicantReviewerEnrichment.js` | 0 of 1 | — | 0 | SSE, comment only |
+| `search/useReviewerRoster.js` | 1 | envelope, tolerant | 1 | |
+
+Parse-error policy: every migrated site was already `.json().catch(() => ({}))`
+pre-migration, so `tolerantBody: true` is identical on both 2xx and non-2xx;
+no axis-(e) change in this group. Two call-shape-only matcher fixes
+(`campaign-config-modal.test.js`, `reviewer-search-context-lifecycle.test.js`)
+for the explicit GET init, same precedent as Stage 3. Body assertion at
+`confirmIdentityContact` uses `toMatchObject` because `pruneCandidateForRoster`
+expands the candidate (pre-existing normalizer).
+
+Gates at `b917cc550`: `npm test` 1006 suites / 15043 tests green; lint 0
+errors; `check:types` clean; `check:reviewer-engagement-boundary` + self-test
+pass. Commits (test/refactor): 65fd3b4a/83a74502, a9eeb5de8/55c3cf166,
+7030631ce/81dd31ec9, 246b8e792/dfd7719b7, e4cf8a08b/811cb2a26,
+dba965df3/55a64325b, 9cbfdd367/1ba67d6da, d5671d940/959abd521,
+b5dd79218/b18cb2981, 5de279a62/a8b072848, 5d7c3bd79 (SSE comments),
+3bbc98282/86477449b, b917cc550 (test fix).
