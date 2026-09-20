@@ -3,7 +3,7 @@
  *
  * T3 (Stage 3) per-call-site contract matrix for the inline admin sections
  * reachable through `PeopleWorkspace` (pages/admin.js): RoleManagementSection
- * (:1583 D1 preserve, :1602 D1 preserve, :1619, :1642, view="roles"),
+ * (:1583 D1 fix, :1602 D1 fix, :1619, :1642, view="roles"),
  * AppAccessSection (:1788, :1888, :1896, :1953, view="app-access" — extends
  * tests/unit/app-access-admin-partial-refresh.test.js with the axes it does
  * not cover: initial 401/403, network rejection, malformed body), and
@@ -30,7 +30,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('RoleManagementSection (view="roles") — D1 preserve on :1583/:1602', () => {
+describe('RoleManagementSection (view="roles") — D1 fix on :1583/:1602', () => {
   test('(a) 2xx renders the roles table for a superuser', async () => {
     global.fetch = jest.fn((url) => {
       if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(200, { callerRole: 'superuser', roles: [{ id: 1, user_profile_id: 9, user_name: 'Ann', role: 'read_write' }] }));
@@ -50,13 +50,20 @@ describe('RoleManagementSection (view="roles") — D1 preserve on :1583/:1602', 
     expect(screen.queryByText('Assign')).not.toBeInTheDocument();
   });
 
-  test('(D1 preserve) a non-2xx, non-401/403 status with a parseable body is still read as if it were success (today\'s unguarded bug, pinned)', async () => {
+  test('(D1 fix) a non-2xx, non-401/403 {error} status now surfaces the server error message instead of being read as data', async () => {
     global.fetch = jest.fn((url) => {
-      if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(500, { callerRole: 'superuser', roles: [{ id: 1, user_profile_id: 9, user_name: 'Ann', role: 'read_write' }] }));
+      if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(500, { error: 'Roles table unavailable' }));
       return Promise.resolve(jsonResponse(200, { profiles: [] }));
     });
     render(<PeopleWorkspace view="roles" />);
-    expect(await screen.findByText('Ann')).toBeInTheDocument();
+    expect(await screen.findByText('Roles table unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Ann')).not.toBeInTheDocument();
+  });
+
+  test('(D1 fix) a non-2xx, non-401/403 unparseable body surfaces the fallback message', async () => {
+    global.fetch = jest.fn((url) => (url === '/api/dynamics-explorer/roles' ? Promise.resolve(malformedResponse(502)) : Promise.resolve(jsonResponse(200, { profiles: [] }))));
+    render(<PeopleWorkspace view="roles" />);
+    expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
   });
 
   test('(c) network rejection sets denied', async () => {
@@ -66,12 +73,6 @@ describe('RoleManagementSection (view="roles") — D1 preserve on :1583/:1602', 
     expect(screen.queryByText('Assign')).not.toBeInTheDocument();
   });
 
-  test('(e) an unparseable non-2xx, non-401/403 body still lands in denied, not silently treated as data', async () => {
-    global.fetch = jest.fn((url) => (url === '/api/dynamics-explorer/roles' ? Promise.resolve(malformedResponse(500)) : Promise.resolve(jsonResponse(200, { profiles: [] }))));
-    render(<PeopleWorkspace view="roles" />);
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    expect(screen.queryByText('Assign')).not.toBeInTheDocument();
-  });
 
   test('(d) malformed 2xx also lands in denied (strict-on-success)', async () => {
     global.fetch = jest.fn((url) => (url === '/api/dynamics-explorer/roles' ? Promise.resolve(malformedResponse(200)) : Promise.resolve(jsonResponse(200, { profiles: [] }))));
@@ -80,7 +81,7 @@ describe('RoleManagementSection (view="roles") — D1 preserve on :1583/:1602', 
     expect(screen.queryByText('Assign')).not.toBeInTheDocument();
   });
 
-  test('(:1602 D1) user-profiles bare .json() populates the assign dropdown; a malformed body is silently ignored (unchanged users), matching today\'s catch{}', async () => {
+  test('(:1602) user-profiles populates the assign dropdown on 2xx; a malformed 2xx body is silently ignored (unchanged), matching the existing catch{}', async () => {
     global.fetch = jest.fn((url) => {
       if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(200, { callerRole: 'superuser', roles: [] }));
       return Promise.resolve(malformedResponse(200));
@@ -89,6 +90,24 @@ describe('RoleManagementSection (view="roles") — D1 preserve on :1583/:1602', 
     await screen.findByText('No roles assigned yet.');
     expect(screen.getByText('Select user...')).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /@/ })).not.toBeInTheDocument();
+  });
+
+  test('(:1602 D1 fix) user-profiles non-2xx {error} now surfaces the server error message instead of being read as data', async () => {
+    global.fetch = jest.fn((url) => {
+      if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(200, { callerRole: 'superuser', roles: [] }));
+      return Promise.resolve(jsonResponse(500, { error: 'Profiles table unavailable' }));
+    });
+    render(<PeopleWorkspace view="roles" />);
+    expect(await screen.findByText('Profiles table unavailable')).toBeInTheDocument();
+  });
+
+  test('(:1602 D1 fix) user-profiles non-2xx unparseable body surfaces the fallback message', async () => {
+    global.fetch = jest.fn((url) => {
+      if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(200, { callerRole: 'superuser', roles: [] }));
+      return Promise.resolve(malformedResponse(502));
+    });
+    render(<PeopleWorkspace view="roles" />);
+    expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
   });
 
   test('(POST assign) sends exact body/method/headers; non-2xx bare .json() with fallback shows body.error', async () => {

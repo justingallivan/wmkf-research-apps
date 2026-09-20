@@ -45,7 +45,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('HealthSection (view="health") — GET /api/health, D1 preserve (no ok check)', () => {
+describe('HealthSection (view="health") — GET /api/health (D1 fix: unguarded response)', () => {
   test('(a) 2xx renders health data', async () => {
     mockFetchRouter([['/api/health', () => jsonResponse(200, { overall: 'ok', services: { database: { status: 'ok' } } })]]);
     render(<OperationsWorkspace view="health" />);
@@ -53,10 +53,11 @@ describe('HealthSection (view="health") — GET /api/health, D1 preserve (no ok 
     expect(await screen.findByText('1 service checked')).toBeInTheDocument();
   });
 
-  test('(b) D1: a non-2xx parseable body is still used as if it were success (today\'s unguarded bug, pinned)', async () => {
-    mockFetchRouter([['/api/health', () => jsonResponse(500, { overall: 'error', services: {} })]]);
+  test('(b) D1 fix: a non-2xx {error} body now surfaces the server error message, not the raw body as data', async () => {
+    mockFetchRouter([['/api/health', () => jsonResponse(500, { error: 'Database unreachable' })]]);
     render(<OperationsWorkspace view="health" />);
-    expect(await screen.findByText('0 services checked')).toBeInTheDocument();
+    expect(await screen.findByText('Database unreachable')).toBeInTheDocument();
+    expect(screen.getByText('0 services checked')).toBeInTheDocument();
   });
 
   test('(c) network rejection sets the error health state', async () => {
@@ -66,11 +67,11 @@ describe('HealthSection (view="health") — GET /api/health, D1 preserve (no ok 
     expect(await screen.findByText('error')).toBeInTheDocument();
   });
 
-  test('(e) D1: an unparseable non-2xx body still lands in the error catch, not silently as {}', async () => {
+  test('(e) D1 fix: an unparseable non-2xx body surfaces the fallback message, not the raw body as data', async () => {
     mockFetchRouter([['/api/health', () => malformedResponse(500)]]);
     render(<OperationsWorkspace view="health" />);
     await screen.findByText('Service Health');
-    expect(await screen.findByText('error')).toBeInTheDocument();
+    expect(await screen.findByText('Request failed (500)')).toBeInTheDocument();
   });
 
   test('(d) malformed 2xx body also lands in the error catch (strict-on-success)', async () => {
