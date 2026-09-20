@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { requestEnvelope } from '../../../shared/utils/api-request';
 import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../../shared/config/siteVisitMaterials';
 
 const REASON_MESSAGE = {
@@ -101,14 +102,17 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
     setError(null);
     setProgress('Checking the file…');
     try {
-      const finalizeRes = await fetch(`/api/external/materials/${encodeURIComponent(token)}/finalize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stagingId: pendingUpload.stagingId, slot }),
-      });
-      const result = await finalizeRes.json().catch(() => ({}));
-      if (!finalizeRes.ok) {
-        if (finalizeRes.status >= 400 && finalizeRes.status < 500 && finalizeRes.status !== 409) {
+      const { ok: finalizeOk, status: finalizeStatus, data: result } = await requestEnvelope(
+        `/api/external/materials/${encodeURIComponent(token)}/finalize`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: { stagingId: pendingUpload.stagingId, slot },
+          tolerantBody: true,
+        },
+      );
+      if (!finalizeOk) {
+        if (finalizeStatus >= 400 && finalizeStatus < 500 && finalizeStatus !== 409) {
           removePendingUpload(token, slot);
           setPending(null);
         }
@@ -142,13 +146,16 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
     setError(null);
     setProgress('Preparing…');
     try {
-      const tokenRes = await fetch(`/api/external/materials/${encodeURIComponent(token)}/upload-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slot, filename: file.name, contentType: file.type || 'application/octet-stream', size: file.size }),
-      });
-      const tokenData = await tokenRes.json().catch(() => ({}));
-      if (!tokenRes.ok) throw new Error(UPLOAD_MESSAGE[tokenData.reason] || REASON_MESSAGE[tokenData.reason] || 'The upload could not start.');
+      const { ok: tokenOk, data: tokenData } = await requestEnvelope(
+        `/api/external/materials/${encodeURIComponent(token)}/upload-token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: { slot, filename: file.name, contentType: file.type || 'application/octet-stream', size: file.size },
+          tolerantBody: true,
+        },
+      );
+      if (!tokenOk) throw new Error(UPLOAD_MESSAGE[tokenData.reason] || REASON_MESSAGE[tokenData.reason] || 'The upload could not start.');
       setProgress('Uploading…');
       const { put } = await import('@vercel/blob/client');
       await put(tokenData.pathname, file, { access: 'private', token: tokenData.clientToken, contentType: tokenData.contentType });
@@ -210,8 +217,15 @@ export default function MaterialsContributorPage() {
 
   const load = async () => {
     try {
-      const res = await fetch(`/api/external/materials/${encodeURIComponent(token)}/context`);
-      const data = await res.json().catch(() => ({ ok: false, reason: 'server_error' }));
+      const envelope = await requestEnvelope(`/api/external/materials/${encodeURIComponent(token)}/context`, {
+        tolerantBody: () => ({ ok: false, reason: 'server_error' }),
+      });
+      // Today's `.catch(() => ({ ok: false, reason: 'server_error' }))` applies
+      // to both 2xx and non-2xx malformed bodies; the function-form
+      // tolerantBody only runs for 2xx (a non-2xx body is always parsed
+      // tolerantly to `{}`), so a non-2xx unparseable body is mapped back to
+      // the same fallback here via the recorded parseError.
+      const data = envelope.error?.parseError ? { ok: false, reason: 'server_error' } : envelope.data;
       setState(data.ok ? { status: 'ok', data } : { status: 'error', reason: data.reason });
     } catch {
       setState({ status: 'error', reason: 'server_error' });
@@ -223,8 +237,10 @@ export default function MaterialsContributorPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/external/materials/${encodeURIComponent(token)}/context`);
-        const data = await res.json().catch(() => ({ ok: false, reason: 'server_error' }));
+        const envelope = await requestEnvelope(`/api/external/materials/${encodeURIComponent(token)}/context`, {
+          tolerantBody: () => ({ ok: false, reason: 'server_error' }),
+        });
+        const data = envelope.error?.parseError ? { ok: false, reason: 'server_error' } : envelope.data;
         if (!cancelled) setState(data.ok ? { status: 'ok', data } : { status: 'error', reason: data.reason });
       } catch {
         if (!cancelled) setState({ status: 'error', reason: 'server_error' });
