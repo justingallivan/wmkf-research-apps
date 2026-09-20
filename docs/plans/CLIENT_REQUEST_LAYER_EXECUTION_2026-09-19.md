@@ -1057,3 +1057,27 @@ where `previewReadOnly` is false and the target interlock still denies
 production writes from local, so confirm buttons return a denial banner. Owner
 decision pending on whether to run it now or record the write-path dialogs as
 covered by the T4 request-bytes and receipt pins plus post-merge observation.
+
+### Stage 4 rehearsal, part 2 — owner click-through on local `npm run dev` (2026-09-20, in progress)
+
+Venue: the owner's dev server on this checkout (started 12:29, `next-server`
+v16.3.5), production reads on, interlock on. Caveat: the Stage 5a group 1
+agent was committing workbench/meeting-tracker component files into the same
+checkout during the run (six commits in ~17 minutes incl. `WorkbenchShell.js`),
+each triggering a Fast Refresh.
+
+- Step 2 (invite preview) and step 4 (reminder preview): manage controls
+  present locally (`previewReadOnly` false); previews rendered. [owner]
+- Step 5 (release invitations, `ReleaseEmailModal` via `ReviewerInvitePanel`):
+  dev-server log `POST /api/review-manager/withdraw-sufficient 200 in 956ms`;
+  rows unchanged afterward, so the interlock denied the write and the service
+  reported per-row `write_failed` in a 200 body (`withdraw-sufficient-service.js`
+  ~:291-297). The dialog stayed at "Releasing…" with no banner. FINDING under
+  investigation. The T4 suite had no pin for this exact 200 + `write_failed`
+  outcome; added three (`a2e71560`: write_failed, not_pending, missing_result),
+  all PASS in isolation: the dialog renders the amber partial banner and Done.
+  Client path therefore correct in isolation; the stuck spinner is most
+  consistent with a Fast Refresh remount mid-request. Owner DevTools
+  (Network response body, Console) and a retry pending.
+- Steps 6-7 (closeout, due date): request 1002788 has no accepted reviewer;
+  need another request or record as test-covered.
