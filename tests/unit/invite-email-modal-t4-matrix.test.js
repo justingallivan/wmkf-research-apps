@@ -5,8 +5,9 @@
  * defaults, campaign-config, render-emails (request bytes + malformed 2xx),
  * my-candidates PATCH (mark manual invite sent), reviewer-address-trust
  * (verify + create repair request), update-abstract, and the sticky-timing
- * save (best-effort). :292 (invite-timing GET) is D1-preserve, unguarded, not
- * migrated here; :735 (send-emails) is the allowlisted SSE stream.
+ * save (best-effort), and the invite-timing GET (:293, D1-preserve, unguarded
+ * — migrated onto requestEnvelope with no ok check, matching today's
+ * behavior). :735 (send-emails) is the allowlisted SSE stream.
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -354,7 +355,7 @@ describe('update-abstract (:648)', () => {
   });
 });
 
-describe('invite-timing GET (:293, D1-preserve, unguarded — not migrated here)', () => {
+describe('invite-timing GET (:293, D1-preserve, migrated ungated — no ok check)', () => {
   test('T4 axis (a): a 2xx body with a value overlays the sticky respondOffsetDays', async () => {
     global.fetch = jest.fn(baseHandlers({ inviteTiming: mockJson({ value: { respondOffsetDays: 14 } }) }));
     render(<InviteEmailModal candidates={CANDIDATES} settings={{}} onClose={jest.fn()} onSent={jest.fn()} />);

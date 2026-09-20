@@ -290,8 +290,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     (async () => {
       const nextTiming = {};
       try {
-        const res = await fetch(`/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.INVITE_TIMING)}`);
-        const data = await res.json().catch(() => ({}));
+        const { data } = await requestEnvelope(
+          `/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.INVITE_TIMING)}`,
+          { tolerantBody: true },
+        );
         if (data?.value) {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           // Pick only the known keys (a pre-Phase-1 sticky value carries the retired
