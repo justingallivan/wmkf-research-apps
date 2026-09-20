@@ -1004,6 +1004,52 @@ pages in the route manifest. Commits: `3cb3fa4a9`/`0c93e0467`
 Process note: the group 2 implementer split its 12 remaining files across three
 parallel sub-agents it supervised; commits are per file as required.
 
+### Group 1: shared components (logged 2026-09-20; fresh review pending with group 2)
+
+24 files, 52 JSON sites migrated; one raw site remains, the `ReviewsTab.js:320`
+export-reviews blob download (reads `Content-Disposition`), annotated per §2.6.
+One test-then-refactor commit pair per file (see `git log --oneline
+d82f24df4..1ce5587c9 | grep "Stage 5a"`). Implementer's gates at the group's
+final commit: full suite 1041 suites / 15347 tests green; lint 0 errors
+(transient unused-directive warning on the blob site until Stage 6);
+`check:types` clean; `grep fetch(` over the 24 files finds only the blob site.
+
+| File | Sites | Form / policy |
+|---|---|---|
+| `ReviewsTab.js` | 4 (1 blob) | synthesize POST, send-reminder POST, reviewers GET → envelope tolerant; new test file (15) |
+| `PreSiteDistributionPanel.js` | 4 | requestJson/envelope tolerant; rule (i) at reissue's fallback-less throw; gap file (8) |
+| `InitialAssessmentTab.js` | 4 | requestJson, D3 static fallback (no pinned interpolation); gap file (4) |
+| `RequestListPanel.js` | 2 | dashboard GET kept **envelope** to preserve the pinned `Failed to load requests (403)`; triage POST requestJson |
+| `RequestLocator.js`, `ProposalTab.js`, `WorkbenchShell.js`, `FinalWriteupsViews.js` | 2/2/1/3 | requestJson static fallback (D3 drops the status suffix; no pin existed); GET call-shape fixes in their tests |
+| `ManualReviewEntryForm.js` | 2 | envelope tolerant; new full matrix (9) |
+| `AwardeesPanel.js` | 2 | load bare `.json()` → envelope strict; cycle list requestJson tolerant |
+| `ArtifactVersionHistory.js` | 2 | envelope tolerant, 409 special case preserved |
+| `ReviewerFollowUpPanel.js`, `useSiteVisitContext.js`, `MeetingTrackerList.js` | 2/2/3 parallel GETs | envelope tolerant; per-site fallback text and silent best-effort picker preserved |
+| `CuratedRecipientPicker.js`, `InitialAssessmentsPanel.js`, `StaffDeliberationsPanel.js` | 1 each | requestJson tolerant |
+| `OverviewTab.js` | 1 | envelope tolerant (`body.success` + status combined) |
+| `SessionAgendaPanel.js` | 3 | requestJson/envelope tolerant; rule (i) at send |
+| `SiteVisitEditor.js` | 3 | local `readJson` folded to `readJson(url, options, fallback)` over `requestEnvelope`, thrown `.code`/`.status` shape kept |
+| `SiteVisitMaterialsCard.js` | 2 | envelope tolerant, GET 503 special case kept |
+| `RosterContactField.js` | 2 | bare `.json()` → requestJson strict, AbortError guard kept |
+| `ProfileLinkingDialog.js` | 3 | fetchProfiles envelope strict (throw ignores body, as today); both POSTs envelope tolerant — axis (e) now shows the fallback instead of leaking raw parse text (accepted D3) |
+| `Layout.js` | 1 | alerts summary GET envelope tolerant, D1-preserve fail-open |
+
+Deviations flagged by the implementer, all to be weighed in the fresh review:
+(1) shared-index race swept the `PreSiteDistributionPanel` pair into the
+other lane's commit `87289fb9c` (content verified, attribution off, history not
+rewritten, same class as the Stage 4 incident); (2) for several small/no-test
+files (PreSiteDistributionPanel, InitialAssessmentTab, ReviewerFollowUpPanel,
+ManualReviewEntryForm, others) the migration was written before the test and
+the test was **not** confirmed red against unmigrated code, though the test
+commit still precedes the code commit; red-before-green or a live mutation was
+confirmed for ReviewsTab, RequestListPanel, and the GET call-shape fixes; (3) D3
+static-fallback drops in the files named above after checking for pins; (4)
+`ProfileLinkingDialog` axis-(e) change; (5) GET call-shape fixes touched seven
+test files (`workbench-shell`, `initial-assessment-tab`,
+`artifact-version-history`, `request-locator-controls`,
+`workbench-proposal-tab-documents`, `reviewer-follow-up`,
+`workbench-request-number-lookup`), all for endpoints migrated this stage.
+
 ## Stage 5b — external token pages, upload-adjacent forms, email pages (Tier 2)
 
 Logged 2026-09-20; fresh review pending. 10 files, 19 JSON sites migrated;
@@ -1079,5 +1125,19 @@ each triggering a Fast Refresh.
   Client path therefore correct in isolation; the stuck spinner is most
   consistent with a Fast Refresh remount mid-request. Owner DevTools
   (Network response body, Console) and a retry pending.
+  **Resolved (`1ce5587c9`).** Owner DevTools: console clean, response body
+  `{ok:true, withdrawn:0, results:[{status:'write_failed', …}]}`. Root cause
+  is not the migration: `reactStrictMode: true` double-invokes effects in dev,
+  the dialog's cleanup-only guard (`useEffect(() => () => { mountedRef.current
+  = false; … }, [])`) flipped false at mount and nothing set it back, so every
+  post-await guard and the `finally` that clears `sending` were skipped.
+  Pre-existing (present at `2e267593`), dev-only; production never runs the
+  StrictMode double-invoke. Fix: set `mountedRef.current = true` in the effect
+  body (the form ten sibling components already use). Fan-out: same defect in
+  `CampaignConfigModal.js` and `pages/dataverse-bulk-export.js`, fixed in the
+  same commit; the other ten `mountedRef` sites already re-arm. Pin: a
+  `React.StrictMode`-wrapped write_failed test in
+  `release-email-modal.test.js`, red before the fix (stuck at "Releasing…",
+  matching the browser) and green after. Owner retry of step 5 pending.
 - Steps 6-7 (closeout, due date): request 1002788 has no accepted reviewer;
   need another request or record as test-covered.
