@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 function refKey(ref) {
   if (ref?.kind === 'staff') return `staff:${ref.profileId}`;
@@ -31,14 +32,15 @@ export default function useSiteVisitContext(requestId) {
     const controller = new AbortController();
     let cancelled = false;
     Promise.all([
-      fetch(`/api/workbench/site-visit/logistics?requestId=${encodeURIComponent(requestId)}`, {
+      requestEnvelope(`/api/workbench/site-visit/logistics?requestId=${encodeURIComponent(requestId)}`, {
         signal: controller.signal,
+        tolerantBody: true,
       }),
-      fetch('/api/workbench/site-visit/recipients', { signal: controller.signal }),
-    ]).then(async ([logisticsResponse, directoryResponse]) => {
-      const logisticsBody = await logisticsResponse.json().catch(() => ({}));
-      const directoryBody = await directoryResponse.json().catch(() => ({}));
-      if (cancelled || !logisticsResponse.ok || !directoryResponse.ok) return;
+      requestEnvelope('/api/workbench/site-visit/recipients', { signal: controller.signal, tolerantBody: true }),
+    ]).then(([logisticsEnvelope, directoryEnvelope]) => {
+      const logisticsBody = logisticsEnvelope.data;
+      const directoryBody = directoryEnvelope.data;
+      if (cancelled || !logisticsEnvelope.ok || !directoryEnvelope.ok) return;
       const visit = logisticsBody.siteVisit || null;
       const lookup = new Map([
         ...(directoryBody.staff || []).map((row) => [refKey(row), row]),
