@@ -149,6 +149,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
     const status = Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599
       ? httpStatus
       : null;
+    // eslint-disable-next-line no-restricted-syntax -- raw fetch: fire-and-forget keepalive beacon; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
     void fetch(`/api/external/grantee/${token}/upload-failure`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
