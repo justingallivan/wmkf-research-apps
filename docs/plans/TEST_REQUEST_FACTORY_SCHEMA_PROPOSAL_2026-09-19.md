@@ -1,10 +1,10 @@
 # Test Request Factory — schema proposal
 
-Status: **PROPOSAL ONLY; no schema apply, live write, route wiring, deployment, or push.** This document proposes the additive Dataverse schema needed for Stage 1 isolation. Metadata observations below are taken from the existing read-only receipts; they do not prove create permission, plugin behavior, Power Automate suppression, number allocation, or a safe end-to-end create.
+Status: **LOCAL SCHEMA/POLICY IMPLEMENTED; no schema apply, live write, route wiring, deployment, or push.** This document proposes the additive Dataverse schema needed for Stage 1 isolation. Metadata observations below are taken from the existing read-only receipts; they do not prove create permission, plugin behavior, Power Automate suppression, number allocation, or a safe end-to-end create.
 
 ## Proposed schema wave
 
-Use a new isolated `extensions-on-existing` wave, proposed name `wave29-test-request-isolation`, containing only the two new `akoya_request` attributes. This follows the repository's isolated-wave convention in `wave2-triagestatus`, `wave2-fieldprimer`, and `wave7-reviewer-engagement`: the JSON declares `kind`, `entityLogicalName`, an explicit no-automation/no-duplicate warning, and creation-only semantics. The wave must be dry-run and metadata-preflighted before any target apply. Schema application is creation-only and does not reconcile a divergent pre-existing field.
+The local implementation adds an isolated `extensions-on-existing` wave named `wave29-test-request-isolation`, containing only the two new `akoya_request` attributes. This follows the repository's isolated-wave convention in `wave2-triagestatus`, `wave2-fieldprimer`, and `wave7-reviewer-engagement`: the JSON declares `kind`, `entityLogicalName`, an explicit no-automation/no-duplicate warning, and creation-only semantics. The wave must be dry-run and metadata-preflighted before any target apply. Schema application is creation-only and does not reconcile a divergent pre-existing field.
 
 ### `wmkf_IsTestRequest`
 
@@ -151,16 +151,32 @@ Rollback is additive and leaves fields in place. First disable new factory creat
 
 ## Open decisions and blockers
 
-- Verify publisher/solution metadata using the existing schema tooling. `wave29-test-request-isolation` is the engineering choice, subject to a collision check before creating the directory; its name does not require an owner decision.
+- Sandbox dry-run verified publisher `WMKF_Publisher` with prefix `wmkf` and absence of both proposed attributes. Solution existence/membership remains unverified: dry-run skips solution creation/checking. The isolated wave was created after the directory collision check.
 - Sandbox needs the two existing reviewer-engagement reminder controls before creation. Prepare a narrow additive step under that existing contract; do not run the entire wave or change ordinary defaults as an incidental repair.
 - Platform-owner suppression contract for initial create and every status/pointer update.
 - SharePoint request-location provisioner and uniqueness/recovery contract.
 - Permission proof for the app principal and server-owned marker/run writes.
 
-Until these are resolved, the schema remains a reviewed proposal and the offline compiler remains disabled for runtime use. No metadata/default observation in this proposal is a claim that the Test Request Factory is production-ready.
+Until these are resolved, the schema remains unapplied and the offline compiler remains disabled for runtime use. No metadata/default observation in this proposal is a claim that the Test Request Factory is production-ready.
 
 ## Review disposition
 
 Sol reviewed the source contract and proposal. Root incorporated the material corrections: absent projections never classify ordinary; requiredness/createability of new fields are checked after schema apply; verified ordinary rows need no run ID; wave naming is engineering work, not a user blocker. Schema remains un-applied. The platform census rejects malformed/partial pages, bounds pagination and tests cross-origin/collection continuation rejection and omission of credential-bearing action inputs.
 
-Final bounded review: Sol **ACCEPTED the proposal/evidence scope** after the corrections. Root verified 35 focused tests (existing offline policy plus new probe), scoped ESLint, probe syntax and `git diff --check`. Doc-currency and fact-consistency with sequential self-tests, plus docs-catalog, passed. No runtime files were changed; the previous offline-slice build remains the last build evidence, not a fresh build claim for this proposal.
+Previous proposal-only review (before the local isolation slice below): Sol **ACCEPTED the proposal/evidence scope** after the corrections. Root verified 35 focused tests (existing offline policy plus new probe), scoped ESLint, probe syntax and `git diff --check`. Doc-currency and fact-consistency with sequential self-tests, plus docs-catalog, passed. No runtime files were changed; the previous offline-slice build remains the last build evidence, not a fresh build claim for this proposal.
+
+## Local isolation implementation — 2026-09-20 UTC
+
+[VERIFIED via source and sandbox schema dry-run] `lib/dataverse/schema/wave29-test-request-isolation/akoya_request-test-request-isolation.json` contains only the two proposed attributes. `lib/services/test-requests/isolation.js` provides a pure classifier, ordinary assertion, and fixed parenthesized OData / AND FetchXML fragments. Only explicit false plus explicit null run is ordinary. Missing, malformed and unverified legacy-null values deny dispatch. Classification does not establish actor authorization or matching ledger ownership. No runtime consumer imports this module yet; the Stage 1 inventory above is still outstanding.
+
+The schema tests invoke the existing `ensureAttribute` engine with a mock client and verify emitted Dataverse payloads, rather than duplicating a schema builder. The existing engine is unchanged.
+
+Sandbox dry-run command (exit 0; existing application authentication, no schema writes):
+
+```sh
+DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com node --env-file=/Users/gallivan/Code/WMKF_Apps/.env.local scripts/apply-dataverse-schema.js --target=sandbox --wave=29-test-request-isolation
+```
+
+The runner reported DRY-RUN, verified publisher prefix `wmkf`, and printed two proposed attribute POSTs. Its generic “created attr” messages are simulated in dry-run, not evidence of remote creation. This does not verify effective write privileges, solution membership, post-apply createability or existing-row defaults. No `--execute` was used.
+
+Local-slice acceptance: Luna built and tested; Sol accepted the unwired/unapplied source; root checked the real schema-engine test, classifier and absence of runtime imports. All 56 focused tests across policy/isolation/platform-probe suites passed, scoped ESLint passed, and `npm run build` exited 0. Fact-consistency and doc-currency gates plus their sequential self-tests and docs-catalog passed. Stage 1 runtime integration and all live enablement gates remain outstanding.

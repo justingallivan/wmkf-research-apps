@@ -58,6 +58,14 @@ Both targets returned complete paginated HTTP-200 collections for the applicatio
 
 The reproducible probe exports selected metadata and definition hashes, not raw flow definitions, action inputs, connection parameters, credentials or document content. It rejects malformed pages, cross-origin/collection continuations and unbounded pagination. No flow execution, business-record read, schema change or request create occurred.
 
+### Registered owner and browser follow-up
+
+[VERIFIED via read-only owner metadata census, `evidence/test-request-factory/registered-owners-2026-09-20.json`]
+
+Connor Noda is the registered owner of production `WMKF_Set Payee Payment Contact from Request` and `WMKF_Create SoCal draft Phase II Ack`. Other activated production request Create workflows are registered to Bromelkamp Admin or # BCO akoyaGO Integration. Registered ownership identifies the starting point for follow-up; it does not confirm who currently operates the workflow or how it handles synthetic requests.
+
+[VERIFIED via signed-in Power Automate browser observation, 2026-09-20 UTC] Justin Gallivan's Cloud flows and Shared with me views showed no flows in the default environment and WM Keck Foundation akoyaGO environment (`36db5b1b-d5f3-ef3e-9b18-32473347ec0f`). Solutions and administrative inventories were not inspected. These empty views do not prove tenant flows absent. No flow was run, edited or shared; nobody was contacted.
+
 ### Concrete platform-owner handoff
 
 Use the receipt IDs/names to obtain the following evidence, without sending messages or changing platform configuration as part of this task:

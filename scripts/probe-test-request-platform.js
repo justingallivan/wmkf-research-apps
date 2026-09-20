@@ -26,7 +26,7 @@ async function all(client, resourceUrl, path) {
     if (++pages > 30) throw Error('pagination bound');
     const u = new URL(path, resourceUrl + '/api/data/v9.2/');
     if (u.origin !== resourceUrl || u.pathname !== collectionPath) throw Error('untrusted continuation');
-    const r = await client.get(u.href);
+    const r = await client.get(u.href, {Prefer: 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"'});
     if (!r.ok) return {
       status: r.status,
       complete: false,
@@ -64,6 +64,8 @@ function flowFacts(w) {
   return {
     id: w.workflowid,
     name: w.name,
+    registeredOwnerId: w._ownerid_value || null,
+    registeredOwnerName: w['_ownerid_value@OData.Community.Display.V1.FormattedValue'] || null,
     category: w.category,
     state: w.statecode,
     primaryentity: w.primaryentity,
@@ -105,7 +107,7 @@ async function main() {
       resourceUrl,
       token: await getAccessToken(resourceUrl)
     });
-    const workflows = await all(client, resourceUrl, "/api/data/v9.2/workflows?$select=workflowid,name,category,statecode,type,primaryentity,triggeroncreate,triggerondelete,triggeronupdateattributelist,clientdata&$filter=type eq 1");
+    const workflows = await all(client, resourceUrl, "/api/data/v9.2/workflows?$select=workflowid,name,_ownerid_value,category,statecode,type,primaryentity,triggeroncreate,triggerondelete,triggeronupdateattributelist,clientdata&$filter=type eq 1");
     const relevant = workflows.rows.filter(w => ['akoya_request', 'sharepointdocumentlocation'].includes(w.primaryentity) || terms.some(t => (w.clientdata || '').toLowerCase().includes(t))).map(flowFacts);
     const steps = await all(client, resourceUrl, "/api/data/v9.2/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,stage,mode,statecode,rank,filteringattributes&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$filter=sdkmessagefilterid/primaryobjecttypecode eq 'akoya_request' or sdkmessagefilterid/primaryobjecttypecode eq 'sharepointdocumentlocation'");
     const entity = await client.get("/EntityDefinitions(LogicalName='akoya_request')?$select=EntitySetName,IsDocumentManagementEnabled");

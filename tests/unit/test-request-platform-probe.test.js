@@ -135,3 +135,20 @@ test('extracts nested/flattened trigger fields without exporting inputs, definit
     clientdata: 'invalid'
   }).definitionPresent).toBe(false);
 });
+
+test('exports only selected registered owner metadata and requests formatted labels', async () => {
+  const result = flowFacts({
+    _ownerid_value: 'owner-id',
+    '_ownerid_value@OData.Community.Display.V1.FormattedValue': 'Owner name',
+    unrelatedAnnotation: 'must-not-export',
+  });
+  expect(result.registeredOwnerId).toBe('owner-id');
+  expect(result.registeredOwnerName).toBe('Owner name');
+  expect(JSON.stringify(result)).not.toContain('must-not-export');
+  expect(flowFacts({}).registeredOwnerName).toBeNull();
+  const get = jest.fn().mockResolvedValue({ ok: true, body: { value: [] } });
+  await all({ get }, origin, path);
+  expect(get).toHaveBeenCalledWith(origin + path, {
+    Prefer: 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
+  });
+});
