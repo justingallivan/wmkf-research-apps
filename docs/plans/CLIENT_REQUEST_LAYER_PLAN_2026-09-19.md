@@ -3,7 +3,7 @@ title: Client Request Layer Migration Plan
 domain: platform
 kind: plan
 status: draft
-summary: Staged introduction of one shared client-side JSON request helper and migration of the 308 raw fetch call sites in client components and pages onto it, preserving every call site's visible error behavior.
+summary: Staged introduction of one shared client-side JSON request helper and migration of the raw fetch call sites in client components and pages onto it, preserving each call site's visible error behavior except the owner-decided D3 deviation on non-2xx non-JSON bodies.
 canonical: false
 owner: product-engineering
 related:
@@ -25,7 +25,8 @@ count only].
 **Chosen refactor:** introduce one shared client-side request helper and migrate
 the raw `fetch(` call sites in `shared/components/**` and `pages/**` (excluding
 `pages/api/**`) onto it, one bounded group of files per stage, with each call
-site keeping exactly the visible error behavior it has today.
+site keeping the visible error behavior it has today, except the single
+deviation D3 (§9), which is an owner decision, not a plan default.
 
 **Why this one.** Two independent surveys on 2026-09-19 ranked the repo's large
 unplanned refactors. Every large backend service already has a decomposition plan
@@ -119,7 +120,7 @@ The census script and its CSV outputs are regenerated and committed in Stage 0
 - Body-level failure flags exist and are NOT equivalent to HTTP status:
   `pages/api/review-manager/materials-preflight.js:55` returns HTTP 200 with
   `{ ok: false, reason: 'materials_unavailable' }` on a sanitized lookup failure
-  [VERIFIED via that file, lines 45-58]; 9 routes return `{ success: false, ... }`
+  [VERIFIED via that file, lines 45-58]; 9 sites across 5 route files return `{ success: false, ... }`
   (some with 409, e.g. `pages/api/workbench/reviewer-roster.js:502`). Clients
   read body-level `.ok` at 22 sites and `.success` at 28 sites (8 in
   `shared/components/reviewers/search/useReviewerContactActions.js`).
@@ -130,10 +131,13 @@ The census script and its CSV outputs are regenerated and committed in Stage 0
 ### 2.3 Client error-extraction variance [VERIFIED via census]
 Collapsing local variable names, call sites read `.message` (202), `.error`
 (187), `.details` (9), and 78 read nothing and throw/show a generic string.
-Eleven sites throw `'Admin access required'` on 403 (`pages/admin.js:940,1251`,
-`shared/components/admin/PoliciesSection.js:77`,
+Five client sites throw exactly `'Admin access required'` on 403
+(`pages/admin.js:940,1251`, `shared/components/admin/PoliciesSection.js:77`,
 `shared/components/admin/ReviewQuestionsSection.js:101`,
-`shared/components/admin/PromptTemplatesSection.js:97,117`);
+`shared/components/admin/PromptTemplatesSection.js:98`) and one throws
+`'Admin access required for Executor budgets'`
+(`shared/components/admin/PromptTemplatesSection.js:117`) [VERIFIED via grep,
+P-C corrected an earlier repo-wide count];
 `shared/components/workbench/ReviewsTab.js:911` sets `error.denial` on 401/403.
 Each of these is a preserved difference: the migration carries the site's
 message and branch, it does not unify them.
@@ -147,7 +151,9 @@ message and branch, it does not unify them.
 - `sendJson(url, method, body, fetchImpl = fetch)` at
   `shared/components/meeting-tracker/SessionEditor.js:26-35`: JSON POST/PATCH,
   ok-check-then-throw with a site-specific fallback message, injectable
-  `fetchImpl` for tests.
+  `fetchImpl` for tests. It parses through a file-local `readJson(response)`
+  (`:22-24`, `response.json().catch(() => ({}))`) that goes dead in Stage 1 and
+  is removed there.
 - Several single-endpoint local wrappers (`readStatus`/`readBriefStatus` in
   `shared/components/workbench/StaffDeliberationsTab.js`,
   `fetchStatus`/`fetchAcknowledgementState` in
@@ -204,21 +210,41 @@ export async function requestJson(url, {
 // -> parsed body on 2xx. Throws ApiRequestError on non-2xx. Network/abort
 //    errors propagate unchanged (AbortError stays AbortError).
 
-// Non-throwing form. For the 54 sites that do not check `ok`, for sites that
+// Non-throwing form. For the 52 migrated sites that do not check `ok` (54 in
+// the census minus the 2 allowlisted beacons), for sites that
 // branch on 409/412/413/202 etc. before deciding whether it is an error, and
 // for sites that read `status` on success.
 export async function requestEnvelope(url, opts)
-// -> { ok, status, data, error }  where error is an ApiRequestError or null.
+// -> { ok: response.ok, status: response.status, data, error }
+//    `data` is ALWAYS the parsed body from readJsonBody (so {} on a tolerant
+//    non-2xx), never null; `error` is an ApiRequestError when !ok, else null.
 //    Same body/header/signal handling. Never throws on HTTP status.
 
 // Parse step, exported so the Stage 1 adapters (which receive a Response, not a
 // URL) share it. Both request forms call it.
-export async function readJsonBody(response, { signal } = {})
-// -> parsed JSON object; {} for an empty body (204, content-length 0) and for
-//    an unparseable body. Rethrows when the read/parse rejection is an
-//    AbortError or when `signal?.aborted` is true, so an abort that lands
-//    between headers and body is never reported as a successful `{}`.
+export async function readJsonBody(response, { signal, tolerantBody = false } = {})
+// Non-2xx: always tolerant — empty or unparseable body -> {} (error bodies are
+//   only ever read for a message). 2xx: STRICT by default — an empty or
+//   unparseable body rejects with the native parse error, exactly like a bare
+//   `response.json()` does today. `tolerantBody: true` makes 2xx return {} on
+//   empty/unparseable, for callers whose current code is
+//   `response.json().catch(() => ({}))`. In every mode, a rejection whose
+//   `name` is 'AbortError', or any rejection while `signal?.aborted` is true,
+//   is rethrown unchanged.
+// Mechanics: it calls ONLY `response.json()` and reads `response.ok` /
+//   `response.status`. It never touches `response.headers`, `text()`, or
+//   `body`, so the repo's `{ ok, status, json }` test doubles keep working. An
+//   "empty body" is simply a `json()` rejection: strict rethrows it, tolerant
+//   returns {}. A 2xx body that parses to null, a primitive, or an array is
+//   returned as-is; the message rule guards `typeof payload` before reading
+//   `.error`/`.message`. Both request forms forward `signal` into readJsonBody.
 ```
+
+`requestJson` and `requestEnvelope` take the same `tolerantBody` option and
+pass it through. The per-site rule is mechanical: a site whose code has
+`.catch(() => ({}))` (or an equivalent guard) on its body read migrates with
+`tolerantBody: true`; a site with a bare `.json()` migrates strict. The
+execution doc records the choice per site.
 
 Invariants (each pinned by a unit test in Stage 0):
 1. `fetch` is resolved as `fetchImpl ?? globalThis.fetch` at call time (§2.5).
@@ -230,13 +256,18 @@ Invariants (each pinned by a unit test in Stage 0):
    (`method, body, headers, signal, fallbackMessage, fetchImpl`); the one
    `keepalive` site is allowlisted (§2.6), not served.
 3. Caller headers are merged over defaults, so `If-Match` and `lock` survive.
-4. Body parse is `readJsonBody`: empty body → `{}`, unparseable body → `{}`,
-   abort during body read → rethrown (P-B finding: the incumbent
+4. Body parse is `readJsonBody` with the strict-on-success policy above. Two
+   review findings fix the policy: (a) P-B: the incumbent
    `response.json().catch(() => ({}))` swallows abort-during-body, and
    `pollForArtifact` at `shared/components/workbench/StaffDeliberationsTab.js:354-378`
-   would keep polling on a `{}` pseudo-status). For the 67 bare-`.json()` sites
-   this converts a `SyntaxError` on a non-JSON error body into the site's
-   fallback message; recorded as accepted deviation D3.
+   would keep polling on a `{}` pseudo-status, so aborts are rethrown; (b) Codex
+   cycle 1: a tolerant `{}` on a malformed 2xx would turn
+   `shared/components/workbench/AwardeeTab.js:547-572`'s send-invite outcome
+   from `uncertain` (today: bare `.json()` throws, the `catch` sets
+   `uncertain`) into `sent` (`statusPersisted` undefined → `'sent'`), hiding a
+   possibly lost email receipt. Strict-on-success preserves the `uncertain`
+   path at every bare-`.json()` site. The only remaining deviation is on
+   non-2xx bodies (D3).
 5. Success is `response.ok` only. Body-level `ok`/`success` are never read (§2.2).
 6. No retry, no redirect on 401/403, no toast, no global error handler. Those
    belong to call sites, and centralizing them is a behavior change this plan
@@ -271,10 +302,10 @@ surface.
 | Stage | Group | Files (JSON call sites) |
 |---|---|---|
 | 1 | Fold existing helpers, zero behavior change | `review-panel-ui.js` (`readResponse`), `SessionEditor.js` (`sendJson`, 3); the 14 `readResponse` consumer sites are unchanged by construction |
-| 2 | Highest-count files that already have an RTL render test and a single dominant error surface | `AwardeeTab.js` (13 json + 1 excluded), `StaffDeliberationsTab.js` (8), `ConsultantFeedbackSection.js` (8), `pages/expertise-finder.js` (8), `FinalWriteupTab.js` (5), `pages/cycle-dossier.js` (already via `readResponse`; verify only) |
+| 2 | Highest-count files that already have an RTL render test and a single dominant error surface | `AwardeeTab.js` (13 json + 1 excluded), `StaffDeliberationsTab.js` (8), `ConsultantFeedbackSection.js` (8), `pages/expertise-finder.js` (8), `FinalWriteupTab.js` (5); `pages/cycle-dossier.js`, `pages/review-panel.js`, `ReviewPanelTab.js` (all sites already via `readResponse`; verify only, no edits) |
 | 3 | Admin surface | `shared/components/admin/*` sections with sites (`PromptTemplatesSection` 5, `SiteVisitRecipientsSection` 4, `OperationalEventsSection` 3, `ReviewQuestionsSection` 3, `DynamicsExplorerRestrictionsSection` 3, `PoliciesSection` 2, `EmailDefaultsSection` 2, `FinalWriteupMatrixAudiencesSection` 2, `SiteVisitMaterialsDefaultsSection` 2, `MeetingTrackerDefaultsSection` 2, `ReviewerRepairAlertDetails` 1), then `pages/admin.js` (32) section by section |
 | 4 | Reviewer engagement surface (Tier 2 re-check at stage start; see §1) | `InviteEmailModal.js` (10), `ReviewerInvitePanel.js` (5 + 1 blob excluded), `ReviewerManagePanel.js` (6), `ReviewersTab.js` (5), `ReviewerFindPanel.js` (5), `ReleaseMaterialsModal.js` (4 + 1 stream excluded), `search/useReviewerContactActions.js` (8), `search/useReviewerRosterActions.js` (4), `search/useReviewerPromotion.js` (4), `search/useReviewerDiscovery.js` (4), `search/useReviewerExport.js` (0 migrated; its single site is the allowlisted blob download), `CandidateEditModal.js`, `CampaignConfigModal.js`, `RespondReminderModal.js`, `RemoveEntirelyModal.js`, `ReleaseEmailModal.js`, `email-template-store.js`, `prompt-override-store.js` |
-| 5 | Long tail | every remaining file in the census with at least one JSON site: workbench (`ReviewsTab`, `PreSiteDistributionPanel`, `InitialAssessmentTab`, `ReviewPanelTab`, `RequestListPanel`, `RequestLocator`, `ProposalTab`, `ManualReviewEntryForm`, `AwardeesPanel`, `ArtifactVersionHistory`, `OverviewTab`, `ReviewerFollowUpPanel`, `useSiteVisitContext`), meeting-tracker (`MeetingTrackerList`, `SiteVisitEditor`, `SessionAgendaPanel`, `SiteVisitMaterialsCard`), external (`ReviewAuthoringForm`, `GranteeDeliverableForm`, `pages/external/**`), `ProfileLinkingDialog`, `RosterContactField`, `FinalWriteupsViews`, and pages (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dynamics-explorer`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, `review-panel`, and the Executor tool pages' non-stream sites) |
+| 5 | Long tail | every remaining file in the census with at least one JSON site: workbench (`ReviewsTab`, `PreSiteDistributionPanel`, `InitialAssessmentTab`, `RequestListPanel`, `RequestLocator`, `ProposalTab`, `ManualReviewEntryForm`, `AwardeesPanel`, `ArtifactVersionHistory`, `OverviewTab`, `ReviewerFollowUpPanel`, `useSiteVisitContext`), meeting-tracker (`MeetingTrackerList`, `SiteVisitEditor`, `SessionAgendaPanel`, `SiteVisitMaterialsCard`), external (`ReviewAuthoringForm`, `GranteeDeliverableForm`, `pages/external/**`), `ProfileLinkingDialog`, `RosterContactField`, `FinalWriteupsViews`, and pages (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dynamics-explorer`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, and the Executor tool pages' non-stream sites) |
 | 6 | Closeout ratchet | ESLint `no-restricted-syntax` for raw `fetch(` in a `files: ['shared/components/**/*.js','pages/**/*.js'], ignores: ['pages/api/**']` flat-config block; the §2.6 allowlist is expressed as a per-site `eslint-disable-next-line` with a reason, never a file-level ignore |
 
 Stage 5 is split into 5a (workbench + meeting-tracker) and 5b (external + pages)
@@ -291,12 +322,12 @@ immediately; never commit it). No test hits a live provider or store.
 
 | ID | Required before | Content |
 |---|---|---|
-| T0 | Stage 0 exit | `tests/unit/api-request.test.js`: every §3 invariant, plus: 2xx JSON, 2xx empty body, non-2xx `{error}`, non-2xx `{message}`, non-2xx non-JSON body, network rejection, AbortError passthrough, FormData body, `If-Match` header survival, `fetchImpl` injection, `globalThis.fetch` late binding (reassign after import). |
-| T1 | Stage 1 | `readResponse`/`sendJson` behavior pins: same thrown message text for `{error}`, for empty body, for non-JSON body; same return on 2xx. Existing consumers' tests (verified by name in Stage 0) run green. |
-| T2 | Stage 2, per file | For each file: with `global.fetch` mocked, three scenarios per distinct endpoint or per distinct error surface in the file, whichever is fewer: (a) 200 JSON renders the success state, (b) non-2xx `{error:'X'}` shows/sets/throws exactly what it does today, (c) network rejection does the same. Existing RTL tests (`tests/unit/awardee-tab.test.js`, `tests/unit/staff-deliberations-tab.test.js`, `tests/unit/consultant-feedback-section.test.js`, `tests/unit/expertise-finder-batch-cycle.test.js`, `tests/unit/final-writeup-tab.test.js`) are extended, not replaced [VERIFIED P-B: each renders the component and mocks `global.fetch` per scenario]. Fixtures that mock `{ ok: true, json }` without a `status` field (e.g. `expertise-finder-batch-cycle.test.js:31`) must gain `status` before any site in that file moves to `requestEnvelope`. |
+| T0 | Stage 0 exit | `tests/unit/api-request.test.js`: every §3 invariant, plus: 2xx JSON; 2xx empty body strict (rejects) and tolerant (`{}`); 2xx malformed body strict (rejects with the native parse error, `name` preserved) and tolerant (`{}`); non-2xx `{error}`; non-2xx `{message}`; non-2xx nested `{error:{message}}`; non-2xx non-JSON body (`{}` → fallback message); network rejection passthrough; AbortError rejected by `fetch` passthrough; AbortError raised during the body read rethrown in both strict and tolerant modes; `signal.aborted` true after a body-read failure → rethrow; FormData body; `If-Match` header survival; `fetchImpl` injection; `globalThis.fetch` late binding (reassign after import). |
+| T1 | Stage 1 | `readResponse`/`sendJson` behavior pins: same thrown message text for `{error}`, `{message}` only, nested `{error:{message}}`, `{error:5}`, empty body, non-JSON body; same return on 2xx; thrown value has `.name === 'Error'` (not `ApiRequestError`). Existing consumers' tests (verified by name in Stage 0) run green. |
+| T2 | Stage 2, per file | For each file: with `global.fetch` mocked, three scenarios per distinct endpoint or per distinct error surface in the file, whichever is fewer: (a) 200 JSON renders the success state, (b) non-2xx `{error:'X'}` shows/sets/throws exactly what it does today, (c) network rejection does the same, and (d) for every bare-`.json()` site, a 2xx with a malformed body produces today's outcome (for `AwardeeTab.js` send-invite: the `uncertain` receipt and step, pinned verbatim). Existing RTL tests (`tests/unit/awardee-tab.test.js`, `tests/unit/staff-deliberations-tab.test.js`, `tests/unit/consultant-feedback-section.test.js`, `tests/unit/expertise-finder-batch-cycle.test.js`, `tests/unit/final-writeup-tab.test.js`) are extended, not replaced [VERIFIED P-B: each renders the component and mocks `global.fetch` per scenario]. Fixtures that mock `{ ok: true, json }` without a `status` field (e.g. `expertise-finder-batch-cycle.test.js:31`) must gain `status` before any site in that file moves to `requestEnvelope`. |
 | T3 | Stage 3 | Same three-scenario pin for each admin section. For `pages/admin.js`: the four workspace functions (`OperationsWorkspace` :3139, `WorkflowsWorkspace` :3198, `AiWorkspace` :3335, `PeopleWorkspace` :3375) are not exported today and `AdminDashboard` (:3453) reads `router.query` and renders `Layout` (which calls `useSession`). T3 therefore first adds named exports for the four workspace functions (the file already exports sections such as `DynamicsFeedbackSection` and `AppAccessSection` for `tests/unit/admin-dynamics-feedback-filters.test.js` and `tests/unit/app-access-admin-partial-refresh.test.js`), then one test file per workspace mounts the exported workspace with `view` as a prop and mocks `global.fetch` per section. No test mounts `AdminDashboard`. `tests/unit/admin-models.test.js` tests the API route, not the page, and is not a T3 anchor. The 403 → `'Admin access required'` message is pinned verbatim at every site that has it. |
-| T4 | Stage 4 | Three-scenario pin per file, plus: body-level `.success`/`.ok` branches in `useReviewerContactActions`, `ReviewersTab`, `ReviewerManagePanel`, `ReviewerFindPanel`, `useReviewerRosterActions` pinned with a 200 + `{success:false}` fixture and a 409 + `{success:false, ...promotionAuthority}` fixture (§2.2). `ReleaseMaterialsModal.js` has no render test today; one is added before its migration or the file is deferred to Stage 5 and the execution doc says which. Existing `tests/unit/invite-email-modal-capture.test.js`, `reviewer-manage-*.test.js`, `tests/unit/reviewer-materials-modal-lifetimes.test.js` run green. |
-| T5 | Stage 5 | Three-scenario pin for each file lacking an RTL test today (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, `ProfileLinkingDialog`, `ReviewerFollowUpPanel`, `SiteVisitMaterialsDefaultsSection`, `MeetingTrackerDefaultsSection`, `useSiteVisitContext`). Files that already have one get the extension only. |
+| T4 | Stage 4 | Three-scenario pin per file, plus: body-level `.success`/`.ok` branches in `useReviewerContactActions`, `ReviewersTab`, `ReviewerManagePanel`, `ReviewerFindPanel`, `useReviewerRosterActions` pinned with a 200 + `{success:false}` fixture and a 409 + `{success:false, ...promotionAuthority}` fixture (§2.2). `ReleaseMaterialsModal.js` has no direct render test; it is exercised through `ReviewerManagePanel` in `tests/unit/reviewer-materials-modal-lifetimes.test.js` (`renderPanel` :163-166, `openReleaseModal` :169), which is extended for its three scenarios. Existing `tests/unit/invite-email-modal-capture.test.js`, `reviewer-manage-*.test.js`, `tests/unit/reviewer-materials-modal-lifetimes.test.js` run green. |
+| T5 | Stage 5 | Three-scenario pin for each file lacking an RTL test today (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, `ProfileLinkingDialog`, `ReviewerFollowUpPanel`, `useSiteVisitContext`; the two admin defaults sections belong to T3). Files that already have one get the extension only. |
 | T6 | Stage 6 | A lint fixture proving the rule fires on a raw `fetch(` in a client file, does not fire on `pages/api`, does not fire on a site carrying `// eslint-disable-next-line no-restricted-syntax -- <reason>`, and DOES fire on an un-annotated raw `fetch(` elsewhere in the same file as an annotated one (site-level, not file-level, exemption). |
 
 The 41 "unknown body kind" sites are resolved during their file's stage: the
@@ -312,16 +343,26 @@ recorded in the execution doc.
 ### Stage 0 — Baseline, helper, census
 Before: feature branch `feature/client-request-layer` from `main`; worktree if
 another agent is active on `main`. Do: commit the census script as
-`scripts/census-client-fetch-sites.js` (read-only, writes CSV to a path argument)
-and its by-file table into `docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md`;
+`scripts/census-client-fetch-sites.js` (read-only; writes CSV to a path
+argument; its header documents the classification rules: body kind from the
+first `.json()`/`.blob()`/`getReader()`/no-read within the call's own scope,
+`ok` check present or not, error surface from the nearest `catch`, "unknown"
+when none matches). Stage 0's numbers supersede §2.1 if they differ and the
+delta is recorded. Write its by-file table into
+`docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md` as the
+source-to-stage map: one row per file with stage, site count, and per site the
+line, form (`requestJson` / `requestEnvelope` / allowlisted), `tolerantBody`
+choice, and resolved body kind for any census "unknown";
 add `shared/utils/api-request.js` with zero callers; add T0. Verify: T0 green,
 mutation check (flip invariant 5 to read body `ok`; T0 must fail), full Gate G.
 Exit: helper landed unused, census tracked, execution doc created with the
 source-to-stage map. Rollback: revert the two commits; nothing else changed.
 
 ### Stage 1 — Fold existing helpers
-Before: T1. Do: reimplement `readResponse` and `sendJson` over the helper,
-keeping exports, signatures, and message text. Verify: T1 and all consumer
+Before: T1. Do: reimplement `readResponse` and `sendJson` over
+`readJsonBody(response, { tolerantBody: true })`, keeping exports, signatures,
+and message text; delete the now-dead file-local `readJson` in
+`SessionEditor.js`. Verify: T1 and all consumer
 tests green; diff of every thrown message string is empty. Exit: 17 sites now
 route through the helper with no call-site edits. Rollback: revert one commit.
 
@@ -438,12 +479,13 @@ stages.
 |---|---|---|
 | A1 | The 41 "unknown body kind" sites are JSON or excluded; none need a new body mode | [ASSUMED] resolved per file in its stage |
 | A2 | No client site depends on `fetch` being captured at module load | [VERIFIED §2.5] mocking convention requires late binding |
-| A3 | The 54 no-`ok`-check sites tolerate non-2xx bodies today; migrating them with `requestEnvelope` preserves that | [VERIFIED by census] behavior preserved by construction; each pinned in its stage's tests |
+| A3 | The 52 migrated no-`ok`-check sites (54 minus the 2 allowlisted beacons) tolerate non-2xx bodies today; migrating them with `requestEnvelope` preserves that | [VERIFIED by census] behavior preserved by construction; each pinned in its stage's tests |
 | A4 | 19 retry/poll wrappers wrap the call site rather than living inside it; the helper stays retry-free and the wrapper is untouched | [VERIFIED P-B for `StaffDeliberationsTab.js:354-378` and `FinalWriteupTab.js:283-291`; remaining 17 verified at their stage] |
 | D1 | Pre-existing: 54 sites trust the body without checking `ok` | Characterized, not fixed. Fixing is a behavior change outside this plan; listed for the owner |
 | D2 | Pre-existing: `materials-preflight` returns 200 with `ok:false` | Preserved; helper does not interpret body flags |
-| D3 | 67 client sites parse with bare `.json()`; a non-JSON error body (an HTML 502 page) surfaces a `SyntaxError` message today and the site's fallback message after migration | Accepted deviation, recorded per site in the execution doc; not preserved behavior |
-| D4 | `response.json().catch(() => ({}))` swallows an abort raised during the body read; `readStatus`/`pollForArtifact` (`StaffDeliberationsTab.js:78-83, 354-378`) can loop on a `{}` pseudo-status | Pre-existing at `readResponse`-style sites; fixed by `readJsonBody` rethrow (§3 invariant 4) and pinned in T0 |
+| D3 | Up to 67 client sites parse with bare `.json()`; those that parse BEFORE the `ok` check (e.g. `PromptTemplatesSection.js:478`) surface a `SyntaxError` message today on a non-2xx non-JSON body and would surface the site's fallback message after migration. Sites that parse only after the `ok` check (e.g. `pages/admin.js:938-942`) never see such a body, so the real exposure is smaller [ASSUMED; resolved per site]. On 2xx the strict policy preserves today's rejection exactly | Proposed deviation, limited to non-2xx bodies. Owner decision (3) below; until decided, the implementer preserves the SyntaxError path by using `tolerantBody: false` semantics on non-2xx too, which the helper supports via `ApiRequestError.cause` (see decision text) |
+| D8 | A tolerant-by-default parser would have converted `AwardeeTab.js:547-572`'s `uncertain` send-invite outcome into `sent` on a malformed 2xx (Codex cycle 1, reproduced) | Fixed by the strict-on-success policy (§3); T0 and T2(d) pin it |
+| D4 | `response.json().catch(() => ({}))` swallows an abort raised during the body read; `readStatus` (`StaffDeliberationsTab.js:66`), `readBriefStatus` (`:76-84`) and `pollForArtifact` (`:354-378`) can loop on a `{}` pseudo-status | Pre-existing at `readResponse`-style sites; fixed by `readJsonBody` rethrow (§3 invariant 4) and pinned in T0 |
 | D5 | `search/useReviewerExport.js` was in no stage row or allowlist in the first draft | Fixed: allowlisted (§2.6, §4) |
 | D6 | A helper that threw `ApiRequestError` from the Stage 1 adapters would change `.name` at 17 sites | Avoided: Stage 1 adapters throw plain `Error` with the legacy expression (§3); T1 pins `.name === 'Error'` |
 | D7 | `shared/components/admin/PromptTemplatesSection.js:478` parses a 409 body with bare `.json()` and `shared/components/reviewers/InviteEmailModal.js:660-665` fires a side effect on 409 before throwing | Both must use `requestEnvelope`; listed for their stages |
@@ -452,7 +494,12 @@ Owner decisions requested before Stage 2: (1) confirm no-behavior-change posture
 for D1 (recommended: preserve now, fix later per site); (2) whether Stage 4
 proceeds in this cycle or waits for a quiet window, given it touches invite and
 release call sites (recommended: proceed, Tier 1 controls plus the T4 request-
-bytes diff).
+bytes diff); (3) D3: accept that a non-2xx non-JSON body shows the site's
+fallback message instead of a raw `SyntaxError` message (recommended: accept;
+the raw message is never useful to a user). If declined, the helper's tolerant
+non-2xx parse still applies but `ApiRequestError.message` falls back to the
+parse error's message when the body was unparseable, so the visible text stays
+what it is today.
 
 ## 10. Planning review receipts
 
@@ -460,5 +507,6 @@ bytes diff).
 |---|---|---|---|---|
 | P-A scope census | Opus (fresh) | `e269756a` / census brief | READY WITH NAMED CHANGES | Applied: nested `error.message` tolerance (§3), SSE not-consolidated restatement (§1, §2.6), counts corrected (215 / 14 / 118), baseline provenance noted. Reviewer's premise challenge (SSE consolidation as a sibling) accepted and recorded, not absorbed into scope. |
 | P-B design + stages | Opus (fresh) | `e269756a` / `9c122add…` | READY WITH NAMED CHANGES | Applied: `readJsonBody` with abort rethrow (§3 inv. 4, T0), Stage 1 adapters keep legacy expressions and plain `Error` (§3, D6), T3 uses exported workspace seams and drops the `admin-models` miscite, site-level lint allowlist (T6, Stage 6), `keepalive` beacon and `useReviewerExport.js` placed (§2.1, §2.6, §4), census row for bare `.json()`, D3–D7 and A4 upgrade in §9. Premise challenge accepted: the incumbent parse step is not adopted wholesale. |
-| P-C final document | Opus (fresh) | — | pending | — |
-| Codex adversarial 1 | gpt-5.6-sol | — | pending | — |
+| P-C final document | Opus (fresh) | `9efda1b6` / `611ddb63…` | READY WITH NAMED CHANGES | Applied: Stage 1↔5 `readResponse` overlap removed (§4), envelope `data`/`ok`/`status` defined and `readJsonBody` mechanics pinned to `json()`+`status` only (§3), non-object 2xx body and `signal` forwarding stated (§3), census rules and map format specified (§6 Stage 0), `readJson` retirement moved to Stage 1, admin-access count corrected to five + one (§2.3), T1 `.name` pin, T4 `ReleaseMaterialsModal` wording, T5 admin sections removed, D3 reframed as owner decision (3) with narrowed exposure, D4 line numbers, 52-vs-54 counts (§3, A3), summary/§1 qualified "except D3". 27 file:line refs spot-checked, 2 corrected. |
+| Codex adversarial 1 | Codex (ran as `gpt-6-astra`: the companion was invoked without `--model`, against the owner directive; recorded, not repeated) | `9efda1b6` / `611ddb63…` | needs-attention (1 high) | Applied: strict-on-success `readJsonBody` policy with per-site `tolerantBody`, T0/T2(d) pins, D3 narrowed, D8 added. |
+| Codex adversarial 2 | gpt-5.6-sol | — | pending | — |
