@@ -336,6 +336,13 @@ describe('AlertRecipientsSection (view="notifications") — GET/PUT /api/admin/a
     expect(await screen.findByText('Unexpected end of JSON input')).toBeInTheDocument();
   });
 
+  test('(e) GET non-2xx malformed body also surfaces the raw parse error (the parseError rethrow at :2487 runs before the ok check, so the "Failed to load" fallback is never reached)', async () => {
+    mockFetchRouter([['/api/admin/alert-recipients', () => malformedResponse(502)]]);
+    render(<OperationsWorkspace view="notifications" />);
+    expect(await screen.findByText('Unexpected end of JSON input')).toBeInTheDocument();
+    expect(screen.queryByText('Failed to load')).not.toBeInTheDocument();
+  });
+
   test('(PUT save, custom derivation with .details) sends exact body and shows error+details verbatim', async () => {
     let putCall = null;
     global.fetch = jest.fn((url, init) => {
@@ -350,6 +357,17 @@ describe('AlertRecipientsSection (view="notifications") — GET/PUT /api/admin/a
     expect(putCall.headers['Content-Type']).toBe('application/json');
     expect(putCall.body).toBe(JSON.stringify({ config: {} }));
     expect(await screen.findByText('Save failed: bad@; also-bad')).toBeInTheDocument();
+  });
+
+  test('(PUT save) malformed 2xx body surfaces the raw parse error (strict-on-success: no tolerantBody is passed, so a malformed 2xx body throws before the ok/error branches are reached)', async () => {
+    global.fetch = jest.fn((url, init) => {
+      if (init?.method === 'PUT') return Promise.resolve(malformedResponse(200));
+      return Promise.resolve(jsonResponse(200, { seedCategories: [{ key: 'default', description: 'Default' }], config: {}, fallbackRoster: [] }));
+    });
+    render(<OperationsWorkspace view="notifications" />);
+    await screen.findByText(/Default/);
+    fireEvent.click(screen.getByText('Save changes'));
+    expect(await screen.findByText('Unexpected end of JSON input')).toBeInTheDocument();
   });
 
   test('(PUT save success) refetches and shows Saved', async () => {

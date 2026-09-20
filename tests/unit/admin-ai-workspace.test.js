@@ -160,6 +160,23 @@ describe('ModelConfigSection (view="models") — GET/PUT /api/admin/models', () 
     expect(await screen.findByText('Failed to save')).toBeInTheDocument();
   });
 
+  // D3 (owner-accepted 2026-09-20): fallback text replaces the raw parse error on a non-2xx unparseable body.
+  test('PUT: a non-2xx unparseable body (502) shows the fallback "Failed to save", not the raw parse error', async () => {
+    const withOverride = {
+      apps: [{ appKey: 'literature-analyzer', models: { model: { hardcoded: 'claude-haiku', stored: 'claude-haiku', dbOverride: 'claude-haiku' }, visionModel: modelInfo(), fallback: modelInfo() } }],
+      availableModels: [{ id: 'claude-haiku', display_name: 'Haiku' }, { id: 'claude-sonnet', display_name: 'Sonnet' }],
+      tiers: [],
+      defaultModel: 'claude-haiku',
+    };
+    global.fetch = jest.fn((url, init) => Promise.resolve(init?.method === 'PUT' ? malformedResponse(502) : jsonResponse(200, withOverride)));
+    render(<AiWorkspace view="models" />);
+    const [select] = await screen.findAllByRole('combobox');
+    fireEvent.change(select, { target: { value: 'claude-sonnet' } });
+    fireEvent.click(screen.getByText('Save Changes'));
+    expect(await screen.findByText('Failed to save')).toBeInTheDocument();
+    expect(screen.queryByText('Unexpected end of JSON input')).not.toBeInTheDocument();
+  });
+
   test('PUT: 2xx success (body ignored) refetches and shows the saved-count message', async () => {
     const withOverride = {
       apps: [{ appKey: 'literature-analyzer', models: { model: { hardcoded: 'claude-haiku', stored: 'claude-haiku', dbOverride: 'claude-haiku' }, visionModel: modelInfo(), fallback: modelInfo() } }],

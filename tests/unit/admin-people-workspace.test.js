@@ -122,6 +122,21 @@ describe('RoleManagementSection (view="roles") — D1 preserve on :1583/:1602', 
     expect(await screen.findByText('Failed to assign role')).toBeInTheDocument();
   });
 
+  // D3 (owner-accepted 2026-09-20): fallback text replaces the raw parse error on a non-2xx unparseable body.
+  test('(POST assign) a non-2xx unparseable body (502) shows the fallback "Failed to assign role", not the raw parse error', async () => {
+    global.fetch = jest.fn((url, init) => {
+      if (url === '/api/dynamics-explorer/roles' && init?.method === 'POST') return Promise.resolve(malformedResponse(502));
+      if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(200, { callerRole: 'superuser', roles: [] }));
+      return Promise.resolve(jsonResponse(200, { profiles: [{ id: 9, name: 'Ann', isActive: true }] }));
+    });
+    render(<PeopleWorkspace view="roles" />);
+    await screen.findByText('Ann', { selector: 'option' });
+    fireEvent.change(screen.getByDisplayValue('Select user...'), { target: { value: '9' } });
+    fireEvent.click(screen.getByText('Assign'));
+    expect(await screen.findByText('Failed to assign role')).toBeInTheDocument();
+    expect(screen.queryByText('Unexpected end of JSON input')).not.toBeInTheDocument();
+  });
+
   test('(POST assign) 2xx success (body ignored) refetches roles', async () => {
     let rolesCallCount = 0;
     global.fetch = jest.fn((url, init) => {
@@ -188,6 +203,40 @@ describe('AppAccessSection (view="app-access") — extends app-access-admin-part
     global.fetch = jest.fn(() => Promise.resolve(malformedResponse(200)));
     render(<PeopleWorkspace view="app-access" />);
     expect(await screen.findByText('Unexpected end of JSON input')).toBeInTheDocument();
+  });
+
+  // D3 (owner-accepted 2026-09-20): fallback text replaces the raw parse error on a non-2xx unparseable body.
+  test('(:1895 grant) a non-2xx unparseable body (502) shows the fallback "Grant failed", not the raw parse error', async () => {
+    let getCount = 0;
+    global.fetch = jest.fn((url, init) => {
+      if (url.startsWith('/api/app-access') && init?.method === 'POST') return Promise.resolve(malformedResponse(502));
+      getCount += 1;
+      return Promise.resolve(jsonResponse(200, { grants: [{ user_profile_id: 8, user_name: 'Test User', apps: [] }], allApps: ['x'] }));
+    });
+    render(<PeopleWorkspace view="app-access" />);
+    await screen.findByText('Test User');
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(await screen.findByText('Grant failed. Current grants were reloaded.')).toBeInTheDocument();
+    expect(screen.queryByText(/Unexpected end of JSON input/)).not.toBeInTheDocument();
+    expect(getCount).toBeGreaterThanOrEqual(2);
+  });
+
+  // D3 (owner-accepted 2026-09-20): fallback text replaces the raw parse error on a non-2xx unparseable body.
+  test('(:1903 revoke) a non-2xx unparseable body (502) shows the fallback "Revoke failed", not the raw parse error', async () => {
+    let getCount = 0;
+    global.fetch = jest.fn((url, init) => {
+      if (url.startsWith('/api/app-access') && init?.method === 'DELETE') return Promise.resolve(malformedResponse(502));
+      getCount += 1;
+      return Promise.resolve(jsonResponse(200, { grants: [{ user_profile_id: 8, user_name: 'Test User', apps: ['x'] }], allApps: ['x'] }));
+    });
+    render(<PeopleWorkspace view="app-access" />);
+    await screen.findByText('Test User');
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(await screen.findByText('Revoke failed. Current grants were reloaded.')).toBeInTheDocument();
+    expect(screen.queryByText(/Unexpected end of JSON input/)).not.toBeInTheDocument();
+    expect(getCount).toBeGreaterThanOrEqual(2);
   });
 
   test('(:1953 DELETE remove-user) network rejection shows err.message', async () => {

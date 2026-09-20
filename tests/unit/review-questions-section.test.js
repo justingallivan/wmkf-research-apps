@@ -241,3 +241,17 @@ test('(e) save: a non-2xx unparseable body (502) shows "Save failed." (tolerant 
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
   expect(await screen.findByTestId('rq-message-error')).toHaveTextContent('Save failed.');
 });
+
+// D3-adjacent (Stage 3 correction round 1, review item 3): a 2xx save whose
+// body is empty/unparseable is tolerant (:205 `tolerantBody: true`), so
+// `data` is `{}`; `data.status !== 'completed'` is then true and the save
+// falls into today's "Save failed." fallback rather than surfacing the raw
+// parse error.
+test('(save, 2xx empty body) a 2xx save with an empty/unparseable body falls back to "Save failed." (tolerant parse)', async () => {
+  global.fetch = mockFetch({ postResponse: { ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } } });
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'edited' } });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+  expect(await screen.findByTestId('rq-message-error')).toHaveTextContent('Save failed.');
+});

@@ -510,6 +510,21 @@ test('(c) executor-budgets PUT: a network rejection is shown as the outcome text
   expect(await screen.findByText('network down')).toBeInTheDocument();
 });
 
+test('(d) executor-budgets PUT: a malformed 2xx body rejects into the same error state (strict: the parseError rethrow at :483 runs before the ok check)', async () => {
+  global.fetch.mockImplementation(async (url, options = {}) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    if (url === '/api/admin/executor-budgets' && options.method === 'PUT') return unparseable(200);
+    if (url === '/api/admin/executor-budgets') return response(budgetConfig());
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+  const maxTokens = await screen.findByLabelText(/Maximum output tokens/);
+  fireEvent.change(maxTokens, { target: { value: '40000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Publish v1' }));
+  expect(await screen.findByText('bad json')).toBeInTheDocument();
+});
+
 test('(e) executor-budgets PUT: a non-2xx unparseable body (502) never silent', async () => {
   global.fetch.mockImplementation(async (url, options = {}) => {
     if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
