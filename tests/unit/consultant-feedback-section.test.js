@@ -494,3 +494,216 @@ test('previewReadOnly disables the Add feedback button', async () => {
   await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
   expect(screen.getByRole('button', { name: 'Add feedback' })).toBeDisabled();
 });
+
+// --- Stage 2 T2 contract matrix (client-request-layer migration pins) ---
+//
+// This file had no failure-path coverage at all before this pass: every
+// existing test mocks only 2xx responses. These tests pin the visible
+// outcome of every ConsultantFeedbackSection fetch site under a non-2xx
+// response (including the dynamic `(${status})` fallback text three sites
+// build), a network rejection, a malformed 2xx body (tolerant sites), and
+// the upload-token body-level `ok` flag and delete's
+// `attachment_removal_pending` body-flag branch. Run green against the
+// UNMIGRATED component and again, unchanged, after migration onto
+// shared/utils/api-request.js. See
+// docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md §5/§6.
+
+function sampleEntry(overrides = {}) {
+  return {
+    id: '9', receivedOn: '2026-09-01', bodyHtml: '<p>Great work.</p>', shared: true,
+    consultant: { rosterId: 1, name: 'Ada Lovelace', affiliation: 'Analytical Engines' }, oneOff: false,
+    updatedAt: '2026-09-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+test('T2 load(): non-2xx entries response surfaces the dynamic status fallback', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    return Promise.resolve(jsonResponse({}, false));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('Failed to load consultant feedback (400)')).toBeInTheDocument());
+});
+
+test('T2 load(): non-2xx entries response with a body error uses that message', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    return Promise.resolve(jsonResponse({ error: 'entries down for maintenance' }, false));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('entries down for maintenance')).toBeInTheDocument());
+});
+
+test('T2 load(): a network rejection on either fetch surfaces the raw error message', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    return Promise.reject(new Error('network down'));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('network down')).toBeInTheDocument());
+});
+
+test('T2 load(): a malformed 2xx entries body is tolerated as {} (no crash, empty list)', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    return Promise.resolve({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } });
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+  expect(screen.queryByText(/failed to load/i)).not.toBeInTheDocument();
+});
+
+test('T2 load(): consultants non-2xx is silent (no error, empty roster) — branches on ok without throwing', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ error: 'roster down' }, false));
+    return Promise.resolve(jsonResponse({ items: [] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+  expect(screen.queryByText(/roster down/i)).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+  await userEvent.click(screen.getByRole('combobox'));
+  expect(screen.getByRole('listbox').children).toHaveLength(1);
+  expect(screen.getByText('No matching consultants.')).toBeInTheDocument();
+});
+
+test('T2 handleSave PATCH (edit): non-2xx with no body error uses the dynamic status fallback', async () => {
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (options?.method === 'PATCH') return Promise.resolve(jsonResponse({}, false));
+    return Promise.resolve(jsonResponse({ items: [sampleEntry()] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('Ada Lovelace')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.getByText('Save failed (400)')).toBeInTheDocument());
+});
+
+test('T2 handleSave POST (create): non-2xx with a body error uses that message', async () => {
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (options?.method === 'POST' && String(url) === '/api/workbench/consultant-feedback') {
+      return Promise.resolve(jsonResponse({ error: 'duplicate mutation' }, false));
+    }
+    return Promise.resolve(jsonResponse({ items: [] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+  await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+  await userEvent.type(screen.getByRole('textbox', { name: 'Consultant feedback' }), 'Great work.');
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.getByText('duplicate mutation')).toBeInTheDocument());
+});
+
+test('T2 handleSave: a network rejection surfaces the raw error message', async () => {
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (options?.method === 'POST' && String(url) === '/api/workbench/consultant-feedback') {
+      return Promise.reject(new Error('network down'));
+    }
+    return Promise.resolve(jsonResponse({ items: [] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+  await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+  await userEvent.type(screen.getByRole('textbox', { name: 'Consultant feedback' }), 'Great work.');
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.getByText('network down')).toBeInTheDocument());
+});
+
+test('T2 upload-token: a 2xx body with {ok:false} still throws (body-level flag branch)', async () => {
+  put.mockClear();
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (String(url).includes('/upload-token')) {
+      return Promise.resolve(jsonResponse({ ok: false, error: 'upload window closed' }));
+    }
+    return Promise.resolve(jsonResponse({ items: [] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+  await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+  await userEvent.upload(document.getElementById('consultant-feedback-attachment'), pdfFile());
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.getByText('upload window closed')).toBeInTheDocument());
+  expect(put).not.toHaveBeenCalled();
+});
+
+test('T2 finalize (attachment-only create): non-2xx falls back to the fixed attachment message', async () => {
+  put.mockResolvedValue({});
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (String(url).includes('/upload-token')) {
+      return Promise.resolve(jsonResponse({ ok: true, stagingId: 'staging-1', pathname: 'x', clientToken: 'tok', contentType: 'application/pdf' }));
+    }
+    if (String(url).includes('/finalize')) return Promise.resolve(jsonResponse({}, false));
+    return Promise.resolve(jsonResponse({ items: [] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+  await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+  await userEvent.upload(document.getElementById('consultant-feedback-attachment'), pdfFile());
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.getByText('The attachment could not be saved.')).toBeInTheDocument());
+});
+
+test('T2 handleDelete: attachment_removal_pending clears the row via reload (the branch never throws)', async () => {
+  // The branch calls setError('Attachment removed, delete again.') and then
+  // immediately await load(), whose own setError(null) at the top of the
+  // same synchronous call wins the batch — so today this message never
+  // renders; the observable outcome is just the reload clearing the row
+  // with no error surfaced. This test pins that ACTUAL behavior, not the
+  // apparent intent of the inline comment.
+  let deleteAttempts = 0;
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (options?.method === 'DELETE') {
+      deleteAttempts += 1;
+      return Promise.resolve(jsonResponse({ error: 'attachment removal pending', reason: 'attachment_removal_pending' }, false));
+    }
+    return Promise.resolve(jsonResponse({ items: deleteAttempts > 0 ? [] : [sampleEntry()] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('Ada Lovelace')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+  expect(screen.queryByText(/attachment removed/i)).not.toBeInTheDocument();
+});
+
+test('T2 handleDelete: a generic non-2xx with no body error uses the dynamic status fallback', async () => {
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (options?.method === 'DELETE') return Promise.resolve(jsonResponse({}, false));
+    return Promise.resolve(jsonResponse({ items: [sampleEntry()] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('Ada Lovelace')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+  await waitFor(() => expect(screen.getByText('Delete failed (400)')).toBeInTheDocument());
+});
+
+test('T2 handleDelete: a network rejection surfaces the raw error message', async () => {
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (options?.method === 'DELETE') return Promise.reject(new Error('network down'));
+    return Promise.resolve(jsonResponse({ items: [sampleEntry()] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('Ada Lovelace')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+  await waitFor(() => expect(screen.getByText('network down')).toBeInTheDocument());
+});
