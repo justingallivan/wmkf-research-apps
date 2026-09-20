@@ -1224,6 +1224,17 @@ each triggering a Fast Refresh.
   branch (service adds a safe `detail` on `write_failed`; dialog copy gets a
   system-blame + retry/administrator ladder per
   `feedback-user-facing-error-copy-voice`); not part of the migration.
+  **Built and owner-approved 2026-09-20** ("approve"): `896796ed`
+  (`withdraw-sufficient-service.js` `classifyWriteFailure` → `failure` ∈
+  write_interlocked / dataverse_forbidden / not_found / dataverse_unavailable /
+  unknown, raw message never forwarded), `ba3741db` (`ReleaseEmailModal`
+  five cause + recovery sentences keyed by `failure`), `250e7b9c`
+  (`terminal-transition.js` same classification; also removed the previously
+  forwarded raw `error` text), `a41d3716` (`AcceptedReviewerReleaseModal`
+  same sentences). Orchestrator read all four diffs: classification mirrors
+  `close-review.js` `mapWriteError`; `changed_skipped` untouched; the
+  `ReviewerManagePanel.js:884` alert path reads only `.status` and is
+  unaffected; route passes `results` through (docblock updated).
 - Step 6 (closeout, `ReviewerCloseoutModal` via the manage menu): request
   1003222 (ZZTEST-03 copy), reviewer with review received. **PASSED**: red
   message "Closeout writes are blocked in this environment by the Dataverse

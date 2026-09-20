@@ -7,7 +7,9 @@
  *           sendEmail?: boolean,   // false releases without the courtesy email for either reason
  *           overrides?: { <suggestionId>:
  *             { subject, bodyText, to, from, senderId } } }
- *   → { ok: true, withdrawn: N, results: [{ suggestionId, status, reason }] }
+ *   → { ok: true, withdrawn: N, results: [{ suggestionId, status, reason, failure? }] }
+ *     (`failure` only on status 'write_failed': a fixed client-safe code, never
+ *     the upstream error text — see withdraw-sufficient-service.js)
  *
  * `overrides` carries complete staff-reviewed copy plus the previewed recipient
  * and sender. Identity values are expected-value guards only and can never
