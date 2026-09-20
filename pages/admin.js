@@ -210,11 +210,12 @@ function HealthSection() {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    // D1 PRESERVE: no ok check today, so a non-2xx response with a parseable
-    // body is still read as if it were success. Kept as-is; see plan §9.
+    // D1 fix: a non-2xx response now routes through the same error path a
+    // network failure already used, instead of being read as if it were
+    // success (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
     requestEnvelope('/api/health')
       .then((envelope) => {
-        if (envelope.error?.parseError) throw envelope.error.parseError;
+        if (!envelope.ok) throw envelope.error;
         return envelope.data;
       })
       .then(setHealth)
@@ -302,6 +303,9 @@ function HealthSection() {
           );
         })}
       </div>
+      )}
+      {health.error && (
+        <p className="text-sm text-red-700 mt-3">{health.error}</p>
       )}
       {health.timestamp && (
         <p className="text-xs text-gray-400 mt-3">Checked at {new Date(health.timestamp).toLocaleString()}</p>
@@ -1581,15 +1585,20 @@ function RoleManagementSection() {
   const [message, setMessage] = useState(null);
 
   const fetchRoles = () => {
-    // D1 PRESERVE: only 401/403 are guarded; any other non-2xx status still
-    // has its body read as if it were success. Kept as-is; see plan §9.
+    // D1 fix: the 401/403 branch is unchanged (still hides the section as
+    // "denied"). Any other non-2xx status now surfaces the server's error in
+    // the existing `message` banner instead of being read as if it were
+    // success (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
     requestEnvelope('/api/dynamics-explorer/roles')
       .then(envelope => {
         if (envelope.status === 403 || envelope.status === 401) {
           setCallerRole('denied');
           return null;
         }
-        if (envelope.error?.parseError) throw envelope.error.parseError;
+        if (!envelope.ok) {
+          setMessage({ type: 'error', text: envelope.error.message });
+          return null;
+        }
         return envelope.data;
       })
       .then(data => {
@@ -1603,15 +1612,18 @@ function RoleManagementSection() {
 
   useEffect(() => {
     fetchRoles();
-    // D1 PRESERVE: bare .json() unconditionally, so a non-2xx with a
-    // parseable body is still read as if it were success. Kept as-is; see
-    // plan §9.
+    // D1 fix: a non-2xx response now surfaces the server's error in the
+    // existing `message` banner instead of being read as if it were success.
+    // The `.catch(() => {})` here still only covers network/parse failures,
+    // unchanged from before (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
     requestEnvelope('/api/user-profiles?all=true')
       .then(envelope => {
-        if (envelope.error?.parseError) throw envelope.error.parseError;
-        return envelope.data;
+        if (!envelope.ok) {
+          setMessage({ type: 'error', text: envelope.error.message });
+          return;
+        }
+        setUsers(envelope.data.profiles || []);
       })
-      .then(data => setUsers(data.profiles || []))
       .catch(() => {});
   }, []);
 
@@ -1619,7 +1631,20 @@ function RoleManagementSection() {
     return <div className="text-gray-500 text-sm">Loading...</div>;
   }
 
-  if (callerRole !== 'superuser') return null;
+  // D1 fix: a generic (non-401/403) load failure leaves callerRole unset, so
+  // this used to hide the section with no message. Reuse the same `message`
+  // banner the save/remove actions already render, instead of adding a new
+  // error surface (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+  if (callerRole !== 'superuser') {
+    if (!message) return null;
+    return (
+      <div className={`mb-4 px-3 py-2 rounded-lg text-sm ${
+        message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+      }`}>
+        {message.text}
+      </div>
+    );
+  }
 
   const assignRole = async () => {
     if (!selectedUser) return;
