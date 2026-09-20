@@ -1004,6 +1004,16 @@ pages in the route manifest. Commits: `3cb3fa4a9`/`0c93e0467`
 Process note: the group 2 implementer split its 12 remaining files across three
 parallel sub-agents it supervised; commits are per file as required.
 
+D3 split (Stage 5a review): `pages/phase-i-dynamics.js:77,104` took the
+**accept** branch — `throw new Error(envelope.data.error || \`Lookup failed
+(${envelope.status})\`)`, a static fallback with the status suffix restored
+by hand — while `pages/grant-reporting.js`, `pages/dataverse-bulk-export.js`,
+and `pages/phase-ii-writeup.js` took the **decline** branch — `if
+(envelope.error?.parseError) throw envelope.error.parseError;`, rethrowing
+the raw parse error and preserving old-code behavior exactly (`grant-
+reporting.js:148,183,223,257`; `dataverse-bulk-export.js:212,343`;
+`phase-ii-writeup.js:175`) [VERIFIED by reading all four files].
+
 ### Group 1: shared components (logged 2026-09-20; fresh review pending with group 2)
 
 24 files, 52 JSON sites migrated; one raw site remains, the `ReviewsTab.js:320`
@@ -1014,10 +1024,48 @@ final commit: full suite 1041 suites / 15347 tests green; lint 0 errors
 (transient unused-directive warning on the blob site until Stage 6);
 `check:types` clean; `grep fetch(` over the 24 files finds only the blob site.
 
+**Per-file tier determination (Stage 5a review, campaign_critical files).**
+The source-to-stage map marks 4 of this group's files `campaign_critical:
+true`: `ManualReviewEntryForm.js`, `PreSiteDistributionPanel.js`,
+`ReviewerFollowUpPanel.js`, `ReviewsTab.js`. They ran under Stage 5a's
+blanket Tier 1 heading; this pass checks each against the plan's own
+Tier 2 trigger (email send or durable reviewer-state write) by reading its
+endpoints, since the stage-level tier and the file-level risk are not the
+same thing.
+
+- `ManualReviewEntryForm.js` calls `GET /api/review-manager/manual-review-entry`
+  (load) and `POST /api/review-manager/manual-review-entry` (submit). The
+  route's own docblock: "POST commits the complete answer snapshot and
+  parent receipt atomically." No email send, but a durable reviewer-state
+  write. **Requires Tier 2** (preview rehearsal before merge) on the write
+  path.
+- `PreSiteDistributionPanel.js` calls `POST /api/workbench/pre-site-visit/distribution/prepare`,
+  `POST /api/workbench/pre-site-visit/briefing-link`, and
+  `POST /api/workbench/pre-site-visit/distribution/send`. The send route's
+  own docblock: "Send one previously confirmed frozen distribution preview
+  through Dynamics." **Requires Tier 2**: it sends email.
+- `ReviewsTab.js` calls `POST /api/review-manager/synthesize-reviews`,
+  `POST /api/review-manager/send-review-reminder`, and
+  `GET /api/review-manager/reviewers` (plus the allowlisted
+  `export-reviews` blob download). `send-review-reminder`'s own docblock:
+  "`action:'send'` accepts that complete reviewed copy" — sends the
+  reminder email. `synthesize-reviews` writes AI-synthesized review state.
+  **Requires Tier 2**: it sends email and writes durable state.
+- `ReviewerFollowUpPanel.js` calls `GET /api/workbench/dashboard` and
+  `GET /api/review-manager/reviewers` only — both reads, no email, no
+  write. **Tier 1 is sufficient** for this file.
+
+Net: 3 of the 4 campaign_critical files in this group (all but
+`ReviewerFollowUpPanel.js`) met the plan's own Tier 2 trigger and should
+have run under Tier 2 controls rather than Stage 5a's Tier 1 heading. This
+is a process finding for the owner to weigh, not a code change; no gate
+result above is affected, since Gate G ran regardless of tier at each
+group's final commit.
+
 | File | Sites | Form / policy |
 |---|---|---|
 | `ReviewsTab.js` | 4 (1 blob) | synthesize POST, send-reminder POST, reviewers GET → envelope tolerant; new test file (15) |
-| `PreSiteDistributionPanel.js` | 4 | requestJson/envelope tolerant; rule (i) at reissue's fallback-less throw; gap file (8) |
+| `PreSiteDistributionPanel.js` | 4 | requestJson/envelope tolerant; **rule (i)** (defined here, first use) — at a fallback-less throw, use `throw new Error(data.error || envelope.error.message)` instead of a static string, so a non-2xx body with no `error` field surfaces the helper's own `Request failed (<status>)` text rather than a hand-picked fallback; applied at reissue's fallback-less throw (`PreSiteDistributionPanel.js:610`, `body.error \|\| envelopeError.message`); gap file (8) |
 | `InitialAssessmentTab.js` | 4 | requestJson, D3 static fallback (no pinned interpolation); gap file (4) |
 | `RequestListPanel.js` | 2 | dashboard GET kept **envelope** to preserve the pinned `Failed to load requests (403)`; triage POST requestJson |
 | `RequestLocator.js`, `ProposalTab.js`, `WorkbenchShell.js`, `FinalWriteupsViews.js` | 2/2/1/3 | requestJson static fallback (D3 drops the status suffix; no pin existed); GET call-shape fixes in their tests |
@@ -1042,13 +1090,32 @@ files (PreSiteDistributionPanel, InitialAssessmentTab, ReviewerFollowUpPanel,
 ManualReviewEntryForm, others) the migration was written before the test and
 the test was **not** confirmed red against unmigrated code, though the test
 commit still precedes the code commit; red-before-green or a live mutation was
-confirmed for ReviewsTab, RequestListPanel, and the GET call-shape fixes; (3) D3
-static-fallback drops in the files named above after checking for pins; (4)
-`ProfileLinkingDialog` axis-(e) change; (5) GET call-shape fixes touched seven
-test files (`workbench-shell`, `initial-assessment-tab`,
-`artifact-version-history`, `request-locator-controls`,
-`workbench-proposal-tab-documents`, `reviewer-follow-up`,
-`workbench-request-number-lookup`), all for endpoints migrated this stage.
+confirmed for ReviewsTab, RequestListPanel, and the GET call-shape fixes; (3)
+status-suffix drops at five files (`InitialAssessmentTab.js`, `ProposalTab.js`,
+`RequestLocator.js`, `WorkbenchShell.js`, `FinalWriteupsViews.js`) — the
+migration's static `fallbackMessage` on `requestJson` dropped the interpolated
+`(${status})` five old-code call sites carried — were **reverted to parity**
+in the Stage 5a review round: each site now uses `requestEnvelope` with an
+explicit `data.error || \`... (${status})\`` throw, matching
+`RequestListPanel.js`. Commits: `523028d7`/`7d545f19` (InitialAssessmentTab),
+`2710b193`/`3d711b06` (ProposalTab), `42a58326`/`722fe9ac` (RequestLocator),
+`014c64e7`/`f067b882` (WorkbenchShell), `9715f730`/`cf0fcff1`
+(FinalWriteupsViews); (4) `ProfileLinkingDialog` axis-(e) change; (5) GET
+call-shape fixes touched seven test files (`workbench-shell`,
+`initial-assessment-tab`, `artifact-version-history`,
+`request-locator-controls`, `workbench-proposal-tab-documents`,
+`reviewer-follow-up`, `workbench-request-number-lookup`), all for endpoints
+migrated this stage; (6) **rule (i)'s** own fallback (`Request failed
+(<status>)`, from the shared helper's `deriveErrorMessage`) is a visible
+IMPROVEMENT, not a regression, at the two sites where it was applied: old
+code at both was a fallback-less `throw new Error(body.error)`, which is
+`new Error(undefined)` when `body.error` is absent — an empty-string message
+that is falsy and so renders no banner at all
+(`PreSiteDistributionPanel.js:610`, pre-migration at `87289fb9c^:611`;
+`SessionAgendaPanel.js:319`, pre-migration at `47298cb2e^:316`). Migrated
+code now shows `Request failed (<status>)` in that case instead of nothing —
+pending owner acceptance that a visible generic message is preferable to a
+silent one at these two sites.
 
 ## Stage 5b — external token pages, upload-adjacent forms, email pages (Tier 2)
 
