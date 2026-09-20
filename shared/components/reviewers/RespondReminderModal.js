@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
+import { requestEnvelope } from '../../utils/api-request';
 
 const ERROR_MESSAGE = {
   removed: 'This reviewer was removed from the proposal — restore them first.',
@@ -49,19 +50,19 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
     setLoadError(null);
     setSendFeedback(null);
     try {
-      const resp = await fetch('/api/review-manager/send-review-reminder', {
+      const envelope = await requestEnvelope('/api/review-manager/send-review-reminder', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionId: candidate.suggestionId,
           kind: 'respond',
           action: 'preview',
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await resp.json().catch(() => ({}));
+      const data = envelope.data;
       if (!mountedRef.current || generation !== loadGenerationRef.current) return;
-      if (!resp.ok || !data.ok || !data.draft) {
+      if (!envelope.ok || !data.ok || !data.draft) {
         setLoadError(responseError(data, 'Could not load the reminder preview.'));
         if (onStale && ['removed', 'revoked', 'not_found'].includes(data.reason)) onStale();
         return;
@@ -102,10 +103,9 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
     setSending(true);
     setSendFeedback(null);
     try {
-      const resp = await fetch('/api/review-manager/send-review-reminder', {
+      const envelope = await requestEnvelope('/api/review-manager/send-review-reminder', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionId: candidate.suggestionId,
           kind: 'respond',
@@ -117,11 +117,12 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
             from: draft.from,
             senderId: draft.senderId,
           },
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await resp.json().catch(() => ({}));
+      const data = envelope.data;
       if (!mountedRef.current || generation !== sendGenerationRef.current) return;
-      if (!resp.ok || !data.ok) {
+      if (!envelope.ok || !data.ok) {
         setSendFeedback({
           status: data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed',
           message: responseError(data, 'Could not send the reminder. Refresh and try again.'),
