@@ -96,9 +96,14 @@ request bytes change, so the tier follows the surface, not the diff:
   decision (4) in §9.
 Stage 0's census tags every file whose endpoints match
 `/api/review-manager/*`, `/api/external/*`, `/api/scheduled-emails*`,
-`/api/upload*`, or contain `send`, `invite`, `reminder`, `release`, `close` as
-campaign-critical; those files belong to Stage 4 or 5b and cannot be placed in
-a Tier 1 stage by the long-tail rule (Codex cycle 2 finding).
+`/api/upload*`, or contain `send`, `invite`, `reminder`, `release`, `close`,
+`email` as campaign-critical; those files belong to Stage 4 or 5b, never a
+Tier 1 stage (Codex cycle 2 finding). The tag is a URL-literal heuristic, not a
+guarantee: 8 census sites have a dynamic endpoint and cannot be tagged, and
+the rule can misfire (Stage 0 review: `pages/profile-settings.js` flagged on a
+GET of `/api/email-defaults/grantee-invite`). Tier placement is therefore
+confirmed per file at each stage's start against the endpoints actually
+called, and the census column is the starting list, not the verdict.
 
 ## 2. Verified contract and preserved differences
 
@@ -121,8 +126,12 @@ All items below were checked against `e269756a` on 2026-09-19.
 | Body parsed with bare `.json()` (no catch) | 67 sites [VERIFIED P-B] |
 | Non-standard fetch init options | `keepalive: true` at one site (`shared/components/external/GranteeDeliverableForm.js:152-163`, a fire-and-forget beacon); no `credentials`/`cache`/`redirect`/`mode` anywhere |
 
-The census script and its CSV outputs are regenerated and committed in Stage 0
-(§6) so later stages diff against a tracked baseline, not a scratch file.
+The census script is committed in Stage 0 (§6); its CSV outputs are written
+to a caller-supplied directory and are NOT committed. The tracked baseline is
+the by-file table in the execution doc. Stage 0's run found 309 sites, not
+308: `shared/components/meeting-tracker/SessionEditor.js:321` holds two
+`fetch(` calls on one line and the planning scan counted one per line
+[VERIFIED by reading the line]. Stage 0's numbers supersede this table.
 
 ### 2.2 Server error shape [VERIFIED via grep over `pages/api`]
 - 716 sites return `res.status(n).json({ error: <string> })`; 3 return
@@ -168,9 +177,13 @@ message and branch, it does not unify them.
 - `sendJson(url, method, body, fetchImpl = fetch)` at
   `shared/components/meeting-tracker/SessionEditor.js:26-35`: JSON POST/PATCH,
   ok-check-then-throw with a site-specific fallback message, injectable
-  `fetchImpl` for tests. It parses through a file-local `readJson(response)`
-  (`:22-24`, `response.json().catch(() => ({}))`) that goes dead in Stage 1 and
-  is removed there.
+  `fetchImpl` for tests. `sendJson` issues its request through `fetchImpl`, so
+  it contributes no raw `fetch(` census site; it has 7 callers. It parses
+  through a file-local `readJson(response)` (`:22-24`,
+  `response.json().catch(() => ({}))`) which is ALSO called directly at `:306`
+  and `:324` on the file's four raw fetch sites (`:305`, `:321` twice, `:322`)
+  [VERIFIED; the Stage 0 review caught the earlier "dead after Stage 1" claim].
+  `readJson` is therefore a fourth Stage 1 adapter, folded, not deleted.
 - Several single-endpoint local wrappers (`readStatus`/`readBriefStatus` in
   `shared/components/workbench/StaffDeliberationsTab.js`,
   `fetchStatus`/`fetchAcknowledgementState` in
@@ -342,11 +355,11 @@ surface.
 
 | Stage | Group | Files (JSON call sites) |
 |---|---|---|
-| 1 | Fold existing helpers, zero behavior change | `review-panel-ui.js` `readResponse` (6 consumer sites in `pages/review-panel.js` and `ReviewPanelTab.js`), the local `readResponse` in `pages/cycle-dossier.js:72-75` (7 sites), `SessionEditor.js` `sendJson` (3 sites); all 16 sites unchanged by construction |
+| 1 | Fold existing helpers, zero behavior change | Four adapters: `review-panel-ui.js` `readResponse` (6 consumer sites: `pages/review-panel.js:44,89,110`; `ReviewPanelTab.js:251,279,289`), the local `readResponse` in `pages/cycle-dossier.js:72-75` (7 sites), `SessionEditor.js` `readJson` (:22-24; 4 raw sites at :305, :321 ×2, :322) and `sendJson` (:26-35; 7 callers, no raw sites). 17 raw sites flow through them; none is edited |
 | 2 | Highest-count files that already have an RTL render test and a single dominant error surface | `AwardeeTab.js` (13 json + 1 excluded), `StaffDeliberationsTab.js` (8), `ConsultantFeedbackSection.js` (8), `pages/expertise-finder.js` (8), `FinalWriteupTab.js` (5); `pages/cycle-dossier.js`, `pages/review-panel.js`, `ReviewPanelTab.js` (all sites already through the adapters folded in Stage 1; verify only, no edits) |
 | 3 | Admin surface | `shared/components/admin/*` sections with sites (`PromptTemplatesSection` 5, `SiteVisitRecipientsSection` 4, `OperationalEventsSection` 3, `ReviewQuestionsSection` 3, `DynamicsExplorerRestrictionsSection` 3, `PoliciesSection` 2, `EmailDefaultsSection` 2, `FinalWriteupMatrixAudiencesSection` 2, `SiteVisitMaterialsDefaultsSection` 2, `MeetingTrackerDefaultsSection` 2, `ReviewerRepairAlertDetails` 1), then `pages/admin.js` (32) section by section |
-| 4 | Reviewer engagement surface (Tier 2 re-check at stage start; see §1) | `InviteEmailModal.js` (10), `ReviewerInvitePanel.js` (5 + 1 blob excluded), `ReviewerManagePanel.js` (6), `ReviewersTab.js` (5), `ReviewerFindPanel.js` (5), `ReleaseMaterialsModal.js` (4 + 1 stream excluded), `search/useReviewerContactActions.js` (8), `search/useReviewerRosterActions.js` (4), `search/useReviewerPromotion.js` (4), `search/useReviewerDiscovery.js` (4), `search/useReviewerExport.js` (0 migrated; its single site is the allowlisted blob download), `CandidateEditModal.js`, `CampaignConfigModal.js`, `RespondReminderModal.js`, `RemoveEntirelyModal.js`, `ReleaseEmailModal.js`, `ReviewReminderAction.js` (1, `/api/review-manager/send-review-reminder`), `ReviewerDueDateEditor.js` (1, `review-due-extension`), `AcceptedReviewerReleaseModal.js` (1, `terminal-transition`), `ReviewerCloseoutModal.js` (1, `close-review`), `email-template-store.js`, `prompt-override-store.js`. Tier 2. |
-| 5a (Tier 1) / 5b (Tier 2) | Long tail; 5b is every external-token page and upload-adjacent form (`pages/external/**`, `ReviewAuthoringForm`, `GranteeDeliverableForm`, `scheduled-emails`), 5a is everything else | every remaining file in the census with at least one JSON site: workbench (`ReviewsTab`, `PreSiteDistributionPanel`, `InitialAssessmentTab`, `RequestListPanel`, `RequestLocator`, `ProposalTab`, `ManualReviewEntryForm`, `AwardeesPanel`, `ArtifactVersionHistory`, `OverviewTab`, `ReviewerFollowUpPanel`, `useSiteVisitContext`), meeting-tracker (`MeetingTrackerList`, `SiteVisitEditor`, `SessionAgendaPanel`, `SiteVisitMaterialsCard`), external (`ReviewAuthoringForm`, `GranteeDeliverableForm`, `pages/external/**`), `ProfileLinkingDialog`, `RosterContactField`, `FinalWriteupsViews`, and pages (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dynamics-explorer`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, and the Executor tool pages' non-stream sites) |
+| 4 | Reviewer engagement surface (Tier 2 re-check at stage start; see §1) | `InviteEmailModal.js` (10), `ReviewerInvitePanel.js` (5 + 1 blob excluded), `ReviewerManagePanel.js` (6), `ReviewersTab.js` (5), `ReviewerFindPanel.js` (5), `ReleaseMaterialsModal.js` (4 + 1 stream excluded), `search/useReviewerContactActions.js` (8), `search/useReviewerRosterActions.js` (4), `search/useReviewerPromotion.js` (4), `search/useReviewerDiscovery.js` (4), `search/useReviewerExport.js` (0 migrated; its single site is the allowlisted blob download), `CandidateEditModal.js`, `CampaignConfigModal.js`, `RespondReminderModal.js`, `RemoveEntirelyModal.js`, `ReleaseEmailModal.js`, `ReviewReminderAction.js` (1, `/api/review-manager/send-review-reminder`), `ReviewerDueDateEditor.js` (1, `review-due-extension`), `AcceptedReviewerReleaseModal.js` (1, `terminal-transition`), `ReviewerCloseoutModal.js` (1, `close-review`), `email-template-store.js`, `prompt-override-store.js`, `search/useApplicantReviewerEnrichment.js` (1), `search/useReviewerRoster.js` (1) [the two hooks placed here by the Stage 0 review; ASSUMED until their endpoints are read at stage start]. Tier 2. |
+| 5a (Tier 1) / 5b (Tier 2) | Long tail; 5b is every external-token page, upload-adjacent form, and email-sending page (`pages/external/**`, `ReviewAuthoringForm`, `GranteeDeliverableForm`, `scheduled-emails`, `pages/test-email.js`), 5a is everything else including `shared/components/Layout.js:35` (`/api/admin/alerts?summary=true`) and `pages/workbench/[requestId].js:127` (`resolve-request`); `pages/profile-settings.js:147` is owner decision (6) | every remaining file in the census with at least one JSON site: workbench (`ReviewsTab`, `PreSiteDistributionPanel`, `InitialAssessmentTab`, `RequestListPanel`, `RequestLocator`, `ProposalTab`, `ManualReviewEntryForm`, `AwardeesPanel`, `ArtifactVersionHistory`, `OverviewTab`, `ReviewerFollowUpPanel`, `useSiteVisitContext`), meeting-tracker (`MeetingTrackerList`, `SiteVisitEditor`, `SessionAgendaPanel`, `SiteVisitMaterialsCard`), external (`ReviewAuthoringForm`, `GranteeDeliverableForm`, `pages/external/**`), `ProfileLinkingDialog`, `RosterContactField`, `FinalWriteupsViews`, and pages (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dynamics-explorer`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, and the Executor tool pages' non-stream sites) |
 | 6 | Closeout ratchet | ESLint `no-restricted-syntax` for raw `fetch(` in a `files: ['shared/components/**/*.js','pages/**/*.js'], ignores: ['pages/api/**']` flat-config block; the §2.6 allowlist is expressed as a per-site `eslint-disable-next-line` with a reason, never a file-level ignore |
 
 Stage 5 is always two stages: 5a (Tier 1: workbench, meeting-tracker, admin
@@ -400,13 +413,14 @@ Exit: helper landed unused, census tracked, execution doc created with the
 source-to-stage map. Rollback: revert the two commits; nothing else changed.
 
 ### Stage 1 — Fold existing helpers
-Before: T1. Do: reimplement both `readResponse` copies and `sendJson` over
-`readJsonBody(response, { tolerantBody: true })`, keeping exports, signatures,
-and message text; delete the now-dead file-local `readJson` in
-`SessionEditor.js`. Do not replace the cycle-dossier local copy with an import
-of the shared one in this stage (that is a call-site edit; Stage 2 may do it). Verify: T1 and all consumer
-tests green; diff of every thrown message string is empty. Exit: 16 sites now
-route through the helper with no call-site edits. Rollback: revert one commit.
+Before: T1. Do: reimplement both `readResponse` copies, `SessionEditor.js`'s
+`readJson`, and `sendJson` over `readJsonBody(response, { tolerantBody: true })`,
+keeping exports, signatures, and message text. `readJson` stays (it has two
+direct callers at `:306` and `:324`); nothing is deleted in this stage. Do not
+replace the cycle-dossier local copy with an import of the shared one here
+(that is a call-site edit; Stage 2 may do it). Verify: T1 and all consumer
+tests green; diff of every thrown message string is empty. Exit: 17 raw
+sites now route through the helper via four adapters with no call-site edits. Rollback: revert one commit.
 
 ### Stage 2 — Covered high-count files
 Before: T2 for each file. Do: migrate each file whole, in the §4 order, one
@@ -564,7 +578,10 @@ token click-through in the preview deployment satisfies the strategy's
 the owner did not build any of it, so the owner is not a builder-tester, and
 the rehearsal is recorded in the execution doc). (5) Stage 4 rehearsal data
 mode: Mode A by default; Mode D only if the owner wants real records exercised,
-with the expected-writes and cleanup list written first.
+with the expected-writes and cleanup list written first. (6) `pages/profile-settings.js:147`
+reads `/api/email-defaults/grantee-invite` (a GET of a template default; the
+census tag fired on `invite`): place in 5a as an internal read (recommended) or
+in 5b under the letter of the tag rule.
 
 ## 10. Planning review receipts
 
