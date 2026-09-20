@@ -246,3 +246,18 @@ Informational: `16719450` carried a one-line pin change that belonged in its
 test commit; four pins deliberately flipped silent → visible (the intended
 change); none of these sites passes a `fallbackMessage`, so the D3 text is the
 bare `Request failed (<status>)` (owner may want friendlier strings later).
+
+## 10. Sibling defect D10: send routes treat a malformed 2xx as "failed" (found Stage 4 review, 2026-09-20)
+
+`RespondReminderModal.js:~122` and `ReviewReminderAction.js:~114`
+(`/api/review-manager/send-review-reminder`) and `ReviewerDueDateEditor.js:~129`
+(`review-due-extension`) parse tolerantly, so a 2xx whose body is unparseable
+yields `{}` → `reason` undefined → the receipt renders `failed` and offers a
+retry. A 2xx from a send route most likely means the email already went out,
+so the honest receipt is `uncertain` (as `AwardeeTab` send-invite does via
+`envelope.error?.parseError` on non-2xx, and as these sites already do in their
+network-failure catch). Pre-existing behavior, preserved by Stage 4. Fix: on
+2xx, detect the unparseable body (use the strict form and map the rejection, or
+the function-form `tolerantBody` sentinel as `ReviewerManagePanel` updateStatus
+does) and route to the existing `uncertain` receipt. Tier 2 (email semantics).
+Ship with the Stage 4 D1 batch.

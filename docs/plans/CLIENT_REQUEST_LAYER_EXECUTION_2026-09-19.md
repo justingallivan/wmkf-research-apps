@@ -861,3 +861,41 @@ ab29913c, d11647ae, 856a135e, fe293a62, 3aa7b84b, f878d44d, 6ac0e51c.
 allowlisted; 4 D1-preserve sites carried; T4 tests added ≈180. Fresh review,
 full Gate G, and the Tier 2 preview rehearsal (owner authorized the branch push
 2026-09-20) pending below.
+
+### Stage 4 fresh review (Opus, no inherited context, at `6ac0e51c6`) — READY WITH NAMED CHANGES
+
+No behavior change found at any migrated site. Confirmed: request bytes
+PRESERVED at every non-GET invite/reminder/release/closeout/send site (group B
+kept literal `JSON.stringify` + headers; group A's object bodies stringify in
+the same key order with the same `Content-Type` casing); receipt semantics
+PRESERVED (RespondReminderModal `send_unconfirmed` → `uncertain`, catch →
+`uncertain`; ReviewReminderAction; InviteEmailModal markManualInviteSent and
+requestAddressRepair; ReviewerManagePanel updateStatus sentinel + `parseError`
+mapping both halves correct); body-level `.success`/`data.code`/`data.lookup`
+branches intact with 200 and 409 fixtures; the a9eeb5de sweep held tests only.
+
+Named changes (hygiene, blocking before merge), applied in the correction round:
+1. `InviteEmailModal.js:293` invite-timing GET was left raw instead of migrated
+   ungated (the D1-preserve rule is migrate-without-guard, as
+   `email-template-store.js:109` was). Migrated.
+2. Five group-B §2.6 annotations used a bare `// raw fetch:` form that the
+   Stage 6 ratchet will not exempt; normalized to
+   `// eslint-disable-next-line no-restricted-syntax -- <reason>`.
+3. `useReviewerExport.js:58` blob site had no annotation; added.
+4. `ReviewerManagePanel.releaseReviewer` terminal-transition POST had no
+   request-bytes pin; added. The withdraw-sufficient body assertion upgraded to
+   exact bytes (Tier 2 release write). Other order-insensitive body assertions
+   left as is (non-blocking).
+
+Process deviations recorded: four Stage 4 commits combined tests and refactor
+(fe293a624, 3aa7b84b3, f878d44d3, 6ac0e51c6), so the "green against unmigrated
+code" run is unrecorded for those files though the implementer reports doing
+it; 435ba78ad migrated four one-site files in one commit. Three refactor commits
+carry call-shape-only test matcher edits (explicit GET init), same precedent as
+Stage 3.
+
+Premise challenge accepted as a follow-up, not a Stage 4 change: on the send
+routes a malformed/unparseable 2xx most likely means the email DID go out, yet
+`RespondReminderModal.js:122`, `ReviewReminderAction.js:114`, and
+`ReviewerDueDateEditor.js:129` render `failed` and invite a resend. Faithfully
+preserved here; recorded as D10 in the D1 follow-up doc.
