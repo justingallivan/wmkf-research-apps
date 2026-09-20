@@ -11,7 +11,7 @@
  * unmigrated code first (must pass), then unchanged after each migration
  * commit.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react';
 import { PeopleWorkspace } from '../../pages/admin';
 
 const jsonResponse = (status, body) => ({
@@ -57,6 +57,9 @@ describe('RoleManagementSection (view="roles") — D1 fix on :1583/:1602', () =>
     });
     const { container } = render(<PeopleWorkspace view="roles" />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+    // Let the user-profiles promise chain settle before asserting absence.
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(screen.queryByText('Superuser access required')).not.toBeInTheDocument();
     expect(screen.queryByText('Forbidden')).not.toBeInTheDocument();
     expect(screen.queryByText('Assign')).not.toBeInTheDocument();
