@@ -1066,9 +1066,9 @@ group's final commit.
 |---|---|---|
 | `ReviewsTab.js` | 4 (1 blob) | synthesize POST, send-reminder POST, reviewers GET → envelope tolerant; new test file (15) |
 | `PreSiteDistributionPanel.js` | 4 | requestJson/envelope tolerant; **rule (i)** (defined here, first use) — at a fallback-less throw, use `throw new Error(data.error || envelope.error.message)` instead of a static string, so a non-2xx body with no `error` field surfaces the helper's own `Request failed (<status>)` text rather than a hand-picked fallback; applied at reissue's fallback-less throw (`PreSiteDistributionPanel.js:610`, `body.error \|\| envelopeError.message`); gap file (8) |
-| `InitialAssessmentTab.js` | 4 | requestJson, D3 static fallback (no pinned interpolation); gap file (4) |
+| `InitialAssessmentTab.js` | 4 | requestEnvelope tolerant; explicit `data.error \|\| \`… (${status})\`` throw (parity restored in the review round, `7d545f19`); gap file (4 → 17) |
 | `RequestListPanel.js` | 2 | dashboard GET kept **envelope** to preserve the pinned `Failed to load requests (403)`; triage POST requestJson |
-| `RequestLocator.js`, `ProposalTab.js`, `WorkbenchShell.js`, `FinalWriteupsViews.js` | 2/2/1/3 | requestJson static fallback (D3 drops the status suffix; no pin existed); GET call-shape fixes in their tests |
+| `RequestLocator.js`, `ProposalTab.js`, `WorkbenchShell.js`, `FinalWriteupsViews.js` | 2/2/1/3 | requestEnvelope; explicit `data.error \|\| \`… (${status})\`` throw (parity restored in the review round, `722fe9ac`/`3d711b06`/`f067b882`/`cf0fcff1`); GET call-shape fixes in their tests |
 | `ManualReviewEntryForm.js` | 2 | envelope tolerant; new full matrix (9) |
 | `AwardeesPanel.js` | 2 | load bare `.json()` → envelope strict; cycle list requestJson tolerant |
 | `ArtifactVersionHistory.js` | 2 | envelope tolerant, 409 special case preserved |

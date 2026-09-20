@@ -111,8 +111,16 @@ export default function SiteVisitEditor() {
     setLoading(true);
     setError(null);
     try {
-      const visitBody = await readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The site visit could not be loaded.');
-      const recipientBody = await readJson('/api/meeting-tracker/recipients', undefined, 'The attendee directory could not be loaded.');
+      // Both GETs in flight together (as before the migration); the visit
+      // result is settled first so its failure always wins the banner.
+      const [visitSettled, recipientSettled] = await Promise.allSettled([
+        readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The site visit could not be loaded.'),
+        readJson('/api/meeting-tracker/recipients', undefined, 'The attendee directory could not be loaded.'),
+      ]);
+      if (visitSettled.status === 'rejected') throw visitSettled.reason;
+      if (recipientSettled.status === 'rejected') throw recipientSettled.reason;
+      const visitBody = visitSettled.value;
+      const recipientBody = recipientSettled.value;
       setVisit(visitBody.siteVisit || null);
       setForm(formFromVisit(visitBody.siteVisit, requestNumber));
       setRecipients({ staff: recipientBody.staff || [], board: recipientBody.board || [] });

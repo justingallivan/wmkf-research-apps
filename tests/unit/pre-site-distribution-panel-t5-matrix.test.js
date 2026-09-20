@@ -295,7 +295,7 @@ test('prepare: request bytes (url, method, headers, exact body) unchanged', asyn
   const [url, opts] = captured;
   expect(url).toBe('/api/workbench/pre-site-visit/distribution/prepare');
   expect(opts.method).toBe('POST');
-  expect(opts.headers).toEqual(expect.objectContaining({ 'Content-Type': 'application/json' }));
+  expect(opts.headers).toEqual({ 'Content-Type': 'application/json' });
   expect(opts.body).toBe(JSON.stringify({
     requestId: REQUEST_ID,
     expectedArtifactId: ARTIFACT_ID,
@@ -324,7 +324,7 @@ test('reissueBriefingLink (briefing-link): request bytes (url, method, headers, 
   const [url, opts] = captured;
   expect(url).toBe('/api/workbench/pre-site-visit/briefing-link');
   expect(opts.method).toBe('POST');
-  expect(opts.headers).toEqual(expect.objectContaining({ 'Content-Type': 'application/json' }));
+  expect(opts.headers).toEqual({ 'Content-Type': 'application/json' });
   expect(opts.body).toBe(JSON.stringify({ requestId: REQUEST_ID, action: 'reissue', expectedLinkId: 'l' }));
 });
 
@@ -344,7 +344,7 @@ test('send: request bytes (url, method, headers, exact body) unchanged', async (
   const [url, opts] = captured;
   expect(url).toBe('/api/workbench/pre-site-visit/distribution/send');
   expect(opts.method).toBe('POST');
-  expect(opts.headers).toEqual(expect.objectContaining({ 'Content-Type': 'application/json' }));
+  expect(opts.headers).toEqual({ 'Content-Type': 'application/json' });
   expect(opts.body).toBe(JSON.stringify({
     requestId: REQUEST_ID,
     operationId: preparedAttempt().operationId,

@@ -35,7 +35,6 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
         if (!resOk) {
           const responseError = body && typeof body === 'object' ? body.error : null;
           const requestError = new Error(responseError || `Failed to load artifact (${resStatus})`);
-          requestError.status = resStatus;
           throw requestError;
         }
         if (loadSequence.current !== sequence) return;
@@ -71,7 +70,6 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
         if (!resOk) {
           const responseError = body && typeof body === 'object' ? body.error : null;
           const requestError = new Error(responseError || `Failed to refresh artifact (${resStatus})`);
-          requestError.status = resStatus;
           throw requestError;
         }
         if (loadSequence.current !== sequence || id !== requestId) return;
@@ -102,7 +100,6 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
       if (!resOk) {
         const responseError = body && typeof body === 'object' ? body.error : null;
         const requestError = new Error(responseError || `Generation failed (${resStatus})`);
-        requestError.status = resStatus;
         throw requestError;
       }
       if (generationSequence.current !== sequence || id !== requestId) return;
@@ -148,7 +145,6 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
       if (!resOk) {
         const responseError = body && typeof body === 'object' ? body.error : null;
         const requestError = new Error(responseError || `Board snapshot failed (${resStatus})`);
-        requestError.status = resStatus;
         throw requestError;
       }
       if (snapshotSequence.current !== sequence || id !== requestId) return;
