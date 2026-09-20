@@ -926,3 +926,28 @@ Stage 4 totals: 65 JSON sites migrated across 23 files (64 + the invite-timing
 GET); 9 SSE/blob sites allowlisted; 3 D1-preserve sites carried to the D1 lane
 (ReviewerFindPanel :281, ReviewersTab :210, useReviewerPromotion :188) plus
 D10's three send sites. Stages 5a, 5b, and the D1 Stage-4 batch start next.
+
+### Stage 4 rehearsal setup — 2026-09-20 (owner-authorized preview)
+
+- Push: `origin/feature/client-request-layer` at `d82f24df4`; Vercel preview
+  `wmkfresearchapps-dpe11n60z` built Ready.
+- Entra rejected the immutable deployment host (AADSTS50011), as
+  `docs/AUTHENTICATION_SETUP.md` §1.5 predicts. Applied the documented method:
+  the registered stable alias `wmkfresearchapps-preview.vercel.app` (previously
+  unassigned; `vercel alias ls` showed no target, `vercel inspect` found none)
+  was pointed at the deployment.
+- The open queue item "Preview CSRF origin check rejects alias-hosted POSTs"
+  applies: `lib/utils/auth.js validateOrigin` derives the Preview origin from
+  `VERCEL_URL`. Applied the queue's documented workaround: branch-scoped Preview
+  env `NEXTAUTH_URL=https://wmkfresearchapps-preview.vercel.app` for
+  `feature/client-request-layer` (`vercel env add`, verified via `vercel env ls`),
+  then `vercel redeploy` → `wmkfresearchapps-gp0rk903t` (Ready), alias re-pointed
+  to it. First redirect from the alias is Vercel deployment protection
+  (`vercel.com/sso-api`), expected for previews.
+- NOT set by the orchestrator: `DATAVERSE_ALLOW_PROD_READS` for this branch's
+  previews (a production-data read decision the owner makes; prior smoke
+  branches set it branch-scoped). Without it the Reviewers roster will not load
+  from production Dataverse.
+- Rollback of the setup: `vercel alias rm wmkfresearchapps-preview.vercel.app`
+  (returns the alias to unassigned) and `vercel env rm NEXTAUTH_URL preview
+  feature/client-request-layer`. Neither touches production.
