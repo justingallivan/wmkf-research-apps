@@ -1277,4 +1277,10 @@ valid load below).
   empty state "No scheduled emails" rendered, the review-every-email
   preference toggle rendered with a value, no error banner. The queue was
   empty, so the per-message detail and action paths remain test-covered.
-- Step 8 (`pages/test-email.js`): pending owner (sends real mail).
+- Step 8 (`pages/test-email.js`, preview host): **PASSED** [owner]. Send to
+  self → "Not sent. Test email failed". Expected: `sendTestEmail` creates a
+  Dynamics email activity (`test-email-service.js:35/51`), a Dataverse write
+  the target interlock denies from the preview; the route returns 500
+  `{ error: 'Test email failed', outcome: 'failed' }` (`pages/api/test-email.js:64-70`)
+  and the page rendered that body's `error` — the axis (b) path, no hang, no
+  raw text. No mail was sent (by design in this venue).
