@@ -5,7 +5,7 @@ import Layout, { Button } from '../Layout';
 import { formatZonedLocalInput, resolveZonedDateTime } from '../../../lib/utils/zoned-date-time';
 import SessionAgendaPanel from './SessionAgendaPanel';
 import OverflowMenu from '../workbench/OverflowMenu';
-import { readJsonBody } from '../../utils/api-request';
+import { requestEnvelope } from '../../utils/api-request';
 
 const FIELD_CLASS = 'mt-1 rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300';
 
@@ -20,18 +20,13 @@ const EMPTY_FORM = {
   attendees: [],
 };
 
-export async function readJson(response) {
-  return readJsonBody(response, { tolerantBody: true });
+export async function readJson(url, options) {
+  return requestEnvelope(url, { ...options, tolerantBody: true });
 }
 
 export async function sendJson(url, method, body, fetchImpl = fetch) {
-  const response = await fetchImpl(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const result = await readJson(response);
-  if (!response.ok) throw new Error(result.error || 'The schedule change could not be saved.');
+  const { ok, data: result } = await requestEnvelope(url, { method, body, fetchImpl, tolerantBody: true });
+  if (!ok) throw new Error(result.error || 'The schedule change could not be saved.');
   return result;
 }
 
@@ -303,9 +298,8 @@ export default function SessionEditor() {
   const [warning, setWarning] = useState(null);
 
   const loadDetail = useCallback(async (id) => {
-    const response = await fetch(`/api/meeting-tracker/sessions/${id}`);
-    const body = await readJson(response);
-    if (!response.ok) throw new Error(body.error || 'The meeting session could not be loaded.');
+    const { ok, data: body } = await readJson(`/api/meeting-tracker/sessions/${id}`);
+    if (!ok) throw new Error(body.error || 'The meeting session could not be loaded.');
     setSession(body.session);
     setForm(sessionForm(body.session));
     setSlots(body.slots || []);
@@ -319,12 +313,12 @@ export default function SessionEditor() {
       setError(null);
       try {
         const dashboardQuery = new URLSearchParams({ ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}), scope: 'all' });
-        const requests = [fetch('/api/meeting-tracker/recipients'), fetch('/api/meeting-tracker/sessions')];
-        if (cycleCode) requests.push(fetch(`/api/meeting-tracker/dashboard?${dashboardQuery}`));
-        const responses = await Promise.all(requests);
-        const bodies = await Promise.all(responses.map(readJson));
+        const requests = [readJson('/api/meeting-tracker/recipients'), readJson('/api/meeting-tracker/sessions')];
+        if (cycleCode) requests.push(readJson(`/api/meeting-tracker/dashboard?${dashboardQuery}`));
+        const envelopes = await Promise.all(requests);
+        const bodies = envelopes.map((envelope) => envelope.data);
         if (!current) return;
-        const failedIndex = responses.findIndex((response) => !response.ok);
+        const failedIndex = envelopes.findIndex((envelope) => !envelope.ok);
         if (failedIndex >= 0) throw new Error(bodies[failedIndex].error || 'The session workspace could not be loaded.');
         setRecipients(bodies[0]);
         setSessions(bodies[1].sessions || []);

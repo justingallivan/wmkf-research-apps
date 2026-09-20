@@ -37,7 +37,10 @@ test('fetches the per-request read and renders Launch enabled only when the serv
   global.fetch.mockResolvedValue(ok(body()));
   render(<ReviewPanelTab requestId={REQ} />);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Launch panel' })).not.toBeDisabled());
-  expect(global.fetch).toHaveBeenCalledWith(`/api/review-panel?requestId=${REQ}`);
+  // The GET now goes through readResponse -> requestEnvelope (shared/utils/api-request.js),
+  // which always passes an init object ({ method: 'GET', signal: undefined }) even when the
+  // caller supplies no options — Client Request Layer Stage 6 Part A fold.
+  expect(global.fetch).toHaveBeenCalledWith(`/api/review-panel?requestId=${REQ}`, { method: 'GET', signal: undefined });
   expect(screen.getByTestId('review-panel-state-sentence')).toHaveTextContent('No panel has been run for this request yet.');
   expect(screen.getByText('Nothing here yet. Launch a panel to review this proposal narrative.')).toBeInTheDocument();
   // D6: the bound (never a typical cost) shows beside Launch while launchable AND inside the Configuration disclosure.

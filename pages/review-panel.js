@@ -41,7 +41,7 @@ export function ReviewPanelWorkspace() {
     setLoading(true);
     setError('');
     try {
-      const body = await readResponse(await fetch('/api/review-panel'));
+      const body = await readResponse('/api/review-panel');
       if (!mounted.current || requestSeq.current !== seq) return;
       setData(body);
       setNowMs(Date.now());
@@ -86,7 +86,7 @@ export function ReviewPanelWorkspace() {
     const poll = async () => {
       const actionGeneration = requestSeq.current;
       try {
-        const body = await readResponse(await fetch('/api/review-panel'));
+        const body = await readResponse('/api/review-panel');
         if (!cancelled && mounted.current && requestSeq.current === actionGeneration) { setData(body); setNowMs(Date.now()); }
       } catch (pollError) {
         if (!cancelled && mounted.current && requestSeq.current === actionGeneration) setError(pollError.message);
@@ -106,10 +106,7 @@ export function ReviewPanelWorkspace() {
   const includeAll = () => setSelectedIds(asSet(candidates.map((c) => c.requestId)));
   const excludeAll = () => setSelectedIds(new Set());
 
-  const runAction = async (body) => {
-    const response = await fetch('/api/review-panel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    return readResponse(response);
-  };
+  const runAction = async (body) => readResponse('/api/review-panel', { method: 'POST', body });
 
   // Mirrors pages/cycle-dossier.js's launchKeyRef: mint a fresh idempotency
   // key ONLY when the selection changed since the last mint, or after a

@@ -248,7 +248,7 @@ export default function ReviewPanelTab({ requestId }) {
     setLoading(true);
     setError('');
     try {
-      const body = await readResponse(await fetch(endpoint));
+      const body = await readResponse(endpoint);
       if (!mounted.current || requestSeq.current !== seq) return;
       setData(body);
       setNowMs(Date.now());
@@ -276,7 +276,7 @@ export default function ReviewPanelTab({ requestId }) {
     const poll = async () => {
       const generation = requestSeq.current;
       try {
-        const body = await readResponse(await fetch(endpoint));
+        const body = await readResponse(endpoint);
         if (!cancelled && mounted.current && requestSeq.current === generation) { setData(body); setNowMs(Date.now()); }
       } catch (pollError) {
         if (!cancelled && mounted.current && requestSeq.current === generation) setError(pollError.message);
@@ -286,9 +286,7 @@ export default function ReviewPanelTab({ requestId }) {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [activeRunId, endpoint]);
 
-  const runAction = async (body) => readResponse(await fetch('/api/review-panel', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  }));
+  const runAction = async (body) => readResponse('/api/review-panel', { method: 'POST', body });
 
   // Same idempotency posture as the page: one key per launch attempt for this
   // request, kept across a lost response so a second click replays instead of
