@@ -419,10 +419,47 @@ test('a 200 withdraw-sufficient carrying write_failed rows still surfaces the am
   fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
 
   await screen.findByText(/2 issues:/);
-  expect(screen.getByText(/Dr\. First Reviewer — The invitation could not be closed/)).toBeInTheDocument();
-  expect(screen.getByText(/Dr\. Second Reviewer — The invitation could not be closed/)).toBeInTheDocument();
+  expect(screen.getByText(
+    'Dr. First Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
+  )).toBeInTheDocument();
+  expect(screen.getByText(
+    'Dr. Second Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
+  )).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Releasing…' })).not.toBeInTheDocument();
+});
+
+test.each([
+  ['write_interlocked', 'Dr. First Reviewer is still invited. The system blocked the release in this environment (Dataverse write interlock). Retry from the production site, or contact an administrator.'],
+  ['dataverse_forbidden', 'Dr. First Reviewer is still invited. Dataverse refused to save the release for this account. Retry, and if it fails again contact an administrator.'],
+  ['not_found', 'Dr. First Reviewer is still invited. The reviewer record could not be found when saving. Reload and retry.'],
+  ['dataverse_unavailable', 'Dr. First Reviewer is still invited. The database did not respond when saving the release. This is usually a temporary blip. Retry, and if it keeps failing contact an administrator.'],
+  ['unknown', 'Dr. First Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.'],
+])('write_failed with failure %s renders the matching cause+recovery sentence, no name doubling', async (failure, expectedText) => {
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first] }))
+    .mockResolvedValueOnce(response({
+      withdrawn: 0,
+      results: [{ suggestionId: FIRST_ID, status: 'write_failed', failure }],
+    }, { status: 200 }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+
+  await screen.findByText(/1 issue/);
+  expect(screen.getByText(expectedText)).toBeInTheDocument();
+  // The sentence itself names the reviewer once — no "<Name> — <Name> is..." doubling.
+  expect(screen.queryByText(/Dr\. First Reviewer — Dr\. First Reviewer/)).not.toBeInTheDocument();
 });
 
 test('a 200 withdraw-sufficient carrying not_pending rows surfaces the amber banner and Done', async () => {
@@ -516,7 +553,9 @@ test('under React.StrictMode the send still settles (double-invoked effects must
   fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
 
   await screen.findByText(/1 issue/);
-  expect(screen.getByText(/Dr\. First Reviewer — The invitation could not be closed/)).toBeInTheDocument();
+  expect(screen.getByText(
+    'Dr. First Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
+  )).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
   expect(screen.queryByText(/Releasing/)).not.toBeInTheDocument();
 });
