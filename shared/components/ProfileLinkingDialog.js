@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
+import { requestEnvelope } from '../utils/api-request';
 
 export default function ProfileLinkingDialog({ session, onLinked }) {
   const [profiles, setProfiles] = useState([]);
@@ -20,9 +21,8 @@ export default function ProfileLinkingDialog({ session, onLinked }) {
   useEffect(() => {
     async function fetchProfiles() {
       try {
-        const response = await fetch('/api/user-profiles?linkable=true');
-        if (!response.ok) throw new Error('Failed to fetch profiles');
-        const data = await response.json();
+        const { ok: resOk, data } = await requestEnvelope('/api/user-profiles?linkable=true');
+        if (!resOk) throw new Error('Failed to fetch profiles');
         setProfiles(data.profiles || []);
       } catch (err) {
         console.error('Failed to load profiles:', err);
@@ -41,16 +41,16 @@ export default function ProfileLinkingDialog({ session, onLinked }) {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/link-profile', {
+      const { ok: resOk, data } = await requestEnvelope('/api/auth/link-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           profileId: selectedProfileId,
-        }),
+        },
+        tolerantBody: true,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
+      if (!resOk) {
         throw new Error(data.error || 'Failed to link profile');
       }
 
@@ -67,16 +67,16 @@ export default function ProfileLinkingDialog({ session, onLinked }) {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/link-profile', {
+      const { ok: resOk, data } = await requestEnvelope('/api/auth/link-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           createNew: true,
-        }),
+        },
+        tolerantBody: true,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
+      if (!resOk) {
         throw new Error(data.error || 'Failed to create profile');
       }
 
