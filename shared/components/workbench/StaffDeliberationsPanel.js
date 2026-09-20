@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
 import DeliberationStageRail from './DeliberationStageRail';
 import ScopeSegment from './ScopeSegment';
@@ -168,12 +169,11 @@ export default function StaffDeliberationsPanel({
     setError(null);
     (async () => {
       try {
-        const response = await fetch(
+        const body = await requestJson(
           `/api/workbench/staff-deliberations?cycleCode=${encodeURIComponent(cycleCode)}&scope=${encodeURIComponent(scope)}`,
+          { fallbackMessage: 'Failed to load pre-site drafts', tolerantBody: true },
         );
-        const body = await response.json().catch(() => ({}));
         if (requestSequence.current !== sequence) return;
-        if (!response.ok) throw new Error(body.error || 'Failed to load pre-site drafts');
         setArtifacts(Array.isArray(body.artifacts) ? body.artifacts : []);
         setCounts(body.counts || EMPTY_COUNTS);
         if (body.stageLabels) setStageLabels(body.stageLabels);
