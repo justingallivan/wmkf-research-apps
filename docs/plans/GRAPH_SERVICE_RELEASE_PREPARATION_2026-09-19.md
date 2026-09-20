@@ -1,35 +1,40 @@
 # GraphService release preparation — 2026-09-19
 
-Status: **REHEARSAL PACKET PREPARED — NOT APPROVED FOR PROMOTION**.
+Status: **BOUNDED REHEARSAL PASSED — NOT APPROVED FOR PROMOTION**.
 
-Scope: prepare release of `codex/graph-service-decomposition`, reviewed candidate `4349449f782ff1c164b6c865f8e2bd4a2fbd7a8c`, from `/private/tmp/wmkf-graph-decomposition`. The owner authorized release preparation after local implementation acceptance. This packet does not authorize live writes, sending email, pushing `main`, or deployment. Release policy: `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, Tier 2; prior verification: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`.
+Scope: prepare release of `codex/graph-service-decomposition`, reviewed candidate `7f59afbafdc9f7eb6687c679cfc13ac80fae71b6`, from `/private/tmp/wmkf-graph-decomposition`. The owner authorized release preparation after local implementation acceptance. This packet does not authorize live writes, sending email, pushing `main`, or deployment. Release policy: `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, Tier 2; prior verification: `docs/plans/GRAPH_SERVICE_DECOMPOSITION_EXECUTION_2026-09-19.md`.
 
 ## Verified candidate and production baseline
 
-- **[VERIFIED via local Git]** Candidate tree was clean at `4349449f`. Runtime was last changed in the S11 checkpoint; subsequent changes are documentation and verification tooling. Full S11 Jest/build/gates and the subsequent focused verification remain recorded in the execution receipt.
+- **[VERIFIED via local Git]** Candidate tree was clean at `7f59afba` before the bounded rehearsal overlay. Runtime was last changed in the S11 checkpoint; subsequent changes are documentation and verification tooling. Full S11 Jest/build/gates and the subsequent focused verification remain recorded in the execution receipt.
 - **[VERIFIED via Vercel project metadata, 2026-09-19T23:39:11Z]** Production target for project `wmkf_research_apps` is `dpl_Aui3x7NtH3MoKARNHZQB5YUyJLZS`, state `READY`, commit `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`.
 - Deployment URL: `https://wmkfresearchapps-d5abdqntq-justin-gallivans-projects.vercel.app`. Production aliases include `applications.wmkeck.org`, `reviews.wmkeck.org`, `grantees.wmkeck.org`, and `submissions.wmkeck.org`.
 - Sanitized metadata receipt: `/private/tmp/wmkf-graph-decomposition-logs/release-production-metadata.json`. This is a proposed rollback baseline, **not independently established application health**. A staff sign-in/read smoke and rollback-operator confirmation remain required. Recheck the production target immediately before release; do not use a stale deployment ID silently.
 
-## Rehearsal contract to approve
+## Rehearsal contract and completed evidence
 
-Use a local candidate deployment and dedicated synthetic records/files. Select a safe sandbox only after verifying that every affected backend, including SharePoint, is isolated. If the required integration can only be tested against production, use the policy's controlled production rehearsal mode with explicitly approved targets. Do not infer permission from previous ZZTEST rehearsals or reuse their artifacts without fresh approval and readback.
+The owner authorized one bounded synthetic rehearsal against request `1003220` (`4bfb6e40-678f-f111-8076-7ced8d3d15a6`) in the dedicated Vercel custom environment `graph-rehearsal`. The isolated guard overlay was built on candidate `7f59afba`, with guarded source `06f9c5e1` and deployed checkout `c12935d1` on `codex/graph-rehearsal-guards`. That overlay must never be merged/promoted. The deployment was `dpl_B5N32yJxKpiVfo72c9b2uJuNngoT`, reached `READY`, and was then removed successfully. Production deployment `dpl_Aui3x7NtH3MoKARNHZQB5YUyJLZS` remained protected and was not promoted or changed. Fresh retirement/protection receipt: `/private/tmp/1003220-cloud-retirement-proof.json`.
 
-Required owner inputs: rehearsal mode; request GUID/number; tenant/site/library and folder; staff identity and staff-controlled external identity; cleanup owner; campaign window; rollback operator. These remain **UNKNOWN** until supplied. Credentials stay in existing server-side configuration and are never copied into this packet.
+**[VERIFIED via sanitized cloud receipts]** The external materials flow completed one authorized synthetic upload: upload-token `200`, finalize `200`, no application errors. The same SharePoint item retained identity `01G4GVMS22FWXXB5KDRBD3NT27JBE5GPFG`; it advanced to version `3.0`, size `917`, with SHA-256 `a75d11fdb0149ff17159457ee560154f7565c5fd2e43387cf2821a3dec1bca79`. The prior versions `1.0` and `2.0` remain present. The new Request Document row is `4dec19a5-acb4-f111-aaac-6045bd04539e`, `Ready`/`Draft`; predecessor `9079e179-a0b4-f111-aaac-000d3a361c1f` is `Superseded`. The staging row is `consumed`/`ok`, its candidate wrapper is retained, and the staged Blob is deleted. Receipt: `/private/tmp/1003220-cloud-after.json`; staging proof: `/private/tmp/1003220-cloud-staging-proof.json`.
 
-Before the first write, record the approved request's current registry rows, lifecycle pointers, and exact file item/version IDs. Use unique `graph-refactor-20260919-*` synthetic filenames where the flow accepts them. The external materials flow assigns canonical slot filenames, so select an empty synthetic slot and confirm its computed destination before upload; do not rely on the client filename to avoid replacement. Preserve any preexisting real files. Record expected deltas for each operation and reconcile them immediately after it. Stop on an unexplained delta, target mismatch, auth failure, or partial success; retain evidence and do not attempt broad cleanup.
+**[VERIFIED via conditional PUT receipt]** A separate disposable file probe in the same request folder established `before=404`, create `201`, current conditional PUT `200`, stale-ETag PUT `412`, unchanged-content proof, and cleanup `204`. Receipt: `/private/tmp/1003220-conditional-put-proof.json`. This verifies the exact stale-ETag behavior for the tested path and item operation; it does not establish behavior for every Graph upload API or chunked upload session.
 
-| Journey | Exercise and acceptance | Expected durable effects |
+**[VERIFIED via IA restore receipt]** The staff Initial Assessment restore path returned to the original governed content. Pointer and item identity remained stable; current version `3.0` matched the registry, the governed hash remained stable, the test marker was gone, and versions `1.0` and `2.0` remain available. Receipt: `/private/tmp/1003220-ia-restored-proof.json`.
+
+One Cloudmersive scan was explicitly authorized for this rehearsal and the flow enforced a clean outcome. This is evidence of the exercised scan path, not an independent billing or quota receipt. The sanitized runtime evidence records the rehearsal route fence rejecting `/api/cron/maintenance` and `/api/auth/session`; it does not prove every possible UI, route, or chunked upload journey. Receipt: `/private/tmp/1003220-cloud-runtime-sanitized.jsonl`.
+
+The synthetic current file and restored IA evidence remain retained for Justin's later restore decision. No production promotion, push, email send, or additional provider generation is authorized by this packet. The production baseline remains the previously recorded deployment and must be refreshed before any future release action.
+
+The rehearsal covered these bounded journeys:
+
+| Journey | Result and limits | Durable effects |
 |---|---|---|
-| Staff history | Open document history, change request while loading, close/reopen. Confirm current/prior versions belong to the selected request and no stale response replaces it. | Reads only. |
-| Staff download | Download current and prior versions; open the files and compare synthetic content/bytes. Check PDF conversion only on a supported synthetic document. | Reads/conversion; no registry or source-file writes expected. |
-| External upload | Staff-controlled external user opens its authorized upload flow, uploads a small synthetic file, retries/returns, and staff verifies stable file/registry identity. Exercise the upload-session path with an allowed fixture only if the selected public flow's size cap permits it. | Named SharePoint file and the chosen flow's registry/receipt rows; enumerate exact row types and allowed transitions before execution. No blanket claim that retry creates no version or row. |
-| Replace and restore | Replace a disposable synthetic item, inspect version history, then restore its prior content through the supported staff flow. Check metadata/registry readback and error handling. | New versions of the exact approved item and documented caller-owned registry updates. Never restore a preexisting real document as a test. |
-| Search and recovery | Search for synthetic content from the actual UI; confirm usable results and empty-state behavior. Exercise throttle/incomplete/error handling through the existing mocked tests, not deliberate live rate-limit exhaustion. | Live read-only search; injected failures remain local/mock-only and must be labelled accordingly. |
+| Conditional Graph write | Passed on a disposable file: stale ETag returned `412`; content remained unchanged; cleanup succeeded. | Disposable item cleaned up. |
+| External upload | Passed once through the authorized small-PDF path with upload-token issuance and finalize; the existing contributor invitation was reused. | SharePoint version `3.0`, new Ready/Draft registry row, predecessor superseded, staging consumed, Blob deleted. |
+| Staff restore | Passed for the governed Initial Assessment path; original content and pointer were restored. | IA version history retained; registry pointer remained stable. |
+| Scan and route fence | One explicitly authorized clean scan; runtime route fence rejected cron/auth paths. | No additional durable effect. |
 
-A staff rehearsal and an external-user rehearsal are separate evidence. Record actor, candidate SHA, environment, scenario, result, and before/after IDs. A scripted Graph transport probe alone cannot replace either rehearsal. `scripts/probe-sharepoint-write.js` uses raw fetch for its write/delete; `scripts/probe-graph-write-access.mjs` covers only sentinel upload/delete. Neither proves the complete release contract. Neither was run for this preparation.
-
-No AI generation or real email send is part of the proposed rehearsal. If a selected flow requires either to reach the file path, stop and select another synthetic entry point or explicitly revise the approved scope.
+The evidence does not claim that all possible UIs, chunked uploads, or production promotion paths were tested. Credentials and token values remain outside this document.
 
 ## Promotion and rollback procedure
 
@@ -49,9 +54,15 @@ Run from the linked project checkout and confirm the project/team and refreshed 
 
 ## Integration and review evidence
 
-**[VERIFIED via `git ls-remote origin refs/heads/main` and local Git, 2026-09-19]** Remote `main` is `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`, matching production metadata. Local `main` is `710892ac4d84b29de15a789de3c9c44c5a2d3fae`, containing the two planning commits. Both are ancestors of candidate `4349449f`; `git rev-list --left-right --count main...HEAD` returned `0 14`, and `origin/main...HEAD` returned `0 16`. The candidate changes 35 tracked files against remote main. Integration at these heads can fast-forward without conflict resolution. These counts exclude this subsequent preparation document commit.
+**Historical integration snapshot (2026-09-19, preparation at `4349449f`):** Remote
+`main` was `f4d0a33f98c82a4356c8ba41dfb10130b0161fd7`, local `main` was
+`710892ac4d84b29de15a789de3c9c44c5a2d3fae`, both ancestors of that candidate.
+The then-recorded counts were `0 14` against local main and `0 16` against remote
+main, with 35 changed files. These counts are not a fresh integration check of
+`7f59afba` or of current remote main; repeat comparison before release.
 
-Luna's sandboxed fetch could not write `FETCH_HEAD`; live `ls-remote` established the remote head without that write. Root independently repeated the remote comparison. No fetch update, merge, push, or application rehearsal was required or performed.
+
+Luna's sandboxed fetch could not write `FETCH_HEAD`; live `ls-remote` established the remote head without that write. Root independently repeated the remote comparison. No fetch update, merge, push, or production promotion was performed; the bounded rehearsal evidence is recorded above.
 
 Concrete caller paths identified by Luna's source reconnaissance:
 
@@ -59,4 +70,16 @@ Concrete caller paths identified by Luna's source reconnaissance:
 - Staff history: `pages/api/workbench/initial-assessment/versions.js` → `lib/services/initial-assessment/artifact-service.js` re-export → `lib/services/initial-assessment/artifact-reader.js` (`listInitialAssessmentArtifactVersions`). Staff restore: `pages/api/workbench/initial-assessment/restore-version.js` → `lib/services/initial-assessment/controls-service.js` (`restoreInitialAssessmentVersion`). The synthetic request must have an eligible document/lifecycle state; a raw upload alone does not establish those prerequisites. Confirm them before selecting this route.
 - External materials finalization: `pages/api/external/materials/[token]/finalize.js` → `lib/services/site-visit-materials/contributor-service.js` → `GraphService.uploadFileLarge`. Use the supported complete upload flow, including authorization and staging, rather than calling finalize on a fabricated item. Token issuance and staging/Blob/registry side effects must be enumerated for the approved fixture before execution. Tokens must not appear in this document or logs. Source review confirms finalization acquires/releases a collection slot lease, creates missing folders, uploads with `conflictBehavior: replace`, records the upload candidate on staging, creates a Request Document row, may supersede the previous slot row, and marks staging consumed. The approved fixture must have no real predecessor. Byte validation and configured malware scanning remain enforced; scanner calls are an expected external dependency to include in authorization. A small fixture takes the simple-upload branch; actual chunk transfer requires more than 60 MiB and must also fit the configured public-flow cap. Record chunk coverage as mocked if no such fixture is approved.
 
-Fresh Sol `sol_release_review` accepted this preparation packet after correction of the history caller chain. Root independently verified the chain and external finalize side effects. Seven sequential document gates/self-tests passed; log: `/private/tmp/wmkf-graph-decomposition-logs/release-preparation-doc-gates.log`. `git diff --check` passed. No code integration change occurred, so the existing runtime build/test evidence was not rerun. No application rehearsal or promotion has run.
+Initial packet review and its seven documentation gates are historical evidence in
+`/private/tmp/wmkf-graph-decomposition-logs/release-preparation-doc-gates.log`.
+Sol (`sol_s11`) separately accepted the completed external journey from the live
+before/after, staging and sanitized log receipts; the earlier staff restore was
+reviewed independently. Root verified retirement and unchanged production.
+Original candidate runtime is unchanged; the temporary guard overlay was isolated.
+No production promotion occurred.
+
+Remaining coverage limits: these receipts do not independently establish rapid
+request switching in history, every search/empty-state UI, supported PDF conversion,
+live chunked transfer, or injected recovery failures. Existing automated evidence
+covers its stated cases; no unperformed scenario is silently treated as a pass or
+waived. Reconcile required coverage and release timing before promotion approval.
