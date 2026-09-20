@@ -551,7 +551,7 @@ stages.
 | A2 | No client site depends on `fetch` being captured at module load | [VERIFIED §2.5] mocking convention requires late binding |
 | A3 | The 52 migrated no-`ok`-check sites (54 minus the 2 allowlisted beacons) tolerate non-2xx bodies today; migrating them with `requestEnvelope` preserves that | [VERIFIED by census] behavior preserved by construction; each pinned in its stage's tests |
 | A4 | 19 retry/poll wrappers wrap the call site rather than living inside it; the helper stays retry-free and the wrapper is untouched | [VERIFIED P-B for `StaffDeliberationsTab.js:354-378` and `FinalWriteupTab.js:283-291`; remaining 17 verified at their stage] |
-| D1 | Pre-existing: 54 sites trust the body without checking `ok` | Characterized, not fixed. Fixing is a behavior change outside this plan; listed for the owner |
+| D1 | Pre-existing: sites trust the body without checking `ok` (census: 38 unwrapped JSON candidates, heuristic, to be confirmed by reading) | Preserved during migration. **Owner priority for the next session**; fix specified in `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` |
 | D2 | Pre-existing: `materials-preflight` returns 200 with `ok:false` | Preserved; helper does not interpret body flags |
 | D3 (owner accepted 2026-09-20) | Up to 67 client sites parse with bare `.json()`; those that parse BEFORE the `ok` check (e.g. `PromptTemplatesSection.js:478`) surface a `SyntaxError` message today on a non-2xx non-JSON body and would surface the site's fallback message after migration. Sites that parse only after the `ok` check (e.g. `pages/admin.js:938-942`) never see such a body, so the real exposure is smaller [ASSUMED; resolved per site]. On 2xx the strict policy preserves today's rejection exactly | Proposed deviation, limited to non-2xx bodies. Owner decision (3) below, required before Stage 0 exit; `parseError` is recorded in both branches |
 | D8 | A tolerant-by-default parser would have converted `AwardeeTab.js:547-572`'s `uncertain` send-invite outcome into `sent` on a malformed 2xx (Codex cycle 1, reproduced) | Fixed by the strict-on-success policy (§3); T0 and T2(d) pin it |
@@ -560,11 +560,13 @@ stages.
 | D6 | A helper that threw `ApiRequestError` from the Stage 1 adapters would change `.name` at 17 sites | Avoided: Stage 1 adapters throw plain `Error` with the legacy expression (§3); T1 pins `.name === 'Error'` |
 | D7 | `shared/components/admin/PromptTemplatesSection.js:478` parses a 409 body with bare `.json()` and `shared/components/reviewers/InviteEmailModal.js:660-665` fires a side effect on 409 before throwing | Both must use `requestEnvelope`; listed for their stages |
 
-Owner decisions requested before Stage 2: (1) confirm no-behavior-change posture
-for D1 (recommended: preserve now, fix later per site); (2) whether Stage 4
-proceeds in this cycle or waits for a quiet window, given it touches invite and
-release call sites (recommended: proceed under the Tier 2 controls in §1 and
-§6); (3) D3: accept that a non-2xx non-JSON body shows the site's
+Owner decisions, all resolved 2026-09-20:
+(1) D1: **preserve during migration; fixing is an owner PRIORITY for the next
+session.** The fix is specified for a cold-start agent in
+`docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` (38
+census candidates to confirm by reading, fix pattern, tiering) and queued in
+`docs/CURRENT_WORK_QUEUE.md`. (2) Stage 4: **proceed** in this cycle under the
+Tier 2 controls in §1 and §6. (3) D3: accept that a non-2xx non-JSON body shows the site's
 fallback message instead of a raw `SyntaxError` message. **DECIDED 2026-09-20:
 owner accepted** ("1 accept"). The public default is `preferParseError: false`;
 `parseError` is still recorded and T0 still pins both policies. Implementable either way: the
@@ -572,16 +574,13 @@ helper always records `ApiRequestError.parseError`; under "accept" the message
 rule is as written in §3; under "decline" the rule prefers
 `parseError.message` when `parseError` is set, and T0 pins whichever policy is
 chosen. The decision is required before Stage 0 exit, not Stage 2.
-(4) Tier 2 external-flow rehearsal for Stage 5b: whether the owner's own
-token click-through in the preview deployment satisfies the strategy's
-"naive-user rehearsal" for a no-behavior-change refactor (recommended: yes;
-the owner did not build any of it, so the owner is not a builder-tester, and
-the rehearsal is recorded in the execution doc). (5) Stage 4 rehearsal data
-mode: Mode A by default; Mode D only if the owner wants real records exercised,
-with the expected-writes and cleanup list written first. (6) `pages/profile-settings.js:147`
-reads `/api/email-defaults/grantee-invite` (a GET of a template default; the
-census tag fired on `invite`): place in 5a as an internal read (recommended) or
-in 5b under the letter of the tag rule.
+(4) Stage 5b rehearsal: **decided, the owner's own token click-through in
+the preview deployment satisfies the naive-user rehearsal** (the owner built
+none of it); recorded in the execution doc when run. (5) Stage 4 data mode:
+**decided, Mode A** (route-mocked pages); Mode D only by a new owner decision
+with the expected-writes and cleanup list first. (6) `pages/profile-settings.js:147`:
+**decided, Stage 5a** as an internal read; the census tag fired on `invite` in
+`/api/email-defaults/grantee-invite`, a GET of a template default.
 
 ## 10. Planning review receipts
 
