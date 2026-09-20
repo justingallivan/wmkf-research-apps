@@ -247,7 +247,7 @@ function MatchTab() {
         {processing ? 'Matching...' : 'Find Matches'}
       </Button>
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
+      {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
 
       <MatchResults results={results} metadata={metadata} />
     </div>
@@ -385,7 +385,7 @@ function RosterTab() {
         </Button>
       </div>
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
+      {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
 
       {/* Add Form */}
       {showAddForm && (
@@ -848,7 +848,7 @@ function BatchTab() {
         </div>
       </Card>
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
+      {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
 
       {/* Proposal List */}
       {proposals.length > 0 && (
