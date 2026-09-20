@@ -10,42 +10,56 @@ export default function DynamicsExplorerRestrictionsSection({ userProfileId }) {
   const [restrictions, setRestrictions] = useState([]);
   const [newRestriction, setNewRestriction] = useState({ table_name: '', field_name: '', reason: '' });
   const [loading, setLoading] = useState(true);
+  // D1 fix: this section had no error surface at all; add the minimal state
+  // + inline element pattern the sibling PoliciesSection already uses
+  // (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // D1 PRESERVE: no ok check today; the body is used regardless of status
-    // (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
     requestEnvelope('/api/dynamics-explorer/restrictions')
-      .then(({ data }) => {
-        setRestrictions(data.restrictions || []);
-        setLoading(false);
+      .then((envelope) => {
+        if (!envelope.ok) {
+          setError(envelope.error.message);
+          return;
+        }
+        setRestrictions(envelope.data.restrictions || []);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const addRestriction = async () => {
     if (!newRestriction.table_name) return;
-    // D1 PRESERVE: no ok check today; `data.restriction` is read regardless
-    // of status.
-    const { data } = await requestEnvelope('/api/dynamics-explorer/restrictions', {
+    setError(null);
+    const envelope = await requestEnvelope('/api/dynamics-explorer/restrictions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: { ...newRestriction, userProfileId },
     });
-    if (data.restriction) {
-      setRestrictions((previous) => [...previous, data.restriction]);
+    if (!envelope.ok) {
+      setError(envelope.error.message);
+      return;
+    }
+    if (envelope.data.restriction) {
+      setRestrictions((previous) => [...previous, envelope.data.restriction]);
       setNewRestriction({ table_name: '', field_name: '', reason: '' });
     }
   };
 
   const removeRestriction = async (id) => {
-    // D1 PRESERVE: the body is never read today; tolerantBody keeps a 2xx
-    // with an empty body from becoming a new rejection (plan §6 Stage 3).
-    await requestEnvelope('/api/dynamics-explorer/restrictions', {
+    // D1 fix: a failed delete no longer removes the row optimistically; the
+    // row stays and the error is surfaced.
+    setError(null);
+    const envelope = await requestEnvelope('/api/dynamics-explorer/restrictions', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: { id, userProfileId },
       tolerantBody: true,
     });
+    if (!envelope.ok) {
+      setError(envelope.error.message);
+      return;
+    }
     setRestrictions((previous) => previous.filter((restriction) => restriction.id !== id));
   };
 
@@ -53,6 +67,7 @@ export default function DynamicsExplorerRestrictionsSection({ userProfileId }) {
 
   return (
     <div className="space-y-4">
+      {error && <p className="text-sm text-red-700">{error}</p>}
       {restrictions.length > 0 ? (
         <div className="space-y-2">
           {restrictions.map((restriction) => (
