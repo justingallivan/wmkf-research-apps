@@ -939,11 +939,11 @@ function UsageSection() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/admin/stats?period=${period}`)
-      .then(r => {
-        if (r.status === 403) throw new Error('Admin access required');
-        if (!r.ok) throw new Error('Failed to fetch stats');
-        return r.json();
+    requestEnvelope(`/api/admin/stats?period=${period}`)
+      .then(envelope => {
+        if (envelope.status === 403) throw new Error('Admin access required');
+        if (!envelope.ok) throw new Error('Failed to fetch stats');
+        return envelope.data;
       })
       .then(setStats)
       .catch(err => setError(err.message))
@@ -1250,11 +1250,11 @@ function ModelConfigSection() {
     if (refresh) setRefreshing(true); else setLoading(true);
     setError(null);
     const url = refresh ? '/api/admin/models?refresh=1' : '/api/admin/models';
-    fetch(url)
-      .then(r => {
-        if (r.status === 403) throw new Error('Admin access required');
-        if (!r.ok) throw new Error('Failed to fetch model config');
-        return r.json();
+    requestEnvelope(url)
+      .then(envelope => {
+        if (envelope.status === 403) throw new Error('Admin access required');
+        if (!envelope.ok) throw new Error('Failed to fetch model config');
+        return envelope.data;
       })
       .then(data => {
         setServerState(data);
@@ -1336,15 +1336,12 @@ function ModelConfigSection() {
     setMessage(null);
     try {
       for (const change of diff) {
-        const resp = await fetch('/api/admin/models', {
+        await requestJson('/api/admin/models', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(change),
+          body: change,
+          tolerantBody: true,
+          fallbackMessage: 'Failed to save',
         });
-        if (!resp.ok) {
-          const err = await resp.json();
-          throw new Error(err.error || 'Failed to save');
-        }
       }
       setMessage({ type: 'success', text: `Saved ${diff.length} model override(s)` });
       fetchConfig();
