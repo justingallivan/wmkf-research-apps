@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { requestJson, requestEnvelope } from '../../utils/api-request';
 import EmailSendFeedback from '../EmailSendFeedback';
 
 const EMPTY_DEFAULTS = { subject: '', message: '', unavailable: false };
@@ -163,9 +164,11 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   const currentScheduleKey = scheduleKey(session, slots);
 
   const loadStatus = useCallback(async (signal, expectedSequence) => {
-    const response = await fetch(`/api/meeting-tracker/sessions/${sessionId}/agenda`, { signal });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error || 'The last agenda could not be loaded.');
+    const body = await requestJson(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
+      signal,
+      fallbackMessage: 'The last agenda could not be loaded.',
+      tolerantBody: true,
+    });
     if (sequence.current !== expectedSequence) return;
     setLastAgenda(body.lastAgenda || null);
     setPendingSend(body.pendingSend || null);
@@ -258,14 +261,14 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setNotice(null);
     setConfirmed(false);
     try {
-      const response = await fetch(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
+      const { ok: resOk, data: body } = await requestEnvelope(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operationId: newOperationId(), ...form }),
+        body: { operationId: newOperationId(), ...form },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok && body.code === 'agenda_send_unresolved' && body.pendingSend) {
+      if (!resOk && body.code === 'agenda_send_unresolved' && body.pendingSend) {
         if (sequence.current === currentSequence) {
           setPendingSend(body.pendingSend);
           setPreview(body.pendingSend);
@@ -274,7 +277,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         }
         return;
       }
-      if (!response.ok) throw new Error(body.error || 'The agenda preview could not be created.');
+      if (!resOk) throw new Error(body.error || 'The agenda preview could not be created.');
       if (sequence.current !== currentSequence) return;
       setPreview(body.agenda || null);
     } catch (prepareFailure) {
@@ -299,23 +302,23 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setError(null);
     setSendFeedback(null);
     try {
-      const response = await fetch(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
+      const { ok: resOk, error: envelopeError, data: body } = await requestEnvelope(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operationId: preview.operationId }),
+        body: { operationId: preview.operationId },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok && body.code === 'agenda_send_unresolved' && body.pendingSend) {
+      if (!resOk && body.code === 'agenda_send_unresolved' && body.pendingSend) {
         if (sequence.current === currentSequence) {
           setPendingSend(body.pendingSend);
           setPreview(body.pendingSend);
           setConfirmed(false);
           setNotice('Another session agenda send is unresolved. Review and retry that same agenda before creating or sending another one.');
         }
-        throw new Error(body.error);
+        throw new Error(body.error || envelopeError.message);
       }
-      if (!response.ok && body.code === 'agenda_operation_stale') {
+      if (!resOk && body.code === 'agenda_operation_stale') {
         if (sequence.current === currentSequence) {
           setPendingSend(null);
           if (recoveringPending) {
@@ -332,7 +335,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         }
         return;
       }
-      if (!response.ok && body.code === 'agenda_send_terminal') {
+      if (!resOk && body.code === 'agenda_send_terminal') {
         if (sequence.current === currentSequence) {
           setPendingSend(null);
           if (recoveringPending) {
@@ -358,7 +361,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         }
         return;
       }
-      if (!response.ok || body.error) {
+      if (!resOk || body.error) {
         const agendaFailure = new Error(body.error || 'The agenda could not be sent.');
         agendaFailure.outcome = body.outcome || 'failed';
         throw agendaFailure;
