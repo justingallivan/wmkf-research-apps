@@ -746,3 +746,23 @@ Named changes and dispositions:
    malformed 2xx on the other): pre-existing shape confirmed; **accepted narrow
    deviation, no fix** (both outcomes are error states; the obvious fix would
    perturb the pinned single-endpoint case).
+
+### Stage 3 acceptance — 2026-09-20, orchestrator (Fable), at `a1aaec80`
+
+Correction round (`513d5025` tests, `a0066729` migration of
+`AdminOverviewSection.js:29` → `requestJson` tolerant with the site's own
+fallback; `a1aaec80` pins): D3 axis-(e) pins at the four `pages/admin.js`
+fallback sites; (d) pins at `PromptTemplatesSection.js:469` and the
+AlertRecipients PUT; 2xx-empty pin at `ReviewQuestionsSection.js:202`; (e) pin
+for AlertRecipients load. Each new discriminating pin was shown red under its
+mutation (flip `tolerantBody`, drop the rethrow) and green restored. The admin
+grep for raw `fetch(` is empty. The orchestrator read the AdminOverviewSection
+diff in full; accepted without a further fresh cycle.
+
+Full Gate G at `a1aaec80` [VERIFIED via this run]: every `check:*` gate and
+self-test 0 red; `npm test` 993 suites / 14885 tests green; lint 0 errors;
+`check:types` clean; `npm run build` compiled.
+
+Verdict: **Stage 3 ACCEPTED.** 62 admin sites migrated (30 sections + 32
+page); 4 workspace seams exported; tests added 215 (89 + 119 + 7). Stage 4
+(Tier 2) and the D1 trailing lane (admin batch) start next.
