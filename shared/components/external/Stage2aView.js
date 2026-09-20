@@ -25,6 +25,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import PolicyAckModal from './PolicyAckModal';
 import { COUNTRIES } from '../../config/countries';
 
@@ -242,37 +243,40 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
         const trimmedAddress = buildAddressPayload(address);
         if (Object.keys(trimmedAddress).length) addressPayload = trimmedAddress;
       }
-      const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/respond`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Optimistic lock: round-trip the suggestion _etag from page load so
-          // a concurrent staff edit is caught with a 412 (handled below).
-          ...(data.etag ? { 'If-Match': data.etag } : {}),
-        },
-        body: JSON.stringify({
-          action: 'accept',
-          contactEdits: Object.keys(contactEdits).length ? contactEdits : undefined,
-          honorariumOptOut,
-          address: addressPayload,
-          // S308 board-writeup identity — always sent (required, validated above),
-          // trimmed. Person-scoped, so it rides outside contactEdits (which is
-          // engagement-scoped + allowlisted server-side).
-          boardIdentity: {
-            academicRank: boardIdentity.academicRank.trim(),
-            primaryDepartment: boardIdentity.primaryDepartment.trim(),
-            mainInstitution: boardIdentity.mainInstitution.trim(),
+      const { ok: respOk, status: respStatus, data: json } = await requestEnvelope(
+        `/api/external/review/${encodeURIComponent(token)}/respond`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // Optimistic lock: round-trip the suggestion _etag from page load so
+            // a concurrent staff edit is caught with a 412 (handled below).
+            ...(data.etag ? { 'If-Match': data.etag } : {}),
           },
-          policyAcks: Object.fromEntries(policySlots.map((s) => [s, true])),
-        }),
-      });
-      const json = await resp.json().catch(() => ({}));
-      if (!resp.ok || !json.ok) {
-        if (resp.status === 409) {
+          body: {
+            action: 'accept',
+            contactEdits: Object.keys(contactEdits).length ? contactEdits : undefined,
+            honorariumOptOut,
+            address: addressPayload,
+            // S308 board-writeup identity — always sent (required, validated above),
+            // trimmed. Person-scoped, so it rides outside contactEdits (which is
+            // engagement-scoped + allowlisted server-side).
+            boardIdentity: {
+              academicRank: boardIdentity.academicRank.trim(),
+              primaryDepartment: boardIdentity.primaryDepartment.trim(),
+              mainInstitution: boardIdentity.mainInstitution.trim(),
+            },
+            policyAcks: Object.fromEntries(policySlots.map((s) => [s, true])),
+          },
+          tolerantBody: true,
+        },
+      );
+      if (!respOk || !json.ok) {
+        if (respStatus === 409) {
           setError(
             json.message || 'This invitation can no longer be accepted online. Please contact your Program Director.',
           );
-        } else if (resp.status === 412) {
+        } else if (respStatus === 412) {
           setError('Someone else updated this invitation while you were viewing it. Please refresh and try again.');
         } else if (json.reason === 'policy_misconfigured') {
           setError('We hit a configuration error on our end. The Foundation has been notified.');
@@ -294,7 +298,7 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
             : [];
           if (fields.length) setIdentityErrors(fields);
           setError('Please complete your academic rank, primary department, and main institution.');
-        } else if (resp.status === 400 && VALIDATION_REASON_COPY[json.reason]) {
+        } else if (respStatus === 400 && VALIDATION_REASON_COPY[json.reason]) {
           // Surface the specific server validation reason and, when it points at
           // a named address field, flag that field inline.
           if (json.field && ADDRESS_FIELD_KEYS.has(json.field)) {
