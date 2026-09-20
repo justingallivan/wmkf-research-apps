@@ -199,7 +199,35 @@ describe('PoliciesSection — unique-label guidance', () => {
     expect(await screen.findByText('bad json')).toBeInTheDocument();
   });
 
-  test('(b) POST: a well-formed non-2xx body (409 label_conflict) is read regardless of status (D1)', async () => {
+  test('(b) D1 fix: non-2xx {error} with no status field surfaces the server error message, not a blank banner', async () => {
+    mockGet(makeState({ versions: [version('v1', { isActive: true, title: 'Waiver Title', body: 'y'.repeat(60) })] }));
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'New title' } });
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    global.fetch.mockImplementationOnce((url, opts) => (opts?.method === 'POST'
+      ? Promise.resolve({ ok: false, status: 500, json: async () => ({ error: 'Audit log unavailable' }) })
+      : Promise.resolve({ ok: true, status: 200, json: async () => makeState({ versions: [version('v1', { isActive: true })] }) })));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    expect(await screen.findByText('Publishing failed. Try again; if it keeps failing, contact an administrator.')).toBeInTheDocument();
+    expect(screen.getByText('Audit log unavailable')).toBeInTheDocument();
+  });
+
+  test('(b) D1 fix: non-2xx unparseable body (502) surfaces the fallback message, not a blank banner', async () => {
+    mockGet(makeState({ versions: [version('v1', { isActive: true, title: 'Waiver Title', body: 'y'.repeat(60) })] }));
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'New title' } });
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    global.fetch.mockImplementationOnce((url, opts) => (opts?.method === 'POST'
+      ? Promise.resolve({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad gateway'); } })
+      : Promise.resolve({ ok: true, status: 200, json: async () => makeState({ versions: [version('v1', { isActive: true })] }) })));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    expect(await screen.findByText('Publishing failed. Try again; if it keeps failing, contact an administrator.')).toBeInTheDocument();
+    expect(screen.getByText('Request failed (502)')).toBeInTheDocument();
+  });
+
+  test('(b) POST: a well-formed non-2xx body (409 label_conflict) is read regardless of status (unchanged, not a D1 defect)', async () => {
     mockGet(makeState({ versions: [version('v1', { isActive: true, title: 'Waiver Title', body: 'y'.repeat(60) })] }));
     render(<PoliciesSection />);
     await openForm();
