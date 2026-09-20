@@ -6,6 +6,7 @@ import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 import { membershipKeyFor } from './reviewer-draft-keys';
 import { SEND_SKIP_REASON_LABEL } from '../../utils/reviewer-send-skip-reasons';
+import { requestEnvelope } from '../../utils/api-request';
 
 // ─── Email Modal ────────────────────────────────────────────────────────────
 
@@ -324,9 +325,8 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/review-manager/release-settings');
-        const data = await res.json().catch(() => ({}));
-        if (!cancelled) setAttachProposalEmailEnabled(!!(res.ok && data?.attachProposalEmail));
+        const envelope = await requestEnvelope('/api/review-manager/release-settings', { tolerantBody: true });
+        if (!cancelled) setAttachProposalEmailEnabled(!!(envelope.ok && envelope.data?.attachProposalEmail));
       } catch (e) {
         if (!cancelled) setAttachProposalEmailEnabled(false);
       }
@@ -345,10 +345,10 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     setMaterialsPreflight({ status: 'checking', fileCount: null });
     (async () => {
       try {
-        const res = await fetch(`/api/review-manager/materials-preflight?requestId=${encodeURIComponent(requestId)}`);
-        const data = await res.json().catch(() => ({}));
+        const envelope = await requestEnvelope(`/api/review-manager/materials-preflight?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true });
+        const data = envelope.data;
         if (cancelled) return;
-        if (res.ok && data?.ok) {
+        if (envelope.ok && data?.ok) {
           setMaterialsPreflight({ status: 'ok', fileCount: typeof data.fileCount === 'number' ? data.fileCount : null });
         } else {
           setMaterialsPreflight({ status: 'unavailable', fileCount: null });
@@ -376,19 +376,19 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
       loading: true,
     }));
     try {
-      const response = await fetch('/api/reviewer-finder/load-proposal', {
+      const envelope = await requestEnvelope('/api/reviewer-finder/load-proposal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fileKey ? { requestId, fileKey } : { requestId }),
+        body: fileKey ? { requestId, fileKey } : { requestId },
+        tolerantBody: true,
       });
-      const data = await response.json().catch(() => ({}));
+      const data = envelope.data;
       const allFiles = Array.isArray(data.allFiles) ? data.allFiles : [];
 
-      if (!response.ok || !data.success) {
+      if (!envelope.ok || !data.success) {
         if (proposalLoadSeq.current !== seq) return;
         setProposalDoc({
           loading: false,
-          error: response.status === 404 ? 'not_found' : (data.error || `Could not load the proposal document (${response.status})`),
+          error: envelope.status === 404 ? 'not_found' : (data.error || `Could not load the proposal document (${envelope.status})`),
           blobUrl: null,
           filename: null,
           allFiles,
@@ -608,25 +608,24 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
       const timeoutId = setTimeout(() => controller.abort(), PREVIEW_RENDER_TIMEOUT_MS);
 
       try {
-        const response = await fetch('/api/review-manager/render-emails', {
+        const envelope = await requestEnvelope('/api/review-manager/render-emails', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             suggestionIds: snapshotSuggestionIds,
             templateType: snapshotTemplateType,
             template: snapshotTemplate,
             settings: snapshotSettings,
-          }),
+          },
           signal: controller.signal,
+          // Tolerate a non-JSON body (gateway timeout / crashed function) — the
+          // status-code message below beats a raw JSON parse error in the banner.
+          tolerantBody: true,
         });
         if (modalSessionRef.current !== epoch) return;
 
-        // Tolerate a non-JSON body (gateway timeout / crashed function) — the
-        // status-code message below beats a raw JSON parse error in the banner.
-        const data = await response.json().catch(() => ({}));
-        if (modalSessionRef.current !== epoch) return;
-        if (!response.ok) {
-          const failure = new Error(renderPreviewFailureMessage({ status: response.status, serverMessage: data.error }));
+        const data = envelope.data;
+        if (!envelope.ok) {
+          const failure = new Error(renderPreviewFailureMessage({ status: envelope.status, serverMessage: data.error }));
           failure.isPreviewFailure = true;
           throw failure;
         }
@@ -722,6 +721,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
         ? Array.from(new Set([proposalDoc.blobUrl, ...manualAttachmentUrls]))
         : manualAttachmentUrls;
 
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream (response.body.getReader() below); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const response = await fetch('/api/review-manager/send-emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
