@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import {
   buildInitialValues,
   isComplete,
@@ -23,11 +24,11 @@ export default function ManualReviewEntryForm({ reviewer, onCancel, onSubmitted 
 
   const loadForm = useCallback(async ({ preserveValues = null } = {}) => {
     try {
-      const response = await fetch(
+      const { ok: resOk, data } = await requestEnvelope(
         `/api/review-manager/manual-review-entry?suggestionId=${encodeURIComponent(reviewer.suggestionId)}`,
+        { tolerantBody: true },
       );
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok || !Array.isArray(data.questions) || !data.setVersion) {
+      if (!resOk || !data.ok || !Array.isArray(data.questions) || !data.setVersion) {
         throw new Error(data.message || 'Could not load the current review form.');
       }
       setForm({ questions: data.questions, setVersion: data.setVersion });
@@ -64,21 +65,21 @@ export default function ManualReviewEntryForm({ reviewer, onCancel, onSubmitted 
     setErrorReason(null);
     setMessage(null);
     try {
-      const response = await fetch('/api/review-manager/manual-review-entry', {
+      const { ok: resOk, status: resStatus, data } = await requestEnvelope('/api/review-manager/manual-review-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           suggestionId: reviewer.suggestionId,
           answers: values,
           setVersion: form.setVersion,
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await response.json().catch(() => ({}));
-      if (response.ok && data.ok) {
+      if (resOk && data.ok) {
         if (onSubmitted) await onSubmitted(data);
         return;
       }
-      if (response.status === 409 && data.reason === 'set_changed') {
+      if (resStatus === 409 && data.reason === 'set_changed') {
         setSubmitState('error');
         setErrorReason('set_changed');
         setMessage(data.message || 'The review questions changed while this form was open.');
