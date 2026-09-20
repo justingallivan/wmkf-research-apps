@@ -175,6 +175,56 @@ test('a sparse Invite-origin alert preserves its suggestion deep link when refre
   );
 });
 
+// T3 matrix (Stage 3, group A) ahead of migrating this component's single
+// fetch site onto shared/utils/api-request.js. The site combines an `ok`
+// check with a body-level `!body.context` check, so it moves to
+// `requestEnvelope` with the branch kept verbatim.
+test('(c) a network rejection falls back the same as a failed refresh', async () => {
+  global.fetch.mockRejectedValueOnce(new Error('network down'));
+
+  render(<ReviewerRepairAlertDetails alert={alert} />);
+
+  expect(await screen.findByText(/Current details could not be refreshed/)).toBeInTheDocument();
+  expect(screen.getByText('Request request-guid')).toBeInTheDocument();
+});
+
+test('(d) a malformed 2xx body (tolerant catch) is treated as missing context, same fallback message', async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => { throw new SyntaxError('Unexpected end of JSON input'); },
+  });
+
+  render(<ReviewerRepairAlertDetails alert={alert} />);
+
+  expect(await screen.findByText(/Current details could not be refreshed/)).toBeInTheDocument();
+  expect(screen.getByText('Request request-guid')).toBeInTheDocument();
+});
+
+test('(e) a non-2xx unparseable body (502 gateway page) falls back, never silent', async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: false,
+    status: 502,
+    json: async () => { throw new SyntaxError('Unexpected token < in JSON'); },
+  });
+
+  render(<ReviewerRepairAlertDetails alert={alert} />);
+
+  expect(await screen.findByText(/Current details could not be refreshed/)).toBeInTheDocument();
+  expect(screen.getByText('Request request-guid')).toBeInTheDocument();
+});
+
+test('request bytes: GET with the abort signal only, no body or extra headers', async () => {
+  render(<ReviewerRepairAlertDetails alert={alert} />);
+  await screen.findByText('Request 1000001');
+
+  const [url, init] = global.fetch.mock.calls[0];
+  expect(url).toBe('/api/admin/alerts?repairContext=491');
+  expect(init.method === undefined || init.method === 'GET').toBe(true);
+  expect(init.body).toBeUndefined();
+  expect(init.signal).toBeInstanceOf(AbortSignal);
+});
+
 test('a cleared conflict tells the administrator to close the alert instead of repairing again', async () => {
   global.fetch.mockResolvedValueOnce({
     ok: true,
