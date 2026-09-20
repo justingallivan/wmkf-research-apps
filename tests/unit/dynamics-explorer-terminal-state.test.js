@@ -421,7 +421,7 @@ describe('feedback POST (:476, fire-and-forget)', () => {
     fetch.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: 'boom' }) });
     fireEvent.click(screen.getByTitle('Helpful'));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600');
+    await waitFor(() => expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600'));
   });
 
   test('T5(d) malformed 2xx body is ignored (never read today), feedback still records locally', async () => {
@@ -429,7 +429,7 @@ describe('feedback POST (:476, fire-and-forget)', () => {
     fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } });
     fireEvent.click(screen.getByTitle('Helpful'));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600');
+    await waitFor(() => expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600'));
   });
 
   test('T5(c) network rejection is caught and logged, feedback still records locally', async () => {
@@ -438,7 +438,7 @@ describe('feedback POST (:476, fire-and-forget)', () => {
     fetch.mockRejectedValueOnce(new Error('network down'));
     fireEvent.click(screen.getByTitle('Helpful'));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600');
+    await waitFor(() => expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600'));
     expect(errSpy).toHaveBeenCalledWith('Failed to submit feedback:', expect.any(Error));
     errSpy.mockRestore();
   });
