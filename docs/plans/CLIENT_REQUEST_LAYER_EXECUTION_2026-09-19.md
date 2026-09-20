@@ -1104,7 +1104,7 @@ production writes from local, so confirm buttons return a denial banner. Owner
 decision pending on whether to run it now or record the write-path dialogs as
 covered by the T4 request-bytes and receipt pins plus post-merge observation.
 
-### Stage 4 rehearsal, part 2 — owner click-through on local `npm run dev` (2026-09-20, in progress)
+### Stage 4 rehearsal, part 2 — owner click-through on local `npm run dev` (2026-09-20, complete)
 
 Venue: the owner's dev server on this checkout (started 12:29, `next-server`
 v16.3.5), production reads on, interlock on. Caveat: the Stage 5a group 1
@@ -1138,6 +1138,29 @@ each triggering a Fast Refresh.
   same commit; the other ten `mountedRef` sites already re-arm. Pin: a
   `React.StrictMode`-wrapped write_failed test in
   `release-email-modal.test.js`, red before the fix (stuck at "Releasing…",
-  matching the browser) and green after. Owner retry of step 5 pending.
-- Steps 6-7 (closeout, due date): request 1002788 has no accepted reviewer;
-  need another request or record as test-covered.
+  matching the browser) and green after. **Owner retry PASSED** at
+  `1ce5587c9`: banner "Some emails need attention. 0 sent. 1 issue: <reviewer>
+  — The invitation could not be closed", Done button present, no hang. Owner
+  follow-up: the copy names neither the cause nor a recovery; the closeout
+  dialog (step 6) already classifies the interlock refusal and names it, so
+  the release path should do the same. Tracked as a separate change on this
+  branch (service adds a safe `detail` on `write_failed`; dialog copy gets a
+  system-blame + retry/administrator ladder per
+  `feedback-user-facing-error-copy-voice`); not part of the migration.
+- Step 6 (closeout, `ReviewerCloseoutModal` via the manage menu): request
+  1003222 (ZZTEST-03 copy), reviewer with review received. **PASSED**: red
+  message "Closeout writes are blocked in this environment by the Dataverse
+  write interlock. Contact an administrator.", form and both buttons intact,
+  no hang. [owner]
+- Step 7 (due date, `ReviewerDueDateEditor`): **recorded as test-covered**
+  (owner decision 2026-09-20). The editor renders only for reviewers in
+  `accepted`/`materials_sent`/`under_review` without `reviewReceivedAt`
+  (`ReviewerManagePanel.js:1252-1255`); no test request had such a row. The
+  refused-save path is pinned in `tests/unit/reviewer-due-date-editor.test.js`
+  and the Stage 5 fresh reviewer confirmed the Stage 4 D1/D10 pins are
+  discriminating.
+
+Stage 4 rehearsal result: steps 2, 4, 5, 6 passed in the browser; step 7
+test-covered; steps 1 and 3 (invite send, reminder send) were preview-only by
+design (Mode A, no outbound mail from local). **Stage 4 closes** with this
+record; the Tier 2 merge condition (owner merge after preview) still applies.
