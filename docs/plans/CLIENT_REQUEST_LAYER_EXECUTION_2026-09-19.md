@@ -393,8 +393,9 @@ matching `tests/unit/.*(cycle-dossier|review-panel|session-editor|meeting-tracke
 for the plan's stated command shape): 671/671 passed, both before and after
 migration.
 
-**Gate G**, run sequentially at the code commit (recorded after committing
-below, hash filled in post-commit): `npm test -- --runInBand --silent`:
+**Gate G**, run sequentially before the code commit `a38b085f` (this section
+was written and gate output captured immediately beforehand, against the
+same working tree that commit records): `npm test -- --runInBand --silent`:
 986 suites / 14578 tests green; `npm run lint`: 0 errors (114 pre-existing
 warnings, none newly introduced); `npm run check:types`: clean;
 `check:status-enum-parity` + self-test: OK (8 invariants, 17/17 self-test);
