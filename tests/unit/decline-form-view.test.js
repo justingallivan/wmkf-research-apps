@@ -81,3 +81,60 @@ test('allows an empty decline and blocks a partial referral without a name', asy
   expect(await screen.findByText(/include a name/i)).toBeInTheDocument();
   expect(global.fetch).not.toHaveBeenCalled();
 });
+
+// T5 matrix for the single POST /respond site.
+test('(b) a 409 with a server message shows it verbatim', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 409, json: async () => ({ ok: false, message: 'Already handled by staff.' }) }));
+  render(<DeclineFormView token="t" etag={null} onCancel={jest.fn()} onDeclined={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Submit decline' }));
+  await screen.findByText('Already handled by staff.');
+});
+
+test('(b) a 409 with no message falls back to the generic 409 copy', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 409, json: async () => ({ ok: false }) }));
+  render(<DeclineFormView token="t" etag={null} onCancel={jest.fn()} onDeclined={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Submit decline' }));
+  await screen.findByText(/can no longer be declined online/i);
+});
+
+test('(b) a 412 shows the optimistic-lock conflict copy', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 412, json: async () => ({ ok: false }) }));
+  render(<DeclineFormView token="t" etag={null} onCancel={jest.fn()} onDeclined={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Submit decline' }));
+  await screen.findByText(/Someone else updated this invitation/i);
+});
+
+test('(b) any other non-ok status shows the generic retry copy', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 500, json: async () => ({ ok: false }) }));
+  render(<DeclineFormView token="t" etag={null} onCancel={jest.fn()} onDeclined={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Submit decline' }));
+  await screen.findByText('Could not submit your response. Please try again.');
+});
+
+test('(b) a 2xx body with ok:false is treated as a failure too (body-level flag, not status)', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: false }) }));
+  render(<DeclineFormView token="t" etag={null} onCancel={jest.fn()} onDeclined={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Submit decline' }));
+  await screen.findByText('Could not submit your response. Please try again.');
+});
+
+test('(c) a network rejection shows the network-error copy', async () => {
+  global.fetch = jest.fn(async () => { throw new Error('network down'); });
+  render(<DeclineFormView token="t" etag={null} onCancel={jest.fn()} onDeclined={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Submit decline' }));
+  await screen.findByText('Network error. Please try again.');
+});
+
+test('(d) a malformed 2xx body is tolerated to {} (today\'s `.catch(() => ({}))`) and treated as a failure', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }));
+  render(<DeclineFormView token="t" etag={null} onCancel={jest.fn()} onDeclined={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Submit decline' }));
+  await screen.findByText('Could not submit your response. Please try again.');
+});
+
+test('(e) a non-2xx unparseable body (502 gateway page) is tolerated to {} and hits the generic retry copy', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } }));
+  render(<DeclineFormView token="t" etag={null} onCancel={jest.fn()} onDeclined={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Submit decline' }));
+  await screen.findByText('Could not submit your response. Please try again.');
+});
