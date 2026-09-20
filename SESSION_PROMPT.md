@@ -1,4 +1,4 @@
-# Session 529 Prompt: Client Request Layer complete on branch; owner merge decision + D1 remainder
+# Session 529 Prompt: Client Request Layer merged and deployed; preview cleanup + D1 remainder
 
 ## Session 528 Summary
 
@@ -15,7 +15,9 @@ streams, 3 blob downloads, 2 beacons), each annotated, and an ESLint
 `no-restricted-syntax` ratchet (`eslint.config.mjs`, T6 fixture test) keeps
 it that way. Plan status is `complete`. **Nothing is merged to `main`; the
 branch carries Tier 2 work (Stages 4 and 5b), so merge is an explicit owner
-decision.**
+decision.** **Update 16:20 PT: the owner said "merge"; merge commit
+`23901d5da` is on `main` and deployed as `dpl_7PMh3nf1w5fiUNst2pmAQZdUvtUR`
+(Gate G rerun green on the merged head; DEVELOPMENT_LOG entry written).**
 
 ### What Was Completed
 
@@ -59,14 +61,10 @@ decision.**
 
 ### Owner Decision Needed
 
-1. **Merge `feature/client-request-layer` to `main`** (Tier 2 promotion).
-   Evidence: plan `status: complete`; Gate G green at `c9dd84e2e`; execution
-   log "Stage 6 acceptance". Before merging: `git fetch`, confirm `origin/main`
-   is still `e269756ac` (if it advanced, merge main into the branch and rerun
-   Gate G per plan §7); record the production deployment id again; merge with a
-   merge commit (not squash — the execution log cites hashes); watch the Vercel
-   production build; smoke the workbench release dialog and one external token
-   page in production. Rollback = redeploy `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki`.
+1. ~~Merge~~ **DONE 2026-09-20 16:20 PT** — `23901d5da` on `main`, production
+   `dpl_7PMh3nf1w5fiUNst2pmAQZdUvtUR` Ready on both aliases; public briefing
+   page smoked. Rollback = redeploy `wmkfresearchapps-kwgubwobw`. Optional
+   owner smoke: release dialog on a ZZTEST request in production.
 2. **Preview env cleanup** after merge or abandonment: `vercel alias rm
    wmkfresearchapps-preview.vercel.app`; `vercel env rm <NEXTAUTH_URL |
    DATAVERSE_ALLOW_PROD_READS | DELIBERATION_BRIEFING_SCHEMA_READY> preview
@@ -108,6 +106,8 @@ decision.**
 
 ### Verify Before Acting
 
+0. `feature/client-request-layer` is merged; delete the remote branch only
+   after confirming `git branch -r --merged origin/main` lists it.
 1. Any "delete `readJsonBody`" impulse: it is exported with no live caller by
    design (plan: keep exports); its tests pin it. Verify callers before removal.
 2. The preview alias points at build `6l5suly2f` (branch head `a41d37162`),

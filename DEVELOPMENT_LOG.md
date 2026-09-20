@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Client Request Layer promoted: one helper for every client JSON fetch, with a lint ratchet (Session 528)
+
+**Milestone:** `shared/utils/api-request.js` (`requestJson` / `requestEnvelope`) now carries every client-side JSON `fetch` in `shared/components/**` and `pages/**` (309 sites at census; 26 raw sites remain by allowlist — SSE streams, blob downloads, beacons — each annotated), and an ESLint `no-restricted-syntax` ratchet with a fixture test blocks new raw calls. Per-site visible behavior preserved except the accepted D3 rule (fallback text, never raw parse text, on unparseable non-2xx bodies).
+**Sessions:** 528; Fable orchestrated, Sonnet built, Opus reviewed each stage fresh with mutation checks, Codex reviewed the plan (3 cycles) and corroborated the code; the owner ran the Tier 2 rehearsals and approved promotion.
+**Ship state:** `main` `01ccf78f5` → `23901d5da` (merge commit), deployed as `dpl_7PMh3nf1w5fiUNst2pmAQZdUvtUR`. Gate G on the merged head: every gate + self-test green, 1042 suites / 15430 tests, build compiled. No schema or env change in production. Also shipped: StrictMode mounted-guard fix in three dialogs; release dialogs' `write_failed` banners now carry a server-classified cause code and owner-approved recovery copy; `terminal-transition.js` no longer forwards raw upstream error text.
+**Why it matters:** error handling, request bytes, and body-parse policy for the whole client are defined once and pinned by ~12k lines of per-site matrices; the ratchet keeps drift out; D1 (unguarded response reads) is now a bounded, documented remainder rather than 300 ad-hoc sites.
+**Pointers:** `docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md`; `docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md` (acceptances, rehearsals, rollback `wmkfresearchapps-kwgubwobw`); `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md`; memory `project-preview-rehearsal-venue-limits`.
+
 ## September 2026 — GraphService decomposition promoted behind the preserved facade (Session 526)
 
 **Milestone:** The 1,641-line GraphService was decomposed into 11 ownership modules behind its unchanged 21-method public facade, with contract and boundary tests protecting the existing SharePoint read, write, cache, and error behavior.

@@ -1472,3 +1472,19 @@ clean, **1042 suites / 15430 tests**, build compiled
 to `ocl7vs3ux` / `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki`). Promotion: merge commit
 (no squash) of `feature/client-request-layer` into `main`, pushed; post-deploy
 smoke recorded below when done.
+
+### Promotion complete — 2026-09-20 16:20 PT
+
+Merge commit `23901d5da` (no squash; tree identical to branch head
+`f61d6a870`) pushed to `main`. Git-integration production build
+`wmkfresearchapps-bttqc2wnp` = `dpl_7PMh3nf1w5fiUNst2pmAQZdUvtUR`, created 19 s
+after the push (the merge build, not an earlier one), Ready, holds
+`reviews.wmkeck.org` and `grantees.wmkeck.org`. Smoke: the public briefing
+page and its context route answer on production (`/external/briefing/<bad
+token>` → page 200, context `{ ok:false, reason:'malformed' }`), i.e. a
+Stage 5b page serving from the new helper. Authenticated smoke (release
+dialog on a ZZTEST request) is optional and the owner's; the same path passed
+the local rehearsal. Rollback: redeploy `wmkfresearchapps-kwgubwobw`
+(docs-only build of pre-merge `main`). Preview env cleanup (alias + three
+branch-scoped variables) remains the owner's call now that the branch is
+merged.
