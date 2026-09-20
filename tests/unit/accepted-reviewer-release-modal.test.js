@@ -154,6 +154,49 @@ test('shows a friendly commit-time honorarium failure instead of a raw status co
   expect(screen.queryByText('honorarium_authorized')).not.toBeInTheDocument();
 });
 
+test.each([
+  ['write_interlocked', 'Dr. Reviewer is still invited. The system blocked the release in this environment (Dataverse write interlock). Retry from the production site, or contact an administrator.'],
+  ['dataverse_forbidden', 'Dr. Reviewer is still invited. Dataverse refused to save the release for this account. Retry, and if it fails again contact an administrator.'],
+  ['not_found', 'Dr. Reviewer is still invited. The reviewer record could not be found when saving. Reload and retry.'],
+  ['dataverse_unavailable', 'Dr. Reviewer is still invited. The database did not respond when saving the release. This is usually a temporary blip. Retry, and if it keeps failing contact an administrator.'],
+  ['unknown', 'Dr. Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.'],
+])('a write_failed release with failure %s shows the matching cause+recovery sentence', async (failure, expectedText) => {
+  global.fetch.mockResolvedValue(response({
+    ok: true,
+    drafts: [{
+      suggestionId: SUGGESTION_ID,
+      status: 'ok',
+      name: 'Dr. Reviewer',
+      to: 'reviewer@example.org',
+      from: 'pd@example.org',
+      senderId: 'pd-1',
+      subject: 'Thank you',
+      bodyText: 'Thank you.',
+      expectedNotes: '',
+      existingNotes: '',
+    }],
+  }));
+  const onRelease = jest.fn(async () => ({
+    ok: false,
+    error: 'write_failed',
+    data: { transitioned: 0, results: [{ status: 'write_failed', failure }] },
+  }));
+
+  render(
+    <AcceptedReviewerReleaseModal
+      reviewer={reviewer}
+      requestId={REQUEST_ID}
+      onClose={jest.fn()}
+      onRelease={onRelease}
+    />,
+  );
+
+  await screen.findByDisplayValue('Thank you');
+  fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+  expect(await screen.findByText(expectedText)).toBeInTheDocument();
+  expect(screen.queryByText('write_failed')).not.toBeInTheDocument();
+});
+
 test('blocks an unsafe honorarium during preview before showing the composer', async () => {
   global.fetch.mockResolvedValue(response({
     ok: true,
