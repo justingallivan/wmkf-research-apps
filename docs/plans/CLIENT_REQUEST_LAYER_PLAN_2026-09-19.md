@@ -25,8 +25,9 @@ count only].
 **Chosen refactor:** introduce one shared client-side request helper and migrate
 the raw `fetch(` call sites in `shared/components/**` and `pages/**` (excluding
 `pages/api/**`) onto it, one bounded group of files per stage, with each call
-site keeping the visible error behavior it has today, except the single
-deviation D3 (§9), which is an owner decision, not a plan default.
+site keeping the visible error behavior it has today, except two deliberate
+deviations: D3 (§9, an owner decision, not a plan default) and D4 (the
+abort-during-body defect fix, §3 invariant 4).
 
 **Why this one.** Two independent surveys on 2026-09-19 ranked the repo's large
 unplanned refactors. Every large backend service already has a decomposition plan
@@ -159,9 +160,11 @@ message and branch, it does not unify them.
 ### 2.4 Existing partial helpers [VERIFIED by reading source]
 - `readResponse(response)` at `shared/components/review-panel/review-panel-ui.js:62-66`:
   `json().catch(() => ({}))`, throw `new Error(body.error || \`Request failed (${status})\`)`
-  when `!ok`, return body. 14 call sites: `pages/cycle-dossier.js` (8),
-  `pages/review-panel.js` (3), `shared/components/workbench/ReviewPanelTab.js` (3). This is the model for the shared helper's default
-  behavior.
+  when `!ok`, return body. Imported by `pages/review-panel.js` (3 sites) and
+  `shared/components/workbench/ReviewPanelTab.js` (3 sites). A byte-identical
+  LOCAL copy lives at `pages/cycle-dossier.js:72-75` with 7 sites
+  (`:266,335,350,398,427,459,481`) [VERIFIED; Codex cycle 3 caught the earlier
+  claim that cycle-dossier imported the shared one]. Stage 1 folds both copies.
 - `sendJson(url, method, body, fetchImpl = fetch)` at
   `shared/components/meeting-tracker/SessionEditor.js:26-35`: JSON POST/PATCH,
   ok-check-then-throw with a site-specific fallback message, injectable
@@ -214,15 +217,18 @@ it is usable from hooks, components, pages, and the non-component stores such as
 export class ApiRequestError extends Error {
   // name = 'ApiRequestError'; status: number; payload: any (parsed body or {});
   // parseError: Error | null — the native error when a non-2xx body could not
-  //   be parsed (always recorded, so owner decision D3 can go either way with a
-  //   one-line change to the message rule and a T0 flip; see §9 D3)
+  //   be parsed, taken from parseJsonBody's result (always recorded).
+  // message is computed by an exported pure function
+  //   deriveErrorMessage(payload, parseError, fallbackMessage, status, { preferParseError })
+  //   so T0 pins BOTH D3 policies; the public default for `preferParseError`
+  //   is the owner's decision (3) in §9.
   // message = (typeof payload.error === 'string' ? payload.error : payload.error?.message)
   //        || payload.message || fallbackMessage || `Request failed (${status})`
 }
 
 // Throwing form. Default for the 254 sites that already check `ok` and throw/set.
 export async function requestJson(url, {
-  method = 'GET', body, headers, signal, fallbackMessage, fetchImpl,
+  method = 'GET', body, headers, signal, fallbackMessage, fetchImpl, tolerantBody,
 } = {})
 // -> parsed body on 2xx. Throws ApiRequestError on non-2xx. Network/abort
 //    errors propagate unchanged (AbortError stays AbortError).
@@ -237,8 +243,13 @@ export async function requestEnvelope(url, opts)
 //    non-2xx), never null; `error` is an ApiRequestError when !ok, else null.
 //    Same body/header/signal handling. Never throws on HTTP status.
 
-// Parse step, exported so the Stage 1 adapters (which receive a Response, not a
-// URL) share it. Both request forms call it.
+// Internal parse step used by both request forms; returns the body AND the
+// parse outcome so ApiRequestError.parseError can be populated.
+async function parseJsonBody(response, { signal, tolerantBody = false } = {})
+// -> { data, parseError }  (parseError is the native error or null)
+
+// Public data-only adapter over parseJsonBody, for the Stage 1 adapters (which
+// receive a Response, not a URL). Same options, returns `data` only.
 export async function readJsonBody(response, { signal, tolerantBody = false } = {})
 // tolerantBody: false | true | (parseError, response) => fallbackValue
 // Non-2xx: always tolerant — empty or unparseable body -> {} (error bodies are
@@ -277,8 +288,8 @@ Invariants (each pinned by a unit test in Stage 0):
    `URLSearchParams` bodies pass through with no content-type added. No live
    client site sends a non-JSON body today [VERIFIED P-B: zero `new FormData`],
    so this clause is a T0 pin, not a served case. The option list is closed
-   (`method, body, headers, signal, fallbackMessage, fetchImpl`); the one
-   `keepalive` site is allowlisted (§2.6), not served.
+   (`method, body, headers, signal, fallbackMessage, fetchImpl, tolerantBody`);
+   the one `keepalive` site is allowlisted (§2.6), not served.
 3. Caller headers are merged over defaults, so `If-Match` and `lock` survive.
 4. Body parse is `readJsonBody` with the strict-on-success policy above. Two
    review findings fix the policy: (a) P-B: the incumbent
@@ -305,11 +316,17 @@ Invariants (each pinned by a unit test in Stage 0):
    `.reason`, or `promotionAuthority` fields keep working.
 8. Module has no React dependency and no side effects at import.
 
-**Stage 1 adapters keep their legacy expressions verbatim.** `readResponse`
-becomes `const body = await readJsonBody(response); if (!response.ok) throw new
-Error(body.error || \`Request failed (${response.status})\`); return body;` and
-`sendJson` keeps `throw new Error(result.error || 'The schedule change could not
-be saved.')` over `readJsonBody`. They throw plain `Error`, not
+**Stage 1 adapters keep their legacy expressions verbatim.** Both
+`readResponse` copies (shared and the local one in `pages/cycle-dossier.js`)
+become `const body = await readJsonBody(response, { tolerantBody: true }); if
+(!response.ok) throw new Error(body.error || \`Request failed (${response.status})\`);
+return body;` and `sendJson` keeps `throw new Error(result.error || 'The
+schedule change could not be saved.')` over `readJsonBody(response, {
+tolerantBody: true })`. The abort rethrow (invariant 4) is unobservable in
+Stage 1: none of the four consumer files (`pages/review-panel.js`,
+`ReviewPanelTab.js`, `pages/cycle-dossier.js`, `SessionEditor.js`) passes a
+`signal` or creates an `AbortController` [VERIFIED via grep, 0 hits each], so
+no body read there can abort. T1 pins that fact. They throw plain `Error`, not
 `ApiRequestError`, and compute the message from the body with the legacy
 expression, so `{ message: 'x' }`, `{ error: { code, message } }`, and
 `{ error: 5 }` produce exactly the strings they produce today (P-B finding 7).
@@ -325,8 +342,8 @@ surface.
 
 | Stage | Group | Files (JSON call sites) |
 |---|---|---|
-| 1 | Fold existing helpers, zero behavior change | `review-panel-ui.js` (`readResponse`), `SessionEditor.js` (`sendJson`, 3); the 14 `readResponse` consumer sites are unchanged by construction |
-| 2 | Highest-count files that already have an RTL render test and a single dominant error surface | `AwardeeTab.js` (13 json + 1 excluded), `StaffDeliberationsTab.js` (8), `ConsultantFeedbackSection.js` (8), `pages/expertise-finder.js` (8), `FinalWriteupTab.js` (5); `pages/cycle-dossier.js`, `pages/review-panel.js`, `ReviewPanelTab.js` (all sites already via `readResponse`; verify only, no edits) |
+| 1 | Fold existing helpers, zero behavior change | `review-panel-ui.js` `readResponse` (6 consumer sites in `pages/review-panel.js` and `ReviewPanelTab.js`), the local `readResponse` in `pages/cycle-dossier.js:72-75` (7 sites), `SessionEditor.js` `sendJson` (3 sites); all 16 sites unchanged by construction |
+| 2 | Highest-count files that already have an RTL render test and a single dominant error surface | `AwardeeTab.js` (13 json + 1 excluded), `StaffDeliberationsTab.js` (8), `ConsultantFeedbackSection.js` (8), `pages/expertise-finder.js` (8), `FinalWriteupTab.js` (5); `pages/cycle-dossier.js`, `pages/review-panel.js`, `ReviewPanelTab.js` (all sites already through the adapters folded in Stage 1; verify only, no edits) |
 | 3 | Admin surface | `shared/components/admin/*` sections with sites (`PromptTemplatesSection` 5, `SiteVisitRecipientsSection` 4, `OperationalEventsSection` 3, `ReviewQuestionsSection` 3, `DynamicsExplorerRestrictionsSection` 3, `PoliciesSection` 2, `EmailDefaultsSection` 2, `FinalWriteupMatrixAudiencesSection` 2, `SiteVisitMaterialsDefaultsSection` 2, `MeetingTrackerDefaultsSection` 2, `ReviewerRepairAlertDetails` 1), then `pages/admin.js` (32) section by section |
 | 4 | Reviewer engagement surface (Tier 2 re-check at stage start; see §1) | `InviteEmailModal.js` (10), `ReviewerInvitePanel.js` (5 + 1 blob excluded), `ReviewerManagePanel.js` (6), `ReviewersTab.js` (5), `ReviewerFindPanel.js` (5), `ReleaseMaterialsModal.js` (4 + 1 stream excluded), `search/useReviewerContactActions.js` (8), `search/useReviewerRosterActions.js` (4), `search/useReviewerPromotion.js` (4), `search/useReviewerDiscovery.js` (4), `search/useReviewerExport.js` (0 migrated; its single site is the allowlisted blob download), `CandidateEditModal.js`, `CampaignConfigModal.js`, `RespondReminderModal.js`, `RemoveEntirelyModal.js`, `ReleaseEmailModal.js`, `ReviewReminderAction.js` (1, `/api/review-manager/send-review-reminder`), `ReviewerDueDateEditor.js` (1, `review-due-extension`), `AcceptedReviewerReleaseModal.js` (1, `terminal-transition`), `ReviewerCloseoutModal.js` (1, `close-review`), `email-template-store.js`, `prompt-override-store.js`. Tier 2. |
 | 5a (Tier 1) / 5b (Tier 2) | Long tail; 5b is every external-token page and upload-adjacent form (`pages/external/**`, `ReviewAuthoringForm`, `GranteeDeliverableForm`, `scheduled-emails`), 5a is everything else | every remaining file in the census with at least one JSON site: workbench (`ReviewsTab`, `PreSiteDistributionPanel`, `InitialAssessmentTab`, `RequestListPanel`, `RequestLocator`, `ProposalTab`, `ManualReviewEntryForm`, `AwardeesPanel`, `ArtifactVersionHistory`, `OverviewTab`, `ReviewerFollowUpPanel`, `useSiteVisitContext`), meeting-tracker (`MeetingTrackerList`, `SiteVisitEditor`, `SessionAgendaPanel`, `SiteVisitMaterialsCard`), external (`ReviewAuthoringForm`, `GranteeDeliverableForm`, `pages/external/**`), `ProfileLinkingDialog`, `RosterContactField`, `FinalWriteupsViews`, and pages (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dynamics-explorer`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, and the Executor tool pages' non-stream sites) |
@@ -346,8 +363,8 @@ immediately; never commit it). No test hits a live provider or store.
 
 | ID | Required before | Content |
 |---|---|---|
-| T0 | Stage 0 exit | `tests/unit/api-request.test.js`: every §3 invariant, plus: 2xx JSON; 2xx empty body strict (rejects), tolerant (`{}`), and function-form (returns the function's value); `parseError` set on an unparseable non-2xx body and null otherwise; 2xx malformed body strict (rejects with the native parse error, `name` preserved) and tolerant (`{}`); non-2xx `{error}`; non-2xx `{message}`; non-2xx nested `{error:{message}}`; non-2xx non-JSON body (`{}` → fallback message); network rejection passthrough; AbortError rejected by `fetch` passthrough; AbortError raised during the body read rethrown in both strict and tolerant modes; `signal.aborted` true after a body-read failure → rethrow; FormData body; `If-Match` header survival; `fetchImpl` injection; `globalThis.fetch` late binding (reassign after import). |
-| T1 | Stage 1 | `readResponse`/`sendJson` behavior pins: same thrown message text for `{error}`, `{message}` only, nested `{error:{message}}`, `{error:5}`, empty body, non-JSON body; same return on 2xx; thrown value has `.name === 'Error'` (not `ApiRequestError`). Existing consumers' tests (verified by name in Stage 0) run green. |
+| T0 | Stage 0 exit | `tests/unit/api-request.test.js`: every §3 invariant, plus: 2xx JSON; 2xx empty body strict (rejects), tolerant (`{}`), and function-form (returns the function's value); `parseError` set on an unparseable non-2xx body and null otherwise; `deriveErrorMessage` pinned under both `preferParseError: false` (D3 accepted) and `true` (D3 declined), with the public default asserted to match the recorded owner decision; 2xx malformed body strict (rejects with the native parse error, `name` preserved) and tolerant (`{}`); non-2xx `{error}`; non-2xx `{message}`; non-2xx nested `{error:{message}}`; non-2xx non-JSON body (`{}` → fallback message); network rejection passthrough; AbortError rejected by `fetch` passthrough; AbortError raised during the body read rethrown in both strict and tolerant modes; `signal.aborted` true after a body-read failure → rethrow; FormData body; `If-Match` header survival; `fetchImpl` injection; `globalThis.fetch` late binding (reassign after import). |
+| T1 | Stage 1 | `readResponse`/`sendJson` behavior pins: same thrown message text for `{error}`, `{message}` only, nested `{error:{message}}`, `{error:5}`, empty body, non-JSON body; same return on 2xx; thrown value has `.name === 'Error'` (not `ApiRequestError`); a static assertion that none of the four Stage 1 consumer files contains `signal` or `AbortController` (so the invariant 4 rethrow cannot be observed; if a later change adds one, this test fails and the site is re-characterized). Existing consumers' tests (verified by name in Stage 0) run green. |
 | T2 | Stage 2, per file | **Per-call-site contract matrix, not per-endpoint sampling** (Codex cycle 2: `RespondReminderModal.js:52-75` and `:105-140` hit the same endpoint with different failure semantics, preview → `loadError`, send → `uncertain` receipt). For EVERY migrated site: (a) 2xx JSON produces today's visible state, (b) non-2xx `{error:'X'}` produces today's state/throw/toast verbatim, (c) network rejection likewise, (d) for bare-`.json()` sites a malformed 2xx produces today's outcome (for `AwardeeTab.js` send-invite: the `uncertain` receipt and step), and for tolerant sites a malformed and an empty 2xx produce today's fallback value; and for every non-GET site the test also asserts the mocked `fetch` call's URL, method, headers, and exact body string are unchanged before and after migration. Sites that branch on status or body-level flags add one case per branch. Existing RTL tests (`tests/unit/awardee-tab.test.js`, `tests/unit/staff-deliberations-tab.test.js`, `tests/unit/consultant-feedback-section.test.js`, `tests/unit/expertise-finder-batch-cycle.test.js`, `tests/unit/final-writeup-tab.test.js`) are extended, not replaced [VERIFIED P-B: each renders the component and mocks `global.fetch` per scenario]. Fixtures that mock `{ ok: true, json }` without a `status` field (e.g. `expertise-finder-batch-cycle.test.js:31`) must gain `status` before any site in that file moves to `requestEnvelope`. |
 | T3 | Stage 3 | The T2 per-site matrix for each admin section. For `pages/admin.js`: the four workspace functions (`OperationsWorkspace` :3139, `WorkflowsWorkspace` :3198, `AiWorkspace` :3335, `PeopleWorkspace` :3375) are not exported today and `AdminDashboard` (:3453) reads `router.query` and renders `Layout` (which calls `useSession`). T3 therefore first adds named exports for the four workspace functions (the file already exports sections such as `DynamicsFeedbackSection` and `AppAccessSection` for `tests/unit/admin-dynamics-feedback-filters.test.js` and `tests/unit/app-access-admin-partial-refresh.test.js`), then one test file per workspace mounts the exported workspace with `view` as a prop and mocks `global.fetch` per section. No test mounts `AdminDashboard`. `tests/unit/admin-models.test.js` tests the API route, not the page, and is not a T3 anchor. The 403 → `'Admin access required'` message is pinned verbatim at every site that has it. |
 | T4 | Stage 4 | The T2 per-site matrix for every site in every Stage 4 file (including the four one-site files added by Codex cycle 2), plus: body-level `.success`/`.ok` branches in `useReviewerContactActions`, `ReviewersTab`, `ReviewerManagePanel`, `ReviewerFindPanel`, `useReviewerRosterActions` pinned with a 200 + `{success:false}` fixture and a 409 + `{success:false, ...promotionAuthority}` fixture (§2.2). `ReleaseMaterialsModal.js` has no direct render test; it is exercised through `ReviewerManagePanel` in `tests/unit/reviewer-materials-modal-lifetimes.test.js` (`renderPanel` :163-166, `openReleaseModal` :169), which is extended for its three scenarios. Existing `tests/unit/invite-email-modal-capture.test.js`, `reviewer-manage-*.test.js`, `tests/unit/reviewer-materials-modal-lifetimes.test.js` run green. |
@@ -383,11 +400,12 @@ Exit: helper landed unused, census tracked, execution doc created with the
 source-to-stage map. Rollback: revert the two commits; nothing else changed.
 
 ### Stage 1 — Fold existing helpers
-Before: T1. Do: reimplement `readResponse` and `sendJson` over
+Before: T1. Do: reimplement both `readResponse` copies and `sendJson` over
 `readJsonBody(response, { tolerantBody: true })`, keeping exports, signatures,
 and message text; delete the now-dead file-local `readJson` in
-`SessionEditor.js`. Verify: T1 and all consumer
-tests green; diff of every thrown message string is empty. Exit: 17 sites now
+`SessionEditor.js`. Do not replace the cycle-dossier local copy with an import
+of the shared one in this stage (that is a call-site edit; Stage 2 may do it). Verify: T1 and all consumer
+tests green; diff of every thrown message string is empty. Exit: 16 sites now
 route through the helper with no call-site edits. Rollback: revert one commit.
 
 ### Stage 2 — Covered high-count files
@@ -410,8 +428,13 @@ Before: T4 (request-bytes assertions included); production deployment and
 rollback ids refreshed and recorded. Do: migrate per file. Verify: T4, existing
 reviewer tests, Gate G including `check:reviewer-engagement-boundary`; deploy
 the branch to a Vercel preview and record a staff click-through of invite
-preview, reminder preview, release, closeout, and due-date flows in capture
-mode (no external email leaves). Exit: group migrated, rehearsal recorded.
+preview, reminder preview, release, closeout, and due-date flows. Data mode:
+Mode A (route-mocked pages, no Dataverse/email side effects) is the default
+because a request-layer refactor is proven at the response-handling seam;
+capture mode in a preview is an email control, not a sandbox, and would still
+persist lifecycle writes, so it is NOT used against real records. If the owner
+wants a real-data rehearsal it is Mode D with its written expected-writes and
+cleanup list (owner decision (5)). Exit: group migrated, rehearsal recorded.
 Rollback: per-commit; production untouched until the owner merges.
 
 ### Stage 5a — Long tail, internal (Tier 1)
@@ -460,8 +483,10 @@ failures are recorded distinctly from code failures.
 HEAD and `origin/main`; if `main` advanced, merge it into the feature branch,
 rerun Gate G, and re-review before continuing.
 
-**Release:** Tier 1. Merge to `main` is an explicit owner decision after Stage 6
-or after any earlier stage the owner chooses to ship. Before merge: record the
+**Release:** tiered per stage (§1): Stages 0-3 and 5a Tier 1, Stages 4 and 5b
+Tier 2. Merge to `main` is an explicit owner decision after Stage 6 or after
+any earlier stage the owner chooses to ship; a merge that includes Stage 4 or
+5b carries the Tier 2 controls. Before merge: record the
 current production deployment id and the rollback deployment id in the execution
 doc (last known: `dpl_6Z3Fv3mYxpkSYiQCjqmUQrbsQvbd` at `7c729379`; refresh
 before acting). Rollback is a Vercel redeploy of the recorded prior deployment;
@@ -524,8 +549,8 @@ stages.
 Owner decisions requested before Stage 2: (1) confirm no-behavior-change posture
 for D1 (recommended: preserve now, fix later per site); (2) whether Stage 4
 proceeds in this cycle or waits for a quiet window, given it touches invite and
-release call sites (recommended: proceed, Tier 1 controls plus the T4 request-
-bytes diff); (3) D3: accept that a non-2xx non-JSON body shows the site's
+release call sites (recommended: proceed under the Tier 2 controls in §1 and
+§6); (3) D3: accept that a non-2xx non-JSON body shows the site's
 fallback message instead of a raw `SyntaxError` message (recommended: accept;
 the raw message is never useful to a user). Implementable either way: the
 helper always records `ApiRequestError.parseError`; under "accept" the message
@@ -534,8 +559,11 @@ rule is as written in §3; under "decline" the rule prefers
 chosen. The decision is required before Stage 0 exit, not Stage 2.
 (4) Tier 2 external-flow rehearsal for Stage 5b: whether the owner's own
 token click-through in the preview deployment satisfies the strategy's
-"naive-user rehearsal" for a no-behavior-change refactor (recommended: yes,
-recorded in the execution doc).
+"naive-user rehearsal" for a no-behavior-change refactor (recommended: yes;
+the owner did not build any of it, so the owner is not a builder-tester, and
+the rehearsal is recorded in the execution doc). (5) Stage 4 rehearsal data
+mode: Mode A by default; Mode D only if the owner wants real records exercised,
+with the expected-writes and cleanup list written first.
 
 ## 10. Planning review receipts
 
@@ -546,4 +574,4 @@ recorded in the execution doc).
 | P-C final document | Opus (fresh) | `9efda1b6` / `611ddb63…` | READY WITH NAMED CHANGES | Applied: Stage 1↔5 `readResponse` overlap removed (§4), envelope `data`/`ok`/`status` defined and `readJsonBody` mechanics pinned to `json()`+`status` only (§3), non-object 2xx body and `signal` forwarding stated (§3), census rules and map format specified (§6 Stage 0), `readJson` retirement moved to Stage 1, admin-access count corrected to five + one (§2.3), T1 `.name` pin, T4 `ReleaseMaterialsModal` wording, T5 admin sections removed, D3 reframed as owner decision (3) with narrowed exposure, D4 line numbers, 52-vs-54 counts (§3, A3), summary/§1 qualified "except D3". 27 file:line refs spot-checked, 2 corrected. |
 | Codex adversarial 1 | Codex (ran as `gpt-6-astra`: the companion was invoked without `--model`, against the owner directive; recorded, not repeated) | `9efda1b6` / `611ddb63…` | needs-attention (1 high) | Applied: strict-on-success `readJsonBody` policy with per-site `tolerantBody`, T0/T2(d) pins, D3 narrowed, D8 added. |
 | Codex adversarial 2 | gpt-5.6-sol | `b9e3548c` / `70adf091…` | needs-attention (2 high, 2 medium) | All four verified against source and applied: Stage 4 and new Stage 5b re-tiered to Tier 2 with the strategy's controls and a census tag that keeps campaign-critical files out of Tier 1 stages; four one-site reminder/release files added to Stage 4; T2-T5 replaced with a per-call-site matrix including request-bytes assertions for non-GET sites; `tolerantBody` gains a function form for the three non-`{}` fallbacks; D3 made implementable in both branches via `parseError`, decision moved before Stage 0 exit, frontmatter corrected. |
-| Codex adversarial 3 | gpt-5.6-sol | — | pending | — |
+| Codex adversarial 3 | gpt-5.6-sol | `7d1505d8` / `df5fa017…` | needs-attention, NOT CONVERGED (3 high on Stage 0/1 bookkeeping; matrix and fallbacks confirmed converged) | Verified and applied: cycle-dossier's local `readResponse` copy folded in Stage 1 (16 sites, not 17); internal `parseJsonBody → { data, parseError }` with `readJsonBody` as the public data-only adapter, `tolerantBody` added to the closed option list and `requestJson` signature, `deriveErrorMessage` pinned under both D3 policies; Stage 1 abort rethrow shown unobservable (no consumer passes a signal) and pinned by T1. Non-blocking notes applied: §7 per-stage tier wording, decision (2) wording, Stage 4 data mode (Mode A default, Mode D as decision (5)), 5b rehearsal wording. **Three-cycle limit reached without Codex's formal CONVERGED: per the owner's rule, planning stops here for owner review before Stage 0.** |
