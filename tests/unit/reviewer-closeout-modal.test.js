@@ -97,7 +97,7 @@ describe('ReviewerCloseoutModal', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      resolveRequest({ ok: true, json: async () => ({ success: true }) });
+      resolveRequest({ ok: true, status: 200, json: async () => ({ success: true }) });
       await Promise.resolve();
     });
   });
@@ -106,12 +106,48 @@ describe('ReviewerCloseoutModal', () => {
     const onClose = jest.fn();
     global.fetch = jest.fn(async () => ({
       ok: false,
+      status: 409,
       json: async () => ({ error: 'Closeout prerequisites changed. Reload and try again.' }),
     }));
     render(<ReviewerCloseoutModal isOpen reviewer={REVIEWER} onClose={onClose} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
     fireEvent.click(screen.getByRole('button', { name: 'Complete closeout' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Closeout prerequisites changed. Reload and try again.');
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('axis (network): a rejected fetch surfaces its message and re-enables the form', async () => {
+    global.fetch = jest.fn(async () => { throw new Error('offline'); });
+    render(<ReviewerCloseoutModal isOpen reviewer={REVIEWER} onClose={jest.fn()} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Complete closeout' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('offline');
+    expect(screen.getByRole('button', { name: 'Complete closeout' })).toBeEnabled();
+  });
+
+  test('axis (d): a malformed 2xx body falls back to the generic save-failed message', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } }));
+    render(<ReviewerCloseoutModal isOpen reviewer={REVIEWER} onClose={jest.fn()} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Complete closeout' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The reviewer closeout could not be saved. Reload and try again.');
+  });
+
+  test('axis (e): a non-2xx body that fails to parse never fails silently', async () => {
+    global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } }));
+    render(<ReviewerCloseoutModal isOpen reviewer={REVIEWER} onClose={jest.fn()} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Complete closeout' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The reviewer closeout could not be saved. Reload and try again.');
+  });
+
+  test('pins a 200 body-level {success:false} to the generic save-failed message (never treated as ok)', async () => {
+    const onClose = jest.fn();
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: false }) }));
+    render(<ReviewerCloseoutModal isOpen reviewer={REVIEWER} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Complete closeout' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The reviewer closeout could not be saved. Reload and try again.');
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -147,7 +183,7 @@ describe('ReviewerCloseoutModal', () => {
   });
 
   test('No submits not eligible with the required reason', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
     render(<ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER, notes: '' }} onClose={jest.fn()} />);
 
     fireEvent.click(screen.getByRole('radio', { name: 'No' }));
@@ -168,7 +204,7 @@ describe('ReviewerCloseoutModal', () => {
   });
 
   test('opt-out skips the payment question and records not applicable automatically', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
     render(<ReviewerCloseoutModal
       isOpen
       reviewer={{ ...REVIEWER, honorariumOptOut: true, notes: '' }}
@@ -219,7 +255,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
       let resolve;
       const promise = new Promise((r) => { resolve = r; });
       global.fetch = jest.fn(() => promise);
-      return { settle: () => resolve({ ok: true, json: async () => ({ success: true }) }) };
+      return { settle: () => resolve({ ok: true, status: 200, json: async () => ({ success: true }) }) };
     }
     if (stage === 'reject') {
       let reject;
@@ -229,7 +265,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
     }
     let resolve;
     const jsonPromise = new Promise((r) => { resolve = r; });
-    global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: () => jsonPromise }));
+    global.fetch = jest.fn(() => Promise.resolve({ ok: true, status: 200, json: () => jsonPromise }));
     return { settle: () => resolve({ success: true }) };
   }
 
@@ -328,7 +364,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
   });
 
   test('a new session reinitializes disposition/notes from the current row and clears a prior error', async () => {
-    global.fetch = jest.fn(async () => ({ ok: false, json: async () => ({ error: 'stale error' }) }));
+    global.fetch = jest.fn(async () => ({ ok: false, status: 400, json: async () => ({ error: 'stale error' }) }));
     const { rerender } = render(
       <ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER, notes: 'Old notes' }} onClose={jest.fn()} />,
     );
@@ -411,7 +447,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      resolveFetch({ ok: true, json: async () => ({ success: true }) });
+      resolveFetch({ ok: true, status: 200, json: async () => ({ success: true }) });
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -441,7 +477,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
   });
 
   test('onSaved sync throw still closes the modal once, no error copy, one request', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
     const onClose = jest.fn();
     const onSaved = jest.fn(() => { throw new Error('boom'); });
     render(<ReviewerCloseoutModal isOpen reviewer={OPTOUT_REVIEWER} onSaved={onSaved} onClose={onClose} />);
@@ -452,7 +488,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
   });
 
   test('onSaved rejected promise still closes the modal once, no error copy, one request', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
     const onClose = jest.fn();
     const onSaved = jest.fn(() => Promise.reject(new Error('refresh failed')));
     render(<ReviewerCloseoutModal isOpen reviewer={OPTOUT_REVIEWER} onSaved={onSaved} onClose={onClose} />);
@@ -463,7 +499,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
   });
 
   test('onSaved that never resolves does not hold the modal open or the save lock', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
     const onClose = jest.fn();
     const onSaved = jest.fn(() => new Promise(() => {})); // never settles
     render(<ReviewerCloseoutModal isOpen reviewer={OPTOUT_REVIEWER} onSaved={onSaved} onClose={onClose} />);
@@ -475,7 +511,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
   });
 
   test('onSaved that switches the session prevents closing the replacement modal', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
     const onClose = jest.fn();
     let rerenderRef;
     const onSaved = jest.fn(() => {
@@ -495,7 +531,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
   });
 
   test('onSaved that unmounts prevents a stale onClose call', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
     const onClose = jest.fn();
     let unmountRef;
     const onSaved = jest.fn(() => {
@@ -596,7 +632,7 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     await act(async () => {
-      resolveCloseout({ ok: true, json: async () => ({ success: true }) });
+      resolveCloseout({ ok: true, status: 200, json: async () => ({ success: true }) });
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -638,7 +674,7 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     await act(async () => {
-      resolveCloseout({ ok: true, json: async () => ({ success: true }) });
+      resolveCloseout({ ok: true, status: 200, json: async () => ({ success: true }) });
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -675,7 +711,7 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
     );
 
     await act(async () => {
-      resolveCloseout({ ok: true, json: async () => ({ success: true }) });
+      resolveCloseout({ ok: true, status: 200, json: async () => ({ success: true }) });
       await Promise.resolve();
       await Promise.resolve();
     });
