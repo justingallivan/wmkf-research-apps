@@ -827,7 +827,7 @@ RespondReminderModal (preview, send; `send_unconfirmed` → `uncertain` and catc
 ReleaseEmailModal (render-withdraw-emails, withdraw-sufficient), ReleaseMaterialsModal
 (4), ReviewerInvitePanel (VIP PUT/DELETE/PATCH tolerant), InviteEmailModal (7
 tolerant), ReviewerManagePanel (regenerate/revoke-token, my-candidates DELETE,
-reviewers PATCH, 2× terminal-transition).
+reviewers PATCH, 2× terminal-transition). [RECHECKED after lib/services/reviewer-engagement/terminal-transition.js change: the release-copy follow-up (`250e7b9c0`) changed only the service's `write_failed` row shape (adds `failure`, drops the raw `error` text); the client POST sites, their request bytes, and the pins named below are unchanged]
 
 `ReviewerManagePanel.js` updateStatus PATCH: pre-image was a bare `.json()`
 whose own catch shows "Invalid response from the server (HTTP {status})." for a
