@@ -133,6 +133,7 @@ test('failed options retain saved filters in searches, and Clear filters preserv
   fireEvent.click(screen.getByRole('button', { name: 'Search requests', exact: true }));
   await waitFor(() => expect(fetch).toHaveBeenLastCalledWith(
     `/api/workbench/search-requests?q=University&cycle=D26&status=Phase+II+Pending&programId=${PROGRAM_ID}`,
+    expect.objectContaining({ method: 'GET' }),
   ));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Search requests', exact: true })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Clear filters', exact: true }));
@@ -143,7 +144,7 @@ test('failed options retain saved filters in searches, and Clear filters preserv
   expect(cycleSelect()).toHaveAccessibleDescription(/You can still search/);
 
   fireEvent.click(screen.getByRole('button', { name: 'Search requests', exact: true }));
-  await waitFor(() => expect(fetch).toHaveBeenLastCalledWith(`/api/workbench/search-requests?q=University&programId=${PROGRAM_ID}`));
+  await waitFor(() => expect(fetch).toHaveBeenLastCalledWith(`/api/workbench/search-requests?q=University&programId=${PROGRAM_ID}`, expect.objectContaining({ method: 'GET' })));
 });
 
 test('retry disables the controls, makes one request and preserves saved values absent from new options', async () => {
@@ -250,7 +251,7 @@ test('switching Grant program clears dependent state and requests fresh scoped o
   fireEvent.change(programSelect(), { target: { value: socalId } });
   expect(cycleSelect()).toHaveValue('');
   expect(screen.queryByText(/No requests matched/)).not.toBeInTheDocument();
-  expect(fetch).toHaveBeenLastCalledWith(`/api/workbench/search-requests?mode=options&programId=${socalId}`);
+  expect(fetch).toHaveBeenLastCalledWith(`/api/workbench/search-requests?mode=options&programId=${socalId}`, expect.objectContaining({ method: 'GET' }));
   await act(async () => nextOptions.resolve(response(socalOptions)));
   await waitFor(() => expect(cycleSelect()).toHaveValue(''));
   expect(screen.getByRole('option', { name: 'December 2026' })).toBeInTheDocument();
@@ -293,7 +294,7 @@ test('cached Research results cannot revive after switching to Southern Californ
 test('the shell programId seeds the locator program on first mount', async () => {
   fetch.mockResolvedValue(response(options));
   render(<RequestLocator programId={PROGRAM_ID} />);
-  await waitFor(() => expect(fetch).toHaveBeenCalledWith(`/api/workbench/search-requests?mode=options&programId=${PROGRAM_ID}`));
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith(`/api/workbench/search-requests?mode=options&programId=${PROGRAM_ID}`, expect.objectContaining({ method: 'GET' })));
 });
 
 test('a saved search for a different program is not restored when the shell passes another programId', async () => {
@@ -305,7 +306,7 @@ test('a saved search for a different program is not restored when the shell pass
   }));
   fetch.mockResolvedValue(response(options));
   render(<RequestLocator programId={PROGRAM_ID} />);
-  await waitFor(() => expect(fetch).toHaveBeenCalledWith(`/api/workbench/search-requests?mode=options&programId=${PROGRAM_ID}`));
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith(`/api/workbench/search-requests?mode=options&programId=${PROGRAM_ID}`, expect.objectContaining({ method: 'GET' })));
   expect(queryInput()).toHaveValue('');
   expect(screen.queryByText('Southern California cached row')).not.toBeInTheDocument();
   expect(searchOptionsToggle()).toHaveAttribute('aria-expanded', 'false');
