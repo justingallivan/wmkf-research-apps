@@ -261,3 +261,29 @@ network-failure catch). Pre-existing behavior, preserved by Stage 4. Fix: on
 the function-form `tolerantBody` sentinel as `ReviewerManagePanel` updateStatus
 does) and route to the existing `uncertain` receipt. Tier 2 (email semantics).
 Ship with the Stage 4 D1 batch.
+
+## 11. D1/D10 fixes — Stage 4 batch (built 2026-09-20; fresh review pending)
+
+Trailing lane after Stage 4 code acceptance, files disjoint from Stage 5.
+Request bytes unchanged everywhere; only response handling changed. Tests
+first (red against the accepted Stage 4 code by design), fix second (green).
+
+| Site | Old | New | Commits |
+|---|---|---|---|
+| `ReviewerFindPanel.js:~283` orcid-lookup POST | non-2xx fell into the "no confident ORCID match" branch | `!ok` → existing `lookupMsg` warn surface with the server message | `618b1e8a4` / `474f2da50` |
+| `ReviewersTab.js:~213` my-candidates GET | swallowed | `!ok` → the tab's existing `setError` banner ("Couldn't load reviewers: …"; its Retry still re-fetches reviewers, not candidates: noted, not rewired) | `a0c2ace92` / `e694ce090` |
+| `InviteEmailModal.js:~293` invite-timing GET | non-2xx body applied as a value | `envelope.ok && data?.value` guard like its two sibling calls; default stays the state initializer's `respondOffsetDays: 7` | `03ac59bcd` / `1910c5736` |
+| `useReviewerPromotion.js:~188` save-candidates | listed as a candidate | **guarded-elsewhere**: `if ((!sOk || !sData.success) && saved === 0)` already surfaces `sData.error`; two characterization pins added, no source change | `33f766e9a` |
+| D10 `RespondReminderModal.js` send | malformed 2xx → `failed` | sentinel `tolerantBody: () => MALFORMED_BODY`; `ok && data === MALFORMED_BODY` → the file's existing `uncertain` receipt and copy | `7f96d4ffa` / `ddb6b982a` |
+| D10 `ReviewReminderAction.js` send | same | same pattern, same existing copy | `fbb2e3546` / `08161a070` |
+| D10 `ReviewerDueDateEditor.js` submit | malformed 2xx → generic failure | throws the file's existing `{ outcome: 'uncertain' }` error with its existing 'I could not complete the deadline update.' literal before the `data.saved` read | `8e29ac5ee` / `fc3760edb` |
+
+Gates at `fc3760edb` (with Stage 5 work in progress in the shared tree): touched
+suites green; `check:types` and `check:reviewer-engagement-boundary` clean;
+lint 0 errors. Two unrelated suites (`phase-i-dynamics`, `request-list-panel`)
+were red from concurrent Stage 5 edits at that moment and are that lane's to
+resolve.
+
+Remaining D1 sites: Stage 5a (`dynamics-explorer :153`, `virtual-review-panel
+:1030`) and 5b (`scheduled-emails :59, :61`, campaign-critical, Tier 2) after
+their stages; D9's three pages after Stage 5a.
