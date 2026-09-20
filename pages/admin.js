@@ -1792,20 +1792,20 @@ export function AppAccessSection() {
 
   const fetchGrants = async () => {
     try {
-      const res = await fetch('/api/app-access?all=true');
-      if (res.status === 403 || res.status === 401) {
+      const envelope = await requestEnvelope('/api/app-access?all=true');
+      if (envelope.status === 403 || envelope.status === 401) {
         setIsSuperuser(false);
         setSnapshotStale(true);
         return 'unauthorized';
       }
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Unable to load app access grants');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) {
+        throw new Error(envelope.data.error || 'Unable to load app access grants');
       }
       setIsSuperuser(true);
       setSnapshotStale(false);
       setMessage(null);
-      applyServerData(data);
+      applyServerData(envelope.data);
       return 'ok';
     } catch (error) {
       // The admin page is already superuser-only. Keep this section visible so
@@ -1892,20 +1892,20 @@ export function AppAccessSection() {
     try {
       for (const { userId, toGrant, toRevoke } of diff) {
         if (toGrant.length > 0) {
-          const res = await fetch('/api/app-access', {
+          await requestJson('/api/app-access', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userProfileId: userId, apps: toGrant }),
+            body: { userProfileId: userId, apps: toGrant },
+            tolerantBody: true,
+            fallbackMessage: 'Grant failed',
           });
-          if (!res.ok) throw new Error((await res.json()).error || 'Grant failed');
         }
         if (toRevoke.length > 0) {
-          const res = await fetch('/api/app-access', {
+          await requestJson('/api/app-access', {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userProfileId: userId, apps: toRevoke }),
+            body: { userProfileId: userId, apps: toRevoke },
+            tolerantBody: true,
+            fallbackMessage: 'Revoke failed',
           });
-          if (!res.ok) throw new Error((await res.json()).error || 'Revoke failed');
         }
       }
       const totalGrants = diff.reduce((n, d) => n + d.toGrant.length, 0);
@@ -1957,10 +1957,10 @@ export function AppAccessSection() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/users?id=${userId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Remove failed');
-      const removedName = data.name || userName || userId;
+      const envelope = await requestEnvelope(`/api/admin/users?id=${userId}`, { method: 'DELETE' });
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data.error || 'Remove failed');
+      const removedName = envelope.data.name || userName || userId;
       const refreshed = await fetchGrants();
       setMessage(refreshed === 'ok'
         ? { type: 'success', text: `Removed ${removedName}` }
