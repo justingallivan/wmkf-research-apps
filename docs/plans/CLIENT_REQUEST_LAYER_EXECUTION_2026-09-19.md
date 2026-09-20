@@ -1369,7 +1369,11 @@ Implementer's suite: 1009 suites / 14711 tests green; `check:types` clean.
 deployment: `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki`
 (`wmkfresearchapps-ocl7vs3ux`, created 2026-09-19 22:15 PT, aliases
 `reviews.wmkeck.org` + `grantees.wmkeck.org`; `origin/main` = `e269756ac`).
-That is the rollback target for any merge of this branch: redeploy it
+Updated 2026-09-20 ~16:30 PT: the Session 528 handoff banner (docs-only,
+`01ccf78f5`, 4 files) fast-forwarded `main` and deployed as
+`wmkfresearchapps-kwgubwobw` (Ready, holds both aliases; runtime identical to
+`ocl7vs3ux`). Either deployment is a valid rollback target for a merge of this
+branch: redeploy it
 (`vercel redeploy <url>` or promote in the dashboard); no data rollback exists
 or is needed. Merge to `main` is the owner's explicit decision (Tier 2 work on
 the branch).
