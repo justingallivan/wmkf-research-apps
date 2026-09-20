@@ -25,6 +25,7 @@ jest.mock('../../shared/context/ProfileContext', () => {
 });
 
 import DynamicsExplorerPage from '../../pages/dynamics-explorer';
+import ProfileContext from '../../shared/context/ProfileContext';
 
 const EOF = Symbol('EOF');
 
@@ -357,5 +358,88 @@ describe('Dynamics Explorer SSE terminal state', () => {
     expect(priorTurnLateRead.started).toBe(false);
     expect(priorTurnLateRead.consumed).toBe(false);
     await expectComposerUnlocked();
+  });
+});
+
+// ── T5 (client-request-layer Stage 5a, plan §5) matrix for the :153 roles
+// GET (D1-preserve: no `ok` check today — `.then(r => r.json()).then(...).
+// catch(() => {})` swallows ANY failure, so every axis below converges on
+// the same visible default (badge stays "Read Only")) and the :476 feedback
+// POST (fire-and-forget: the response is never read today, only a network
+// rejection reaches the console.error catch). ──────────────────────────
+
+function renderWithProfile(profileId = 'profile-1') {
+  return render(
+    <ProfileContext.Provider value={{ currentProfile: { id: profileId } }}>
+      <DynamicsExplorerPage />
+    </ProfileContext.Provider>,
+  );
+}
+
+describe('roles GET (:153, D1-preserve)', () => {
+  test('T5(a) 2xx JSON sets the role badge from callerRole', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ callerRole: 'superuser' }) });
+    renderWithProfile();
+    expect(await screen.findByText('Superuser')).toBeInTheDocument();
+  });
+
+  test('T5(b) non-2xx body is still read unguarded and can set the role (D1-preserve)', async () => {
+    fetch.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ role: 'read_write' }) });
+    renderWithProfile();
+    expect(await screen.findByText('Read/Write')).toBeInTheDocument();
+  });
+
+  test('T5(c) network rejection is swallowed, badge stays the default', async () => {
+    fetch.mockRejectedValueOnce(new Error('network down'));
+    renderWithProfile();
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(screen.getByText('Read Only')).toBeInTheDocument();
+  });
+
+  test('T5(d)/(e) malformed body at any status is swallowed, badge stays the default', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } });
+    renderWithProfile();
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(screen.getByText('Read Only')).toBeInTheDocument();
+  });
+});
+
+describe('feedback POST (:476, fire-and-forget)', () => {
+  function renderReadyForFeedback() {
+    fetch.mockResolvedValueOnce(streamResponse([
+      sse('response', { content: 'Correlated answer' }),
+      sse('complete', { requestId: 'req-1', rounds: 1, outcome: 'completed' }),
+      EOF,
+    ]));
+    render(<DynamicsExplorerPage />);
+    submitQuestion();
+    return screen.findByText('Correlated answer');
+  }
+
+  test('T5(b) non-2xx response is ignored, feedback still records locally', async () => {
+    await renderReadyForFeedback();
+    fetch.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: 'boom' }) });
+    fireEvent.click(screen.getByTitle('Helpful'));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600');
+  });
+
+  test('T5(d) malformed 2xx body is ignored (never read today), feedback still records locally', async () => {
+    await renderReadyForFeedback();
+    fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } });
+    fireEvent.click(screen.getByTitle('Helpful'));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600');
+  });
+
+  test('T5(c) network rejection is caught and logged, feedback still records locally', async () => {
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await renderReadyForFeedback();
+    fetch.mockRejectedValueOnce(new Error('network down'));
+    fireEvent.click(screen.getByTitle('Helpful'));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(screen.getByTitle('Helpful')).toHaveClass('text-green-600');
+    expect(errSpy).toHaveBeenCalledWith('Failed to submit feedback:', expect.any(Error));
+    errSpy.mockRestore();
   });
 });
