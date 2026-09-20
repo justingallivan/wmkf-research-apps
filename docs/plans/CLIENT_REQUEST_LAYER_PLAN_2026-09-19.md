@@ -539,7 +539,7 @@ stages.
 | A4 | 19 retry/poll wrappers wrap the call site rather than living inside it; the helper stays retry-free and the wrapper is untouched | [VERIFIED P-B for `StaffDeliberationsTab.js:354-378` and `FinalWriteupTab.js:283-291`; remaining 17 verified at their stage] |
 | D1 | Pre-existing: 54 sites trust the body without checking `ok` | Characterized, not fixed. Fixing is a behavior change outside this plan; listed for the owner |
 | D2 | Pre-existing: `materials-preflight` returns 200 with `ok:false` | Preserved; helper does not interpret body flags |
-| D3 | Up to 67 client sites parse with bare `.json()`; those that parse BEFORE the `ok` check (e.g. `PromptTemplatesSection.js:478`) surface a `SyntaxError` message today on a non-2xx non-JSON body and would surface the site's fallback message after migration. Sites that parse only after the `ok` check (e.g. `pages/admin.js:938-942`) never see such a body, so the real exposure is smaller [ASSUMED; resolved per site]. On 2xx the strict policy preserves today's rejection exactly | Proposed deviation, limited to non-2xx bodies. Owner decision (3) below, required before Stage 0 exit; `parseError` is recorded in both branches |
+| D3 (owner accepted 2026-09-20) | Up to 67 client sites parse with bare `.json()`; those that parse BEFORE the `ok` check (e.g. `PromptTemplatesSection.js:478`) surface a `SyntaxError` message today on a non-2xx non-JSON body and would surface the site's fallback message after migration. Sites that parse only after the `ok` check (e.g. `pages/admin.js:938-942`) never see such a body, so the real exposure is smaller [ASSUMED; resolved per site]. On 2xx the strict policy preserves today's rejection exactly | Proposed deviation, limited to non-2xx bodies. Owner decision (3) below, required before Stage 0 exit; `parseError` is recorded in both branches |
 | D8 | A tolerant-by-default parser would have converted `AwardeeTab.js:547-572`'s `uncertain` send-invite outcome into `sent` on a malformed 2xx (Codex cycle 1, reproduced) | Fixed by the strict-on-success policy (§3); T0 and T2(d) pin it |
 | D4 | `response.json().catch(() => ({}))` swallows an abort raised during the body read; `readStatus` (`StaffDeliberationsTab.js:66`), `readBriefStatus` (`:76-84`) and `pollForArtifact` (`:354-378`) can loop on a `{}` pseudo-status | Pre-existing at `readResponse`-style sites; fixed by `readJsonBody` rethrow (§3 invariant 4) and pinned in T0 |
 | D5 | `search/useReviewerExport.js` was in no stage row or allowlist in the first draft | Fixed: allowlisted (§2.6, §4) |
@@ -551,8 +551,9 @@ for D1 (recommended: preserve now, fix later per site); (2) whether Stage 4
 proceeds in this cycle or waits for a quiet window, given it touches invite and
 release call sites (recommended: proceed under the Tier 2 controls in §1 and
 §6); (3) D3: accept that a non-2xx non-JSON body shows the site's
-fallback message instead of a raw `SyntaxError` message (recommended: accept;
-the raw message is never useful to a user). Implementable either way: the
+fallback message instead of a raw `SyntaxError` message. **DECIDED 2026-09-20:
+owner accepted** ("1 accept"). The public default is `preferParseError: false`;
+`parseError` is still recorded and T0 still pins both policies. Implementable either way: the
 helper always records `ApiRequestError.parseError`; under "accept" the message
 rule is as written in §3; under "decline" the rule prefers
 `parseError.message` when `parseError` is set, and T0 pins whichever policy is
