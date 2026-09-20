@@ -128,6 +128,34 @@ test('loadReviewers: non-2xx unparseable body falls back to the status-embedded 
   await waitFor(() => expect(screen.getByTestId('manage-panel')).toBeInTheDocument());
 });
 
+test('loadCandidates: D1 fix — a non-2xx {error} body is surfaced via the reviewers-tab error banner', async () => {
+  global.fetch = mkFetch({
+    ...okDefaults,
+    candidates: () => ({ ok: false, status: 500, json: async () => ({ error: 'candidates service down' }) }),
+  });
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByText('Couldn’t load reviewers: candidates service down')).toBeInTheDocument());
+});
+
+test('loadCandidates: D1 fix — a 502 unparseable body falls back to the status-embedded message', async () => {
+  global.fetch = mkFetch({
+    ...okDefaults,
+    candidates: () => ({ ok: false, status: 502, json: async () => { throw new Error('bad gateway'); } }),
+  });
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByText('Couldn’t load reviewers: Request failed (502)')).toBeInTheDocument());
+});
+
+test('loadCandidates: 2xx behavior is unchanged (no error banner)', async () => {
+  global.fetch = mkFetch({
+    ...okDefaults,
+    candidates: () => ({ ok: true, status: 200, json: async () => ({ proposals: [] }) }),
+  });
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByTestId('manage-panel')).toBeInTheDocument());
+  expect(screen.queryByText(/Couldn.t load reviewers/)).not.toBeInTheDocument();
+});
+
 test('addReferralCandidate: posts exact body bytes and headers', async () => {
   let sentOpts = null;
   global.fetch = mkFetch({
