@@ -354,7 +354,7 @@ test('the Final writeups view carries writeups/pd/uncycled in the URL, keeps the
   render(<WorkbenchShell />);
   // Working cycle D26 has nothing visible: the in-place notice names it and links June.
   expect(await screen.findByText('No current writeups visible to you in December 2026.')).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26', expect.objectContaining({ method: 'GET' }));
 
   fireEvent.click(screen.getByRole('button', { name: 'June 2026' }));
   expect(push).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=J26', undefined, expect.any(Object));
@@ -372,7 +372,7 @@ test('the Final writeups view carries writeups/pd/uncycled in the URL, keeps the
 
   fireEvent.click(await screen.findByRole('button', { name: 'Writeups without a cycle' }));
   expect(push).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=D26&writeups=all&pd=33333333-3333-4333-8333-333333333331&uncycled=1', undefined, expect.any(Object));
-  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=none'));
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=none', expect.objectContaining({ method: 'GET' })));
 });
 
 test('the legacy Final writeups route redirects into the shell, translating its old keys', async () => {
