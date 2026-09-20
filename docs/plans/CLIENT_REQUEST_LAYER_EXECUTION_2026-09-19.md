@@ -536,3 +536,54 @@ errors; `check:types` clean.
   `pages/phase-i-dynamics.js:152`), so those error banners render blank
   [VERIFIED via grep]. Recorded as D9 in the D1 follow-up doc; not fixed here.
 
+### Group A (logged 2026-09-20; fresh review pending)
+
+**A1 `shared/components/workbench/AwardeeTab.js` — 14 sites: 13 migrated, 1 excluded.**
+`requestJson`: :238 email-defaults GET (tolerant), :263 recipients GET (strict),
+:276 vip-flags GET (tolerant), :322 abstract GET (strict), :381 abstract GET
+conflict re-read (tolerant), :458 generate POST (strict; fallback 'Abstract
+generation failed.'; catch branches `instanceof ApiRequestError`), :481 abstract
+PUT (tolerant; fallback 'Could not save the abstract.'; catch reads
+`err.payload?.code === 'stale'`), :583 preview-invite POST, :613 website-html GET
+(both tolerant, `instanceof` catch). `requestEnvelope`: :285 vip-flags PUT
+(reads `body.flagged` on 2xx), :543 send-invite POST (STRICT body so a
+malformed 2xx still yields the `uncertain` receipt, D8; branches on
+`outcome==='uncertain'` and `statusPersisted===false`), :662 upload-token POST
+(body-level `tokenData.ok` + 413), :705 replace-submission POST (413 + several
+`data.code` branches). Excluded: :645 replacement-upload-failure beacon stays raw
+`fetch` with the §2.6 allowlist comment. Tests `tests/unit/awardee-tab.test.js`
+94 → 115. Commits `fbde13a3` (tests), `ab64f35d` (migration).
+
+**A2 `shared/components/workbench/FinalWriteupTab.js` — 5/5 → `requestEnvelope`, `tolerantBody: true`.**
+All sites embed the status in their fallback or branch on status on success:
+`fetchStatus` :47 (attaches `.code` to the thrown Error), `fetchAcknowledgementState`
+:60 (503 + `schema_not_ready` → `{available:false}`), `start()` :302 (202 or
+`inProgress` → poll), `advance()` :353 (artifactId mismatch → "changed"),
+`markReviewed()` :399 (503 code check; finalArtifactId mismatch). Retry loop
+stays outside the helper. Tests `tests/unit/final-writeup-tab.test.js` 16 → 28
+(incl. the previously untested 202 poll branch). Commits `6bc90807`, `d5f7cb6c`.
+
+**A3 `shared/components/workbench/ConsultantFeedbackSection.js` — 8/8, `tolerantBody: true`.**
+`requestEnvelope` at :297 entries GET, :298 consultants GET (ternary on `.ok`),
+:444 upload-token POST (body-level `ok`), :484 PATCH, :534 POST, :576 DELETE
+(`data.reason==='attachment_removal_pending'`; status-embedded fallbacks);
+`requestJson` at :501 and :514 finalize POSTs (fallback 'The attachment could
+not be saved.'). No import from review-panel-ui.js (comment mention only). This
+file had zero failure-path coverage before; tests
+`tests/unit/consultant-feedback-section.test.js` 18 → 30. Commits `a3a44129`,
+`07470083`.
+
+Group A gates at `07470083`: `npm test` 986 suites / 14652 tests green; lint 0
+errors (three pre-existing `react-hooks` warnings on untouched effects);
+`check:types` clean.
+
+**Observation O3 (pre-existing, unchanged):** `ConsultantFeedbackSection`
+`handleDelete`'s `attachment_removal_pending` branch calls
+`setError('Attachment removed, delete again.')` then `await load()`, whose
+leading `setError(null)` wins the same batch, so that message never renders.
+Documented in the new test; candidate for the D1 follow-up family.
+
+**Stage 2 totals:** 42 sites migrated across 5 files (13+5+8+8+8), 1 excluded
+beacon, 3 verify-only files confirmed on the Stage 1 adapters. T2 tests added:
+75 (21+12+12+9+21). Form split: `requestJson` 11, `requestEnvelope` 31. Fresh
+review and full Gate G by the orchestrator: pending below.
