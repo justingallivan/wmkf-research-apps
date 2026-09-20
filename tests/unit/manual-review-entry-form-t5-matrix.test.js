@@ -72,7 +72,7 @@ test('submit: 2xx success calls onSubmitted', async () => {
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/manual-review-entry', expect.objectContaining({ method: 'POST' })));
 });
 
-test('submit: 409 set_changed maps to the durable reason banner (verbatim)', async () => {
+test('submit: 409 set_changed maps to the durable reason banner (verbatim) and shows the reload affordance', async () => {
   await readyForm();
   global.fetch = jest.fn((url, opts) => (
     opts?.method === 'POST'
@@ -81,6 +81,11 @@ test('submit: 409 set_changed maps to the durable reason banner (verbatim)', asy
   ));
   fireEvent.click(screen.getByRole('button', { name: 'Record review as received' }));
   expect(await screen.findByText('The review questions changed while this form was open.')).toBeInTheDocument();
+  // The set_changed affordance only renders when errorReason === 'set_changed' (the true
+  // 409 branch), never from the generic fallthrough throw — this discriminates a
+  // `resStatus === 409` → `410` mutation from a fixture whose message text happens to
+  // match the fallthrough's `data.message` fallback (finding 6).
+  expect(screen.getByRole('button', { name: 'Reload current questions and keep compatible answers' })).toBeInTheDocument();
 });
 
 test('submit: network rejection is never silent', async () => {
