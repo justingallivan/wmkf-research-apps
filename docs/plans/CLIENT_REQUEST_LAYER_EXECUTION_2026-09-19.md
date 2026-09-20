@@ -15,9 +15,11 @@ related:
 ## Scope and status
 
 Stage 0 (baseline, helper, census) was ACCEPTED 2026-09-20 at `e65b03a0` (see
-Stage 0 acceptance below); Stage 1 has not started. Owner decision D3 (plan §9)
+Stage 0 acceptance below). Owner decision D3 (plan §9)
 was accepted 2026-09-20: public default `preferParseError: false`; `parseError`
-is still always recorded on `ApiRequestError`.
+is still always recorded on `ApiRequestError`. Stage 1 (fold existing
+helpers) implemented 2026-09-20; see Stage 1 section below. Fresh review:
+pending.
 
 ## Census baseline
 
@@ -332,9 +334,79 @@ Verdict: **Stage 0 ACCEPTED.** Helper landed with zero callers; census
 tracked; execution map corrected. Rollback: revert `e65b03a0`, `0775005c`,
 `d169fd63` (docs/scripts/tests plus one uncalled module; no runtime effect).
 
-Stage 1 is NOT started. Owner decisions outstanding before later stages:
-(1) D1 posture, (2) Stage 4 timing, (4) 5b rehearsal, (5) Stage 4 data mode,
-(6) `pages/profile-settings.js` placement. D3 accepted 2026-09-20.
+Owner decisions outstanding before later stages: (1) D1 posture, (2) Stage 4
+timing, (4) 5b rehearsal, (5) Stage 4 data mode, (6)
+`pages/profile-settings.js` placement. D3 accepted 2026-09-20.
+
+## Stage 1 — fold adapters
+
+Implemented 2026-09-20. Four adapters reimplemented over
+`readJsonBody(response, { tolerantBody: true })`; no call site edited; no
+export/signature/message-string change; thrown values stay plain `Error`.
+
+| Adapter | File | Before | After |
+|---|---|---|---|
+| `readResponse` | `shared/components/review-panel/review-panel-ui.js:62-66` | `const body = await response.json().catch(() => ({}));` | `const body = await readJsonBody(response, { tolerantBody: true });` |
+| `readResponse` (local copy) | `pages/cycle-dossier.js:73-77` (was :72-75; +1 line for the added import elsewhere in the file, no adapter body change) | `const body = await response.json().catch(() => ({}));` | `const body = await readJsonBody(response, { tolerantBody: true });` |
+| `readJson` | `shared/components/meeting-tracker/SessionEditor.js:23-25` (was :22-24; +1 line for the added import elsewhere in the file) | `return response.json().catch(() => ({}));` | `return readJsonBody(response, { tolerantBody: true });` |
+| `sendJson` | `shared/components/meeting-tracker/SessionEditor.js:27-36` (was :26-35; +1 line, same shift) | unchanged — still calls the file-local `readJson`, which now folds over `readJsonBody` | unchanged expression; behavior folds through `readJson`'s new body |
+
+`pages/cycle-dossier.js`'s local `readResponse` and `SessionEditor.js`'s
+`readJson`/`sendJson` gained `export` (additive only, no signature/behavior
+change) so `tests/unit/client-request-stage1-adapters.test.js` (T1) can
+import them directly, matching each file's existing convention of exporting
+its other pure helpers (e.g. `groupedCandidates`, `reorderSessionSlots`).
+
+**17 raw sites confirmed** [VERIFIED via grep against each file, this
+session]:
+- `shared/components/review-panel/review-panel-ui.js` `readResponse` (6
+  sites): `pages/review-panel.js:44,89,111` (the pair at :110-111 is
+  `readResponse(response)` called at :111 on the previous line's `response`)
+  and `shared/components/workbench/ReviewPanelTab.js:251,279,289`.
+- `pages/cycle-dossier.js` local `readResponse` (7 sites): :266, :335, :350,
+  :398, :427, :459, :481.
+- `shared/components/meeting-tracker/SessionEditor.js` `readJson`/`sendJson`
+  (4 raw-fetch sites): :305 (`fetch` feeding `readJson` at :306), :321 (two
+  `fetch(` calls on one line), :322 (`fetch` feeding `readJson` at :324, via
+  `responses.map(readJson)`). `sendJson` itself has 8 callers
+  (`reorderSessionSlots` at :38, plus :380/:381/:385/:426/:514/:515/:516)
+  and contributes no additional raw `fetch(` census site (its request goes
+  through `fetchImpl`).
+
+Total: 6 + 7 + 4 = **17**, matching the plan (§2.4) and the Stage 0
+source-to-stage map above.
+
+**T1** (`tests/unit/client-request-stage1-adapters.test.js`): 30 tests —
+message-text pins for `{error}`, `{message}`-only (falls to fallback),
+nested `{error:{message}}` (`[object Object]`), `{error:5}` (`"5"`), a
+non-2xx body whose `json()` rejects (empty/non-JSON, falls to fallback), 2xx
+return-as-is, thrown `.name === 'Error'`, `sendJson`'s `fetchImpl`/headers/body
+assertions, and a static grep-based assertion that none of the four consumer
+files (`pages/review-panel.js`, `shared/components/workbench/ReviewPanelTab.js`,
+`pages/cycle-dossier.js`, `shared/components/meeting-tracker/SessionEditor.js`)
+contains `signal` or `AbortController` — confirmed 0 hits in this session, so
+invariant 4's abort rethrow is unobservable here. Ran green against the
+UNMIGRATED adapters first (30/30), committed at `45907489`; ran again
+UNCHANGED after migration (30/30, same test file, no edits). Existing tests
+matching `tests/unit/.*(cycle-dossier|review-panel|session-editor|meeting-tracker)`
+(no file matches `session-editor` by that exact name; the pattern is kept
+for the plan's stated command shape): 671/671 passed, both before and after
+migration.
+
+**Gate G**, run sequentially at the code commit (recorded after committing
+below, hash filled in post-commit): `npm test -- --runInBand --silent`:
+986 suites / 14578 tests green; `npm run lint`: 0 errors (114 pre-existing
+warnings, none newly introduced); `npm run check:types`: clean;
+`check:status-enum-parity` + self-test: OK (8 invariants, 17/17 self-test);
+`check:api-routes` + self-test: OK (224 routes); `check:doc-symbol-refs` +
+self-test: OK (295 docs / 1756 refs); `check:build-claim-freshness` +
+self-test: OK (295 docs / 1607 refs) — updated `shared/utils/api-request.js`'s
+header comment, which said "Zero callers until Stage 1", to reflect that
+Stage 1 now has callers; `check:doc-currency` + self-test: OK; `check:secret-scan`
++ self-test: OK (3904 files); `check:scaffolding-tokens` + self-test: OK
+(3888 files); `npm run build`: compiled successfully.
+
+Fresh review: pending.
 
 ## Verification log
 

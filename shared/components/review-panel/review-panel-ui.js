@@ -7,6 +7,8 @@
  * the two surfaces cannot fork; the page re-exports the names its tests import.
  */
 
+import { readJsonBody } from '../../utils/api-request';
+
 export const EMPTY_ARRAY = [];
 export const POLL_MS = 4000;
 
@@ -60,7 +62,7 @@ export function runPillLabel(run) {
 }
 
 export async function readResponse(response) {
-  const body = await response.json().catch(() => ({}));
+  const body = await readJsonBody(response, { tolerantBody: true });
   if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
   return body;
 }

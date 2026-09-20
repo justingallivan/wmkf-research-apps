@@ -5,6 +5,7 @@ import Layout, { Button } from '../Layout';
 import { formatZonedLocalInput, resolveZonedDateTime } from '../../../lib/utils/zoned-date-time';
 import SessionAgendaPanel from './SessionAgendaPanel';
 import OverflowMenu from '../workbench/OverflowMenu';
+import { readJsonBody } from '../../utils/api-request';
 
 const FIELD_CLASS = 'mt-1 rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300';
 
@@ -20,7 +21,7 @@ const EMPTY_FORM = {
 };
 
 export async function readJson(response) {
-  return response.json().catch(() => ({}));
+  return readJsonBody(response, { tolerantBody: true });
 }
 
 export async function sendJson(url, method, body, fetchImpl = fetch) {

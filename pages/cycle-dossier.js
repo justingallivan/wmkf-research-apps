@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Layout, { Button, Card, PageHeader } from '../shared/components/Layout';
 import RequireAuth from '../shared/components/RequireAuth';
 import { useAppAccess } from '../shared/context/AppAccessContext';
+import { readJsonBody } from '../shared/utils/api-request';
 
 const POLL_MS = 4000;
 const EMPTY_ARRAY = [];
@@ -70,7 +71,7 @@ function formatUsd(value) {
 }
 
 export async function readResponse(response) {
-  const body = await response.json().catch(() => ({}));
+  const body = await readJsonBody(response, { tolerantBody: true });
   if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
   return body;
 }

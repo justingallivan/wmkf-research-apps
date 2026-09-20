@@ -48,7 +48,8 @@
  * than the raw parse error. `parseError` is always recorded on
  * `ApiRequestError` regardless of that default.
  *
- * Zero callers until Stage 1; see
+ * Zero callers through Stage 0; Stage 1 folds four existing partial adapters
+ * (readResponse x2, readJson, sendJson) over `readJsonBody`. See
  * docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md §3.
  */
 
