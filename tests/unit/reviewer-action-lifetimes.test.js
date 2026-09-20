@@ -229,6 +229,39 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       expect(def.fetchMock()).toHaveBeenCalledTimes(1);
     });
 
+    test('T4 request bytes: the mutation sends exact method and headers', async () => {
+      def.fetchMock().mockResolvedValue(def.successResponse());
+      renderPanel();
+      def.trigger();
+      await act(async () => {});
+      const [, init] = def.fetchMock().mock.calls[0];
+      expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+      expect(init.method).toBe(def.kind === 'remove' ? 'DELETE' : 'POST');
+    });
+
+    if (def.kind !== 'remove') {
+      test('T4 axis (d): a malformed 2xx body is never treated as success', async () => {
+        def.fetchMock().mockResolvedValue({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
+        const onRefresh = jest.fn();
+        renderPanel({ onRefresh });
+        def.trigger();
+        await act(async () => {});
+        expect(window.alert).toHaveBeenCalledTimes(1);
+        expect(onRefresh).not.toHaveBeenCalled();
+      });
+    }
+
+    test('T4 axis (e): a non-2xx body that fails to parse is never silent (reports the status)', async () => {
+      def.fetchMock().mockResolvedValue({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
+      const onRefresh = jest.fn();
+      renderPanel({ onRefresh });
+      def.trigger();
+      await act(async () => {});
+      expect(window.alert).toHaveBeenCalledTimes(1);
+      expect(window.alert.mock.calls[0][0]).toMatch('502');
+      expect(onRefresh).not.toHaveBeenCalled();
+    });
+
     if (def.needsConfirm) {
       test('declining the confirm dialog never dispatches a request', async () => {
         window.confirm.mockReturnValue(false);
@@ -538,6 +571,43 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       expect(requests.filter((body) => body.terminalStatus === 'released' && body.preview !== true)).toHaveLength(0);
       await act(async () => withdrawJob.resolve(response({ transitioned: 1 })));
       expect(onRefresh.mock.calls).toEqual([[]]);
+    });
+
+    function acceptedDraftResponse() {
+      return response({
+        drafts: [{
+          suggestionId: reviewer.suggestionId,
+          status: 'no_email',
+          expectedNotes: '',
+          existingNotes: '',
+        }],
+      });
+    }
+
+    test('T4 axis (d): a malformed 2xx release-dispatch body is never treated as success', async () => {
+      terminalFetch.mockImplementation((_url, options) => {
+        const body = JSON.parse(options.body);
+        if (body.preview === true) return Promise.resolve(acceptedDraftResponse());
+        return Promise.resolve({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
+      });
+      renderPanel();
+      release();
+      await screen.findByRole('checkbox', { name: 'Send a thank-you email' });
+      fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+      expect(await screen.findByText('Release failed (200)')).toBeInTheDocument();
+    });
+
+    test('T4 axis (e): a non-2xx release-dispatch body that fails to parse is never silent', async () => {
+      terminalFetch.mockImplementation((_url, options) => {
+        const body = JSON.parse(options.body);
+        if (body.preview === true) return Promise.resolve(acceptedDraftResponse());
+        return Promise.resolve({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
+      });
+      renderPanel();
+      release();
+      await screen.findByRole('checkbox', { name: 'Send a thank-you email' });
+      fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+      expect(await screen.findByText(/Release failed \(502\)/i)).toBeInTheDocument();
     });
 
     test('preview read-only context refuses to open or fetch the release dialog', async () => {

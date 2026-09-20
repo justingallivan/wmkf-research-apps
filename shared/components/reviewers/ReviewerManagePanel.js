@@ -47,6 +47,12 @@ import ReleaseMaterialsModal from './ReleaseMaterialsModal';
 import { proposalKeyFor } from './reviewer-draft-keys';
 import { TokenActionsMenu, TokenStateBadge } from './TokenActionsMenu';
 import { ReviewReminderAction } from './ReviewReminderAction';
+import { requestEnvelope } from '../../utils/api-request';
+
+// Sentinel for updateStatus's PATCH: distinguishes "body failed to parse" from
+// a legitimately empty/null 2xx body without losing envelope.status (which a
+// thrown parse error under strict tolerantBody would). See :743.
+const MALFORMED_BODY = Symbol('malformed-body');
 
 // Pure status-pipeline / mode-bucketing logic lives in ./reviewer-modes
 // (React-free + unit-tested). Re-export the pipeline so existing importers of
@@ -541,22 +547,21 @@ export default function ReviewerManagePanel({
     if (!attempt) return;
     const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      let resp;
+      let envelope;
       try {
-        resp = await fetch('/api/review-manager/regenerate-token', {
+        envelope = await requestEnvelope('/api/review-manager/regenerate-token', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ suggestionId }),
+          body: { suggestionId },
+          tolerantBody: true,
         });
       } catch (err) {
         if (isCurrent()) alert(`Network error generating link: ${err.message}`);
         return;
       }
       if (!isCurrent()) return;
-      const data = await resp.json().catch(() => ({}));
-      if (!isCurrent()) return;
-      if (!resp.ok || !data.ok) {
-        alert(`Could not generate a new link: ${data.reason || resp.status}`);
+      const data = envelope.data;
+      if (!envelope.ok || !data.ok) {
+        alert(`Could not generate a new link: ${data.reason || envelope.status}`);
         return;
       }
       // A new token already exists server-side at this point (mintAndStore
@@ -603,22 +608,21 @@ export default function ReviewerManagePanel({
     if (!attempt) return;
     const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      let resp;
+      let envelope;
       try {
-        resp = await fetch('/api/review-manager/revoke-token', {
+        envelope = await requestEnvelope('/api/review-manager/revoke-token', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ suggestionId }),
+          body: { suggestionId },
+          tolerantBody: true,
         });
       } catch (err) {
         if (isCurrent()) alert(`Network error: ${err.message}`);
         return;
       }
       if (!isCurrent()) return;
-      const data = await resp.json().catch(() => ({}));
-      if (!isCurrent()) return;
-      if (!resp.ok || !data.ok) {
-        alert(`Revoke failed: ${data.reason || resp.status}`);
+      const data = envelope.data;
+      if (!envelope.ok || !data.ok) {
+        alert(`Revoke failed: ${data.reason || envelope.status}`);
         return;
       }
       const currentOnRefresh = statusContextRef.current.onRefresh;
@@ -667,22 +671,21 @@ export default function ReviewerManagePanel({
     if (!attempt) return;
     const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      let resp;
+      let envelope;
       try {
-        resp = await fetch('/api/reviewer-finder/my-candidates', {
+        envelope = await requestEnvelope('/api/reviewer-finder/my-candidates', {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ suggestionId: reviewer.suggestionId }),
+          body: { suggestionId: reviewer.suggestionId },
+          tolerantBody: true,
         });
       } catch (err) {
         if (isCurrent()) alert(`Network error removing reviewer: ${err.message}`);
         return;
       }
       if (!isCurrent()) return;
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        if (!isCurrent()) return;
-        const detail = data.error || data.message || data.details || resp.status;
+      if (!envelope.ok) {
+        const data = envelope.data;
+        const detail = data.error || data.message || data.details || envelope.status;
         alert(`Could not remove the reviewer: ${detail}`);
         return;
       }
@@ -738,27 +741,31 @@ export default function ReviewerManagePanel({
     };
 
     try {
-      let response;
+      let envelope;
       try {
-        response = await fetch('/api/review-manager/reviewers', {
+        envelope = await requestEnvelope('/api/review-manager/reviewers', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ suggestionId, reviewStatus: newStatus }),
+          body: { suggestionId, reviewStatus: newStatus },
+          // Function form: keeps envelope.status available on a malformed
+          // body (2xx or non-2xx) instead of throwing before status is known
+          // or silently substituting {} into the outcome logic below.
+          tolerantBody: () => MALFORMED_BODY,
         });
       } catch (error) {
         reportUnconfirmed(`Network error${error?.message ? `: ${error.message}` : ''}.`);
         return;
       }
       if (!isCurrent()) return;
-
-      let data;
-      try {
-        data = await response.json();
-      } catch {
-        reportUnconfirmed(`Invalid response from the server (HTTP ${response.status}).`);
+      // The function-form tolerantBody only fires for a 2xx body; a non-2xx
+      // body is always parsed tolerantly by the helper regardless, recording
+      // the native error as envelope.error.parseError instead (rule ii).
+      if (envelope.data === MALFORMED_BODY || envelope.error?.parseError) {
+        reportUnconfirmed(`Invalid response from the server (HTTP ${envelope.status}).`);
         return;
       }
-      if (!isCurrent()) return;
+
+      const response = { ok: envelope.ok, status: envelope.status };
+      const data = envelope.data;
       const outcomeKeys = ['savedIds', 'failedIds', 'notAttemptedIds'];
       const hasOutcomes = data != null && outcomeKeys.some(key => Object.hasOwn(data, key));
       const isResponseObject = data !== null && typeof data === 'object' && !Array.isArray(data);
@@ -853,28 +860,27 @@ export default function ReviewerManagePanel({
     // request switch after this point must not relabel this payload.
     const requestId = attempt.requestId;
     try {
-      let response;
+      let envelope;
       try {
-        response = await fetch('/api/review-manager/terminal-transition', {
+        envelope = await requestEnvelope('/api/review-manager/terminal-transition', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             requestId,
             suggestionIds: [reviewer.suggestionId],
             terminalStatus,
-          }),
+          },
+          tolerantBody: true,
         });
       } catch (transitionError) {
         if (isCurrent()) alert(`Network error ending engagement: ${transitionError.message}`);
         return;
       }
       if (!isCurrent()) return;
-      const data = await response.json().catch(() => ({}));
-      if (!isCurrent()) return;
-      if (!response.ok || data.transitioned !== 1) {
+      const data = envelope.data;
+      if (!envelope.ok || data.transitioned !== 1) {
         // A 409 with results[0].status === 'write_failed' may have partially
         // committed server-side; there is no client-side replay or repair.
-        const reason = data.results?.[0]?.status || data.error || response.status;
+        const reason = data.results?.[0]?.status || data.error || envelope.status;
         alert(`Could not end the engagement: ${reason}. Reload and try again.`);
         return;
       }
@@ -898,28 +904,28 @@ export default function ReviewerManagePanel({
     if (!attempt) return { ok: false, error: 'The reviewer is no longer available for this action.' };
     const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      let response;
+      let envelope;
       try {
-        response = await fetch('/api/review-manager/terminal-transition', {
+        envelope = await requestEnvelope('/api/review-manager/terminal-transition', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             requestId: attempt.requestId,
             suggestionIds: [reviewer.suggestionId],
             terminalStatus: 'released',
             ...releasePayload,
-          }),
+          },
+          tolerantBody: true,
         });
       } catch (releaseError) {
         if (!isCurrent()) return { ok: false, error: 'The reviewer context changed while the release was being saved.' };
         throw releaseError;
       }
       if (!isCurrent()) return { ok: false, error: 'The reviewer context changed while the release was being saved.' };
-      const data = await response.json().catch(() => ({}));
+      const data = envelope.data;
       if (!isCurrent()) return { ok: false, error: 'The reviewer context changed while the release was being saved.' };
-      if (!response.ok || data.transitioned !== 1) {
+      if (!envelope.ok || data.transitioned !== 1) {
         const status = data.results?.[0]?.status;
-        return { ok: false, data, error: status || data.error || `Release failed (${response.status})` };
+        return { ok: false, data, error: status || data.error || `Release failed (${envelope.status})` };
       }
       try {
         await statusContextRef.current.onRefresh?.();

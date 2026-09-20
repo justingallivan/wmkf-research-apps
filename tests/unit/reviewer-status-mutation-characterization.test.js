@@ -185,8 +185,18 @@ describe.each([false, true])('Stage 1E/6A rendered status contract (StrictMode: 
     expect(statusFetch).toHaveBeenCalledTimes(1);
   });
 
+  test('T4 axis (e): a non-2xx body that fails to parse reports the status, not silently', async () => {
+    statusFetch.mockResolvedValue({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed(reviewer.name, /Invalid response from the server \(HTTP 502\)\./);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
   test.each([
-    { name: 'malformed JSON', result: () => ({ ok: true, status: 200, json: async () => { throw new Error('Unexpected token'); } }), detail: /invalid response/i },
+    { name: 'malformed JSON', result: () => ({ ok: true, status: 200, json: async () => { throw new Error('Unexpected token'); } }), detail: /Invalid response from the server \(HTTP 200\)./ },
     { name: 'rejected fetch', result: () => Promise.reject(new Error('offline')), detail: /network.*offline/i },
   ])('$name reports an unconfirmed outcome without retry', async ({ result, detail }) => {
     statusFetch.mockImplementation(result);
