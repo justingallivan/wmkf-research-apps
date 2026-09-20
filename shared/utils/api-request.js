@@ -2,10 +2,14 @@
  * Shared client-side JSON request helper.
  *
  * Purpose: one place for the fetch → parse-body → ok-check → error-message
- * dance that 308 client `fetch(` call sites in `shared/components/**` and
- * `pages/**` (excluding `pages/api/**`) currently hand-roll, each slightly
- * differently. Plain JavaScript, no React import, no side effects at import,
- * so it is usable from hooks, components, pages, and non-component stores.
+ * dance that client `fetch(` call sites in `shared/components/**` and
+ * `pages/**` (excluding `pages/api/**`) used to hand-roll, each slightly
+ * differently (309 sites at the 2026-09-19 census; every JSON site now goes
+ * through this module, and an ESLint `no-restricted-syntax` ratchet keeps it
+ * that way — the remaining raw `fetch(` calls are the §2.6 allowlist: SSE
+ * streams, blob downloads, fire-and-forget beacons). Plain JavaScript, no
+ * React import, no side effects at import, so it is usable from hooks,
+ * components, pages, and non-component stores.
  *
  * Invariants (each pinned by a unit test in tests/unit/api-request.test.js):
  * 1. `fetch` is resolved as `fetchImpl ?? globalThis.fetch` AT CALL TIME,
@@ -48,9 +52,11 @@
  * than the raw parse error. `parseError` is always recorded on
  * `ApiRequestError` regardless of that default.
  *
- * Zero callers through Stage 0; Stage 1 folds four existing partial adapters
- * (readResponse x2, readJson, sendJson) over `readJsonBody`. See
- * docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md §3.
+ * The four legacy adapters (readResponse x2, readJson, sendJson) were first
+ * folded over `readJsonBody` (Stage 1) and then rewritten over
+ * `requestEnvelope` (Stage 6), so `readJsonBody` has no live caller; it stays
+ * exported for API stability (plan: keep exports) and is pinned by its unit
+ * tests. See docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md §3.
  */
 
 export class ApiRequestError extends Error {
@@ -158,8 +164,8 @@ async function parseJsonBody(response, { signal, tolerantBody = false } = {}) {
 
 /**
  * Public data-only adapter over `parseJsonBody`, for callers that already
- * hold a `Response` (e.g. the Stage 1 adapters folding `readResponse` /
- * `sendJson`). Returns the parsed body; does not throw on HTTP status.
+ * hold a `Response`. No live caller after Stage 6 (kept exported for API
+ * stability). Returns the parsed body; does not throw on HTTP status.
  */
 export async function readJsonBody(response, { signal, tolerantBody = false } = {}) {
   const { data } = await parseJsonBody(response, { signal, tolerantBody });

@@ -190,8 +190,11 @@ Claude config sync, and environment-specific operating notes.
 fetch → parse-body → ok-check → error-message dance. Two entry points:
 `requestJson(url, options)` (throws `ApiRequestError` on non-2xx, resolves to
 the parsed body on 2xx) and `requestEnvelope(url, options)` (never throws on
-HTTP status; resolves to `{ ok, status, data, error }`). `readJsonBody` is
-the data-only adapter for callers that already hold a `Response`.
+HTTP status; resolves to `{ ok, status, data, error }`). The local
+`readResponse`/`readJson`/`sendJson` adapters in review-panel, cycle-dossier
+and the meeting-tracker editors are `(url, options)` wrappers over
+`requestEnvelope`; `readJsonBody` (data-only, takes a `Response`) is exported
+but has no live caller.
 
 An ESLint `no-restricted-syntax` rule (`eslint.config.mjs`, scoped to
 `shared/components/**/*.js` and `pages/**/*.js`, excluding `pages/api/**`)

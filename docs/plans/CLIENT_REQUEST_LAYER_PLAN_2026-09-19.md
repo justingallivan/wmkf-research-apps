@@ -2,7 +2,7 @@
 title: Client Request Layer Migration Plan
 domain: platform
 kind: plan
-status: active
+status: complete
 summary: Staged introduction of one shared client-side JSON request helper and migration of the raw fetch call sites in client components and pages onto it, preserving each call site's visible error behavior except owner decision D3 on non-2xx non-JSON bodies.
 canonical: false
 owner: product-engineering
@@ -210,7 +210,19 @@ sites (`shared/components/reviewers/ReviewerInvitePanel.js:357`,
 `shared/components/external/GranteeDeliverableForm.js:152` with `keepalive`)
 stay on raw `fetch` under this plan and form the closeout allowlist. The
 allowlist is site-level (§6 Stage 6), because `ReviewerInvitePanel.js` and
-`ReleaseMaterialsModal.js` mix allowlisted and migrated sites. SSE consolidation is the named sibling plan
+`ReleaseMaterialsModal.js` mix allowlisted and migrated sites.
+**Stage 6 amendment (2026-09-20):** the ratchet found 26 annotated sites, not
+19. The 7 extra are SSE consumers whose stream is parsed by
+`shared/components/reviewers/sse.js` `readSseStream` or
+`shared/utils/sse-stream.js` `parseSseStream` rather than a local
+`getReader()` loop, which is why the census could not tag them:
+`shared/components/reviewers/InviteEmailModal.js:736`,
+`shared/components/reviewers/search/useReviewerDiscovery.js:75,119,190`,
+`shared/components/reviewers/search/useReviewerPromotion.js:61`,
+`shared/components/reviewers/search/useApplicantReviewerEnrichment.js:47`,
+`pages/phase-ii-writeup.js:241`. Each was read to its stream consumer in the
+Stage 6 fresh review; all are the stream category. The allowlist is therefore
+26 sites: 21 stream, 3 blob, 2 beacon. SSE consolidation is the named sibling plan
 in §1.
 
 ### 2.7 Precedent

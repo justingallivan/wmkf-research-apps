@@ -435,11 +435,12 @@ If you're touching a service or utility, read its header before this catalog. If
   (throwing form, resolves to the parsed body on 2xx, throws `ApiRequestError` on non-2xx) and
   `requestEnvelope(url, options)` (non-throwing form, resolves to `{ ok, status, data, error }`);
   both share `fetchImpl ?? globalThis.fetch` late binding, `tolerantBody` body-parse policy, and
-  `deriveErrorMessage`'s message rule. `readJsonBody(response, options)` is the data-only adapter
-  for callers that already hold a `Response` (the Stage 1 fold's `readResponse`/`readJson`/
-  `sendJson` in `shared/components/review-panel/review-panel-ui.js`, `pages/cycle-dossier.js`, and
-  `shared/components/meeting-tracker/SessionEditor.js`/`SiteVisitEditor.js`). No React import, no
-  side effects at import. An ESLint `no-restricted-syntax` rule (`eslint.config.mjs`, scoped to
+  `deriveErrorMessage`'s message rule. The local adapters `readResponse`/`readJson`/`sendJson` in
+  `shared/components/review-panel/review-panel-ui.js`, `pages/cycle-dossier.js`,
+  `shared/components/meeting-tracker/SessionEditor.js` and `SiteVisitEditor.js` are thin
+  `(url, options)` wrappers over `requestEnvelope`. `readJsonBody(response, options)` (data-only,
+  for a caller that already holds a `Response`) is exported for API stability and has no live
+  caller. No React import, no side effects at import. An ESLint `no-restricted-syntax` rule (`eslint.config.mjs`, scoped to
   `shared/components/**/*.js` and `pages/**/*.js`, excluding `pages/api/**`) bans raw
   `fetch(`/`globalThis.fetch(`/`window.fetch(` calls outside this module; a site kept on raw
   `fetch` for a plan §2.6 reason (SSE stream, blob download reading `Content-Disposition`, or a
