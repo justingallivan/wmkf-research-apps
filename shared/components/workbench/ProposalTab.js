@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { requestJson } from '../../utils/api-request';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import { parseFieldPrimerEnvelope } from '../../utils/field-primer-envelope';
 import { expertProfileLinks, expertMetrics } from '../../utils/field-primer-display';
@@ -261,13 +261,16 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
     setError(null);
     setPending(false);
     try {
-      const body = await requestJson('/api/field-primer/generate', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/field-primer/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: { requestId, ...(regenerate ? { regenerate: true } : {}) },
-        fallbackMessage: 'Generation failed',
         tolerantBody: true,
       });
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        throw new Error(responseError || `Generation failed (${resStatus})`);
+      }
       if (token !== reqRef.current) return; // request changed mid-flight — ignore stale response
       if (body.envelope) setEnvelope(body.envelope);
       else if (body.status === 'generating') setPending(true);
@@ -506,9 +509,9 @@ export default function ProposalTab({ context, requestId: requestIdProp }) {
     let cancelled = false;
     setDocs(null);
     setDocsError(null);
-    requestJson(`/api/workbench/proposal-documents?requestId=${encodeURIComponent(requestId)}`, { fallbackMessage: 'Failed to load documents', tolerantBody: true })
-      .then((body) => {
-        if (body?.success !== true) throw new Error(body?.error || 'Failed to load documents');
+    requestEnvelope(`/api/workbench/proposal-documents?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true })
+      .then(({ ok: resOk, status: resStatus, data: body }) => {
+        if (!resOk || body?.success !== true) throw new Error(body?.error || `Failed to load documents (${resStatus})`);
         if (!cancelled) setDocs(body);
       })
       .catch((e) => {
