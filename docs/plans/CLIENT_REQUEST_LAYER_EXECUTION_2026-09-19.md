@@ -622,3 +622,50 @@ added 85 (75 + 10 in the correction round). Rollback: revert `3472bcbc`,
 `7c77d39c`, then the five migration commits (`ab64f35d`, `d5f7cb6c`,
 `231842a9`, `8785a9bf`, `07470083`) and their test commits in reverse order.
 Stage 3 next.
+
+## Stage 3 — admin surface
+
+### Group A: `shared/components/admin/*` sections (logged 2026-09-20; fresh review pending with group B)
+
+29 sites across 11 files, all migrated; census count matched. Forms:
+`requestJson` at SiteVisitRecipientsSection (4), EmailDefaultsSection (2),
+FinalWriteupMatrixAudiencesSection (2), SiteVisitMaterialsDefaultsSection (2),
+MeetingTrackerDefaultsSection (2); `requestEnvelope` at
+DynamicsExplorerRestrictionsSection (3), OperationalEventsSection (3),
+ReviewQuestionsSection (3), PoliciesSection (2), ReviewerRepairAlertDetails (1),
+PromptTemplatesSection (5). The 403 messages are pinned verbatim by test:
+'Admin access required' at `PoliciesSection.js:77`, `ReviewQuestionsSection.js:101`,
+`PromptTemplatesSection.js:98`; 'Admin access required for Executor budgets' at
+`PromptTemplatesSection.js:117`.
+
+D1-preserve sites (unguarded today; fixed later, not here):
+`DynamicsExplorerRestrictionsSection.js:14,25,38` → `requestEnvelope`, `data` used
+regardless of `ok`; the :38 DELETE never read a body and uses
+`tolerantBody: true` with the result ignored so a 2xx empty body adds no new
+rejection. `PoliciesSection.js:363` and `PromptTemplatesSection.js:741` (bare
+`.json()` parsed before any check) → `requestEnvelope` with
+`envelope.error?.parseError` rethrown, so a malformed non-2xx body still routes
+to the same catch a bare `.json()` reaches today. The same rethrow was applied
+at `PromptTemplatesSection.js:469` (executor-budgets PUT, guarded, but parsed
+before its status checks). Generalization of Stage 2 rule (ii); every case has
+a pre- and post-migration passing pin.
+
+Tests added 89 (three new test files: dynamics-explorer-restrictions-section,
+site-visit-materials-defaults-section, meeting-tracker-defaults-section; eight
+existing files extended). Three test files had their fetch-call matchers
+adjusted from "no method" to "no method or GET" because the helper always
+passes an explicit init (`{ method: 'GET' }`) where the raw code passed none;
+the server cannot distinguish these. No behavioral assertion weakened.
+
+Flagged, not fixed (narrow, pre-existing shape): `PromptTemplatesSection`
+`Promise.all` over prompts + models: if prompts returns 403 AND models returns a
+2xx malformed body simultaneously, the pre-image short-circuited to 'Admin
+access required'; post-migration the models parse may reject first. Not an
+axis case; recorded for the reviewer.
+
+Group A gates at `1fa9eb46`: `npm test` 993 suites / 14871 tests green (includes
+group B's interleaved commits); lint 0 errors; `check:types` clean. Commits
+(test → refactor per file): 61448af3→08d934eb, d0db6515→01d7c73a,
+f13f9e82→623fa25e, 3b7646ad→1f96a97a, daadfbfb→e1ca3c19, bbb6fdf3→57c821a0,
+0566951e→4f1c2275, b7e07d6e→b6d27985, a87fe90b→e22a8dad, cd114413→3a459d54,
+cd245a8d→1fa9eb46.
