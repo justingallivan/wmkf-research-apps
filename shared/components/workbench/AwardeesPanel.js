@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { requestJson, requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ScopeSegment from './ScopeSegment';
 
@@ -53,13 +54,12 @@ export default function AwardeesPanel({ cycleCode, loadingCycles, scope, onScope
     setErrorContextVersion(null);
     try {
       const scopeParam = all ? '&scope=all' : '';
-      const res = await fetch(
+      const { ok: resOk, data: d } = await requestEnvelope(
         `/api/workbench/grantee-deliverables/awardees?cycleCode=${encodeURIComponent(code)}${scopeParam}`,
         { signal: request.controller.signal },
       );
-      const d = await res.json();
       if (!ownsRequest()) return;
-      if (!res.ok) {
+      if (!resOk) {
         setError(d?.error || 'Failed to load awardees.');
         setErrorContextKey(contextKey(code, all));
         setErrorContextVersion(request.version);
@@ -122,10 +122,11 @@ export default function AwardeesPanel({ cycleCode, loadingCycles, scope, onScope
     let current = true;
     (async () => {
       try {
-        const res = await fetch('/api/workbench/grantee-deliverables/awardees');
-        const body = await res.json().catch(() => ({}));
+        const body = await requestJson('/api/workbench/grantee-deliverables/awardees', {
+          fallbackMessage: 'cycle list failed',
+          tolerantBody: true,
+        });
         if (!current) return;
-        if (!res.ok) throw new Error(body?.error || 'cycle list failed');
         setCycleList({ cycles: Array.isArray(body.cycles) ? body.cycles : [], lastDecidedCycleCode: body.lastDecidedCycleCode || null });
       } catch {
         if (current) setCycleList('error');
