@@ -311,8 +311,29 @@ the api-route fact gate), reworded in `1c0cc671`. `npm test`: 985 suites /
 `npm run build`: compiled successfully, with 2 pre-existing Turbopack
 warnings on `/auth/error` (not introduced by this work).
 
-Reviewer verdict on this round's corrections: [left for the orchestrator to
-fill in].
+### Stage 0 acceptance — 2026-09-20, orchestrator (Fable), at `e65b03a0`
+
+Fresh Opus review of `d169fd63`+`0775005c`: READY WITH NAMED CHANGES (all 8
+invariants present with line citations; every T0 row mapped to a test; late-
+binding and mutation tests shown discriminating; census reproduces §2.1; named
+changes were Stage 1 bookkeeping, census deltas, and T0 pins). One Sonnet
+correction round (`e65b03a0`) applied them; the orchestrator applied the plan-
+side corrections (`fdbee75a`) and spot-checked `sendJson` callers (8, incl.
+`reorderSessionSlots` at :38) and the empty-string message rule.
+
+Full Gate G run by the orchestrator at `e65b03a0` [VERIFIED via this run]:
+every defined `check:*` gate and its self-test sequentially, 0 red;
+`npm test`: 985 suites / 14548 tests green; `npm run lint`: 0 errors, 13
+pre-existing warnings; `npm run check:types`: clean; `npm run build`:
+compiled successfully.
+
+Verdict: **Stage 0 ACCEPTED.** Helper landed with zero callers; census
+tracked; execution map corrected. Rollback: revert `e65b03a0`, `0775005c`,
+`d169fd63` (docs/scripts/tests plus one uncalled module; no runtime effect).
+
+Stage 1 is NOT started. Owner decisions outstanding before later stages:
+(1) D1 posture, (2) Stage 4 timing, (4) 5b rehearsal, (5) Stage 4 data mode,
+(6) `pages/profile-settings.js` placement. D3 accepted 2026-09-20.
 
 ## Verification log
 
