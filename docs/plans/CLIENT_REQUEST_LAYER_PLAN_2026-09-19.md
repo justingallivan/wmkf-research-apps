@@ -3,7 +3,7 @@ title: Client Request Layer Migration Plan
 domain: platform
 kind: plan
 status: draft
-summary: Staged introduction of one shared client-side JSON request helper and migration of the raw fetch call sites in client components and pages onto it, preserving each call site's visible error behavior except the owner-decided D3 deviation on non-2xx non-JSON bodies.
+summary: Staged introduction of one shared client-side JSON request helper and migration of the raw fetch call sites in client components and pages onto it, preserving each call site's visible error behavior except owner decision D3 on non-2xx non-JSON bodies.
 canonical: false
 owner: product-engineering
 related:
@@ -79,11 +79,25 @@ Deployment timing is a separate later decision.
   `requireAppAccess` call; a wrapper hides those from the gates or forces a gate
   rewrite, and it is auth-touching (Tier 2). Not reopened by this plan.
 
-**Release tier:** Tier 1 per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`
-§4 (internal refactor, stable public contract, no Dataverse/auth/email semantics
-change). Feature branch, automated tests, review of the final diff, deliberate
-owner merge. If any stage would change what a client sends to an email, invite,
-reminder, or upload route, that stage is re-tiered to Tier 2 before it starts.
+**Release tier, per stage** (`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`
+§4, lines 112-131). The strategy classifies invitation/reminder behavior,
+external reviewer flows, email, and uploads as Tier 2 regardless of whether
+request bytes change, so the tier follows the surface, not the diff:
+- Stages 0-3 and 5a: **Tier 1** (internal refactor, stable contract). Feature
+  branch, automated tests, final-diff review, deliberate owner merge.
+- Stage 4 (reviewer engagement: invite, reminder, release, closeout,
+  due-date, send) and Stage 5b (external token pages and upload-adjacent
+  forms): **Tier 2**. Adds: characterization coverage before change (T4/T5),
+  an integrated preview deployment of the branch, a staff click-through of each
+  migrated flow in the preview using capture mode (§7 of the strategy: capture
+  is an email control), a recorded production deployment and rollback id, and
+  an explicit owner decision to merge. External-flow rehearsal is owner
+  decision (4) in §9.
+Stage 0's census tags every file whose endpoints match
+`/api/review-manager/*`, `/api/external/*`, `/api/scheduled-emails*`,
+`/api/upload*`, or contain `send`, `invite`, `reminder`, `release`, `close` as
+campaign-critical; those files belong to Stage 4 or 5b and cannot be placed in
+a Tier 1 stage by the long-tail rule (Codex cycle 2 finding).
 
 ## 2. Verified contract and preserved differences
 
@@ -199,6 +213,9 @@ it is usable from hooks, components, pages, and the non-component stores such as
 ```js
 export class ApiRequestError extends Error {
   // name = 'ApiRequestError'; status: number; payload: any (parsed body or {});
+  // parseError: Error | null — the native error when a non-2xx body could not
+  //   be parsed (always recorded, so owner decision D3 can go either way with a
+  //   one-line change to the message rule and a T0 flip; see §9 D3)
   // message = (typeof payload.error === 'string' ? payload.error : payload.error?.message)
   //        || payload.message || fallbackMessage || `Request failed (${status})`
 }
@@ -223,12 +240,18 @@ export async function requestEnvelope(url, opts)
 // Parse step, exported so the Stage 1 adapters (which receive a Response, not a
 // URL) share it. Both request forms call it.
 export async function readJsonBody(response, { signal, tolerantBody = false } = {})
+// tolerantBody: false | true | (parseError, response) => fallbackValue
 // Non-2xx: always tolerant — empty or unparseable body -> {} (error bodies are
 //   only ever read for a message). 2xx: STRICT by default — an empty or
 //   unparseable body rejects with the native parse error, exactly like a bare
 //   `response.json()` does today. `tolerantBody: true` makes 2xx return {} on
 //   empty/unparseable, for callers whose current code is
-//   `response.json().catch(() => ({}))`. In every mode, a rejection whose
+//   `response.json().catch(() => ({}))`. A function form returns that
+//   function's value, for the three sites whose current fallback is not {}:
+//   `pages/external/briefing/[token].js:75` and
+//   `pages/external/materials/[token].js:214,227`, all
+//   `.catch(() => ({ ok: false, reason: 'server_error' }))` [VERIFIED; the
+//   repo has exactly these three non-{} JSON fallbacks in client code]. In every mode, a rejection whose
 //   `name` is 'AbortError', or any rejection while `signal?.aborted` is true,
 //   is rethrown unchanged.
 // Mechanics: it calls ONLY `response.json()` and reads `response.ok` /
@@ -242,8 +265,9 @@ export async function readJsonBody(response, { signal, tolerantBody = false } = 
 
 `requestJson` and `requestEnvelope` take the same `tolerantBody` option and
 pass it through. The per-site rule is mechanical: a site whose code has
-`.catch(() => ({}))` (or an equivalent guard) on its body read migrates with
-`tolerantBody: true`; a site with a bare `.json()` migrates strict. The
+`.catch(() => ({}))` on its body read migrates with `tolerantBody: true`; a
+site whose catch returns anything else migrates with the function form
+returning exactly that value; a site with a bare `.json()` migrates strict. The
 execution doc records the choice per site.
 
 Invariants (each pinned by a unit test in Stage 0):
@@ -304,13 +328,13 @@ surface.
 | 1 | Fold existing helpers, zero behavior change | `review-panel-ui.js` (`readResponse`), `SessionEditor.js` (`sendJson`, 3); the 14 `readResponse` consumer sites are unchanged by construction |
 | 2 | Highest-count files that already have an RTL render test and a single dominant error surface | `AwardeeTab.js` (13 json + 1 excluded), `StaffDeliberationsTab.js` (8), `ConsultantFeedbackSection.js` (8), `pages/expertise-finder.js` (8), `FinalWriteupTab.js` (5); `pages/cycle-dossier.js`, `pages/review-panel.js`, `ReviewPanelTab.js` (all sites already via `readResponse`; verify only, no edits) |
 | 3 | Admin surface | `shared/components/admin/*` sections with sites (`PromptTemplatesSection` 5, `SiteVisitRecipientsSection` 4, `OperationalEventsSection` 3, `ReviewQuestionsSection` 3, `DynamicsExplorerRestrictionsSection` 3, `PoliciesSection` 2, `EmailDefaultsSection` 2, `FinalWriteupMatrixAudiencesSection` 2, `SiteVisitMaterialsDefaultsSection` 2, `MeetingTrackerDefaultsSection` 2, `ReviewerRepairAlertDetails` 1), then `pages/admin.js` (32) section by section |
-| 4 | Reviewer engagement surface (Tier 2 re-check at stage start; see §1) | `InviteEmailModal.js` (10), `ReviewerInvitePanel.js` (5 + 1 blob excluded), `ReviewerManagePanel.js` (6), `ReviewersTab.js` (5), `ReviewerFindPanel.js` (5), `ReleaseMaterialsModal.js` (4 + 1 stream excluded), `search/useReviewerContactActions.js` (8), `search/useReviewerRosterActions.js` (4), `search/useReviewerPromotion.js` (4), `search/useReviewerDiscovery.js` (4), `search/useReviewerExport.js` (0 migrated; its single site is the allowlisted blob download), `CandidateEditModal.js`, `CampaignConfigModal.js`, `RespondReminderModal.js`, `RemoveEntirelyModal.js`, `ReleaseEmailModal.js`, `email-template-store.js`, `prompt-override-store.js` |
-| 5 | Long tail | every remaining file in the census with at least one JSON site: workbench (`ReviewsTab`, `PreSiteDistributionPanel`, `InitialAssessmentTab`, `RequestListPanel`, `RequestLocator`, `ProposalTab`, `ManualReviewEntryForm`, `AwardeesPanel`, `ArtifactVersionHistory`, `OverviewTab`, `ReviewerFollowUpPanel`, `useSiteVisitContext`), meeting-tracker (`MeetingTrackerList`, `SiteVisitEditor`, `SessionAgendaPanel`, `SiteVisitMaterialsCard`), external (`ReviewAuthoringForm`, `GranteeDeliverableForm`, `pages/external/**`), `ProfileLinkingDialog`, `RosterContactField`, `FinalWriteupsViews`, and pages (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dynamics-explorer`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, and the Executor tool pages' non-stream sites) |
+| 4 | Reviewer engagement surface (Tier 2 re-check at stage start; see §1) | `InviteEmailModal.js` (10), `ReviewerInvitePanel.js` (5 + 1 blob excluded), `ReviewerManagePanel.js` (6), `ReviewersTab.js` (5), `ReviewerFindPanel.js` (5), `ReleaseMaterialsModal.js` (4 + 1 stream excluded), `search/useReviewerContactActions.js` (8), `search/useReviewerRosterActions.js` (4), `search/useReviewerPromotion.js` (4), `search/useReviewerDiscovery.js` (4), `search/useReviewerExport.js` (0 migrated; its single site is the allowlisted blob download), `CandidateEditModal.js`, `CampaignConfigModal.js`, `RespondReminderModal.js`, `RemoveEntirelyModal.js`, `ReleaseEmailModal.js`, `ReviewReminderAction.js` (1, `/api/review-manager/send-review-reminder`), `ReviewerDueDateEditor.js` (1, `review-due-extension`), `AcceptedReviewerReleaseModal.js` (1, `terminal-transition`), `ReviewerCloseoutModal.js` (1, `close-review`), `email-template-store.js`, `prompt-override-store.js`. Tier 2. |
+| 5a (Tier 1) / 5b (Tier 2) | Long tail; 5b is every external-token page and upload-adjacent form (`pages/external/**`, `ReviewAuthoringForm`, `GranteeDeliverableForm`, `scheduled-emails`), 5a is everything else | every remaining file in the census with at least one JSON site: workbench (`ReviewsTab`, `PreSiteDistributionPanel`, `InitialAssessmentTab`, `RequestListPanel`, `RequestLocator`, `ProposalTab`, `ManualReviewEntryForm`, `AwardeesPanel`, `ArtifactVersionHistory`, `OverviewTab`, `ReviewerFollowUpPanel`, `useSiteVisitContext`), meeting-tracker (`MeetingTrackerList`, `SiteVisitEditor`, `SessionAgendaPanel`, `SiteVisitMaterialsCard`), external (`ReviewAuthoringForm`, `GranteeDeliverableForm`, `pages/external/**`), `ProfileLinkingDialog`, `RosterContactField`, `FinalWriteupsViews`, and pages (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dynamics-explorer`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, and the Executor tool pages' non-stream sites) |
 | 6 | Closeout ratchet | ESLint `no-restricted-syntax` for raw `fetch(` in a `files: ['shared/components/**/*.js','pages/**/*.js'], ignores: ['pages/api/**']` flat-config block; the §2.6 allowlist is expressed as a per-site `eslint-disable-next-line` with a reason, never a file-level ignore |
 
-Stage 5 is split into 5a (workbench + meeting-tracker) and 5b (external + pages)
-at execution time if the diff exceeds roughly 25 files; each half gets its own
-Gate G and review.
+Stage 5 is always two stages: 5a (Tier 1: workbench, meeting-tracker, admin
+leftovers, internal pages) and 5b (Tier 2: external token pages, upload-adjacent
+forms, scheduled emails). Each has its own Gate G and review.
 
 ## 5. Tests that must exist before each stage starts
 
@@ -322,12 +346,12 @@ immediately; never commit it). No test hits a live provider or store.
 
 | ID | Required before | Content |
 |---|---|---|
-| T0 | Stage 0 exit | `tests/unit/api-request.test.js`: every §3 invariant, plus: 2xx JSON; 2xx empty body strict (rejects) and tolerant (`{}`); 2xx malformed body strict (rejects with the native parse error, `name` preserved) and tolerant (`{}`); non-2xx `{error}`; non-2xx `{message}`; non-2xx nested `{error:{message}}`; non-2xx non-JSON body (`{}` → fallback message); network rejection passthrough; AbortError rejected by `fetch` passthrough; AbortError raised during the body read rethrown in both strict and tolerant modes; `signal.aborted` true after a body-read failure → rethrow; FormData body; `If-Match` header survival; `fetchImpl` injection; `globalThis.fetch` late binding (reassign after import). |
+| T0 | Stage 0 exit | `tests/unit/api-request.test.js`: every §3 invariant, plus: 2xx JSON; 2xx empty body strict (rejects), tolerant (`{}`), and function-form (returns the function's value); `parseError` set on an unparseable non-2xx body and null otherwise; 2xx malformed body strict (rejects with the native parse error, `name` preserved) and tolerant (`{}`); non-2xx `{error}`; non-2xx `{message}`; non-2xx nested `{error:{message}}`; non-2xx non-JSON body (`{}` → fallback message); network rejection passthrough; AbortError rejected by `fetch` passthrough; AbortError raised during the body read rethrown in both strict and tolerant modes; `signal.aborted` true after a body-read failure → rethrow; FormData body; `If-Match` header survival; `fetchImpl` injection; `globalThis.fetch` late binding (reassign after import). |
 | T1 | Stage 1 | `readResponse`/`sendJson` behavior pins: same thrown message text for `{error}`, `{message}` only, nested `{error:{message}}`, `{error:5}`, empty body, non-JSON body; same return on 2xx; thrown value has `.name === 'Error'` (not `ApiRequestError`). Existing consumers' tests (verified by name in Stage 0) run green. |
-| T2 | Stage 2, per file | For each file: with `global.fetch` mocked, three scenarios per distinct endpoint or per distinct error surface in the file, whichever is fewer: (a) 200 JSON renders the success state, (b) non-2xx `{error:'X'}` shows/sets/throws exactly what it does today, (c) network rejection does the same, and (d) for every bare-`.json()` site, a 2xx with a malformed body produces today's outcome (for `AwardeeTab.js` send-invite: the `uncertain` receipt and step, pinned verbatim). Existing RTL tests (`tests/unit/awardee-tab.test.js`, `tests/unit/staff-deliberations-tab.test.js`, `tests/unit/consultant-feedback-section.test.js`, `tests/unit/expertise-finder-batch-cycle.test.js`, `tests/unit/final-writeup-tab.test.js`) are extended, not replaced [VERIFIED P-B: each renders the component and mocks `global.fetch` per scenario]. Fixtures that mock `{ ok: true, json }` without a `status` field (e.g. `expertise-finder-batch-cycle.test.js:31`) must gain `status` before any site in that file moves to `requestEnvelope`. |
-| T3 | Stage 3 | Same three-scenario pin for each admin section. For `pages/admin.js`: the four workspace functions (`OperationsWorkspace` :3139, `WorkflowsWorkspace` :3198, `AiWorkspace` :3335, `PeopleWorkspace` :3375) are not exported today and `AdminDashboard` (:3453) reads `router.query` and renders `Layout` (which calls `useSession`). T3 therefore first adds named exports for the four workspace functions (the file already exports sections such as `DynamicsFeedbackSection` and `AppAccessSection` for `tests/unit/admin-dynamics-feedback-filters.test.js` and `tests/unit/app-access-admin-partial-refresh.test.js`), then one test file per workspace mounts the exported workspace with `view` as a prop and mocks `global.fetch` per section. No test mounts `AdminDashboard`. `tests/unit/admin-models.test.js` tests the API route, not the page, and is not a T3 anchor. The 403 → `'Admin access required'` message is pinned verbatim at every site that has it. |
-| T4 | Stage 4 | Three-scenario pin per file, plus: body-level `.success`/`.ok` branches in `useReviewerContactActions`, `ReviewersTab`, `ReviewerManagePanel`, `ReviewerFindPanel`, `useReviewerRosterActions` pinned with a 200 + `{success:false}` fixture and a 409 + `{success:false, ...promotionAuthority}` fixture (§2.2). `ReleaseMaterialsModal.js` has no direct render test; it is exercised through `ReviewerManagePanel` in `tests/unit/reviewer-materials-modal-lifetimes.test.js` (`renderPanel` :163-166, `openReleaseModal` :169), which is extended for its three scenarios. Existing `tests/unit/invite-email-modal-capture.test.js`, `reviewer-manage-*.test.js`, `tests/unit/reviewer-materials-modal-lifetimes.test.js` run green. |
-| T5 | Stage 5 | Three-scenario pin for each file lacking an RTL test today (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, `ProfileLinkingDialog`, `ReviewerFollowUpPanel`, `useSiteVisitContext`; the two admin defaults sections belong to T3). Files that already have one get the extension only. |
+| T2 | Stage 2, per file | **Per-call-site contract matrix, not per-endpoint sampling** (Codex cycle 2: `RespondReminderModal.js:52-75` and `:105-140` hit the same endpoint with different failure semantics, preview → `loadError`, send → `uncertain` receipt). For EVERY migrated site: (a) 2xx JSON produces today's visible state, (b) non-2xx `{error:'X'}` produces today's state/throw/toast verbatim, (c) network rejection likewise, (d) for bare-`.json()` sites a malformed 2xx produces today's outcome (for `AwardeeTab.js` send-invite: the `uncertain` receipt and step), and for tolerant sites a malformed and an empty 2xx produce today's fallback value; and for every non-GET site the test also asserts the mocked `fetch` call's URL, method, headers, and exact body string are unchanged before and after migration. Sites that branch on status or body-level flags add one case per branch. Existing RTL tests (`tests/unit/awardee-tab.test.js`, `tests/unit/staff-deliberations-tab.test.js`, `tests/unit/consultant-feedback-section.test.js`, `tests/unit/expertise-finder-batch-cycle.test.js`, `tests/unit/final-writeup-tab.test.js`) are extended, not replaced [VERIFIED P-B: each renders the component and mocks `global.fetch` per scenario]. Fixtures that mock `{ ok: true, json }` without a `status` field (e.g. `expertise-finder-batch-cycle.test.js:31`) must gain `status` before any site in that file moves to `requestEnvelope`. |
+| T3 | Stage 3 | The T2 per-site matrix for each admin section. For `pages/admin.js`: the four workspace functions (`OperationsWorkspace` :3139, `WorkflowsWorkspace` :3198, `AiWorkspace` :3335, `PeopleWorkspace` :3375) are not exported today and `AdminDashboard` (:3453) reads `router.query` and renders `Layout` (which calls `useSession`). T3 therefore first adds named exports for the four workspace functions (the file already exports sections such as `DynamicsFeedbackSection` and `AppAccessSection` for `tests/unit/admin-dynamics-feedback-filters.test.js` and `tests/unit/app-access-admin-partial-refresh.test.js`), then one test file per workspace mounts the exported workspace with `view` as a prop and mocks `global.fetch` per section. No test mounts `AdminDashboard`. `tests/unit/admin-models.test.js` tests the API route, not the page, and is not a T3 anchor. The 403 → `'Admin access required'` message is pinned verbatim at every site that has it. |
+| T4 | Stage 4 | The T2 per-site matrix for every site in every Stage 4 file (including the four one-site files added by Codex cycle 2), plus: body-level `.success`/`.ok` branches in `useReviewerContactActions`, `ReviewersTab`, `ReviewerManagePanel`, `ReviewerFindPanel`, `useReviewerRosterActions` pinned with a 200 + `{success:false}` fixture and a 409 + `{success:false, ...promotionAuthority}` fixture (§2.2). `ReleaseMaterialsModal.js` has no direct render test; it is exercised through `ReviewerManagePanel` in `tests/unit/reviewer-materials-modal-lifetimes.test.js` (`renderPanel` :163-166, `openReleaseModal` :169), which is extended for its three scenarios. Existing `tests/unit/invite-email-modal-capture.test.js`, `reviewer-manage-*.test.js`, `tests/unit/reviewer-materials-modal-lifetimes.test.js` run green. |
+| T5 | Stages 5a/5b | The T2 per-site matrix for every migrated site; for the three function-form tolerant sites, malformed and empty 2xx pinned to `{ ok:false, reason:'server_error' }` → the "retry later" state. Files lacking an RTL test today get one first (`scheduled-emails`, `grant-reporting`, `phase-ii-writeup`, `dataverse-bulk-export`, `virtual-review-panel`, `phase-i-dynamics`, `ProfileLinkingDialog`, `ReviewerFollowUpPanel`, `useSiteVisitContext`; the two admin defaults sections belong to T3). Files that already have one get the extension only. |
 | T6 | Stage 6 | A lint fixture proving the rule fires on a raw `fetch(` in a client file, does not fire on `pages/api`, does not fire on a site carrying `// eslint-disable-next-line no-restricted-syntax -- <reason>`, and DOES fire on an un-annotated raw `fetch(` elsewhere in the same file as an annotated one (site-level, not file-level, exemption). |
 
 The 41 "unknown body kind" sites are resolved during their file's stage: the
@@ -381,17 +405,24 @@ Before: T3. Do: sections under `shared/components/admin/` first, then
 files in this plan. Verify: per-workspace tests, Gate G. Exit: 61 admin sites
 migrated. Rollback: per-commit.
 
-### Stage 4 — Reviewer engagement surface
-Before: T4; re-tier check (§1): confirm no request body or method changes at
-any invite/reminder/release site by diffing the mocked `fetch` call arguments
-in T4 before and after. Do: migrate per file. Verify: T4, existing reviewer
-tests, Gate G including `check:reviewer-engagement-boundary`. Exit: group
-migrated. Rollback: per-commit.
+### Stage 4 — Reviewer engagement surface (Tier 2)
+Before: T4 (request-bytes assertions included); production deployment and
+rollback ids refreshed and recorded. Do: migrate per file. Verify: T4, existing
+reviewer tests, Gate G including `check:reviewer-engagement-boundary`; deploy
+the branch to a Vercel preview and record a staff click-through of invite
+preview, reminder preview, release, closeout, and due-date flows in capture
+mode (no external email leaves). Exit: group migrated, rehearsal recorded.
+Rollback: per-commit; production untouched until the owner merges.
 
-### Stage 5 — Long tail (5a, 5b if split)
-Before: T5. Do: migrate remaining JSON sites. Verify: Gate G. Exit: only
-allowlisted raw `fetch(` sites remain; the census script reports the count
-and it matches the allowlist. Rollback: per-commit.
+### Stage 5a — Long tail, internal (Tier 1)
+Before: T5 for its files. Do: migrate. Verify: Gate G. Rollback: per-commit.
+
+### Stage 5b — Long tail, external and upload-adjacent (Tier 2)
+Before: T5 for its files; owner decision (4). Do: migrate. Verify: Gate G;
+preview deployment; token click-through of the external briefing, materials,
+review, and grantee pages per decision (4). Exit: only allowlisted raw
+`fetch(` sites remain; the census script reports the count and it matches the
+allowlist. Rollback: per-commit.
 
 ### Stage 6 — Closeout ratchet
 Before: T6. Do: add the flat-config rule block (`eslint.config.mjs` is a 49-line
@@ -483,7 +514,7 @@ stages.
 | A4 | 19 retry/poll wrappers wrap the call site rather than living inside it; the helper stays retry-free and the wrapper is untouched | [VERIFIED P-B for `StaffDeliberationsTab.js:354-378` and `FinalWriteupTab.js:283-291`; remaining 17 verified at their stage] |
 | D1 | Pre-existing: 54 sites trust the body without checking `ok` | Characterized, not fixed. Fixing is a behavior change outside this plan; listed for the owner |
 | D2 | Pre-existing: `materials-preflight` returns 200 with `ok:false` | Preserved; helper does not interpret body flags |
-| D3 | Up to 67 client sites parse with bare `.json()`; those that parse BEFORE the `ok` check (e.g. `PromptTemplatesSection.js:478`) surface a `SyntaxError` message today on a non-2xx non-JSON body and would surface the site's fallback message after migration. Sites that parse only after the `ok` check (e.g. `pages/admin.js:938-942`) never see such a body, so the real exposure is smaller [ASSUMED; resolved per site]. On 2xx the strict policy preserves today's rejection exactly | Proposed deviation, limited to non-2xx bodies. Owner decision (3) below; until decided, the implementer preserves the SyntaxError path by using `tolerantBody: false` semantics on non-2xx too, which the helper supports via `ApiRequestError.cause` (see decision text) |
+| D3 | Up to 67 client sites parse with bare `.json()`; those that parse BEFORE the `ok` check (e.g. `PromptTemplatesSection.js:478`) surface a `SyntaxError` message today on a non-2xx non-JSON body and would surface the site's fallback message after migration. Sites that parse only after the `ok` check (e.g. `pages/admin.js:938-942`) never see such a body, so the real exposure is smaller [ASSUMED; resolved per site]. On 2xx the strict policy preserves today's rejection exactly | Proposed deviation, limited to non-2xx bodies. Owner decision (3) below, required before Stage 0 exit; `parseError` is recorded in both branches |
 | D8 | A tolerant-by-default parser would have converted `AwardeeTab.js:547-572`'s `uncertain` send-invite outcome into `sent` on a malformed 2xx (Codex cycle 1, reproduced) | Fixed by the strict-on-success policy (§3); T0 and T2(d) pin it |
 | D4 | `response.json().catch(() => ({}))` swallows an abort raised during the body read; `readStatus` (`StaffDeliberationsTab.js:66`), `readBriefStatus` (`:76-84`) and `pollForArtifact` (`:354-378`) can loop on a `{}` pseudo-status | Pre-existing at `readResponse`-style sites; fixed by `readJsonBody` rethrow (§3 invariant 4) and pinned in T0 |
 | D5 | `search/useReviewerExport.js` was in no stage row or allowlist in the first draft | Fixed: allowlisted (§2.6, §4) |
@@ -496,10 +527,15 @@ proceeds in this cycle or waits for a quiet window, given it touches invite and
 release call sites (recommended: proceed, Tier 1 controls plus the T4 request-
 bytes diff); (3) D3: accept that a non-2xx non-JSON body shows the site's
 fallback message instead of a raw `SyntaxError` message (recommended: accept;
-the raw message is never useful to a user). If declined, the helper's tolerant
-non-2xx parse still applies but `ApiRequestError.message` falls back to the
-parse error's message when the body was unparseable, so the visible text stays
-what it is today.
+the raw message is never useful to a user). Implementable either way: the
+helper always records `ApiRequestError.parseError`; under "accept" the message
+rule is as written in §3; under "decline" the rule prefers
+`parseError.message` when `parseError` is set, and T0 pins whichever policy is
+chosen. The decision is required before Stage 0 exit, not Stage 2.
+(4) Tier 2 external-flow rehearsal for Stage 5b: whether the owner's own
+token click-through in the preview deployment satisfies the strategy's
+"naive-user rehearsal" for a no-behavior-change refactor (recommended: yes,
+recorded in the execution doc).
 
 ## 10. Planning review receipts
 
@@ -509,4 +545,5 @@ what it is today.
 | P-B design + stages | Opus (fresh) | `e269756a` / `9c122add…` | READY WITH NAMED CHANGES | Applied: `readJsonBody` with abort rethrow (§3 inv. 4, T0), Stage 1 adapters keep legacy expressions and plain `Error` (§3, D6), T3 uses exported workspace seams and drops the `admin-models` miscite, site-level lint allowlist (T6, Stage 6), `keepalive` beacon and `useReviewerExport.js` placed (§2.1, §2.6, §4), census row for bare `.json()`, D3–D7 and A4 upgrade in §9. Premise challenge accepted: the incumbent parse step is not adopted wholesale. |
 | P-C final document | Opus (fresh) | `9efda1b6` / `611ddb63…` | READY WITH NAMED CHANGES | Applied: Stage 1↔5 `readResponse` overlap removed (§4), envelope `data`/`ok`/`status` defined and `readJsonBody` mechanics pinned to `json()`+`status` only (§3), non-object 2xx body and `signal` forwarding stated (§3), census rules and map format specified (§6 Stage 0), `readJson` retirement moved to Stage 1, admin-access count corrected to five + one (§2.3), T1 `.name` pin, T4 `ReleaseMaterialsModal` wording, T5 admin sections removed, D3 reframed as owner decision (3) with narrowed exposure, D4 line numbers, 52-vs-54 counts (§3, A3), summary/§1 qualified "except D3". 27 file:line refs spot-checked, 2 corrected. |
 | Codex adversarial 1 | Codex (ran as `gpt-6-astra`: the companion was invoked without `--model`, against the owner directive; recorded, not repeated) | `9efda1b6` / `611ddb63…` | needs-attention (1 high) | Applied: strict-on-success `readJsonBody` policy with per-site `tolerantBody`, T0/T2(d) pins, D3 narrowed, D8 added. |
-| Codex adversarial 2 | gpt-5.6-sol | — | pending | — |
+| Codex adversarial 2 | gpt-5.6-sol | `b9e3548c` / `70adf091…` | needs-attention (2 high, 2 medium) | All four verified against source and applied: Stage 4 and new Stage 5b re-tiered to Tier 2 with the strategy's controls and a census tag that keeps campaign-critical files out of Tier 1 stages; four one-site reminder/release files added to Stage 4; T2-T5 replaced with a per-call-site matrix including request-bytes assertions for non-GET sites; `tolerantBody` gains a function form for the three non-`{}` fallbacks; D3 made implementable in both branches via `parseError`, decision moved before Stage 0 exit, frontmatter corrected. |
+| Codex adversarial 3 | gpt-5.6-sol | — | pending | — |
