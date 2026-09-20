@@ -955,8 +955,17 @@ D10's three send sites. Stages 5a, 5b, and the D1 Stage-4 batch start next.
   WRITES from the preview remain denied by the target interlock.
 - Rollback of the setup: `vercel alias rm wmkfresearchapps-preview.vercel.app`
   (returns the alias to unassigned), `vercel env rm NEXTAUTH_URL preview
-  feature/client-request-layer`, and `vercel env rm DATAVERSE_ALLOW_PROD_READS
-  preview feature/client-request-layer`. None touches production.
+  feature/client-request-layer`, `vercel env rm DATAVERSE_ALLOW_PROD_READS
+  preview feature/client-request-layer`, and `vercel env rm
+  DELIBERATION_BRIEFING_SCHEMA_READY preview feature/client-request-layer`.
+  None touches production.
+- 5b briefing-page rehearsal (owner authorized 2026-09-20, "Enable the flag"):
+  `DELIBERATION_BRIEFING_SCHEMA_READY=on` added at preview scope for this
+  branch only (production has had it on; the shared Neon database already
+  holds `deliberation_briefing_links`). Branch pushed at `a41d37162`; the
+  git-integration build `wmkfresearchapps-6l5suly2f` is Ready and the stable
+  alias now points at it. Local `.env.local` lacks both this flag and
+  `EXTERNAL_LINK_SECRET`, so token pages are verifiable only on the preview.
 
 ## Stage 5a — internal long tail (Tier 1)
 
