@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { requestJson } from '../../utils/api-request';
 
 /**
  * Admin editor for the Meeting Tracker's fixed default attendee list (D10).
@@ -20,10 +21,11 @@ export default function MeetingTrackerDefaultsSection() {
     let active = true;
     (async () => {
       try {
-        const res = await fetch('/api/admin/meeting-tracker-defaults');
-        const data = await res.json().catch(() => ({}));
+        const data = await requestJson('/api/admin/meeting-tracker-defaults', {
+          tolerantBody: true,
+          fallbackMessage: 'Failed to load Meeting Tracker defaults.',
+        });
         if (!active) return;
-        if (!res.ok) throw new Error(data?.error || 'Failed to load Meeting Tracker defaults.');
         const ids = (data.defaultAttendeeRefs || []).map((ref) => Number(ref.profileId)).filter(Number.isFinite);
         setStaff(Array.isArray(data.staff) ? data.staff : []);
         setSelected(ids);
@@ -48,13 +50,12 @@ export default function MeetingTrackerDefaultsSection() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/meeting-tracker-defaults', {
+      const data = await requestJson('/api/admin/meeting-tracker-defaults', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attendees: selected.map((profileId) => ({ kind: 'staff', profileId })) }),
+        body: { attendees: selected.map((profileId) => ({ kind: 'staff', profileId })) },
+        tolerantBody: true,
+        fallbackMessage: 'Failed to save the default attendee list.',
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Failed to save the default attendee list.');
       const ids = (data.defaultAttendeeRefs || []).map((ref) => ref.profileId);
       setSelected(ids);
       setBaseline(JSON.stringify(ids));

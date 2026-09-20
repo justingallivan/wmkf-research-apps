@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { requestJson } from '../../utils/api-request';
 
 const CATEGORY_LABELS = {
   staff: 'Staff',
@@ -39,12 +40,10 @@ export default function CuratedRecipientPicker({
     if (!open) return undefined;
     if (recipients === null && !error) {
       const sequence = ++loadSequence.current;
-      fetch('/api/workbench/pre-site-visit/recipient-options')
-        .then(async (response) => {
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(data.error || 'The recipient directory could not be loaded.');
-          return data;
-        })
+      requestJson('/api/workbench/pre-site-visit/recipient-options', {
+        fallbackMessage: 'The recipient directory could not be loaded.',
+        tolerantBody: true,
+      })
         .then((data) => {
           if (loadSequence.current === sequence) setRecipients(data.recipients || []);
         })

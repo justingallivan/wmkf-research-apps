@@ -201,9 +201,9 @@ test('a batch completion refetches the current filters, not the filters captured
   fireEvent.change(screen.getByRole('combobox', { name: 'Status filter' }), {
     target: { value: 'resolved' },
   });
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-    expect.stringContaining('status=resolved'),
-  ));
+  await waitFor(() => expect(
+    global.fetch.mock.calls.some(([url]) => String(url).includes('status=resolved')),
+  ).toBe(true));
 
   finishPatch();
   await screen.findByText('Resolved 4 of 4');
@@ -214,4 +214,76 @@ test('a batch completion refetches the current filters, not the filters captured
     expect(getUrls).toHaveLength(3);
     expect(getUrls.at(-1)).toContain('status=resolved');
   });
+});
+
+// T3 matrix (Stage 3, group A) ahead of migrating all three fetch sites onto
+// shared/utils/api-request.js. GET fetchEvents (:67) and PATCH resolveBatch
+// (:123) branch on `ok` before deciding whether to read the body; PATCH
+// handleAction (:90) never reads a body at all.
+test('(c) GET: a network rejection clears the list instead of throwing', async () => {
+  global.fetch = jest.fn(async () => { throw new Error('network down'); });
+  render(<OperationalEventsSection />);
+  expect(await screen.findByText('No matching operational events.')).toBeInTheDocument();
+});
+
+test('(d) GET: a malformed 2xx body (bare .json()) is caught the same as a rejection', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }));
+  render(<OperationalEventsSection />);
+  expect(await screen.findByText('No matching operational events.')).toBeInTheDocument();
+});
+
+test('(e) GET: a non-2xx unparseable body (502) never reads the body, same as today', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } }));
+  render(<OperationalEventsSection />);
+  expect(await screen.findByText('No matching operational events.')).toBeInTheDocument();
+});
+
+test('(c) handleAction: a network rejection shows the connection-failure message', async () => {
+  global.fetch = jest.fn(async (url, init) => {
+    if (init?.method === 'PATCH') throw new Error('network down');
+    return response(listBody);
+  });
+  render(<OperationalEventsSection />);
+  await screen.findByText('×3');
+  const prefsCard = screen.getByText(prefs.summary).closest('div.rounded-lg');
+  fireEvent.click(within(prefsCard).getByRole('button', { name: 'Resolve' }));
+  expect(await screen.findByText('Update failed. Check the connection and retry.')).toBeInTheDocument();
+});
+
+test('(e) handleAction: a 409 with an unparseable body still refetches (never reads the body, today\'s behavior)', async () => {
+  let getCount = 0;
+  global.fetch = jest.fn(async (url, init) => {
+    if (init?.method === 'PATCH') return { ok: false, status: 409, json: async () => { throw new SyntaxError('bad json'); } };
+    getCount += 1;
+    return response(listBody);
+  });
+  render(<OperationalEventsSection />);
+  await screen.findByText('×3');
+  const prefsCard = screen.getByText(prefs.summary).closest('div.rounded-lg');
+  const getCountBefore = getCount;
+  fireEvent.click(within(prefsCard).getByRole('button', { name: 'Resolve' }));
+  expect(await screen.findByText('Event changed since load; refreshed without applying the action.')).toBeInTheDocument();
+  await waitFor(() => expect(getCount).toBeGreaterThan(getCountBefore));
+});
+
+test('(c) resolveBatch: a network rejection shows "Bulk resolve failed"', async () => {
+  global.fetch = jest.fn(async (url, init) => {
+    if (init?.method === 'PATCH') throw new Error('network down');
+    return response(listBody);
+  });
+  render(<OperationalEventsSection />);
+  await screen.findByText('×3');
+  fireEvent.click(screen.getByRole('button', { name: 'Resolve all 4 shown' }));
+  expect(await screen.findByText('Bulk resolve failed')).toBeInTheDocument();
+});
+
+test('(d) resolveBatch: a malformed 2xx body (bare .json()) shows "Bulk resolve failed"', async () => {
+  global.fetch = jest.fn(async (url, init) => {
+    if (init?.method === 'PATCH') return { ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } };
+    return response(listBody);
+  });
+  render(<OperationalEventsSection />);
+  await screen.findByText('×3');
+  fireEvent.click(screen.getByRole('button', { name: 'Resolve all 4 shown' }));
+  expect(await screen.findByText('Bulk resolve failed')).toBeInTheDocument();
 });

@@ -363,6 +363,7 @@ describe('direct review follow-up action', () => {
     const onSent = jest.fn();
     global.fetch = jest.fn(async () => ({
       ok: true,
+      status: 200,
       json: async () => ({ ok: true }),
     }));
 
@@ -413,7 +414,7 @@ describe('direct review follow-up action', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      resolveRequest({ ok: true, json: async () => ({ ok: true }) });
+      resolveRequest({ ok: true, status: 200, json: async () => ({ ok: true }) });
       await Promise.resolve();
     });
   });
@@ -460,7 +461,7 @@ describe('direct review follow-up action', () => {
       let resolve;
       const promise = new Promise((r) => { resolve = r; });
       global.fetch = jest.fn(() => promise);
-      return { settle: () => resolve({ ok: true, json: async () => ({ ok: true }) }) };
+      return { settle: () => resolve({ ok: true, status: 200, json: async () => ({ ok: true }) }) };
     }
     if (stage === 'reject') {
       let reject;
@@ -470,7 +471,7 @@ describe('direct review follow-up action', () => {
     }
     let resolve;
     const jsonPromise = new Promise((r) => { resolve = r; });
-    global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: () => jsonPromise }));
+    global.fetch = jest.fn(() => Promise.resolve({ ok: true, status: 200, json: () => jsonPromise }));
     return { settle: () => resolve({ ok: true }) };
   }
 
@@ -559,7 +560,7 @@ describe('direct review follow-up action', () => {
   });
 
   test('onSent sync throw keeps the confirmed feedback and never shows error copy', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }));
     const onSent = jest.fn(() => { throw new Error('boom'); });
     render(<ReviewReminderAction requestId="P1" reviewer={reviewer} onSent={onSent} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
@@ -568,7 +569,7 @@ describe('direct review follow-up action', () => {
   });
 
   test('onSent rejected promise keeps the confirmed feedback and issues no second request', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }));
     const onSent = jest.fn(() => Promise.reject(new Error('refresh failed')));
     render(<ReviewReminderAction requestId="P1" reviewer={reviewer} onSent={onSent} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
@@ -581,7 +582,7 @@ describe('direct review follow-up action', () => {
   });
 
   test('onSent that never resolves does not hold the send lock or feedback hostage', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }));
     const onSent = jest.fn(() => new Promise(() => {})); // never settles
     render(<ReviewReminderAction requestId="P1" reviewer={reviewer} onSent={onSent} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
@@ -592,7 +593,7 @@ describe('direct review follow-up action', () => {
   });
 
   test('a reviewer switch clears confirmed feedback from the departed session', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }));
     const { rerender } = render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
     expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
@@ -602,13 +603,43 @@ describe('direct review follow-up action', () => {
   });
 
   test('a request switch clears a confirmed failure message from the departed session', async () => {
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: false, reason: 'not_found' }) }));
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: false, reason: 'not_found' }) }));
     const { rerender } = render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
     expect(await screen.findByText('This reviewer is no longer available. Refresh the list.')).toBeInTheDocument();
 
     rerender(<ReviewReminderAction requestId="P2" reviewer={reviewer} />);
     expect(screen.queryByText('This reviewer is no longer available. Refresh the list.')).not.toBeInTheDocument();
+  });
+
+  test('T4 axis (network): a rejected fetch reports the uncertain outcome', async () => {
+    global.fetch = jest.fn(async () => { throw new Error('offline'); });
+    render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
+    expect(await screen.findByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
+  });
+
+  test('D10 fix: a malformed 2xx body reports the uncertain receipt, not "sent" or the generic failure', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } }));
+    render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
+    expect(await screen.findByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
+    expect(screen.queryByText('Sent for delivery.')).not.toBeInTheDocument();
+    expect(screen.queryByText('The reminder could not be sent.')).not.toBeInTheDocument();
+  });
+
+  test('T4 axis (e): a non-2xx body that fails to parse is never silent (reports the generic failure)', async () => {
+    global.fetch = jest.fn(async () => ({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } }));
+    render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
+    expect(await screen.findByText('The reminder could not be sent.')).toBeInTheDocument();
+  });
+
+  test('a body-level ok:false with reason "send_unconfirmed" reports the uncertain outcome', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: false, reason: 'send_unconfirmed' }) }));
+    render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
+    expect(await screen.findByText('Dynamics did not confirm the send. Check reviewer activity before trying again.')).toBeInTheDocument();
   });
 });
 
@@ -661,7 +692,7 @@ describe('reminder lifetime wiring through the panel (D4)', () => {
     );
 
     await act(async () => {
-      resolveReminder({ ok: true, json: async () => ({ ok: true }) });
+      resolveReminder({ ok: true, status: 200, json: async () => ({ ok: true }) });
       await Promise.resolve();
       await Promise.resolve();
     });

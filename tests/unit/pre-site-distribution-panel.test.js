@@ -931,6 +931,47 @@ test('a superseded reissue refreshes the header from history instead of revoking
   expect(global.fetch).toHaveBeenCalledTimes(3);
 });
 
+test('a superseded reissue with no error field falls back to the server-mirrored sentence', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response({ success: true, attempts: [], briefingLink: { id: 'l', url: 'https://apps.test/external/briefing/old', expiresAt: null } }))
+    .mockResolvedValueOnce(response({ code: 'briefing_link_superseded' }, 409))
+    .mockResolvedValueOnce(response({ success: true, attempts: [], briefingLink: { id: 'm', url: 'https://apps.test/external/briefing/newer', expiresAt: null } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText('https://apps.test/external/briefing/old');
+  fireEvent.click(screen.getByText('Issue new link'));
+  await screen.findByText(/stops the current one immediately/);
+  fireEvent.click(screen.getByText('Issue new link'));
+  await screen.findByText('https://apps.test/external/briefing/newer');
+  expect(screen.getByText('The briefing link was replaced by another action. Refresh to see the current link.')).toBeInTheDocument();
+  expect(screen.queryByText(/Request failed \(409\)/)).toBeNull();
+});
+
+test('a reissue blocked by an in-progress send with no error field falls back to the server-mirrored sentence', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response({ success: true, attempts: [], briefingLink: { id: 'l', url: 'https://apps.test/external/briefing/old', expiresAt: null } }))
+    .mockResolvedValueOnce(response({ code: 'briefing_send_in_progress' }, 409))
+    .mockResolvedValueOnce(response({ success: true, attempts: [], briefingLink: { id: 'l', url: 'https://apps.test/external/briefing/old', expiresAt: null } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText('https://apps.test/external/briefing/old');
+  fireEvent.click(screen.getByText('Issue new link'));
+  await screen.findByText(/stops the current one immediately/);
+  fireEvent.click(screen.getByText('Issue new link'));
+  await screen.findByText('A send that carries the current briefing link has not finished. Retry it (or wait for it to reconcile) before issuing a new link.');
+  expect(screen.queryByText(/Request failed \(409\)/)).toBeNull();
+});
+
 test('dialog mode: Add from directory opens the picker above the composer, and Escape closes the picker first', async () => {
   global.fetch = jest.fn(async (url) => {
     if (String(url).includes('/history')) return response({ success: true, attempts: [] });

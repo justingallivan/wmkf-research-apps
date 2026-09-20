@@ -427,6 +427,23 @@ test('partial failure keeps successful row identifiers and failed row retryable'
 });
 
 test.each([
+  ['write_interlocked', new Error('[dataverse-interlock] denied write to prod-host.crm.dynamics.com'), 'write_interlocked'],
+  ['401 forbidden', Object.assign(new Error('upstream detail'), { status: 401 }), 'dataverse_forbidden'],
+  ['403 forbidden', Object.assign(new Error('upstream detail'), { status: 403 }), 'dataverse_forbidden'],
+  ['404 not found', Object.assign(new Error('upstream detail'), { status: 404 }), 'not_found'],
+  ['503 unavailable', Object.assign(new Error('upstream detail'), { status: 503 }), 'dataverse_unavailable'],
+  ['network timeout with no status', Object.assign(new Error('request timed out'), { code: 'ETIMEDOUT' }), 'dataverse_unavailable'],
+  ['unclassifiable error', new Error('boom'), 'unknown'],
+])('write failure (%s) → write_failed/%s, no raw message leaked', async (_label, thrown, failure) => {
+  applyStaffReviewerWithdrawal.mockRejectedValueOnce(thrown);
+  const result = await transitionReviewersTerminal(args());
+  expect(result.results[0]).toEqual({ suggestionId: SUGGESTION, status: 'write_failed', failure });
+  expect(JSON.stringify(result)).not.toContain('detail');
+  expect(JSON.stringify(result)).not.toContain('crm.dynamics.com');
+  expect(JSON.stringify(result)).not.toContain('boom');
+});
+
+test.each([
   ['missing reviewed override', {}, { overrides: {} }, 'invalid_override'],
   ['changed internal notes', { wmkf_notes: 'Changed on server' }, {}, 'notes_changed'],
   ['non-string internal note', {}, { internalNotes: { [SUGGESTION]: { text: 'invalid' } } }, 'invalid_note'],

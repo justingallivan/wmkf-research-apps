@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { currentYmdInTimeZone, isYmd } from '../../../lib/utils/date-ymd';
 import EmailSendFeedback from '../EmailSendFeedback';
+import { requestEnvelope } from '../../utils/api-request';
 
 function formatDate(value) {
   if (!isYmd(value)) return 'Not set';
@@ -25,6 +26,12 @@ export function minimumExtensionDate(originalDate, today = currentYmdInTimeZone(
   if (!dayAfterOriginal) return today;
   return dayAfterOriginal > today ? dayAfterOriginal : today;
 }
+
+// Sentinel for submit's POST: distinguishes "2xx body failed to parse" (the
+// extension was most likely saved — the app just couldn't confirm it) from a
+// legitimately empty/null 2xx body, without losing envelope.ok/status the way
+// a thrown parse error under strict tolerantBody would. See submit below.
+const MALFORMED_BODY = Symbol('malformed-body');
 
 function messageForReason(reason, fallback) {
   const messages = {
@@ -107,13 +114,17 @@ export default function ReviewerDueDateEditor({
       const body = action === 'retry'
         ? { action, suggestionId }
         : { action, suggestionId, reviewDueDateOverride };
-      const response = await fetch('/api/review-manager/review-due-extension', {
+      const envelope = await requestEnvelope('/api/review-manager/review-due-extension', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body,
+        tolerantBody: () => MALFORMED_BODY,
       });
-      const data = await response.json().catch(() => ({}));
+      const data = envelope.data;
       if (!mountedRef.current || generation !== generationRef.current) return;
+
+      if (envelope.ok && data === MALFORMED_BODY) {
+        throw Object.assign(new Error('I could not complete the deadline update.'), { outcome: 'uncertain' });
+      }
 
       if (data.saved === true && data.notified === false) {
         const nextOutcome = data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed';
@@ -125,7 +136,7 @@ export default function ReviewerDueDateEditor({
           : 'The deadline was saved, but the reviewer notification was not sent.');
         return;
       }
-      if (!response.ok || !data.ok) {
+      if (!envelope.ok || !data.ok) {
         const requestFailure = new Error(messageForReason(data.reason, data.error || 'The extension could not be saved.'));
         requestFailure.outcome = data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed';
         requestFailure.retryable = requestFailure.outcome === 'failed' && data.retryable !== false;

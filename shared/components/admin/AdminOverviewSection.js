@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import { adminHref } from './AdminWorkspaceNavigation';
+import { requestJson } from '../../utils/api-request';
 
 const OVERVIEW_SOURCES = Object.freeze([
   { key: 'health', label: 'service health', url: '/api/health' },
@@ -26,10 +27,21 @@ const SOURCE_DESTINATIONS = Object.freeze({
 });
 
 async function loadSource(source, signal) {
-  const response = await fetch(source.url, { signal });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.error || `${source.label} could not be checked`);
-  return data;
+  // requestJson's `tolerantBody: true` matches today's `.json().catch(() =>
+  // ({}))` for both 2xx and non-2xx (non-2xx is always tolerant per the
+  // module's own contract). `fallbackMessage` matches the `${label} could
+  // not be checked` fallback used when a non-2xx body has no `error` field.
+  // One documented delta: an abort that occurs mid-body-read (after the
+  // underlying request itself resolved) is rethrown here instead of
+  // swallowed to `{}` — this is
+  // never observable because the effect's generation guard (:129/:136)
+  // already discards results from a superseded/aborted run before that
+  // rejection would be read.
+  return requestJson(source.url, {
+    signal,
+    tolerantBody: true,
+    fallbackMessage: `${source.label} could not be checked`,
+  });
 }
 
 export function buildAttentionItems(data, errors) {

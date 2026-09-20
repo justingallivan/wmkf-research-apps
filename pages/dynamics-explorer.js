@@ -5,6 +5,7 @@ import HelpButton from '../shared/components/HelpButton';
 import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import Link from 'next/link';
+import { requestEnvelope } from '../shared/utils/api-request';
 
 // ─── Markdown table parser ───
 
@@ -150,9 +151,8 @@ function DynamicsExplorer() {
     const profileId = currentProfile?.id;
     if (!profileId) return;
 
-    fetch(`/api/dynamics-explorer/roles?userProfileId=${profileId}`)
-      .then(r => r.json())
-      .then(data => setUserRole(data.callerRole || data.role || 'read_only'))
+    requestEnvelope(`/api/dynamics-explorer/roles?userProfileId=${profileId}`, { tolerantBody: true })
+      .then(envelope => setUserRole(envelope.data.callerRole || envelope.data.role || 'read_only'))
       .catch(() => {});
   }, [currentProfile?.id]);
 
@@ -200,6 +200,7 @@ function DynamicsExplorer() {
     };
 
     try {
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream (response.body.getReader() below); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const resp = await fetch('/api/dynamics-explorer/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -473,7 +474,10 @@ function DynamicsExplorer() {
     const userMsg = idx > 0 ? messages.slice(0, idx).reverse().find(m => m.role === 'user') : null;
 
     try {
-      await fetch('/api/dynamics-explorer/feedback', {
+      // Fire-and-forget: the response is never read (§2.6 A3), so any
+      // status or body shape is tolerated; only a network-level rejection
+      // reaches this catch, unchanged from the pre-image.
+      await requestEnvelope('/api/dynamics-explorer/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -486,6 +490,7 @@ function DynamicsExplorer() {
           requestId: targetMsg?.requestId || null,
           autoDetected: messageId === suggestFeedbackId,
         }),
+        tolerantBody: true,
       });
     } catch (err) {
       console.error('Failed to submit feedback:', err);

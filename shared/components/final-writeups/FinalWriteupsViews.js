@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { requestEnvelope } from '../../utils/api-request';
 import Layout from '../Layout';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 import ToolbarSelect, { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
@@ -661,10 +662,14 @@ export function FinalWriteupsPanel({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/workbench/final-writeups?cycleCode=${encodeURIComponent(selector)}`);
-      const body = await response.json().catch(() => ({}));
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/workbench/final-writeups?cycleCode=${encodeURIComponent(selector)}`, {
+        tolerantBody: true,
+      });
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        throw new Error(responseError || `Failed to load Final Writeups (${resStatus})`);
+      }
       if (requestIdRef.current !== requestId) return;
-      if (!response.ok) throw new Error(body.error || `Failed to load Final Writeups (${response.status})`);
       setData(body);
     } catch (loadError) {
       if (requestIdRef.current === requestId) {
@@ -1055,10 +1060,14 @@ export function FinalWriteupFocusedView({ requestId }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/workbench/final-writeups?requestId=${encodeURIComponent(requestId)}`);
-      const body = await response.json().catch(() => ({}));
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/workbench/final-writeups?requestId=${encodeURIComponent(requestId)}`, {
+        tolerantBody: true,
+      });
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        throw new Error(responseError || `Failed to load Final Writeup (${resStatus})`);
+      }
       if (requestIdRef.current !== loadId) return;
-      if (!response.ok) throw new Error(body.error || `Failed to load Final Writeup (${response.status})`);
       setData(body);
     } catch (loadError) {
       if (requestIdRef.current === loadId) {
@@ -1085,17 +1094,20 @@ export function FinalWriteupFocusedView({ requestId }) {
     setSaving(true);
     setSaveError(null);
     try {
-      const response = await fetch('/api/workbench/final-writeup/acknowledgement', {
+      const { ok: resOk, status: resStatus, data: ackBody } = await requestEnvelope('/api/workbench/final-writeup/acknowledgement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId: writeup.requestId,
           expectedFinalArtifactId: writeup.finalArtifactId,
-        }),
+        },
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
+      if (!resOk) {
+        const responseError = ackBody && typeof ackBody === 'object' ? ackBody.error : null;
+        throw new Error(responseError || `Failed to record review (${resStatus})`);
+      }
       if (requestIdRef.current !== generation) return;
-      if (!response.ok) throw new Error(body.error || `Failed to record review (${response.status})`);
       setSaving(false);
       await load();
     } catch (saveFailure) {

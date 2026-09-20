@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 
+import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReleaseEmailModal from '../../shared/components/reviewers/ReleaseEmailModal';
 
@@ -15,6 +16,10 @@ function response(body, { ok = true, status = 200 } = {}) {
     status,
     json: jest.fn(async () => body),
   };
+}
+
+function containing(text) {
+  return new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 }
 
 function draft(suggestionId, name, to) {
@@ -277,12 +282,12 @@ test('no response without a courtesy note never requests a preview', async () =>
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   expect(global.fetch.mock.calls[0][0]).toBe('/api/review-manager/withdraw-sufficient');
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+  expect(global.fetch.mock.calls[0][1].body).toBe(JSON.stringify({
     requestId: REQUEST_ID,
     suggestionIds: [FIRST_ID],
     reason: 'no_response',
     sendEmail: false,
-  });
+  }));
   expect(onClose).toHaveBeenCalled();
 });
 
@@ -328,6 +333,195 @@ test('no longer needed defaults to sending the note, and unticking it releases w
   expect(onClose).toHaveBeenCalled();
 });
 
+test('T4 request bytes: the render-withdraw-emails POST sends exact method, headers, and body', async () => {
+  global.fetch.mockResolvedValueOnce(response({ ok: true, drafts: [] }));
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID, SECOND_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/render-withdraw-emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requestId: REQUEST_ID, suggestionIds: [FIRST_ID, SECOND_ID] }),
+  });
+});
+
+test('T4 axis (b): a non-2xx render body surfaces its error verbatim', async () => {
+  global.fetch.mockResolvedValueOnce(response({ error: 'render blew up' }, { ok: false, status: 500 }));
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  expect(await screen.findByText('render blew up')).toBeInTheDocument();
+});
+
+test('T4 axis (c): a render network rejection surfaces its message', async () => {
+  global.fetch.mockRejectedValueOnce(new Error('offline'));
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  expect(await screen.findByText('Network error: offline')).toBeInTheDocument();
+});
+
+test('T4 axis (d): a malformed 2xx render body is treated as an empty draft list', async () => {
+  global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: jest.fn(async () => { throw new Error('bad json'); }) });
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  expect(await screen.findByText('There is nothing to send.')).toBeInTheDocument();
+});
+
+test('T4 axis (e): a non-2xx render body that fails to parse falls back to the status message, never silently', async () => {
+  global.fetch.mockResolvedValueOnce({ ok: false, status: 502, json: jest.fn(async () => { throw new Error('bad gateway html'); }) });
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  expect(await screen.findByText('Could not render the emails (502)')).toBeInTheDocument();
+});
+
+test('T4 axis (b, send): a non-2xx release body surfaces its error verbatim', async () => {
+  global.fetch.mockResolvedValueOnce(response({ error: 'release blew up' }, { ok: false, status: 500 }));
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No response/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+  expect(await screen.findByText('release blew up')).toBeInTheDocument();
+});
+
+test('T4 axis (e, send): a non-2xx release body that fails to parse falls back to the status message, never silently', async () => {
+  global.fetch.mockResolvedValueOnce({ ok: false, status: 502, json: jest.fn(async () => { throw new Error('bad gateway html'); }) });
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No response/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+  expect(await screen.findByText('Release failed (502)')).toBeInTheDocument();
+});
+
+test('T4 axis (c, send): a release network rejection reports the uncertain outcome, never silently', async () => {
+  global.fetch.mockRejectedValueOnce(new Error('offline'));
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No response/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+  expect(await screen.findByText(/The connection ended before the result could be confirmed.*offline/)).toBeInTheDocument();
+});
+
+test('a 200 withdraw-sufficient carrying write_failed rows still surfaces the amber banner and Done', async () => {
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  const second = draft(SECOND_ID, 'Dr. Second Reviewer', 'second@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first, second] }))
+    .mockResolvedValueOnce(response({
+      withdrawn: 0,
+      results: [
+        { suggestionId: FIRST_ID, status: 'write_failed' },
+        { suggestionId: SECOND_ID, status: 'write_failed' },
+      ],
+    }, { status: 200 }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID, SECOND_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
+
+  await screen.findByText(/2 issues:/);
+  expect(screen.getByText(containing(
+    'Dr. First Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
+  ))).toBeInTheDocument();
+  expect(screen.getByText(containing(
+    'Dr. Second Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
+  ))).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Releasing…' })).not.toBeInTheDocument();
+});
+
+test.each([
+  ['write_interlocked', 'Dr. First Reviewer is still invited. The system blocked the release in this environment (Dataverse write interlock). Retry from the production site, or contact an administrator.'],
+  ['dataverse_forbidden', 'Dr. First Reviewer is still invited. Dataverse refused to save the release for this account. Retry, and if it fails again contact an administrator.'],
+  ['not_found', 'Dr. First Reviewer is still invited. The reviewer record could not be found when saving. Reload and retry.'],
+  ['dataverse_unavailable', 'Dr. First Reviewer is still invited. The database did not respond when saving the release. This is usually a temporary blip. Retry, and if it keeps failing contact an administrator.'],
+  ['unknown', 'Dr. First Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.'],
+])('write_failed with failure %s renders the matching cause+recovery sentence, no name doubling', async (failure, expectedText) => {
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first] }))
+    .mockResolvedValueOnce(response({
+      withdrawn: 0,
+      results: [{ suggestionId: FIRST_ID, status: 'write_failed', failure }],
+    }, { status: 200 }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+
+  await screen.findByText(/1 issue/);
+  expect(screen.getByText(containing(expectedText))).toBeInTheDocument();
+  // The sentence itself names the reviewer once — no "<Name> — <Name> is..." doubling.
+  expect(screen.queryByText(/Dr\. First Reviewer — Dr\. First Reviewer/)).not.toBeInTheDocument();
+});
+
+test('a 200 withdraw-sufficient carrying not_pending rows surfaces the amber banner and Done', async () => {
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  const second = draft(SECOND_ID, 'Dr. Second Reviewer', 'second@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first, second] }))
+    .mockResolvedValueOnce(response({
+      withdrawn: 0,
+      results: [
+        { suggestionId: FIRST_ID, status: 'not_pending' },
+        { suggestionId: SECOND_ID, status: 'not_pending' },
+      ],
+    }, { status: 200 }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID, SECOND_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
+
+  await screen.findByText(/2 issues:/);
+  expect(screen.getByText(/Dr\. First Reviewer — The reviewer already responded or was already closed/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Releasing…' })).not.toBeInTheDocument();
+});
+
+test('a 200 withdraw-sufficient with no results array at all falls back to missing_result per row', async () => {
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  const second = draft(SECOND_ID, 'Dr. Second Reviewer', 'second@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first, second] }))
+    .mockResolvedValueOnce(response({ withdrawn: 0 }, { status: 200 }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID, SECOND_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (2)' }));
+
+  await screen.findByText(/2 issues:/);
+  expect(screen.getByText(/Dr\. First Reviewer — The server did not return a result for this reviewer/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Releasing…' })).not.toBeInTheDocument();
+});
+
 test('switching back to No longer needed re-arms the courtesy note default', () => {
   global.fetch.mockResolvedValue(response({ ok: true, drafts: [] }));
   render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
@@ -335,4 +529,37 @@ test('switching back to No longer needed re-arms the courtesy note default', () 
   expect(screen.getByRole('checkbox', { name: 'Also send a courtesy note' })).not.toBeChecked();
   fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
   expect(screen.getByRole('checkbox', { name: 'Send a courtesy note' })).toBeChecked();
+});
+
+test('under React.StrictMode the send still settles (double-invoked effects must not leave the mounted guard false)', async () => {
+  // Pin for the dev-only hang found in the Stage 4 local rehearsal: StrictMode runs
+  // effect cleanup once at mount, and a cleanup-only mounted guard never flips back.
+  const first = draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org');
+  global.fetch
+    .mockResolvedValueOnce(response({ ok: true, drafts: [first] }))
+    .mockResolvedValueOnce(response({
+      withdrawn: 0,
+      results: [{ suggestionId: FIRST_ID, status: 'write_failed' }],
+    }, { status: 200 }));
+  render(
+    <StrictMode>
+      <ReleaseEmailModal
+        requestId={REQUEST_ID}
+        suggestionIds={[FIRST_ID]}
+        onClose={jest.fn()}
+        onReleased={jest.fn()}
+      />
+    </StrictMode>,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue(first.subject);
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+
+  await screen.findByText(/1 issue/);
+  expect(screen.getByText(containing(
+    'Dr. First Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.',
+  ))).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  expect(screen.queryByText(/Releasing/)).not.toBeInTheDocument();
 });

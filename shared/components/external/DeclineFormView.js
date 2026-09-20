@@ -9,6 +9,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import {
   DECLINE_REFERRAL_LIMITS,
   MAX_DECLINE_REFERRALS,
@@ -40,21 +41,24 @@ export default function DeclineFormView({ token, etag, onCancel, onDeclined }) {
     setError(null);
     setSubmitting(true);
     try {
-      const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/respond`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Optimistic lock: round-trip the suggestion _etag from page load so
-          // a concurrent staff edit is caught with a 412 (handled below).
-          ...(etag ? { 'If-Match': etag } : {}),
+      const { ok: respOk, status: respStatus, data: json } = await requestEnvelope(
+        `/api/external/review/${encodeURIComponent(token)}/respond`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // Optimistic lock: round-trip the suggestion _etag from page load so
+            // a concurrent staff edit is caught with a 412 (handled below).
+            ...(etag ? { 'If-Match': etag } : {}),
+          },
+          body: { action: 'decline', decline },
+          tolerantBody: true,
         },
-        body: JSON.stringify({ action: 'decline', decline }),
-      });
-      const json = await resp.json().catch(() => ({}));
-      if (!resp.ok || !json.ok) {
-        if (resp.status === 409) {
+      );
+      if (!respOk || !json.ok) {
+        if (respStatus === 409) {
           setError(json.message || 'This invitation can no longer be declined online. Please contact your Program Director.');
-        } else if (resp.status === 412) {
+        } else if (respStatus === 412) {
           setError('Someone else updated this invitation while you were viewing it. Please refresh and try again.');
         } else {
           setError('Could not submit your response. Please try again.');

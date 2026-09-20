@@ -205,8 +205,8 @@ describe('reviewer follow-up request scope', () => {
     render(<ReviewerFollowUpDashboard />);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=my'));
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=my'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=my'), expect.objectContaining({ method: 'GET' }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=my'), expect.objectContaining({ method: 'GET' }));
     });
     expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
 
@@ -216,8 +216,8 @@ describe('reviewer follow-up request scope', () => {
     fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=all'));
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=all'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=all'), expect.objectContaining({ method: 'GET' }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=all'), expect.objectContaining({ method: 'GET' }));
     });
     expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
     expect(screen.getByRole('button', { name: 'All in program' })).toHaveAttribute('aria-pressed', 'true');
@@ -751,7 +751,7 @@ describe('reviewer follow-up refetch resilience', () => {
     // flight before we toggle scope, or the effect's cleanup would simply
     // clear the still-pending setTimeout and this would pass trivially.
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('scope=my'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('scope=my'), expect.objectContaining({ method: 'GET' }));
     });
 
     allScopeShouldFail = true;

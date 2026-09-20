@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-17
+last_verified: 2026-09-20
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -16,9 +16,12 @@ source_files:
   - .claude/settings.json
   - .claude/hooks/enum-parity-commit-guard.js
   - .claude/hooks/trust-boundary-guid-commit-guard.js
+  - eslint.config.mjs
+  - shared/utils/api-request.js
 canonical_docs:
   - docs/CREDENTIALS_RUNBOOK.md
   - docs/CI_GATES_REFERENCE.md
+  - docs/SERVICE_AND_UTILITY_CATALOG.md
 watch_paths:
   - AGENTS.md
   - CLAUDE.md
@@ -30,6 +33,8 @@ watch_paths:
   - scripts/**
   - .github/workflows/**
   - docs/CREDENTIALS_RUNBOOK.md
+  - eslint.config.mjs
+  - shared/utils/api-request.js
 update_triggers:
   - root instruction, hook, rule, or skill wiring changes
   - local build/test/deploy command changes
@@ -178,6 +183,30 @@ Claude config sync, and environment-specific operating notes.
   root `CLAUDE.md`, its Bash hook in `.claude/settings.json`, and the orphaned
   `.rtk/filters.toml` were removed 2026-08-30 after the missing binary exposed
   that the tracked instructions had drifted back from the durable memory.
+
+## Client Request Layer
+
+`shared/utils/api-request.js` is the one place for the client-side
+fetch → parse-body → ok-check → error-message dance. Two entry points:
+`requestJson(url, options)` (throws `ApiRequestError` on non-2xx, resolves to
+the parsed body on 2xx) and `requestEnvelope(url, options)` (never throws on
+HTTP status; resolves to `{ ok, status, data, error }`). The local
+`readResponse`/`readJson`/`sendJson` adapters in review-panel, cycle-dossier
+and the meeting-tracker editors are `(url, options)` wrappers over
+`requestEnvelope`; `readJsonBody` (data-only, takes a `Response`) is exported
+but has no live caller.
+
+An ESLint `no-restricted-syntax` rule (`eslint.config.mjs`, scoped to
+`shared/components/**/*.js` and `pages/**/*.js`, excluding `pages/api/**`)
+ratchets this: any raw `fetch(`/`globalThis.fetch(`/`window.fetch(` call in
+those files is a lint error unless it carries a site-level (not file-level)
+`// eslint-disable-next-line no-restricted-syntax -- <reason>; allowlisted
+per CLIENT_REQUEST_LAYER_PLAN §2.6` comment naming the exemption reason
+(SSE stream, blob download reading `Content-Disposition`, or a
+fire-and-forget beacon — see
+`docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md` §2.6). See
+`docs/SERVICE_AND_UTILITY_CATALOG.md` for the full contract and the plan's
+execution log for the migration history.
 
 ## Commit Guards & Triggers
 

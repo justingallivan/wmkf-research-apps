@@ -20,7 +20,40 @@ test('a revoked link shows the replacement message', async () => {
   global.fetch = jest.fn().mockResolvedValue(response({ ok: false, reason: 'revoked' }, 401));
   render(<BriefingPage />);
   await screen.findByText(/This link was replaced/);
-  expect(global.fetch).toHaveBeenCalledWith('/api/external/briefing/tok/context');
+  expect(global.fetch).toHaveBeenCalledWith('/api/external/briefing/tok/context', { method: 'GET', signal: undefined });
+});
+
+// T5 (e): a malformed 2xx body falls back to { ok: false, reason: 'server_error' }
+// via the site's own `.catch(() => ({ ok: false, reason: 'server_error' }))` —
+// one of the three plan §2.6 function-form sites.
+test('T5(e): a malformed 2xx body shows the "retry later" state', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected end of JSON input'); } });
+  render(<BriefingPage />);
+  await screen.findByText(/Something went wrong on our end. Please try again shortly./);
+});
+
+// T5 (e): an empty 2xx body (json() throws on empty string) hits the same
+// fallback as the malformed case.
+test('T5(e): an empty 2xx body shows the "retry later" state', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected end of JSON input'); } });
+  render(<BriefingPage />);
+  await screen.findByText(/Something went wrong on our end. Please try again shortly./);
+});
+
+// T5 (e): a non-2xx unparseable body (e.g. a 502 HTML gateway page). Today's
+// bare `res.json().catch(() => ({ ok:false, reason:'server_error' }))` applies
+// regardless of status, so this must also land on the same fallback message —
+// not the helper's generic non-2xx tolerant `{}`.
+test('T5 (e): a non-2xx unparseable body (502 gateway page) still shows the "retry later" state', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token < in JSON'); } });
+  render(<BriefingPage />);
+  await screen.findByText(/Something went wrong on our end. Please try again shortly./);
+});
+
+test('network rejection shows the fail-closed default message', async () => {
+  global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
+  render(<BriefingPage />);
+  await screen.findByText(/Something went wrong on our end. Please try again shortly./);
 });
 
 test('renders the placeholder states before any share, review, or schedule exists', async () => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Layout, { Button, Card, PageHeader } from '../shared/components/Layout';
 import RequireAuth from '../shared/components/RequireAuth';
 import { useAppAccess } from '../shared/context/AppAccessContext';
+import { requestEnvelope } from '../shared/utils/api-request';
 
 const POLL_MS = 4000;
 const EMPTY_ARRAY = [];
@@ -69,10 +70,10 @@ function formatUsd(value) {
   return Number.isFinite(value) ? value.toFixed(2) : '0.00';
 }
 
-async function readResponse(response) {
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
-  return body;
+export async function readResponse(url, options) {
+  const { ok, status, data } = await requestEnvelope(url, { ...options, tolerantBody: true });
+  if (!ok) throw new Error(data.error || `Request failed (${status})`);
+  return data;
 }
 
 function Icon({ name, className = 'h-5 w-5' }) {
@@ -263,7 +264,7 @@ export function CycleDossierWorkspace() {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const body = await readResponse(await fetch('/api/cycle-dossier'));
+      const body = await readResponse('/api/cycle-dossier');
       if (!mounted.current || !isCurrentGeneration(requestSeq.current, seq)) return;
       setData(body);
       if (!initialViewSet.current) {
@@ -332,7 +333,7 @@ export function CycleDossierWorkspace() {
     const poll = async () => {
       const actionGeneration = requestSeq.current;
       try {
-        const body = await readResponse(await fetch('/api/cycle-dossier'));
+        const body = await readResponse('/api/cycle-dossier');
         if (!cancelled && mounted.current && requestSeq.current === actionGeneration) setData(body);
       } catch (pollError) {
         if (!cancelled && mounted.current && requestSeq.current === actionGeneration) setError(pollError.message);
@@ -347,11 +348,7 @@ export function CycleDossierWorkspace() {
     setSelectionSaved(false);
     const write = selectionWriteChain.current.catch(() => {}).then(async () => {
       try {
-        const body = await readResponse(await fetch('/api/cycle-dossier', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'selection', selectedRequestIds: [...nextIds] }),
-        }));
+        const body = await readResponse('/api/cycle-dossier', { method: 'POST', body: { action: 'selection', selectedRequestIds: [...nextIds] } });
         if (!mounted.current || selectionGeneration.current !== generation) return;
         if (body.dossier) setData((current) => ({ ...(current || {}), dossier: body.dossier }));
         setSelectionSaved(true);
@@ -395,11 +392,7 @@ export function CycleDossierWorkspace() {
     setPreviewLoading(true);
     setError('');
     try {
-      const body = await readResponse(await fetch('/api/cycle-dossier', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'preview', selectedRequestIds: [...selectedIds], generateRequestIds: generateIds }),
-      }));
+      const body = await readResponse('/api/cycle-dossier', { method: 'POST', body: { action: 'preview', selectedRequestIds: [...selectedIds], generateRequestIds: generateIds } });
       if (!mounted.current || previewSeq.current !== generation || selectionGeneration.current !== selectionAtRequest) return;
       setPreview(body.preview || null);
       setView('review');
@@ -424,11 +417,7 @@ export function CycleDossierWorkspace() {
     setActionLoading('launch');
     setError('');
     try {
-      const body = await readResponse(await fetch('/api/cycle-dossier', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildLaunchPayload({ previewId: preview.id, selectedIds: [...selectedIds], generateIds, budgetUsd: parsedBudget, idempotencyKey: launchKeyRef.current.key })),
-      }));
+      const body = await readResponse('/api/cycle-dossier', { method: 'POST', body: buildLaunchPayload({ previewId: preview.id, selectedIds: [...selectedIds], generateIds, budgetUsd: parsedBudget, idempotencyKey: launchKeyRef.current.key }) });
       if (!mounted.current) return;
       setPreview(null);
       setView('progress');
@@ -456,11 +445,7 @@ export function CycleDossierWorkspace() {
     setActionLoading(action);
     setError('');
     try {
-      const body = await readResponse(await fetch('/api/cycle-dossier', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, runId: latestRun.id, ...(actionBudget != null ? { budgetUsd: actionBudget } : {}) }),
-      }));
+      const body = await readResponse('/api/cycle-dossier', { method: 'POST', body: { action, runId: latestRun.id, ...(actionBudget != null ? { budgetUsd: actionBudget } : {}) } });
       if (mounted.current && requestSeq.current === actionGeneration && body.run) setData((current) => ({ ...(current || {}), runs: [body.run, ...(current?.runs || []).filter((run) => run.id !== body.run.id)] }));
     } catch (actionError) {
       if (mounted.current && requestSeq.current === actionGeneration) setError(actionError.message);
@@ -478,11 +463,7 @@ export function CycleDossierWorkspace() {
     setActionLoading(action);
     setError('');
     try {
-      const body = await readResponse(await fetch('/api/cycle-dossier', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'operator-stop', stop, reason: stop ? 'Stopped by the Cycle Dossier operator.' : null }),
-      }));
+      const body = await readResponse('/api/cycle-dossier', { method: 'POST', body: { action: 'operator-stop', stop, reason: stop ? 'Stopped by the Cycle Dossier operator.' : null } });
       if (mounted.current && body.control) setData((current) => ({ ...(current || {}), control: body.control }));
       if (mounted.current) void load({ silent: true });
     } catch (controlError) {

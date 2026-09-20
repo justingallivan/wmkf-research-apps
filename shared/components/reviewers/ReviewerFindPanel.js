@@ -44,6 +44,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '../Layout';
 import ReviewerSearchSection from './ReviewerSearchSection';
+import { requestEnvelope } from '../../utils/api-request';
 
 function Spinner() {
   return <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />;
@@ -131,12 +132,13 @@ export default function ReviewerFindPanel({
     const submittedRequestId = requestId;
     setIngest({ loading: true, data: null, error: null });
     try {
-      const res = await fetch(`/api/workbench/applicant-reviewers?requestId=${encodeURIComponent(submittedRequestId)}`);
+      const { ok, status, data } = await requestEnvelope(
+        `/api/workbench/applicant-reviewers?requestId=${encodeURIComponent(submittedRequestId)}`,
+        { tolerantBody: true },
+      );
       if (requestIdRef.current !== submittedRequestId) return;
-      const data = await res.json().catch(() => ({}));
-      if (requestIdRef.current !== submittedRequestId) return;
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Ingestion failed (${res.status})`);
+      if (!ok || !data.success) {
+        throw new Error(data.error || `Ingestion failed (${status})`);
       }
       setIngest({ loading: false, data, error: null });
     } catch (e) {
@@ -158,22 +160,22 @@ export default function ReviewerFindPanel({
     lastProposalLoadRef.current = { requestId: submittedRequestId, fileKey: requestedFileKey };
     setDoc({ loading: true, data: null, error: null, requestedFileKey });
     try {
-      const res = await fetch('/api/reviewer-finder/load-proposal', {
+      const { ok, status, data } = await requestEnvelope('/api/reviewer-finder/load-proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestedFileKey
           ? { requestId: submittedRequestId, fileKey: requestedFileKey }
           : { requestId: submittedRequestId }),
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
       if (
         requestIdRef.current !== submittedRequestId
         || proposalLoadGenerationRef.current !== myGeneration
       ) return;
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         // Carry allFiles through on a 404 so staff can make a deliberate
         // historical/ad-hoc override when the canonical file is absent.
-        const err = new Error(data.error || `Could not load the proposal document (${res.status})`);
+        const err = new Error(data.error || `Could not load the proposal document (${status})`);
         err.allFiles = data.allFiles || null;
         throw err;
       }
@@ -233,7 +235,7 @@ export default function ReviewerFindPanel({
   });
 
   const lookupReviewer = async ({ name, email, affiliation, orcid }) => {
-    const res = await fetch('/api/workbench/reviewer-lookup', {
+    const { ok, status, data } = await requestEnvelope('/api/workbench/reviewer-lookup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -242,9 +244,9 @@ export default function ReviewerFindPanel({
         affiliation: affiliation || undefined,
         orcid: orcid || undefined,
       }),
+      tolerantBody: true,
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `Reviewer lookup failed (${res.status})`);
+    if (!ok) throw new Error(data.error || `Reviewer lookup failed (${status})`);
     return data;
   };
 
@@ -278,7 +280,7 @@ export default function ReviewerFindPanel({
     });
 
     try {
-      const res = await fetch('/api/workbench/orcid-lookup', {
+      const { ok, data, error } = await requestEnvelope('/api/workbench/orcid-lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -286,9 +288,13 @@ export default function ReviewerFindPanel({
           affiliation: manual.affiliation.trim() || undefined,
           email: submittedEmail || undefined,
         }),
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
       if (requestIdRef.current !== submittedRequestId) return;
+      if (!ok) {
+        apply(() => ({ lookupMsg: { tone: 'warn', text: error.message } }));
+        return;
+      }
       if (data.found && data.orcid) {
         // If staff typed an email and the matched ORCID record's public email
         // disagrees, that's a wrong-person signal — do NOT auto-fill. Surface it
@@ -343,7 +349,7 @@ export default function ReviewerFindPanel({
 
   const submitManualReviewer = async (resolution) => {
     const name = manual.name.trim();
-    const res = await fetch('/api/workbench/manual-reviewer', {
+    const { ok, status, data } = await requestEnvelope('/api/workbench/manual-reviewer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -356,10 +362,10 @@ export default function ReviewerFindPanel({
         referredBy: manual.referredBy.trim() || undefined,
         resolution: resolution || undefined,
       }),
+      tolerantBody: true,
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || `Could not add reviewer (${res.status})`);
+    if (!ok || !data.success) {
+      throw new Error(data.error || `Could not add reviewer (${status})`);
     }
     return data;
   };

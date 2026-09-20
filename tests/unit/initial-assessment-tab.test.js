@@ -73,6 +73,7 @@ it('binds version history to the artifact currently displayed', async () => {
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     `/api/workbench/initial-assessment/versions?requestId=${REQUEST_ID}`
       + '&expectedArtifactId=44444444-4444-4444-4444-444444444444',
+    expect.objectContaining({ method: 'GET' }),
   ));
 });
 

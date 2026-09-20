@@ -25,6 +25,7 @@
 
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { validateInvitationTemplateForSave } from '../../../lib/utils/invitation-link-validator';
+import { requestEnvelope } from '../../utils/api-request';
 
 export const TEMPLATE_TYPES = ['invitation', 'materials', 'followup', 'thankyou'];
 
@@ -92,9 +93,8 @@ export function toOverrides(templates, adminDefaults) {
  */
 export async function loadAdminTemplateDefaults() {
   try {
-    const res = await fetch('/api/email-defaults/reviewer-templates');
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data?.templates) return toShape(data.templates);
+    const { ok, data } = await requestEnvelope('/api/email-defaults/reviewer-templates', { tolerantBody: true });
+    if (ok && data?.templates) return toShape(data.templates);
   } catch { /* fall through to blank skeleton */ }
   return toShape(null);
 }
@@ -106,8 +106,10 @@ export async function loadAdminTemplateDefaults() {
 export async function loadEmailTemplates() {
   const adminDefaults = await loadAdminTemplateDefaults();
   try {
-    const res = await fetch(`/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.EMAIL_TEMPLATES)}`);
-    const data = await res.json().catch(() => ({}));
+    const { data } = await requestEnvelope(
+      `/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.EMAIL_TEMPLATES)}`,
+      { tolerantBody: true },
+    );
     if (data?.value) {
       const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
       return mergeTemplates(parsed, adminDefaults);
@@ -125,12 +127,13 @@ export async function saveEmailTemplates(templates) {
   try {
     const adminDefaults = await loadAdminTemplateDefaults();
     const overrides = toOverrides(templates, adminDefaults);
-    const res = await fetch('/api/user-preferences', {
+    const { ok } = await requestEnvelope('/api/user-preferences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: PREFERENCE_KEYS.EMAIL_TEMPLATES, value: JSON.stringify(overrides) }),
+      tolerantBody: true,
     });
-    return res.ok;
+    return ok;
   } catch {
     return false;
   }

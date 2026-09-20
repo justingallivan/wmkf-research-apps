@@ -191,7 +191,7 @@ const defaults = [
 
 beforeEach(() => {
   global.fetch = jest.fn(async (url, opts = {}) => {
-    if (String(url) === '/api/admin/email-defaults' && !opts.method) {
+    if (String(url) === '/api/admin/email-defaults' && (!opts.method || opts.method === 'GET')) {
       return { ok: true, json: async () => ({ defaults }) };
     }
     if (String(url) === '/api/admin/email-defaults' && opts.method === 'PUT') {
@@ -351,6 +351,47 @@ test('a failed PUT keeps the field dirty, shows the error, and does not advance 
   expect(within(card).getByText('Unsaved changes')).toBeInTheDocument();
   expect(within(field).getByRole('button', { name: 'Save' })).toBeEnabled();
   expect(screen.getByLabelText('Deliberation agenda subject')).toHaveValue('Edited');
+});
+
+// T3 matrix (Stage 3, group A) ahead of migrating both fetch sites onto
+// shared/utils/api-request.js. Both are tolerant-`.json()`, `!ok` throw with
+// a fallback message; no status branching, so both use requestJson.
+test('(c) load: a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch.mockImplementationOnce(() => Promise.reject(new Error('network down')));
+  render(<EmailDefaultsSection />);
+  expect(await screen.findByText('network down')).toBeInTheDocument();
+});
+
+test('(d) load: a malformed 2xx body (tolerant) becomes {} with no editable defaults found', async () => {
+  global.fetch.mockImplementationOnce(async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }));
+  render(<EmailDefaultsSection />);
+  expect(await screen.findByText('No editable email defaults found.')).toBeInTheDocument();
+});
+
+test('(e) load: a non-2xx unparseable body (502 gateway page) shows the fallback message, never silent', async () => {
+  global.fetch.mockImplementationOnce(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } }));
+  render(<EmailDefaultsSection />);
+  expect(await screen.findByText('Failed to load email defaults.')).toBeInTheDocument();
+});
+
+test('(c) saveKey: a network rejection shows the rejection\'s own message on the field', async () => {
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  global.fetch.mockImplementationOnce(() => Promise.reject(new Error('network down')));
+  fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
+  expect(await within(field).findByText('network down')).toBeInTheDocument();
+});
+
+test('(e) saveKey: a non-2xx unparseable body (502) shows the fallback "Save failed.", never silent', async () => {
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  global.fetch.mockImplementationOnce(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } }));
+  fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
+  expect(await within(field).findByText('Save failed.')).toBeInTheDocument();
 });
 
 test('the Saved timestamp persists across a re-render and clears on the next edit', async () => {

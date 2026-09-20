@@ -39,6 +39,7 @@ import EmailTemplatesModal from './EmailTemplatesModal';
 import CampaignConfigModal from './CampaignConfigModal';
 import { SubTabBadge } from './SubTabBadges';
 import { countForMode, workRemainingForMode, computeDefaultSub } from './reviewer-modes';
+import { requestEnvelope } from '../../utils/api-request';
 
 const SUB_TABS = [
   { key: 'find', label: 'Find' },
@@ -163,11 +164,13 @@ export default function ReviewersTab({
       setError(null);
     }
     try {
-      const res = await fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(rid)}`);
-      const data = await res.json().catch(() => ({}));
+      const { ok, status, data } = await requestEnvelope(
+        `/api/review-manager/reviewers?proposalId=${encodeURIComponent(rid)}`,
+        { tolerantBody: true },
+      );
       if (!isCurrent()) return; // request changed or a newer load superseded this one
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Failed to load reviewers (${res.status})`);
+      if (!ok || !data.success) {
+        throw new Error(data.error || `Failed to load reviewers (${status})`);
       }
       setProposal((data.proposals && data.proposals[0]) || null);
     } catch (e) {
@@ -207,9 +210,17 @@ export default function ReviewersTab({
     const isCurrent = () => rid === currentRequestIdRef.current && gen === candidatesGenRef.current;
     setCandidatesLoading(true);
     try {
-      const res = await fetch(`/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(rid)}`);
-      const data = await res.json().catch(() => ({}));
+      const { ok, data, error } = await requestEnvelope(
+        `/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(rid)}`,
+        { tolerantBody: true },
+      );
       if (!isCurrent()) return; // request changed or a newer load superseded this one
+      if (!ok) {
+        setError(error.message);
+        setCandidates([]);
+        setRemovedCandidates([]);
+        return;
+      }
       const prop = (data.proposals && data.proposals[0]) || null;
       const rows = (prop && prop.candidates) || [];
       const removed = (prop && prop.removedCandidates) || [];
@@ -254,10 +265,12 @@ export default function ReviewersTab({
     const gen = ++referralsGenRef.current;
     const isCurrent = () => rid === currentRequestIdRef.current && gen === referralsGenRef.current;
     try {
-      const res = await fetch(`/api/workbench/decline-referrals?requestId=${encodeURIComponent(rid)}`);
-      const data = await res.json().catch(() => ({}));
+      const { ok, data } = await requestEnvelope(
+        `/api/workbench/decline-referrals?requestId=${encodeURIComponent(rid)}`,
+        { tolerantBody: true },
+      );
       if (!isCurrent()) return; // request changed or a newer load superseded this one
-      setDeclineReferrals(res.ok && Array.isArray(data.referrals) ? data.referrals : []);
+      setDeclineReferrals(ok && Array.isArray(data.referrals) ? data.referrals : []);
     } catch {
       if (isCurrent()) setDeclineReferrals([]);
     }
@@ -319,7 +332,7 @@ export default function ReviewersTab({
     const rid = requestId;
     setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'adding' } }));
     try {
-      const res = await fetch('/api/workbench/manual-reviewer', {
+      const { ok, status, data } = await requestEnvelope('/api/workbench/manual-reviewer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -333,10 +346,10 @@ export default function ReviewersTab({
           referredBy: referral?.reviewerName || 'Declining reviewer',
           resolution: resolution || undefined,
         }),
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
       if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
-      if (res.ok && data.success) {
+      if (ok && data.success) {
         if (['promotion_required', 'restore_required', 'already_handled'].includes(data.outcome)) {
           setReferralActions((prev) => ({
             ...prev,
@@ -363,13 +376,13 @@ export default function ReviewersTab({
         selectSub('candidates'); // land on Invite Reviewers, where the new row shows
         return;
       }
-      if (res.status === 409 && data.lookup) {
+      if (status === 409 && data.lookup) {
         setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'confirm', lookup: data.lookup } }));
         return;
       }
       const message = data.code === 'applicant_excluded'
         ? 'This person is excluded for this request.'
-        : (data.error || `Couldn’t add (${res.status}).`);
+        : (data.error || `Couldn’t add (${status}).`);
       setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'error', error: message } }));
     } catch (e) {
       if (rid !== currentRequestIdRef.current) return;
@@ -387,7 +400,7 @@ export default function ReviewersTab({
     const rid = requestId;
     setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'dismissing' } }));
     try {
-      const res = await fetch('/api/workbench/decline-referrals', {
+      const { ok, status, data } = await requestEnvelope('/api/workbench/decline-referrals', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -396,16 +409,16 @@ export default function ReviewersTab({
           referralVersion: referral.referralVersion,
           ...(!referral?.legacy ? { referralIndex: referral.referralIndex } : {}),
         }),
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
       if (rid !== currentRequestIdRef.current) return;
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setReferralActions((prev) => ({
           ...prev,
           [actionKey]: {
             status: 'error',
             operation: 'dismiss',
-            error: data.error || `Couldn’t dismiss the referral (${res.status}).`,
+            error: data.error || `Couldn’t dismiss the referral (${status}).`,
           },
         }));
         return;

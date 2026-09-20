@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 
 const POLL_INTERVAL_MS = 2000;
@@ -44,13 +45,12 @@ const STAGE_PRESENTATION = Object.freeze({
 });
 
 async function fetchStatus(requestId, signal) {
-  const response = await fetch(
+  const { ok, status, data: body } = await requestEnvelope(
     `/api/workbench/final-writeup?requestId=${encodeURIComponent(requestId)}`,
-    { method: 'GET', signal },
+    { signal, tolerantBody: true },
   );
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const failure = new Error(body.error || `Final Writeup status failed (${response.status})`);
+  if (!ok) {
+    const failure = new Error(body.error || `Final Writeup status failed (${status})`);
     failure.code = body.code || null;
     throw failure;
   }
@@ -58,16 +58,15 @@ async function fetchStatus(requestId, signal) {
 }
 
 async function fetchAcknowledgementState(requestId, signal) {
-  const response = await fetch(
+  const { ok, status, data: body } = await requestEnvelope(
     `/api/workbench/final-writeup/acknowledgement?requestId=${encodeURIComponent(requestId)}`,
-    { method: 'GET', signal },
+    { signal, tolerantBody: true },
   );
-  const body = await response.json().catch(() => ({}));
-  if (response.status === 503 && body.code === ACKNOWLEDGEMENT_SCHEMA_NOT_READY) {
+  if (status === 503 && body.code === ACKNOWLEDGEMENT_SCHEMA_NOT_READY) {
     return { available: false };
   }
-  if (!response.ok) {
-    throw new Error(body.error || `Final Writeup review status failed (${response.status})`);
+  if (!ok) {
+    throw new Error(body.error || `Final Writeup review status failed (${status})`);
   }
   return body;
 }
@@ -299,24 +298,23 @@ export default function FinalWriteupTab({ requestId }) {
     setStarting(true);
     setError(null);
     try {
-      const response = await fetch('/api/workbench/final-writeup', {
+      const { ok, status: httpStatus, data: body } = await requestEnvelope('/api/workbench/final-writeup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           expectedArtifactId: status.sourceArtifactId,
-        }),
+        },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const failure = new Error(body.error || `Final Writeup transition failed (${response.status})`);
+      if (!ok) {
+        const failure = new Error(body.error || `Final Writeup transition failed (${httpStatus})`);
         failure.code = body.code || null;
         throw failure;
       }
       if (activeController.current !== controller) return;
       setConfirming(null);
-      if (response.status === 202 || body.inProgress) {
+      if (httpStatus === 202 || body.inProgress) {
         setStatus((current) => ({ ...current, phase: 'starting' }));
         await pollUntilReady(controller);
       } else {
@@ -350,15 +348,14 @@ export default function FinalWriteupTab({ requestId }) {
     setAdvancing(true);
     setError(null);
     try {
-      const response = await fetch('/api/workbench/final-writeup/leadership-review', {
+      const { ok, status: httpStatus, data: body } = await requestEnvelope('/api/workbench/final-writeup/leadership-review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, expectedFinalArtifactId: finalArtifactId }),
+        body: { requestId, expectedFinalArtifactId: finalArtifactId },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(body.error || `Leadership review transition failed (${response.status})`);
+      if (!ok) {
+        throw new Error(body.error || `Leadership review transition failed (${httpStatus})`);
       }
       if (activeController.current !== controller) return;
       if (body.artifact?.artifactId !== finalArtifactId) {
@@ -396,24 +393,23 @@ export default function FinalWriteupTab({ requestId }) {
     setAcknowledging(true);
     setAcknowledgementError(null);
     try {
-      const response = await fetch('/api/workbench/final-writeup/acknowledgement', {
+      const { ok, status: httpStatus, data: body } = await requestEnvelope('/api/workbench/final-writeup/acknowledgement', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           expectedFinalArtifactId: acknowledgementArtifactId,
-        }),
+        },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
-      if (response.status === 503 && body.code === ACKNOWLEDGEMENT_SCHEMA_NOT_READY) {
+      if (httpStatus === 503 && body.code === ACKNOWLEDGEMENT_SCHEMA_NOT_READY) {
         if (acknowledgementController.current === controller) {
           setAcknowledgement({ available: false });
         }
         return;
       }
-      if (!response.ok) {
-        throw new Error(body.error || `Final Writeup review update failed (${response.status})`);
+      if (!ok) {
+        throw new Error(body.error || `Final Writeup review update failed (${httpStatus})`);
       }
       if (acknowledgementController.current !== controller) return;
       if (body.finalArtifactId !== acknowledgementArtifactId) {

@@ -11,6 +11,7 @@ import {
   GRANTEE_INVITE_SEED_BODY,
   GRANTEE_INVITE_SEED_SUBJECT,
 } from '../../lib/seed/email-defaults/grantee-invite';
+import { fillInviteBody, fillInviteSubject } from '../../shared/config/granteeInviteEmail';
 
 // AwardeeTab reads the logged-in PD's saved custom invite body + profile identity
 // via useProfile. Mock the context so the component renders in isolation;
@@ -133,9 +134,9 @@ function wireFetch({
           }
           // Mirrors the route's 409 stale body, which drives the separate
           // conflict-snapshot load without replacing the working editor value.
-          return { ok: false, json: async () => ({ error: 'The abstract changed since you loaded it.', code: 'stale' }) };
+          return { ok: false, status: 409, json: async () => ({ error: 'The abstract changed since you loaded it.', code: 'stale' }) };
         }
-        if (!saveOk) return { ok: false, json: async () => ({ error: 'Could not save the abstract.' }) };
+        if (!saveOk) return { ok: false, status: 500, json: async () => ({ error: 'Could not save the abstract.' }) };
         const b = JSON.parse(opts.body);
         state.effective = b.text;
         state.effectiveHtml = `<p>${b.text}</p>`;
@@ -206,7 +207,7 @@ function wireFetch({
       }
       return generateOk
         ? { ok: true, json: async () => ({ abstractFormatted: state.effective, status: 100000000 }) }
-        : { ok: false, json: async () => ({ error: 'no applicant abstract' }) };
+        : { ok: false, status: 500, json: async () => ({ error: 'no applicant abstract' }) };
     }
     if (u.includes('/grantee-deliverables/send-invite')) {
       if (sendOk) {
@@ -216,7 +217,7 @@ function wireFetch({
       }
       return sendOk
         ? { ok: true, json: async () => ({ ok: true, status: 100000001 }) }
-        : { ok: false, json: async () => ({ error: 'send failed' }) };
+        : { ok: false, status: 500, json: async () => ({ error: 'send failed' }) };
     }
     if (u.includes('/grantee-deliverables/preview-invite')) {
       return { ok: true, json: async () => ({ html: '<p>Dear Professor [Name],</p><a>Open the Grantee Portal</a>' }) };
@@ -224,7 +225,7 @@ function wireFetch({
     if (u.includes('/grantee-deliverables/website-html')) {
       return websiteOk
         ? { ok: true, json: async () => ({ requestId: REQ, html: '<article class="grantee-award"><strong>Emory University</strong></article>' }) }
-        : { ok: false, json: async () => ({ error: 'no request found' }) };
+        : { ok: false, status: 500, json: async () => ({ error: 'no request found' }) };
     }
     throw new Error(`unexpected fetch ${u}`);
   });
@@ -518,7 +519,7 @@ test('a late stale-save response from a previous request cannot install conflict
   rerender(<AwardeeTab requestId={requestB} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Request B draft.'));
   await act(async () => {
-    resolveSaveA({ ok: false, json: async () => ({ code: 'stale', error: 'stale A' }) });
+    resolveSaveA({ ok: false, status: 409, json: async () => ({ code: 'stale', error: 'stale A' }) });
     await saveA;
   });
 
@@ -1682,4 +1683,259 @@ test('a failed byline lookup reads as unverified, never as an empty roster', asy
   expect(screen.queryByText('none listed')).not.toBeInTheDocument();
   // Display-only data must not disable the editor.
   expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Draft text.');
+});
+
+// --- Stage 2 T2 contract matrix (client-request-layer migration pins) ---
+//
+// These tests pin the visible outcome of each AwardeeTab fetch site under
+// non-2xx, network-rejection, and (where relevant) malformed-body responses,
+// plus the exact request bytes for non-GET sites, so the Stage 2 migration
+// onto shared/utils/api-request.js cannot change any of them. Run green
+// against the UNMIGRATED component (T2 baseline) and again, unchanged, after
+// migration (T2 confirmation). See docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md §5/§6.
+
+function mountReadyFetch(overrides = {}) {
+  const h = {
+    emailDefaults: async () => ({ ok: true, status: 200, json: async () => defaultEmailDefaults() }),
+    recipients: async () => ({
+      ok: true, status: 200,
+      json: async () => ({
+        pi: { name: 'Monika Raj', email: 'monika.raj@emory.edu', contactId: 'c-pi' },
+        liaison: { name: 'Lorena McLaren', email: 'lorena.mclaren@emory.edu', contactId: 'c-liaison' },
+      }),
+    }),
+    vipFlagsGet: async () => ({ ok: true, status: 200, json: async () => ({ flags: [] }) }),
+    vipFlagsPut: async (url, opts) => {
+      const b = JSON.parse(opts.body);
+      return { ok: true, status: 200, json: async () => ({ contactId: b.contactId, flagged: b.flagged }) };
+    },
+    abstract: async () => ({ ok: true, status: 200, json: async () => ({ effective: 'Ready abstract.', effectiveField: 'formatted', etag: 'W/"1"', status: 100000000, editable: true }) }),
+    saveAbstract: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, field: 'formatted', etag: 'W/"2"' }) }),
+    generate: async () => ({ ok: true, status: 200, json: async () => ({ status: 100000000 }) }),
+    send: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, status: 100000001 }) }),
+    preview: async () => ({ ok: true, status: 200, json: async () => ({ html: '<p>x</p>' }) }),
+    website: async () => ({ ok: true, status: 200, json: async () => ({ html: '<p>x</p>' }) }),
+    token: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, stagingId: 's1', pathname: 'p', clientToken: 't', contentType: 'image/png' }) }),
+    replace: async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }),
+    ...overrides,
+  };
+  global.fetch = jest.fn(async (url, opts = {}) => {
+    const u = String(url);
+    const method = opts.method || 'GET';
+    if (u.includes('/api/email-defaults/grantee-invite')) return h.emailDefaults(url, opts);
+    if (u.includes('/grantee-deliverables/recipients')) return h.recipients(url, opts);
+    if (u.includes('/scheduled-emails/vip-flags')) return method === 'PUT' ? h.vipFlagsPut(url, opts) : h.vipFlagsGet(url, opts);
+    if (u.includes('/grantee-deliverables/abstract')) return method === 'PUT' ? h.saveAbstract(url, opts) : h.abstract(url, opts);
+    if (u.includes('/grantee-deliverables/generate')) return h.generate(url, opts);
+    if (u.includes('/grantee-deliverables/send-invite')) return h.send(url, opts);
+    if (u.includes('/grantee-deliverables/preview-invite')) return h.preview(url, opts);
+    if (u.includes('/grantee-deliverables/website-html')) return h.website(url, opts);
+    if (u.includes('/grantee-deliverables/replacement-upload-token')) return h.token(url, opts);
+    if (u.includes('/grantee-deliverables/replace-submission')) return h.replace(url, opts);
+    throw new Error(`unexpected fetch ${u}`);
+  });
+  return h;
+}
+
+async function readyRender(overrides = {}) {
+  mountReadyFetch(overrides);
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+  return screen;
+}
+
+test('T2 loadEmailDefaults: non-2xx falls back to the unavailable message', async () => {
+  await readyRender({ emailDefaults: async () => ({ ok: false, status: 500, json: async () => ({ error: 'boom' }) }) });
+  await waitFor(() => expect(screen.getByText(/settings read failed/i)).toBeInTheDocument());
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+});
+
+test('T2 loadEmailDefaults: network rejection falls back to the unavailable message', async () => {
+  await readyRender({ emailDefaults: async () => { throw new Error('network down'); } });
+  await waitFor(() => expect(screen.getByText(/settings read failed/i)).toBeInTheDocument());
+});
+
+test('T2 loadRecipients: non-2xx leaves To/Cc blank (no throw surfaced)', async () => {
+  await readyRender({ recipients: async () => ({ ok: false, status: 500, json: async () => ({ error: 'boom' }) }) });
+  expect(screen.getByLabelText('To email')).toHaveValue('');
+  expect(screen.getByLabelText('Cc email')).toHaveValue('');
+});
+
+test('T2 loadRecipients: network rejection leaves To/Cc blank', async () => {
+  await readyRender({ recipients: async () => { throw new Error('network down'); } });
+  expect(screen.getByLabelText('To email')).toHaveValue('');
+});
+
+test('T2 loadRecipients: malformed 2xx body leaves To/Cc blank (bare .json(), strict)', async () => {
+  await readyRender({ recipients: async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }) });
+  expect(screen.getByLabelText('To email')).toHaveValue('');
+});
+
+test('T2 loadVipFlags: non-2xx renders no VIP checkbox', async () => {
+  await readyRender({ vipFlagsGet: async () => ({ ok: false, status: 500, json: async () => ({}) }) });
+  expect(screen.queryByLabelText(/Always review automated emails/i)).not.toBeInTheDocument();
+});
+
+test('T2 loadVipFlags: network rejection renders no VIP checkbox', async () => {
+  await readyRender({ vipFlagsGet: async () => { throw new Error('network down'); } });
+  expect(screen.queryByLabelText(/Always review automated emails/i)).not.toBeInTheDocument();
+});
+
+test('T2 toggleVipFlag: 2xx flips the checkbox and sends exact bytes', async () => {
+  await readyRender();
+  const box = await screen.findByLabelText(/Always review automated emails to Monika Raj/i);
+  expect(box).not.toBeChecked();
+  fireEvent.click(box);
+  await waitFor(() => expect(box).toBeChecked());
+  const putCall = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/scheduled-emails/vip-flags') && o?.method === 'PUT');
+  expect(putCall[0]).toBe('/api/scheduled-emails/vip-flags');
+  expect(putCall[1].method).toBe('PUT');
+  expect(putCall[1].headers).toMatchObject({ 'Content-Type': 'application/json' });
+  expect(JSON.parse(putCall[1].body)).toEqual({ contactId: 'c-pi', flagged: true });
+});
+
+test('T2 toggleVipFlag: non-2xx leaves the checkbox unchanged (no throw)', async () => {
+  await readyRender({ vipFlagsPut: async () => ({ ok: false, status: 500, json: async () => ({ error: 'nope' }) }) });
+  const box = await screen.findByLabelText(/Always review automated emails to Monika Raj/i);
+  fireEvent.click(box);
+  await waitFor(() => expect(box).not.toBeDisabled());
+  expect(box).not.toBeChecked();
+});
+
+test('T2 loadAbstract: non-2xx leaves prior state (no crash)', async () => {
+  mountReadyFetch({ abstract: async () => ({ ok: false, status: 500, json: async () => ({ error: 'boom' }) }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+  expect(screen.queryByLabelText('Formatted abstract')).not.toBeInTheDocument();
+});
+
+test('T2 generate: network rejection shows the fixed fallback message, and request bytes are exact', async () => {
+  await readyRender({ generate: async () => { throw new Error('network down'); } });
+  fireEvent.click(screen.getByRole('button', { name: /regenerate abstract/i }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/abstract generation failed/i));
+  const call = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/grantee-deliverables/generate') && o?.method === 'POST');
+  expect(call[1].headers).toMatchObject({ 'Content-Type': 'application/json' });
+  expect(JSON.parse(call[1].body)).toEqual({ requestId: REQ, regenerate: true });
+});
+
+test('T2 saveAbstract: request bytes are exact (PUT, headers, body)', async () => {
+  await readyRender();
+  fireEvent.change(screen.getByLabelText('Formatted abstract'), { target: { value: 'Edited abstract text.' } });
+  fireEvent.click(screen.getByRole('button', { name: /save edits/i }));
+  await waitFor(() => expect(screen.getByText(/abstract saved/i)).toBeInTheDocument());
+  const call = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/grantee-deliverables/abstract') && o?.method === 'PUT');
+  expect(call[1].headers).toMatchObject({ 'Content-Type': 'application/json' });
+  expect(JSON.parse(call[1].body)).toEqual({ requestId: REQ, text: 'Edited abstract text.', etag: 'W/"1"', baseField: 'formatted' });
+});
+
+test('T2 send: malformed 2xx body produces the uncertain receipt (bare .json(), strict)', async () => {
+  await readyRender({ send: async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(screen.getByText(/could not confirm the result/i)).toBeInTheDocument());
+});
+
+test('T2 send: statusPersisted:false surfaces the partial-record message', async () => {
+  await readyRender({ send: async () => ({ ok: true, status: 200, json: async () => ({ status: 100000001, statusPersisted: false }) }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(screen.getByText(/status could not be recorded/i)).toBeInTheDocument());
+});
+
+test('T2 send: non-2xx with outcome:"uncertain" keeps the uncertain step (body-flag branch)', async () => {
+  await readyRender({ send: async () => ({ ok: false, status: 502, json: async () => ({ error: 'gateway hiccup', outcome: 'uncertain' }) }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(within(screen.getByRole('dialog')).getByText(/gateway hiccup/i)).toBeInTheDocument());
+});
+
+// T2 axis (e) (Stage 2 review, correction round 1): a non-2xx response whose
+// body is unparseable (e.g. a 502 HTML gateway page) must keep the same
+// "may have sent" meaning as the catch-block network-rejection path, not
+// silently become a plain `failed` receipt.
+test('T2 send: non-2xx with an unparseable body (502 gateway page) keeps the uncertain receipt', async () => {
+  await readyRender({ send: async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(within(screen.getByRole('dialog')).getByText(/could not confirm the result/i)).toBeInTheDocument());
+});
+
+test('T2 send: plain non-2xx {error} without outcome is a failed receipt with the body message', async () => {
+  await readyRender({ send: async () => ({ ok: false, status: 400, json: async () => ({ error: 'X' }) }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(within(screen.getByRole('dialog')).getByText('X')).toBeInTheDocument());
+});
+
+test('T2 send: plain non-2xx {} (parseable, no error field) is a failed receipt with the default message', async () => {
+  await readyRender({ send: async () => ({ ok: false, status: 400, json: async () => ({}) }) });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(within(screen.getByRole('dialog')).getByText('The invitation was not sent.')).toBeInTheDocument());
+});
+
+test('T2 send: request bytes are exact (POST, headers, body)', async () => {
+  await readyRender();
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
+  const call = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/send-invite') && o?.method === 'POST');
+  expect(call[1].headers).toMatchObject({ 'Content-Type': 'application/json' });
+  const expectedSubject = fillInviteSubject(GRANTEE_INVITE_SEED_SUBJECT, { title: undefined });
+  const expectedBody = fillInviteBody(GRANTEE_INVITE_SEED_BODY, { piName: 'Monika Raj', title: undefined });
+  expect(call[1].body).toBe(JSON.stringify({
+    requestId: REQ,
+    toEmail: 'monika.raj@emory.edu',
+    ccEmail: 'lorena.mclaren@emory.edu',
+    subject: expectedSubject,
+    bodyText: expectedBody,
+  }));
+});
+
+test('T2 previewEmail: non-2xx sets the error from the body', async () => {
+  const openSpy = jest.spyOn(window, 'open').mockReturnValue({ document: { write: jest.fn(), close: jest.fn() } });
+  await readyRender({ preview: async () => ({ ok: false, status: 500, json: async () => ({ error: 'preview blew up' }) }) });
+  fireEvent.click(screen.getByRole('button', { name: /preview email/i }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/preview blew up/i));
+  expect(openSpy).not.toHaveBeenCalled();
+  openSpy.mockRestore();
+});
+
+test('T2 previewEmail: network rejection shows the fixed fallback message', async () => {
+  const openSpy = jest.spyOn(window, 'open').mockReturnValue({ document: { write: jest.fn(), close: jest.fn() } });
+  await readyRender({ preview: async () => { throw new Error('network down'); } });
+  fireEvent.click(screen.getByRole('button', { name: /preview email/i }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not render the preview/i));
+  openSpy.mockRestore();
+});
+
+test('T2 copyWebsiteHtml: network rejection shows the fixed fallback message', async () => {
+  await readyRender({ website: async () => { throw new Error('network down'); } });
+  await openCloseout();
+  fireEvent.click(screen.getByRole('button', { name: /copy website html/i }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not build the website html/i));
+});
+
+test('T2 replacement-upload-token: non-2xx/{ok:false} blocks the upload with the server message', async () => {
+  await readyRender({
+    abstract: async () => ({
+      ok: true, status: 200,
+      json: async () => ({
+        effective: 'Ready abstract.', effectiveField: 'formatted', etag: 'W/"1"', status: 100000000, editable: true,
+        hasImage: true, submittedAt: '2026-08-01T00:00:00Z', canReplace: true, deliverableEtag: 'W/"d1"',
+      }),
+    }),
+    token: async () => ({ ok: false, status: 500, json: async () => ({ error: 'could not mint token' }) }),
+  });
+  fireEvent.click(screen.getByRole('tab', { name: /Submission/ }));
+  fireEvent.click(screen.getByRole('button', { name: /replace image or caption/i }));
+  fireEvent.change(screen.getByLabelText('Replacement image'), {
+    target: { files: [new File(['x'], 'new.png', { type: 'image/png' })] },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /save replacement/i }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not mint token/i));
+  const call = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/replacement-upload-token') && o?.method === 'POST');
+  expect(call[1].headers).toMatchObject({ 'Content-Type': 'application/json' });
+  const payload = JSON.parse(call[1].body);
+  expect(payload).toMatchObject({ requestId: REQ, filename: 'new.png', contentType: 'image/png' });
 });

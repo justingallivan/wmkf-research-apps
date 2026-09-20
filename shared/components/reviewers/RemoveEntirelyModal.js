@@ -22,6 +22,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 function formatAmount(amount) {
   if (amount === null || amount === undefined) return null;
@@ -42,12 +43,12 @@ export default function RemoveEntirelyModal({ candidate, onClose, onRemoved }) {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
-    fetch(`/api/reviewer-finder/my-candidates?mode=removal-preflight&suggestionId=${encodeURIComponent(candidate.suggestionId)}`)
-      .then(async (resp) => {
-        const data = await resp.json().catch(() => ({}));
+    requestEnvelope(`/api/reviewer-finder/my-candidates?mode=removal-preflight&suggestionId=${encodeURIComponent(candidate.suggestionId)}`, { tolerantBody: true })
+      .then((envelope) => {
         if (cancelled) return;
-        if (!resp.ok) {
-          setLoadError(data.error || data.message || `Could not load removal preview (${resp.status})`);
+        const data = envelope.data;
+        if (!envelope.ok) {
+          setLoadError(data.error || data.message || `Could not load removal preview (${envelope.status})`);
         } else {
           setDisclosure(data);
         }
@@ -78,14 +79,14 @@ export default function RemoveEntirelyModal({ candidate, onClose, onRemoved }) {
     setRemoving(true);
     setRemoveError(null);
     try {
-      const resp = await fetch('/api/reviewer-finder/my-candidates', {
+      const envelope = await requestEnvelope('/api/reviewer-finder/my-candidates', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId: candidate.suggestionId, mode: 'hard', deleteContact }),
+        body: { suggestionId: candidate.suggestionId, mode: 'hard', deleteContact },
+        tolerantBody: true,
       });
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        setRemoveError(data.error || data.message || data.details || `Removal failed (${resp.status})`);
+      if (!envelope.ok) {
+        const data = envelope.data;
+        setRemoveError(data.error || data.message || data.details || `Removal failed (${envelope.status})`);
         return;
       }
       if (onRemoved) onRemoved();

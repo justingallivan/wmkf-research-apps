@@ -38,6 +38,7 @@ import {
 } from '../../../lib/utils/invitation-link-validator';
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 import { SEND_SKIP_REASON_LABEL } from '../../utils/reviewer-send-skip-reasons';
+import { requestEnvelope } from '../../utils/api-request';
 
 // Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
 function formatDate(ymd) {
@@ -289,9 +290,12 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     (async () => {
       const nextTiming = {};
       try {
-        const res = await fetch(`/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.INVITE_TIMING)}`);
-        const data = await res.json().catch(() => ({}));
-        if (data?.value) {
+        const envelope = await requestEnvelope(
+          `/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.INVITE_TIMING)}`,
+          { tolerantBody: true },
+        );
+        const data = envelope.data;
+        if (envelope.ok && data?.value) {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           // Pick only the known keys (a pre-Phase-1 sticky value carries the retired
           // `respondByDate` date — ignore it; respondOffsetDays falls back to default 7).
@@ -301,9 +305,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         }
       } catch { /* sticky defaults are best-effort */ }
       try {
-        const res = await fetch('/api/review-manager/campaign-timeline-defaults');
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.timeline && data.isDefault !== true) {
+        const envelope = await requestEnvelope('/api/review-manager/campaign-timeline-defaults', { tolerantBody: true });
+        const data = envelope.data;
+        if (envelope.ok && data?.timeline && data.isDefault !== true) {
           const d = data.timeline;
           nextTiming.respondOffsetDays = d.respondOffsetDays == null ? '' : d.respondOffsetDays;
           nextTiming.proposalSendDate = d.proposalReleaseDate || '';
@@ -312,9 +316,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       } catch { /* admin cycle defaults are best-effort for preview hydration */ }
       if (requestId) {
         try {
-          const res = await fetch(`/api/review-manager/campaign-config?requestId=${encodeURIComponent(requestId)}`);
-          const data = await res.json().catch(() => ({}));
-          if (res.ok && data?.config) {
+          const envelope = await requestEnvelope(`/api/review-manager/campaign-config?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true });
+          const data = envelope.data;
+          if (envelope.ok && data?.config) {
             const c = data.config;
             if (c.respondOffsetDays != null) nextTiming.respondOffsetDays = c.respondOffsetDays;
             if (c.reviewDueDate) nextTiming.reviewDueDate = c.reviewDueDate;
@@ -385,23 +389,23 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       const timeoutId = setTimeout(() => controller.abort(), PREVIEW_RENDER_TIMEOUT_MS);
 
       try {
-        const res = await fetch('/api/review-manager/render-emails', {
+        const envelope = await requestEnvelope('/api/review-manager/render-emails', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             suggestionIds: snapshotIds,
             templateType: 'invitation',
             template: snapshotTemplate,
             settings: { signature: snapshotSignature },
-          }),
+          },
           signal: controller.signal,
+          tolerantBody: true,
         });
-        const data = await res.json().catch(() => ({}));
+        const data = envelope.data;
         if (gen !== renderGenRef.current) return; // superseded by a newer render
-        if (!res.ok) {
+        if (!envelope.ok) {
           // Carry the composed message through the shared catch; the flag
           // distinguishes a server reply from a network/transport failure.
-          const failure = new Error(renderPreviewFailureMessage({ status: res.status, serverMessage: data.error }));
+          const failure = new Error(renderPreviewFailureMessage({ status: envelope.status, serverMessage: data.error }));
           failure.isPreviewFailure = true;
           throw failure;
         }
@@ -521,17 +525,16 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       [draft.suggestionId]: { ...prev[draft.suggestionId], marking: true, markError: null },
     }));
     try {
-      const res = await fetch('/api/reviewer-finder/my-candidates', {
+      const envelope = await requestEnvelope('/api/reviewer-finder/my-candidates', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           suggestionId: draft.suggestionId,
           markManualInviteSent: true,
           manualLink: draft.manualLink,
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not record the manual invitation.');
+      if (!envelope.ok) throw new Error(envelope.data.error || 'Could not record the manual invitation.');
       if (!mountedRef.current) return;
       // The PATCH above just stamped this row invited — same confirmed-fact
       // overlay contract as the batch send path.
@@ -576,20 +579,19 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     if (!ok) return;
     setVerifyState((prev) => ({ ...prev, [draft.suggestionId]: { verifying: true, error: null } }));
     try {
-      const res = await fetch('/api/workbench/reviewer-address-trust', {
+      const envelope = await requestEnvelope('/api/workbench/reviewer-address-trust', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionId: draft.suggestionId,
           action: 'verify_person_and_address',
           email: selectedEmail,
           evidenceType: evidence.type || 'publication_corresponding_author',
           evidenceUrl: evidence.url.trim(),
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not record the verification.');
+      if (!envelope.ok) throw new Error(envelope.data.error || 'Could not record the verification.');
       if (!mountedRef.current) return;
       setVerifyState((prev) => ({ ...prev, [draft.suggestionId]: { verifying: false, error: null } }));
       // Re-classify this row: the render service re-reads the person's email source,
@@ -606,18 +608,18 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     if (!requestId || !draft?.suggestionId) return;
     setRepairState((prev) => ({ ...prev, [draft.suggestionId]: { requesting: true, error: null } }));
     try {
-      const res = await fetch('/api/workbench/reviewer-address-trust', {
+      const envelope = await requestEnvelope('/api/workbench/reviewer-address-trust', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionId: draft.suggestionId,
           action: 'create_repair_request',
           code: draft.skipped || 'address_conflict_pending',
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.message || data.error || 'Could not create a repair request.');
+      const data = envelope.data;
+      if (!envelope.ok || !data.success) throw new Error(data.message || data.error || 'Could not create a repair request.');
       if (!mountedRef.current) return;
       setRepairState((prev) => ({
         ...prev,
@@ -645,24 +647,23 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     setAbstractSaving(true);
     setAbstractError(null);
     try {
-      const res = await fetch('/api/review-manager/update-abstract', {
+      const envelope = await requestEnvelope('/api/review-manager/update-abstract', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         // expectedCurrent = the abstract this editor was seeded from; the service
         // rejects (409) if someone else rewrote it since, so we never silently
         // clobber a newer edit.
-        body: JSON.stringify({
+        body: {
           requestId: flaggedAbstract.requestId,
           abstract: abstractDraft,
           expectedCurrent: flaggedAbstract.currentAbstract,
-        }),
+        },
+        tolerantBody: true,
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+      if (!envelope.ok) {
         // On a concurrent-edit conflict, reload so the editor reseeds from the
         // now-current abstract before the PD re-applies their fix.
-        if (res.status === 409) renderPreviews();
-        throw new Error(data.error || 'Failed to save abstract');
+        if (envelope.status === 409) renderPreviews();
+        throw new Error(envelope.data.error || 'Failed to save abstract');
       }
       setAbstractEditorOpen(false);
       // Drop per-recipient subject/body overrides: a manual body edit would else
@@ -703,10 +704,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   const persistTiming = useCallback(async () => {
     try {
-      await fetch('/api/user-preferences', {
+      await requestEnvelope('/api/user-preferences', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: PREFERENCE_KEYS.INVITE_TIMING, value: JSON.stringify(timing) }),
+        body: { key: PREFERENCE_KEYS.INVITE_TIMING, value: JSON.stringify(timing) },
+        tolerantBody: true,
       });
     } catch { /* sticky save is best-effort */ }
   }, [timing]);
@@ -732,6 +733,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     setResults({ sent: [], failed: [], skipped: [], unconfirmed: [] });
     persistTiming(); // remember the dates for next time (best-effort, non-blocking)
     try {
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const res = await fetch('/api/review-manager/send-emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -44,6 +44,7 @@ import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/uti
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { splitReferredByReason } from '../../../lib/utils/reviewer-provenance';
 import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
+import { requestJson, requestEnvelope } from '../../utils/api-request';
 
 export const VIP_FLAGS_LOAD_TIMEOUT_MS = 10000;
 
@@ -246,12 +247,14 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
     vipLoadAbortRef.current = controller;
     const timeoutId = setTimeout(() => controller.abort(), VIP_FLAGS_LOAD_TIMEOUT_MS);
     try {
-      const resp = await fetch(
+      // The catch below never surfaces this error's message (it always shows
+      // the fixed "VIP flags unavailable" string), so the exact wording here
+      // is not load-bearing -- only the throw-on-!ok and abort-passthrough
+      // behavior are.
+      const data = await requestJson(
         `/api/review-manager/reviewer-vip-flags?requestId=${encodeURIComponent(requestId)}`,
         { signal: controller.signal },
       );
-      if (!resp.ok) throw new Error(`VIP flags request failed (${resp.status})`);
-      const data = await resp.json();
       if (controller.signal.aborted || vipLoadAbortRef.current !== controller) return;
       setVipIds(new Set(data.flaggedPotentialReviewerIds || []));
       setVipLoaded(true);
@@ -293,19 +296,19 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
       return next;
     });
     try {
-      const resp = await fetch('/api/review-manager/reviewer-vip-flags', {
+      const envelope = await requestEnvelope('/api/review-manager/reviewer-vip-flags', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, potentialReviewerId: personId, flagged }),
+        body: { requestId, potentialReviewerId: personId, flagged },
+        tolerantBody: true,
       });
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
+      if (!envelope.ok) {
+        const data = envelope.data;
         setVipIds((prev) => {
           const next = new Set(prev);
           if (flagged) next.delete(personId); else next.add(personId);
           return next;
         });
-        alert(`Could not update the VIP flag: ${data.error || resp.status}`);
+        alert(`Could not update the VIP flag: ${data.error || envelope.status}`);
         return;
       }
     } catch (err) {
@@ -354,6 +357,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
         hasRealScholar: isRealScholarProfileUrl(c.googleScholarUrl),
         hIndex: c.hIndex ?? null,
       }));
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: blob download (reads response.headers for Content-Disposition), allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const res = await fetch('/api/workbench/export-candidates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -399,14 +403,14 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
     if (!confirm(msg)) return;
     setRemovingId(c.suggestionId);
     try {
-      const resp = await fetch('/api/reviewer-finder/my-candidates', {
+      const envelope = await requestEnvelope('/api/reviewer-finder/my-candidates', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId: c.suggestionId }),
+        body: { suggestionId: c.suggestionId },
+        tolerantBody: true,
       });
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        alert(`Could not remove candidate: ${data.error || data.message || data.details || resp.status}`);
+      if (!envelope.ok) {
+        const data = envelope.data;
+        alert(`Could not remove candidate: ${data.error || data.message || data.details || envelope.status}`);
         return;
       }
       if (onRefresh) onRefresh();
@@ -423,14 +427,14 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   const restoreCandidate = async (c) => {
     setRestoringId(c.suggestionId);
     try {
-      const resp = await fetch('/api/reviewer-finder/my-candidates', {
+      const envelope = await requestEnvelope('/api/reviewer-finder/my-candidates', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId: c.suggestionId, restore: true }),
+        body: { suggestionId: c.suggestionId, restore: true },
+        tolerantBody: true,
       });
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        alert(`Could not restore candidate: ${data.error || data.message || data.details || resp.status}`);
+      if (!envelope.ok) {
+        const data = envelope.data;
+        alert(`Could not restore candidate: ${data.error || data.message || data.details || envelope.status}`);
         return;
       }
       if (onRefresh) onRefresh();

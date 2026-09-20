@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
+import { requestEnvelope } from '../../utils/api-request';
 
 const REASON = 'sufficient_reviews_received';
 
@@ -25,8 +26,26 @@ const FAILURE_LABELS = {
   honorarium_missing_etag: 'The linked honorarium has no concurrency version. Reload and try again.',
   honorarium_read_failed: 'The linked honorarium could not be verified.',
   changed_skipped: 'The reviewer record changed while the release was being saved.',
-  write_failed: 'The release could not be saved.',
 };
+
+// write_failed carries a `failure` code the server derives from the
+// discarded write error (never the raw upstream message — see
+// lib/services/reviewer-engagement/terminal-transition.js
+// classifyWriteFailure). Each sentence names the cause in plain language and
+// ends with an action ladder (retry, then contact an administrator), per
+// .claude-memory/feedback-user-facing-error-copy-voice.md.
+const WRITE_FAILED_MESSAGE = {
+  write_interlocked: (name) => `${name} is still invited. The system blocked the release in this environment (Dataverse write interlock). Retry from the production site, or contact an administrator.`,
+  dataverse_forbidden: (name) => `${name} is still invited. Dataverse refused to save the release for this account. Retry, and if it fails again contact an administrator.`,
+  not_found: (name) => `${name} is still invited. The reviewer record could not be found when saving. Reload and retry.`,
+  dataverse_unavailable: (name) => `${name} is still invited. The database did not respond when saving the release. This is usually a temporary blip. Retry, and if it keeps failing contact an administrator.`,
+  unknown: (name) => `${name} is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.`,
+};
+
+function writeFailedMessage(name, failure) {
+  const build = WRITE_FAILED_MESSAGE[failure] || WRITE_FAILED_MESSAGE.unknown;
+  return build(name);
+}
 
 function failureMessage(status, fallback = 'The reviewer could not be released.') {
   return FAILURE_LABELS[status] || fallback;
@@ -46,19 +65,19 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/review-manager/terminal-transition', {
+    requestEnvelope('/api/review-manager/terminal-transition', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         requestId,
         suggestionIds: [reviewer.suggestionId],
         terminalStatus: 'released',
         preview: true,
-      }),
-    }).then(async (response) => {
-      const data = await response.json().catch(() => ({}));
+      },
+      tolerantBody: true,
+    }).then((envelope) => {
       if (cancelled) return;
-      if (!response.ok) throw new Error(data.error || `Could not prepare the release (${response.status})`);
+      if (!envelope.ok) throw new Error(envelope.data.error || `Could not prepare the release (${envelope.status})`);
+      const data = envelope.data;
       const next = data.drafts?.[0];
       if (!next || !['ok', 'no_email', 'no_pd', 'defaults_unavailable'].includes(next.status)) {
         throw new Error(failureMessage(
@@ -126,8 +145,13 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
         overrides: { [reviewer.suggestionId]: override },
       });
       if (!mountedRef.current) return;
+      const name = reviewer.name || 'This reviewer';
       if (!outcome?.ok) {
-        setError(failureMessage(outcome?.error, outcome?.error || 'The reviewer could not be released.'));
+        if (outcome?.error === 'write_failed') {
+          setError(writeFailedMessage(name, outcome?.data?.results?.[0]?.failure));
+        } else {
+          setError(failureMessage(outcome?.error, outcome?.error || 'The reviewer could not be released.'));
+        }
         return;
       }
       const result = outcome.data?.results?.[0] || {};
@@ -139,6 +163,8 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
         setFeedback({ outcome: 'uncertain', detail: 'The reviewer was released, but the email result could not be confirmed. Check before sending anything manually.' });
       } else if (result.status === 'released_email_failed') {
         setFeedback({ outcome: 'partial', detail: 'The reviewer was released and the honorarium was closed if open, but the thank-you email failed.' });
+      } else if (result.status === 'write_failed') {
+        setError(writeFailedMessage(name, result.failure));
       } else {
         setError(FAILURE_LABELS[result.status] || `The release did not complete: ${result.status || 'unknown result'}`);
       }

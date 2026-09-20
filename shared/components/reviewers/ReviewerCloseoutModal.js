@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 const PAYMENT_OPTIONS = [
   { value: 'eligible', label: 'Yes' },
@@ -158,18 +159,18 @@ export default function ReviewerCloseoutModal({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch('/api/review-manager/close-review', {
+      const envelope = await requestEnvelope('/api/review-manager/close-review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           suggestionId: reviewer.suggestionId,
           disposition,
           notes,
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await response.json().catch(() => ({}));
+      const data = envelope.data;
       if (generation !== generationRef.current || !isCurrent(epoch)) return;
-      if (!response.ok || !data.success) {
+      if (!envelope.ok || !data.success) {
         setError(data.error || 'The reviewer closeout could not be saved. Reload and try again.');
         return;
       }

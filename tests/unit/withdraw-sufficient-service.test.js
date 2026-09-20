@@ -252,13 +252,50 @@ test('412 on the conditional write → changed_skipped, no email', async () => {
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
-test('non-412 write failure → write_failed without leaking upstream diagnostics, no email', async () => {
+test('non-412 write failure with no classifiable shape → write_failed/unknown without leaking upstream diagnostics, no email', async () => {
   findById.mockResolvedValue(pendingRow());
   updateLifecycle.mockRejectedValueOnce(new Error('boom'));
   const out = await withdrawSufficient(ARGS);
   expect(out.withdrawn).toBe(0);
-  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', reason: 'no_longer_needed' });
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', failure: 'unknown', reason: 'no_longer_needed' });
   expect(createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('write failure from the Dataverse write interlock → write_failed/write_interlocked, no raw message leaked', async () => {
+  findById.mockResolvedValue(pendingRow());
+  updateLifecycle.mockRejectedValueOnce(new Error('[dataverse-interlock] denied write to prod-host.crm.dynamics.com'));
+  const out = await withdrawSufficient(ARGS);
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', failure: 'write_interlocked', reason: 'no_longer_needed' });
+  expect(JSON.stringify(out)).not.toContain('crm.dynamics.com');
+});
+
+test.each([401, 403])('write failure with upstream status %d → write_failed/dataverse_forbidden', async (status) => {
+  findById.mockResolvedValue(pendingRow());
+  updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('upstream detail'), { status }));
+  const out = await withdrawSufficient(ARGS);
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', failure: 'dataverse_forbidden', reason: 'no_longer_needed' });
+  expect(JSON.stringify(out)).not.toContain('upstream detail');
+});
+
+test('write failure with upstream status 404 → write_failed/not_found', async () => {
+  findById.mockResolvedValue(pendingRow());
+  updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('upstream detail'), { status: 404 }));
+  const out = await withdrawSufficient(ARGS);
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', failure: 'not_found', reason: 'no_longer_needed' });
+});
+
+test('write failure with upstream status 503 → write_failed/dataverse_unavailable', async () => {
+  findById.mockResolvedValue(pendingRow());
+  updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('upstream detail'), { status: 503 }));
+  const out = await withdrawSufficient(ARGS);
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', failure: 'dataverse_unavailable', reason: 'no_longer_needed' });
+});
+
+test('write failure with a network timeout and no status → write_failed/dataverse_unavailable', async () => {
+  findById.mockResolvedValue(pendingRow());
+  updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('request timed out'), { code: 'ETIMEDOUT' }));
+  const out = await withdrawSufficient(ARGS);
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', failure: 'dataverse_unavailable', reason: 'no_longer_needed' });
 });
 
 test('email send failure → withdrawn_email_failed without leaking diagnostics, lifecycle write NOT rolled back (state-before-email)', async () => {

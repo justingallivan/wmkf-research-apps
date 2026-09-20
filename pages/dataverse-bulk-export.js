@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
+import { requestEnvelope } from '../shared/utils/api-request';
 
 /**
  * Dataverse Bulk Export — Track B expert filter builder (build plan §6).
@@ -205,17 +206,17 @@ function DataverseBulkExport() {
     let cancelled = false;
     (async () => {
       try {
-        const resp = await fetch('/api/dataverse-export/metadata');
-        const data = await resp.json();
+        const envelope = await requestEnvelope('/api/dataverse-export/metadata');
         if (cancelled) return;
-        if (!resp.ok) {
+        if (!envelope.ok) {
+          if (envelope.error?.parseError) throw envelope.error.parseError;
           setTaxError(
-            data.message ||
-              `Could not load the live taxonomy (${resp.status}). The builder refuses to show a stale or partial list.`
+            envelope.data.message ||
+              `Could not load the live taxonomy (${envelope.status}). The builder refuses to show a stale or partial list.`
           );
           return;
         }
-        setTax(data);
+        setTax(envelope.data);
       } catch (err) {
         if (!cancelled) setTaxError(err.message || 'Taxonomy fetch failed.');
       } finally {
@@ -247,10 +248,14 @@ function DataverseBulkExport() {
 
   // P3 — on unmount: mark unmounted, abort an in-flight SSE fetch, clear the
   // expiry timer. The mounted flag makes the post-await setState guards fire.
-  useEffect(() => () => {
-    mountedRef.current = false;
-    if (abortRef.current) abortRef.current.abort();
-    if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+  useEffect(() => {
+    // StrictMode (dev) runs this cleanup once at mount, so re-arm the guard here.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (abortRef.current) abortRef.current.abort();
+      if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+    };
   }, []);
 
   const patchRow = (id, patch) => {
@@ -325,21 +330,21 @@ function DataverseBulkExport() {
     setTruncation(null);
     setTopError(null);
     try {
-      const resp = await fetch('/api/dataverse-export/preview', {
+      const envelope = await requestEnvelope('/api/dataverse-export/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ querySpec }),
       });
-      const data = await resp.json();
       // Stale (spec edited mid-flight) or unmounted ⇒ drop the response
       // wholesale; the finally below still clears the spinner so the UI
       // can never get stuck disabled (Codex S161 confirm P1a).
       if (!mountedRef.current || myRev !== specRev.current) return;
-      if (!resp.ok) {
-        setPreviewError(data);
+      if (!envelope.ok) {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        setPreviewError(envelope.data);
         return;
       }
-      setPreview(data);
+      setPreview(envelope.data);
     } catch (err) {
       if (mountedRef.current && myRev === specRev.current) {
         setTopError(err.message || 'Preview request failed.');
@@ -361,6 +366,7 @@ function DataverseBulkExport() {
     const ac = new AbortController();
     abortRef.current = ac;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE-shaped stream (response.body.getReader() below); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const response = await fetch('/api/dataverse-export/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

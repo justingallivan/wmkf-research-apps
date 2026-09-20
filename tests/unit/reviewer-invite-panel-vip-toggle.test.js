@@ -243,6 +243,67 @@ test('a successful flags load opens the modal with vipUnknown false and the vip 
   expect(props.candidates[0].vip).toBe(true);
 });
 
+test('T4 axis (d): a malformed 2xx flags-load body fails closed like a network error', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      return { ok: true, status: 200, json: async () => { throw new Error('bad json'); } };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+  expect(await screen.findByText(/VIP flags unavailable/)).toBeTruthy();
+});
+
+test('T4 axis (e): a non-2xx flags-load body that fails to parse fails closed, never silently', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      return { ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+  expect(await screen.findByText(/VIP flags unavailable/)).toBeTruthy();
+});
+
+test('T4 axis (d, put): a malformed 2xx VIP PUT body is still a success (the body is never read on the ok path)', async () => {
+  let resolvePut;
+  jest.spyOn(window, 'alert').mockImplementation(() => {});
+  global.fetch = jest.fn((url, options) => {
+    if (options?.method === 'PUT') return new Promise((resolve) => { resolvePut = resolve; });
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [] }) });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+  const toggle = screen.getByRole('button', { name: /toggle vip review for dr\. keyed person/i });
+  await waitFor(() => expect(toggle).not.toBeDisabled());
+  fireEvent.click(toggle);
+  resolvePut({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
+  await waitFor(() => expect(toggle).not.toBeDisabled());
+  expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  expect(window.alert).not.toHaveBeenCalled();
+});
+
+test('T4 axis (e, put): a non-2xx VIP PUT body that fails to parse rolls back and is never silent', async () => {
+  let resolvePut;
+  jest.spyOn(window, 'alert').mockImplementation(() => {});
+  global.fetch = jest.fn((url, options) => {
+    if (options?.method === 'PUT') return new Promise((resolve) => { resolvePut = resolve; });
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [] }) });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+  const toggle = screen.getByRole('button', { name: /toggle vip review for dr\. keyed person/i });
+  await waitFor(() => expect(toggle).not.toBeDisabled());
+  fireEvent.click(toggle);
+  resolvePut({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
+  await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+  expect(window.alert).toHaveBeenCalledWith('Could not update the VIP flag: 502');
+});
+
 test('a row without a potentialReviewerId renders no VIP toggle', async () => {
   render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withoutPerson]} onRefresh={() => {}} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalled());

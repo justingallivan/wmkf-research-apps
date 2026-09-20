@@ -32,6 +32,30 @@ const eslintConfig = defineConfig([
       // shared/components/RequireAuth.js). Do not demote it.
     },
   },
+  {
+    // Client Request Layer closeout ratchet
+    // (docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md §6 Stage 6, §2.6
+    // allowlist). Every client `fetch(` call site under shared/components/**
+    // and pages/** (excluding pages/api/**, which is server code) has been
+    // migrated to shared/utils/api-request.js's requestJson/requestEnvelope,
+    // except the sites listed in plan §2.6 (SSE streams, blob-download
+    // sites reading Content-Disposition, and two fire-and-forget beacons).
+    // Those sites carry `// eslint-disable-next-line no-restricted-syntax --
+    // <reason>` naming the exemption; this is a site-level ratchet, not a
+    // file-level one, so an un-annotated raw fetch( elsewhere in an
+    // allowlisted file still fires.
+    files: ['shared/components/**/*.js', 'pages/**/*.js'],
+    ignores: ['pages/api/**'],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: "CallExpression[callee.name='fetch']",
+        message: 'Use requestJson/requestEnvelope from shared/utils/api-request.js; raw fetch is allowlisted only per CLIENT_REQUEST_LAYER_PLAN §2.6 with an eslint-disable comment naming the reason.',
+      }, {
+        selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='fetch'][callee.object.name=/^(globalThis|window)$/]",
+        message: 'Use requestJson/requestEnvelope from shared/utils/api-request.js; raw fetch is allowlisted only per CLIENT_REQUEST_LAYER_PLAN §2.6 with an eslint-disable comment naming the reason.',
+      }],
+    },
+  },
   globalIgnores([
     // eslint-config-next defaults
     '.next/**',

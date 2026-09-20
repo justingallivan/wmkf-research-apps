@@ -151,6 +151,93 @@ test('the support-email footer renders only when the context includes supportEma
   expect(screen.queryByText(/Need help\?/)).toBeNull();
 });
 
+// T5 matrix for the two context-GET sites (`load` and the mount effect —
+// migrated separately, both function-form) and the finalize/upload-token
+// POST sites.
+test('(a)/(c)/(d)/(e) context: a network rejection shows the fail-closed default message', async () => {
+  global.fetch = jest.fn(async () => { throw new Error('network down'); });
+  render(<MaterialsContributorPage />);
+  await screen.findByText(/Something went wrong on our end/);
+});
+
+test('(e) context: a malformed 2xx body shows the fail-closed default message (today\'s function-form `.catch`)', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return { ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } };
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  await screen.findByText(/Something went wrong on our end/);
+});
+
+test('(e) context: a non-2xx unparseable body (502 gateway page) also shows the fail-closed default message', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return { ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } };
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  await screen.findByText(/Something went wrong on our end/);
+});
+
+test('(b) context: a 2xx body with ok:false shows the mapped reason message (body-level flag, not status)', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, { ok: false, reason: 'closed' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  await screen.findByText(/This collection has closed/);
+});
+
+test('(c) upload-token: a network rejection surfaces the generic save-failure copy', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) throw new Error('network down');
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  const input = await screen.findByLabelText('Presentation file');
+  fireEvent.change(input, { target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] } });
+  await screen.findByText('network down');
+});
+
+test('(d)/(e) upload-token: a malformed non-2xx body is tolerated to {} and falls back to "could not start"', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return { ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } };
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  const input = await screen.findByLabelText('Presentation file');
+  fireEvent.change(input, { target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] } });
+  await screen.findByText('The upload could not start.');
+});
+
+test('(c) finalize: a network rejection preserves the staging id for retry', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) throw new Error('network down');
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  const input = await screen.findByLabelText('Presentation file');
+  fireEvent.change(input, { target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] } });
+  await screen.findByText('The file could not be saved. Please retry this same upload.');
+  expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
+});
+
+test('(d)/(e) finalize: a malformed non-2xx body is tolerated to {} and falls back to the generic save-failed message', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) return { ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } };
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  const input = await screen.findByLabelText('Presentation file');
+  fireEvent.change(input, { target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] } });
+  await screen.findByText('The file could not be saved.');
+});
+
 test('the support-email footer shows a mailto link to the configured address when present', async () => {
   const withSupport = { ...context, supportEmail: 'portalhelp@wmkeck.org' };
   global.fetch = jest.fn(async (url) => {

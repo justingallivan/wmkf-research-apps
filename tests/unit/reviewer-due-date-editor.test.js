@@ -210,6 +210,52 @@ test('minimum extension date is the later of today and the day after the origina
   expect(minimumExtensionDate('2020-09-01', '2099-08-01')).toBe('2099-08-01');
 });
 
+test('D10 fix: a malformed 2xx body reports the uncertain receipt, not the generic extension-failed message', async () => {
+  global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
+  render(
+    <ReviewerDueDateEditor
+      suggestionId={SUGGESTION_ID}
+      effectiveDate="2099-09-01"
+      defaultDate="2099-09-01"
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
+  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
+  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
+  expect(await screen.findByText('I could not complete the deadline update.')).toBeInTheDocument();
+  expect(screen.queryByText('The extension could not be saved.')).not.toBeInTheDocument();
+});
+
+test('T4 axis (e): a non-2xx body that fails to parse is never silent (reports the generic extension-failed message)', async () => {
+  global.fetch.mockResolvedValueOnce({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
+  render(
+    <ReviewerDueDateEditor
+      suggestionId={SUGGESTION_ID}
+      effectiveDate="2099-09-01"
+      defaultDate="2099-09-01"
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
+  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
+  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
+  expect(await screen.findByText('The extension could not be saved.')).toBeInTheDocument();
+});
+
+test('T4 axis (network): a rejected fetch surfaces its message with an uncertain outcome', async () => {
+  global.fetch.mockRejectedValueOnce(new Error('offline'));
+  render(
+    <ReviewerDueDateEditor
+      suggestionId={SUGGESTION_ID}
+      effectiveDate="2099-09-01"
+      defaultDate="2099-09-01"
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
+  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
+  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
+  expect(await screen.findByText('offline')).toBeInTheDocument();
+});
+
 test('ignores a response that finishes after the component unmounts', async () => {
   let finishRequest;
   global.fetch = jest.fn(() => new Promise((resolve) => {

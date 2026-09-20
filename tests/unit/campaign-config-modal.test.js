@@ -15,14 +15,19 @@ afterEach(() => { if (global.fetch && global.fetch.mockRestore) global.fetch.moc
 
 function mockGet(config, defaultsTimeline = { reviewDueDate: '', desiredCount: 4 }, defaultsOk = true) {
   return jest.spyOn(global, 'fetch').mockImplementation((url, opts) => {
-    if (!opts || opts.method === undefined) {
+    // GET-shape matcher (call-shape only, Stage 4): the site now always calls
+    // requestEnvelope, whose doFetch always sets an explicit `method` in the
+    // fetch init (default 'GET'), so a GET call's `opts` is never undefined
+    // post-migration. Distinguish GET from the POST save by method, not by
+    // whether `opts` was passed at all.
+    if (!opts || opts.method === undefined || opts.method === 'GET') {
       if (String(url).includes('campaign-timeline-defaults')) {
-        if (!defaultsOk) return Promise.resolve({ ok: false, json: async () => ({ error: 'nope' }) });
-        return Promise.resolve({ ok: true, json: async () => ({ timeline: defaultsTimeline, isDefault: false, malformed: false }) });
+        if (!defaultsOk) return Promise.resolve({ ok: false, status: 500, json: async () => ({ error: 'nope' }) });
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ timeline: defaultsTimeline, isDefault: false, malformed: false }) });
       }
-      return Promise.resolve({ ok: true, json: async () => ({ requestId: REQUEST_ID, config }) });
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ requestId: REQUEST_ID, config }) });
     }
-    return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+    return Promise.resolve({ ok: true, status: 200, json: async () => ({ success: true }) });
   });
 }
 

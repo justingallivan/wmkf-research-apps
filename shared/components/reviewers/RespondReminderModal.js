@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
+import { requestEnvelope } from '../../utils/api-request';
 
 const ERROR_MESSAGE = {
   removed: 'This reviewer was removed from the proposal — restore them first.',
@@ -29,6 +30,12 @@ function responseError(data, fallback) {
   return ERROR_MESSAGE[data?.reason] || data?.errors?.[0] || fallback;
 }
 
+// Sentinel for handleSend's POST: distinguishes "2xx body failed to parse"
+// (most likely sent — the app just couldn't confirm) from a legitimately
+// empty/null 2xx body, without losing envelope.ok/status the way a thrown
+// parse error under strict tolerantBody would. See handleSend below.
+const MALFORMED_BODY = Symbol('malformed-body');
+
 export default function RespondReminderModal({ requestId, candidate, onClose, onSent, onStale }) {
   const [draft, setDraft] = useState(null);
   const [subject, setSubject] = useState('');
@@ -49,19 +56,19 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
     setLoadError(null);
     setSendFeedback(null);
     try {
-      const resp = await fetch('/api/review-manager/send-review-reminder', {
+      const envelope = await requestEnvelope('/api/review-manager/send-review-reminder', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionId: candidate.suggestionId,
           kind: 'respond',
           action: 'preview',
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await resp.json().catch(() => ({}));
+      const data = envelope.data;
       if (!mountedRef.current || generation !== loadGenerationRef.current) return;
-      if (!resp.ok || !data.ok || !data.draft) {
+      if (!envelope.ok || !data.ok || !data.draft) {
         setLoadError(responseError(data, 'Could not load the reminder preview.'));
         if (onStale && ['removed', 'revoked', 'not_found'].includes(data.reason)) onStale();
         return;
@@ -102,10 +109,9 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
     setSending(true);
     setSendFeedback(null);
     try {
-      const resp = await fetch('/api/review-manager/send-review-reminder', {
+      const envelope = await requestEnvelope('/api/review-manager/send-review-reminder', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionId: candidate.suggestionId,
           kind: 'respond',
@@ -117,11 +123,19 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
             from: draft.from,
             senderId: draft.senderId,
           },
-        }),
+        },
+        tolerantBody: () => MALFORMED_BODY,
       });
-      const data = await resp.json().catch(() => ({}));
+      const data = envelope.data;
       if (!mountedRef.current || generation !== sendGenerationRef.current) return;
-      if (!resp.ok || !data.ok) {
+      if (envelope.ok && data === MALFORMED_BODY) {
+        setSendFeedback({
+          status: 'uncertain',
+          message: 'The app could not confirm the result. Check reviewer activity before trying again.',
+        });
+        return;
+      }
+      if (!envelope.ok || !data.ok) {
         setSendFeedback({
           status: data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed',
           message: responseError(data, 'Could not send the reminder. Refresh and try again.'),

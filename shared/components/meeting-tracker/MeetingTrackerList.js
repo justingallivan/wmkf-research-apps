@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { requestJson, requestEnvelope } from '../../utils/api-request';
 import Layout, { PageHeader } from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
 import ScopeSegment from '../workbench/ScopeSegment';
@@ -129,17 +130,17 @@ export default function MeetingTrackerList() {
       const needsPicker = Boolean(selectedCycleCode) && cyclesRef.current.length === 0;
       const pickerQuery = new URLSearchParams();
       if (selectedProgramId) pickerQuery.set('programId', selectedProgramId);
-      const [dashboardResponse, sessionsResponse, pickerResponse] = await Promise.all([
-        fetch(`/api/meeting-tracker/dashboard${query.size ? `?${query}` : ''}`),
-        fetch('/api/meeting-tracker/sessions'),
-        needsPicker ? fetch(`/api/meeting-tracker/dashboard${pickerQuery.size ? `?${pickerQuery}` : ''}`) : Promise.resolve(null),
+      const [dashboardEnvelope, sessionsEnvelope, pickerEnvelope] = await Promise.all([
+        requestEnvelope(`/api/meeting-tracker/dashboard${query.size ? `?${query}` : ''}`, { tolerantBody: true }),
+        requestEnvelope('/api/meeting-tracker/sessions', { tolerantBody: true }),
+        needsPicker ? requestEnvelope(`/api/meeting-tracker/dashboard${pickerQuery.size ? `?${pickerQuery}` : ''}`, { tolerantBody: true }) : Promise.resolve(null),
       ]);
-      const dashboard = await dashboardResponse.json().catch(() => ({}));
-      const sessionBody = await sessionsResponse.json().catch(() => ({}));
-      const picker = pickerResponse?.ok ? await pickerResponse.json().catch(() => ({})) : null;
+      const dashboard = dashboardEnvelope.data;
+      const sessionBody = sessionsEnvelope.data;
+      const picker = pickerEnvelope?.ok ? pickerEnvelope.data : null;
       if (token !== loadToken.current) return;
-      if (!dashboardResponse.ok) throw new Error(dashboard.error || 'The meeting schedule could not be loaded. Please try again.');
-      if (!sessionsResponse.ok) throw new Error(sessionBody.error || 'The meeting sessions could not be loaded. Please try again.');
+      if (!dashboardEnvelope.ok) throw new Error(dashboard.error || 'The meeting schedule could not be loaded. Please try again.');
+      if (!sessionsEnvelope.ok) throw new Error(sessionBody.error || 'The meeting sessions could not be loaded. Please try again.');
       setPrograms((current) => dashboard.programs || picker?.programs || current);
       const nextCycles = dashboard.cycles || picker?.cycles || cyclesRef.current;
       cyclesRef.current = nextCycles;

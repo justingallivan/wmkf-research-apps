@@ -658,6 +658,7 @@ function MultiPerspectiveEvaluator() {
     setError(null);
 
     try {
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream (response.body.getReader() below); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const response = await fetch('/api/evaluate-multi-perspective', {
         method: 'POST',
         headers: {

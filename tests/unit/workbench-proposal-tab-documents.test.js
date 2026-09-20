@@ -147,7 +147,7 @@ test('fetches and renders documents from an explicit requestId while context is 
   render(<ProposalTab requestId={REQUEST_ID} context={null} />);
 
   await waitFor(() => expect(screen.getByText('Proposal Narrative')).toBeInTheDocument());
-  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(`/api/workbench/proposal-documents?requestId=${REQUEST_ID}`));
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(`/api/workbench/proposal-documents?requestId=${REQUEST_ID}`), expect.objectContaining({ method: 'GET' }));
   expect(screen.getByText('Loading proposal…')).toBeInTheDocument();
 });
 

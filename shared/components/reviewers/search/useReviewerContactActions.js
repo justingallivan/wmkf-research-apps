@@ -9,6 +9,7 @@ import {
   pruneCandidateForRoster,
 } from '../reviewer-search-logic';
 import { candKey, dedupeByName } from './candidateKeys';
+import { requestEnvelope } from '../../../utils/api-request';
 
 export default function useReviewerContactActions({
   requestId,
@@ -105,7 +106,7 @@ export default function useReviewerContactActions({
       return;
     }
     const myGen = genRef.current;
-    const response = await fetch('/api/workbench/reviewer-roster', {
+    const { ok, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -114,10 +115,10 @@ export default function useReviewerContactActions({
         candidateKey: key,
         updates: durableUpdates,
       }),
+      tolerantBody: true,
     });
-    const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return false;
-    if (!response.ok || !data.success || !data.candidate) {
+    if (!ok || !data.success || !data.candidate) {
       throw new Error(data.error || 'Could not save these contact details to the request.');
     }
     applyAuthoritativeRosterCandidate(key, data.candidate);
@@ -132,7 +133,7 @@ export default function useReviewerContactActions({
     const key = candKey(cand);
     if (!key) throw new Error('This reviewer has no stable roster key. Reload and try again.');
     const myGen = genRef.current;
-    const response = await fetch('/api/workbench/reviewer-address-trust', {
+    const { ok, data } = await requestEnvelope('/api/workbench/reviewer-address-trust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -151,10 +152,10 @@ export default function useReviewerContactActions({
         evidenceUrl: evidence.evidenceUrl,
         note: evidence.note,
       }),
+      tolerantBody: true,
     });
-    const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return false;
-    if (!response.ok || !data.success || !data.candidate) {
+    if (!ok || !data.success || !data.candidate) {
       // Verification can commit the server-owned roster receipt before an
       // ETag-guarded Dataverse adjudication fails. Reflect only that explicit
       // partial success so the card and the next retry use the authoritative
@@ -174,14 +175,14 @@ export default function useReviewerContactActions({
     const key = candKey(cand);
     if (!requestId || !key) return;
     const myGen = genRef.current;
-    const response = await fetch('/api/workbench/reviewer-address-trust', {
+    const { ok, data } = await requestEnvelope('/api/workbench/reviewer-address-trust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requestId, candidateKey: key, action: 'get_address_conflict' }),
+      tolerantBody: true,
     });
-    const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
-    if (!response.ok || !data.success || !data.conflict) {
+    if (!ok || !data.success || !data.conflict) {
       setRosterNote(addressTrustFailureMessage(
         data,
         'Could not load the current address conflict. Use the available action on this reviewer card.',
@@ -195,7 +196,7 @@ export default function useReviewerContactActions({
     const key = candKey(cand);
     if (!requestId || !key) return;
     const myGen = genRef.current;
-    const response = await fetch('/api/workbench/reviewer-address-trust', {
+    const { ok, data } = await requestEnvelope('/api/workbench/reviewer-address-trust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -207,10 +208,10 @@ export default function useReviewerContactActions({
             ? getCandidatePromotionDecision(cand).reason
             : null),
       }),
+      tolerantBody: true,
     });
-    const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
-    if (!response.ok || !data.success || !data.candidate) {
+    if (!ok || !data.success || !data.candidate) {
       setRosterNote(addressTrustFailureMessage(
         data,
         'The conflict check could not be retried. Use the available action on this reviewer card.',
@@ -225,7 +226,7 @@ export default function useReviewerContactActions({
     const key = candKey(cand);
     if (!requestId || !key) return;
     const myGen = genRef.current;
-    const response = await fetch('/api/workbench/reviewer-address-trust', {
+    const { ok, data } = await requestEnvelope('/api/workbench/reviewer-address-trust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -240,16 +241,16 @@ export default function useReviewerContactActions({
             ? 'address_conflict_pending'
             : 'address_verification_required'),
       }),
+      tolerantBody: true,
     });
-    const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
-    if (response.ok && data.success && data.repairRequest) {
+    if (ok && data.success && data.repairRequest) {
       setRepairRequestsByCandidateKey((previous) => ({
         ...previous,
         [key]: data.repairRequest,
       }));
     }
-    setRosterNote(response.ok && data.success
+    setRosterNote(ok && data.success
       ? data.message
       : (data.message || data.error || 'Could not create a repair request. Retry from this reviewer card.'));
   }, [requestId, genRef, setRepairRequestsByCandidateKey, setRosterNote]);
@@ -273,14 +274,14 @@ export default function useReviewerContactActions({
     const key = candKey(cand);
     if (!requestId || !key) return;
     const myGen = genRef.current;
-    const response = await fetch('/api/workbench/reviewer-address-trust', {
+    const { ok, data } = await requestEnvelope('/api/workbench/reviewer-address-trust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requestId, candidateKey: key, action: 'get_address_conflict' }),
+      tolerantBody: true,
     });
-    const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
-    if (!response.ok || !data.success || !data.conflict) {
+    if (!ok || !data.success || !data.conflict) {
       setRosterNote(addressTrustFailureMessage(
         data,
         'Could not load the current email choice. Reload the reviewer card and try again.',
@@ -304,13 +305,13 @@ export default function useReviewerContactActions({
     // to; recordSurfaced upserts, so a re-run after a partial failure is safe.
     const wasUnverified = unverified.some((u) => candKey(u) === key);
     if (wasUnverified) {
-      const recordRes = await fetch('/api/workbench/reviewer-roster', {
+      const { ok: recordOk, data: recordData } = await requestEnvelope('/api/workbench/reviewer-roster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, candidates: [pruneCandidateForRoster(cand)] }),
+        tolerantBody: true,
       });
-      const recordData = await recordRes.json().catch(() => ({}));
-      if (!recordRes.ok || !recordData.success) {
+      if (!recordOk || !recordData.success) {
         throw new Error(recordData.error || 'Could not add this suggestion to the request roster. Please retry.');
       }
       if (genRef.current !== myGen) return false;
@@ -329,13 +330,13 @@ export default function useReviewerContactActions({
         affiliationSource: 'staff_manual',
       },
     };
-    const response = await fetch('/api/workbench/reviewer-roster', {
+    const { ok, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requestId, action: 'confirm_identity', candidate: confirmedCandidate }),
+      tolerantBody: true,
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.success || !data.confirmationId) {
+    if (!ok || !data.success || !data.confirmationId) {
       throw new Error(data.error || 'Could not record identity confirmation. Please retry.');
     }
     if (genRef.current !== myGen) return false;

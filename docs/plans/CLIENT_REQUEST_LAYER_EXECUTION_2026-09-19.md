@@ -1,0 +1,1474 @@
+---
+title: Client Request Layer Execution Log
+domain: platform
+kind: plan
+status: active
+summary: Execution receipts and the source-to-stage file map for docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md, filled in as each stage runs.
+canonical: false
+owner: product-engineering
+related:
+  - docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md
+---
+
+# Client Request Layer Execution Log
+
+## Scope and status
+
+Stage 0 (baseline, helper, census) was ACCEPTED 2026-09-20 at `e65b03a0` (see
+Stage 0 acceptance below). Owner decision D3 (plan §9)
+was accepted 2026-09-20: public default `preferParseError: false`; `parseError`
+is still always recorded on `ApiRequestError`. Stage 1 (fold existing
+helpers) implemented 2026-09-20; see Stage 1 section below. Fresh review:
+pending.
+
+## Census baseline
+
+Run: `node scripts/census-client-fetch-sites.js --out <scratch-dir>`, 2026-09-20,
+against the working tree at branch `feature/client-request-layer` (HEAD
+`1c0cc671` or later, round-1 review corrections).
+
+Round 1 correction: the scanner previously matched only the FIRST `fetch(` on
+a line (`line.match`, non-global). `shared/components/meeting-tracker/
+SessionEditor.js:321` has two calls on one line
+(`fetch('/api/meeting-tracker/recipients')`, `fetch('/api/meeting-tracker/
+sessions')`), so the true count is one higher than the prior run reported.
+The scanner now finds every `fetch(` occurrence per line (global match), one
+row per occurrence, with a `col` column added to `sites.csv`.
+
+| Fact | Plan §2.1 | This run | Delta |
+|---|---|---|---|
+| `shared/components/**` sites / files | 215 / 70 | 216 / 70 | +1 site (SessionEditor.js:321 double call) |
+| `pages/**` (non-api) sites / files | 93 / 27 | 93 / 27 | none |
+| Total sites / files | 308 / 97 | 309 / 97 | +1 |
+| Body kind | json 248, unknown 41, stream 14, blob 3, none 2 | json 248, unknown 42, stream 14, blob 3, none 2 | +1 unknown (the added occurrence) |
+| Method | GET 127, POST 130, PUT 21, PATCH 20, DELETE 10 | GET 128, POST 130, PUT 21, PATCH 20, DELETE 10 | +1 GET |
+| `response.ok` checked | 254 yes, 54 no | 254 yes, 55 no | +1 no (the added occurrence has no `.ok` check in its own window) |
+| Error surface | setError-state 190, swallowed 45, throw 36, unknown 27, toast/alert 8, console 2 | setError-state 190, swallowed 45, throw 36, unknown 28, toast/alert 8, console 2 | +1 unknown |
+| Abort signal passed | 35 | 35 | none |
+| Retry/poll wrapper | 19 | 19 | none |
+| Explicit status branches | 409(13), 403(11), 401(4), 413(4), 503(3), 400(3), 412(2), 202(2), 404(1) | same, plus `200: 1` | **new**: `200: 1` — `shared/components/reviewers/ReviewerManagePanel.js:743` (PATCH `/api/review-manager/reviewers`), a real `response.status === 200` branch at line 779, inside the site's 40-line census window; not a false positive. §2.1 predates this branch's inclusion in the window or undercounted it. |
+
+Two real deltas vs §2.1, both verified against source, not scanner artifacts:
+the one-per-occurrence fix (+1 site) and the `status_branch` `200: 1`
+(confirmed real code, not a window false positive — see above).
+
+New dimension not in §2.1 (added for this plan's release-tier rule, §1, now
+amended to include `email`):
+`campaign_critical` (endpoint matches `/api/review-manager/*`, `/api/external/*`,
+`/api/scheduled-emails*`, `/api/upload*`, or contains `send`/`invite`/
+`reminder`/`release`/`close`/`email`) — **71 sites across 31 files** (up from
+65/28 before the `email` keyword was added; `pages/test-email.js:26`
+`/api/test-email` now flags true).
+
+The census script (`scripts/census-client-fetch-sites.js`) is committed;
+CSV/JSON outputs are **not** committed — they write under a required
+`--out <dir>` outside the repo tree (plan §6 governs; §2.1's "committed"
+wording is being reconciled by the orchestrator). The source-to-stage map
+below is the durable record of the census content the plan asks for (§6
+Stage 0: "Write its by-file table into
+docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md as the
+source-to-stage map").
+
+## Source-to-stage map
+
+One row per file from the census `by-file.csv`, with the stage assigned by
+plan §4. Per-site `form` (`requestJson` / `requestEnvelope` / allowlisted),
+`tolerantBody` choice, and a resolved body kind for the sites this scan
+could not classify are filled in during each file's own stage — the columns
+are reserved here with
+"—" so the table shape doesn't change later. File names below are census
+output (a mechanical scan), not individually read for this map unless a
+row's Note says otherwise: [NOT-READ: <path> — file-list entry from the
+census script's output, not opened this session; content claims about it
+are limited to what the census counted (site count, campaign_critical
+match, RTL-test presence)].
+
+**6 files below are marked `UNASSIGNED`**: they have at least one JSON `fetch(`
+site but are not individually named anywhere in plan §4, and do not fall
+inside any of §4's named directory groups (`admin/*`, `workbench/*`,
+`reviewers/*`, `external/*`, the named Executor tool pages). They need a
+Fable/owner disposition (which stage owns them) before that stage runs;
+until then treat them as **not yet in scope** for any stage. 15 further files
+are marked `ASSUMED`: they fall inside a §4-named directory group or category
+(admin/*, workbench/* long tail, external/* long tail, "Executor tool pages'
+non-stream sites") but aren't named by filename, so the stage assignment is
+inferred from the group, not verified against explicit plan text.
+
+Per-site detail columns (added during migration, not at census time):
+
+| Site line | Form | tolerantBody | Resolved body kind (if the scan could not classify it) |
+|---|---|---|---|
+| filled in per site during the file's stage | — | — | — |
+
+### Stage 1 — Fold existing helpers
+
+Verified this round against source (file:line cites below). Four adapters
+fold into Stage 1, not three — `SessionEditor.js`'s local `readJson` (:22-24)
+is **not dead** and is folded as a fourth adapter, not deleted; the file's
+raw-fetch sites (4, not 3) flow through `readJson`/`sendJson`, not directly
+through the new helper.
+
+| File | Stage | Raw-fetch sites (census) | Campaign-critical | RTL test | Adapter |
+|---|---|---|---|---|---|
+| `pages/review-panel.js` + `shared/components/workbench/ReviewPanelTab.js` | 1 | 6 | false | yes | shared `readResponse` at `shared/components/review-panel/review-panel-ui.js:62-66`. Consumers: `pages/review-panel.js` :44, :89, :110-111 (the :110-111 pair is `const response = await fetch(...)` then `return readResponse(response);` on the next line — same-statement, not same-line); `shared/components/workbench/ReviewPanelTab.js` :251, :279, :289. |
+| `pages/cycle-dossier.js` | 1 | 7 | false | yes | local `readResponse` copy at :72-75 (7 sites: :266, :335, :350, :398, :427, :459, :481) |
+| `shared/components/meeting-tracker/SessionEditor.js` | 1 | 4 | false | yes | local `readJson` at :22-24. Raw-fetch sites: :305 (via `readJson` directly), :321 (two calls on one line — `fetch('/api/meeting-tracker/recipients')`, `fetch('/api/meeting-tracker/sessions')`), :322. `sendJson` (:26-27, issues its request through `fetchImpl` at :27) wraps `readJson` and is the fourth adapter in this file; it has 8 callers — `reorderSessionSlots` at :38, plus :380, :381, :385, :426, :514, :515, :516 — and contributes zero *additional* raw-fetch census sites (its own `fetchImpl(...)` call at :27 is not a literal `fetch(` call site the census scanner counts). |
+
+Total raw-fetch sites flowing through Stage 1 adapters: **17** (6 + 7 + 4).
+
+### Stage 2 — Covered high-count files
+
+| File | Stage | Sites | Campaign-critical | RTL test |
+|---|---|---|---|---|
+| `pages/expertise-finder.js` | 2 | 8 | false | yes |
+| `shared/components/workbench/AwardeeTab.js` | 2 | 14 | true | yes |
+| `shared/components/workbench/ConsultantFeedbackSection.js` | 2 | 8 | false | yes |
+| `shared/components/workbench/FinalWriteupTab.js` | 2 | 5 | false | yes |
+| `shared/components/workbench/StaffDeliberationsTab.js` | 2 | 8 | false | yes |
+
+### Stage 3 — Admin surface
+
+| File | Stage | Sites | Campaign-critical | RTL test | Note |
+|---|---|---|---|---|---|
+| `pages/admin.js` | 3 | 32 | true | yes | [NOT-READ: pages/admin.js — census-derived row, not opened this session] |
+| `shared/components/admin/AdminOverviewSection.js` | 3 | 1 | false | no | ASSUMED: admin/* directory. [NOT-READ: shared/components/admin/AdminOverviewSection.js] |
+| `shared/components/admin/DynamicsExplorerRestrictionsSection.js` | 3 | 3 | false | no | [NOT-READ: shared/components/admin/DynamicsExplorerRestrictionsSection.js] |
+| `shared/components/admin/EmailDefaultsSection.js` | 3 | 2 | false | yes | [NOT-READ: shared/components/admin/EmailDefaultsSection.js] |
+| `shared/components/admin/FinalWriteupMatrixAudiencesSection.js` | 3 | 2 | false | yes | [NOT-READ: shared/components/admin/FinalWriteupMatrixAudiencesSection.js] |
+| `shared/components/admin/MeetingTrackerDefaultsSection.js` | 3 | 2 | false | no | [NOT-READ: shared/components/admin/MeetingTrackerDefaultsSection.js] |
+| `shared/components/admin/OperationalEventsSection.js` | 3 | 3 | false | yes | [NOT-READ: shared/components/admin/OperationalEventsSection.js] |
+| `shared/components/admin/PoliciesSection.js` | 3 | 2 | false | yes | [NOT-READ: shared/components/admin/PoliciesSection.js] |
+| `shared/components/admin/PromptTemplatesSection.js` | 3 | 5 | false | yes | [NOT-READ: shared/components/admin/PromptTemplatesSection.js] |
+| `shared/components/admin/ReviewQuestionsSection.js` | 3 | 3 | false | yes | [NOT-READ: shared/components/admin/ReviewQuestionsSection.js] |
+| `shared/components/admin/ReviewerRepairAlertDetails.js` | 3 | 1 | false | yes | [NOT-READ: shared/components/admin/ReviewerRepairAlertDetails.js] |
+| `shared/components/admin/SiteVisitMaterialsDefaultsSection.js` | 3 | 2 | false | no | [NOT-READ: shared/components/admin/SiteVisitMaterialsDefaultsSection.js] |
+| `shared/components/admin/SiteVisitRecipientsSection.js` | 3 | 4 | false | yes | [NOT-READ: shared/components/admin/SiteVisitRecipientsSection.js] |
+
+### Stage 4 — Reviewer engagement surface (Tier 2)
+
+| File | Stage | Sites | Campaign-critical | RTL test |
+|---|---|---|---|---|
+| `shared/components/reviewers/AcceptedReviewerReleaseModal.js` | 4 | 1 | true | yes |
+| `shared/components/reviewers/CampaignConfigModal.js` | 4 | 3 | true | yes |
+| `shared/components/reviewers/CandidateEditModal.js` | 4 | 3 | false | yes |
+| `shared/components/reviewers/InviteEmailModal.js` | 4 | 10 | true | yes |
+| `shared/components/reviewers/ReleaseEmailModal.js` | 4 | 2 | true | yes |
+| `shared/components/reviewers/ReleaseMaterialsModal.js` | 4 | 5 | true | no |
+| `shared/components/reviewers/RemoveEntirelyModal.js` | 4 | 2 | false | yes |
+| `shared/components/reviewers/RespondReminderModal.js` | 4 | 2 | true | yes |
+| `shared/components/reviewers/ReviewReminderAction.js` | 4 | 1 | true | no |
+| `shared/components/reviewers/ReviewerCloseoutModal.js` | 4 | 1 | true | yes |
+| `shared/components/reviewers/ReviewerDueDateEditor.js` | 4 | 1 | true | yes |
+| `shared/components/reviewers/ReviewerFindPanel.js` | 4 | 5 | false | yes |
+| `shared/components/reviewers/ReviewerInvitePanel.js` | 4 | 6 | true | yes |
+| `shared/components/reviewers/ReviewerManagePanel.js` | 4 | 6 | true | yes |
+| `shared/components/reviewers/ReviewersTab.js` | 4 | 5 | true | yes |
+| `shared/components/reviewers/email-template-store.js` | 4 | 3 | false | yes |
+| `shared/components/reviewers/prompt-override-store.js` | 4 | 3 | false | no |
+| `shared/components/reviewers/search/useReviewerContactActions.js` | 4 | 8 | false | no |
+| `shared/components/reviewers/search/useReviewerDiscovery.js` | 4 | 4 | false | no |
+| `shared/components/reviewers/search/useReviewerExport.js` | 4 | 1 | false | no |
+| `shared/components/reviewers/search/useReviewerPromotion.js` | 4 | 4 | false | no |
+| `shared/components/reviewers/search/useReviewerRosterActions.js` | 4 | 4 | false | no |
+
+(All Stage 4 file names above are census output; none was opened this
+session. [NOT-READ: shared/components/reviewers/* files listed in this
+table — census-derived rows only].)
+
+### Stage 5a — Long tail, internal (Tier 1)
+
+| File | Stage | Sites | Campaign-critical | RTL test | Note |
+|---|---|---|---|---|---|
+| `pages/batch-phase-i-summaries.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/batch-proposal-summaries.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/dataverse-bulk-export.js` | 5a | 3 | false | no | [NOT-READ] |
+| `pages/dynamics-explorer.js` | 5a | 3 | false | yes | [NOT-READ] |
+| `pages/expense-reporter.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/funding-gap-analyzer.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/grant-reporting.js` | 5a | 4 | false | no | read this session: grant reporting page (Field Set A writeback area) |
+| `pages/integrity-screener.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/literature-analyzer.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/multi-perspective-evaluator.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/peer-review-summarizer.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/phase-i-dynamics.js` | 5a | 2 | false | no | read this session: single-request Phase I summarization + Dynamics writeback test page |
+| `pages/phase-i-writeup.js` | 5a | 1 | false | no | ASSUMED: Executor tool page. [NOT-READ] |
+| `pages/phase-ii-writeup.js` | 5a | 4 | false | no | [NOT-READ] |
+| `pages/virtual-review-panel.js` | 5a | 2 | false | no | [NOT-READ] |
+| `shared/components/ProfileLinkingDialog.js` | 5a | 3 | false | no | [NOT-READ] |
+| `shared/components/expertise-finder/RosterContactField.js` | 5a | 2 | false | yes | [NOT-READ] |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | 5a | 3 | false | yes | [NOT-READ] |
+| `shared/components/meeting-tracker/MeetingTrackerList.js` | 5a | 3 | false | yes | [NOT-READ] |
+| `shared/components/meeting-tracker/SessionAgendaPanel.js` | 5a | 3 | false | yes | [NOT-READ] |
+| `shared/components/meeting-tracker/SiteVisitEditor.js` | 5a | 3 | false | yes | [NOT-READ] |
+| `shared/components/meeting-tracker/SiteVisitMaterialsCard.js` | 5a | 2 | false | yes | [NOT-READ] |
+| `shared/components/workbench/ArtifactVersionHistory.js` | 5a | 2 | false | yes | [NOT-READ] |
+| `shared/components/workbench/AwardeesPanel.js` | 5a | 2 | false | yes | [NOT-READ] |
+| `shared/components/workbench/CuratedRecipientPicker.js` | 5a | 1 | false | no | ASSUMED: workbench/* long tail. [NOT-READ] |
+| `shared/components/workbench/InitialAssessmentTab.js` | 5a | 4 | false | yes | [NOT-READ] |
+| `shared/components/workbench/InitialAssessmentsPanel.js` | 5a | 1 | false | no | ASSUMED: workbench/* long tail. [NOT-READ] |
+| `shared/components/workbench/ManualReviewEntryForm.js` | 5a | 2 | true | yes | [NOT-READ] |
+| `shared/components/workbench/OverviewTab.js` | 5a | 1 | false | yes | [NOT-READ] |
+| `shared/components/workbench/PreSiteDistributionPanel.js` | 5a | 4 | true | yes | [NOT-READ] |
+| `shared/components/workbench/ProposalTab.js` | 5a | 2 | false | yes | [NOT-READ] |
+| `shared/components/workbench/RequestListPanel.js` | 5a | 3 | false | yes | [NOT-READ] |
+| `shared/components/workbench/RequestLocator.js` | 5a | 2 | false | yes | [NOT-READ] |
+| `shared/components/workbench/ReviewerFollowUpPanel.js` | 5a | 2 | true | no | [NOT-READ] |
+| `shared/components/workbench/ReviewsTab.js` | 5a | 4 | true | yes | [NOT-READ] |
+| `shared/components/workbench/StaffDeliberationsPanel.js` | 5a | 1 | false | yes | ASSUMED: workbench/* long tail. [NOT-READ] |
+| `shared/components/workbench/WorkbenchShell.js` | 5a | 1 | false | yes | ASSUMED: workbench/* long tail. [NOT-READ] |
+| `shared/components/workbench/useSiteVisitContext.js` | 5a | 2 | false | yes | [NOT-READ] |
+
+### Stage 5b — Long tail, external and upload-adjacent (Tier 2)
+
+| File | Stage | Sites | Campaign-critical | RTL test | Note |
+|---|---|---|---|---|---|
+| `pages/external/briefing/[token].js` | 5b | 1 | true | yes | [NOT-READ] |
+| `pages/external/grantee/[token].js` | 5b | 1 | true | yes | read this session: scaffold landing page, fetches `/api/external/grantee/[token]/context` |
+| `pages/external/materials/[token].js` | 5b | 4 | true | yes | [NOT-READ] |
+| `pages/external/review/[token].js` | 5b | 1 | true | yes | read this session: state-driven view dispatcher, fetches `/api/external/review/[token]/context` |
+| `pages/scheduled-emails.js` | 5b | 6 | true | no | [NOT-READ] |
+| `shared/components/external/DeclineFormView.js` | 5b | 1 | true | yes | ASSUMED: external/* directory. [NOT-READ] |
+| `shared/components/external/GranteeDeliverableForm.js` | 5b | 3 | true | yes | [NOT-READ] |
+| `shared/components/external/ReviewAuthoringForm.js` | 5b | 3 | true | yes | [NOT-READ] |
+| `shared/components/external/Stage2aView.js` | 5b | 1 | true | yes | ASSUMED: external/* directory. [NOT-READ] |
+
+### UNASSIGNED — needs Fable/owner disposition before any stage claims them
+
+Resolved this round per §4's catch-all: `pages/workbench/[requestId].js` and
+`shared/components/Layout.js` → **5a** (internal, no reviewer-engagement
+endpoint); `pages/test-email.js` → **5b** (email surface, Tier 2, and now
+also `campaign_critical: true` under the amended keyword rule — see Census
+baseline); `pages/profile-settings.js` → **owner decision (6)**, not
+auto-assigned (see below); the two `reviewers/search/*` hooks → **Stage 4**,
+marked ASSUMED pending orchestrator confirmation (directory/naming match to
+sibling Stage 4 hooks, not an explicit §4 name).
+
+| File | Sites | Campaign-critical | RTL test | Disposition | Note |
+|---|---|---|---|---|---|
+| `pages/profile-settings.js` | 1 | true | yes | owner decision (6) | Verified this round: the flag fires on `invite`, not `send` — the site's literal endpoint is `/api/email-defaults/grantee-invite` (`pages/profile-settings.js:147`, GET; confirmed in both the census CSV and source). This is a self-service staff email-template-preference read, not a reviewer-engagement send/invite action; still not auto-assigned since it is a campaign-critical file absent from §4 by name (long-tail rule, §1). |
+| `pages/test-email.js` | 1 | true (as of this round; `email` keyword added) | no | 5b | Ad hoc Dynamics-email-integration test page; site is `/api/test-email` POST at :26. |
+| `pages/workbench/[requestId].js` | 1 | false | yes | 5a | Request Workbench shell (tab strip host for the Stage 2/4/5a tab components); site is `/api/workbench/resolve-request?requestId=...` GET at :127 (verified via census CSV). |
+| `shared/components/Layout.js` | 1 | false | no | 5a | App-wide Layout/PageHeader/Card/Button shell imported by most pages; its only site is an internal read, `/api/admin/alerts?summary=true` GET at :35 (verified via census CSV). |
+| `shared/components/reviewers/search/useApplicantReviewerEnrichment.js` | 1 | false | no | Stage 4 [ASSUMED] | reviewers/search/* hook, sibling to several Stage 4 hooks, but not individually named in §4's Stage 4 row; pending orchestrator confirmation. |
+| `shared/components/reviewers/search/useReviewerRoster.js` | 1 | false | no | Stage 4 [ASSUMED] | reviewers/search/* hook, sibling to several Stage 4 hooks, but not individually named in §4's Stage 4 row; pending orchestrator confirmation. |
+
+## Stage 0 acceptance
+
+Gate G commands (plan §7), run sequentially, tests before code, stage-named
+tests first:
+
+```bash
+npx jest tests/unit/api-request.test.js
+npm test -- --runInBand --silent
+npm run lint
+npm run check:types
+npm run check:status-enum-parity && npm run check:status-enum-parity:self-test
+npm run check:api-routes && npm run check:api-routes:self-test
+npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test
+npm run check:build-claim-freshness && npm run check:build-claim-freshness:self-test
+npm run check:doc-currency && npm run check:doc-currency:self-test
+npm run check:secret-scan && npm run check:secret-scan:self-test
+npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test
+npm run build
+```
+
+Results filled in so far by the Stage 0 implementer (2026-09-20); the
+remaining rows (a full-suite run in the orchestrator's own pass,
+status-enum-parity, api-routes, build-claim-freshness self-tests, and
+`npm run build`) are the orchestrator's responsibility per the plan:
+
+- `npx jest tests/unit/api-request.test.js`: 47 passed, 47 total.
+- `npm test -- --runInBand --silent`: 985 suites passed, 14533 tests passed
+  (plan baseline: 984 suites, 14486 tests; delta is this session's one new
+  test file).
+- `npm run lint`: 0 errors, 114 pre-existing warnings, none in the two files
+  this session added.
+- `npm run check:types`: clean.
+- `npm run check:status-enum-parity` (+ self-test): not run this session.
+- `npm run check:api-routes` (+ self-test): not run this session.
+- `npm run check:doc-symbol-refs` (+ self-test): OK, 295 docs / 1756 refs.
+- `npm run check:build-claim-freshness` (+ self-test): not run this session.
+- `npm run check:doc-currency` (+ self-test): OK, no drift markers.
+- `npm run check:secret-scan` (+ self-test): OK, 3898 files scanned.
+- `npm run check:scaffolding-tokens` (+ self-test): OK, 3882 files scanned.
+- `npm run check:docs-catalog`: OK, 302 docs cataloged (not in plan §7's
+  list, run per this task's own gate checklist).
+- `npm run build`: not run this session (orchestrator's responsibility).
+
+Mutation check (invariant 5, `requestEnvelope` keying success on HTTP status
+only): temporarily computed `ok` as `data.ok ?? response.ok`; exactly one
+test failed — `requestEnvelope › success keys on HTTP status only: body-level
+{ok:false}/{success:false} is never interpreted`; reverted immediately and
+the suite re-ran green (47/47).
+
+### Round 1 review corrections — Gate G (full), run by the orchestrator at `1c0cc671`
+
+[ASSUMED — as instructed for this section; not independently re-run by the
+Stage 0 corrections pass, which ran its own narrower gate subset (see
+Verification log below) against the working tree after `1c0cc671`.]
+
+Every `check:*` gate and its self-test, run sequentially: all green, with one
+fact-consistency false positive on plan wording (a count that pattern-matched
+the api-route fact gate), reworded in `1c0cc671`. `npm test`: 985 suites /
+14533 tests, green. `npm run lint`: 0 errors. `npm run check:types`: clean.
+`npm run build`: compiled successfully, with 2 pre-existing Turbopack
+warnings on `/auth/error` (not introduced by this work).
+
+### Stage 0 acceptance — 2026-09-20, orchestrator (Fable), at `e65b03a0`
+
+Fresh Opus review of `d169fd63`+`0775005c`: READY WITH NAMED CHANGES (all 8
+invariants present with line citations; every T0 row mapped to a test; late-
+binding and mutation tests shown discriminating; census reproduces §2.1; named
+changes were Stage 1 bookkeeping, census deltas, and T0 pins). One Sonnet
+correction round (`e65b03a0`) applied them; the orchestrator applied the plan-
+side corrections (`fdbee75a`) and spot-checked `sendJson` callers (8, incl.
+`reorderSessionSlots` at :38) and the empty-string message rule.
+
+Full Gate G run by the orchestrator at `e65b03a0` [VERIFIED via this run]:
+every defined `check:*` gate and its self-test sequentially, 0 red;
+`npm test`: 985 suites / 14548 tests green; `npm run lint`: 0 errors, 13
+pre-existing warnings; `npm run check:types`: clean; `npm run build`:
+compiled successfully.
+
+Verdict: **Stage 0 ACCEPTED.** Helper landed with zero callers; census
+tracked; execution map corrected. Rollback: revert `e65b03a0`, `0775005c`,
+`d169fd63` (docs/scripts/tests plus one uncalled module; no runtime effect).
+
+Owner decisions outstanding before later stages: (1) D1 posture, (2) Stage 4
+timing, (4) 5b rehearsal, (5) Stage 4 data mode, (6)
+`pages/profile-settings.js` placement. D3 accepted 2026-09-20.
+
+## Stage 1 — fold adapters
+
+Implemented 2026-09-20. Four adapters reimplemented over
+`readJsonBody(response, { tolerantBody: true })`; no call site edited; no
+export/signature/message-string change; thrown values stay plain `Error`.
+
+| Adapter | File | Before | After |
+|---|---|---|---|
+| `readResponse` | `shared/components/review-panel/review-panel-ui.js:64-68` (was :62-66; +2 for the added import and blank line) | `const body = await response.json().catch(() => ({}));` | `const body = await readJsonBody(response, { tolerantBody: true });` |
+| `readResponse` (local copy) | `pages/cycle-dossier.js:73-77` (was :72-75; +1 line for the added import elsewhere in the file, no adapter body change) | `const body = await response.json().catch(() => ({}));` | `const body = await readJsonBody(response, { tolerantBody: true });` |
+| `readJson` | `shared/components/meeting-tracker/SessionEditor.js:23-25` (was :22-24; +1 line for the added import elsewhere in the file) | `return response.json().catch(() => ({}));` | `return readJsonBody(response, { tolerantBody: true });` |
+| `sendJson` | `shared/components/meeting-tracker/SessionEditor.js:27-36` (was :26-35; +1 line, same shift) | unchanged — still calls the file-local `readJson`, which now folds over `readJsonBody` | unchanged expression; behavior folds through `readJson`'s new body |
+
+`pages/cycle-dossier.js`'s local `readResponse` and `SessionEditor.js`'s
+`readJson`/`sendJson` gained `export` (additive only, no signature/behavior
+change) so `tests/unit/client-request-stage1-adapters.test.js` (T1) can
+import them directly, matching each file's existing convention of exporting
+its other pure helpers (e.g. `groupedCandidates`, `reorderSessionSlots`).
+
+**17 raw sites confirmed** (line numbers are pre-edit, Stage 0 census; each is +1 in the migrated files after the added import) [VERIFIED via grep against each file, this
+session]:
+- `shared/components/review-panel/review-panel-ui.js` `readResponse` (6
+  sites): `pages/review-panel.js:44,89,111` (the pair at :110-111 is
+  `readResponse(response)` called at :111 on the previous line's `response`)
+  and `shared/components/workbench/ReviewPanelTab.js:251,279,289`.
+- `pages/cycle-dossier.js` local `readResponse` (7 sites): :266, :335, :350,
+  :398, :427, :459, :481.
+- `shared/components/meeting-tracker/SessionEditor.js` `readJson`/`sendJson`
+  (4 raw-fetch sites): :305 (`fetch` feeding `readJson` at :306), :321 (two
+  `fetch(` calls on one line), :322 (`fetch` feeding `readJson` at :324, via
+  `responses.map(readJson)`). `sendJson` itself has 8 callers
+  (`reorderSessionSlots` at :38, plus :380/:381/:385/:426/:514/:515/:516)
+  and contributes no additional raw `fetch(` census site (its request goes
+  through `fetchImpl`).
+
+Total: 6 + 7 + 4 = **17**, matching the plan (§2.4) and the Stage 0
+source-to-stage map above.
+
+**T1** (`tests/unit/client-request-stage1-adapters.test.js`): 30 tests —
+message-text pins for `{error}`, `{message}`-only (falls to fallback),
+nested `{error:{message}}` (`[object Object]`), `{error:5}` (`"5"`), a
+non-2xx body whose `json()` rejects (empty/non-JSON, falls to fallback), 2xx
+return-as-is, thrown `.name === 'Error'`, `sendJson`'s `fetchImpl`/headers/body
+assertions, and a static grep-based assertion that none of the four consumer
+files (`pages/review-panel.js`, `shared/components/workbench/ReviewPanelTab.js`,
+`pages/cycle-dossier.js`, `shared/components/meeting-tracker/SessionEditor.js`)
+contains `signal` or `AbortController` — confirmed 0 hits in this session, so
+invariant 4's abort rethrow is unobservable here. Ran green against the
+UNMIGRATED adapters first (30/30), committed at `45907489`; ran again
+UNCHANGED after migration (30/30, same test file, no edits). Existing tests
+matching `tests/unit/.*(cycle-dossier|review-panel|session-editor|meeting-tracker)`
+(no file matches `session-editor` by that exact name; the pattern is kept
+for the plan's stated command shape): 671/671 passed, both before and after
+migration.
+
+**Gate G**, run sequentially before the code commit `a38b085f` (this section
+was written and gate output captured immediately beforehand, against the
+same working tree that commit records): `npm test -- --runInBand --silent`:
+986 suites / 14578 tests green; `npm run lint`: 0 errors (114 pre-existing
+warnings, none newly introduced); `npm run check:types`: clean;
+`check:status-enum-parity` + self-test: OK (8 invariants, 17/17 self-test);
+`check:api-routes` + self-test: OK (224 routes); `check:doc-symbol-refs` +
+self-test: OK (295 docs / 1756 refs); `check:build-claim-freshness` +
+self-test: OK (295 docs / 1607 refs) — updated `shared/utils/api-request.js`'s
+header comment, which said "Zero callers until Stage 1", to reflect that
+Stage 1 now has callers; `check:doc-currency` + self-test: OK; `check:secret-scan`
++ self-test: OK (3904 files); `check:scaffolding-tokens` + self-test: OK
+(3888 files); `npm run build`: compiled successfully.
+
+Fresh review (Opus, no inherited context, at `c3a84a41`): **READY WITH NAMED
+CHANGES, doc-only.** Per-adapter thrown expressions byte-identical and plain
+`Error`; no consumer line changed (exports landed in the T1 commit `45907489`,
+additive; `pages/cycle-dossier.js` already had 7 named exports and the repo has
+precedent for tests importing page-module exports); T1's five message pins
+shown discriminating against a `deriveErrorMessage` swap; two introduced
+semantic differences, both unobservable here (abort-during-body rethrow: 0
+`signal`/`AbortController` hits in the four consumer files; the helper's
+try/await also tolerates a synchronous `json()` throw, which a real Response
+never does). Named changes applied by the orchestrator: this row's line shift,
+T1 header refs, census pre-edit label, `\bsignal\b` tripwire. Reviewer's
+scope note recorded: Stage 1 adds a seam and removes no duplication; the
+slimming payoff is in Stages 2-6.
+
+**Stage 1 ACCEPTED 2026-09-20 by the orchestrator (Fable).** Rollback: revert
+`c3a84a41`, `a38b085f`, `45907489` (tests, adapters, log; consumers untouched).
+
+## Verification log
+
+Commands actually run by the Stage 0 implementer (subset of Gate G; full Gate
+G above is the orchestrator's responsibility per the plan):
+
+- `node scripts/census-client-fetch-sites.js --out <scratch-dir>` — totals
+  reproduced §2.1 exactly (see Census baseline above).
+- `npx jest tests/unit/api-request.test.js` — see this session's report for
+  the pass count.
+- `npm test -- --silent 2>&1 | grep -E '^(Tests|Test Suites):'` — see this
+  session's report for the full-suite summary line.
+- `npm run lint`, `npm run check:types`, `npm run check:doc-symbol-refs`,
+  `npm run check:doc-currency`, `npm run check:docs-catalog`,
+  `npm run check:secret-scan`, `npm run check:scaffolding-tokens` — see this
+  session's report.
+- Mutation check on `requestEnvelope` (`ok` computed from `data.ok ?? response.ok`
+  instead of `response.ok` alone): the test file was run, restored, and
+  re-run green — failing test names recorded in this session's report, not
+  duplicated here to avoid drift between two copies of the same fact.
+
+### Round 1 review corrections (2026-09-20)
+
+- Read `shared/utils/api-request.js` in full to verify `deriveErrorMessage`
+  (:73-84), the `requestEnvelope` "never null" docblock line (:180), and
+  `isPlainObjectBody` (:98-104) before editing any of them.
+- `npx jest tests/unit/api-request.test.js`: 62 passed, 62 total (up from
+  47; 15 new tests for the invariant-8 import pin, `requestJson` signal
+  forwarding, 2xx `null`/array/primitive bodies on both `requestJson` and
+  `requestEnvelope`, the `deriveErrorMessage` empty-string/non-string-message
+  edge cases, and Blob/string/URLSearchParams body passthrough).
+- `npm test -- --silent`: 985 suites / 14548 tests, green.
+- `npm run lint`: 0 errors (removed two `eslint-disable` comments this round
+  added that triggered "unused directive" warnings; re-ran to confirm 0
+  problems in the touched test file).
+- `npm run check:doc-symbol-refs`: OK, 295 docs / 1756 refs.
+- `npm run check:doc-currency`: OK, no drift markers.
+- `npm run check:fact-consistency`: OK.
+- `npm run check:scaffolding-tokens`: OK, 3886 files scanned.
+- Read `scripts/census-client-fetch-sites.js` in full before editing the
+  fetch-occurrence scanner (:148-165), the piped-wrapper match (:315-321),
+  and the campaign-critical keyword list (:63).
+- Verified `shared/components/meeting-tracker/SessionEditor.js:321` has two
+  `fetch(` calls on one line (read source directly) — the scanner's prior
+  non-global match undercounted this by one site.
+- Re-ran the census script against a scratch dir
+  (`.../scratchpad/census-r1`): 309 total sites (up from 308), `readResponse`
+  wrapper resolved to 6 (`pages/review-panel.js` :44, :89, :110-111;
+  `shared/components/workbench/ReviewPanelTab.js` :251, :279, :289) plus
+  cycle-dossier's local copy at 7 sites, `campaign_critical` 71 sites / 31
+  files with `email` added (`pages/test-email.js:26` now flags true).
+- Diffed the re-run's `summary.json` against a checkout of the pre-round-1
+  script (`git stash` / re-run / `git stash pop`) to derive each delta in
+  the Census baseline table above from an actual before/after comparison,
+  not by assumption.
+- Read `shared/components/reviewers/ReviewerManagePanel.js:735-782` to
+  confirm the `status_branch` `200: 1` at :743 is a real
+  `response.status === 200` branch at line 779 inside the site's window, not
+  a false positive.
+- Read `pages/profile-settings.js:60-150` (relevant slice) to confirm the
+  `campaign_critical` flag on that file fires on `invite` via
+  `/api/email-defaults/grantee-invite` (:147), not on `send`.
+- Read `shared/components/meeting-tracker/SessionEditor.js:1-40` and grepped
+  all `sendJson(` call sites in the file: found 8 callers, not 7 — the plan
+  round's brief omitted `reorderSessionSlots` at :38. Corrected in the Stage
+  1 table above.
+- Committed: `fix(client-request): stage 0 review corrections (census
+  one-per-occurrence, message rule edge cases, execution log facts)`.
+
+## Stage 2 — covered high-count files
+
+Two disjoint groups built concurrently by Sonnet; tests committed before code
+per file and run unchanged after migration; the orchestrator fills this log.
+
+### Group B (logged 2026-09-20; fresh review pending with group A)
+
+**B1 `shared/components/workbench/StaffDeliberationsTab.js` — 8/8 sites → `requestEnvelope`, `tolerantBody: true`.**
+Every site keeps its own `data.error || "<verb> failed (${status})"` derivation
+because the fallback embeds the live status, which a static `fallbackMessage`
+cannot reproduce; `submitReopen`/`submitBriefReopen` keep their `status === 202`
+branches; `pollForArtifact`'s retry loop stays outside the helper; the file's
+synthesized `AbortError`s and `err?.name !== 'AbortError'` branches untouched.
+Tests `tests/unit/staff-deliberations-tab.test.js` 60 → 69 (9 T2 cases incl. an
+aborted mid-poll case). Commits `6607ba1f` (tests), `231842a9` (migration).
+
+**B2 `pages/expertise-finder.js` — 8/8 sites → `requestEnvelope`, strict body.**
+Sites throw `data.error || "HTTP ${status}"` or bare `throw new Error(data.error)`
+(no fallback; a missing `error` field still yields the message `"undefined"`,
+preserved). `runBatch` stores ok/!ok into per-proposal state without throwing;
+`fetchHistory` acts only on the truthy `ok` branch. Fixture `beforeEach` gained
+`status: 200`. Tests `tests/unit/expertise-finder-batch-cycle.test.js` 1 → 22.
+Commits `6ae896d2` (tests), `8785a9bf` (migration).
+
+**B3 verify-only:** `pages/cycle-dossier.js` (7), `pages/review-panel.js` (3;
+one is the two-statement `const response = await fetch(...); return
+readResponse(response)`), `ReviewPanelTab.js` (3): every site passes through
+the Stage 1 `readResponse` adapter; no raw unwrapped site. No edits.
+
+Group B gates at `8785a9bf`: `npm test` 986 suites / 14639 tests green; lint 0
+errors; `check:types` clean.
+
+**Observations for the plan (not defects in this stage):**
+- O1. Sixteen of sixteen group B sites chose `requestEnvelope` because their
+  fallback message embeds `response.status`. A `fallbackMessage` that accepts
+  a function `(status) => string` would let `requestJson` serve them and remove
+  the per-site derivation. Candidate helper enhancement; owner call, since it
+  widens the closed option contract.
+- O2. Pre-existing, user-facing: `shared/components/ErrorAlert.js:45` reads the
+  prop `error`, but six call sites pass `message=` (`pages/expertise-finder.js:250,388,851`,
+  `pages/dataverse-bulk-export.js:471`, `pages/virtual-review-panel.js:1296`,
+  `pages/phase-i-dynamics.js:152`), so those error banners render blank
+  [VERIFIED via grep]. Recorded as D9 in the D1 follow-up doc; not fixed here.
+
+### Group A (logged 2026-09-20; fresh review pending)
+
+**A1 `shared/components/workbench/AwardeeTab.js` — 14 sites: 13 migrated, 1 excluded.**
+`requestJson`: :238 email-defaults GET (tolerant), :263 recipients GET (strict),
+:276 vip-flags GET (tolerant), :322 abstract GET (strict), :381 abstract GET
+conflict re-read (tolerant), :458 generate POST (strict; fallback 'Abstract
+generation failed.'; catch branches `instanceof ApiRequestError`), :481 abstract
+PUT (tolerant; fallback 'Could not save the abstract.'; catch reads
+`err.payload?.code === 'stale'`), :583 preview-invite POST, :613 website-html GET
+(both tolerant, `instanceof` catch). `requestEnvelope`: :285 vip-flags PUT
+(reads `body.flagged` on 2xx), :543 send-invite POST (STRICT body so a
+malformed 2xx still yields the `uncertain` receipt, D8; branches on
+`outcome==='uncertain'` and `statusPersisted===false`), :662 upload-token POST
+(body-level `tokenData.ok` + 413), :705 replace-submission POST (413 + several
+`data.code` branches). Excluded: :645 replacement-upload-failure beacon stays raw
+`fetch` with the §2.6 allowlist comment. Tests `tests/unit/awardee-tab.test.js`
+94 → 115. Commits `fbde13a3` (tests), `ab64f35d` (migration).
+
+**A2 `shared/components/workbench/FinalWriteupTab.js` — 5/5 → `requestEnvelope`, `tolerantBody: true`.**
+All sites embed the status in their fallback or branch on status on success:
+`fetchStatus` :47 (attaches `.code` to the thrown Error), `fetchAcknowledgementState`
+:60 (503 + `schema_not_ready` → `{available:false}`), `start()` :302 (202 or
+`inProgress` → poll), `advance()` :353 (artifactId mismatch → "changed"),
+`markReviewed()` :399 (503 code check; finalArtifactId mismatch). Retry loop
+stays outside the helper. Tests `tests/unit/final-writeup-tab.test.js` 16 → 28
+(incl. the previously untested 202 poll branch). Commits `6bc90807`, `d5f7cb6c`.
+
+**A3 `shared/components/workbench/ConsultantFeedbackSection.js` — 8/8, `tolerantBody: true`.**
+`requestEnvelope` at :297 entries GET, :298 consultants GET (ternary on `.ok`),
+:444 upload-token POST (body-level `ok`), :484 PATCH, :534 POST, :576 DELETE
+(`data.reason==='attachment_removal_pending'`; status-embedded fallbacks);
+`requestJson` at :501 and :514 finalize POSTs (fallback 'The attachment could
+not be saved.'). No import from review-panel-ui.js (comment mention only). This
+file had zero failure-path coverage before; tests
+`tests/unit/consultant-feedback-section.test.js` 18 → 30. Commits `a3a44129`,
+`07470083`.
+
+Group A gates at `07470083`: `npm test` 986 suites / 14652 tests green; lint 0
+errors (three pre-existing `react-hooks` warnings on untouched effects);
+`check:types` clean.
+
+**Observation O3 (pre-existing, unchanged):** `ConsultantFeedbackSection`
+`handleDelete`'s `attachment_removal_pending` branch calls
+`setError('Attachment removed, delete again.')` then `await load()`, whose
+leading `setError(null)` wins the same batch, so that message never renders.
+Documented in the new test; candidate for the D1 follow-up family.
+
+**Stage 2 totals:** 42 sites migrated across 5 files (13+5+8+8+8), 1 excluded
+beacon, 3 verify-only files confirmed on the Stage 1 adapters. T2 tests added:
+75 (21+12+12+9+21). Form split: `requestJson` 11, `requestEnvelope` 31. Fresh
+review and full Gate G by the orchestrator: pending below.
+
+### Stage 2 acceptance — 2026-09-20, orchestrator (Fable), at `3472bcbc`
+
+Fresh Opus review of the ten Stage 2 commits (`4655b937..07470083`): READY WITH
+NAMED CHANGES. Tests-before-code order and one-source-file-per-migration-commit
+confirmed for all five files; request bytes, `signal` forwarding, status and
+body-flag branches, and the `saveAbstract` `stale` handling confirmed
+PRESERVED; only the allowlisted beacon remains raw. Material finding: because
+the helper parses every non-2xx body tolerantly, bare-`.json()` sites' "non-2xx
+with unparseable body" input moved from the catch block to the `!ok` branch,
+and at three sites those paths meant different things (send-invite `uncertain`
+→ `failed`; four expertise-finder roster sites → empty message hidden by the
+`{error && ...}` guard; `runBatch` → empty per-proposal cell). Three T2 gaps
+named (body-bytes assertion at send, the plain `failed` pin, fixtures lacking
+`status`).
+
+One Sonnet correction round (`7c77d39c` tests, `3472bcbc` fix): six new
+axis-(e) tests red before the fix and green after; send-invite maps
+`error.parseError` to `uncertain`; roster sites and `runBatch` use
+`data.error || error.message`; body-bytes and `failed`-branch pins and fixture
+statuses added. `handleMatch`/`loadProposals` already had a non-empty fallback
+and were left alone. The orchestrator read the 21-line fix diff in full against
+the finding and accepted it without a further fresh cycle. Plan amended
+(`597981bf`): T2 axis (e) and the never-silent / `parseError` rules for later
+stages.
+
+Full Gate G at `3472bcbc` [VERIFIED via this run]: every `check:*` gate and
+self-test 0 red; `npm test` 986 suites / 14662 tests green; lint 0 errors;
+`check:types` clean; `npm run build` compiled.
+
+Verdict: **Stage 2 ACCEPTED.** 42 sites migrated across 5 files; T2 tests
+added 85 (75 + 10 in the correction round). Rollback: revert `3472bcbc`,
+`7c77d39c`, then the five migration commits (`ab64f35d`, `d5f7cb6c`,
+`231842a9`, `8785a9bf`, `07470083`) and their test commits in reverse order.
+Stage 3 next.
+
+## Stage 3 — admin surface
+
+### Group A: `shared/components/admin/*` sections (logged 2026-09-20; fresh review pending with group B)
+
+29 sites across 11 files, all migrated; census count matched. Forms:
+`requestJson` at SiteVisitRecipientsSection (4), EmailDefaultsSection (2),
+FinalWriteupMatrixAudiencesSection (2), SiteVisitMaterialsDefaultsSection (2),
+MeetingTrackerDefaultsSection (2); `requestEnvelope` at
+DynamicsExplorerRestrictionsSection (3), OperationalEventsSection (3),
+ReviewQuestionsSection (3), PoliciesSection (2), ReviewerRepairAlertDetails (1),
+PromptTemplatesSection (5). The 403 messages are pinned verbatim by test:
+'Admin access required' at `PoliciesSection.js:77`, `ReviewQuestionsSection.js:101`,
+`PromptTemplatesSection.js:98`; 'Admin access required for Executor budgets' at
+`PromptTemplatesSection.js:117`.
+
+D1-preserve sites (unguarded today; fixed later, not here):
+`DynamicsExplorerRestrictionsSection.js:14,25,38` → `requestEnvelope`, `data` used
+regardless of `ok`; the :38 DELETE never read a body and uses
+`tolerantBody: true` with the result ignored so a 2xx empty body adds no new
+rejection. `PoliciesSection.js:363` and `PromptTemplatesSection.js:741` (bare
+`.json()` parsed before any check) → `requestEnvelope` with
+`envelope.error?.parseError` rethrown, so a malformed non-2xx body still routes
+to the same catch a bare `.json()` reaches today. The same rethrow was applied
+at `PromptTemplatesSection.js:469` (executor-budgets PUT, guarded, but parsed
+before its status checks). Generalization of Stage 2 rule (ii); every case has
+a pre- and post-migration passing pin.
+
+Tests added 89 (three new test files: dynamics-explorer-restrictions-section,
+site-visit-materials-defaults-section, meeting-tracker-defaults-section; eight
+existing files extended). Three test files had their fetch-call matchers
+adjusted from "no method" to "no method or GET" because the helper always
+passes an explicit init (`{ method: 'GET' }`) where the raw code passed none;
+the server cannot distinguish these. No behavioral assertion weakened.
+
+Flagged, not fixed (narrow, pre-existing shape): `PromptTemplatesSection`
+`Promise.all` over prompts + models: if prompts returns 403 AND models returns a
+2xx malformed body simultaneously, the pre-image short-circuited to 'Admin
+access required'; post-migration the models parse may reject first. Not an
+axis case; recorded for the reviewer.
+
+Group A gates at `1fa9eb46`: `npm test` 993 suites / 14871 tests green (includes
+group B's interleaved commits); lint 0 errors; `check:types` clean. Commits
+(test → refactor per file): 61448af3→08d934eb, d0db6515→01d7c73a,
+f13f9e82→623fa25e, 3b7646ad→1f96a97a, daadfbfb→e1ca3c19, bbb6fdf3→57c821a0,
+0566951e→4f1c2275, b7e07d6e→b6d27985, a87fe90b→e22a8dad, cd114413→3a459d54,
+cd245a8d→1fa9eb46.
+
+### Group B: `pages/admin.js` (logged 2026-09-20; fresh review pending)
+
+Seam commit `ef605f78`: named `export` added to `OperationsWorkspace`,
+`WorkflowsWorkspace`, `AiWorkspace`, `PeopleWorkspace`; each mounts directly
+with `view` as a prop (none needs router or session; only `AdminDashboard`
+does), so no mocking. `admin-dynamics-feedback-filters.test.js` fixture gained
+`status: 200`; its `toHaveBeenNthCalledWith(1, url)` was loosened to read
+`fetch.mock.calls[0][0]` because the helper always passes a second init arg
+(URL asserted unchanged). Four new test files: admin-operations-workspace (36),
+admin-workflows-workspace (44), admin-ai-workspace (16), admin-people-workspace
+(23) = 119 tests, green before and after every migration commit.
+
+32 sites migrated, census matched; `grep -n "fetch(" pages/admin.js` is empty.
+Operations (11, `df98cc0a`): :212 health (D1 preserve), :323 health-history,
+:497/:509 alerts, :640 maintenance (signal), :763/:791 secrets, :2131/:2154
+feedback, :2479/:2569 alert-recipients (`.details`-join derivation verbatim).
+Workflows (8, `fd30c767`): Honorarium :2703/:2724, ReleaseAttachments
+:2796/:2814, CampaignTimeline :2877/:2919, TimeBudget :3054/:3076. AI (3,
+`4f66a3dd`): Usage :938 and ModelConfig :1249 (403 → 'Admin access required'
+verbatim), ModelConfig PUT loop :1335 (`requestJson`, tolerant, 'Failed to
+save'). People (10, `9d61cdb0` RoleManagement :1583 D1 / :1602 D1 / :1619 /
+:1642; `4c33c8d5` AppAccess :1788 / :1888 / :1896 / :1953; `6615ef08`
+DynamicsIdentity :2349 / :2365). All `requestEnvelope` except the PUT loop.
+
+Parse-error idiom: at ~13 sites whose pre-image parsed with bare `.json()`
+before or without an `ok` check, `if (envelope.error?.parseError) throw
+envelope.error.parseError;` reproduces today's native parse-error text on a
+malformed non-2xx body. Deliberately NOT applied at AppAccess grant :1888 and
+revoke :1896, which now show 'Grant failed' / 'Revoke failed' on a 502 HTML
+body instead of the raw parse-error text (D3-permitted; flagged for review).
+
+Group B gates at `6615ef08`: `npm test` 993 suites / 14871 tests green; lint 0
+errors; `check:types` clean; `npm run build` compiled with the new page exports.
+
+**Observation O4 (for the owner).** Across Stage 3 both groups reproduced
+today's native `SyntaxError` text at ~16 sites via the parse-error rethrow,
+which is more conservative than accepted decision D3 permits and adds a line
+per site. Options: (a) keep as is; (b) in the D1 follow-up, drop the rethrow
+where the site's fallback message is acceptable (recommended: the raw parse
+text is never useful to a user); (c) add a helper option so the choice is one
+flag, not a hand-written line. No change made in Stage 3.
+
+### Stage 3 fresh review (Opus, no inherited context, at `d5340f7e`) — READY WITH NAMED CHANGES
+
+Confirmed: tests-before-code order for all 12 files (four group-A refactor
+commits also carried a GET-shape matcher edit, call-shape only); the seam
+commit `ef605f78` is exactly four `export` keywords, four test files, and one
+fixture `status`; 20 sampled sites PRESERVED incl. all 8 D1-preserve sites
+(no guard added), the four 403 messages verbatim, the `.details` join at
+`pages/admin.js:2577-2584`, `signal` at `ReviewerRepairAlertDetails.js:57` and
+`pages/admin.js:645`; request bytes unchanged; 255 admin tests green; wrong-form
+mutations caught at PromptTemplates :469 and AlertRecipients :2577.
+
+Named changes and dispositions:
+1. Four `pages/admin.js` sites show the fallback text instead of the raw parse
+   text on a non-2xx unparseable body: ModelConfig PUT :1339 ('Failed to
+   save'), Role assign :1629 ('Failed to assign role'), AppAccess grant :1895
+   ('Grant failed'), revoke :1903 ('Revoke failed'). All user-visible, never
+   silent. **Disposition: keep. This is exactly owner decision D3.** The
+   reviewer's own premise challenge reaches the same conclusion. (e) pins added
+   at all four in the correction round recording the D3 text. The
+   intra-component inconsistency with Role DELETE :1649 (which rethrows the
+   parse error) is documented here and resolved globally by O4, not by adding
+   more rethrows now.
+2. `shared/components/admin/AdminOverviewSection.js:29` was a census row but not
+   in the plan's Stage 3 table (the "61 sites" exit count omitted it), so the
+   admin grep was not empty. **Disposition: migrate now** (correction round);
+   plan §4/§6 corrected to 62 sites.
+3. Discrimination gaps: (d) pins at `PromptTemplatesSection.js:469` and
+   `pages/admin.js:2577`, a 2xx-empty pin at `ReviewQuestionsSection.js:202`,
+   an (e) pin for AlertRecipients load :2486. **Disposition: added** in the
+   correction round with mutation evidence.
+4. `PromptTemplatesSection` `Promise.all` prompts/models race (403 on one +
+   malformed 2xx on the other): pre-existing shape confirmed; **accepted narrow
+   deviation, no fix** (both outcomes are error states; the obvious fix would
+   perturb the pinned single-endpoint case).
+
+### Stage 3 acceptance — 2026-09-20, orchestrator (Fable), at `a1aaec80`
+
+Correction round (`513d5025` tests, `a0066729` migration of
+`AdminOverviewSection.js:29` → `requestJson` tolerant with the site's own
+fallback; `a1aaec80` pins): D3 axis-(e) pins at the four `pages/admin.js`
+fallback sites; (d) pins at `PromptTemplatesSection.js:469` and the
+AlertRecipients PUT; 2xx-empty pin at `ReviewQuestionsSection.js:202`; (e) pin
+for AlertRecipients load. Each new discriminating pin was shown red under its
+mutation (flip `tolerantBody`, drop the rethrow) and green restored. The admin
+grep for raw `fetch(` is empty. The orchestrator read the AdminOverviewSection
+diff in full; accepted without a further fresh cycle.
+
+Full Gate G at `a1aaec80` [VERIFIED via this run]: every `check:*` gate and
+self-test 0 red; `npm test` 993 suites / 14885 tests green; lint 0 errors;
+`check:types` clean; `npm run build` compiled.
+
+Verdict: **Stage 3 ACCEPTED.** 62 admin sites migrated (30 sections + 32
+page); 4 workspace seams exported; tests added 215 (89 + 119 + 7). Stage 4
+(Tier 2) and the D1 trailing lane (admin batch) start next.
+
+## Stage 4 — reviewer engagement surface (Tier 2)
+
+### Group B: tabs, stores, search hooks (logged 2026-09-20; fresh review pending with group A)
+
+12 files, 37 sites migrated; 5 SSE sites confirmed by reading (response passed
+to `readSseStream`) and left raw with the §2.6 allowlist comment:
+`useReviewerPromotion.js` enrich-contacts (:62), `useReviewerDiscovery.js`
+analyze/discover/enrich-contacts (:76/:120/:191), `useApplicantReviewerEnrichment.js`
+enrich-recommended (:48).
+
+| File | Sites | Form | Tests added | Notes |
+|---|---|---|---|---|
+| `ReviewersTab.js` | 5 | envelope, tolerant | 9 (`reviewers-tab-t4-matrix.test.js`) | 409 + `data.lookup` and 200 + `{success:false}` pinned |
+| `ReviewerFindPanel.js` | 5 | envelope, tolerant | 6 | :281 orcid-lookup D1-preserved |
+| `CandidateEditModal.js` | 3 | envelope, tolerant | 4 | save PATCH now parses a body it never read; `{}` on malformed, unused on success |
+| `CampaignConfigModal.js` | 3 | envelope, tolerant | 6 | defaults GET best-effort swallow preserved |
+| `email-template-store.js` | 3 | envelope, tolerant | 8 | :109 best-effort preserved |
+| `prompt-override-store.js` | 3 | json strict (load/delete), envelope (save) | 10 | bare-`.json()` sites keep native parse rejection |
+| `search/useReviewerContactActions.js` | 8 | envelope, tolerant | 10 (new harness) | 409 + `{success:false, code, promotionAuthority}`, 200 + `{success:false}`, partial-success apply-before-throw pinned |
+| `search/useReviewerRosterActions.js` | 4 | json tolerant (exclude ×2, body discarded), envelope (promote, removePrevious) | 9 (new harness) | 409 `data.code` allowlist and `{success:false}` rollback pinned |
+| `search/useReviewerPromotion.js` | 3 of 4 | envelope, tolerant | 2 | :188 save-candidates D1-preserved |
+| `search/useReviewerDiscovery.js` | 1 of 4 | json, tolerant | 3 | roster-persist POST only |
+| `search/useApplicantReviewerEnrichment.js` | 0 of 1 | — | 0 | SSE, comment only |
+| `search/useReviewerRoster.js` | 1 | envelope, tolerant | 1 | |
+
+Parse-error policy: every migrated site was already `.json().catch(() => ({}))`
+pre-migration, so `tolerantBody: true` is identical on both 2xx and non-2xx;
+no axis-(e) change in this group. Two call-shape-only matcher fixes
+(`campaign-config-modal.test.js`, `reviewer-search-context-lifecycle.test.js`)
+for the explicit GET init, same precedent as Stage 3. Body assertion at
+`confirmIdentityContact` uses `toMatchObject` because `pruneCandidateForRoster`
+expands the candidate (pre-existing normalizer).
+
+Gates at `b917cc550`: `npm test` 1006 suites / 15043 tests green; lint 0
+errors; `check:types` clean; `check:reviewer-engagement-boundary` + self-test
+pass. Commits (test/refactor): 65fd3b4a/83a74502, a9eeb5de8/55c3cf166,
+7030631ce/81dd31ec9, 246b8e792/dfd7719b7, e4cf8a08b/811cb2a26,
+dba965df3/55a64325b, 9cbfdd367/1ba67d6da, d5671d940/959abd521,
+b5dd79218/b18cb2981, 5de279a62/a8b072848, 5d7c3bd79 (SSE comments),
+3bbc98282/86477449b, b917cc550 (test fix).
+
+### Group A: modals and panels (logged 2026-09-20; fresh review pending)
+
+11 files, 27 JSON sites migrated (all `requestEnvelope`, `tolerantBody: true`,
+except `ReviewerInvitePanel.js:249` VIP GET → `requestJson` strict, matching its
+bare `.json()`, and `ReviewerManagePanel.js:~743` updateStatus PATCH, see below).
+Allowlisted raw sites with the §2.6 comment: `InviteEmailModal.js` send-emails
+(SSE via `reviewers/sse.js`), `ReviewerInvitePanel.js:357` (blob export),
+`ReleaseMaterialsModal.js` send-emails (SSE `getReader`). D1-preserve:
+`InviteEmailModal.js:292` invite-timing GET untouched; :706 sticky save kept
+best-effort.
+
+One-site files (AcceptedReviewerReleaseModal preview POST, ReviewerCloseoutModal
+close-review, ReviewReminderAction send-review-reminder, ReviewerDueDateEditor
+review-due-extension): status-interpolated fallbacks kept via `envelope.status`.
+RespondReminderModal (preview, send; `send_unconfirmed` → `uncertain` and catch
+→ `uncertain` preserved), RemoveEntirelyModal (preflight GET, DELETE),
+ReleaseEmailModal (render-withdraw-emails, withdraw-sufficient), ReleaseMaterialsModal
+(4), ReviewerInvitePanel (VIP PUT/DELETE/PATCH tolerant), InviteEmailModal (7
+tolerant), ReviewerManagePanel (regenerate/revoke-token, my-candidates DELETE,
+reviewers PATCH, 2× terminal-transition). [RECHECKED after lib/services/reviewer-engagement/terminal-transition.js change: the release-copy follow-up (`250e7b9c0`) changed only the service's `write_failed` row shape (adds `failure`, drops the raw `error` text); the client POST sites, their request bytes, and the pins named below are unchanged]
+
+`ReviewerManagePanel.js` updateStatus PATCH: pre-image was a bare `.json()`
+whose own catch shows "Invalid response from the server (HTTP {status})." for a
+malformed body at ANY status, reading `response.status` inside the catch.
+Reproduced with a function-form `tolerantBody: () => MALFORMED_BODY` sentinel
+(keeps `envelope.status` on a malformed 2xx) plus rule (ii) mapping of
+`envelope.error?.parseError` for the non-2xx case. The axis-(e) T4 test caught
+the missing non-2xx half in the first draft.
+
+Tests added ≈112: extensions to the existing modal/action tests
+(reviewer-action-lifetimes, reviewer-status-mutation-characterization,
+reviewer-invite-panel-vip-toggle, reviewer-manage-proposal-attachment, and the
+one-site files' tests); new `reviewer-invite-panel-remove-restore.test.js` and
+`invite-email-modal-t4-matrix.test.js` (markManualInviteSent,
+requestAddressRepair, handleSaveAbstract had no coverage). Two first-draft
+pins were corrected against source before commit (malformed 2xx VIP PUT and
+render-emails bodies are NOT error states: those sites read the body only on
+`!ok`).
+
+Process notes: a shared-index race let group B's `a9eeb5de` sweep four of
+group A's staged test files into its commit (content correct; attribution off;
+history not rewritten). The orchestrator's stash misfire (see the memory note)
+briefly blocked a commit with an unrelated conflict; cleaned up.
+
+Gates at `6ac0e51c`: `npm test` 1007 suites / 15070 tests green; lint 0
+errors; `check:types` clean; `check:reviewer-engagement-boundary` + self-test
+pass; `npm run build` compiled. Commits: a9eeb5de (shared), 435ba78a, 0a6d65d2,
+ab29913c, d11647ae, 856a135e, fe293a62, 3aa7b84b, f878d44d, 6ac0e51c.
+
+**Stage 4 totals:** 64 JSON sites migrated across 23 files; 8 SSE/blob sites
+allowlisted; 4 D1-preserve sites carried; T4 tests added ≈180. Fresh review,
+full Gate G, and the Tier 2 preview rehearsal (owner authorized the branch push
+2026-09-20) pending below.
+
+### Stage 4 fresh review (Opus, no inherited context, at `6ac0e51c6`) — READY WITH NAMED CHANGES
+
+No behavior change found at any migrated site. Confirmed: request bytes
+PRESERVED at every non-GET invite/reminder/release/closeout/send site (group B
+kept literal `JSON.stringify` + headers; group A's object bodies stringify in
+the same key order with the same `Content-Type` casing); receipt semantics
+PRESERVED (RespondReminderModal `send_unconfirmed` → `uncertain`, catch →
+`uncertain`; ReviewReminderAction; InviteEmailModal markManualInviteSent and
+requestAddressRepair; ReviewerManagePanel updateStatus sentinel + `parseError`
+mapping both halves correct); body-level `.success`/`data.code`/`data.lookup`
+branches intact with 200 and 409 fixtures; the a9eeb5de sweep held tests only.
+
+Named changes (hygiene, blocking before merge), applied in the correction round:
+1. `InviteEmailModal.js:293` invite-timing GET was left raw instead of migrated
+   ungated (the D1-preserve rule is migrate-without-guard, as
+   `email-template-store.js:109` was). Migrated.
+2. Five group-B §2.6 annotations used a bare `// raw fetch:` form that the
+   Stage 6 ratchet will not exempt; normalized to
+   `// eslint-disable-next-line no-restricted-syntax -- <reason>`.
+3. `useReviewerExport.js:58` blob site had no annotation; added.
+4. `ReviewerManagePanel.releaseReviewer` terminal-transition POST had no
+   request-bytes pin; added. The withdraw-sufficient body assertion upgraded to
+   exact bytes (Tier 2 release write). Other order-insensitive body assertions
+   left as is (non-blocking).
+
+Process deviations recorded: four Stage 4 commits combined tests and refactor
+(fe293a624, 3aa7b84b3, f878d44d3, 6ac0e51c6), so the "green against unmigrated
+code" run is unrecorded for those files though the implementer reports doing
+it; 435ba78ad migrated four one-site files in one commit. Three refactor commits
+carry call-shape-only test matcher edits (explicit GET init), same precedent as
+Stage 3.
+
+Premise challenge accepted as a follow-up, not a Stage 4 change: on the send
+routes a malformed/unparseable 2xx most likely means the email DID go out, yet
+`RespondReminderModal.js:122`, `ReviewReminderAction.js:114`, and
+`ReviewerDueDateEditor.js:129` render `failed` and invite a resend. Faithfully
+preserved here; recorded as D10 in the D1 follow-up doc.
+
+### Stage 4 acceptance (code) — 2026-09-20, orchestrator (Fable), at `d82f24df4`; Tier 2 rehearsal pending
+
+Correction round (`c6b47178f`/`4e7238bd8` invite-timing GET migrated ungated;
+`7d0abb13d` annotations normalized to the eslint-disable form, `useReviewerExport.js:58`
+annotated; `d82f24df4` exact request-bytes pins for the terminal-transition
+release POST and withdraw-sufficient). All nine remaining raw `fetch(` sites in
+`shared/components/reviewers/**` carry the ratchet-compatible annotation
+[VERIFIED by the implementer's grep]. Transient: those annotations register as
+"unused eslint-disable directive" warnings until Stage 6 wires the rule (lint
+0 errors, 123 warnings vs 114 baseline; returns to baseline at Stage 6).
+
+Full Gate G at `d82f24df4` [VERIFIED via this run]: every `check:*` gate and
+self-test 0 red; `npm test` 1007 suites / 15077 tests green; lint 0 errors;
+`check:types` clean; `npm run build` compiled.
+
+Branch pushed to `origin/feature/client-request-layer` at `d82f24df4` for the
+Vercel preview (owner authorized 2026-09-20). **Tier 2 rehearsal (owner
+decision 2/4/5): the owner's click-through of invite preview, reminder
+preview, release, closeout, and due-date flows in the preview, Mode A
+(route-mocked data). Record the result here when done.** Code is accepted;
+Stage 4 closes when the rehearsal is recorded.
+
+Stage 4 totals: 65 JSON sites migrated across 23 files (64 + the invite-timing
+GET); 9 SSE/blob sites allowlisted; 3 D1-preserve sites carried to the D1 lane
+(ReviewerFindPanel :281, ReviewersTab :210, useReviewerPromotion :188) plus
+D10's three send sites. Stages 5a, 5b, and the D1 Stage-4 batch start next.
+
+### Stage 4 rehearsal setup — 2026-09-20 (owner-authorized preview)
+
+- Push: `origin/feature/client-request-layer` at `d82f24df4`; Vercel preview
+  `wmkfresearchapps-dpe11n60z` built Ready.
+- Entra rejected the immutable deployment host (AADSTS50011), as
+  `docs/AUTHENTICATION_SETUP.md` §1.5 predicts. Applied the documented method:
+  the registered stable alias `wmkfresearchapps-preview.vercel.app` (previously
+  unassigned; `vercel alias ls` showed no target, `vercel inspect` found none)
+  was pointed at the deployment.
+- The open queue item "Preview CSRF origin check rejects alias-hosted POSTs"
+  applies: `lib/utils/auth.js validateOrigin` derives the Preview origin from
+  `VERCEL_URL`. Applied the queue's documented workaround: branch-scoped Preview
+  env `NEXTAUTH_URL=https://wmkfresearchapps-preview.vercel.app` for
+  `feature/client-request-layer` (`vercel env add`, verified via `vercel env ls`),
+  then `vercel redeploy` → `wmkfresearchapps-gp0rk903t` (Ready), alias re-pointed
+  to it. First redirect from the alias is Vercel deployment protection
+  (`vercel.com/sso-api`), expected for previews.
+- NOT set by the orchestrator: `DATAVERSE_ALLOW_PROD_READS` for this branch's
+  previews (a production-data read decision the owner makes; prior smoke
+  branches set it branch-scoped). Without it the Reviewers roster will not load
+  from production Dataverse.
+- Owner authorized 2026-09-20 ("allow prod reads for this branch"):
+  branch-scoped Preview env `DATAVERSE_ALLOW_PROD_READS=yes` added (the literal
+  the interlock checks at `lib/dataverse/core/interlock.js:348`), redeployed →
+  `wmkfresearchapps-eclkwuj5b` (Ready), alias re-pointed to it. Production
+  WRITES from the preview remain denied by the target interlock.
+- Rollback of the setup: `vercel alias rm wmkfresearchapps-preview.vercel.app`
+  (returns the alias to unassigned), `vercel env rm NEXTAUTH_URL preview
+  feature/client-request-layer`, `vercel env rm DATAVERSE_ALLOW_PROD_READS
+  preview feature/client-request-layer`, and `vercel env rm
+  DELIBERATION_BRIEFING_SCHEMA_READY preview feature/client-request-layer`.
+  None touches production.
+- 5b briefing-page rehearsal (owner authorized 2026-09-20, "Enable the flag"):
+  `DELIBERATION_BRIEFING_SCHEMA_READY=on` added at preview scope for this
+  branch only (production has had it on; the shared Neon database already
+  holds `deliberation_briefing_links`). Branch pushed at `a41d37162`; the
+  git-integration build `wmkfresearchapps-6l5suly2f` is Ready and the stable
+  alias now points at it. Local `.env.local` lacks both this flag and
+  `EXTERNAL_LINK_SECRET`, so token pages are verifiable only on the preview.
+
+## Stage 5a — internal long tail (Tier 1)
+
+### Group 2: internal pages (logged 2026-09-20; fresh review pending with group 1)
+
+Census corrections found by reading: the nine Executor tool pages
+(batch-phase-i-summaries, batch-proposal-summaries, expense-reporter,
+funding-gap-analyzer, integrity-screener, literature-analyzer,
+multi-perspective-evaluator, peer-review-summarizer, phase-i-writeup) have ONE
+fetch each, consumed via `getReader()`; their `!response.ok` branch reads
+`response.json()` on that same Response, which the census had counted as a
+separate JSON site. Zero JSON sites migrated there; each stream site annotated
+(`735d1ebcb`). `pages/phase-ii-writeup.js` has 1 JSON site (:161 refine) plus 2
+whole-fetch streams (`/api/process`, `/api/qa`); the census "4 JSON" count and
+the plan's ":263 /api/qa" were a comment line and the stream, not JSON sites.
+
+Migrated: `pages/profile-settings.js:147` (requestJson tolerant; outer catch
+collapses all failures to `unavailable:true`); `pages/workbench/[requestId].js:127`
+(envelope, status-templated fallback verbatim); `pages/dynamics-explorer.js:153`
+roles GET (D1-preserve, envelope tolerant, unguarded as today) and :476 feedback
+POST (fire-and-forget shape preserved), :204 chat stream annotated;
+`pages/virtual-review-panel.js:1030` (D1-preserve, envelope tolerant), :1072
+stream annotated; `pages/phase-i-dynamics.js` :76 and :104 (envelope strict; D3
+fallback policy); `pages/dataverse-bulk-export.js` :208 and :328 (envelope;
+parseError-rethrow policy because every site parses before its ok check), :366
+stream annotated; `pages/grant-reporting.js` 4 sites (envelope; parseError-rethrow);
+`pages/phase-ii-writeup.js:161` (envelope; parseError-rethrow).
+
+Tests: new `virtual-review-panel`, `phase-i-dynamics`, `dataverse-bulk-export`,
+`grant-reporting`, `phase-ii-writeup` test files; extended
+`dynamics-explorer-terminal-state`, `workbench-request-page-context`,
+`profile-settings-email-signature`. All green against unmigrated code and
+unchanged after. Only annotated stream sites remain raw in the 17 files.
+
+Gates at the group's final commit: targeted 77/77; full suite 1020/1021 suites
+(one unrelated red in `workbench-request-number-lookup.test.js` against
+`RequestLocator.js`, a group 1 file mid-migration at that moment); eslint 0
+errors on the 17 files; `check:types` clean; `npm run build` compiled with all
+pages in the route manifest. Commits: `3cb3fa4a9`/`0c93e0467`
+(profile-settings), `59583bd59` (+ test) (workbench/[requestId]), `735d1ebcb`
+(Executor annotations), `d6bcd1e01`/`957abc387` (dynamics-explorer),
+`46ea7b093` (+ test) (virtual-review-panel), `76e294b88`/`e8a943037`
+(phase-i-dynamics), `ab91984c8`/`3a49e4d55` (dataverse-bulk-export),
+`ae082b079` (+ test) (grant-reporting), `56f225cb4` (+ test) (phase-ii-writeup).
+Process note: the group 2 implementer split its 12 remaining files across three
+parallel sub-agents it supervised; commits are per file as required.
+
+D3 split (Stage 5a review): `pages/phase-i-dynamics.js:77,104` took the
+**accept** branch — `throw new Error(envelope.data.error || \`Lookup failed
+(${envelope.status})\`)`, a static fallback with the status suffix restored
+by hand — while `pages/grant-reporting.js`, `pages/dataverse-bulk-export.js`,
+and `pages/phase-ii-writeup.js` took the **decline** branch — `if
+(envelope.error?.parseError) throw envelope.error.parseError;`, rethrowing
+the raw parse error and preserving old-code behavior exactly (`grant-
+reporting.js:148,183,223,257`; `dataverse-bulk-export.js:212,343`;
+`phase-ii-writeup.js:175`) [VERIFIED by reading all four files].
+
+### Group 1: shared components (logged 2026-09-20; fresh review pending with group 2)
+
+24 files, 52 JSON sites migrated; one raw site remains, the `ReviewsTab.js:320`
+export-reviews blob download (reads `Content-Disposition`), annotated per §2.6.
+One test-then-refactor commit pair per file (see `git log --oneline
+d82f24df4..1ce5587c9 | grep "Stage 5a"`). Implementer's gates at the group's
+final commit: full suite 1041 suites / 15347 tests green; lint 0 errors
+(transient unused-directive warning on the blob site until Stage 6);
+`check:types` clean; `grep fetch(` over the 24 files finds only the blob site.
+
+**Per-file tier determination (Stage 5a review, campaign_critical files).**
+The source-to-stage map marks 4 of this group's files `campaign_critical:
+true`: `ManualReviewEntryForm.js`, `PreSiteDistributionPanel.js`,
+`ReviewerFollowUpPanel.js`, `ReviewsTab.js`. They ran under Stage 5a's
+blanket Tier 1 heading; this pass checks each against the plan's own
+Tier 2 trigger (email send or durable reviewer-state write) by reading its
+endpoints, since the stage-level tier and the file-level risk are not the
+same thing.
+
+- `ManualReviewEntryForm.js` calls `GET /api/review-manager/manual-review-entry`
+  (load) and `POST /api/review-manager/manual-review-entry` (submit). The
+  route's own docblock: "POST commits the complete answer snapshot and
+  parent receipt atomically." No email send, but a durable reviewer-state
+  write. **Requires Tier 2** (preview rehearsal before merge) on the write
+  path.
+- `PreSiteDistributionPanel.js` calls `POST /api/workbench/pre-site-visit/distribution/prepare`,
+  `POST /api/workbench/pre-site-visit/briefing-link`, and
+  `POST /api/workbench/pre-site-visit/distribution/send`. The send route's
+  own docblock: "Send one previously confirmed frozen distribution preview
+  through Dynamics." **Requires Tier 2**: it sends email.
+- `ReviewsTab.js` calls `POST /api/review-manager/synthesize-reviews`,
+  `POST /api/review-manager/send-review-reminder`, and
+  `GET /api/review-manager/reviewers` (plus the allowlisted
+  `export-reviews` blob download). `send-review-reminder`'s own docblock:
+  "`action:'send'` accepts that complete reviewed copy" — sends the
+  reminder email. `synthesize-reviews` writes AI-synthesized review state.
+  **Requires Tier 2**: it sends email and writes durable state.
+- `ReviewerFollowUpPanel.js` calls `GET /api/workbench/dashboard` and
+  `GET /api/review-manager/reviewers` only — both reads, no email, no
+  write. **Tier 1 is sufficient** for this file.
+
+Net: 3 of the 4 campaign_critical files in this group (all but
+`ReviewerFollowUpPanel.js`) met the plan's own Tier 2 trigger and should
+have run under Tier 2 controls rather than Stage 5a's Tier 1 heading. This
+is a process finding for the owner to weigh, not a code change; no gate
+result above is affected, since Gate G ran regardless of tier at each
+group's final commit.
+
+| File | Sites | Form / policy |
+|---|---|---|
+| `ReviewsTab.js` | 4 (1 blob) | synthesize POST, send-reminder POST, reviewers GET → envelope tolerant; new test file (15) |
+| `PreSiteDistributionPanel.js` | 4 | requestJson/envelope tolerant; **rule (i)** (defined here, first use) — at a fallback-less throw, use `throw new Error(data.error || envelope.error.message)` instead of a static string, so a non-2xx body with no `error` field surfaces the helper's own `Request failed (<status>)` text rather than a hand-picked fallback; applied at reissue's fallback-less throw (`PreSiteDistributionPanel.js:610`, `body.error \|\| envelopeError.message`); gap file (8) |
+| `InitialAssessmentTab.js` | 4 | requestEnvelope tolerant; explicit `data.error \|\| \`… (${status})\`` throw (parity restored in the review round, `7d545f19`); gap file (4 → 17) |
+| `RequestListPanel.js` | 2 | dashboard GET kept **envelope** to preserve the pinned `Failed to load requests (403)`; triage POST requestJson |
+| `RequestLocator.js`, `ProposalTab.js`, `WorkbenchShell.js`, `FinalWriteupsViews.js` | 2/2/1/3 | requestEnvelope; explicit `data.error \|\| \`… (${status})\`` throw (parity restored in the review round, `722fe9ac`/`3d711b06`/`f067b882`/`cf0fcff1`); GET call-shape fixes in their tests |
+| `ManualReviewEntryForm.js` | 2 | envelope tolerant; new full matrix (9) |
+| `AwardeesPanel.js` | 2 | load bare `.json()` → envelope strict; cycle list requestJson tolerant |
+| `ArtifactVersionHistory.js` | 2 | envelope tolerant, 409 special case preserved |
+| `ReviewerFollowUpPanel.js`, `useSiteVisitContext.js`, `MeetingTrackerList.js` | 2/2/3 parallel GETs | envelope tolerant; per-site fallback text and silent best-effort picker preserved |
+| `CuratedRecipientPicker.js`, `InitialAssessmentsPanel.js`, `StaffDeliberationsPanel.js` | 1 each | requestJson tolerant |
+| `OverviewTab.js` | 1 | envelope tolerant (`body.success` + status combined) |
+| `SessionAgendaPanel.js` | 3 | requestJson/envelope tolerant; rule (i) at send |
+| `SiteVisitEditor.js` | 3 | local `readJson` folded to `readJson(url, options, fallback)` over `requestEnvelope`, thrown `.code`/`.status` shape kept |
+| `SiteVisitMaterialsCard.js` | 2 | envelope tolerant, GET 503 special case kept |
+| `RosterContactField.js` | 2 | bare `.json()` → requestJson strict, AbortError guard kept |
+| `ProfileLinkingDialog.js` | 3 | fetchProfiles envelope strict (throw ignores body, as today); both POSTs envelope tolerant — axis (e) now shows the fallback instead of leaking raw parse text (accepted D3) |
+| `Layout.js` | 1 | alerts summary GET envelope tolerant, D1-preserve fail-open |
+
+Deviations flagged by the implementer, all to be weighed in the fresh review:
+(1) shared-index race swept the `PreSiteDistributionPanel` pair into the
+other lane's commit `87289fb9c` (content verified, attribution off, history not
+rewritten, same class as the Stage 4 incident); (2) for several small/no-test
+files (PreSiteDistributionPanel, InitialAssessmentTab, ReviewerFollowUpPanel,
+ManualReviewEntryForm, others) the migration was written before the test and
+the test was **not** confirmed red against unmigrated code, though the test
+commit still precedes the code commit; red-before-green or a live mutation was
+confirmed for ReviewsTab, RequestListPanel, and the GET call-shape fixes; (3)
+status-suffix drops at five files (`InitialAssessmentTab.js`, `ProposalTab.js`,
+`RequestLocator.js`, `WorkbenchShell.js`, `FinalWriteupsViews.js`) — the
+migration's static `fallbackMessage` on `requestJson` dropped the interpolated
+`(${status})` five old-code call sites carried — were **reverted to parity**
+in the Stage 5a review round: each site now uses `requestEnvelope` with an
+explicit `data.error || \`... (${status})\`` throw, matching
+`RequestListPanel.js`. Commits: `523028d7`/`7d545f19` (InitialAssessmentTab),
+`2710b193`/`3d711b06` (ProposalTab), `42a58326`/`722fe9ac` (RequestLocator),
+`014c64e7`/`f067b882` (WorkbenchShell), `9715f730`/`cf0fcff1`
+(FinalWriteupsViews); (4) `ProfileLinkingDialog` axis-(e) change; (5) GET
+call-shape fixes touched seven test files (`workbench-shell`,
+`initial-assessment-tab`, `artifact-version-history`,
+`request-locator-controls`, `workbench-proposal-tab-documents`,
+`reviewer-follow-up`, `workbench-request-number-lookup`), all for endpoints
+migrated this stage; (6) **rule (i)'s** own fallback (`Request failed
+(<status>)`, from the shared helper's `deriveErrorMessage`) is a visible
+IMPROVEMENT, not a regression, at the two sites where it was applied: old
+code at both was a fallback-less `throw new Error(body.error)`, which is
+`new Error(undefined)` when `body.error` is absent — an empty-string message
+that is falsy and so renders no banner at all
+(`PreSiteDistributionPanel.js:610`, pre-migration at `87289fb9c^:611`;
+`SessionAgendaPanel.js:319`, pre-migration at `47298cb2e^:316`). Migrated
+code now shows `Request failed (<status>)` in that case instead of nothing —
+pending owner acceptance that a visible generic message is preferable to a
+silent one at these two sites. **Closed 2026-09-20 (owner: "do it").**
+`PreSiteDistributionPanel.js` reissue: per-code client fallbacks mirroring
+the server sentences for `briefing_link_superseded` /
+`briefing_send_in_progress` (`f3e396db` tests RED first, `4462f05d` code);
+`body.error` still wins; the generic text no longer reaches that banner.
+`SessionAgendaPanel.js` send: **left unchanged, claim above corrected** — a
+DOM probe showed the thrown message is never rendered at this site: the
+`catch` (`SessionAgendaPanel.js:376-384`) maps a throw without `.outcome` to
+the static "Send status is uncertain / The app could not confirm the result"
+feedback, and the `agenda_send_unresolved` branch already calls `setNotice`
+with its own explicit sentence. So neither the old empty message nor the new
+generic one was ever visible there; no fallback map was added because no test
+could go red. Observation for the owner, not acted on: a 409
+`agenda_send_unresolved` is a definite refusal, and the "uncertain" banner is
+arguably the wrong outcome class for it (pre-existing, outside this plan).
+
+## Stage 5b — external token pages, upload-adjacent forms, email pages (Tier 2)
+
+Logged 2026-09-20; fresh review pending. 10 files, 19 JSON sites migrated;
+only the annotated `GranteeDeliverableForm.js:154` keepalive beacon remains raw.
+One test-then-refactor commit pair per file (8 pairs; the two one-site external
+components share pairs).
+
+| File | Sites | Form / policy | Tests |
+|---|---|---|---|
+| `pages/external/briefing/[token].js` | 1 | function-form `() => ({ ok:false, reason:'server_error' })`; non-2xx unparseable mapped via `parseError` to the same fallback | +4 in `external-briefing-page.test.js` |
+| `pages/external/grantee/[token].js` | 1 | strict (bare `.json()` today); non-2xx unparseable → `parseError` → outer catch `server_error` | new `external-grantee-portal-page.test.js` (8) |
+| `pages/external/review/[token].js` | 1 | strict; non-2xx unparseable → `parseError` → `reason:'network'` as today | new `external-review-page.test.js` (7) |
+| `pages/external/materials/[token].js` | 4 | `load` and mount-effect GETs function-form (same fallback as briefing); `finalize`/`upload-token` POSTs envelope tolerant | +11 in `external-materials-routes-client.test.js` |
+| `shared/components/external/DeclineFormView.js` | 1 | envelope tolerant | +9 |
+| `shared/components/external/Stage2aView.js` | 1 | envelope tolerant | new `stage2a-view-accept-fetch.test.js` (10) |
+| `shared/components/external/GranteeDeliverableForm.js` | 2 + beacon | envelope tolerant; beacon annotated | +10 |
+| `shared/components/external/ReviewAuthoringForm.js` | 3 | envelope tolerant; the draft PUT reads no body today, so tolerant was required to avoid a new failure mode on an empty 2xx (documented inline) | new `review-authoring-form-fetch.test.js` (16) |
+| `pages/scheduled-emails.js` | 6 | :59/:61 D1-preserve GETs envelope tolerant, `.data` used unguarded as today; PUTs and list GET `requestJson` tolerant with `fallbackMessage`; action PATCH envelope tolerant, `data.outcome` branch before `!ok` verbatim | new `scheduled-emails-page.test.js` (14; first test for this page) |
+| `pages/test-email.js` | 1 | strict; non-2xx unparseable → `parseError` → the page's existing `uncertain` path, parse message in the parenthetical (AwardeeTab precedent) | new `test-email-page.test.js` (7) |
+
+The three §2.6 function-form sites (`briefing :75`, `materials :214/:227`) each
+pin malformed 2xx, empty 2xx, and non-2xx unparseable → the "retry later"
+`server_error` state. GET call-shape assertion flips bundled into migration
+commits (Stage 3/4 precedent). Deviations flagged by the implementer: a test
+file was created for `test-email.js` though the plan's T5 list omitted it
+(required by tests-first); the ReviewAuthoringForm PUT tolerant choice above.
+
+Gates at the group's final commit: full suite 1024/1025 suites (the one red,
+`workbench-request-number-lookup.test.js` against `RequestLocator.js`, is a
+Stage 5a group 1 file mid-migration); lint 0 errors (one expected unused
+eslint-disable warning on the beacon until Stage 6); `check:types` clean;
+`check:api-routes` + self-test pass.
+
+### Stage 4 rehearsal, part 1 — owner click-through on the Vercel preview (2026-09-20)
+
+Result: the Reviewers tab, the Invite Reviewers panel, and the synthesis
+"invited, awaiting response" panel for request 1002788 all rendered from
+production reads through migrated sites (roster, my-candidates, invited
+dates, status chips, VIP/prefs reads) with no visible difference from
+production. The reminder, release, closeout, and due-date dialogs were NOT
+reachable: `pages/workbench/[requestId].js:303` sets `previewReadOnly` when
+`VERCEL_ENV === 'preview'`, and `ReviewersTab.js:113` derives
+`canEdit = canManage && !previewReadOnly`, which the invite and manage panels
+receive as `canManage` [VERIFIED by reading both]. That is a pre-existing,
+deliberate fail-closed design for previews backed by production Dataverse,
+not a Stage 4 effect. Consequence for the Tier 2 control: a Vercel preview
+can rehearse Stage 4's read paths only.
+
+Part 2 (write-path dialogs): rehearse on a local `npm run dev` of the branch,
+where `previewReadOnly` is false and the target interlock still denies
+production writes from local, so confirm buttons return a denial banner. Owner
+decision pending on whether to run it now or record the write-path dialogs as
+covered by the T4 request-bytes and receipt pins plus post-merge observation.
+
+### Stage 4 rehearsal, part 2 — owner click-through on local `npm run dev` (2026-09-20, complete)
+
+Venue: the owner's dev server on this checkout (started 12:29, `next-server`
+v16.3.5), production reads on, interlock on. Caveat: the Stage 5a group 1
+agent was committing workbench/meeting-tracker component files into the same
+checkout during the run (six commits in ~17 minutes incl. `WorkbenchShell.js`),
+each triggering a Fast Refresh.
+
+- Step 2 (invite preview) and step 4 (reminder preview): manage controls
+  present locally (`previewReadOnly` false); previews rendered. [owner]
+- Step 5 (release invitations, `ReleaseEmailModal` via `ReviewerInvitePanel`):
+  dev-server log `POST /api/review-manager/withdraw-sufficient 200 in 956ms`;
+  rows unchanged afterward, so the interlock denied the write and the service
+  reported per-row `write_failed` in a 200 body (`withdraw-sufficient-service.js`
+  ~:291-297 at the time; now ~:321, where the row also carries a `failure`
+  code [RECHECKED after lib/services/review-manager/withdraw-sufficient-service.js change: :321]). The dialog stayed at "Releasing…" with no banner. FINDING under
+  investigation. The T4 suite had no pin for this exact 200 + `write_failed`
+  outcome; added three (`a2e71560`: write_failed, not_pending, missing_result),
+  all PASS in isolation: the dialog renders the amber partial banner and Done.
+  Client path therefore correct in isolation; the stuck spinner is most
+  consistent with a Fast Refresh remount mid-request. Owner DevTools
+  (Network response body, Console) and a retry pending.
+  **Resolved (`1ce5587c9`).** Owner DevTools: console clean, response body
+  `{ok:true, withdrawn:0, results:[{status:'write_failed', …}]}`. Root cause
+  is not the migration: `reactStrictMode: true` double-invokes effects in dev,
+  the dialog's cleanup-only guard (`useEffect(() => () => { mountedRef.current
+  = false; … }, [])`) flipped false at mount and nothing set it back, so every
+  post-await guard and the `finally` that clears `sending` were skipped.
+  Pre-existing (present at `2e267593`), dev-only; production never runs the
+  StrictMode double-invoke. Fix: set `mountedRef.current = true` in the effect
+  body (the form ten sibling components already use). Fan-out: same defect in
+  `CampaignConfigModal.js` and `pages/dataverse-bulk-export.js`, fixed in the
+  same commit; the other ten `mountedRef` sites already re-arm. Pin: a
+  `React.StrictMode`-wrapped write_failed test in
+  `release-email-modal.test.js`, red before the fix (stuck at "Releasing…",
+  matching the browser) and green after. **Owner retry PASSED** at
+  `1ce5587c9`: banner "Some emails need attention. 0 sent. 1 issue: <reviewer>
+  — The invitation could not be closed", Done button present, no hang. Owner
+  follow-up: the copy names neither the cause nor a recovery; the closeout
+  dialog (step 6) already classifies the interlock refusal and names it, so
+  the release path should do the same. Tracked as a separate change on this
+  branch (service adds a safe `detail` on `write_failed`; dialog copy gets a
+  system-blame + retry/administrator ladder per
+  `feedback-user-facing-error-copy-voice`); not part of the migration.
+  **Built and owner-approved 2026-09-20** ("approve"): `896796ed`
+  (`withdraw-sufficient-service.js` `classifyWriteFailure` → `failure` ∈
+  write_interlocked / dataverse_forbidden / not_found / dataverse_unavailable /
+  unknown, raw message never forwarded), `ba3741db` (`ReleaseEmailModal`
+  five cause + recovery sentences keyed by `failure`), `250e7b9c`
+  (`terminal-transition.js` same classification; also removed the previously
+  forwarded raw `error` text), `a41d3716` (`AcceptedReviewerReleaseModal`
+  same sentences). Orchestrator read all four diffs: classification mirrors
+  `close-review.js` `mapWriteError`; `changed_skipped` untouched; the
+  `ReviewerManagePanel.js:884` alert path reads only `.status` and is
+  unaffected; route passes `results` through (docblock updated).
+- Step 6 (closeout, `ReviewerCloseoutModal` via the manage menu): request
+  1003222 (ZZTEST-03 copy), reviewer with review received. **PASSED**: red
+  message "Closeout writes are blocked in this environment by the Dataverse
+  write interlock. Contact an administrator.", form and both buttons intact,
+  no hang. [owner]
+- Step 7 (due date, `ReviewerDueDateEditor`): **recorded as test-covered**
+  (owner decision 2026-09-20). The editor renders only for reviewers in
+  `accepted`/`materials_sent`/`under_review` without `reviewReceivedAt`
+  (`ReviewerManagePanel.js:1252-1255`); no test request had such a row. The
+  refused-save path is pinned in `tests/unit/reviewer-due-date-editor.test.js`
+  and the Stage 5 fresh reviewer confirmed the Stage 4 D1/D10 pins are
+  discriminating.
+
+Stage 4 rehearsal result: steps 2, 4, 5, 6 passed in the browser; step 7
+test-covered; steps 1 and 3 (invite send, reminder send) were preview-only by
+design (Mode A, no outbound mail from local). **Stage 4 closes** with this
+record; the Tier 2 merge condition (owner merge after preview) still applies.
+
+### Stage 5b rehearsal — owner click-through on the Vercel preview (2026-09-20, in progress)
+
+Venue: `wmkfresearchapps-preview.vercel.app` → `wmkfresearchapps-6l5suly2f`
+(branch head `a41d37162`), production reads on, briefing flag on at branch
+scope, writes denied by the interlock. Links are minted in production and
+opened on the preview host (same `EXTERNAL_LINK_SECRET`, confirmed by the
+valid load below).
+
+- Step 3 (`pages/external/briefing/[token].js`): **PENDING — earlier PASSED
+  record withdrawn.** The owner issued a new briefing link in production and
+  it rendered; the altered token showed "This link is malformed." But step 4
+  below proved the preview verifies with a different `EXTERNAL_LINK_SECRET`
+  than production, so a production-signed briefing token cannot have verified
+  on the preview host; the successful load was on production (`main`, no
+  Stage 5b code) and does not count.
+- Step 4 (`pages/external/review/[token].js`): owner invited a test reviewer
+  in production (Dataverse write, preview cannot), opened the emailed link on
+  `reviews.wmkeck.org` (rendered), then swapped the host to the preview alias:
+  "We couldn't open your review … Reference: invalid_signature". That reason
+  comes only from the JWT signature check (`verify-suggestion-token.js:137` ←
+  `external-token.js:227`), so the preview's `EXTERNAL_LINK_SECRET` (set
+  separately 141 days ago) differs from production's. **Environment setup
+  gap, not a Stage 5b finding.** Token pages therefore cannot be
+  click-through-tested on the preview with production-minted links.
+- **Owner decision (2026-09-20): steps 3–6 recorded as test-covered.** The
+  four token pages share one migration pattern; their T5 matrices (incl. the
+  function-form fallbacks and non-2xx unparseable → `server_error`/`network`
+  mappings) were read and confirmed clean in the Stage 5 fresh review, item
+  E. The production link secret was NOT copied into the preview.
+- Steps 5–6 (grantee, materials): test-covered per the decision above.
+- Step 7 (`pages/scheduled-emails.js`, preview host): **PASSED** [owner]. The
+  three load requests (list, automation preferences, VIP flags) all settled:
+  empty state "No scheduled emails" rendered, the review-every-email
+  preference toggle rendered with a value, no error banner. The queue was
+  empty, so the per-message detail and action paths remain test-covered.
+- Step 8 (`pages/test-email.js`, preview host): **PASSED** [owner]. Send to
+  self → "Not sent. Test email failed". Expected: `sendTestEmail` creates a
+  Dynamics email activity (`test-email-service.js:35/51`), a Dataverse write
+  the target interlock denies from the preview; the route returns 500
+  `{ error: 'Test email failed', outcome: 'failed' }` (`pages/api/test-email.js:64-70`)
+  and the page rendered that body's `error` — the axis (b) path, no hang, no
+  raw text. No mail was sent (by design in this venue).
+- Step 9 (Tier 2 additions from the Stage 5 review: `PreSiteDistributionPanel`
+  prepare/preview and `ReviewsTab` reminder): **recorded as test-covered**
+  (owner + orchestrator, 2026-09-20). The only ZZTEST request with a reviewer
+  (1003222) has moved to Final Writeup (Share action gone) and its reviewer
+  has submitted (no reminder row); inviting/accepting a new reviewer needs
+  production writes. Both files' T5 matrices (axes a–e, request bytes on
+  every POST) were mutation-verified in the Stage 5 fresh review, item 2.
+
+## Stage 6 — closeout ratchet (logged 2026-09-20; fresh review + Gate G pending)
+
+Commits: `5e5bfc0e7` (T1 pins for url-based adapters, RED), `c688cf655`
+(Part A fold), `027f2b44b` (T6 lint fixture, RED), `828a0a96c`
+(`no-restricted-syntax` block), `c9dd84e2e` (catalog + wiki).
+
+**Part A — Stage 1 fold finished.** The four adapters now take `(url,
+options)` and call `requestEnvelope` themselves, so the 16 consumer sites the
+Stage 5 reviewer flagged (`pages/review-panel.js` ×3, `pages/cycle-dossier.js`
+×7, `ReviewPanelTab.js` ×3, `SessionEditor.js` ×3) carry no raw `fetch(`:
+`review-panel-ui.js` readResponse and `cycle-dossier.js` readResponse keep
+their thrown `Error` (`data.error || Request failed (${status})`) and return
+value; `SessionEditor.js` readJson returns the envelope (both callers need
+`ok`/`status`), sendJson reimplemented over `requestEnvelope` with the same
+signature. `tests/unit/client-request-stage1-adapters.test.js` rewritten for
+the new signatures (+ per-site URL/method/header/body-byte pins, envelope
+shape suite, static zero-raw-fetch assertion): 28/44 RED against the
+pre-change adapters, 44/44 GREEN after. One fixture correction in
+`workbench-review-panel-tab.test.js` (the call now always carries an init
+object). Implementer deviation: RED was reproduced via `git stash push
+--keep-index` on the five source files after writing the code, not by writing
+the test first; committed history is still test-then-code; `git stash list`
+afterwards shows only the two pre-existing entries.
+
+**Part B — ratchet.** `eslint.config.mjs` gains one scoped block (`files:
+shared/components/**/*.js, pages/**/*.js`; `ignores: pages/api/**`) with two
+selectors (bare `fetch(`; `globalThis.fetch(`/`window.fetch(`). T6
+(`tests/unit/eslint-no-raw-fetch-ratchet.test.js`) runs the repo config via
+`npx eslint --stdin` (ESLint's `lintText` cannot import the ESM flat config
+under Jest); cases (a)–(d) per the plan plus member-call and `fetchImpl(`
+non-firing checks; 5/7 RED before the rule, 7/7 after. `npm run lint`: 0
+errors, 114 warnings (baseline unchanged; the transient "unused directive"
+warnings are gone). **No site needed migration or a new directive**: all 26
+remaining raw sites already carried the canonical §2.6 annotation. 26 vs the
+19 named in §2.6: the extra 7 are SSE consumers of `reviewers/sse.js`
+(`InviteEmailModal.js:736`, `useReviewerDiscovery.js:75,119,190`,
+`useReviewerPromotion.js:61`, `useApplicantReviewerEnrichment.js:47`, and one
+more) — same three allowlisted categories; to be confirmed site-by-site in
+the fresh review. Dead wrappers: none (every local `readJson`-style helper
+has live callers).
+
+**Docs.** `docs/SERVICE_AND_UTILITY_CATALOG.md` bullet for
+`shared/utils/api-request.js`; `docs/agent-wiki/topics/dev-environment.md`
+"Client Request Layer" heading (entry points, ratchet, annotation form;
+frontmatter extended). `check:docs-catalog` OK (302 docs);
+`check:doc-symbol-refs` + self-test OK; `check:agent-wiki` + self-test OK.
+Implementer's suite: 1009 suites / 14711 tests green; `check:types` clean.
+
+**Release record (refreshed 2026-09-20 ~15:30 PT).** Current production
+deployment: `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki`
+(`wmkfresearchapps-ocl7vs3ux`, created 2026-09-19 22:15 PT, aliases
+`reviews.wmkeck.org` + `grantees.wmkeck.org`; `origin/main` = `e269756ac`).
+Updated 2026-09-20 ~16:30 PT: the Session 528 handoff banner (docs-only,
+`01ccf78f5`, 4 files) fast-forwarded `main` and deployed as
+`wmkfresearchapps-kwgubwobw` (Ready, holds both aliases; runtime identical to
+`ocl7vs3ux`). Either deployment is a valid rollback target for a merge of this
+branch: redeploy it
+(`vercel redeploy <url>` or promote in the dashboard); no data rollback exists
+or is needed. Merge to `main` is the owner's explicit decision (Tier 2 work on
+the branch).
+
+### Gate G (full, Stage 6 scope) — 2026-09-20, orchestrator (Fable), at `c9dd84e2e`
+
+Every defined `check:*` gate and its self-test sequentially (37 gates,
+`check:memory-drift` write-mode excluded; advisory gates included): RED count
+0. `npm run lint`: 0 errors, 13 warnings. `check:types`: clean. Full suite
+(`npx jest`, not `tests/unit` only): **1042 suites / 15430 tests passed**.
+`npm run build`: compiled. Log:
+`scratchpad/gates-stage6.log` (session-local). This run covers Stage 5
+(all corrections + residuals), the release-copy follow-up, the deviation-6
+fallback, and Stage 6 code; commits after it are docs-only.
+
+### Stage 5 acceptance — 2026-09-20, orchestrator (Fable)
+
+5a (groups 1–2) and 5b accepted: fresh review READY at `976458f9a` (second
+pass), residuals R1–R4 fixed (`135f11d9e`), owner decisions recorded
+(steps 3–6 and 9 test-covered; steps 7–8 passed on the preview; deviation
+(6) closed; release copy approved), Gate G green above. Stage 6 acceptance
+follows its fresh review.
+
+### Stage 6 fresh review (Opus, no inherited context, isolated worktree at `c9dd84e2e`) — READY WITH NAMED CHANGES
+
+Scope: Stage 6 (Part A fold, Part B ratchet, docs), the release-copy
+follow-up, and the deviation-6 fallback. No behavior defect. Verified: all 16
+Part A sites byte-identical on the wire (plain-object bodies → same
+`JSON.stringify` + same single `Content-Type`; bare GETs now carry `{ method:
+'GET', signal: undefined }`, wire-identical); thrown error shapes and return
+values unchanged; no consumer reads a body-level `ok` as HTTP `ok`; the rule
+block's scope and both selectors; T6 runs the repo config; case (d) proves
+site-level exemption; the 7 extra allowlisted sites each read to their SSE
+consumer; no raw `e.message` reaches a response body; the removed row-level
+`error` from terminal-transition has zero readers; `outcome.error ===
+'write_failed'` traced through `ReviewerManagePanel.releaseAcceptedReviewer`;
+no stash-misfire artefacts in the committed diffs. Mutations: adapter fallback
+text → RED 3/44; adapter method → RED 1/44; rule block deleted → T6 RED 5/7
+(incl. the "not an unused directive" case); failure code string → service RED
+1/26; modal sentence → RED 1/15. Caveat: the 28/44 T1 red against pre-change
+adapters is signature-shape red, not characterization; preservation rests on
+the per-site diff trace plus the bytes pins.
+
+Findings: (1) plan §2.6 listed 19 sites vs 26 annotated, and plan status was
+still `active` — **fixed `9f64a364a`** (§2.6 amendment naming the 7 SSE
+sites; `status: complete`); (2) catalog, wiki, and the helper's own header
+still described `readJsonBody` as the adapters' seam after the fold moved them
+to `requestEnvelope` — **fixed `9f64a364a`** (readJsonBody documented as
+exported, caller-less). (3) informational: `ReviewerManagePanel.js:884` alert
+path still shows the literal `write_failed` status word; the new `failure`
+code is available there — left as is, noted for the owner. (4)
+maintainability: the five-code vocabulary is duplicated across two services
+and two modals with no shared constant / parity gate — noted, not changed
+(tests catch drift today). (5) nit: `REISSUE_REFUSAL_FALLBACKS` declared inside
+the branch body.
+
+### Stage 6 acceptance — 2026-09-20, orchestrator (Fable), at `9f64a364a`
+
+Accepted. Gate G green at `c9dd84e2e` (above); commits since are docs and
+comments only, re-checked with `check:docs-catalog`, `check:agent-wiki` (+
+self-test), `check:doc-symbol-refs` (+ self-test), `check:build-claim-freshness`
+(+ self-test), `check:doc-currency` (+ self-test), `api-request` unit tests
+(62), and lint on the helper. Plan status `complete`. Release decision handed
+to the owner; rollback deployment recorded above. Preview env cleanup list
+(owner call, after merge or abandonment): alias
+`wmkfresearchapps-preview.vercel.app`; branch-scoped `NEXTAUTH_URL`,
+`DATAVERSE_ALLOW_PROD_READS`, `DELIBERATION_BRIEFING_SCHEMA_READY`.
+
+### Codex adversarial review of the built code — 2026-09-20, at `4007d420e`
+
+Owner asked whether Codex had reviewed the builds (it had reviewed only the
+plan). Full base-branch adversarial review (`--base main`, gpt-5.6-sol,
+222 files / +17114 −1502) with the challenge framing on envelope-vs-throwing
+forms, tolerant/strict policy, D3, the allowlist ratchet, per-site regressions
+(request bytes, error precedence, stale guards, body-level `ok`/`success`),
+and tests that cannot fail. **Verdict: approve, no material findings.**
+Receipt in the plan §10 table (cycle 4). Weight (owner asked, orchestrator
+answered 2026-09-20): a ~40-command, pattern-driven sweep — helper, its
+tests, T6, adapters, manage panel, and the runtime diff at several context
+widths, plus tree-wide greps for the named regression classes — not a
+line-by-line read of every site. Of the diff, ~11.9k added lines are tests
+and ~2.6k docs; runtime is ~2.0k added / 1.4k removed across 101 files.
+Recorded as corroboration; the substantive assurance remains the per-stage
+fresh reviews (full source diffs, characterization runs, mutation checks)
+and Gate G. Owner declined further scoped Codex runs.
+
+## Release — owner decision "merge" (2026-09-20)
+
+Pre-merge per plan §7: `origin/main` had advanced by the docs-only handoff
+banner (`01ccf78f5`); merged into the branch (`1a19fc380`, clean; the four
+docs files were byte-identical on both sides). Gate G rerun on the merged head:
+every `check:*` gate + self-test green (RED count 0), lint 0 errors, types
+clean, **1042 suites / 15430 tests**, build compiled
+(`scratchpad/gates-premerge.log`). Rollback target: production deployment
+`wmkfresearchapps-kwgubwobw` (docs-only build of `01ccf78f5`, runtime identical
+to `ocl7vs3ux` / `dpl_oSuLQGHdubsaN5pma7D7wXGvqPki`). Promotion: merge commit
+(no squash) of `feature/client-request-layer` into `main`, pushed; post-deploy
+smoke recorded below when done.

@@ -154,6 +154,49 @@ test('shows a friendly commit-time honorarium failure instead of a raw status co
   expect(screen.queryByText('honorarium_authorized')).not.toBeInTheDocument();
 });
 
+test.each([
+  ['write_interlocked', 'Dr. Reviewer is still invited. The system blocked the release in this environment (Dataverse write interlock). Retry from the production site, or contact an administrator.'],
+  ['dataverse_forbidden', 'Dr. Reviewer is still invited. Dataverse refused to save the release for this account. Retry, and if it fails again contact an administrator.'],
+  ['not_found', 'Dr. Reviewer is still invited. The reviewer record could not be found when saving. Reload and retry.'],
+  ['dataverse_unavailable', 'Dr. Reviewer is still invited. The database did not respond when saving the release. This is usually a temporary blip. Retry, and if it keeps failing contact an administrator.'],
+  ['unknown', 'Dr. Reviewer is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.'],
+])('a write_failed release with failure %s shows the matching cause+recovery sentence', async (failure, expectedText) => {
+  global.fetch.mockResolvedValue(response({
+    ok: true,
+    drafts: [{
+      suggestionId: SUGGESTION_ID,
+      status: 'ok',
+      name: 'Dr. Reviewer',
+      to: 'reviewer@example.org',
+      from: 'pd@example.org',
+      senderId: 'pd-1',
+      subject: 'Thank you',
+      bodyText: 'Thank you.',
+      expectedNotes: '',
+      existingNotes: '',
+    }],
+  }));
+  const onRelease = jest.fn(async () => ({
+    ok: false,
+    error: 'write_failed',
+    data: { transitioned: 0, results: [{ status: 'write_failed', failure }] },
+  }));
+
+  render(
+    <AcceptedReviewerReleaseModal
+      reviewer={reviewer}
+      requestId={REQUEST_ID}
+      onClose={jest.fn()}
+      onRelease={onRelease}
+    />,
+  );
+
+  await screen.findByDisplayValue('Thank you');
+  fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+  expect(await screen.findByText(expectedText)).toBeInTheDocument();
+  expect(screen.queryByText('write_failed')).not.toBeInTheDocument();
+});
+
 test('blocks an unsafe honorarium during preview before showing the composer', async () => {
   global.fetch.mockResolvedValue(response({
     ok: true,
@@ -214,4 +257,44 @@ test('re-arms mounted feedback state under React StrictMode', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
   expect(await screen.findByText('Reviewer released')).toBeInTheDocument();
   expect(screen.queryByText('Releasing…')).not.toBeInTheDocument();
+});
+
+test('preview fetch sends the exact request bytes', async () => {
+  global.fetch.mockResolvedValue(response({ ok: true, drafts: [{ suggestionId: SUGGESTION_ID, status: 'no_email', expectedNotes: '', existingNotes: '' }] }));
+  render(<AcceptedReviewerReleaseModal reviewer={reviewer} requestId={REQUEST_ID} onClose={jest.fn()} onRelease={jest.fn()} />);
+  await screen.findByRole('checkbox', { name: 'Send a thank-you email' });
+  expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/terminal-transition', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requestId: REQUEST_ID,
+      suggestionIds: [SUGGESTION_ID],
+      terminalStatus: 'released',
+      preview: true,
+    }),
+  });
+});
+
+test('axis (b): a non-2xx preview body surfaces its error verbatim', async () => {
+  global.fetch.mockResolvedValue(response({ error: 'preview blew up' }, { ok: false, status: 500 }));
+  render(<AcceptedReviewerReleaseModal reviewer={reviewer} requestId={REQUEST_ID} onClose={jest.fn()} onRelease={jest.fn()} />);
+  expect(await screen.findByText('preview blew up')).toBeInTheDocument();
+});
+
+test('axis (c): a network rejection on preview surfaces its message', async () => {
+  global.fetch.mockRejectedValue(new Error('network down'));
+  render(<AcceptedReviewerReleaseModal reviewer={reviewer} requestId={REQUEST_ID} onClose={jest.fn()} onRelease={jest.fn()} />);
+  expect(await screen.findByText('network down')).toBeInTheDocument();
+});
+
+test('axis (d): a malformed 2xx preview body falls back to "no preview returned"', async () => {
+  global.fetch.mockResolvedValue({ ok: true, status: 200, json: jest.fn(async () => { throw new Error('bad json'); }) });
+  render(<AcceptedReviewerReleaseModal reviewer={reviewer} requestId={REQUEST_ID} onClose={jest.fn()} onRelease={jest.fn()} />);
+  expect(await screen.findByText('This reviewer cannot be released: no preview returned')).toBeInTheDocument();
+});
+
+test('axis (e): a non-2xx preview body that fails to parse falls back to the status message, never silently', async () => {
+  global.fetch.mockResolvedValue({ ok: false, status: 502, json: jest.fn(async () => { throw new Error('bad gateway html'); }) });
+  render(<AcceptedReviewerReleaseModal reviewer={reviewer} requestId={REQUEST_ID} onClose={jest.fn()} onRelease={jest.fn()} />);
+  expect(await screen.findByText('Could not prepare the release (502)')).toBeInTheDocument();
 });

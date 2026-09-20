@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import { useProfile } from '../shared/context/ProfileContext';
+import { requestJson } from '../shared/utils/api-request';
 import {
   PREFERENCE_KEYS,
   readEmailSignaturePreference,
@@ -144,12 +145,10 @@ export default function ProfileSettings() {
   useEffect(() => {
     if (status !== 'ready' || !currentProfile?.id) return;
     let cancelled = false;
-    fetch('/api/email-defaults/grantee-invite')
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error || 'Failed to load Request Abstract email default.');
-        return data;
-      })
+    requestJson('/api/email-defaults/grantee-invite', {
+      tolerantBody: true,
+      fallbackMessage: 'Failed to load Request Abstract email default.',
+    })
       .then((data) => {
         if (cancelled) return;
         setInviteDefault({

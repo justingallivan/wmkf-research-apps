@@ -407,3 +407,231 @@ test('timeout-only budget display names the timeout and leaves output tokens on 
   expect(line).toHaveTextContent('timeout 240s configured by published revision 1');
   expect(line).not.toHaveTextContent('configured override is capped');
 });
+
+// T3 matrix (Stage 3, group A) ahead of migrating all five fetch sites onto
+// shared/utils/api-request.js:
+//  - Promise.all([prompts, models]) (:93-94): combined status branch, 403 ->
+//    'Admin access required' pinned verbatim (plan §2.3).
+//  - executor-budgets GET (:115): status branch, 403 -> 'Admin access
+//    required for Executor budgets' pinned verbatim.
+//  - executor-budgets PUT (:469): status/body-flag branches, already covered
+//    for (a)/(b); this adds (c)/(d)/(e).
+//  - prompt publish PUT (:741): D1 fix — a non-2xx body with a recognized
+//    `status` is still read as before; a non-2xx body with no `status`
+//    now surfaces the server error via the existing failed-outcome banner.
+function unparseable(status) {
+  return { ok: status >= 200 && status < 300, status, json: jest.fn(async () => { throw new SyntaxError('bad json'); }) };
+}
+
+test('(b) prompts+models: 403 on either shows "Admin access required" verbatim', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') return response({ error: 'Forbidden' }, false, 403);
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    return response(budgetConfig());
+  });
+  render(<PromptTemplatesSection />);
+  expect(await screen.findByText('Admin access required')).toBeInTheDocument();
+});
+
+test('(b) prompts+models: a non-403 non-2xx on prompts shows the generic load failure', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') return response({ error: 'ignored' }, false, 500);
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    return response(budgetConfig());
+  });
+  render(<PromptTemplatesSection />);
+  expect(await screen.findByText('Failed to load prompts')).toBeInTheDocument();
+});
+
+test('(c) prompts+models: a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') throw new Error('network down');
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    return response(budgetConfig());
+  });
+  render(<PromptTemplatesSection />);
+  expect(await screen.findByText('network down')).toBeInTheDocument();
+});
+
+test('(d) prompts+models: a malformed 2xx prompts body rejects into the same error state', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') return unparseable(200);
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    return response(budgetConfig());
+  });
+  render(<PromptTemplatesSection />);
+  expect(await screen.findByText('bad json')).toBeInTheDocument();
+});
+
+test('(b) executor-budgets GET: 403 shows "Admin access required for Executor budgets" verbatim', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    if (url === '/api/admin/executor-budgets') return response({ error: 'ignored' }, false, 403);
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+  expect(await screen.findByText(/Admin access required for Executor budgets/)).toBeInTheDocument();
+});
+
+test('(c) executor-budgets GET: a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    if (url === '/api/admin/executor-budgets') throw new Error('network down');
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+  expect(await screen.findByText(/network down/)).toBeInTheDocument();
+});
+
+test('(d) executor-budgets GET: a malformed 2xx body is caught the same as a rejection', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    if (url === '/api/admin/executor-budgets') return unparseable(200);
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+  expect(await screen.findByText(/bad json/)).toBeInTheDocument();
+});
+
+test('(c) executor-budgets PUT: a network rejection is shown as the outcome text', async () => {
+  global.fetch.mockImplementation(async (url, options = {}) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    if (url === '/api/admin/executor-budgets' && options.method === 'PUT') throw new Error('network down');
+    if (url === '/api/admin/executor-budgets') return response(budgetConfig());
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+  const maxTokens = await screen.findByLabelText(/Maximum output tokens/);
+  fireEvent.change(maxTokens, { target: { value: '40000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Publish v1' }));
+  expect(await screen.findByText('network down')).toBeInTheDocument();
+});
+
+test('(d) executor-budgets PUT: a malformed 2xx body rejects into the same error state (strict: the parseError rethrow at :483 runs before the ok check)', async () => {
+  global.fetch.mockImplementation(async (url, options = {}) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    if (url === '/api/admin/executor-budgets' && options.method === 'PUT') return unparseable(200);
+    if (url === '/api/admin/executor-budgets') return response(budgetConfig());
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+  const maxTokens = await screen.findByLabelText(/Maximum output tokens/);
+  fireEvent.change(maxTokens, { target: { value: '40000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Publish v1' }));
+  expect(await screen.findByText('bad json')).toBeInTheDocument();
+});
+
+test('(e) executor-budgets PUT: a non-2xx unparseable body (502) never silent', async () => {
+  global.fetch.mockImplementation(async (url, options = {}) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') return response({ tiers: [], modelStatuses: {} });
+    if (url === '/api/admin/executor-budgets' && options.method === 'PUT') return unparseable(502);
+    if (url === '/api/admin/executor-budgets') return response(budgetConfig());
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+  const maxTokens = await screen.findByLabelText(/Maximum output tokens/);
+  fireEvent.change(maxTokens, { target: { value: '40000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Publish v1' }));
+  expect(await screen.findByText('bad json')).toBeInTheDocument();
+});
+
+describe('prompt publish (PublishForm, D1 fix)', () => {
+  beforeEach(() => {
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+      if (url === '/api/admin/models') {
+        return response({ tiers: [], modelStatuses: { 'claude-sonnet-5': { capability: { status: 'reviewed', maxOutputTokens: 128000 } } } });
+      }
+      if (url === '/api/admin/executor-budgets') return response({ error: 'unavailable' }, false, 503);
+      throw new Error(`Unexpected fetch ${url} ${options.method}`);
+    });
+  });
+
+  async function openPublishForm() {
+    render(<PromptTemplatesSection />);
+    await screen.findByText('pre-site-visit.proposal-core.generate');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit & publish' }));
+    await screen.findByRole('button', { name: 'Publish v6' });
+    fireEvent.change(screen.getByDisplayValue('body'), { target: { value: 'body edited' } });
+  }
+
+  test('(a) 2xx {status:"completed"} calls onSuccess, closes the form', async () => {
+    await openPublishForm();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') {
+        return response({ status: 'completed', newPromptId: 'p-2', targetVersion: 6 });
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
+    expect(await screen.findByText('Published — new version is now current.')).toBeInTheDocument();
+
+    const putCall = global.fetch.mock.calls.find(([, o]) => o?.method === 'PUT');
+    expect(putCall[0]).toBe(`/api/admin/prompts/${encodeURIComponent(prompt.name)}`);
+    expect(putCall[1].headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(putCall[1].body)).toMatchObject({ body: 'body edited', systemPrompt: prompt.systemPrompt, model: prompt.model, expectedVersion: prompt.version });
+  });
+
+  test('(b) a well-formed non-2xx body (409 concurrency_conflict) is read regardless of status (unchanged, not a D1 defect)', async () => {
+    await openPublishForm();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') return response({ status: 'concurrency_conflict' }, false, 409);
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
+    expect(await screen.findByText('Another admin published while you were editing. Reload and re-apply.')).toBeInTheDocument();
+  });
+
+  test('(b) D1 fix: non-2xx {error} with no status field surfaces the server error message, not a blank banner', async () => {
+    await openPublishForm();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') return response({ error: 'Prompt store unavailable' }, false, 500);
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
+    expect(await screen.findByText('Publish failed. Check server logs.')).toBeInTheDocument();
+    expect(screen.getByText('Prompt store unavailable')).toBeInTheDocument();
+  });
+
+  test('(c) a network rejection is caught and rendered as a failed outcome', async () => {
+    await openPublishForm();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') throw new Error('network down');
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
+    expect(await screen.findByText('Publish failed. Check server logs.')).toBeInTheDocument();
+    expect(screen.getByText('network down')).toBeInTheDocument();
+  });
+
+  test('(d) a malformed 2xx body (bare .json()) is caught and rendered as a failed outcome', async () => {
+    await openPublishForm();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') return unparseable(200);
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
+    expect(await screen.findByText('Publish failed. Check server logs.')).toBeInTheDocument();
+    expect(screen.getByText('bad json')).toBeInTheDocument();
+  });
+
+  test('(e) a non-2xx unparseable body (502) is rendered as a failed outcome, never silent', async () => {
+    await openPublishForm();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') return unparseable(502);
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
+    expect(await screen.findByText('Publish failed. Check server logs.')).toBeInTheDocument();
+    // D1 fix: the api-request helper's public default surfaces the fallback
+    // message for a non-2xx unparseable body, not the raw parse error text
+    // (shared/utils/api-request.js deriveErrorMessage, owner decision (3)).
+    expect(screen.getByText('Request failed (502)')).toBeInTheDocument();
+  });
+});

@@ -4,6 +4,7 @@
 
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
+import { RENDER_PREVIEW_NETWORK_MESSAGE } from '../../shared/components/reviewers/render-preview-failure';
 
 const REQUEST_ID = '00000000-0000-0000-0000-000000000001';
 const PROPOSAL_URL = 'https://blob.vercel-storage.com/request-proposal.pdf';
@@ -350,6 +351,98 @@ describe('ReviewerManagePanel release with attach-proposal-email OFF (default)',
     attachProposalEmail = true;
     fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
     await screen.findByText('Proposal document');
+  });
+});
+
+describe('ReviewerManagePanel release-modal T4 axes (malformed/non-2xx bodies)', () => {
+  test('T4 axis (d/e): a malformed release-settings body (2xx or non-2xx) degrades to the OFF default', async () => {
+    for (const settingsResponse of [
+      { ok: true, status: 200, json: async () => { throw new Error('bad json'); } },
+      { ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } },
+    ]) {
+      jest.clearAllMocks();
+      global.fetch.mockImplementation(async (url) => {
+        if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+        if (url === '/api/review-manager/release-settings') return settingsResponse;
+        if (String(url).startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+        if (url === '/api/reviewer-finder/load-proposal') return successProposal();
+        if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft] });
+        throw new Error(`Unexpected fetch: ${url}`);
+      });
+      const view = render(
+        <ReviewerManagePanel proposal={proposal} reviewers={[reviewer]} settings={{ signature: 'Program Director' }} />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
+      await screen.findByText(/Reviewers access materials via their secure portal link/i);
+      view.unmount();
+    }
+  });
+
+  test('T4 axis (d/e): a malformed materials-preflight body (2xx or non-2xx) shows the neutral "couldn\'t verify" note, never silently', async () => {
+    for (const preflightResponse of [
+      { ok: true, status: 200, json: async () => { throw new Error('bad json'); } },
+      { ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } },
+    ]) {
+      jest.clearAllMocks();
+      global.fetch.mockImplementation(async (url) => {
+        if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+        if (url === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: true });
+        if (String(url).startsWith('/api/review-manager/materials-preflight')) return preflightResponse;
+        if (url === '/api/reviewer-finder/load-proposal') return successProposal();
+        if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft] });
+        throw new Error(`Unexpected fetch: ${url}`);
+      });
+      const view = render(
+        <ReviewerManagePanel proposal={proposal} reviewers={[reviewer]} settings={{ signature: 'Program Director' }} />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
+      expect(await screen.findByText(/Couldn.t verify reviewer materials availability/i)).toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
+  test('T4 axis (d): a malformed 2xx load-proposal body is never treated as success', async () => {
+    renderPanel({ proposalResponses: [{ ok: true, status: 200, json: async () => { throw new Error('bad json'); } }] });
+    await openReleaseModal();
+    expect(await screen.findByText('Could not load the proposal document (200)')).toBeInTheDocument();
+  });
+
+  test('T4 axis (e): a non-2xx load-proposal body that fails to parse falls back to the status message, never silently', async () => {
+    renderPanel({ proposalResponses: [{ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } }] });
+    await openReleaseModal();
+    expect(await screen.findByText('Could not load the proposal document (502)')).toBeInTheDocument();
+  });
+
+  test('T4 axis (d): a malformed 2xx render-emails body is treated as zero drafts (the site only reads the body on the !ok path)', async () => {
+    global.fetch.mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+      if (url === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: true });
+      if (String(url).startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+      if (url === '/api/reviewer-finder/load-proposal') return successProposal();
+      if (url === '/api/review-manager/render-emails') return { ok: true, status: 200, json: async () => { throw new Error('bad json'); } };
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    render(<ReviewerManagePanel proposal={proposal} reviewers={[reviewer]} settings={{ signature: 'Program Director' }} />);
+    await openReleaseModal();
+    fireEvent.click(screen.getByRole('button', { name: /preview 1 email/i }));
+    expect(await screen.findByRole('button', { name: /send 0 emails/i })).toBeInTheDocument();
+    expect(screen.queryByText(RENDER_PREVIEW_NETWORK_MESSAGE)).not.toBeInTheDocument();
+  });
+
+  test('T4 axis (e): a non-2xx render-emails body that fails to parse shows the status-code preview failure, never silently', async () => {
+    global.fetch.mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+      if (url === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: true });
+      if (String(url).startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+      if (url === '/api/reviewer-finder/load-proposal') return successProposal();
+      if (url === '/api/review-manager/render-emails') return { ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } };
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    render(<ReviewerManagePanel proposal={proposal} reviewers={[reviewer]} settings={{ signature: 'Program Director' }} />);
+    await openReleaseModal();
+    fireEvent.click(screen.getByRole('button', { name: /preview 1 email/i }));
+    await waitFor(() => expect(screen.queryByText('Rendering preview…')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeInTheDocument();
   });
 });
 

@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ArtifactFileMetadata from './ArtifactFileMetadata';
 
@@ -35,12 +36,11 @@ export default function InitialAssessmentsPanel({ cycleCode, loadingCycles }) {
     setError(null);
     (async () => {
       try {
-        const response = await fetch(
+        const body = await requestJson(
           `/api/workbench/initial-assessment?cycleCode=${encodeURIComponent(cycleCode)}`,
+          { fallbackMessage: 'Failed to load artifacts', tolerantBody: true },
         );
-        const body = await response.json().catch(() => ({}));
         if (requestSequence.current !== sequence) return;
-        if (!response.ok) throw new Error(body.error || 'Failed to load artifacts');
         setArtifacts(body.artifacts || []);
       } catch (loadError) {
         if (requestSequence.current === sequence) {

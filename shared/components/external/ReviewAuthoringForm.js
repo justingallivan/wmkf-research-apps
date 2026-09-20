@@ -29,6 +29,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import RichReviewEditor from './RichReviewEditor';
 import ProgramDirectorContact from './ProgramDirectorContact';
 
@@ -132,9 +133,10 @@ export default function ReviewAuthoringForm({ data, token, onSubmitted }) {
     let cancelled = false;
     (async () => {
       try {
-        const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/draft`);
-        const json = await resp.json().catch(() => ({}));
-        if (!cancelled && resp.ok && json.ok && json.draftJson) {
+        const { ok, data: json } = await requestEnvelope(`/api/external/review/${encodeURIComponent(token)}/draft`, {
+          tolerantBody: true,
+        });
+        if (!cancelled && ok && json.ok && json.draftJson) {
           setValues(buildInitialValues(fields, data.prefill, json.draftJson));
         }
       } catch {
@@ -152,13 +154,17 @@ export default function ReviewAuthoringForm({ data, token, onSubmitted }) {
     const controller = new AbortController();
     autosaveAbortRef.current = controller;
     try {
-      const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/draft`, {
+      // No caller today reads the PUT's body — tolerantBody:true keeps that
+      // true after migration (strict-on-2xx would otherwise reject an
+      // empty/malformed 2xx body that this site never inspected).
+      const { ok } = await requestEnvelope(`/api/external/review/${encodeURIComponent(token)}/draft`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftJson: next }),
+        body: { draftJson: next },
         signal: controller.signal,
+        tolerantBody: true,
       });
-      setSaveState(resp.ok ? 'saved' : 'error');
+      setSaveState(ok ? 'saved' : 'error');
     } catch (e) {
       if (e?.name === 'AbortError') return; // aborted by submit — not a real save failure
       setSaveState('error');
@@ -196,17 +202,20 @@ export default function ReviewAuthoringForm({ data, token, onSubmitted }) {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (autosaveAbortRef.current) autosaveAbortRef.current.abort();
     try {
-      const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // Echo the question-set version we rendered against. A stale version
-        // comes back 409 `set_changed` (questions edited since load) so we can
-        // prompt a reload instead of surfacing a confusing field error. Older
-        // payloads with no version skip the server-side check.
-        body: JSON.stringify({ answers: values, ...(setVersion ? { setVersion } : {}) }),
-      });
-      const json = await resp.json().catch(() => ({}));
-      if (resp.ok && json.ok) {
+      const { ok: respOk, status: respStatus, data: json } = await requestEnvelope(
+        `/api/external/review/${encodeURIComponent(token)}/submit`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // Echo the question-set version we rendered against. A stale version
+          // comes back 409 `set_changed` (questions edited since load) so we can
+          // prompt a reload instead of surfacing a confusing field error. Older
+          // payloads with no version skip the server-side check.
+          body: { answers: values, ...(setVersion ? { setVersion } : {}) },
+          tolerantBody: true,
+        },
+      );
+      if (respOk && json.ok) {
         setSubmittedAt(json.receivedAt || new Date().toISOString());
         setSubmitState('submitted');
         // Let the parent react to the finalized submit (MaterialsView hides
@@ -214,7 +223,7 @@ export default function ReviewAuthoringForm({ data, token, onSubmitted }) {
         if (typeof onSubmitted === 'function') onSubmitted();
         return;
       }
-      if (resp.status === 409) {
+      if (respStatus === 409) {
         if (json.reason === 'set_changed') {
           // The staff question set changed since this form loaded. NOT terminal:
           // a reload re-fetches the current set and reconciles the draft onto it.
@@ -235,7 +244,7 @@ export default function ReviewAuthoringForm({ data, token, onSubmitted }) {
         setSubmitState('conflict');
         return;
       }
-      if (resp.status === 400 && Array.isArray(json.errors)) {
+      if (respStatus === 400 && Array.isArray(json.errors)) {
         setSubmitErrors(json.errors);
       } else {
         setSubmitErrors(['Something went wrong submitting your review. Please try again.']);

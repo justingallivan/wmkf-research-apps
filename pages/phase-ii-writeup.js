@@ -7,6 +7,7 @@ import ErrorAlert from '../shared/components/ErrorAlert';
 import { useProfile } from '../shared/context/ProfileContext';
 import { parseSections } from '../shared/config/prompts/proposal-summarizer';
 import { parseSseStream } from '../shared/utils/sse-stream';
+import { requestEnvelope } from '../shared/utils/api-request';
 import Phase2FeedbackModal from '../shared/components/Phase2FeedbackModal';
 import Phase2WordExportModal from '../shared/components/Phase2WordExportModal';
 import Phase2QAModal from '../shared/components/Phase2QAModal';
@@ -74,6 +75,7 @@ function ProposalSummarizer() {
     setError(null);
 
     try {
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE-style stream (response.body.getReader() below); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const response = await fetch('/api/process', {
         method: 'POST',
         headers: {
@@ -158,7 +160,7 @@ function ProposalSummarizer() {
     setError(null);
 
     try {
-      const response = await fetch('/api/refine', {
+      const envelope = await requestEnvelope('/api/refine', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -169,17 +171,16 @@ function ProposalSummarizer() {
         })
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to refine summary');
+      if (!envelope.ok) {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        throw new Error(envelope.data.error || 'Failed to refine summary');
       }
 
       setResults(prev => ({
         ...prev,
         [selectedFileForRefine]: {
           ...prev[selectedFileForRefine],
-          formatted: data.refinedSummary
+          formatted: envelope.data.refinedSummary
         }
       }));
 
@@ -237,6 +238,7 @@ function ProposalSummarizer() {
 
     try {
       const result = results[selectedFileForQA];
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream via parseSseStream below; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const response = await fetch('/api/qa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ToolbarSelect, { COMPACT_CONTROL_HEIGHT_CLASS, COMPACT_CONTROL_FOCUS_CLASS } from '../ToolbarSelect';
 
@@ -161,9 +162,13 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
       try {
         const params = new URLSearchParams({ mode: 'options' });
         if (programId) params.set('programId', programId);
-        const response = await fetch(`/api/workbench/search-requests?${params}`);
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error || `Failed to load filters (${response.status})`);
+        const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/workbench/search-requests?${params}`, {
+          tolerantBody: true,
+        });
+        if (!resOk) {
+          const responseError = body && typeof body === 'object' ? body.error : null;
+          throw new Error(responseError || `Failed to load filters (${resStatus})`);
+        }
         if (cancelled || optionsRequestRef.current !== operationId) return;
         const selectedProgramId = String(body.programId || '').trim().toLowerCase();
         if (!selectedProgramId) throw new Error('No active Grant Program was returned');
@@ -257,10 +262,14 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
       if (normalized.status) params.set('status', normalized.status);
       params.set('programId', normalized.programId);
       if (offset) params.set('offset', String(offset));
-      const response = await fetch(`/api/workbench/search-requests?${params}`);
-      const body = await response.json().catch(() => ({}));
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/workbench/search-requests?${params}`, {
+        tolerantBody: true,
+      });
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        throw new Error(responseError || `Failed to search requests (${resStatus})`);
+      }
       if (requestIdRef.current !== operationId) return;
-      if (!response.ok) throw new Error(body.error || `Failed to search requests (${response.status})`);
 
       const returnedResults = Array.isArray(body.results) ? body.results : [];
       if (/^\d+$/.test(normalized.query) && !normalized.cycle && !normalized.status

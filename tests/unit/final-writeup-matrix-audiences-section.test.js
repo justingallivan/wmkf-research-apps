@@ -195,6 +195,61 @@ test('stale conflict keeps the complete local draft retryable', async () => {
   expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toMatchObject({ expectedRevision: 'W/"7"' });
 });
 
+// T3 matrix (Stage 3, group A) ahead of migrating both fetch sites onto
+// requestJson (tolerant .json(), !ok throw of data.error || fallback).
+function unparseable(status) {
+  return { ok: status >= 200 && status < 300, status, json: async () => { throw new SyntaxError('bad json'); } };
+}
+
+test('(c) load: a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch.mockRejectedValueOnce(new Error('network down'));
+  render(<FinalWriteupMatrixAudiencesSection />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+});
+
+test('(d) load: a malformed 2xx body (tolerant) becomes {} -> fallback config, no error', async () => {
+  global.fetch.mockResolvedValueOnce(unparseable(200));
+  render(<FinalWriteupMatrixAudiencesSection />);
+  expect(await screen.findByRole('button', { name: 'Publish Final Writeup staffing' })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('(e) load: a non-2xx unparseable body (502) shows the fallback message, never silent', async () => {
+  global.fetch.mockResolvedValueOnce(unparseable(502));
+  render(<FinalWriteupMatrixAudiencesSection />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Final Writeup staffing could not be loaded.');
+});
+
+test('(c) save: a network rejection surfaces the rejection\'s own message', async () => {
+  global.fetch.mockResolvedValueOnce(response(state({
+    configured: true,
+    storedVersion: 2,
+    revision: 'W/"3"',
+    config: { version: 2, personas: personas(), programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }] },
+  })));
+  render(<FinalWriteupMatrixAudiencesSection />);
+  const ada = await screen.findByRole('group', { name: /Responsibilities for Ada Reviewer/ });
+  fireEvent.click(within(ada).getByLabelText('Leadership'));
+  global.fetch.mockRejectedValueOnce(new Error('network down'));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+});
+
+test('(e) save: a non-2xx unparseable body (502) shows the fallback message, never silent', async () => {
+  global.fetch.mockResolvedValueOnce(response(state({
+    configured: true,
+    storedVersion: 2,
+    revision: 'W/"3"',
+    config: { version: 2, personas: personas(), programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }] },
+  })));
+  render(<FinalWriteupMatrixAudiencesSection />);
+  const ada = await screen.findByRole('group', { name: /Responsibilities for Ada Reviewer/ });
+  fireEvent.click(within(ada).getByLabelText('Leadership'));
+  global.fetch.mockResolvedValueOnce(unparseable(502));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Final Writeup staffing could not be published.');
+});
+
 test('configured program with no reviewers remains visibly invalid and cannot publish', async () => {
   global.fetch.mockResolvedValueOnce(response(state({
     configured: true,

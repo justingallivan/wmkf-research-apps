@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import ReviewerManagePanel from '../reviewers/ReviewerManagePanel';
@@ -196,20 +197,18 @@ export default function ReviewerFollowUpPanel({
     const requestScope = selectedScope === 'all' ? 'all' : 'my';
     setLoadingProposals(true);
     try {
-      const [dashboardResponse, reviewerResponse] = await Promise.all([
-        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}`),
-        fetch(`/api/review-manager/reviewers?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}`),
+      const [dashboardEnvelope, reviewerEnvelope] = await Promise.all([
+        requestEnvelope(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}`, { tolerantBody: true }),
+        requestEnvelope(`/api/review-manager/reviewers?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}`, { tolerantBody: true }),
       ]);
-      const [dashboardBody, reviewerBody] = await Promise.all([
-        dashboardResponse.json().catch(() => ({})),
-        reviewerResponse.json().catch(() => ({})),
-      ]);
+      const dashboardBody = dashboardEnvelope.data;
+      const reviewerBody = reviewerEnvelope.data;
       if (requestIdRef.current !== requestId) return;
-      if (!dashboardResponse.ok) {
-        throw new Error(dashboardBody.error || `Failed to load assigned requests (${dashboardResponse.status})`);
+      if (!dashboardEnvelope.ok) {
+        throw new Error(dashboardBody.error || `Failed to load assigned requests (${dashboardEnvelope.status})`);
       }
-      if (!reviewerResponse.ok) {
-        throw new Error(reviewerBody.error || `Failed to load reviewer tracking (${reviewerResponse.status})`);
+      if (!reviewerEnvelope.ok) {
+        throw new Error(reviewerBody.error || `Failed to load reviewer tracking (${reviewerEnvelope.status})`);
       }
       setProposals(mergeReviewerFollowUpProposals(
         dashboardBody.proposals || [],

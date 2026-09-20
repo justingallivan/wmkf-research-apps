@@ -106,3 +106,60 @@ test('the automation preference card stays out of Profile Settings (it lives on 
   expect(screen.queryByText(/automatic email review/i)).toBeNull();
   expect(screen.queryByRole('button', { name: /save automatic email setting/i })).toBeNull();
 });
+
+// ── T5 (client-request-layer Stage 5a, plan §5) matrix for the :147
+// grantee-invite GET, ahead of migrating it onto requestJson. Outcome is
+// binary and message-independent: the outer `.catch` in the source only
+// sets `unavailable: true` on ANY rejection, so (b)/(c)/(e) all assert the
+// same visible state. `tolerantBody: true` matches today's
+// `.json().catch(() => ({}))`. ─────────────────────────────────────────
+function graniteInviteFetch(handler) {
+  return jest.fn(async (url) => {
+    if (String(url).includes('/api/email-defaults/grantee-invite')) return handler();
+    if (String(url).includes('/api/email-automation-preferences')) {
+      return { ok: true, status: 200, json: async () => ({ configured: true, preference: { mode: 'review', leadDays: 3 } }) };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+}
+
+test('T5(a) grantee-invite 2xx JSON loads the body as today', async () => {
+  global.fetch = graniteInviteFetch(() => ({
+    ok: true, status: 200, json: async () => ({ body: 'Custom default', unavailable: false }),
+  }));
+  render(<ProfileSettings />);
+  await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue('Custom default'));
+});
+
+test('T5(b) grantee-invite non-2xx {error} falls back to unavailable, as today', async () => {
+  global.fetch = graniteInviteFetch(() => ({
+    ok: false, status: 500, json: async () => ({ error: 'boom' }),
+  }));
+  render(<ProfileSettings />);
+  await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue(''));
+});
+
+test('T5(c) grantee-invite network rejection falls back to unavailable, as today', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).includes('/api/email-defaults/grantee-invite')) throw new Error('network down');
+    return { ok: true, status: 200, json: async () => ({ configured: true, preference: {} }) };
+  });
+  render(<ProfileSettings />);
+  await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue(''));
+});
+
+test('T5(d) grantee-invite malformed 2xx body falls back to the empty-default state, as today (tolerant)', async () => {
+  global.fetch = graniteInviteFetch(() => ({
+    ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); },
+  }));
+  render(<ProfileSettings />);
+  await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue(''));
+});
+
+test('T5(e) grantee-invite unparseable non-2xx body (e.g. a 502 HTML page) still resolves to unavailable, as today', async () => {
+  global.fetch = graniteInviteFetch(() => ({
+    ok: false, status: 502, json: async () => { throw new SyntaxError('<html>Bad gateway</html>'); },
+  }));
+  render(<ProfileSettings />);
+  await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue(''));
+});

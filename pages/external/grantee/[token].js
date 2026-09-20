@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import GranteeDeliverableForm from '../../../shared/components/external/GranteeDeliverableForm';
+import { requestEnvelope } from '../../../shared/utils/api-request';
 
 const REASON_MESSAGE = {
   no_token: 'This link is missing its access token.',
@@ -36,8 +37,17 @@ export default function GranteePortalPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/external/grantee/${token}/context`);
-        const data = await res.json();
+        const envelope = await requestEnvelope(`/api/external/grantee/${token}/context`);
+        // Today's bare `.json()` (no catch) throws on ANY malformed body,
+        // regardless of HTTP status, landing in the outer catch below. The
+        // helper only parses strictly on 2xx; a non-2xx unparseable body is
+        // always tolerant, so reproduce the throw-to-catch outcome here via
+        // the recorded parseError.
+        if (envelope.error?.parseError) {
+          if (!cancelled) setState({ status: 'error', reason: 'server_error' });
+          return;
+        }
+        const data = envelope.data;
         if (cancelled) return;
         if (!data.ok) {
           setState({ status: 'error', reason: data.reason });

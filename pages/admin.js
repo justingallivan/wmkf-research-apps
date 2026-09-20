@@ -26,6 +26,7 @@ import {
   resolveAdminLocation,
 } from '../shared/components/admin/AdminWorkspaceNavigation';
 import { APP_REGISTRY } from '../shared/config/appRegistry';
+import { requestJson, requestEnvelope } from '../shared/utils/api-request';
 
 const PERIOD_OPTIONS = [
   { value: '1d', label: '1 day' },
@@ -209,8 +210,14 @@ function HealthSection() {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/health')
-      .then(r => r.json())
+    // D1 fix: a non-2xx response now routes through the same error path a
+    // network failure already used, instead of being read as if it were
+    // success (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+    requestEnvelope('/api/health')
+      .then((envelope) => {
+        if (!envelope.ok) throw envelope.error;
+        return envelope.data;
+      })
       .then(setHealth)
       .catch(err => setHealth({ overall: 'error', services: {}, error: err.message }))
       .finally(() => setLoading(false));
@@ -297,6 +304,9 @@ function HealthSection() {
         })}
       </div>
       )}
+      {health.error && (
+        <p className="text-sm text-red-700 mt-3">{health.error}</p>
+      )}
       {health.timestamp && (
         <p className="text-xs text-gray-400 mt-3">Checked at {new Date(health.timestamp).toLocaleString()}</p>
       )}
@@ -320,8 +330,8 @@ function HealthHistorySection() {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/admin/health-history?hours=${hours}`)
-      .then(r => r.ok ? r.json() : null)
+    requestEnvelope(`/api/admin/health-history?hours=${hours}`)
+      .then(envelope => envelope.ok ? envelope.data : null)
       .then(setHistory)
       .catch(() => setHistory(null))
       .finally(() => setLoading(false));
@@ -494,8 +504,8 @@ function SystemAlertsSection() {
   const [expandedId, setExpandedId] = useState(null);
 
   const fetchAlerts = () => {
-    fetch('/api/admin/alerts')
-      .then(r => r.ok ? r.json() : null)
+    requestEnvelope('/api/admin/alerts')
+      .then(envelope => envelope.ok ? envelope.data : null)
       .then(data => setAlerts(data?.alerts || []))
       .catch(() => setAlerts([]))
       .finally(() => setLoading(false));
@@ -506,12 +516,11 @@ function SystemAlertsSection() {
   const handleAction = async (id, action) => {
     setActionInProgress(id);
     try {
-      const res = await fetch('/api/admin/alerts', {
+      const envelope = await requestEnvelope('/api/admin/alerts', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action }),
+        body: { id, action },
       });
-      if (res.ok) fetchAlerts();
+      if (envelope.ok) fetchAlerts();
     } catch {}
     setActionInProgress(null);
   };
@@ -637,10 +646,10 @@ function MaintenanceSection() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/admin/maintenance', { signal: controller.signal })
-      .then(r => {
-        if (!r.ok) throw new Error('Maintenance status could not be loaded.');
-        return r.json();
+    requestEnvelope('/api/admin/maintenance', { signal: controller.signal })
+      .then(envelope => {
+        if (!envelope.ok) throw new Error('Maintenance status could not be loaded.');
+        return envelope.data;
       })
       .then(setData)
       .catch((loadError) => {
@@ -760,10 +769,10 @@ function SecretExpirationSection() {
   const [error, setError] = useState(null);
 
   const fetchSecrets = () => {
-    fetch('/api/admin/secrets')
-      .then(r => {
-        if (!r.ok) throw new Error('Credential expiration data could not be loaded.');
-        return r.json();
+    requestEnvelope('/api/admin/secrets')
+      .then(envelope => {
+        if (!envelope.ok) throw new Error('Credential expiration data could not be loaded.');
+        return envelope.data;
       })
       .then(data => setSecrets(data?.secrets || []))
       .catch((loadError) => {
@@ -788,17 +797,16 @@ function SecretExpirationSection() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/secrets', {
+      const envelope = await requestEnvelope('/api/admin/secrets', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: editingKey, ...editValues }),
+        body: { key: editingKey, ...editValues },
+        tolerantBody: true,
       });
-      if (res.ok) {
+      if (envelope.ok) {
         setEditingKey(null);
         fetchSecrets();
       } else {
-        const err = await res.json().catch(() => ({}));
-        setError(err.error || 'The credential dates could not be saved.');
+        setError(envelope.data?.error || 'The credential dates could not be saved.');
       }
     } catch (err) {
       setError(err.message || 'The credential dates could not be saved.');
@@ -935,11 +943,11 @@ function UsageSection() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/admin/stats?period=${period}`)
-      .then(r => {
-        if (r.status === 403) throw new Error('Admin access required');
-        if (!r.ok) throw new Error('Failed to fetch stats');
-        return r.json();
+    requestEnvelope(`/api/admin/stats?period=${period}`)
+      .then(envelope => {
+        if (envelope.status === 403) throw new Error('Admin access required');
+        if (!envelope.ok) throw new Error('Failed to fetch stats');
+        return envelope.data;
       })
       .then(setStats)
       .catch(err => setError(err.message))
@@ -1246,11 +1254,11 @@ function ModelConfigSection() {
     if (refresh) setRefreshing(true); else setLoading(true);
     setError(null);
     const url = refresh ? '/api/admin/models?refresh=1' : '/api/admin/models';
-    fetch(url)
-      .then(r => {
-        if (r.status === 403) throw new Error('Admin access required');
-        if (!r.ok) throw new Error('Failed to fetch model config');
-        return r.json();
+    requestEnvelope(url)
+      .then(envelope => {
+        if (envelope.status === 403) throw new Error('Admin access required');
+        if (!envelope.ok) throw new Error('Failed to fetch model config');
+        return envelope.data;
       })
       .then(data => {
         setServerState(data);
@@ -1332,15 +1340,12 @@ function ModelConfigSection() {
     setMessage(null);
     try {
       for (const change of diff) {
-        const resp = await fetch('/api/admin/models', {
+        await requestJson('/api/admin/models', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(change),
+          body: change,
+          tolerantBody: true,
+          fallbackMessage: 'Failed to save',
         });
-        if (!resp.ok) {
-          const err = await resp.json();
-          throw new Error(err.error || 'Failed to save');
-        }
       }
       setMessage({ type: 'success', text: `Saved ${diff.length} model override(s)` });
       fetchConfig();
@@ -1580,13 +1585,21 @@ function RoleManagementSection() {
   const [message, setMessage] = useState(null);
 
   const fetchRoles = () => {
-    fetch('/api/dynamics-explorer/roles')
-      .then(r => {
-        if (r.status === 403 || r.status === 401) {
+    // D1 fix: the 401/403 branch is unchanged (still hides the section as
+    // "denied"). Any other non-2xx status now surfaces the server's error in
+    // the existing `message` banner instead of being read as if it were
+    // success (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+    requestEnvelope('/api/dynamics-explorer/roles')
+      .then(envelope => {
+        if (envelope.status === 403 || envelope.status === 401) {
           setCallerRole('denied');
           return null;
         }
-        return r.json();
+        if (!envelope.ok) {
+          setMessage({ type: 'error', text: envelope.error.message });
+          return null;
+        }
+        return envelope.data;
       })
       .then(data => {
         if (!data) return;
@@ -1599,9 +1612,21 @@ function RoleManagementSection() {
 
   useEffect(() => {
     fetchRoles();
-    fetch('/api/user-profiles?all=true')
-      .then(r => r.json())
-      .then(data => setUsers(data.profiles || []))
+    // D1 fix: a non-2xx response now surfaces the server's error in the
+    // existing `message` banner instead of being read as if it were success.
+    // The `.catch(() => {})` here still only covers network/parse failures,
+    // unchanged from before (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+    requestEnvelope('/api/user-profiles?all=true')
+      .then(envelope => {
+        // 401/403 mirrors the roles fetch: a non-superuser gets 403 from
+        // `?all=true` and the section must stay hidden, not show a banner.
+        if (envelope.status === 403 || envelope.status === 401) return;
+        if (!envelope.ok) {
+          setMessage({ type: 'error', text: envelope.error.message });
+          return;
+        }
+        setUsers(envelope.data.profiles || []);
+      })
       .catch(() => {});
   }, []);
 
@@ -1609,22 +1634,32 @@ function RoleManagementSection() {
     return <div className="text-gray-500 text-sm">Loading...</div>;
   }
 
-  if (callerRole !== 'superuser') return null;
+  // D1 fix: a generic (non-401/403) load failure leaves callerRole unset, so
+  // this used to hide the section with no message. Reuse the same `message`
+  // banner the save/remove actions already render, instead of adding a new
+  // error surface (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+  if (callerRole !== 'superuser') {
+    if (!message) return null;
+    return (
+      <div className={`mb-4 px-3 py-2 rounded-lg text-sm ${
+        message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+      }`}>
+        {message.text}
+      </div>
+    );
+  }
 
   const assignRole = async () => {
     if (!selectedUser) return;
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/dynamics-explorer/roles', {
+      await requestJson('/api/dynamics-explorer/roles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userProfileId: parseInt(selectedUser), role: selectedRole }),
+        body: { userProfileId: parseInt(selectedUser), role: selectedRole },
+        tolerantBody: true,
+        fallbackMessage: 'Failed to assign role',
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to assign role');
-      }
       setMessage({ type: 'success', text: 'Role assigned' });
       setSelectedUser('');
       fetchRoles();
@@ -1639,14 +1674,14 @@ function RoleManagementSection() {
     if (!confirm(`Remove role from ${userName}? They will revert to read-only.`)) return;
     setMessage(null);
     try {
-      const res = await fetch('/api/dynamics-explorer/roles', {
+      const envelope = await requestEnvelope('/api/dynamics-explorer/roles', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userProfileId }),
+        body: { userProfileId },
+        tolerantBody: true,
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to remove role');
+      if (!envelope.ok) {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        throw new Error(envelope.data?.error || 'Failed to remove role');
       }
       setMessage({ type: 'success', text: `Role removed from ${userName}` });
       fetchRoles();
@@ -1785,20 +1820,20 @@ export function AppAccessSection() {
 
   const fetchGrants = async () => {
     try {
-      const res = await fetch('/api/app-access?all=true');
-      if (res.status === 403 || res.status === 401) {
+      const envelope = await requestEnvelope('/api/app-access?all=true');
+      if (envelope.status === 403 || envelope.status === 401) {
         setIsSuperuser(false);
         setSnapshotStale(true);
         return 'unauthorized';
       }
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Unable to load app access grants');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) {
+        throw new Error(envelope.data.error || 'Unable to load app access grants');
       }
       setIsSuperuser(true);
       setSnapshotStale(false);
       setMessage(null);
-      applyServerData(data);
+      applyServerData(envelope.data);
       return 'ok';
     } catch (error) {
       // The admin page is already superuser-only. Keep this section visible so
@@ -1885,20 +1920,20 @@ export function AppAccessSection() {
     try {
       for (const { userId, toGrant, toRevoke } of diff) {
         if (toGrant.length > 0) {
-          const res = await fetch('/api/app-access', {
+          await requestJson('/api/app-access', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userProfileId: userId, apps: toGrant }),
+            body: { userProfileId: userId, apps: toGrant },
+            tolerantBody: true,
+            fallbackMessage: 'Grant failed',
           });
-          if (!res.ok) throw new Error((await res.json()).error || 'Grant failed');
         }
         if (toRevoke.length > 0) {
-          const res = await fetch('/api/app-access', {
+          await requestJson('/api/app-access', {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userProfileId: userId, apps: toRevoke }),
+            body: { userProfileId: userId, apps: toRevoke },
+            tolerantBody: true,
+            fallbackMessage: 'Revoke failed',
           });
-          if (!res.ok) throw new Error((await res.json()).error || 'Revoke failed');
         }
       }
       const totalGrants = diff.reduce((n, d) => n + d.toGrant.length, 0);
@@ -1950,10 +1985,10 @@ export function AppAccessSection() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/users?id=${userId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Remove failed');
-      const removedName = data.name || userName || userId;
+      const envelope = await requestEnvelope(`/api/admin/users?id=${userId}`, { method: 'DELETE' });
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data.error || 'Remove failed');
+      const removedName = envelope.data.name || userName || userId;
       const refreshed = await fetchGrants();
       setMessage(refreshed === 'ok'
         ? { type: 'success', text: `Removed ${removedName}` }
@@ -2128,10 +2163,10 @@ export function DynamicsFeedbackSection() {
     if (type) qs.set('type', type);
     const query = qs.toString();
     setError(null);
-    fetch(`/api/dynamics-explorer/feedback${query ? `?${query}` : ''}`)
-      .then(r => {
-        if (!r.ok) throw new Error('Feedback could not be loaded.');
-        return r.json();
+    requestEnvelope(`/api/dynamics-explorer/feedback${query ? `?${query}` : ''}`)
+      .then(envelope => {
+        if (!envelope.ok) throw new Error('Feedback could not be loaded.');
+        return envelope.data;
       })
       .then(data => {
         setFeedback(data?.feedback || []);
@@ -2151,12 +2186,12 @@ export function DynamicsFeedbackSection() {
   const handleAction = async (id, status) => {
     setActionInProgress(id);
     try {
-      const res = await fetch('/api/dynamics-explorer/feedback', {
+      const envelope = await requestEnvelope('/api/dynamics-explorer/feedback', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status }),
+        body: { id, status },
+        tolerantBody: true,
       });
-      if (!res.ok) throw new Error('The feedback status could not be updated.');
+      if (!envelope.ok) throw new Error('The feedback status could not be updated.');
       fetchFeedback();
     } catch (actionError) {
       setError(actionError.message);
@@ -2346,8 +2381,8 @@ function DynamicsIdentitySection() {
 
   const fetchUsers = () => {
     setLoading(true);
-    fetch('/api/user-profiles?all=true')
-      .then(r => (r.ok ? r.json() : null))
+    requestEnvelope('/api/user-profiles?all=true')
+      .then(envelope => (envelope.ok ? envelope.data : null))
       .then(data => {
         if (!data) return;
         setUsers((data.profiles || []).filter(u => u.isActive));
@@ -2362,13 +2397,13 @@ function DynamicsIdentitySection() {
     setReconciling(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/admin/reconcile-identities', {
+      const envelope = await requestEnvelope('/api/admin/reconcile-identities', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all }),
+        body: { all },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || 'Reconcile failed');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      const data = envelope.data;
+      if (!envelope.ok) throw new Error(data.error || data.message || 'Reconcile failed');
       const s = data.summary || {};
       const parts = [];
       if (s.linked) parts.push(`${s.linked} linked`);
@@ -2476,9 +2511,10 @@ function AlertRecipientsSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/alert-recipients');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      const envelope = await requestEnvelope('/api/admin/alert-recipients');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      const data = envelope.data;
       const seedCats = data.seedCategories || [];
       const config = data.config || {};
       setSeed(seedCats);
@@ -2566,13 +2602,13 @@ function AlertRecipientsSection() {
       for (const r of rows) {
         if (r.emails.length) config[r.category] = r.emails;
       }
-      const res = await fetch('/api/admin/alert-recipients', {
+      const envelope = await requestEnvelope('/api/admin/alert-recipients', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config }),
+        body: { config },
       });
-      const data = await res.json();
-      if (!res.ok) {
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) {
+        const data = envelope.data;
         const detail = Array.isArray(data?.details) ? `: ${data.details.join('; ')}` : '';
         throw new Error((data?.error || 'Save failed') + detail);
       }
@@ -2700,9 +2736,10 @@ function HonorariumAmountSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/honorarium-amount');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      const envelope = await requestEnvelope('/api/admin/honorarium-amount');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      const data = envelope.data;
       setAmount(String(data.amount ?? ''));
       setIsDefault(!!data.isDefault);
       setMalformed(!!data.malformed);
@@ -2721,13 +2758,12 @@ function HonorariumAmountSection() {
     try {
       const n = Number(String(amount).trim());
       if (!Number.isFinite(n) || n <= 0) throw new Error('Enter a positive number');
-      const res = await fetch('/api/admin/honorarium-amount', {
+      const envelope = await requestEnvelope('/api/admin/honorarium-amount', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: n }),
+        body: { amount: n },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Save failed');
       setSavedAt(new Date());
       await load();
     } catch (e) {
@@ -2793,10 +2829,10 @@ function ReviewerReleaseAttachmentsSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/review-manager/release-settings');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
-      setEnabled(!!data.attachProposalEmail);
+      const envelope = await requestEnvelope('/api/review-manager/release-settings');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      setEnabled(!!envelope.data.attachProposalEmail);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -2811,14 +2847,13 @@ function ReviewerReleaseAttachmentsSection() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/review-manager/release-settings', {
+      const envelope = await requestEnvelope('/api/review-manager/release-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachProposalEmail: next }),
+        body: { attachProposalEmail: next },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Save failed');
-      setEnabled(!!data.attachProposalEmail);
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Save failed');
+      setEnabled(!!envelope.data.attachProposalEmail);
       setSavedAt(new Date());
     } catch (e) {
       setError(e.message);
@@ -2874,9 +2909,10 @@ function ReviewerCampaignTimelineSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/review-manager/campaign-timeline-defaults');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      const envelope = await requestEnvelope('/api/review-manager/campaign-timeline-defaults');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      const data = envelope.data;
       setTimeline({
         cycleLabel: data.timeline?.cycleLabel || '',
         inviteStartDate: data.timeline?.inviteStartDate || '',
@@ -2916,19 +2952,18 @@ function ReviewerCampaignTimelineSection() {
       const desiredCount = timeline.desiredCount === ''
         ? null
         : Number(timeline.desiredCount);
-      const res = await fetch('/api/review-manager/campaign-timeline-defaults', {
+      const envelope = await requestEnvelope('/api/review-manager/campaign-timeline-defaults', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           timeline: {
             ...timeline,
             respondOffsetDays,
             desiredCount,
           },
-        }),
+        },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Save failed');
       setSavedAt(new Date());
       await load();
     } catch (e) {
@@ -3051,9 +3086,10 @@ function ReviewerTimeBudgetSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/reviewer-time-budget');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      const envelope = await requestEnvelope('/api/admin/reviewer-time-budget');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Failed to load');
+      const data = envelope.data;
       setSeconds(String(data.seconds ?? ''));
       setIsDefault(!!data.isDefault);
       setMalformed(!!data.malformed);
@@ -3073,13 +3109,12 @@ function ReviewerTimeBudgetSection() {
     try {
       const n = Number(String(seconds).trim());
       if (!Number.isFinite(n) || n <= 0) throw new Error('Enter a positive number of seconds');
-      const res = await fetch('/api/admin/reviewer-time-budget', {
+      const envelope = await requestEnvelope('/api/admin/reviewer-time-budget', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seconds: n }),
+        body: { seconds: n },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      if (envelope.error?.parseError) throw envelope.error.parseError;
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'Save failed');
       setSavedAt(new Date());
       await load();
     } catch (e) {
@@ -3136,7 +3171,7 @@ function ReviewerTimeBudgetSection() {
   );
 }
 
-function OperationsWorkspace({ view }) {
+export function OperationsWorkspace({ view }) {
   switch (view) {
     case 'incidents':
       return (
@@ -3195,7 +3230,7 @@ function OperationsWorkspace({ view }) {
   }
 }
 
-function WorkflowsWorkspace({ view }) {
+export function WorkflowsWorkspace({ view }) {
   switch (view) {
     case 'review-form':
       return (
@@ -3332,7 +3367,7 @@ function WorkflowsWorkspace({ view }) {
   }
 }
 
-function AiWorkspace({ view }) {
+export function AiWorkspace({ view }) {
   switch (view) {
     case 'models':
       return (
@@ -3372,7 +3407,7 @@ function AiWorkspace({ view }) {
   }
 }
 
-function PeopleWorkspace({ view }) {
+export function PeopleWorkspace({ view }) {
   switch (view) {
     case 'app-access':
       return (

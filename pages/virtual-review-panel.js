@@ -3,6 +3,7 @@ import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import FileUploaderSimple from '../shared/components/FileUploaderSimple';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
+import { requestEnvelope } from '../shared/utils/api-request';
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
   WidthType, AlignmentType, BorderStyle
@@ -1027,9 +1028,9 @@ function VirtualReviewPanelContent() {
 
   // Fetch available providers and models from server on mount
   useEffect(() => {
-    fetch('/api/virtual-review-panel')
-      .then(res => res.json())
-      .then(data => {
+    requestEnvelope('/api/virtual-review-panel', { tolerantBody: true })
+      .then(envelope => {
+        const data = envelope.data;
         if (data.providers) {
           setAvailableProviders(data.providers.map(p => p.key));
           const models = {};
@@ -1067,6 +1068,7 @@ function VirtualReviewPanelContent() {
     setIntelligenceBlock(null);
 
     try {
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream (response.body.getReader() below); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const response = await fetch('/api/virtual-review-panel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

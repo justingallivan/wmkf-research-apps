@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 /**
  * Superuser-managed safeguards for the Dynamics Explorer query surface.
@@ -9,37 +10,56 @@ export default function DynamicsExplorerRestrictionsSection({ userProfileId }) {
   const [restrictions, setRestrictions] = useState([]);
   const [newRestriction, setNewRestriction] = useState({ table_name: '', field_name: '', reason: '' });
   const [loading, setLoading] = useState(true);
+  // D1 fix: this section had no error surface at all; add the minimal state
+  // + inline element pattern the sibling PoliciesSection already uses
+  // (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('/api/dynamics-explorer/restrictions')
-      .then((response) => response.json())
-      .then((data) => {
-        setRestrictions(data.restrictions || []);
-        setLoading(false);
+    requestEnvelope('/api/dynamics-explorer/restrictions')
+      .then((envelope) => {
+        if (!envelope.ok) {
+          setError(envelope.error.message);
+          return;
+        }
+        setRestrictions(envelope.data.restrictions || []);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const addRestriction = async () => {
     if (!newRestriction.table_name) return;
-    const response = await fetch('/api/dynamics-explorer/restrictions', {
+    setError(null);
+    const envelope = await requestEnvelope('/api/dynamics-explorer/restrictions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newRestriction, userProfileId }),
+      body: { ...newRestriction, userProfileId },
     });
-    const data = await response.json();
-    if (data.restriction) {
-      setRestrictions((previous) => [...previous, data.restriction]);
+    if (!envelope.ok) {
+      setError(envelope.error.message);
+      return;
+    }
+    if (envelope.data.restriction) {
+      setRestrictions((previous) => [...previous, envelope.data.restriction]);
       setNewRestriction({ table_name: '', field_name: '', reason: '' });
     }
   };
 
   const removeRestriction = async (id) => {
-    await fetch('/api/dynamics-explorer/restrictions', {
+    // D1 fix: a failed delete no longer removes the row optimistically; the
+    // row stays and the error is surfaced.
+    setError(null);
+    const envelope = await requestEnvelope('/api/dynamics-explorer/restrictions', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, userProfileId }),
+      body: { id, userProfileId },
+      tolerantBody: true,
     });
+    if (!envelope.ok) {
+      setError(envelope.error.message);
+      return;
+    }
     setRestrictions((previous) => previous.filter((restriction) => restriction.id !== id));
   };
 
@@ -47,6 +67,7 @@ export default function DynamicsExplorerRestrictionsSection({ userProfileId }) {
 
   return (
     <div className="space-y-4">
+      {error && <p className="text-sm text-red-700">{error}</p>}
       {restrictions.length > 0 ? (
         <div className="space-y-2">
           {restrictions.map((restriction) => (

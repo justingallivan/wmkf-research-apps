@@ -310,3 +310,103 @@ test('a server reason is translated into a useful submit error', async () => {
   expect(screen.getByRole('alert')).toHaveTextContent(/tiff, heic, gif, word, or powerpoint/i);
   expect(submitBtn()).toBeEnabled();
 });
+
+// T5 matrix for the /upload-token and /submit POST sites (the /upload-failure
+// beacon stays raw fetch; covered by the "SDK failure" and "server_error/408"
+// tests above via reportUploadFailure).
+test('(b) a 413 on /upload-token also reports the upload failure beacon', async () => {
+  const fetchSpy = jest.spyOn(global, 'fetch')
+    .mockResolvedValueOnce({ ok: false, status: 413, json: async () => ({ ok: false, reason: 'image_too_large' }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+  renderForm({ token: 'tok-123' });
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/too large/i));
+  const [url, opts] = fetchSpy.mock.calls[1];
+  expect(url).toBe('/api/external/grantee/tok-123/upload-failure');
+  expect(JSON.parse(opts.body)).toMatchObject({ stage: 'token_request', category: 'http_rejected', httpStatus: 413 });
+});
+
+test('(b) a 2xx body with ok:false on /upload-token is treated as a failure (body-level flag, not status)', async () => {
+  jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: false, reason: 'waiver_invalid' }) });
+  renderForm();
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/publication-consent session expired/i));
+});
+
+test('(c) a network rejection on /upload-token shows the upload-prep failure copy', async () => {
+  jest.spyOn(global, 'fetch').mockRejectedValue(new Error('network down'));
+  renderForm();
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/upload could not be prepared/i));
+});
+
+test('(d)/(e) a malformed body on /upload-token (2xx or non-2xx) is tolerated to {} (today\'s `.catch(() => ({}))`)', async () => {
+  jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } });
+  renderForm();
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/submission failed/i));
+});
+
+test('(b) a 413 on /submit reports the upload failure beacon at the finalize stage', async () => {
+  const fetchSpy = jest.spyOn(global, 'fetch')
+    .mockResolvedValueOnce({
+      ok: true, status: 200,
+      json: async () => ({ ok: true, stagingId: 'stage-1', pathname: 'portal-staging/grantee/x', clientToken: 'client-token', contentType: 'image/png' }),
+    })
+    .mockResolvedValueOnce({ ok: false, status: 413, json: async () => ({ ok: false, reason: 'image_too_large' }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+  renderForm({ token: 'tok-123' });
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/too large/i));
+  const [url, opts] = fetchSpy.mock.calls[2];
+  expect(url).toBe('/api/external/grantee/tok-123/upload-failure');
+  expect(JSON.parse(opts.body)).toMatchObject({ stage: 'finalize', category: 'http_rejected', httpStatus: 413 });
+});
+
+test('(c) a network rejection on /submit finalize shows the finalize-retry copy', async () => {
+  jest.spyOn(global, 'fetch')
+    .mockResolvedValueOnce({
+      ok: true, status: 200,
+      json: async () => ({ ok: true, stagingId: 'stage-1', pathname: 'portal-staging/grantee/x', clientToken: 'client-token', contentType: 'image/png' }),
+    })
+    .mockRejectedValueOnce(new Error('network down'))
+    .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+  renderForm({ token: 'tok-123' });
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/final confirmation could not be received/i));
+});
+
+test('(d)/(e) a malformed body on /submit (2xx or non-2xx) is tolerated to {} (today\'s `.catch(() => ({}))`)', async () => {
+  jest.spyOn(global, 'fetch')
+    .mockResolvedValueOnce({
+      ok: true, status: 200,
+      json: async () => ({ ok: true, stagingId: 'stage-1', pathname: 'portal-staging/grantee/x', clientToken: 'client-token', contentType: 'image/png' }),
+    })
+    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } });
+  renderForm({ token: 'tok-123' });
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/submission failed/i));
+});

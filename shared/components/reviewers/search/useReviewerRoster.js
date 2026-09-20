@@ -2,6 +2,7 @@
  * Ownership: operation hook: owns roster loading command; controller owns state and view modules render.
  */
 import { useCallback } from 'react';
+import { requestEnvelope } from '../../../utils/api-request';
 
 export default function useReviewerRoster({
   requestId,
@@ -47,10 +48,12 @@ export default function useReviewerRoster({
 
   const reloadRoster = useCallback(async (expectedGeneration = genRef.current) => {
     if (!requestId) return null;
-    const res = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
-    const data = await res.json().catch(() => ({}));
+    const { ok, data } = await requestEnvelope(
+      `/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`,
+      { tolerantBody: true },
+    );
     if (genRef.current !== expectedGeneration) return null;
-    if (!res.ok || !data.success) return null;
+    if (!ok || !data.success) return null;
     applyRosterSnapshot(data);
     return data;
   }, [requestId, genRef, applyRosterSnapshot]);

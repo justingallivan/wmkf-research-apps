@@ -24,6 +24,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
 import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/external/review-form-schema';
@@ -315,6 +316,7 @@ function ExportMenu({ proposal }) {
     setBusy(true);
     setError(null);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- blob download reads Content-Disposition; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const response = await fetch(`/api/review-manager/export-reviews?proposalId=${encodeURIComponent(proposalId)}`);
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -512,17 +514,17 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated,
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch('/api/review-manager/synthesize-reviews', {
+      const { ok: resOk, data } = await requestEnvelope('/api/review-manager/synthesize-reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           overwrite: !!overwrite,
           confirmEarly,
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
+      if (!resOk || !data.ok) {
         if (data.writtenToDynamics === true) {
           await onUpdated?.();
         }
@@ -756,13 +758,13 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, updating =
     setSending(true);
     setFeedback(null);
     try {
-      const res = await fetch('/api/review-manager/send-review-reminder', {
+      const { ok: resOk, data } = await requestEnvelope('/api/review-manager/send-review-reminder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, suggestionId: reviewer.suggestionId }),
+        body: { requestId, suggestionId: reviewer.suggestionId },
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
+      if (!resOk || !data.ok) {
         const messages = {
           conflict: 'Already claimed by another send — refresh to see the latest status.',
           removed: 'This reviewer was removed from the proposal — restore them first.',
@@ -892,12 +894,11 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
     setUpdating(retained);
     setError(null);
     try {
-      const res = await fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(requestId)}`);
-      const data = await res.json().catch(() => ({}));
+      const { ok: resOk, status: resStatus, data } = await requestEnvelope(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(requestId)}`, { tolerantBody: true });
       if (fetchId !== fetchIdRef.current || !mountedRef.current || currentRequestRef.current !== requestId) return;
       const proposals = data?.proposals;
       const nextProposal = Array.isArray(proposals) && proposals.length === 1 ? proposals[0] : null;
-      const malformed = res.ok && (!data || data.success !== true || !Array.isArray(proposals)
+      const malformed = resOk && (!data || data.success !== true || !Array.isArray(proposals)
         || proposals.length > 1
         || proposals.some((item) => !item
           || typeof item !== 'object'
@@ -906,9 +907,9 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
           || item.proposalId.toLowerCase() !== requestId.toLowerCase()
           || !Array.isArray(item.reviewers)
           || item.reviewers.some((reviewer) => !reviewer || typeof reviewer !== 'object' || Array.isArray(reviewer))));
-      if (!res.ok || malformed) {
-        const error = new Error(data?.error || `Failed to load reviews (${res.status})`);
-        error.denial = res.status === 401 || res.status === 403;
+      if (!resOk || malformed) {
+        const error = new Error(data?.error || `Failed to load reviews (${resStatus})`);
+        error.denial = resStatus === 401 || resStatus === 403;
         error.malformed = malformed;
         throw error;
       }

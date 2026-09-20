@@ -15,6 +15,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import PolicyAckModal from './PolicyAckModal';
 import GranteeAbstractEditor from './GranteeAbstractEditor';
 import {
@@ -149,6 +150,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
     const status = Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599
       ? httpStatus
       : null;
+    // eslint-disable-next-line no-restricted-syntax -- raw fetch: fire-and-forget keepalive beacon; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
     void fetch(`/api/external/grantee/${token}/upload-failure`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -173,18 +175,21 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
     try {
       let staged = stagedUpload;
       if (imageFile && !staged) {
-        const tokenRes = await fetch(`/api/external/grantee/${token}/upload-token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filename: imageFile.name,
-            contentType: declaredImageContentType(imageFile),
-            size: imageFile.size,
-          }),
-        });
-        const tokenData = await tokenRes.json().catch(() => ({}));
-        if (!tokenRes.ok || !tokenData.ok) {
-          if (tokenRes.status === 413) reportUploadFailure(activeStage, 'http_rejected', tokenRes.status);
+        const { ok: tokenOk, status: tokenStatus, data: tokenData } = await requestEnvelope(
+          `/api/external/grantee/${token}/upload-token`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: {
+              filename: imageFile.name,
+              contentType: declaredImageContentType(imageFile),
+              size: imageFile.size,
+            },
+            tolerantBody: true,
+          },
+        );
+        if (!tokenOk || !tokenData.ok) {
+          if (tokenStatus === 413) reportUploadFailure(activeStage, 'http_rejected', tokenStatus);
           setError(submitErrorMessage(tokenData));
           setSubmitting(false);
           return;
@@ -202,19 +207,22 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
       }
 
       activeStage = 'finalize';
-      const res = await fetch(`/api/external/grantee/${token}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          editedAbstract: abstract,
-          caption,
-          waiverToken,
-          stagingId: staged?.stagingId || null,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        if (res.status === 413) reportUploadFailure(activeStage, 'http_rejected', res.status);
+      const { ok: submitOk, status: submitStatus, data } = await requestEnvelope(
+        `/api/external/grantee/${token}/submit`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: {
+            editedAbstract: abstract,
+            caption,
+            waiverToken,
+            stagingId: staged?.stagingId || null,
+          },
+          tolerantBody: true,
+        },
+      );
+      if (!submitOk || !data.ok) {
+        if (submitStatus === 413) reportUploadFailure(activeStage, 'http_rejected', submitStatus);
         const terminalStaging = new Set([
           'staging_expired', 'staging_not_found', 'staged_upload_missing',
           'staging_publicly_readable', 'image_invalid', 'image_too_large',

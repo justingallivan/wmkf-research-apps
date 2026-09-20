@@ -429,6 +429,26 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ## `shared/utils/` — lifecycle policy (browser-safe)
 
+- **`shared/utils/api-request.js`** — the client request layer: one place for the fetch → parse-body
+  → ok-check → error-message dance that client `fetch(` call sites in `shared/components/**` and
+  `pages/**` (excluding `pages/api/**`) hand-roll. Two entry points: `requestJson(url, options)`
+  (throwing form, resolves to the parsed body on 2xx, throws `ApiRequestError` on non-2xx) and
+  `requestEnvelope(url, options)` (non-throwing form, resolves to `{ ok, status, data, error }`);
+  both share `fetchImpl ?? globalThis.fetch` late binding, `tolerantBody` body-parse policy, and
+  `deriveErrorMessage`'s message rule. The local adapters `readResponse`/`readJson`/`sendJson` in
+  `shared/components/review-panel/review-panel-ui.js`, `pages/cycle-dossier.js`,
+  `shared/components/meeting-tracker/SessionEditor.js` and `SiteVisitEditor.js` are thin
+  `(url, options)` wrappers over `requestEnvelope`. `readJsonBody(response, options)` (data-only,
+  for a caller that already holds a `Response`) is exported for API stability and has no live
+  caller. No React import, no side effects at import. An ESLint `no-restricted-syntax` rule (`eslint.config.mjs`, scoped to
+  `shared/components/**/*.js` and `pages/**/*.js`, excluding `pages/api/**`) bans raw
+  `fetch(`/`globalThis.fetch(`/`window.fetch(` calls outside this module; a site kept on raw
+  `fetch` for a plan §2.6 reason (SSE stream, blob download reading `Content-Disposition`, or a
+  fire-and-forget beacon) carries a site-level `// eslint-disable-next-line no-restricted-syntax --
+  <reason>; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6` comment. See
+  `docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md` and its execution log. Tests:
+  `tests/unit/api-request.test.js`, `tests/unit/client-request-stage1-adapters.test.js`,
+  `tests/unit/eslint-no-raw-fetch-ratchet.test.js`.
 - **`shared/utils/reviewer-send-skip-reasons.js`** — Stage 6D: `SEND_SKIP_REASON` (the complete `skipped[].reason` vocabulary emitted by `send-emails-service.js`, every literal replaced; a grep test forbids bare literals) and `SEND_SKIP_REASON_LABEL` (staff copy rendered by `ReleaseMaterialsModal` and `InviteEmailModal`). `check:status-enum-parity` entry #5 requires every produced reason to have a label.
 - **`shared/utils/reviewer-engagement-policy.js`** — Stage 2 (PR #155, `716bc558`, 2026-09-05): the
   one home for the duplicated invitation-correction policy. Exports three predicates over raw

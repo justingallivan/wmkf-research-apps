@@ -7,6 +7,8 @@
  * the two surfaces cannot fork; the page re-exports the names its tests import.
  */
 
+import { requestEnvelope } from '../../utils/api-request';
+
 export const EMPTY_ARRAY = [];
 export const POLL_MS = 4000;
 
@@ -59,10 +61,10 @@ export function runPillLabel(run) {
   return run.status;
 }
 
-export async function readResponse(response) {
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
-  return body;
+export async function readResponse(url, options) {
+  const { ok, status, data } = await requestEnvelope(url, { ...options, tolerantBody: true });
+  if (!ok) throw new Error(data.error || `Request failed (${status})`);
+  return data;
 }
 
 export function StatusPill({ children, tone = 'neutral' }) {

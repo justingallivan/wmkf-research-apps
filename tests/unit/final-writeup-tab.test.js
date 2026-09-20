@@ -439,3 +439,137 @@ describe('leadership review stage', () => {
     expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 });
+
+// --- Stage 2 T2 contract matrix (client-request-layer migration pins) ---
+//
+// Pins the visible outcome of each FinalWriteupTab fetch site under network
+// rejection, a malformed/empty 2xx body (all five sites are tolerant —
+// `.json().catch(() => ({}))` today), and the status-on-success branch in
+// start() (202 / body.inProgress). Run green against the UNMIGRATED
+// component and again, unchanged, after migration onto
+// shared/utils/api-request.js. See
+// docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md §5/§6.
+
+function malformed(status = 200) {
+  return { ok: status >= 200 && status < 300, status, json: async () => { throw new SyntaxError('bad json'); } };
+}
+
+test('T2 fetchStatus: network rejection surfaces the raw error message', async () => {
+  global.fetch = jest.fn().mockRejectedValueOnce(new Error('network down'));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+});
+
+test('T2 fetchStatus: malformed 2xx body is tolerated as {} (no error, nothing to render)', async () => {
+  global.fetch = jest.fn().mockResolvedValueOnce(malformed());
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+});
+
+test('T2 fetchAcknowledgementState: network rejection is isolated to the review-tracking panel', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockRejectedValueOnce(new Error('network down'));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/Review tracking could not be loaded/i)).toBeInTheDocument();
+  expect(screen.getByText('network down')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit writeup' })).toBeInTheDocument();
+});
+
+test('T2 fetchAcknowledgementState: malformed 2xx body reads as a stale-Final mismatch', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(malformed());
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/Review tracking could not be loaded/i)).toBeInTheDocument();
+  expect(screen.getByText(/current Final Writeup changed/i)).toBeInTheDocument();
+});
+
+test('T2 start(): network rejection surfaces the raw error message', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(readyStatus()))
+    .mockRejectedValueOnce(new Error('network down'));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+});
+
+test('T2 start(): malformed 2xx body is tolerated as {} (no crash, no Edit link)', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(readyStatus()))
+    .mockResolvedValueOnce(malformed())
+    .mockResolvedValueOnce(response({ error: 'Temporary review service failure.' }, 500));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(screen.queryByRole('link', { name: 'Edit writeup' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('T2 start(): a 202 response polls status until the phase leaves the review set', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(readyStatus()))
+    .mockResolvedValueOnce(response({ success: true, inProgress: true }, 202))
+    .mockResolvedValueOnce(response({ ...readyStatus(), phase: 'starting' }))
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
+  expect(await screen.findByText(/starting group review/i)).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: 'Edit writeup' }, { timeout: 5000 })).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(5);
+}, 10000);
+
+test('T2 advance(): network rejection surfaces the raw error message', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(groupReviewStatus(true)))
+    .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })))
+    .mockRejectedValueOnce(new Error('network down'));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for leadership review' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Move to leadership review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for leadership review' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+});
+
+test('T2 advance(): malformed 2xx body reads as a stale-Final mismatch', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(groupReviewStatus(true)))
+    .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })))
+    .mockResolvedValueOnce(malformed());
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for leadership review' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Move to leadership review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for leadership review' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(/current Final Writeup changed/i);
+  expect(screen.getByText('Group review')).toBeInTheDocument();
+});
+
+test('T2 markReviewed(): network rejection is isolated to the review-tracking panel', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(response(acknowledgementState()))
+    .mockRejectedValueOnce(new Error('network down'));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
+  await waitFor(() => expect(screen.getByText('network down')).toBeInTheDocument());
+  expect(screen.getByRole('link', { name: 'Edit writeup' })).toBeInTheDocument();
+});
+
+test('T2 markReviewed(): malformed 2xx body reads as a stale-Final mismatch', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(response(acknowledgementState()))
+    .mockResolvedValueOnce(malformed());
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
+  await waitFor(() => expect(screen.getByText(/current Final Writeup changed/i)).toBeInTheDocument());
+});

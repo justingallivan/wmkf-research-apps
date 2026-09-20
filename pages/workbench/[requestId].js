@@ -36,6 +36,7 @@ import StaffDeliberationsTab from '../../shared/components/workbench/StaffDelibe
 import ReviewPanelTab from '../../shared/components/workbench/ReviewPanelTab';
 import FinalWriteupTab from '../../shared/components/workbench/FinalWriteupTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
+import { requestEnvelope } from '../../shared/utils/api-request';
 import { classifyTarget } from '../../lib/dataverse/core/interlock';
 
 // Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
@@ -124,15 +125,16 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
     setError(null);
     setErrorRequestId(null);
     try {
-      const res = await fetch(`/api/workbench/resolve-request?requestId=${encodeURIComponent(id)}`);
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `Failed to load request (${res.status})`);
-      if (body?.success !== true || typeof body.requestId !== 'string'
-        || body.requestId.toLowerCase() !== id.toLowerCase()) {
+      const envelope = await requestEnvelope(`/api/workbench/resolve-request?requestId=${encodeURIComponent(id)}`, {
+        tolerantBody: true,
+      });
+      if (!envelope.ok) throw new Error(envelope.data.error || `Failed to load request (${envelope.status})`);
+      if (envelope.data?.success !== true || typeof envelope.data.requestId !== 'string'
+        || envelope.data.requestId.toLowerCase() !== id.toLowerCase()) {
         throw new Error('Request context did not match the requested request');
       }
       if (ctxLoadGeneration.current === loadGeneration && routeKey === id.toLowerCase()) {
-        setCtx(body);
+        setCtx(envelope.data);
         setCtxOwnerGeneration(ownerGeneration);
       }
     } catch (e) {

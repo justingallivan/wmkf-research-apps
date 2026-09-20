@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { requestJson } from '../../utils/api-request';
 
 /**
  * Admin editor for the applicant materials upload cap (plan §16 M3).
@@ -19,10 +20,11 @@ export default function SiteVisitMaterialsDefaultsSection() {
     let active = true;
     (async () => {
       try {
-        const res = await fetch('/api/admin/site-visit-materials-defaults');
-        const data = await res.json().catch(() => ({}));
+        const data = await requestJson('/api/admin/site-visit-materials-defaults', {
+          tolerantBody: true,
+          fallbackMessage: 'Failed to load the upload cap.',
+        });
         if (!active) return;
-        if (!res.ok) throw new Error(data?.error || 'Failed to load the upload cap.');
         setMaxMb(String(data.maxMb));
         setBaseline(String(data.maxMb));
         setLimits(data.limits || { min: 1, max: 500 });
@@ -43,13 +45,12 @@ export default function SiteVisitMaterialsDefaultsSection() {
     setError(null);
     setStatus(null);
     try {
-      const res = await fetch('/api/admin/site-visit-materials-defaults', {
+      const data = await requestJson('/api/admin/site-visit-materials-defaults', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ maxMb: Number(maxMb) }),
+        body: { maxMb: Number(maxMb) },
+        tolerantBody: true,
+        fallbackMessage: 'Failed to save the upload cap.',
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Failed to save the upload cap.');
       setMaxMb(String(data.maxMb));
       setBaseline(String(data.maxMb));
       setSource(data.source || 'setting');

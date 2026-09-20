@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useProfile } from '../context/ProfileContext';
+import { requestEnvelope } from '../utils/api-request';
 import { useAppAccess } from '../context/AppAccessContext';
 import { getAuthEnabled } from '../utils/auth-enabled';
 import { APP_REGISTRY } from '../config/appRegistry';
@@ -32,10 +33,9 @@ export default function Layout({
   // Fetch active alert count for superusers (for nav badge)
   useEffect(() => {
     if (!isSuperuser) return;
-    fetch('/api/admin/alerts?summary=true')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data) setAlertCount((data.critical || 0) + (data.error || 0));
+    requestEnvelope('/api/admin/alerts?summary=true', { tolerantBody: true })
+      .then(({ ok, data }) => {
+        if (ok) setAlertCount((data.critical || 0) + (data.error || 0));
       })
       .catch(() => {});
   }, [isSuperuser]);

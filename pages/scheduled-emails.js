@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import { useProfile } from '../shared/context/ProfileContext';
 import EmailSendFeedback from '../shared/components/EmailSendFeedback';
+import { requestJson, requestEnvelope } from '../shared/utils/api-request';
 
 function formatWhen(value) {
   if (!value) return '—';
@@ -55,11 +56,13 @@ export default function ScheduledEmailsPage() {
   useEffect(() => {
     if (profileStatus !== 'ready' || !currentProfile?.id) return;
     const controller = new AbortController();
+    // D1-preserve: unguarded today (no `response.ok` check before reading the
+    // body), so the migration keeps reading `.data` regardless of status.
     Promise.all([
-      fetch('/api/email-automation-preferences', { signal: controller.signal })
-        .then((response) => response.json().catch(() => ({}))),
-      fetch('/api/scheduled-emails/vip-flags', { signal: controller.signal })
-        .then((response) => response.json().catch(() => ({}))),
+      requestEnvelope('/api/email-automation-preferences', { signal: controller.signal, tolerantBody: true })
+        .then((envelope) => envelope.data),
+      requestEnvelope('/api/scheduled-emails/vip-flags', { signal: controller.signal, tolerantBody: true })
+        .then((envelope) => envelope.data),
     ])
       .then(([preference, flags]) => {
         setReviewAll(preference?.preference?.reviewAll === true);
@@ -73,13 +76,13 @@ export default function ScheduledEmailsPage() {
     setSavingReviewAll(true);
     setError(null);
     try {
-      const response = await fetch('/api/email-automation-preferences', {
+      const data = await requestJson('/api/email-automation-preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewAll: next }),
+        body: { reviewAll: next },
+        tolerantBody: true,
+        fallbackMessage: 'Could not save your review preference.',
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Could not save your review preference.');
       setReviewAll(data.preference.reviewAll);
     } catch (err) {
       setError(err.message);
@@ -92,13 +95,13 @@ export default function ScheduledEmailsPage() {
     setSavingVip(true);
     setError(null);
     try {
-      const response = await fetch('/api/scheduled-emails/vip-flags', {
+      const data = await requestJson('/api/scheduled-emails/vip-flags', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contactId, flagged }),
+        body: { contactId, flagged },
+        tolerantBody: true,
+        fallbackMessage: 'Could not update the review flag.',
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Could not update the review flag.');
       setVipContactIds((current) => {
         const next = new Set(current);
         if (data.flagged) next.add(data.contactId);
@@ -116,12 +119,12 @@ export default function ScheduledEmailsPage() {
     if (!router.isReady || profileStatus !== 'ready' || !currentProfile?.id) return;
     const controller = new AbortController();
     setLoading(true);
-    fetch('/api/scheduled-emails', { signal: controller.signal })
-      .then(async (response) => {
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || 'Could not load scheduled emails.');
-        return data.messages || [];
-      })
+    requestJson('/api/scheduled-emails', {
+      signal: controller.signal,
+      tolerantBody: true,
+      fallbackMessage: 'Could not load scheduled emails.',
+    })
+      .then((data) => data.messages || [])
       .then((rows) => {
         setMessages(rows);
         const requested = new URLSearchParams(window.location.search).get('message');
@@ -159,17 +162,17 @@ export default function ScheduledEmailsPage() {
     setError(null);
     setActionFeedback(null);
     try {
-      const response = await fetch(`/api/scheduled-emails/${selected.id}`, {
+      const { ok, data } = await requestEnvelope(`/api/scheduled-emails/${selected.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, version: selected.version, ...extra }),
+        body: { action, version: selected.version, ...extra },
+        tolerantBody: true,
       });
-      const data = await response.json().catch(() => ({}));
       if (data.outcome === 'uncertain') {
         setActionFeedback({ status: 'uncertain', message: `${data.error} Check the recipient before trying again.` });
         return;
       }
-      if (!response.ok) {
+      if (!ok) {
         const actionError = new Error(data.error || 'The scheduled email could not be updated.');
         actionError.outcome = data.outcome || 'failed';
         throw actionError;

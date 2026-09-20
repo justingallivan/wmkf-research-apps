@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import { parseFieldPrimerEnvelope } from '../../utils/field-primer-envelope';
 import { expertProfileLinks, expertMetrics } from '../../utils/field-primer-display';
@@ -260,14 +261,17 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
     setError(null);
     setPending(false);
     try {
-      const res = await fetch('/api/field-primer/generate', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/field-primer/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, ...(regenerate ? { regenerate: true } : {}) }),
+        body: { requestId, ...(regenerate ? { regenerate: true } : {}) },
+        tolerantBody: true,
       });
-      const body = await res.json().catch(() => ({}));
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        throw new Error(responseError || `Generation failed (${resStatus})`);
+      }
       if (token !== reqRef.current) return; // request changed mid-flight — ignore stale response
-      if (!res.ok) throw new Error(body.error || `Generation failed (${res.status})`);
       if (body.envelope) setEnvelope(body.envelope);
       else if (body.status === 'generating') setPending(true);
     } catch (e) {
@@ -505,10 +509,9 @@ export default function ProposalTab({ context, requestId: requestIdProp }) {
     let cancelled = false;
     setDocs(null);
     setDocsError(null);
-    fetch(`/api/workbench/proposal-documents?requestId=${encodeURIComponent(requestId)}`)
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok || body?.success !== true) throw new Error(body?.error || `Failed to load documents (${res.status})`);
+    requestEnvelope(`/api/workbench/proposal-documents?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true })
+      .then(({ ok: resOk, status: resStatus, data: body }) => {
+        if (!resOk || body?.success !== true) throw new Error(body?.error || `Failed to load documents (${resStatus})`);
         if (!cancelled) setDocs(body);
       })
       .catch((e) => {

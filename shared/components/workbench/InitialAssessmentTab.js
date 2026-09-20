@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../config/requestDocument';
 import ArtifactFileMetadata from './ArtifactFileMetadata';
@@ -27,12 +28,16 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
     generationSequence.current += 1;
     (async () => {
       try {
-        const response = await fetch(
+        const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(
           `/api/workbench/initial-assessment?requestId=${encodeURIComponent(requestId)}`,
+          { tolerantBody: true },
         );
-        const body = await response.json().catch(() => ({}));
+        if (!resOk) {
+          const responseError = body && typeof body === 'object' ? body.error : null;
+          const requestError = new Error(responseError || `Failed to load artifact (${resStatus})`);
+          throw requestError;
+        }
         if (loadSequence.current !== sequence) return;
-        if (!response.ok) throw new Error(body.error || `Failed to load artifact (${response.status})`);
         setArtifact(body.artifacts?.[0] || null);
         setLatestAttempt(body.latestAttempts?.[0] || null);
         setMilestones(body.milestones || []);
@@ -58,12 +63,16 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
       const id = requestId;
       const sequence = ++loadSequence.current;
       try {
-        const response = await fetch(
+        const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(
           `/api/workbench/initial-assessment?requestId=${encodeURIComponent(id)}`,
+          { tolerantBody: true },
         );
-        const body = await response.json().catch(() => ({}));
+        if (!resOk) {
+          const responseError = body && typeof body === 'object' ? body.error : null;
+          const requestError = new Error(responseError || `Failed to refresh artifact (${resStatus})`);
+          throw requestError;
+        }
         if (loadSequence.current !== sequence || id !== requestId) return;
-        if (!response.ok) throw new Error(body.error || `Failed to refresh artifact (${response.status})`);
         setArtifact(body.artifacts?.[0] || null);
         setLatestAttempt(body.latestAttempts?.[0] || null);
         setMilestones(body.milestones || []);
@@ -82,14 +91,18 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
     setGenerating(true);
     setError(null);
     try {
-      const response = await fetch('/api/workbench/initial-assessment', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/initial-assessment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: id }),
+        body: { requestId: id },
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        const requestError = new Error(responseError || `Generation failed (${resStatus})`);
+        throw requestError;
+      }
       if (generationSequence.current !== sequence || id !== requestId) return;
-      if (!response.ok) throw new Error(body.error || `Generation failed (${response.status})`);
       const returned = body.artifact || null;
       if (returned?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY) {
         setArtifact(returned);
@@ -119,18 +132,22 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
     setSnapshotting(true);
     setError(null);
     try {
-      const response = await fetch('/api/workbench/initial-assessment/board-snapshot', {
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/initial-assessment/board-snapshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId: id,
           expectedArtifactId,
           expectedCurrentVersionId,
-        }),
+        },
+        tolerantBody: true,
       });
-      const body = await response.json().catch(() => ({}));
+      if (!resOk) {
+        const responseError = body && typeof body === 'object' ? body.error : null;
+        const requestError = new Error(responseError || `Board snapshot failed (${resStatus})`);
+        throw requestError;
+      }
       if (snapshotSequence.current !== sequence || id !== requestId) return;
-      if (!response.ok) throw new Error(body.error || `Board snapshot failed (${response.status})`);
       if (body.snapshot) {
         setMilestones((current) => [
           body.snapshot,

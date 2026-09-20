@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import { StatusBadge } from './StatusTab';
 
@@ -81,11 +82,10 @@ function ReviewerProgress({ requestId }) {
     setState({ status: 'loading', data: null, requestKey });
     // Lightweight per-request rollup (counts only, no person/researcher fan-out —
     // Codex S260). Returns { counts, needed, workRemaining, hint }.
-    fetch(`/api/workbench/reviewer-rollup?requestId=${encodeURIComponent(requestId)}`)
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
+    requestEnvelope(`/api/workbench/reviewer-rollup?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true })
+      .then(({ ok: resOk, status: resStatus, data: body }) => {
         if (cancelled || token !== reqRef.current) return;
-        if (!res.ok || !body.success) throw new Error(body.error || `Failed (${res.status})`);
+        if (!resOk || !body.success) throw new Error(body.error || `Failed (${resStatus})`);
         const counts = body.counts && typeof body.counts === 'object' ? body.counts : {};
         setState({ status: 'ready', data: { counts, needed: body.needed, hint: body.hint }, requestKey });
       })

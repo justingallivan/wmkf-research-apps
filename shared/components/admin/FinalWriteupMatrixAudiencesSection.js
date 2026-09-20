@@ -12,6 +12,7 @@ import {
   FINAL_WRITEUP_PERSONA_ORDER,
 } from '../../config/finalWriteupPersonas';
 import useAdminUnsavedChangesGuard from './useAdminUnsavedChangesGuard';
+import { requestJson } from '../../utils/api-request';
 
 const VERSION = 2;
 const UNSAVED_WARNING = 'You have unsaved Final Writeup staffing changes. Leave without publishing?';
@@ -78,9 +79,10 @@ export default function FinalWriteupMatrixAudiencesSection() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/final-writeup-matrix-audiences');
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Final Writeup staffing could not be loaded.');
+      const data = await requestJson('/api/admin/final-writeup-matrix-audiences', {
+        tolerantBody: true,
+        fallbackMessage: 'Final Writeup staffing could not be loaded.',
+      });
       if (loadSequence.current === sequence) applyState(data);
     } catch (loadError) {
       if (loadSequence.current === sequence) setError(loadError.message);
@@ -204,13 +206,12 @@ export default function FinalWriteupMatrixAudiencesSection() {
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch('/api/admin/final-writeup-matrix-audiences', {
+      const data = await requestJson('/api/admin/final-writeup-matrix-audiences', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: normalizedDraft, expectedRevision: revision }),
+        body: { config: normalizedDraft, expectedRevision: revision },
+        tolerantBody: true,
+        fallbackMessage: 'Final Writeup staffing could not be published.',
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Final Writeup staffing could not be published.');
       applyState(data);
       setNotice('Final Writeup staffing published. Responsibilities and program audiences now share this revision.');
     } catch (saveError) {

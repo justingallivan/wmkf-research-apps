@@ -20,6 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 const TYPE_OPTIONS = [
   { value: 'richtext', label: 'Rich text (narrative)' },
@@ -96,11 +97,11 @@ export default function ReviewQuestionsSection() {
     setMessage(null);
     setValidationErrors([]);
     setStaleReload(false);
-    fetch('/api/admin/review-questions')
-      .then((r) => {
-        if (r.status === 403) throw new Error('Admin access required');
-        if (!r.ok) throw new Error('Failed to load review questions');
-        return r.json();
+    requestEnvelope('/api/admin/review-questions')
+      .then(({ status, ok, data }) => {
+        if (status === 403) throw new Error('Admin access required');
+        if (!ok) throw new Error('Failed to load review questions');
+        return data;
       })
       .then((data) => {
         const editable = (data.questions || []).map(toEditable);
@@ -127,9 +128,8 @@ export default function ReviewQuestionsSection() {
    * single-admin surface but must be visible, not implicit.
    */
   const resyncPreservingEdits = useCallback(async () => {
-    const res = await fetch('/api/admin/review-questions');
-    if (!res.ok) throw new Error('Could not reload the current question set');
-    const data = await res.json();
+    const { ok, data } = await requestEnvelope('/api/admin/review-questions');
+    if (!ok) throw new Error('Could not reload the current question set');
     const serverRows = (data.questions || []).map(toEditable);
 
     // What this editor last synced against, recovered from the snapshot rather
@@ -202,13 +202,12 @@ export default function ReviewQuestionsSection() {
     setValidationErrors([]);
     setAuditWarning(false);
     try {
-      const res = await fetch('/api/admin/review-questions', {
+      const { ok, status, data } = await requestEnvelope('/api/admin/review-questions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questions: toPayload(rows), baseVersion }),
+        body: { questions: toPayload(rows), baseVersion },
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 409 && data.status === 'set_changed') {
+      if (status === 409 && data.status === 'set_changed') {
         // Preserve the operator's edits and re-baseline instead of forcing a
         // discarding reload. Save stays enabled: the retry is now against a
         // current baseVersion.
@@ -230,12 +229,12 @@ export default function ReviewQuestionsSection() {
         }
         return;
       }
-      if (res.status === 400 && Array.isArray(data.errors)) {
+      if (status === 400 && Array.isArray(data.errors)) {
         setValidationErrors(data.errors);
         setMessage({ tone: 'error', text: 'Fix the highlighted problems and try again.' });
         return;
       }
-      if (!res.ok || data.status !== 'completed') {
+      if (!ok || data.status !== 'completed') {
         setMessage({ tone: 'error', text: data.error || 'Save failed.' });
         return;
       }

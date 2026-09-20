@@ -125,7 +125,7 @@ test('thrown other error from the command → write_failed without diagnostics, 
   const out = await withdrawSufficient(ARGS);
 
   expect(out.withdrawn).toBe(0);
-  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', reason: 'no_longer_needed' });
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', failure: 'unknown', reason: 'no_longer_needed' });
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 

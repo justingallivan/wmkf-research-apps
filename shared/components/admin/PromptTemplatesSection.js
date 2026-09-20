@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { validatePromptForSave } from '../../../lib/utils/prompt-validators';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
+import { requestEnvelope } from '../../utils/api-request';
 
 const STATUS_COPY = {
   completed:             { tone: 'green', text: 'Published — new version is now current.' },
@@ -90,16 +91,16 @@ export default function PromptTemplatesSection() {
     setError(null);
     setExecutorBudgetError(null);
     Promise.all([
-      fetch('/api/admin/prompts'),
-      fetch('/api/admin/models'),
+      requestEnvelope('/api/admin/prompts'),
+      requestEnvelope('/api/admin/models'),
     ])
-      .then(async ([promptResponse, modelResponse]) => {
-        if ([promptResponse, modelResponse].some((response) => response.status === 403)) {
+      .then(([promptEnvelope, modelEnvelope]) => {
+        if ([promptEnvelope, modelEnvelope].some((envelope) => envelope.status === 403)) {
           throw new Error('Admin access required');
         }
-        if (!promptResponse.ok) throw new Error('Failed to load prompts');
-        if (!modelResponse.ok) throw new Error('Failed to load the reviewed model catalog');
-        return Promise.all([promptResponse.json(), modelResponse.json()]);
+        if (!promptEnvelope.ok) throw new Error('Failed to load prompts');
+        if (!modelEnvelope.ok) throw new Error('Failed to load the reviewed model catalog');
+        return [promptEnvelope.data, modelEnvelope.data];
       })
       .then(([promptData, modelData]) => {
         if (generation !== loadGeneration.current) return;
@@ -112,11 +113,11 @@ export default function PromptTemplatesSection() {
       .finally(() => {
         if (generation === loadGeneration.current) setLoading(false);
       });
-    fetch('/api/admin/executor-budgets')
-      .then(async (response) => {
-        if (response.status === 403) throw new Error('Admin access required for Executor budgets');
-        if (!response.ok) throw new Error('Failed to load Executor budgets');
-        return response.json();
+    requestEnvelope('/api/admin/executor-budgets')
+      .then(({ status, ok, data }) => {
+        if (status === 403) throw new Error('Admin access required for Executor budgets');
+        if (!ok) throw new Error('Failed to load Executor budgets');
+        return data;
       })
       .then((budgetData) => {
         if (generation !== loadGeneration.current) return;
@@ -466,18 +467,25 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
       if (requestRef.current.payloadKey !== payloadKey) {
         requestRef.current = { payloadKey, requestId: newRequestId() };
       }
-      const response = await fetch('/api/admin/executor-budgets', {
+      const envelope = await requestEnvelope('/api/admin/executor-budgets', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           budgets: values,
           expectedVersion: baseRevision,
           requestId: requestRef.current.requestId,
-        }),
+        },
       });
-      const data = await response.json();
-      if (!response.ok) {
-        if (response.status === 409 && data.code === 'version_conflict' && data.current?.budgets) {
+      // A bare `.json()` today parses BEFORE the ok check, so a malformed
+      // body (2xx or non-2xx) throws its native parse error straight to the
+      // catch below rather than reaching the status/body-flag branches. The
+      // helper parses a non-2xx body tolerantly instead of throwing, so that
+      // ordering is restored here (never silent, plan §6 Stage 2 rule ii).
+      if (envelope.error?.parseError) {
+        throw envelope.error.parseError;
+      }
+      const { ok, status, data } = envelope;
+      if (!ok) {
+        if (status === 409 && data.code === 'version_conflict' && data.current?.budgets) {
           setConflictConfig(data.current);
           requestRef.current = { payloadKey: null, requestId: null };
           onPublished(data.current);
@@ -487,7 +495,7 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
           });
           return;
         }
-        if (response.status === 409
+        if (status === 409
             && data.code === 'unsupported_executor_budget_schema'
             && data.current?.budgets) {
           setConflictConfig(data.current);
@@ -738,20 +746,27 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
       if (requestRef.current.payloadKey !== payloadKey) {
         requestRef.current = { payloadKey, requestId: newRequestId() };
       }
-      const r = await fetch(`/api/admin/prompts/${encodeURIComponent(prompt.name)}`, {
+      // D1 fix: a non-2xx body with a recognized structured `data.status`
+      // (concurrency_conflict, etc.) is still read as before — STATUS_COPY
+      // already renders those correctly. A non-2xx body with NO `status`
+      // field (a plain {error} body, or an unparseable body) now routes to
+      // the same failed-outcome shape the catch below already uses, instead
+      // of onOutcome(data) with status: undefined rendering a blank banner
+      // (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
+      const envelope = await requestEnvelope(`/api/admin/prompts/${encodeURIComponent(prompt.name)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           body,
           systemPrompt,
           outputSchema,
           model,
           expectedVersion: prompt.version,
           requestId: requestRef.current.requestId,
-        }),
+        },
       });
-      const data = await r.json();
+      const { data } = envelope;
       if (data.status === 'completed' || data.status === 'already_published') onSuccess(data);
+      else if (!envelope.ok && !data.status) onOutcome({ status: 'failed', warnings: [envelope.error.message] });
       else onOutcome(data);
     } catch (err) {
       onOutcome({ status: 'failed', warnings: [err.message] });

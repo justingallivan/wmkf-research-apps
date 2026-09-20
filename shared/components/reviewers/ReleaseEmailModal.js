@@ -29,6 +29,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RELEASE_REASONS } from '../../config/reviewerLifecycle';
 import EmailSendFeedback from '../EmailSendFeedback';
+import { requestEnvelope } from '../../utils/api-request';
 
 const EXCLUDED_REASON = {
   not_found: 'No longer in this request',
@@ -51,11 +52,31 @@ const SEND_RESULT_REASON = {
   sender_changed: 'The Program Director sender changed after preview; reopen and review the updated sender',
   not_pending: 'The reviewer already responded or was already closed',
   changed_skipped: 'The reviewer changed status while the release was being sent',
-  write_failed: 'The invitation could not be closed',
   not_found: 'The reviewer is no longer available',
   wrong_request: 'The reviewer no longer belongs to this request',
   missing_result: 'The server did not return a result for this reviewer',
 };
+
+// write_failed carries a `failure` code the server derives from the discarded
+// write error (never the raw upstream message — see
+// lib/services/review-manager/withdraw-sufficient-service.js
+// classifyWriteFailure). Each sentence names the cause in plain language and
+// ends with an action ladder (retry, then contact an administrator), per
+// .claude-memory/feedback-user-facing-error-copy-voice.md. It replaces the
+// generic "<Name> — <reason>" line, since the sentence already names the
+// reviewer once.
+const WRITE_FAILED_MESSAGE = {
+  write_interlocked: (name) => `${name} is still invited. The system blocked the release in this environment (Dataverse write interlock). Retry from the production site, or contact an administrator.`,
+  dataverse_forbidden: (name) => `${name} is still invited. Dataverse refused to save the release for this account. Retry, and if it fails again contact an administrator.`,
+  not_found: (name) => `${name} is still invited. The reviewer record could not be found when saving. Reload and retry.`,
+  dataverse_unavailable: (name) => `${name} is still invited. The database did not respond when saving the release. This is usually a temporary blip. Retry, and if it keeps failing contact an administrator.`,
+  unknown: (name) => `${name} is still invited. The release could not be saved. Retry, and if it keeps failing contact an administrator.`,
+};
+
+function writeFailedMessage(name, failure) {
+  const build = WRITE_FAILED_MESSAGE[failure] || WRITE_FAILED_MESSAGE.unknown;
+  return build(name);
+}
 
 const REASON_OPTIONS = [
   {
@@ -109,15 +130,15 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     previewsRequestedRef.current = true;
     let cancelled = false;
     setLoading(true);
-    fetch('/api/review-manager/render-withdraw-emails', {
+    requestEnvelope('/api/review-manager/render-withdraw-emails', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId, suggestionIds }),
+      body: { requestId, suggestionIds },
+      tolerantBody: true,
     })
-      .then(async (resp) => {
-        const data = await resp.json().catch(() => ({}));
+      .then((envelope) => {
         if (cancelled) return;
-        if (!resp.ok) setLoadError(data.error || `Could not render the emails (${resp.status})`);
+        const data = envelope.data;
+        if (!envelope.ok) setLoadError(data.error || `Could not render the emails (${envelope.status})`);
         else setDrafts(data.drafts || []);
       })
       .catch((err) => { if (!cancelled) setLoadError(`Network error: ${err.message}`); })
@@ -125,9 +146,13 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     return () => { cancelled = true; };
   }, [showPreviews, requestId, suggestionIds]);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    sendGenerationRef.current += 1;
+  useEffect(() => {
+    // StrictMode (dev) runs this cleanup once at mount, so re-arm the guard here.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      sendGenerationRef.current += 1;
+    };
   }, []);
 
   const sendable = useMemo(() => (drafts || []).filter((d) => d.status === 'ok'), [drafts]);
@@ -189,21 +214,21 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
         }
       }
 
-      const resp = await fetch('/api/review-manager/withdraw-sufficient', {
+      const envelope = await requestEnvelope('/api/review-manager/withdraw-sufficient', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           requestId,
           suggestionIds: releaseableIds,
           reason,
           sendEmail: sendCourtesyEmail,
           ...(Object.keys(overrides).length > 0 ? { overrides } : {}),
-        }),
+        },
+        tolerantBody: true,
       });
-      const data = await resp.json().catch(() => ({}));
+      const data = envelope.data;
       if (!mountedRef.current || sendGeneration !== sendGenerationRef.current) return;
-      if (!resp.ok) {
-        setSendError(data.error || `Release failed (${resp.status})`);
+      if (!envelope.ok) {
+        setSendError(data.error || `Release failed (${envelope.status})`);
         return;
       }
 
@@ -221,9 +246,11 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
       if (failed.length > 0) {
         const detail = `${releaseWithoutEmail ? `${outcomes.length - failed.length} recorded. ` : `${outcomes.length - failed.length} sent. `}`
           + `${failed.length} issue${failed.length === 1 ? '' : 's'}: `
-          + failed.map(({ draft, result }) => (
-            `${draft.name || draft.suggestionId} — ${SEND_RESULT_REASON[result.status] || result.status}`
-          )).join('; ');
+          + failed.map(({ draft, result }) => {
+            const name = draft.name || draft.suggestionId;
+            if (result.status === 'write_failed') return writeFailedMessage(name, result.failure);
+            return `${name} — ${SEND_RESULT_REASON[result.status] || result.status}`;
+          }).join('; ');
         const hasUnconfirmed = failed.some(({ result }) => result.status === 'withdrawn_email_unconfirmed');
         setSendFeedback({ outcome: hasUnconfirmed ? 'uncertain' : 'partial', detail });
         if ((data.withdrawn || 0) > 0 && onReleased) onReleased(data.results || []);

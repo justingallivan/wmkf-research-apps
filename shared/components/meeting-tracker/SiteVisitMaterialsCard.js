@@ -7,6 +7,7 @@
  * applicant's contributor link (PR 2) and show on the briefing page.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 import { Button } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
 
@@ -41,10 +42,9 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
     if (!requestId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`);
-      const body = await res.json().catch(() => ({}));
-      if (res.status === 503) { setUnavailable(true); return; }
-      if (!res.ok) throw new Error(body.error || 'The materials collection could not be loaded.');
+      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, { tolerantBody: true });
+      if (resStatus === 503) { setUnavailable(true); return; }
+      if (!resOk) throw new Error(body.error || 'The materials collection could not be loaded.');
       setCollection(body.collection || null);
       setError(null);
     } catch (loadError) {
@@ -62,13 +62,13 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
     setNotice(null);
     setEmailFeedback(null);
     try {
-      const res = await fetch(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, {
+      const { ok: resOk, data: body } = await requestEnvelope(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...extra }),
+        body: { action, ...extra },
+        tolerantBody: true,
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      if (!resOk) {
         const actionError = new Error(body.error || 'The materials collection could not be updated.');
         actionError.outcome = body.outcome || 'failed';
         throw actionError;

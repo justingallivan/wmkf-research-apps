@@ -3,6 +3,7 @@ import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import FileUploaderSimple from '../shared/components/FileUploaderSimple';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
+import { requestEnvelope } from '../shared/utils/api-request';
 
 const STATUS_OPTIONS = [
   { value: 'achieved', label: 'Achieved' },
@@ -138,15 +139,16 @@ function GrantReporting() {
     setFormData(null);
 
     try {
-      const resp = await fetch('/api/grant-reporting/lookup-grant', {
+      const envelope = await requestEnvelope('/api/grant-reporting/lookup-grant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestNumber: requestNumber.trim() }),
       });
-      const data = await resp.json();
-      if (!resp.ok) {
-        throw new Error(data.error || `Lookup failed (${resp.status})`);
+      if (!envelope.ok) {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        throw new Error(envelope.data.error || `Lookup failed (${envelope.status})`);
       }
+      const data = envelope.data;
       setLookup(data);
       if (data.documents?.proposalBestGuess) setProposalPick(data.documents.proposalBestGuess);
       if (data.documents?.reportBestGuess) setReportPick(data.documents.reportBestGuess);
@@ -166,7 +168,7 @@ function GrantReporting() {
     setProcessing(true);
     setError(null);
     try {
-      const resp = await fetch('/api/grant-reporting/extract', {
+      const envelope = await requestEnvelope('/api/grant-reporting/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,11 +179,12 @@ function GrantReporting() {
           requestGuid: lookup?.requestId || null,
         }),
       });
-      const data = await resp.json();
-      if (!resp.ok) {
-        const detail = data.details ? `: ${data.details}` : '';
-        throw new Error(`${data.error || `Extraction failed (${resp.status})`}${detail}`);
+      if (!envelope.ok) {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        const detail = envelope.data.details ? `: ${envelope.data.details}` : '';
+        throw new Error(`${envelope.data.error || `Extraction failed (${envelope.status})`}${detail}`);
       }
+      const data = envelope.data;
 
       // Defensive: re-apply Dynamics values so they always win on conflicts
       const mergedHeader = mergeHeaders(data.header, lookup?.header);
@@ -205,7 +208,7 @@ function GrantReporting() {
     setRegeneratingField(fieldKey);
     setError(null);
     try {
-      const resp = await fetch('/api/grant-reporting/extract', {
+      const envelope = await requestEnvelope('/api/grant-reporting/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -216,15 +219,15 @@ function GrantReporting() {
           requestGuid: lookup?.requestId || null,
         }),
       });
-      const data = await resp.json();
-      if (!resp.ok) {
-        const detail = data.details ? `: ${data.details}` : '';
-        throw new Error(`${data.error || `Regeneration failed (${resp.status})`}${detail}`);
+      if (!envelope.ok) {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        const detail = envelope.data.details ? `: ${envelope.data.details}` : '';
+        throw new Error(`${envelope.data.error || `Regeneration failed (${envelope.status})`}${detail}`);
       }
 
       setFormData(prev => ({
         ...prev,
-        narratives: { ...prev.narratives, [fieldKey]: data.value },
+        narratives: { ...prev.narratives, [fieldKey]: envelope.data.value },
       }));
     } catch (err) {
       setError(err.message || 'Regeneration failed');
@@ -238,7 +241,7 @@ function GrantReporting() {
     setIsRegeneratingGoals(true);
     setError(null);
     try {
-      const resp = await fetch('/api/grant-reporting/extract', {
+      const envelope = await requestEnvelope('/api/grant-reporting/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -250,12 +253,12 @@ function GrantReporting() {
           requestGuid: lookup?.requestId || null,
         }),
       });
-      const data = await resp.json();
-      if (!resp.ok) {
-        const detail = data.details ? `: ${data.details}` : '';
-        throw new Error(`${data.error || `Goals regeneration failed (${resp.status})`}${detail}`);
+      if (!envelope.ok) {
+        if (envelope.error?.parseError) throw envelope.error.parseError;
+        const detail = envelope.data.details ? `: ${envelope.data.details}` : '';
+        throw new Error(`${envelope.data.error || `Goals regeneration failed (${envelope.status})`}${detail}`);
       }
-      setFormData(prev => ({ ...prev, goalsAssessment: data.goalsAssessment }));
+      setFormData(prev => ({ ...prev, goalsAssessment: envelope.data.goalsAssessment }));
     } catch (err) {
       setError(err.message || 'Goals regeneration failed');
     } finally {

@@ -143,7 +143,7 @@ test('dashboard leads with one search field and server-derived task queues', asy
   renderPanel();
 
   expect(await screen.findByRole('heading', { name: 'Needs my review' })).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26', expect.objectContaining({ method: 'GET' }));
   expect(screen.getAllByRole('searchbox')).toHaveLength(1);
   expect(screen.getAllByRole('link', { name: 'Open review' })[0])
     .toHaveAttribute('href', `/workbench/final-writeups/${REQUEST_ID}`);
@@ -205,7 +205,7 @@ test('the cycle comes from the shell: a change reloads with the new code', async
 
   harness.set({ cycleCode: 'J26' });
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26');
+  expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26', expect.objectContaining({ method: 'GET' }));
   expect(await screen.findByText(/Nothing needs your review in June 2026\./)).toBeInTheDocument();
 });
 
@@ -214,7 +214,7 @@ test('the shell cycle is passed as the only query parameter', async () => {
   renderPanel({ cycleCode: 'J26', writeupsView: 'reviewed', pd: '33333333-3333-4333-8333-333333333331', search: 'x' });
   await screen.findByRole('combobox', { name: 'Responsible program director' });
   expect(global.fetch).toHaveBeenCalledTimes(1);
-  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=J26');
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=J26', expect.objectContaining({ method: 'GET' }));
 });
 
 test('the "writeups without a cycle" link renders only when uncycled rows exist and switches the fetch to none', async () => {
@@ -230,7 +230,7 @@ test('the "writeups without a cycle" link renders only when uncycled rows exist 
 
   fireEvent.click(link);
   expect(panelState().uncycled).toBe(true);
-  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=none'));
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=none', expect.objectContaining({ method: 'GET' })));
   expect(await screen.findByText(/awaiting your review in No cycle/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Writeups without a cycle' })).not.toBeInTheDocument();
 
@@ -263,7 +263,7 @@ test('an empty cycle shows one in-place notice naming it, linking the newest oth
 
   fireEvent.click(screen.getByRole('button', { name: 'June 2026' }));
   expect(panelState()).toMatchObject({ cycleCode: 'J26', uncycled: false });
-  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26'));
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26', expect.objectContaining({ method: 'GET' })));
   expect(await screen.findByRole('heading', { name: 'Needs my review' })).toBeInTheDocument();
 });
 
@@ -332,7 +332,7 @@ test('focused view shows the cycle label as context (with the empty focused cycl
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
   expect(await screen.findByText('December 2026')).toBeInTheDocument();
   expect(screen.queryByText('D26')).not.toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith(`/api/workbench/final-writeups?requestId=${REQUEST_ID}`);
+  expect(global.fetch).toHaveBeenCalledWith(`/api/workbench/final-writeups?requestId=${REQUEST_ID}`, expect.objectContaining({ method: 'GET' }));
   expect(global.fetch.mock.calls[0][0]).not.toContain('cycleCode');
 });
 
@@ -578,7 +578,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     const first = renderPanel({ writeupsView: 'reviewed', pd: PD_A });
     await screen.findByRole('heading', { name: 'Reviewed by me' });
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
+    expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26', expect.objectContaining({ method: 'GET' }));
     expect(panelState()).toMatchObject({ writeupsView: 'reviewed', pd: PD_A });
     first.unmount();
 
