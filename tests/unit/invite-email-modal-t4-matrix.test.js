@@ -355,7 +355,7 @@ describe('update-abstract (:648)', () => {
   });
 });
 
-describe('invite-timing GET (:293, D1-preserve, migrated ungated — no ok check)', () => {
+describe('invite-timing GET (:293, D1 fixed — ok check added)', () => {
   test('T4 axis (a): a 2xx body with a value overlays the sticky respondOffsetDays', async () => {
     global.fetch = jest.fn(baseHandlers({ inviteTiming: mockJson({ value: { respondOffsetDays: 14 } }) }));
     render(<InviteEmailModal candidates={CANDIDATES} settings={{}} onClose={jest.fn()} onSent={jest.fn()} />);
@@ -364,14 +364,14 @@ describe('invite-timing GET (:293, D1-preserve, migrated ungated — no ok check
     expect(await screen.findByDisplayValue('14')).toBeInTheDocument();
   });
 
-  test('T4 axis (b): a non-2xx {error} body is still read (unguarded, no ok check) and overlays timing as-is', async () => {
+  test('T4 axis (b): D1 fix — a non-2xx {error} body is ignored; default respondOffsetDays (7) stays put', async () => {
     global.fetch = jest.fn(baseHandlers({
       inviteTiming: mockJson({ error: 'nope', value: { respondOffsetDays: 21 } }, { ok: false, status: 400 }),
     }));
     render(<InviteEmailModal candidates={CANDIDATES} settings={{}} onClose={jest.fn()} onSent={jest.fn()} />);
     await screen.findByDisplayValue('Invitation');
     fireEvent.click(screen.getByText('Reviewer campaign timeline').closest('button'));
-    expect(await screen.findByDisplayValue('21')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('7')).toBeInTheDocument();
   });
 
   test('T4 axis (c): a network rejection is swallowed; default respondOffsetDays (7) stays put', async () => {
