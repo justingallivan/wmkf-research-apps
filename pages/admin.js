@@ -1618,6 +1618,9 @@ function RoleManagementSection() {
     // unchanged from before (docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md).
     requestEnvelope('/api/user-profiles?all=true')
       .then(envelope => {
+        // 401/403 mirrors the roles fetch: a non-superuser gets 403 from
+        // `?all=true` and the section must stay hidden, not show a banner.
+        if (envelope.status === 403 || envelope.status === 401) return;
         if (!envelope.ok) {
           setMessage({ type: 'error', text: envelope.error.message });
           return;

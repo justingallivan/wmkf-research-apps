@@ -50,6 +50,19 @@ describe('RoleManagementSection (view="roles") — D1 fix on :1583/:1602', () =>
     expect(screen.queryByText('Assign')).not.toBeInTheDocument();
   });
 
+  test('(D1 review) a non-superuser (roles 403 AND user-profiles 403) still renders nothing, no banner', async () => {
+    global.fetch = jest.fn((url) => {
+      if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(403, { error: 'Forbidden' }));
+      return Promise.resolve(jsonResponse(403, { error: 'Superuser access required' }));
+    });
+    const { container } = render(<PeopleWorkspace view="roles" />);
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Superuser access required')).not.toBeInTheDocument();
+    expect(screen.queryByText('Forbidden')).not.toBeInTheDocument();
+    expect(screen.queryByText('Assign')).not.toBeInTheDocument();
+    expect(container.querySelector('.bg-red-50')).toBeNull();
+  });
+
   test('(D1 fix) a non-2xx, non-401/403 {error} status now surfaces the server error message instead of being read as data', async () => {
     global.fetch = jest.fn((url) => {
       if (url === '/api/dynamics-explorer/roles') return Promise.resolve(jsonResponse(500, { error: 'Roles table unavailable' }));
