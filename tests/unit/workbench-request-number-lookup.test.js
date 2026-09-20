@@ -295,7 +295,16 @@ test('does not apply a delayed triage count patch after returning to the origina
   await waitFor(() => expect(mainProgram()).toHaveValue('p2'));
   fireEvent.change(mainProgram(), { target: { value: 'p1' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p1'));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
+  const __t0 = Date.now();
+  const __snap = () => `buttons: ${screen.getAllByRole('button').map((b) => b.textContent).join(' | ')}; selects: ${screen.getAllByRole('combobox').map((s) => `${s.id}=${s.value}`).join(' | ')}; query: ${JSON.stringify(routerState.query)}; loading: ${Boolean(screen.queryByText('Loading cycle and status filters…'))}; fetch urls: ${global.fetch.mock.calls.map((c) => String(c[0])).join(' | ')}`;
+  // eslint-disable-next-line no-console
+  console.log(`[diag] before wait: ${__snap()}`);
+  try {
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument(), { timeout: 8000 });
+  } finally {
+    // eslint-disable-next-line no-console
+    console.log(`[diag] waited ${Date.now() - __t0}ms for (1); ${__snap()}`);
+  }
 
   await act(async () => {
     triage.resolve(response({ body: { success: true } }));
