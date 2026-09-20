@@ -1266,9 +1266,10 @@ valid load below).
   separately 141 days ago) differs from production's. **Environment setup
   gap, not a Stage 5b finding.** Token pages therefore cannot be
   click-through-tested on the preview with production-minted links.
-- Decision pending (owner): record steps 3–6 as test-covered (T5 matrices
-  complete and mutation-verified in the Stage 5 fresh review), or copy the
-  production link secret into this branch's preview scope for the rehearsal
-  day (runbook keeps them separate; explicit owner say-so required).
-- Steps 5–6 (grantee, materials) blocked by the same gap; steps 7–8
-  (`scheduled-emails`, `test-email`) pending owner.
+- **Owner decision (2026-09-20): steps 3–6 recorded as test-covered.** The
+  four token pages share one migration pattern; their T5 matrices (incl. the
+  function-form fallbacks and non-2xx unparseable → `server_error`/`network`
+  mappings) were read and confirmed clean in the Stage 5 fresh review, item
+  E. The production link secret was NOT copied into the preview.
+- Steps 5–6 (grantee, materials): test-covered per the decision above.
+  Steps 7–8 (`scheduled-emails`, `test-email`) pending owner.
