@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
+import { requestJson } from '../../utils/api-request';
 import Layout, { PageHeader } from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
 import WorkbenchViewsNav, { VIEWS } from './WorkbenchViewsNav';
@@ -97,10 +98,11 @@ export function WorkbenchShell({ previewReadOnly = false }) {
     setDefaultCycleCode(null);
     (async () => {
       try {
-        const res = await fetch(`/api/workbench/dashboard${requestedProgramId ? `?programId=${encodeURIComponent(requestedProgramId)}` : ''}`);
-        const body = await res.json().catch(() => ({}));
+        const body = await requestJson(`/api/workbench/dashboard${requestedProgramId ? `?programId=${encodeURIComponent(requestedProgramId)}` : ''}`, {
+          fallbackMessage: 'Failed to load cycles',
+          tolerantBody: true,
+        });
         if (cyclesLoadRef.current !== token) return;
-        if (!res.ok) throw new Error(body.error || `Failed to load cycles (${res.status})`);
         cyclesGenerationRef.current += 1;
         setCyclesGeneration(cyclesGenerationRef.current);
         setCycles(body.cycles || []);
