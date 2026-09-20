@@ -58,6 +58,7 @@ export default function useReviewerPromotion({
       return { refreshed: [], failures, stale: false };
     }
     pushProgress(`Refreshing contact verification for ${refreshableCandidates.length} reviewer(s)…`, expectedGeneration);
+    // raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
     const enrichmentResponse = await fetch('/api/reviewer-finder/enrich-contacts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

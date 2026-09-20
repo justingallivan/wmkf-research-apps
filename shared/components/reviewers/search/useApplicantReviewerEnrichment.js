@@ -44,6 +44,7 @@ export default function useApplicantReviewerEnrichment({
     setRecPhase('running'); setRecError(null); setRecProgress([]); setRecCandidates([]); setRecHandled([]);
     try {
       if (genRef.current !== myGen) return; // abort if context changed before the request fires
+      // raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const res = await fetch('/api/workbench/enrich-recommended', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
