@@ -711,3 +711,38 @@ per site. Options: (a) keep as is; (b) in the D1 follow-up, drop the rethrow
 where the site's fallback message is acceptable (recommended: the raw parse
 text is never useful to a user); (c) add a helper option so the choice is one
 flag, not a hand-written line. No change made in Stage 3.
+
+### Stage 3 fresh review (Opus, no inherited context, at `d5340f7e`) — READY WITH NAMED CHANGES
+
+Confirmed: tests-before-code order for all 12 files (four group-A refactor
+commits also carried a GET-shape matcher edit, call-shape only); the seam
+commit `ef605f78` is exactly four `export` keywords, four test files, and one
+fixture `status`; 20 sampled sites PRESERVED incl. all 8 D1-preserve sites
+(no guard added), the four 403 messages verbatim, the `.details` join at
+`pages/admin.js:2577-2584`, `signal` at `ReviewerRepairAlertDetails.js:57` and
+`pages/admin.js:645`; request bytes unchanged; 255 admin tests green; wrong-form
+mutations caught at PromptTemplates :469 and AlertRecipients :2577.
+
+Named changes and dispositions:
+1. Four `pages/admin.js` sites show the fallback text instead of the raw parse
+   text on a non-2xx unparseable body: ModelConfig PUT :1339 ('Failed to
+   save'), Role assign :1629 ('Failed to assign role'), AppAccess grant :1895
+   ('Grant failed'), revoke :1903 ('Revoke failed'). All user-visible, never
+   silent. **Disposition: keep. This is exactly owner decision D3.** The
+   reviewer's own premise challenge reaches the same conclusion. (e) pins added
+   at all four in the correction round recording the D3 text. The
+   intra-component inconsistency with Role DELETE :1649 (which rethrows the
+   parse error) is documented here and resolved globally by O4, not by adding
+   more rethrows now.
+2. `shared/components/admin/AdminOverviewSection.js:29` was a census row but not
+   in the plan's Stage 3 table (the "61 sites" exit count omitted it), so the
+   admin grep was not empty. **Disposition: migrate now** (correction round);
+   plan §4/§6 corrected to 62 sites.
+3. Discrimination gaps: (d) pins at `PromptTemplatesSection.js:469` and
+   `pages/admin.js:2577`, a 2xx-empty pin at `ReviewQuestionsSection.js:202`,
+   an (e) pin for AlertRecipients load :2486. **Disposition: added** in the
+   correction round with mutation evidence.
+4. `PromptTemplatesSection` `Promise.all` prompts/models race (403 on one +
+   malformed 2xx on the other): pre-existing shape confirmed; **accepted narrow
+   deviation, no fix** (both outcomes are error states; the obvious fix would
+   perturb the pinned single-endpoint case).
