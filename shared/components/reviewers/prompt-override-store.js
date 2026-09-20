@@ -7,6 +7,8 @@
  * that imports DynamicsService).
  */
 
+import { requestJson, requestEnvelope } from '../../utils/api-request';
+
 export const REVIEWER_PROMPT_OPTIONS = [
   { name: 'reviewer-finder.analyze', label: 'Proposal analysis (reviewer suggestions + search queries)' },
   { name: 'reviewer-finder.score-candidates', label: 'Candidate scoring (database-discovered relevance)' },
@@ -14,35 +16,28 @@ export const REVIEWER_PROMPT_OPTIONS = [
 
 /** @returns {Promise<{name,version,templateBody,userOverride,staleOverride}>} */
 export async function loadPromptOverride(name) {
-  const res = await fetch(`/api/reviewer-finder/prompt-override?name=${encodeURIComponent(name)}`);
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error || 'Failed to load prompt');
-  }
-  return res.json();
+  return requestJson(`/api/reviewer-finder/prompt-override?name=${encodeURIComponent(name)}`, {
+    fallbackMessage: 'Failed to load prompt',
+  });
 }
 
 export async function savePromptOverride(name, body) {
-  const res = await fetch('/api/reviewer-finder/prompt-override', {
+  const { ok, data } = await requestEnvelope('/api/reviewer-finder/prompt-override', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, body }),
+    tolerantBody: true,
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || (data.issues ? data.issues.join('; ') : 'Save failed'));
+  if (!ok) throw new Error(data.error || (data.issues ? data.issues.join('; ') : 'Save failed'));
   return data;
 }
 
 /** Reset to the shared template (removes the user's override). */
 export async function deletePromptOverride(name) {
-  const res = await fetch('/api/reviewer-finder/prompt-override', {
+  return requestJson('/api/reviewer-finder/prompt-override', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
+    fallbackMessage: 'Reset failed',
   });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error || 'Reset failed');
-  }
-  return res.json();
 }
