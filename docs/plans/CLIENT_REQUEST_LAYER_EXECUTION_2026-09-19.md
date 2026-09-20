@@ -1250,14 +1250,25 @@ scope, writes denied by the interlock. Links are minted in production and
 opened on the preview host (same `EXTERNAL_LINK_SECRET`, confirmed by the
 valid load below).
 
-- Step 3 (`pages/external/briefing/[token].js`): the request 1003222 link
-  first shown on the Staff Deliberations card returned "This link is
-  invalid." on the preview; the owner issued a new link in production
-  (revoking the old one for this test request) and that link **rendered the
-  briefing**. One character altered → "This link is malformed." — the page's
-  own copy, not blank, not a spinner, not `server_error`. **PASSED** [owner].
-  The first link's rejection is consistent with a stale or superseded row for
-  a test request and is not attributed to the migration; not investigated
-  further.
-- Steps 4–6 (review, grantee, materials token pages) and 7–8
-  (`scheduled-emails`, `test-email`): pending owner links / decision.
+- Step 3 (`pages/external/briefing/[token].js`): **PENDING — earlier PASSED
+  record withdrawn.** The owner issued a new briefing link in production and
+  it rendered; the altered token showed "This link is malformed." But step 4
+  below proved the preview verifies with a different `EXTERNAL_LINK_SECRET`
+  than production, so a production-signed briefing token cannot have verified
+  on the preview host; the successful load was on production (`main`, no
+  Stage 5b code) and does not count.
+- Step 4 (`pages/external/review/[token].js`): owner invited a test reviewer
+  in production (Dataverse write, preview cannot), opened the emailed link on
+  `reviews.wmkeck.org` (rendered), then swapped the host to the preview alias:
+  "We couldn't open your review … Reference: invalid_signature". That reason
+  comes only from the JWT signature check (`verify-suggestion-token.js:137` ←
+  `external-token.js:227`), so the preview's `EXTERNAL_LINK_SECRET` (set
+  separately 141 days ago) differs from production's. **Environment setup
+  gap, not a Stage 5b finding.** Token pages therefore cannot be
+  click-through-tested on the preview with production-minted links.
+- Decision pending (owner): record steps 3–6 as test-covered (T5 matrices
+  complete and mutation-verified in the Stage 5 fresh review), or copy the
+  production link secret into this branch's preview scope for the rehearsal
+  day (runbook keeps them separate; explicit owner say-so required).
+- Steps 5–6 (grantee, materials) blocked by the same gap; steps 7–8
+  (`scheduled-emails`, `test-email`) pending owner.
