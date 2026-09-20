@@ -19,6 +19,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { requestEnvelope } from '../../utils/api-request';
 
 export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
@@ -39,14 +40,18 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
       setError(null);
       let defaults = null;
       try {
-        const defaultsRes = await fetch('/api/review-manager/campaign-timeline-defaults');
-        const defaultsData = await defaultsRes.json().catch(() => ({}));
-        if (defaultsRes.ok && defaultsData?.timeline) defaults = defaultsData.timeline;
+        const { ok: defaultsOk, data: defaultsData } = await requestEnvelope(
+          '/api/review-manager/campaign-timeline-defaults',
+          { tolerantBody: true },
+        );
+        if (defaultsOk && defaultsData?.timeline) defaults = defaultsData.timeline;
       } catch { /* admin cycle defaults are best-effort; fall back to empty */ }
       try {
-        const res = await fetch(`/api/review-manager/campaign-config?requestId=${encodeURIComponent(requestId)}`);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `Failed to load (${res.status})`);
+        const { ok, status, data } = await requestEnvelope(
+          `/api/review-manager/campaign-config?requestId=${encodeURIComponent(requestId)}`,
+          { tolerantBody: true },
+        );
+        if (!ok) throw new Error(data.error || `Failed to load (${status})`);
         if (cancelled) return;
         const c = data.config || {};
         setRespondOffsetDays(c.respondOffsetDays == null ? '' : c.respondOffsetDays);
@@ -74,13 +79,13 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
       desiredCount: desiredCount === '' ? null : Math.max(0, Math.floor(Number(desiredCount))),
     };
     try {
-      const res = await fetch('/api/review-manager/campaign-config', {
+      const { ok, status, data } = await requestEnvelope('/api/review-manager/campaign-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, config }),
+        tolerantBody: true,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Failed to save (${res.status})`);
+      if (!ok) throw new Error(data.error || `Failed to save (${status})`);
       if (onSaved) onSaved();
       onClose();
     } catch (e) {
