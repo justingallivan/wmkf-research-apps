@@ -72,7 +72,7 @@ export default function useReviewerDiscovery({
     try {
       // 1. Analyze the proposal (Claude). excludedNames soft-blocks Claude's own
       //    suggestions; we still hard-filter discovery results below.
-      // raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const aRes = await fetch('/api/reviewer-finder/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,7 +116,7 @@ export default function useReviewerDiscovery({
 
       // 2. Discover + verify + rank across databases.
       pushProgress('Searching databases for candidates…', myGen);
-      // raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const dRes = await fetch('/api/reviewer-finder/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -187,7 +187,7 @@ export default function useReviewerDiscovery({
       if (keyedKept.length > 0) {
         try {
           pushProgress(`Finding contact info & citation metrics for ${keyedKept.length} reviewer(s)…`, myGen);
-          // raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
+          // eslint-disable-next-line no-restricted-syntax -- raw fetch: SSE stream via reviewers/sse.js; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
           const eRes = await fetch('/api/reviewer-finder/enrich-contacts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

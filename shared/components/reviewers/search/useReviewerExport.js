@@ -55,6 +55,7 @@ export default function useReviewerExport({
           seniorityEstimate: c.seniorityEstimate || null,
         };
       });
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: blob download reads Content-Disposition; allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
       const res = await fetch('/api/workbench/export-candidates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
