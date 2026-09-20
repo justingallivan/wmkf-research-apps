@@ -276,9 +276,9 @@ function RosterTab() {
       if (roleFilter) params.set('roleType', roleFilter);
       params.set('limit', '500');
 
-      const { ok, data } = await requestEnvelope(`/api/expertise-finder/roster?${params}`);
+      const { ok, data, error } = await requestEnvelope(`/api/expertise-finder/roster?${params}`);
 
-      if (!ok) throw new Error(data.error);
+      if (!ok) throw new Error(data.error || error.message);
       setMembers(data.members);
     } catch (err) {
       setError(err.message);
@@ -300,11 +300,11 @@ function RosterTab() {
   const handleSaveEdit = async (formData) => {
     setSaving(true);
     try {
-      const { ok, data } = await requestEnvelope('/api/expertise-finder/roster', {
+      const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'PATCH',
         body: formData,
       });
-      if (!ok) throw new Error(data.error);
+      if (!ok) throw new Error(data.error || error.message);
 
       setMembers(prev => prev.map(m => m.id === formData.id ? data.member : m));
       setEditingId(null);
@@ -320,11 +320,11 @@ function RosterTab() {
     if (!confirm(`Deactivate "${name}"? This can be undone.`)) return;
 
     try {
-      const { ok, data } = await requestEnvelope('/api/expertise-finder/roster', {
+      const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'DELETE',
         body: { id },
       });
-      if (!ok) throw new Error(data.error);
+      if (!ok) throw new Error(data.error || error.message);
 
       setMembers(prev => prev.filter(m => m.id !== id));
     } catch (err) {
@@ -335,11 +335,11 @@ function RosterTab() {
   const handleAdd = async (formData) => {
     setSaving(true);
     try {
-      const { ok, data } = await requestEnvelope('/api/expertise-finder/roster', {
+      const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'POST',
         body: formData,
       });
-      if (!ok) throw new Error(data.error);
+      if (!ok) throw new Error(data.error || error.message);
 
       setMembers(prev => [...prev, data.member]);
       setShowAddForm(false);
@@ -724,7 +724,7 @@ function BatchTab() {
       setProgress({ current: i + 1, total: unprocessed.length });
 
       try {
-        const { ok, data } = await requestEnvelope('/api/expertise-finder/batch-match', {
+        const { ok, data, error } = await requestEnvelope('/api/expertise-finder/batch-match', {
           method: 'POST',
           body: {
             requestId: proposal.requestId,
@@ -735,7 +735,7 @@ function BatchTab() {
         if (!ok) {
           setResults(prev => ({
             ...prev,
-            [proposal.requestId]: { error: data.error, availableFiles: data.availableFiles },
+            [proposal.requestId]: { error: data.error || error.message, availableFiles: data.availableFiles },
           }));
         } else {
           setResults(prev => ({

@@ -525,12 +525,21 @@ export default function AwardeeTab({ requestId, context }) {
     setSendReceipt(null);
     setSending(true); setError(null);
     try {
-      const { ok: sendOk, data } = await requestEnvelope('/api/workbench/grantee-deliverables/send-invite', {
+      const { ok: sendOk, data, error: sendError } = await requestEnvelope('/api/workbench/grantee-deliverables/send-invite', {
         method: 'POST',
         body: { requestId, toEmail, ccEmail, subject: fillInviteSubject(subject, { title: awardTitle }), bodyText: body },
         fallbackMessage: 'The invitation was not sent.',
       });
-      if (!sendOk) {
+      if (!sendOk && sendError?.parseError) {
+        // Non-2xx with an unparseable body (e.g. a 502/504 HTML gateway page):
+        // the response carries no honest outcome, so treat it the same as the
+        // catch-block network-rejection path below — "may have sent".
+        setSendReceipt({
+          status: 'uncertain',
+          message: 'The app could not confirm the result. Check the email activity before trying again.',
+        });
+        setSendStep('uncertain');
+      } else if (!sendOk) {
         setSendReceipt({
           status: data.outcome === 'uncertain' ? 'uncertain' : 'failed',
           message: data.error || 'The invitation was not sent.',
