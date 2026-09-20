@@ -11,6 +11,7 @@ import {
 } from '../reviewer-search-logic';
 import { formatSaveFailureDetails } from './presentation';
 import { candKey, dedupeByName } from './candidateKeys';
+import { requestEnvelope } from '../../../utils/api-request';
 import {
   PROVENANCE_KINDS,
   provenanceKindOf,
@@ -110,19 +111,19 @@ export default function useReviewerPromotion({
       if (genRef.current !== expectedGeneration) {
         return { refreshed, failures, stale: true };
       }
-      const rosterResponse = await fetch('/api/workbench/reviewer-roster', {
+      const { ok: rosterOk, data: rosterData } = await requestEnvelope('/api/workbench/reviewer-roster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestId,
           candidates: [pruneCandidateForRoster(candidate)],
         }),
+        tolerantBody: true,
       });
-      const rosterData = await rosterResponse.json().catch(() => ({}));
       if (genRef.current !== expectedGeneration) {
         return { refreshed, failures, stale: true };
       }
-      if (rosterResponse.ok && rosterData.success && rosterData.recorded === 1) {
+      if (rosterOk && rosterData.success && rosterData.recorded === 1) {
         refreshed.push(candidate);
       } else {
         failures.push({
@@ -185,7 +186,7 @@ export default function useReviewerPromotion({
         pushProgress(`Saving ${toSave.length} candidate(s)…`, myGen);
         let receivedResponse = false;
         try {
-          const sRes = await fetch('/api/reviewer-finder/save-candidates', {
+          const { ok: sOk, status: sStatus, data: sData } = await requestEnvelope('/api/reviewer-finder/save-candidates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -194,9 +195,9 @@ export default function useReviewerPromotion({
               programArea: analysis?.proposalInfo?.programArea || null,
               candidates: toSave,
             }),
+            tolerantBody: true,
           });
           receivedResponse = true;
-          const sData = await sRes.json().catch(() => ({}));
           const saveResults = Array.isArray(sData.results) ? sData.results : [];
           const correlatedSaveResults = correlateSaveResultsToRosterCandidates(saveResults, toSave);
           const recordRepairCodes = new Set([
@@ -264,13 +265,13 @@ export default function useReviewerPromotion({
             rosterWarnings.push('A reviewer was saved, but the Find roster could not be finalized.');
           }
           if (Array.isArray(sData.errors)) failures.push(...sData.errors);
-          if ((!sRes.ok || !sData.success) && saved === 0) {
+          if ((!sOk || !sData.success) && saved === 0) {
             const detail = formatSaveFailureDetails(sData.errors);
             failures.push({
               name: 'Add to Invite',
               error: detail
-                ? `${sData.error || `Save failed (${sRes.status})`} ${detail}`
-                : (sData.error || `Save failed (${sRes.status})`),
+                ? `${sData.error || `Save failed (${sStatus})`} ${detail}`
+                : (sData.error || `Save failed (${sStatus})`),
             });
           }
         } catch (e) {
@@ -345,14 +346,14 @@ export default function useReviewerPromotion({
             const body = { requestId, suggestionId: c.suggestionId };
             if (Object.keys(contact).length > 0) body.contact = contact;
 
-            const res = await fetch('/api/workbench/promote-applicant-reviewer', {
+            const { ok, status, data } = await requestEnvelope('/api/workbench/promote-applicant-reviewer', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(body),
+              tolerantBody: true,
             });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-              const error = new Error(data.message || data.error || `Adding to Invite failed (${res.status})`);
+            if (!ok || !data.success) {
+              const error = new Error(data.message || data.error || `Adding to Invite failed (${status})`);
               error.code = data.code || null;
               throw error;
             }
