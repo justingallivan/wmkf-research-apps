@@ -695,7 +695,7 @@ card must report that partial result and allow a deliberate follow-up after chec
 history. This source-built work passed cross-layer review and the combined 115-test
 run on 2026-09-20; it has not been released to production.
 
-### 16.10 2026-09-20: isolated email-modal rehearsal [ACCEPTED FEATURE-BRANCH SOURCE; NOT RELEASED]
+### 16.10 2026-09-20: isolated email-modal rehearsal [VERIFIED IN PREVIEW; NOT RELEASED TO PRODUCTION]
 
 The feature branch also includes a local/Preview-only rehearsal page for the real
 materials email modal. An exact `_app` path bypass prevents the page from mounting
@@ -709,4 +709,11 @@ passed on 2026-09-20. A built-app Chromium rehearsal exercised all three modal
 scenarios, preview invalidation after editing, sample default save/reset, and
 sample Send; it recorded zero `/api/` network requests and zero page errors, and
 the resulting screenshot was inspected. The webpack production build also
-passed. This is a source-state verification claim; deployment remains pending.
+passed. The interaction evidence above comes from the local production build.
+The feature was deployed Ready from commit `88aca3305a868ac265e3a06df355ac810d735001`
+as Preview deployment `dpl_HekqUG9SUrniPhnWa579nAVd97kX` at
+`https://wmkfresearchapps-ff0re4cjw-justin-gallivans-projects.vercel.app`.
+The Preview route `/meeting-tracker/materials-email-rehearsal` returns the
+expected 307 staff sign-in redirect while retaining its callback. The full
+modal interactions were independently verified against the local production
+build as recorded above. This Preview verification is not a production release.
