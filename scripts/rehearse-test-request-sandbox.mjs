@@ -32,7 +32,7 @@ const MANIFEST_TTL_MS = 60 * 60 * 1000;
 const POLL_MS = 5_000;
 const OBSERVATION_MS = 60_000;
 const GOVERIFY_WORKFLOW = Object.freeze({
-  id: 'efc7d476-6985-ee11-8179-000d3a341b5a',
+  definitionId: 'a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb',
   name: 'GOverify- check Publication 78 on create of a request record',
   primaryEntity: 'akoya_request',
 });
@@ -130,18 +130,47 @@ async function getGoverifyWorkflow(client) {
     'versionnumber',
   ];
   const response = await client.get(
-    `/workflows(${GOVERIFY_WORKFLOW.id})?$select=${fields.join(',')}`,
+    `/workflows(${GOVERIFY_WORKFLOW.definitionId})?$select=${fields.join(',')}`,
   );
   return bodyOrThrow('GoVerify workflow readback', response);
 }
 
+async function getGoverifyActivations(client) {
+  const filter = `_parentworkflowid_value eq ${GOVERIFY_WORKFLOW.definitionId} and type eq 2`;
+  const response = await client.get(
+    '/workflows?$select=workflowid,name,type,primaryentity,statecode,statuscode,_parentworkflowid_value' +
+      `&$filter=${encodeURIComponent(filter)}&$top=5`,
+  );
+  const body = bodyOrThrow('GoVerify activation readback', response);
+  if (body['@odata.nextLink']) throw new Error('GoVerify activation readback exceeded five rows.');
+  return body.value || [];
+}
+
+async function assertGoverifyActivationState(client, expectedActive) {
+  const activations = await getGoverifyActivations(client);
+  const unexpectedIdentity = activations.find((workflow) =>
+    workflow.name !== GOVERIFY_WORKFLOW.name ||
+    workflow.primaryentity !== GOVERIFY_WORKFLOW.primaryEntity ||
+    workflow.type !== 2 ||
+    !guidEqual(workflow._parentworkflowid_value, GOVERIFY_WORKFLOW.definitionId));
+  if (unexpectedIdentity) throw new Error('GoVerify activation identity mismatch.');
+  const active = activations.filter((workflow) => workflow.statecode === 1 && workflow.statuscode === 2);
+  if (expectedActive && (activations.length !== 1 || active.length !== 1)) {
+    throw new Error(`Expected one active GoVerify activation; found ${active.length} active of ${activations.length}.`);
+  }
+  if (!expectedActive && active.length !== 0) {
+    throw new Error(`Expected no active GoVerify activation; found ${active.length}.`);
+  }
+  return activations;
+}
+
 function assertExpectedGoverifyWorkflow(workflow, expectedState) {
   const mismatches = [];
-  if (!guidEqual(workflow.workflowid, GOVERIFY_WORKFLOW.id)) mismatches.push('workflow ID');
+  if (!guidEqual(workflow.workflowid, GOVERIFY_WORKFLOW.definitionId)) mismatches.push('workflow ID');
   if (workflow.name !== GOVERIFY_WORKFLOW.name) mismatches.push('workflow name');
   if (workflow.primaryentity !== GOVERIFY_WORKFLOW.primaryEntity) mismatches.push('primary entity');
   if (workflow.category !== 0) mismatches.push('category');
-  if (workflow.type !== 2) mismatches.push('type');
+  if (workflow.type !== 1) mismatches.push('type');
   if (workflow.mode !== 1) mismatches.push('mode');
   if (workflow.componentstate !== 0) mismatches.push('component state');
   if (workflow.triggeroncreate !== true) mismatches.push('create trigger');
@@ -154,13 +183,14 @@ function assertExpectedGoverifyWorkflow(workflow, expectedState) {
 
 async function setGoverifyWorkflowState(client, before, nextState) {
   const response = await client.patch(
-    `/workflows(${GOVERIFY_WORKFLOW.id})`,
+    `/workflows(${GOVERIFY_WORKFLOW.definitionId})`,
     nextState,
     { 'If-Match': before['@odata.etag'] },
   );
   bodyOrThrow('GoVerify workflow state change', response);
   const after = await getGoverifyWorkflow(client);
   assertExpectedGoverifyWorkflow(after, nextState);
+  await assertGoverifyActivationState(client, nextState.statecode === 1);
   return after;
 }
 
@@ -602,6 +632,7 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       if (bypassGoverify) {
         const workflowBefore = await getGoverifyWorkflow(client);
         assertExpectedGoverifyWorkflow(workflowBefore, { statecode: 1, statuscode: 2 });
+        await assertGoverifyActivationState(client, true);
         receipt.goverifyBypass = {
           workflowId: workflowBefore.workflowid,
           workflowName: workflowBefore.name,
