@@ -1,6 +1,6 @@
 # Test Request Factory — admin-only design
 
-Status: **AMENDED DESIGN; LOCAL IMPLEMENTATION AUTHORIZED — PRODUCTION ENABLEMENT BLOCKED.** The owner authorized staged building/review after the Opus review. No schema apply, live fixture creation, push or deployment is authorized by that instruction. Stage evidence will distinguish source-built features from verified live capability. Owner scope confirmed 2026-09-19: admin-only synthetic test requests, not operational duplication. This is separate from the Graph decomposition release. Source baseline: `710892ac`; the accepted Graph facade contract remains compatible with this proposal.
+Status: **AMENDED DESIGN; SANDBOX SCHEMA APPLIED; FIRST CREATE REJECTED — PRODUCTION ENABLEMENT BLOCKED.** The owner authorized one bounded sandbox rehearsal on 2026-09-21. Its single create rolled back completely after two synchronous workflow failures; no successful fixture, deployment, production apply, or push occurred. Stage evidence distinguishes source-built features from verified live capability. Owner scope confirmed 2026-09-19: admin-only synthetic test requests, not operational duplication. This is separate from the Graph decomposition release. Source baseline: `710892ac`; the accepted Graph facade contract remains compatible with this proposal.
 
 ## Outcome and user flow
 
@@ -9,6 +9,8 @@ From an existing request, an administrator selects **Create test request**. A sh
 A bounded source/script search found existing tests using prebuilt requests, but no reusable admin clone tool. **[VERIFIED via Luna source reconnaissance; not a tenant feature inventory.]**
 
 The tool supplies the repetitive setup. The user should not need to construct a Dataverse request, arrange SharePoint folders, repair document pointers, or send an invitation to establish a test fixture. Defaults come from a configured test organization and test personas; no contact is silently inherited from the source.
+
+The owner explicitly chose fresh destination Requests rather than resetting existing fixtures. SharePoint documents and version history survive Dataverse state resets and can affect later behavior. Every factory run therefore owns a fresh Request GUID/number/location/folder/history under W. M. Keck Foundation; resetting an existing Request is not the default or a fallback.
 
 Proposed starting points:
 
@@ -140,7 +142,7 @@ Implementation owner: Luna; independent stage reviewer: fresh Sol; final accepta
 
 Plan amendment accepted by Sol and committed as `ade5018a`. Source census and sanitized read-only metadata receipts are committed as `d7abaa30`; Sol accepted them as **partial Stage 0 evidence**, not a passed live stage. Both registered tenants lack the proposed marker/run fields. Production and sandbox differ in application-required fields; sandbox also lacks reminder/triage controls. The verified applicant relationship is `akoya_applicantid@odata.bind`, so intake's different binding must not be copied blindly. See the Stage 0 contract for exact evidence and unresolved gates.
 
-Luna built the initial offline basic-request draft compiler and unit tests; root completed the bounded corrections and Sol accepted the result. Root final acceptance is limited to this offline slice: no runtime caller, route, UI, ledger or live creation. Stages 1–5 remain unaccepted; schema rollout, platform suppression and provisioning must be resolved before operational wiring is enabled.
+Luna built the initial offline basic-request draft compiler and unit tests; root completed the bounded corrections and Sol accepted the result. The sandbox-only rehearsal branch added the sandbox-required numeric `akoya_requesttype`, a two-field reminder-control parity wave, a manifest-bound create operator, and read-only recovery/failure probes. Sandbox schema is now live, but the single create failed transactionally in `GOverify- check Publication 78 on create of a request record` and `Copy Applicant to Payee when Grant is Entered`. There is still no runtime caller, route, UI, ledger, or successful live fixture. Stages 1–5 remain unaccepted; sandbox workflow repair, platform suppression and provisioning must be resolved before operational wiring is enabled.
 
 Validation for the initial offline slice: 30 focused Jest tests passed; scoped ESLint passed; `npm run build` passed without copying live credentials; source-census self-test and syntax check passed; doc-currency/fact-consistency with sequential self-tests and docs-catalog passed. Build log: `/private/tmp/test-request-factory-build.log`. Initial build attempts exposed worktree permissions and an external dependency symlink; the final successful build used an independent APFS dependency copy and the required worktree write permission. The migration manifest was regenerated without a tracked change; no database migration was applied.
 

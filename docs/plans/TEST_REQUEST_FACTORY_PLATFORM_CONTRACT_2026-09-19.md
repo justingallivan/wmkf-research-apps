@@ -1,6 +1,6 @@
 # Test Request Factory — Stage 0 platform contract
 
-Status: **PARTIAL: source census, tenant schema metadata and visible automation registrations verified; suppression behavior and provisioning unresolved.** No request creation, schema apply, deployment or business-record query was performed. The offline census is reproducible with `node scripts/probe-test-request-factory-preflight.js --json`; it does not verify tenant state.
+Status: **PARTIAL: source census, tenant schema metadata, visible automation registrations, sandbox schema apply, and one rejected sandbox create are verified; production suppression and provisioning remain unresolved.** The 2026-09-21 create rolled back completely before number/location verification. No production write or deployment was performed. The offline census is reproducible with `node scripts/probe-test-request-factory-preflight.js --json`; it does not verify tenant state.
 
 ## Source contract
 
@@ -58,6 +58,14 @@ Both targets returned complete paginated HTTP-200 collections for the applicatio
 
 The reproducible probe exports selected metadata and definition hashes, not raw flow definitions, action inputs, connection parameters, credentials or document content. It rejects malformed pages, cross-origin/collection continuations and unbounded pagination. No flow execution, business-record read, schema change or request create occurred.
 
+## Platform-owner response and sandbox rehearsal — 2026-09-21
+
+[VERIFIED as owner-provided guidance] Connor reports: no automation sends email without user input; payment creation follows Phase II `Recommended`; organization-contact updates exist; new Requests should automatically receive linked SharePoint folders; Bill.com/other Akoya flows are manual or Request-value-only for this purpose; and sandbox is the appropriate verification target. He directed fixtures to the `W. M. Keck Foundation` organization. The product owner further decided that destinations must always be fresh Requests because SharePoint artifacts and file-version history survive Dataverse state resets.
+
+[VERIFIED via tracked schema runner and `scripts/rehearse-test-request-sandbox.mjs`] Sandbox now has the two marker/run fields and the separately applied two-field reminder-control parity wave. Post-apply metadata confirms all four are createable. The exact manifest under `docs/plans/evidence/test-request-factory/` omitted payment, status, contact, submission, triage, and document fields.
+
+The one authorized POST was rejected transactionally with HTTP 400 / `0x80040265` wrapping a remote 500. Read-only recovery found no Request, location, payment, or regarding email and unchanged Foundation account/Contact versions. `scripts/probe-sandbox-request-create-failure.mjs` and its sanitized receipt `docs/plans/evidence/test-request-factory/sandbox-create-failure-diagnostic-2026-09-21.json` resolved the two failed synchronous process sessions to `GOverify- check Publication 78 on create of a request record` and `Copy Applicant to Payee when Grant is Entered`; both failed during an internal Update. This closes the question of effective create permission only partially: the principal reached the normal synchronous workflow chain, but the transaction could not complete. Number allocation and folder provisioning remain unproved.
+
 ### Registered owner and browser follow-up
 
 [VERIFIED via read-only owner metadata census, `evidence/test-request-factory/registered-owners-2026-09-20.json`]
@@ -90,4 +98,4 @@ The [schema proposal](TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md) specif
 
 The preflight checks required source anchors and negative fixtures for lost evidence, unexpected location creation and incorrect field roles. Read-only behavior is established by source review, not by the script's static safety declarations. Tests do not prove remote suppression or runtime readiness.
 
-Stage 0 remains partial pending the external evidence above. Offline policy development may continue under the accepted design; no create route is enabled by this receipt.
+Stage 0 remains partial pending repair/configuration evidence for the two failing sandbox workflows and the external evidence above. Offline policy development may continue under the accepted design; no create route or retry is enabled by this receipt.

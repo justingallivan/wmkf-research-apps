@@ -1,6 +1,6 @@
 # Test Request Factory — schema proposal
 
-Status: **LOCAL SCHEMA/POLICY IMPLEMENTED; no schema apply, live write, route wiring, deployment, or push.** This document proposes the additive Dataverse schema needed for Stage 1 isolation. Metadata observations below are taken from the existing read-only receipts; they do not prove create permission, plugin behavior, Power Automate suppression, number allocation, or a safe end-to-end create.
+Status: **SANDBOX SCHEMA APPLIED; ONE CREATE REJECTED AND FULLY ROLLED BACK; no route wiring, deployment, production apply, or successful fixture.** Sandbox metadata now proves the four rehearsal fields are createable. The rejected create proves the normal sandbox synchronous workflow chain is currently unhealthy; it does not prove marker persistence, number allocation, folder provisioning, or safe end-to-end creation.
 
 ## Proposed schema wave
 
@@ -46,10 +46,10 @@ The existing metadata receipt at `docs/plans/evidence/test-request-factory/metad
 
 | Field/control | Production receipt | Sandbox receipt | Schema implication |
 |---|---|---|---|
-| `wmkf_istestrequest` | absent | absent | New additive field required in both targets |
-| `wmkf_testcreationrunid` | absent | absent | New additive field required in both targets |
-| `wmkf_respondreminderenabled` | Boolean, createable | absent | Do not invent a second name; sandbox must receive the existing reviewer-engagement field or all factory recipes stay blocked |
-| `wmkf_reviewduereminderenabled` | Boolean, createable | absent | Same gap; a Basic create cannot proceed until explicit false is representable |
+| `wmkf_istestrequest` | absent | applied/createable 2026-09-21 | Production remains blocked; sandbox exact Boolean type/createability verified; tracked create spec sets default false |
+| `wmkf_testcreationrunid` | absent | applied/createable 2026-09-21 | Production remains blocked; sandbox exact String(36) verified |
+| `wmkf_respondreminderenabled` | Boolean, createable | applied/createable 2026-09-21 | Existing reviewer-engagement contract applied through the isolated two-field parity wave; factory writes false |
+| `wmkf_reviewduereminderenabled` | Boolean, createable | applied/createable 2026-09-21 | Same isolated parity wave; factory writes false |
 | `wmkf_triagestatus` | Picklist, createable | absent | Not part of marker wave; triage-dependent recipes remain target-blocked |
 | `akoya_applicantid` | ApplicationRequired | ApplicationRequired | Existing lookup must be supplied through verified `akoya_applicantid@odata.bind` → `accounts`; intake's `akoya_Account@odata.bind` is not the factory contract |
 | Other create requiredness | Fiscal year in receipt | Request type and meeting date in receipt | Policy compiler supplies only explicit, verified recipe values; it never copies source lifecycle/cycle automatically |
@@ -85,7 +85,7 @@ Metadata GET proves logical names, types, createability flags, required-level de
 - that the target SharePoint location is provisioned;
 - that Dataverse Search, FetchXML, exports, workers and email/payment paths honor the marker.
 
-The first controlled rehearsal therefore remains blocked until a platform owner supplies create/update permission evidence, trigger inventory/suppression evidence, and a bounded sandbox rehearsal plan. A schema default of false is a compatibility default, not a security control.
+The first controlled rehearsal was owner-authorized and attempted on 2026-09-21. It was rejected by the sandbox synchronous workflow chain before persistence; see the dated handoff and receipts. A second create remains blocked pending repair/configuration evidence for the failing workflows and separate authorization. A schema default of false is a compatibility default, not a security control.
 
 The reproducible census receipt is `docs/plans/evidence/test-request-factory/platform-2026-09-20.json` (probe: `scripts/probe-test-request-platform.js`). Both targets report `{SEQNUM:7}` request-number metadata and document management enabled; neither proves a create or provisioning outcome.
 
@@ -157,7 +157,7 @@ Rollback is additive and leaves fields in place. First disable new factory creat
 - SharePoint request-location provisioner and uniqueness/recovery contract.
 - Permission proof for the app principal and server-owned marker/run writes.
 
-Until these are resolved, the schema remains unapplied and the offline compiler remains disabled for runtime use. No metadata/default observation in this proposal is a claim that the Test Request Factory is production-ready.
+Until these are resolved, sandbox schema stays additive and the offline compiler remains disabled for runtime use. Production schema is unapplied. No metadata/default observation in this proposal is a claim that the Test Request Factory is production-ready.
 
 ## Review disposition
 

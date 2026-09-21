@@ -28,6 +28,17 @@ after two HTTP 400 / `0x80040216` attempts, which left the view unchanged and
 did not call `PublishXml`. This is platform configuration metadata, not
 application-owned request state.
 
+**Related automation metadata entities:** `workflows` and
+`sdkmessageprocessingsteps` are read-only inputs to
+`scripts/probe-test-request-platform.js`. [VERIFIED via complete bounded
+Production/sandbox metadata census 2026-09-20 and the controlled sandbox
+rehearsal 2026-09-21] They inventory visible classic/cloud process definitions
+and registered request/location plug-in steps; they are not runtime application
+state and the app does not write them. The first sandbox Request-create attempt
+rolled back after synchronous failures in `GOverify- check Publication 78 on
+create of a request record` and `Copy Applicant to Payee when Grant is Entered`;
+see `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`.
+
 ## Key fields (live, sample-probed 2026-05-07)
 
 Identity / status:

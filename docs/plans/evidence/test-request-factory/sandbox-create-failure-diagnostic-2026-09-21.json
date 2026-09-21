@@ -1,0 +1,48 @@
+{
+  "kind": "test-request-sandbox-create-failure-diagnostic/v1",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "window": {
+    "from": "2026-09-21T21:34:30.000Z",
+    "to": "2026-09-21T21:35:20.000Z"
+  },
+  "requestId": "235c3354-945d-4c14-988e-81fa3ff4ca7c",
+  "createResponse": {
+    "httpStatus": 400,
+    "code": "0x80040265",
+    "message": "The remote server returned an error: (500) Internal Server Error."
+  },
+  "processSessions": [
+    {
+      "processSessionId": "b1a64748-04b6-f111-aaac-000d3a341753",
+      "processId": "efc7d476-6985-ee11-8179-000d3a341b5a",
+      "name": "GOverify- check Publication 78 on create of a request record",
+      "startedOn": "2026-09-21T21:34:56Z",
+      "completedOn": "2026-09-21T21:35:02Z",
+      "status": "Failed",
+      "failureSurface": "Microsoft.Crm.Workflow.Services.UpdateActivityService",
+      "reportedErrorCode": -2147220956
+    },
+    {
+      "processSessionId": "b7a64748-04b6-f111-aaac-000d3a341753",
+      "processId": "a79f8f94-8acc-ee11-907a-000d3a341b5a",
+      "name": "Copy Applicant to Payee when Grant is Entered",
+      "startedOn": "2026-09-21T21:34:56Z",
+      "completedOn": "2026-09-21T21:35:02Z",
+      "status": "Failed",
+      "failureSurface": "Microsoft.Crm.Workflow.Services.UpdateActivityService",
+      "reportedErrorCode": -2147220891
+    }
+  ],
+  "recoveryReadback": {
+    "requestExists": false,
+    "dynamicsLocationCount": 0,
+    "paymentRowCount": 0,
+    "regardingEmailCount": 0,
+    "foundationAccountVersionUnchanged": true,
+    "foundationChildContactVersionsUnchanged": true
+  },
+  "notes": [
+    "Plugin trace log had no rows in the bounded window.",
+    "No retry, delete, reset, email, payment, SharePoint file write, or production write was performed."
+  ]
+}
