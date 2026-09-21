@@ -574,3 +574,16 @@ test('the materials section carries the applicant-materials status and count', (
   rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: null, materialsAvailability: 'unavailable' })} cycleCode="D26" programId="p1" />);
   expect(screen.queryByRole('link', { name: 'Request materials' })).not.toBeInTheDocument();
 });
+
+
+test('received materials link to review controls only when the visit is available', () => {
+  const materials = { state: 'received', receivedCount: 3, requiredCount: 3, invited: true, overdue: false };
+  const row = (overrides = {}) => <MeetingTrackerRequestRow proposal={proposal({ siteVisit: { activityId: 'v' }, materials, ...overrides })} cycleCode="D26" programId="p1" />;
+  const { rerender } = render(row());
+  expect(screen.getByText('3/3 received; awaiting confirmation.')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Review materials' })).toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003`);
+  for (const overrides of [{ siteVisit: null }, { materialsAvailability: 'unavailable' }, { materials: { ...materials, state: 'ready' } }]) {
+    rerender(row(overrides));
+    expect(screen.queryByRole('link', { name: 'Review materials' })).not.toBeInTheDocument();
+  }
+});
