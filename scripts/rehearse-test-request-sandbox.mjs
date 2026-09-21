@@ -69,18 +69,21 @@ const READBACK_FIELDS = Object.freeze([
 ]);
 
 function parseArgs(argv) {
-  const parsed = { prepare: null, execute: null, receipt: null };
+  const parsed = { prepare: null, execute: null, inspect: null, receipt: null };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
     else if (arg.startsWith('--execute=')) parsed.execute = arg.slice('--execute='.length);
+    else if (arg.startsWith('--inspect=')) parsed.inspect = arg.slice('--inspect='.length);
     else if (arg.startsWith('--receipt=')) parsed.receipt = arg.slice('--receipt='.length);
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
-  if (parsed.prepare && parsed.execute) throw new Error('Choose --prepare or --execute, never both.');
+  if ([parsed.prepare, parsed.execute, parsed.inspect].filter(Boolean).length > 1) {
+    throw new Error('Choose exactly one of --prepare, --execute, or --inspect.');
+  }
   if (parsed.execute && !parsed.receipt) throw new Error('--execute requires --receipt.');
   if (!parsed.execute && parsed.receipt) throw new Error('--receipt is valid only with --execute.');
-  for (const value of [parsed.prepare, parsed.execute, parsed.receipt].filter(Boolean)) {
+  for (const value of [parsed.prepare, parsed.execute, parsed.inspect, parsed.receipt].filter(Boolean)) {
     if (!path.isAbsolute(value)) throw new Error('Manifest and receipt paths must be absolute.');
   }
   return parsed;
@@ -90,6 +93,7 @@ function printHelp() {
   console.log('Read-only: node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs');
   console.log('Prepare:  ... --prepare=/absolute/new-manifest.json');
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
+  console.log('Inspect:  ... --inspect=/absolute/manifest.json');
 }
 
 function bodyOrThrow(label, response) {
@@ -321,14 +325,48 @@ function buildManifest(preflight) {
   };
 }
 
-function validateManifest(manifest) {
+function validateManifest(manifest, { allowExpired = false } = {}) {
   if (manifest?.kind !== 'test-request-sandbox-rehearsal-manifest/v1') throw new Error('Unsupported manifest kind.');
   if (manifest.target !== SANDBOX_URL) throw new Error('Manifest target is not the registered sandbox.');
-  if (!manifest.expiresAt || Date.parse(manifest.expiresAt) <= Date.now()) throw new Error('Manifest is expired.');
+  if (!manifest.expiresAt || (!allowExpired && Date.parse(manifest.expiresAt) <= Date.now())) throw new Error('Manifest is expired.');
   if (manifest.createBodySha256 !== sha256(manifest.createBody)) throw new Error('Manifest create body hash mismatch.');
   if (manifest.invariants?.exactlyOneCreate !== true || manifest.invariants?.retryOnAmbiguousCreate !== false) {
     throw new Error('Manifest create invariants are invalid.');
   }
+}
+
+async function inspectManifest(client, manifest) {
+  validateManifest(manifest, { allowExpired: true });
+  const response = await client.get(
+    `/akoya_requests(${manifest.values.requestId})?$select=${READBACK_FIELDS.join(',')}`,
+  );
+  const request = response.status === 404 ? null : bodyOrThrow('recovery Request readback', response);
+  const [locations, payments, emails, foundation, contacts] = await Promise.all([
+    getLocations(client, manifest.values.requestId),
+    getPayments(client, manifest.values.requestId),
+    getEmails(client, manifest.values.requestId),
+    getFoundationSnapshot(client),
+    getContactSnapshot(client, manifest.expectedOrganization.accountid),
+  ]);
+  const locationParents = await resolveLocationParents(client, locations);
+  console.log(JSON.stringify({
+    mode: 'READ_ONLY_RECOVERY_INSPECTION',
+    target: SANDBOX_URL,
+    requestId: manifest.values.requestId,
+    requestExists: Boolean(request),
+    request,
+    dynamicsLocations: locations,
+    locationParents,
+    paymentRows: payments,
+    regardingEmails: emails,
+    foundation: {
+      accountid: foundation.accountid,
+      name: foundation.name,
+      modifiedon: foundation.modifiedon,
+      versionnumber: foundation.versionnumber,
+    },
+    childContacts: contacts,
+  }, null, 2));
 }
 
 function compareSnapshots(before, after, idField) {
@@ -563,6 +601,10 @@ async function main() {
     await executeManifest(client, readJson(args.execute), args.receipt);
     return;
   }
+  if (args.inspect) {
+    await inspectManifest(client, readJson(args.inspect));
+    return;
+  }
 
   const preflight = await runPreflight(client);
   if (args.prepare) {
@@ -585,4 +627,3 @@ main().catch((error) => {
   console.error(`FATAL: ${error.message}`);
   process.exit(1);
 });
-
