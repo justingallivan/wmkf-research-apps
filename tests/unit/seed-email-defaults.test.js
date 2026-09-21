@@ -138,7 +138,7 @@ describe('seed-email-defaults script core', () => {
       .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.reviewBundleLinkText);
   });
 
-  test('registers both site-visit email families with the previous default wording', async () => {
+  test('registers both site-visit email families with the Research Presentation wording', async () => {
     const { EMAIL_DEFAULT_SEED_TEXT } = await import('../../scripts/seed-email-defaults.mjs');
     const {
       SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
@@ -150,7 +150,12 @@ describe('seed-email-defaults script core', () => {
     expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_invite.body']).toBe(SITE_VISIT_MATERIALS_INVITE_SEED_BODY);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_reminder.subject']).toBe(SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_reminder.body']).toBe(SITE_VISIT_MATERIALS_REMINDER_SEED_BODY);
-    expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).toContain('No login is needed. You may forward the link below');
+    expect(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT).toBe('W.M. Keck Foundation Research Presentation Materials Request');
+    expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).toContain('Dear Dr. {{piLastName}}');
+    expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).toContain('{{liaisonFullName}}');
+    expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).toContain('{{programCoordinatorName}}');
+    expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).not.toContain('No login is needed.');
+    expect(SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT).toBe('W.M. Keck Foundation Research Presentation Materials Request');
     expect(SITE_VISIT_MATERIALS_REMINDER_SEED_BODY).toContain('The following {{missingItemsGrammar}} still needed');
   });
 
