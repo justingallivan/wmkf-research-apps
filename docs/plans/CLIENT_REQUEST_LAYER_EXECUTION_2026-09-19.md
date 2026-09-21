@@ -1144,7 +1144,7 @@ Follow-up 2026-09-20: [VERIFIED via source, 56 focused tests, and Sol review]
 the separate `codex/agenda-send-feedback` candidate classifies this refused
 competing send as failed ("Not sent."), with explicit recovery copy and the
 earlier pending operation retained. Luna built; Sol reviewed; root accepted.
-Not merged or deployed. See
+Released as `301d4d141` in `dpl_HoTApcaJCeMFaJEZFHeHWwdfSJZy`. See
 `docs/plans/AGENDA_SEND_REFUSAL_FIX_2026-09-20.md` for the contract and evidence.
 
 ## Stage 5b — external token pages, upload-adjacent forms, email pages (Tier 2)
@@ -1437,7 +1437,7 @@ and two modals with no shared constant / parity gate — noted, not changed
 (tests catch drift today). (5) nit: `REISSUE_REFUSAL_FALLBACKS` declared inside
 the branch body.
 
-### D1 remainder + D9 implementation — 2026-09-20, branch-built; reviewed and accepted
+### D1 remainder + D9 implementation — 2026-09-20, reviewed, accepted and released
 
 On `codex/d1-response-handling`, the remaining D1 sites were guarded after
 tests were written against the pre-fix behavior. `pages/dynamics-explorer.js`
@@ -1452,7 +1452,7 @@ successful flags response. The three remaining D9 call sites now pass
 
 Focused verification: 6 suites / 66 tests green, including 2xx, non-2xx,
 malformed 2xx, stale completion, asymmetric posture failures, and a real
-`ErrorAlert` visibility check. Sol's final review accepted the candidate at diff SHA256 `aac1a09bae999b6f7292fa3a384acd9455e0df22cf0b26e39768fee606c8e804`; root's source adjudication accepted it and independently reproduced 66/66 focused tests. This records branch-built state only; no release or deployment claim is made here.
+`ErrorAlert` visibility check. Sol's final review accepted the candidate at diff SHA256 `aac1a09bae999b6f7292fa3a384acd9455e0df22cf0b26e39768fee606c8e804`; root's source adjudication accepted it and independently reproduced 66/66 focused tests. [VERIFIED via Git and Vercel API] Released as `8623c2f7b` in `dpl_9rNyDMfuEMHPHo6ndSNh3di9d9eQ`; see `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md` for release and rollback evidence.
 
 ### Stage 6 acceptance — 2026-09-20, orchestrator (Fable), at `9f64a364a`
 

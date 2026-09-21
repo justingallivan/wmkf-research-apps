@@ -217,8 +217,8 @@ at the policies and prompts sites) were updated to `Request failed (502)`,
 consistent with owner decision D3. Gates at `0bd8d81d`: `npm test` 1001 suites /
 14986 tests green; lint 0 errors; `check:types` clean.
 
-The remaining D1/D9 sites are now branch-built below; fresh review and owner
-promotion remain open.
+The remaining D1/D9 sites are reviewed and released; see the implementation
+record below and `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`.
 
 ### Admin batch fresh review (Opus, no inherited context) — READY WITH NAMED CHANGES; accepted 2026-09-20 at `f136781a8`
 
@@ -281,8 +281,8 @@ lint 0 errors. Two unrelated suites (`phase-i-dynamics`, `request-list-panel`)
 were red from concurrent Stage 5 edits at that moment and are that lane's to
 resolve.
 
-The Stage 5a/5b D1 sites and three remaining D9 pages are branch-built in the
-implementation record below; fresh review and owner promotion remain open.
+The Stage 5a/5b D1 sites and three remaining D9 pages are reviewed and released
+as documented below and in `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`.
 
 ### Stage 4 batch fresh review (Opus, no inherited context) — READY; accepted 2026-09-20 at `fc3760edb`
 
@@ -305,7 +305,7 @@ Clarifications recorded: the `InviteEmailModal` invite-timing fix is a guard
 the `ReviewersTab` banner's Retry re-fetches reviewers, not candidates
 (pre-existing affordance, not rewired).
 
-### D1 remainder + D9 implementation — 2026-09-20, branch-built; reviewed and accepted
+### D1 remainder + D9 implementation — 2026-09-20, reviewed, accepted and released
 
 Implemented on `codex/d1-response-handling` after tests were written against
 the pre-fix behavior. The roles and providers GETs now branch on the helper's
@@ -323,5 +323,7 @@ malformed 2xx, stale role completion, asymmetric posture failures, and real
 `ErrorAlert` renders with expanded raw details. Sol's final review accepted the
 candidate at diff SHA256
 `aac1a09bae999b6f7292fa3a384acd9455e0df22cf0b26e39768fee606c8e804`; root's
-source adjudication also accepted it. This remains branch-built and is not a
-release or deployment claim; promotion remains an owner decision.
+source adjudication also accepted it. [VERIFIED via Git and Vercel API] Owner-
+authorized merge `8623c2f7b` is production-live in
+`dpl_9rNyDMfuEMHPHo6ndSNh3di9d9eQ`; release and rollback evidence is in
+`docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`.

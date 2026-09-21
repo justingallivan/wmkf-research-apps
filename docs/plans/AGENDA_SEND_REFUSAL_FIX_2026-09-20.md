@@ -2,8 +2,8 @@
 title: Agenda send refusal feedback fix
 domain: workbench
 kind: plan
-status: active
-summary: Reviewed branch candidate classifies a blocked competing agenda send as not sent; promotion remains pending.
+status: complete
+summary: Released agenda-send refusal feedback fix with preserved pending-operation reconciliation.
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -108,9 +108,9 @@ Existing persistence is read by the unchanged server guard; no new write path.
 
 [VERIFIED via implementation and scoped tests] This is a Tier 2 email-feedback candidate. Local mocked interaction
 tests provide Mode A rehearsal evidence; they do not claim a human production
-smoke. Commit/review are authorized; merge, production deployment, and real sends
-are not part of this task. Any later promotion must record its known-good
-deployment and rollback under the campaign release strategy.
+smoke of the refusal. The owner subsequently authorized release in agenda-then-D1
+order. Production read-only smoke passed; no real email was sent. Release and
+rollback evidence: `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`.
 
 ## Execution and review evidence
 
@@ -131,8 +131,8 @@ diff and accepts the candidate. Sequence-guard verification used source review
 rather than the initially proposed additional deferred-response test: the new
 feedback write is inside the unchanged guard, and no async machinery changed.
 
-The active handoff and original finding now identify this branch candidate;
-production promotion remains pending. No real email was sent during validation.
+[VERIFIED via Git and Vercel API] Released as `301d4d141`, deployment
+`dpl_HoTApcaJCeMFaJEZFHeHWwdfSJZy`. No real email was sent during validation.
 
 Root documentation gates passed: docs-catalog, doc-currency and its 13-fixture
 self-test, doc-symbol-refs and its self-test; `git diff --check` is clean.

@@ -73,25 +73,19 @@ decision.** **Update 16:20 PT: the owner said "merge"; merge commit
    `write_failed` status word (Stage 6 review finding 3); the `failure` code is
    on the same row. Route it through the same cause/recovery copy, or record the
    asymmetry as deliberate.
-4. **Agenda-send refusal fix — branch candidate, not deployed.**
-   [VERIFIED via source, 56 focused tests, and Sol review] On
-   `codex/agenda-send-feedback`, a competing-send 409 `agenda_send_unresolved`
-   now renders "Not sent." and preserves the earlier unresolved operation for
-   explicit reconciliation. Luna built; Sol reviewed; root accepted. Promotion
-   remains an owner decision. Evidence:
-   `docs/plans/AGENDA_SEND_REFUSAL_FIX_2026-09-20.md`.
+4. **Agenda-send refusal fix — released 2026-09-20.** [VERIFIED via Git,
+   Vercel API and signed-in read-only smoke] Merge `301d4d141`, deployment
+   `dpl_HoTApcaJCeMFaJEZFHeHWwdfSJZy`; competing sends now show "Not sent."
+   Release evidence: `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`.
 
 ### Verified Open
 
-1. **D1 remainder + D9 branch candidate** (owner priority 2026-09-20).
-   The scoped roles, provider, and scheduled-email posture GETs and the three
-   D9 `ErrorAlert` call sites are branch-built on
-   `codex/d1-response-handling`, with focused tests passing (fresh review and
-   owner promotion remain open). Evidence:
-   `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` §11,
-   `docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md`, and
-   `docs/CURRENT_WORK_QUEUE.md` row 13. Preserve this as branch-built status;
-   it is not a release or deployment claim.
+1. **D1 remainder + D9 — released 2026-09-20 after the agenda fix.**
+   [VERIFIED via Git, Vercel API and signed-in read-only smoke] Merge
+   `8623c2f7b`, deployment `dpl_9rNyDMfuEMHPHo6ndSNh3di9d9eQ`.
+   Luna built, Sol reviewed, root accepted. Detailed release, CI and rollback
+   evidence: `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`.
+
 2. **O4 observation** (execution log ~:707): ~16 sites keep the
    `parseError` rethrow idiom (old bare-`.json()` behavior) while others took
    D3's fallback text. Owner may want one policy; today both are within the bar.
