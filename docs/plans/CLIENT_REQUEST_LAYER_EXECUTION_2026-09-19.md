@@ -1136,9 +1136,16 @@ the static "Send status is uncertain / The app could not confirm the result"
 feedback, and the `agenda_send_unresolved` branch already calls `setNotice`
 with its own explicit sentence. So neither the old empty message nor the new
 generic one was ever visible there; no fallback map was added because no test
-could go red. Observation for the owner, not acted on: a 409
+could go red. Historical observation at Stage 5a, not acted on in that stage: a 409
 `agenda_send_unresolved` is a definite refusal, and the "uncertain" banner is
 arguably the wrong outcome class for it (pre-existing, outside this plan).
+
+Follow-up 2026-09-20: [VERIFIED via source, 56 focused tests, and Sol review]
+the separate `codex/agenda-send-feedback` candidate classifies this refused
+competing send as failed ("Not sent."), with explicit recovery copy and the
+earlier pending operation retained. Luna built; Sol reviewed; root accepted.
+Not merged or deployed. See
+`docs/plans/AGENDA_SEND_REFUSAL_FIX_2026-09-20.md` for the contract and evidence.
 
 ## Stage 5b — external token pages, upload-adjacent forms, email pages (Tier 2)
 

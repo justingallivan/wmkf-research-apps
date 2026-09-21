@@ -3,7 +3,7 @@ title: Agenda send refusal feedback fix
 domain: workbench
 kind: plan
 status: active
-summary: Classify a blocked competing agenda send as not sent while preserving reconciliation of the earlier unresolved operation.
+summary: Reviewed branch candidate classifies a blocked competing agenda send as not sent; promotion remains pending.
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -73,7 +73,7 @@ outcome-classification follow-up remains open at the base commit.
 | No automatic retry | PATCH count remains one after conflict; only explicit re-confirmation causes the second PATCH, whose body contains A |
 | Genuine uncertainty is unchanged | Network rejection during send stays uncertain; 202 `agenda_send_unconfirmed` retains same-operation recovery |
 | Other refusal branches remain distinct | Existing stale-preview, terminal-send, prepare-time conflict and accepted receipt tests pass |
-| A stale response cannot change another interaction | New state write remains inside the existing sequence guard; deferred test settles stale response before asserting current state |
+| A stale response cannot change another interaction | Source review confirms the new state write remains inside the existing sequence guard; no new deferred-response test was added |
 | No wire or persistence contract changes | Diff contains no API/service/store/schema edits; existing service/route tests still pass |
 
 Complement check: only the existing non-ok, exact-code, pendingSend branch is
@@ -106,7 +106,7 @@ Existing persistence is read by the unchanged server guard; no new write path.
 
 ## Release boundary
 
-[PLANNED] This is a Tier 2 email-feedback candidate. Local mocked interaction
+[VERIFIED via implementation and scoped tests] This is a Tier 2 email-feedback candidate. Local mocked interaction
 tests provide Mode A rehearsal evidence; they do not claim a human production
 smoke. Commit/review are authorized; merge, production deployment, and real sends
 are not part of this task. Any later promotion must record its known-good
@@ -118,5 +118,21 @@ Sol plan review: accepted after clarifying the concurrent-constraint case above.
 Baseline: four agenda panel/T5/service/route suites, 55 tests, passed locally.
 Worktree agent-invariant gate passed (three required symlinks).
 
-Pending implementation review. Root will reconcile the handoff and original
-finding to branch-built status only after tests and review support that claim.
+[VERIFIED via Luna's red/green run and root's independent final run] Four
+agenda panel/T5/service/route suites pass, **56 tests**. The new real-panel
+regression failed before the source change and passes after it. It proves
+PATCH B is refused, failed feedback is rendered, A is retained, confirmation
+is cleared, no automatic retry occurs, and explicit reconciliation PATCHes A.
+Existing network-failure and 202 uncertainty tests remain green.
+
+Luna reports scoped ESLint clean and `check:types` passed. Fresh Sol source/test
+review: **READY, no blocking findings**. Root independently reviewed the final
+diff and accepts the candidate. Sequence-guard verification used source review
+rather than the initially proposed additional deferred-response test: the new
+feedback write is inside the unchanged guard, and no async machinery changed.
+
+The active handoff and original finding now identify this branch candidate;
+production promotion remains pending. No real email was sent during validation.
+
+Root documentation gates passed: docs-catalog, doc-currency and its 13-fixture
+self-test, doc-symbol-refs and its self-test; `git diff --check` is clean.
