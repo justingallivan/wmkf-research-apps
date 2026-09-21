@@ -80,15 +80,15 @@ decision.** **Update 16:20 PT: the owner said "merge"; merge commit
 
 ### Verified Open
 
-1. **D1 remainder** (owner priority 2026-09-20). Evidence:
-   `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` §11
-   "Remaining D1 sites"; `docs/CURRENT_WORK_QUEUE.md` row 13. Sites:
-   `pages/dynamics-explorer.js:153`, `pages/virtual-review-panel.js:1030`
-   (Tier 1); `pages/scheduled-emails.js:59,61` (Tier 2); D9 `ErrorAlert`
-   `message=` → `error=` at `dataverse-bulk-export.js:471`,
-   `virtual-review-panel.js:1296`, `phase-i-dynamics.js:152`. Fix pattern in §4;
-   tests-first; fresh review; do it on the feature branch if unmerged, else on a
-   new branch.
+1. **D1 remainder + D9 branch candidate** (owner priority 2026-09-20).
+   The scoped roles, provider, and scheduled-email posture GETs and the three
+   D9 `ErrorAlert` call sites are branch-built on
+   `codex/d1-response-handling`, with focused tests passing (fresh review and
+   owner promotion remain open). Evidence:
+   `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` §11,
+   `docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md`, and
+   `docs/CURRENT_WORK_QUEUE.md` row 13. Preserve this as branch-built status;
+   it is not a release or deployment claim.
 2. **O4 observation** (execution log ~:707): ~16 sites keep the
    `parseError` rethrow idiom (old bare-`.json()` behavior) while others took
    D3's fallback text. Owner may want one policy; today both are within the bar.

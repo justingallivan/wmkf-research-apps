@@ -1011,6 +1011,7 @@ function VirtualReviewPanelContent() {
   const [includeDevilsAdvocate, setIncludeDevilsAdvocate] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
+  const [providerLoadError, setProviderLoadError] = useState(null);
   const [events, setEvents] = useState([]);
   const [providerStatuses, setProviderStatuses] = useState({});
   const [currentStage, setCurrentStage] = useState(null);
@@ -1028,8 +1029,15 @@ function VirtualReviewPanelContent() {
 
   // Fetch available providers and models from server on mount
   useEffect(() => {
+    let cancelled = false;
     requestEnvelope('/api/virtual-review-panel', { tolerantBody: true })
       .then(envelope => {
+        if (cancelled) return;
+        if (!envelope.ok) {
+          setProviderLoadError(envelope.error?.message || `Request failed (${envelope.status})`);
+          return;
+        }
+        setProviderLoadError(null);
         const data = envelope.data;
         if (data.providers) {
           setAvailableProviders(data.providers.map(p => p.key));
@@ -1043,7 +1051,10 @@ function VirtualReviewPanelContent() {
           });
         }
       })
-      .catch(() => { /* use defaults */ });
+      .catch(err => {
+        if (!cancelled && err.name !== 'AbortError') setProviderLoadError(err.message);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const handleSubmit = useCallback(async () => {
@@ -1213,6 +1224,7 @@ function VirtualReviewPanelContent() {
       />
 
       <div className="space-y-6">
+        {providerLoadError && <ErrorAlert error={providerLoadError} onDismiss={() => setProviderLoadError(null)} />}
         {/* Upload Section */}
         <Card title="Upload Proposal">
           <FileUploaderSimple
@@ -1295,7 +1307,7 @@ function VirtualReviewPanelContent() {
           </Button>
         </div>
 
-        {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
+        {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
 
         {/* Progress Section — visible during processing AND after completion */}
         {(processing || events.length > 0) && (

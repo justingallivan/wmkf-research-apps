@@ -217,10 +217,8 @@ at the policies and prompts sites) were updated to `Request failed (502)`,
 consistent with owner decision D3. Gates at `0bd8d81d`: `npm test` 1001 suites /
 14986 tests green; lint 0 errors; `check:types` clean.
 
-Remaining D1 sites by stage: Stage 4 batch DONE (see §11; useReviewerPromotion
-:188 was guarded-elsewhere); Stage 5a (dynamics-explorer :153, virtual-review-panel :1030) and
-5b (scheduled-emails :59, :61, campaign-critical, Tier 2) after theirs. D9's
-other three sites ride with Stage 5a.
+The remaining D1/D9 sites are now branch-built below; fresh review and owner
+promotion remain open.
 
 ### Admin batch fresh review (Opus, no inherited context) — READY WITH NAMED CHANGES; accepted 2026-09-20 at `f136781a8`
 
@@ -283,9 +281,8 @@ lint 0 errors. Two unrelated suites (`phase-i-dynamics`, `request-list-panel`)
 were red from concurrent Stage 5 edits at that moment and are that lane's to
 resolve.
 
-Remaining D1 sites: Stage 5a (`dynamics-explorer :153`, `virtual-review-panel
-:1030`) and 5b (`scheduled-emails :59, :61`, campaign-critical, Tier 2) after
-their stages; D9's three pages after Stage 5a.
+The Stage 5a/5b D1 sites and three remaining D9 pages are branch-built in the
+implementation record below; fresh review and owner promotion remain open.
 
 ### Stage 4 batch fresh review (Opus, no inherited context) — READY; accepted 2026-09-20 at `fc3760edb`
 
@@ -307,3 +304,24 @@ Clarifications recorded: the `InviteEmailModal` invite-timing fix is a guard
 (the non-2xx body is no longer applied; nothing is shown), not a surfacing;
 the `ReviewersTab` banner's Retry re-fetches reviewers, not candidates
 (pre-existing affordance, not rewired).
+
+### D1 remainder + D9 implementation — 2026-09-20, branch-built; reviewed and accepted
+
+Implemented on `codex/d1-response-handling` after tests were written against
+the pre-fix behavior. The roles and providers GETs now branch on the helper's
+HTTP envelope, preserve tolerant malformed-2xx behavior, ignore stale
+profile/load completions, and surface non-2xx messages through their existing
+page surfaces; the Explorer role failure uses a new minimal inline role-load
+error beside the role badge because that page had no standalone alert surface.
+Scheduled-email preference and VIP GETs now retain independent
+error state so list success cannot clear posture failures; VIP controls remain
+unknown/disabled until a successful flags load. D9's remaining three
+`ErrorAlert` call sites now pass `error=`.
+
+Focused verification: 6 suites / 66 tests green, including 2xx, non-2xx,
+malformed 2xx, stale role completion, asymmetric posture failures, and real
+`ErrorAlert` renders with expanded raw details. Sol's final review accepted the
+candidate at diff SHA256
+`aac1a09bae999b6f7292fa3a384acd9455e0df22cf0b26e39768fee606c8e804`; root's
+source adjudication also accepted it. This remains branch-built and is not a
+release or deployment claim; promotion remains an owner decision.

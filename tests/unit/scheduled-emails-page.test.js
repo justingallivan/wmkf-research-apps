@@ -5,20 +5,20 @@
  * existed for this page before (T5); this file is that first characterization
  * pass, kept minimal per site.
  *
- * Sites: :59/:61 (D1-preserve, unguarded Promise.all preferences/vip-flags
- * GETs — no `response.ok` check today, so migrating them keeps that), :76
+ * Sites: :59/:61 guarded preferences/vip-flags GETs, :76
  * (PUT reviewAll), :95 (PUT vip flag), :119 (GET scheduled-emails list), :162
  * (PATCH action — reads `data.outcome` before the `!ok` check).
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ScheduledEmailsPage from '../../pages/scheduled-emails';
 
 const routerReplace = jest.fn();
 jest.mock('next/router', () => ({
   useRouter: () => ({ isReady: true, replace: routerReplace, query: {} }),
 }));
+let mockProfile = { status: 'ready', currentProfile: { id: 'profile-1' } };
 jest.mock('../../shared/context/ProfileContext', () => ({
-  useProfile: () => ({ status: 'ready', currentProfile: { id: 'profile-1' } }),
+  useProfile: () => mockProfile,
 }));
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
@@ -55,32 +55,105 @@ function mockFetch(handlers) {
   });
 }
 
-beforeEach(() => { window.history.replaceState({}, '', '/scheduled-emails'); jest.spyOn(window, 'confirm').mockReturnValue(true); });
+beforeEach(() => { mockProfile = { status: 'ready', currentProfile: { id: 'profile-1' } }; window.history.replaceState({}, '', '/scheduled-emails'); jest.spyOn(window, 'confirm').mockReturnValue(true); });
 afterEach(() => jest.restoreAllMocks());
 
-// --- :59/:61 preferences + vip-flags (D1-preserve, unguarded) ---
+// --- :59/:61 preferences + vip-flags ---
 
 test('(a) preferences + vip-flags load and drive the review-all checkbox', async () => {
   mockFetch([
     ['/api/email-automation-preferences', async () => response(200, { preference: { reviewAll: true } })],
     ['/api/scheduled-emails/vip-flags', async () => response(200, { flags: [{ contactId: 'c1' }] })],
-    ['/api/scheduled-emails', async () => response(200, { messages: [] })],
+    ['/api/scheduled-emails', async () => response(200, { messages: [{ ...MESSAGE, recipientContactIds: ['c1'] }] })],
   ]);
   render(<ScheduledEmailsPage />);
   await waitFor(() => expect(screen.getByRole('checkbox', { name: /Review every automated email/ })).toBeChecked());
 });
 
-test('(d)/(e) a malformed or non-2xx preferences/vip-flags body is tolerated to {} (D1-preserve: no ok check)', async () => {
+test('a non-2xx VIP response shows its error and does not clear successful preference state', async () => {
   mockFetch([
-    ['/api/email-automation-preferences', async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } })],
+    ['/api/email-automation-preferences', async () => response(200, { preference: { reviewAll: true } })],
     ['/api/scheduled-emails/vip-flags', async () => response(500, { error: 'nope' })],
+    ['/api/scheduled-emails', async () => response(200, { messages: [{ ...MESSAGE, recipientContactIds: ['c1'] }] })],
+  ]);
+  render(<ScheduledEmailsPage />);
+  await screen.findByDisplayValue('Hi');
+  expect(await screen.findByText('VIP flags: nope')).toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: /Review every automated email/ })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: /Always review emails to/ })).toBeDisabled();
+});
+
+test('a non-2xx preference response shows its error while successful VIP state remains usable', async () => {
+  mockFetch([
+    ['/api/email-automation-preferences', async () => response(500, { error: 'Preference unavailable' })],
+    ['/api/scheduled-emails/vip-flags', async () => response(200, { flags: [{ contactId: 'c1' }] })],
+    ['/api/scheduled-emails', async () => response(200, { messages: [{ ...MESSAGE, recipientContactIds: ['c1'] }] })],
+  ]);
+  render(<ScheduledEmailsPage />);
+  expect(await screen.findByText('Review preference: Preference unavailable')).toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: /Always review emails to/ })).toBeEnabled();
+});
+
+test('posture error survives a later successful sibling and message-list load', async () => {
+  let resolvePreferenceBody;
+  const preferenceBody = new Promise(resolve => { resolvePreferenceBody = resolve; });
+  mockFetch([
+    ['/api/email-automation-preferences', async () => ({ ok: false, status: 503, json: async () => preferenceBody })],
+    ['/api/scheduled-emails/vip-flags', async () => response(200, { flags: [{ contactId: 'c1' }] })],
     ['/api/scheduled-emails', async () => response(200, { messages: [] })],
   ]);
   render(<ScheduledEmailsPage />);
-  // Neither malformed body throws into the page's error state — both are
-  // swallowed via the shared `.catch(() => {})` at the end of the Promise.all chain.
   await screen.findByText('No scheduled emails');
-  expect(screen.queryByRole('alert')).toBeNull();
+  resolvePreferenceBody({ error: 'Preference service unavailable' });
+  expect(await screen.findByText(/Preference service unavailable/)).toBeInTheDocument();
+});
+
+test('a network failure in one posture load does not discard the successful sibling', async () => {
+  mockFetch([
+    ['/api/email-automation-preferences', async () => { throw new Error('preference network down'); }],
+    ['/api/scheduled-emails/vip-flags', async () => response(200, { flags: [{ contactId: 'c1' }] })],
+    ['/api/scheduled-emails', async () => response(200, { messages: [{ ...MESSAGE, recipientContactIds: ['c1'] }] })],
+  ]);
+  render(<ScheduledEmailsPage />);
+  expect(await screen.findByText(/Review preference: preference network down/)).toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: /Always review emails to/ })).toBeEnabled();
+});
+
+test('both posture failures remain visible together', async () => {
+  mockFetch([
+    ['/api/email-automation-preferences', async () => response(503, { error: 'Preference down' })],
+    ['/api/scheduled-emails/vip-flags', async () => response(502, { error: 'VIP down' })],
+    ['/api/scheduled-emails', async () => response(200, { messages: [] })],
+  ]);
+  render(<ScheduledEmailsPage />);
+  expect(await screen.findByText(/Review preference: Preference down/)).toBeInTheDocument();
+  expect(screen.getByText(/VIP flags: VIP down/)).toBeInTheDocument();
+});
+
+test('changing profile aborts the prior posture load and leaves new posture unknown until it resolves', async () => {
+  let resolveOld;
+  let calls = 0;
+  mockFetch([
+    ['/api/email-automation-preferences', async () => {
+      calls += 1;
+      if (calls === 1) return new Promise(resolve => { resolveOld = resolve; });
+      return response(200, { preference: { reviewAll: true } });
+    }],
+    ['/api/scheduled-emails/vip-flags', async () => response(200, { flags: [{ contactId: 'c1' }] })],
+    ['/api/scheduled-emails', async () => response(200, { messages: [{ ...MESSAGE, recipientContactIds: ['c1'] }] })],
+  ]);
+  const view = render(<ScheduledEmailsPage />);
+  await screen.findByDisplayValue('Hi');
+  mockProfile = { status: 'ready', currentProfile: { id: 'profile-2' } };
+  view.rerender(<ScheduledEmailsPage />);
+  expect(await screen.findByRole('checkbox', { name: /Review every automated email/ })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: /Always review emails to/ })).toBeChecked();
+  await act(async () => {
+    resolveOld?.(response(200, { preference: { reviewAll: false } }));
+    await Promise.resolve();
+  });
+  expect(screen.getByRole('checkbox', { name: /Review every automated email/ })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: /Always review emails to/ })).toBeChecked();
 });
 
 // --- :119 GET /api/scheduled-emails (list) ---
