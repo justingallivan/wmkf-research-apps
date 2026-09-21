@@ -291,6 +291,11 @@ describe('institutionNameOf (byline → institution name for display)', () => {
     expect(institutionNameOf('Broad Genomics Platform, Cambridge, MA')).toBe('Broad Genomics Platform');
   });
 
+  it('drops a UK-style postcode segment while keeping digit-bearing organization names', () => {
+    expect(institutionNameOf('Department of Physics, University of Cambridge, Cambridge, CB2 1TN, UK')).toBe('University of Cambridge');
+    expect(institutionNameOf('Imperial College London, South Kensington Campus, London SW7 2AZ, UK')).toBe('Imperial College London');
+  });
+
   it('prefers a sub-unit over a bare one-word proper noun that is probably an unlisted town', () => {
     expect(institutionNameOf('Department of Chemistry, Klosterneuburg')).toBe('Department of Chemistry');
     expect(institutionNameOf('Dept of Biology, Tromsø, Norway')).toBe('Dept of Biology');
@@ -303,6 +308,50 @@ describe('institutionNameOf (byline → institution name for display)', () => {
     expect(institutionNameOf('someone@x.org')).toBeNull();
     expect(institutionNameOf('')).toBeNull();
     expect(institutionNameOf(null)).toBeNull();
+  });
+
+  it('pools comma co-affiliations at institution tier with semicolon runs, deduplicated together (Fix 2, Codex adversarial review 2026-09-21)', () => {
+    expect(institutionNameOf('University of Washington, Fred Hutchinson Cancer Center, Seattle, WA'))
+      .toBe('University of Washington and Fred Hutchinson Cancer Center');
+    // A leading "Institute of …" is a sub-institute and "College of Medicine"
+    // a sub-unit; both semicolon runs name the same university, unchanged.
+    expect(institutionNameOf(
+      'Center for Translational Cancer Research, Institute of Biosciences and Technology, Texas A&M University, Houston, TX 77030, USA; Department of Medical Physiology, College of Medicine, Texas A&M University, Bryan, TX, USA',
+    )).toBe('Texas A&M University');
+    expect(institutionNameOf('Department of Biochemistry, University of California, San Francisco, CA; Howard Hughes Medical Institute'))
+      .toBe('University of California, San Francisco and Howard Hughes Medical Institute');
+    expect(institutionNameOf('Department of Medicine, Massachusetts General Hospital, Harvard Medical School, Boston, MA'))
+      .toBe('Massachusetts General Hospital and Harvard Medical School');
+  });
+
+  it('does not drop an organization name that merely contains a digit (Fix 3, Codex adversarial review 2026-09-21)', () => {
+    expect(institutionNameOf('3M Corporate Research Laboratory, St. Paul, MN')).toBe('3M Corporate Research Laboratory');
+    expect(institutionNameOf('Department of Oncology, Institut Curie U1234, Paris, France')).toBe('Institut Curie U1234');
+    // Unchanged: a genuine postal code still drops.
+    expect(institutionNameOf('Department of Bioengineering, Stanford University, Stanford, CA 94305.')).toBe('Stanford University');
+    expect(institutionNameOf(
+      'Division of Biochemistry and Structural Biology, Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic address: herwig.schuler@biochemistry.lu.se.',
+    )).toBe('Lund University');
+  });
+
+  it('matches non-English university/organization/sub-unit terms and accented forms, Unicode-aware (Fix 4, Codex adversarial review 2026-09-21)', () => {
+    expect(institutionNameOf('Centre de recherche en santé, Université de Montréal, Montréal, Canada')).toBe('Université de Montréal');
+    expect(institutionNameOf('Instituto de Neurociencias, Universidad de Alicante, Alicante, Spain')).toBe('Universidad de Alicante');
+    expect(institutionNameOf('Departamento de Bioquímica, Universidade de São Paulo, São Paulo, Brazil')).toBe('Universidade de São Paulo');
+    expect(institutionNameOf('Institut Pasteur, Paris, France')).toBe('Institut Pasteur');
+    // Unchanged.
+    expect(institutionNameOf('Max Planck Institute for Biophysical Chemistry, Göttingen, Germany')).toBe('Max Planck Institute for Biophysical Chemistry');
+  });
+
+  it('does not re-attach a campus to a university whose name is not "University of <system>" (MULTI_CAMPUS_SYSTEM stays a closed list)', () => {
+    expect(institutionNameOf('New York University, Abu Dhabi')).toBe('New York University');
+  });
+
+  it('still treats "School of X" as a sub-unit for X other than Medicine, after the Unicode-boundary rewrite (Fix 4)', () => {
+    // Discriminating fixture: `school\s+of` must stay excluded from
+    // MULTI_CAMPUS_SYSTEM re-attachment via SUBUNIT_SEGMENT even though the
+    // negative lookahead for "medicine" now sits inside a Unicode boundary.
+    expect(institutionNameOf('University of California, School of Engineering')).toBe('University of California');
   });
 });
 

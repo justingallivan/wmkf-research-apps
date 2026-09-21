@@ -120,11 +120,35 @@ export function reviewerAffiliationOf(reviewer) {
 // here.
 
 // Segments that are sub-units of an institution, never the institution.
-const SUBUNIT_SEGMENT = /^(?:dept\.?|department|division|section|unit|group|program(?:me)?|lab(?:oratory)?\s+(?:of|for)|faculty\s+of|graduate\s+school\s+of|school\s+of\s+(?!medicine\b)|college\s+of|centre?\s+(?:for|of)|institute\s+(?:for|of)|chair\s+of)\b/i;
+// Unicode-aware (`u` flag, explicit lookaround boundaries in place of ASCII-
+// only `\b`) so an accented lead ("Département de …") still matches (Codex
+// adversarial review, 2026-09-21).
+const SUBUNIT_SEGMENT = /^(?:dept\.?|department|division|section|unit|group|program(?:me)?|lab(?:oratory)?\s+(?:of|for)|faculty\s+of|graduate\s+school\s+of|school\s+of(?!\s+medicine(?![\p{L}\p{N}]))|college\s+of|centre?\s+(?:for|of)|institute\s+(?:for|of)|chair\s+of|centre\s+de\s+recherche|centro\s+de|departamento\s+de|département\s+de|laboratoire\s+de|institut\s+de|instituto\s+de|institut\s+für|abteilung)(?![\p{L}\p{N}])/iu;
 // A university-tier organization: preferred over any other segment.
-const UNIVERSITY_TERM = /\b(?:university|universit(?:[äa]t|[ée]|y|a|eit|as|ad|ade)|polytechnic|hochschule|college)\b|\bETH\b|\bMIT\b|\bCaltech\b/i;
+const UNIVERSITY_TERM = /(?<![\p{L}\p{N}])(?:university|universität|universitaet|université|universite|università|universita|universidad|universidade|universiteit|universitet|universitetet|univerzita|uniwersytet|polytechnic|politecnico|polytechnique|hochschule|college|ETH|MIT|Caltech)(?![\p{L}\p{N}])/iu;
 // Any other organization-shaped segment (second preference).
-const ORGANIZATION_TERM = /\b(?:institut(?:e|o|ion)?|hospital|clinic|klinik|medical\s+(?:center|centre|school)|school\s+of\s+medicine|laborator(?:y|ies)|foundation|academy|center|centre|research\s+council|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)\b/i;
+const ORGANIZATION_TERM = /(?<![\p{L}\p{N}])(?:institut(?:e|o|ion)?|istituto|hospital|hôpital|hopital|ospedale|clinic|klinik|klinikum|medical\s+(?:center|centre|school)|school\s+of\s+medicine|centre\s+hospitalier|CHU|laborator(?:y|ies)|foundation|academy|center|centre|research\s+council|CNRS|INSERM|CEA|Max\s+Planck|Howard\s+Hughes|Helmholtz|Fraunhofer|Karolinska|Pasteur|Weizmann|Riken|CSIC)(?![\p{L}\p{N}])/iu;
+// Institution-tier whitelist within ORGANIZATION_TERM (Fix 2, Codex
+// adversarial review 2026-09-21): a comma co-affiliation is only pooled
+// alongside a university when it names a whole institution, not any
+// organization-shaped sub-unit ("Center for Translational Cancer Research"
+// stays a sub-unit-shaped fallback only — bare "center"/"centre" is excluded
+// here even though it is in the broader ORGANIZATION_TERM above).
+const INSTITUTION_TIER_ORG_TERM = /(?<![\p{L}\p{N}])(?:hospital|clinic|klinik|medical\s+(?:center|centre)|medical\s+school|school\s+of\s+medicine|cancer\s+(?:center|centre)|national\s+laboratory|laboratories|foundation|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)(?![\p{L}\p{N}])/iu;
+// A whole institute, not a sub-institute lead ("Institute of X" inside a run
+// that also has a university is a sub-institute — see SUBUNIT_SEGMENT).
+const INSTITUTE_WORD = /(?<![\p{L}\p{N}])(?:institute|institut|instituto)(?![\p{L}\p{N}])/iu;
+const INSTITUTE_SUBUNIT_LEAD = /^(?:institute\s+of|institute\s+for|institut\s+de|institut\s+für|instituto\s+de)(?![\p{L}\p{N}])/iu;
+
+// Institution-tier part (Fix 2): a university-tier part, OR an
+// organization-shaped part matching the narrower INSTITUTION_TIER_ORG_TERM
+// whitelist, OR a whole institute that is not a sub-institute lead.
+function isInstitutionTierPart(part) {
+  if (UNIVERSITY_TERM.test(part)) return true;
+  if (INSTITUTION_TIER_ORG_TERM.test(part)) return true;
+  if (INSTITUTE_WORD.test(part) && !INSTITUTE_SUBUNIT_LEAD.test(part.trim())) return true;
+  return false;
+}
 // Geography that never names an institution on its own.
 const US_STATE_CODE = /^(?:A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY])$/;
 const GEOGRAPHIC_TOKEN = new Set([
@@ -148,14 +172,29 @@ const GEOGRAPHIC_TOKEN = new Set([
 // segment; "University of Oxford, Oxford" must not become a two-part name.
 const MULTI_CAMPUS_SYSTEM = /^university of (?:california|texas|illinois|colorado|massachusetts|maryland|minnesota|wisconsin|nebraska|tennessee|north carolina|alabama|hawaii|missouri|michigan|pittsburgh)$/i;
 
+// A digit alone no longer marks a segment geographic (Fix 3, Codex
+// adversarial review 2026-09-21): that dropped organization names that
+// happen to contain a digit ("3M Corporate Research Laboratory", "Institut
+// Curie U1234"). Only narrow postal/address shapes are geographic:
+//  - a postal code with an optional short country/region letter prefix
+//    ("SE-22362", "02139", "77030", "D-69120"), or a UK/Irish-style
+//    outward+inward code ("CB2 1TN", "SW7 2AZ", "EC1A 1BB")
+//  - "City ST 12345" / "ST 12345" (last token is all digits)
+//  - a street address ("77030 Main Street") — a leading street number
+const POSTAL_CODE_SHAPE = /^(?:(?:[A-Z]{1,2}[- ]?)?\d{3,}[A-Z0-9 -]*|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/i;
+const STREET_ADDRESS_SHAPE = /^\d+\s+\S/;
+
 function isGeographicSegment(segment) {
   const lower = segment.toLowerCase().replace(/\.$/, '');
   if (GEOGRAPHIC_TOKEN.has(lower)) return true;
-  if (/\d/.test(segment)) return true; // postal codes, "TX 77030", "SE-22362"
   if (US_STATE_CODE.test(segment)) return true;
   // "Houston TX", "Cambridge MA", "Lund, Sweden" already split; "City ST".
   const words = segment.split(/\s+/);
-  if (words.length >= 2 && US_STATE_CODE.test(words[words.length - 1])) return true;
+  const lastWord = words[words.length - 1];
+  if (words.length >= 2 && US_STATE_CODE.test(lastWord)) return true;
+  if (/^\d+$/.test(lastWord)) return true; // "City ST 12345" / "ST 12345"
+  if (POSTAL_CODE_SHAPE.test(segment)) return true;
+  if (STREET_ADDRESS_SHAPE.test(segment)) return true;
   return false;
 }
 
@@ -168,54 +207,78 @@ function stripEchoedContact(text) {
     .trim();
 }
 
-function pickInstitutionFromRun(parts) {
-  const candidates = parts.filter((part) => !isGeographicSegment(part));
-  const pool = candidates.length > 0 ? candidates : parts;
-  const nonSubunit = pool.filter((part) => !SUBUNIT_SEGMENT.test(part));
-  // Rank: a university-tier part that is not a sub-unit ("College of
-  // Medicine" is a sub-unit even though it says "college"); then any other
-  // organization-shaped non-sub-unit part; then an organization-shaped part
-  // even if it LOOKS like a sub-unit ("Institute of Science and Technology
-  // Austria" is a whole institution); then the first non-sub-unit part; then
-  // the first part at all.
-  const organizationShaped = nonSubunit.find((part) => UNIVERSITY_TERM.test(part))
-    || nonSubunit.find((part) => ORGANIZATION_TERM.test(part))
-    || pool.find((part) => UNIVERSITY_TERM.test(part) || ORGANIZATION_TERM.test(part))
-    || null;
-  // No organization-shaped part at all: the first non-sub-unit part — unless
-  // that is a bare one-word proper noun, which is almost always a town the
-  // geographic list does not know ("Department of Chemistry, Klosterneuburg").
-  // A sub-unit ("Department of Chemistry") is then less wrong than a city.
-  const fallback = nonSubunit[0] || pool[0] || null;
-  const subunit = pool.find((part) => SUBUNIT_SEGMENT.test(part)) || null;
-  const bareWord = typeof fallback === 'string' && !/\s/.test(fallback);
-  const ranked = organizationShaped || (bareWord && subunit ? subunit : fallback);
-  if (!ranked) return null;
-  if (MULTI_CAMPUS_SYSTEM.test(ranked)) {
-    const next = parts[parts.indexOf(ranked) + 1];
-    const lastWord = ranked.split(/\s+/).pop().toLowerCase();
-    if (next && /^[A-Za-z][A-Za-z .'-]*$/.test(next) && !isGeographicSegment(next)
-      && !SUBUNIT_SEGMENT.test(next) && next.toLowerCase() !== lastWord) {
-      return `${ranked}, ${next}`;
-    }
+// "University of <system>" re-attachment (unchanged behavior, now applied to
+// each institution-tier part individually — Fix 2).
+function reattachMultiCampus(ranked, parts) {
+  if (!MULTI_CAMPUS_SYSTEM.test(ranked)) return ranked;
+  const next = parts[parts.indexOf(ranked) + 1];
+  const lastWord = ranked.split(/\s+/).pop().toLowerCase();
+  if (next && /^[A-Za-z][A-Za-z .'-]*$/.test(next) && !isGeographicSegment(next)
+    && !SUBUNIT_SEGMENT.test(next) && next.toLowerCase() !== lastWord) {
+    return `${ranked}, ${next}`;
   }
   return ranked;
 }
 
 /**
+ * Rank the institution-tier parts of one semicolon-delimited byline run.
+ * Returns an array: every DISTINCT institution-tier part in byline order
+ * when one or more exist (Fix 2, Codex adversarial review 2026-09-21 — a
+ * comma-delimited co-affiliation like "University of Washington, Fred
+ * Hutchinson Cancer Center" names two institutions, not one); otherwise a
+ * one-element array from the existing fallback chain.
+ */
+function pickInstitutionsFromRun(parts) {
+  const candidates = parts.filter((part) => !isGeographicSegment(part));
+  const pool = candidates.length > 0 ? candidates : parts;
+  const nonSubunit = pool.filter((part) => !SUBUNIT_SEGMENT.test(part));
+  const institutionTierParts = nonSubunit.filter(isInstitutionTierPart);
+  if (institutionTierParts.length > 0) {
+    return institutionTierParts.map((part) => reattachMultiCampus(part, parts));
+  }
+  // No institution-tier part at all. Fallback chain (unchanged): a
+  // university-tier non-sub-unit part; then any other organization-shaped
+  // non-sub-unit part (broader than the institution-tier whitelist above —
+  // e.g. "academy", bare "center"/"centre"); then an organization-shaped
+  // part even if it LOOKS like a sub-unit ("Institute of Science and
+  // Technology Austria" is a whole institution; "Center for Translational
+  // Cancer Research" is a genuine sub-unit shown only because nothing else
+  // in the run qualifies); then the first non-sub-unit part — unless that is
+  // a bare one-word proper noun, which is almost always a town the
+  // geographic list does not know ("Department of Chemistry,
+  // Klosterneuburg"), in which case the sub-unit part is less wrong; then
+  // the first part at all.
+  const organizationShaped = nonSubunit.find((part) => UNIVERSITY_TERM.test(part))
+    || nonSubunit.find((part) => ORGANIZATION_TERM.test(part))
+    || pool.find((part) => UNIVERSITY_TERM.test(part) || ORGANIZATION_TERM.test(part))
+    || null;
+  const fallback = nonSubunit[0] || pool[0] || null;
+  const subunit = pool.find((part) => SUBUNIT_SEGMENT.test(part)) || null;
+  const bareWord = typeof fallback === 'string' && !/\s/.test(fallback);
+  const ranked = organizationShaped || (bareWord && subunit ? subunit : fallback);
+  if (!ranked) return [];
+  return [reattachMultiCampus(ranked, parts)];
+}
+
+/**
  * Reduce a free-text affiliation/byline to its institution name(s) for
- * display in the reviewer clause. Semicolons separate independent bylines
- * (each yields one institution; distinct results are joined with "and");
- * commas separate the parts of one byline. Within a byline, geographic
- * parts (cities, states, postal codes, countries) and an echoed email are
- * dropped; a university-tier part is preferred, then any other
- * organization-shaped part, then the first part that is not a department or
- * division, then the first part. A short value with no commas ("MIT") passes
- * through unchanged. Returns null for blank input.
+ * display in the reviewer clause. Semicolons separate independent bylines;
+ * commas separate the parts of one byline, including comma-delimited
+ * co-affiliations ("University of Washington, Fred Hutchinson Cancer
+ * Center"). Within a byline, geographic parts (cities, states, postal codes,
+ * countries) and an echoed email are dropped; every distinct institution-
+ * tier part (a university, or a whole hospital/institute/foundation-shaped
+ * organization) is kept, or — when nothing in the run looks like an
+ * institution — the first non-geographic part is shown. All institution-tier
+ * parts across every run are pooled, deduplicated case-insensitively, and
+ * joined with the Oxford comma (Fix 2, Codex adversarial review 2026-09-21 —
+ * semicolon runs and comma co-affiliations are pooled and deduplicated
+ * together, not one institution per run). A short value with no commas
+ * ("MIT") passes through unchanged. Returns null for blank input.
  *
- * Owner decisions (2026-09-21): two institutions in one byline are BOTH
- * shown, joined with "and"; when nothing looks like an institution the first
- * non-geographic part is shown.
+ * Owner decisions (2026-09-21): every distinct institution in a byline is
+ * shown, joined with "and"/Oxford commas; when nothing looks like an
+ * institution the first non-geographic part is shown.
  *
  * @param {string} text
  * @returns {string|null}
@@ -228,12 +291,13 @@ export function institutionNameOf(text) {
   const seen = new Set();
   for (const run of runs) {
     const parts = run.split(',').map((part) => part.replace(/\.$/, '').trim()).filter(Boolean);
-    const institution = pickInstitutionFromRun(parts);
-    if (!institution) continue;
-    const key = institution.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    picked.push(institution);
+    const institutions = pickInstitutionsFromRun(parts);
+    for (const institution of institutions) {
+      const key = institution.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      picked.push(institution);
+    }
   }
   if (picked.length === 0) return cleaned;
   return joinWithOxfordComma(picked);

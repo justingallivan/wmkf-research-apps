@@ -930,17 +930,48 @@ request 1002852 rendered "Division of Biochemistry and Structural Biology,
 Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic
 address: …" because the echoed email differed from the stored one, so the
 exact-match strip in `reviewerAffiliationOf` never fired. `institutionNameOf`
-strips any echoed email, splits on `;` (independent bylines) and `,`, drops
-geographic parts (cities, US states, postal codes, countries), and ranks
-university-tier > other organization-shaped > organization-shaped-but-sub-unit-
-looking ("Institute of Science and Technology Austria") > first non-sub-unit
-part. Owner decisions: two institutions in one byline are BOTH shown joined with
-"and"; with no institution-shaped part the first non-geographic part is shown.
-A self-confirmed `mainInstitution` is shown verbatim. `reviewerAffiliationOf`
-itself is untouched (tab cards and the review-bundle fingerprint depend on it).
-Reaches the Reviews tab, the Pre-Site Reviews paragraph, and the Pre-RP brief
-(all use `composeReviewerSentence`); the Pre-RP fingerprint hashes composer
-INPUTS, so existing briefs re-render with the shorter name without a drift flag.
+strips any echoed email, splits on `;` (independent bylines) and `,`
+(including comma-delimited co-affiliations within one byline), drops
+geographic parts, and within each run keeps every DISTINCT institution-tier
+part (a university-tier part, or a whole hospital/clinic/medical-school/
+foundation/national-laboratory-shaped organization, or a whole institute that
+is not a sub-institute lead like "Institute of …") — e.g. "University of
+Washington, Fred Hutchinson Cancer Center" shows both. With no
+institution-tier part in a run, the existing fallback (organization-shaped-
+but-sub-unit-looking > first non-sub-unit part > first part) supplies one.
+All institution-tier parts across every semicolon run are pooled, deduplicated
+case-insensitively, and joined with the Oxford comma (Codex adversarial review,
+2026-09-21 — comma co-affiliations and semicolon runs are no longer capped at
+one institution per run). The digit rule that drops geographic parts is
+narrow: only postal-code shapes (`SE-22362`, `77030`, `D-69120`, and UK-style
+`CB2 1TN` / `SW7 2AZ`), `City ST 12345` /
+`ST 12345`, and leading street addresses count as geographic — an
+organization name that merely contains a digit ("3M Corporate Research
+Laboratory", "Institut Curie U1234") is no longer dropped. Matching is
+Unicode-aware (`u`-flag regexes with `(?<![\p{L}\p{N}])`/`(?![\p{L}\p{N}])`
+boundaries, not ASCII `\b`) and the term lists cover non-English forms:
+university terms (université, universität, universidad, universidade,
+università, universiteit, universitet, univerzita, uniwersytet, polytechnique,
+hochschule, …), organization terms (institut/instituto/istituto, hôpital,
+ospedale, klinikum, CHU, CEA, Helmholtz, Fraunhofer, Karolinska, Pasteur,
+Weizmann, …), and sub-unit leads (centre de recherche, centro de, departamento
+de, département de, laboratoire de, institut de/für, instituto de, abteilung).
+`MULTI_CAMPUS_SYSTEM` (the closed "University of <system>" list) is unchanged;
+"New York University, Abu Dhabi" still resolves to "New York University"
+without campus re-attachment. Owner decisions: every distinct institution in a
+byline is shown, joined with "and"/Oxford commas; with no institution-shaped
+part the first non-geographic part is shown. A self-confirmed `mainInstitution`
+is shown verbatim. `reviewerAffiliationOf` itself is untouched (tab cards and
+the review-bundle fingerprint depend on it). Reaches the Reviews tab, the
+Pre-Site Reviews paragraph, and the Pre-RP brief (all use
+`composeReviewerSentence`). `PRE_RP_BRIEF_CONTRACT.renderVersion` moved `'2'`
+→ `'3'` for this change: the Pre-RP generation key binds `renderVersion`
+(`lib/services/pre-rp-brief/artifact-service.js:746`), and since the
+composer's output changed, identical inputs would otherwise produce different
+bytes under the same version, which the contract forbids. Concretely: the
+generation key includes `renderVersion`, so post-change generations carry a
+new identity (a fresh key/row) — the input fingerprint itself is unchanged,
+since it hashes composer inputs, not outputs.
 
 **Expertise for applicant rows (2026-09-21):** applicant-recommended reviewers
 arrive with `expertiseAreas: []` (only Reviewer Finder candidates get Claude-written
