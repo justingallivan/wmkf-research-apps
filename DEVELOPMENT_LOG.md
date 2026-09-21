@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Meeting Tracker materials workflow and visual status tracking (Session 529)
+
+**Milestone:** Program coordinators can personalize materials invitations/reminders, save their own defaults, and scan or filter requests by materials status with direct request/review links.
+**Sessions:** 529; Luna implementation, Sol reviews, root adjudication, Opus adversarial status review and owner Preview acceptance.
+**Ship state:**
+- Personalization merged at `834b83d83`; shared Admin copy reseeded and verified after promotion.
+- Status pills/filter runtime `00fd729da` promoted through `d3d93da39`; production sign-in and nine-row tracker read passed. Final suite: 1,053 suites / 15,549 tests.
+- Agenda refusal feedback and D1/D9 fixes also released (`301d4d141`, `8623c2f7b`). Temporary status Preview resources retired; production data unchanged by status UAT.
+**Why it matters:** Coordinators see the next materials task at a glance while unavailable reads, uploaded files awaiting review, and confirmed readiness remain distinct.
+**Pointers:** `docs/plans/MEETING_TRACKER_MATERIALS_STATUS_PLAN_2026-09-21.md`; `docs/plans/MATERIALS_EMAIL_PERSONALIZATION_PLAN_2026-09-20.md`; `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`.
+
 ## September 2026 — Client Request Layer promoted: one helper for every client JSON fetch, with a lint ratchet (Session 528)
 
 **Milestone:** `shared/utils/api-request.js` (`requestJson` / `requestEnvelope`) now carries every client-side JSON `fetch` in `shared/components/**` and `pages/**` (309 sites at census; 26 raw sites remain by allowlist — SSE streams, blob downloads, beacons — each annotated), and an ESLint `no-restricted-syntax` ratchet with a fixture test blocks new raw calls. Per-site visible behavior preserved except the accepted D3 rule (fallback text, never raw parse text, on unparseable non-2xx bodies).

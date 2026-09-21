@@ -12,7 +12,15 @@ related:
 
 # Meeting Tracker materials status and filters
 
-## Decision and scope
+## Current disposition
+
+Released to production; owner accepted UAT and authorized promotion. Session closeout retired the three temporary Preview deployments, removed the clean feature worktree, and stopped the local rehearsal. The shared Preview alias and branch settings were restored/removed as recorded below. No further release or cleanup action remains for this feature.
+
+## Historical plan and execution record
+
+The following design, build and UAT sections preserve their stage-specific state; they are not current instructions to deploy or clean up again.
+
+### Decision and scope
 
 [PLANNED; owner request 2026-09-20 PT] Help a program coordinator scan approximately 25 requests and identify the next materials task. Preserve the incumbent restrained design: neutral request cards, compact labeled status pills, counts/dates beneath each pill, and clickable status counts above the request list. The owner authorized implementation with “Build it.” Work proceeds on an isolated feature branch; production promotion remains a separate owner decision.
 
@@ -125,11 +133,11 @@ Sol independently re-reviewed the post-Opus hardening and returned READY. Root a
 
 Temporary branch-only Preview settings: `DATAVERSE_ALLOW_PROD_READS=yes`, `MEETING_TRACKER_SCHEMA_READY=on`, `SITE_VISIT_MATERIALS_SCHEMA_READY=on`. Production configuration and deployment are unchanged. Sol verified that list/editor GET navigation does not create collections or send emails. This Preview is **not a fully isolated no-write sandbox**: Meeting Tracker still exposes write controls and some materials operations mutate Postgres before Dataverse transport. Owner UAT is navigation/filter/inspection only; do not send, save, waive or confirm readiness against these live records.
 
-Cleanup when owner UAT ends: restore `wmkfresearchapps-preview.vercel.app` to its prior exact deployment `dpl_ARYTuEzrTbT3U7vt1ZUKyiGgmt6C` (`wmkfresearchapps-6l5suly2f-justin-gallivans-projects.vercel.app`) with `vercel alias set`, then inspect the alias to verify restoration. Remove the three branch-scoped settings above for `codex/meeting-tracker-materials-status`. The alias/settings intentionally remain active while the owner tests; cleanup is pending, not completed. Retire the test deployments when the UAT branch is retired because removing environment settings does not change already-built deployments.
+Historical cleanup procedure (completed at production release/session closeout): restore `wmkfresearchapps-preview.vercel.app` to its prior exact deployment `dpl_ARYTuEzrTbT3U7vt1ZUKyiGgmt6C` (`wmkfresearchapps-6l5suly2f-justin-gallivans-projects.vercel.app`) with `vercel alias set`, then inspect the alias to verify restoration. Remove the three branch-scoped settings above for `codex/meeting-tracker-materials-status`. The alias was restored and all three settings were removed after owner acceptance. Session closeout removed all three test deployments because deleting settings alone does not alter already-built deployments.
 
 
 ## Production release — 2026-09-21
 
 [VERIFIED via Git, Vercel CLI and signed-in browser] After owner approval, main was fast-forwarded and pushed at `d3d93da39ce90f4161e2eeb93de044861c2b9d16`. Production deployment `dpl_DQJxdb26aXgUnn9sB4btxZeiqi8D` (`wmkfresearchapps-3wgeesgse-justin-gallivans-projects.vercel.app`) reached READY and owns `applications.wmkeck.org`. Microsoft sign-in and the production Meeting Tracker were verified: nine assigned D26 rows showed seven Not requested, one Waiting, one Late, with Request materials links. No email or request-data mutation was performed. Final full suite: 1,053 suites / 15,549 tests / one snapshot passed; type, documentation currency/catalog and reviewer-reminder-hold gate/self-test passed. Prior reviewed Preview build evidence covers the same runtime code.
 
-The stable Preview alias was restored and re-inspected at `dpl_ARYTuEzrTbT3U7vt1ZUKyiGgmt6C`. All three temporary branch-scoped settings were removed; a subsequent environment listing found zero settings scoped to this branch. No Azure callback URI was added or removed. Historical immutable Preview deployments remain retained; removing settings does not alter their built environment. They are not the owner test entry point now. The pre-release production rollback target is `dpl_G3vyFbgccF4MTUzZx21zKNAhYt2Y` (`wmkfresearchapps-eg3ol79mn-justin-gallivans-projects.vercel.app`).
+The stable Preview alias was restored and re-inspected at `dpl_ARYTuEzrTbT3U7vt1ZUKyiGgmt6C`. All three temporary branch-scoped settings were removed; a subsequent environment listing found zero settings scoped to this branch. No Azure callback URI was added or removed. Session closeout removed Preview deployments `dpl_EavGB9aaXyqYFX5P4JxKJf9asm5V`, `dpl_3hhNonswaPWAHcXZeh8RxYRurEys`, and `dpl_Gj4ZcByYeFZqUEqcbU9DpqFVdiVi`. The clean feature worktree and local rehearsal server were retired; branch history was retained. The pre-release production rollback target is `dpl_G3vyFbgccF4MTUzZx21zKNAhYt2Y` (`wmkfresearchapps-eg3ol79mn-justin-gallivans-projects.vercel.app`).

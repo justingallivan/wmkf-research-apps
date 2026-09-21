@@ -1,4 +1,78 @@
-# Session 529 Prompt: Client Request Layer merged and deployed; preview cleanup + D1 remainder
+# Session 530 Prompt: Meeting Tracker released; session housekeeping complete
+
+## Session 529 Summary
+
+[VERIFIED via Git, tests, Vercel and signed-in browser] Luna built, Sol reviewed,
+root adjudicated, and the owner approved these production releases:
+
+- Agenda-send refusal feedback and D1/D9 response handling: merges `301d4d141`
+  and `8623c2f7b`. Both are DONE, not background tasks or pending work.
+- Materials email personalization: merge `834b83d83`; personal defaults,
+  editable invitation/reminder previews, PI/liaison/coordinator naming and
+  owner-approved shared Admin copy. Release receipt is in its plan.
+- Materials status pills and filters: runtime `00fd729da`, main promotion
+  `d3d93da39`, production verified on `applications.wmkeck.org/meeting-tracker`.
+  Details stay beneath pills; Request materials and Review materials lead to
+  existing visit controls. Unknown reads stay distinct from not requested.
+- Final release checks: 1,053 suites / 15,549 tests / one snapshot passed;
+  type/docs gates and reminder-hold gate/self-test passed. Sol and Opus reviews
+  accepted; signed-in Preview and Production read checks passed. No email or
+  business-data write was performed during those checks.
+
+### Housekeeping
+
+[VERIFIED via CLI] The shared Preview alias was restored to its original target
+`dpl_ARYTuEzrTbT3U7vt1ZUKyiGgmt6C`; the three Meeting Tracker branch-scoped
+settings were removed. Its three temporary Preview deployments were retired.
+The clean `/private/tmp/wmkf-meeting-materials-status` worktree was removed and
+its port-3131 rehearsal server stopped. Git history is retained. Other worktrees,
+older preview environments, and Azure callbacks were left alone.
+
+## Next Items
+
+### Owner decision needed
+
+- Suite-wide personal email defaults remain a separately scoped to-do, not part
+  of the completed tracker release. Evidence: `docs/CURRENT_WORK_QUEUE.md`
+  Personal email defaults entry and `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+  Choose a next app/surface before extending the existing mechanism.
+
+### Verify before acting
+
+- Older carryovers below (Connor/Test Request Factory, cache telemetry,
+  client-request-layer Preview cleanup, reviewer follow-ups) were not re-probed
+  during this closeout. Use their authoritative plans and live checks before
+  making them a worklist. Do not delete another task's preview or worktree.
+
+### Do not reopen without new evidence
+
+- D1/D9, agenda refusal feedback, materials personalization, and status pills
+  are released. There is no pending D1 agent task.
+- Check files and Ready were covered by synthetic UI/unit tests; neither
+  occurred in the live nine-row assigned scope. Do not claim live review/ready
+  mutations were exercised. The real Preview was not a no-write sandbox.
+
+## Key Files
+
+- `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`
+- `docs/plans/MATERIALS_EMAIL_PERSONALIZATION_PLAN_2026-09-20.md`
+- `docs/plans/MEETING_TRACKER_MATERIALS_STATUS_PLAN_2026-09-21.md`
+- `shared/components/meeting-tracker/MaterialsStatusPill.js`
+- `shared/utils/site-visit-materials-status.js`
+
+## Stop-time notes
+
+Milestone entry added for the Meeting Tracker materials workflow release.
+Claim-evidence pilot report could not read local state; no observation inferred.
+Root instruction files and memory router were unchanged. This documentation-only
+handoff push may trigger another Vercel build of the same runtime code.
+
+## Historical handoffs — not current instructions
+
+All text below is historical context. Session 530 guidance above is authoritative;
+older completion, cleanup and authorization statements apply to their named runs.
+
+## Prior Session 529 Prompt: Client Request Layer merged and deployed; preview cleanup + D1 remainder
 
 ## Session 528 Summary
 
