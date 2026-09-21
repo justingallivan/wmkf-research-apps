@@ -58,3 +58,14 @@ fetch helpers and token pages that build URLs from inputs by design —
 `lib/services/graph/http.js:64`, `pages/api/blob-proxy.js:56`, the grantee
 token page/form; triage is the owner's). The 2026-07 "private-repo blocked"
 reasons above no longer apply; keep them as history.
+Triage the same day: the five current-category `js/request-forgery` alerts
+(#120 api-request helper, #119 grantee failure beacon, #118 Graph HTTP client
+on the fixed GRAPH_BASE, #31 blob-proxy with host-pattern check, #28 safeFetch
+allowlist) were dismissed as false positives with written reasons; the four
+`actions/missing-workflow-permissions` findings were fixed by adding
+least-privilege `permissions:` blocks (`825266b51`). The 89 analyses from the
+deleted `codeql.yml` configuration (and the ~40 alerts pinned to that
+category, e.g. #91/#92/#78) will never auto-close because default setup
+reports under a different category; deleting that configuration is an
+owner UI action on the CodeQL tool-status page (the API deletion was blocked
+for the agent as scan-history tampering).
