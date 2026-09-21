@@ -1,6 +1,6 @@
 # Test Request Factory — schema proposal
 
-Status: **SANDBOX SCHEMA APPLIED; ONE CREATE REJECTED AND FULLY ROLLED BACK; no route wiring, deployment, production apply, or successful fixture.** Sandbox metadata now proves the four rehearsal fields are createable. The rejected create proves the normal sandbox synchronous workflow chain is currently unhealthy; it does not prove marker persistence, number allocation, folder provisioning, or safe end-to-end creation.
+Status: **SANDBOX SCHEMA APPLIED; ONE MARKED REQUEST CREATED; no route wiring, deployment, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields are createable and persist through create. Request 1000338 proves effective create permission and server numbering after a bounded GoVerify bypass; disabled sandbox background processing prevented folder/document verification, and the requested meeting date was rewritten.
 
 ## Proposed schema wave
 
@@ -85,7 +85,7 @@ Metadata GET proves logical names, types, createability flags, required-level de
 - that the target SharePoint location is provisioned;
 - that Dataverse Search, FetchXML, exports, workers and email/payment paths honor the marker.
 
-The first controlled rehearsal was owner-authorized and attempted on 2026-09-21. It was rejected by the sandbox synchronous workflow chain before persistence; see the dated handoff and receipts. A second create remains blocked pending repair/configuration evidence for the failing workflows and separate authorization. A schema default of false is a compatibility default, not a security control.
+The first controlled rehearsal was owner-authorized and rejected by the sandbox synchronous workflow chain before persistence. The owner then classified GoVerify as irrelevant to the exercise and authorized a temporary sandbox bypass plus one fresh create. Request 1000338 persisted the marker, run ID and both reminder-false values and received a server number. The requested meeting date did not survive processing, and no SharePoint location appeared while sandbox background processing was disabled; see the dated handoff and receipts. A schema default of false is a compatibility default, not a security control.
 
 The reproducible census receipt is `docs/plans/evidence/test-request-factory/platform-2026-09-20.json` (probe: `scripts/probe-test-request-platform.js`). Both targets report `{SEQNUM:7}` request-number metadata and document management enabled; neither proves a create or provisioning outcome.
 
@@ -151,17 +151,17 @@ Rollback is additive and leaves fields in place. First disable new factory creat
 
 ## Open decisions and blockers
 
-- Sandbox dry-run verified publisher `WMKF_Publisher` with prefix `wmkf` and absence of both proposed attributes. Solution existence/membership remains unverified: dry-run skips solution creation/checking. The isolated wave was created after the directory collision check.
-- Sandbox needs the two existing reviewer-engagement reminder controls before creation. Prepare a narrow additive step under that existing contract; do not run the entire wave or change ordinary defaults as an incidental repair.
+- The initial sandbox dry-run verified publisher `WMKF_Publisher` with prefix `wmkf` and pre-apply absence of both proposed attributes. The subsequent controlled apply created them and metadata/readback verified them; explicit solution membership remains unverified because the dry-run check did not establish it.
+- The two reviewer-engagement reminder controls are now applied in sandbox through the isolated parity wave and survived false-value create readback. Production already had those controls; production marker/run schema remains unapplied.
 - Platform-owner suppression contract for initial create and every status/pointer update.
 - SharePoint request-location provisioner and uniqueness/recovery contract.
-- Permission proof for the app principal and server-owned marker/run writes.
+- Deterministic meeting-date/default behavior: the manifest supplied `2099-12-01`, but create readback returned `2024-12-13`.
 
-Until these are resolved, sandbox schema stays additive and the offline compiler remains disabled for runtime use. Production schema is unapplied. No metadata/default observation in this proposal is a claim that the Test Request Factory is production-ready.
+Until these are resolved, sandbox schema stays additive and the offline compiler remains disabled for runtime use. Production schema is unapplied. The successful sandbox Request is evidence for create permission and marker/run/reminder persistence only, not a claim that the Test Request Factory is production-ready.
 
 ## Review disposition
 
-Sol reviewed the source contract and proposal. Root incorporated the material corrections: absent projections never classify ordinary; requiredness/createability of new fields are checked after schema apply; verified ordinary rows need no run ID; wave naming is engineering work, not a user blocker. Schema remains un-applied. The platform census rejects malformed/partial pages, bounds pagination and tests cross-origin/collection continuation rejection and omission of credential-bearing action inputs.
+Sol reviewed the source contract and proposal. Root incorporated the material corrections: absent projections never classify ordinary; requiredness/createability of new fields are checked after schema apply; verified ordinary rows need no run ID; wave naming is engineering work, not a user blocker. At that review checkpoint, schema was unapplied. The platform census rejects malformed/partial pages, bounds pagination and tests cross-origin/collection continuation rejection and omission of credential-bearing action inputs.
 
 Previous proposal-only review (before the local isolation slice below): Sol **ACCEPTED the proposal/evidence scope** after the corrections. Root verified 35 focused tests (existing offline policy plus new probe), scoped ESLint, probe syntax and `git diff --check`. Doc-currency and fact-consistency with sequential self-tests, plus docs-catalog, passed. No runtime files were changed; the previous offline-slice build remains the last build evidence, not a fresh build claim for this proposal.
 

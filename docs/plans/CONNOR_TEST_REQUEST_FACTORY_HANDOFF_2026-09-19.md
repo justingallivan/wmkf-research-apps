@@ -1,6 +1,6 @@
 # Connor handoff — Test Request Factory platform gates
 
-Status: **CONNOR RESPONSE RECEIVED; SANDBOX CREATE BLOCKED BY TWO FAILING SYNCHRONOUS WORKFLOWS; PRODUCTION ENABLEMENT BLOCKED.** This handoff records Connor's 2026-09-21 answers, the owner's fixture-isolation decision, and the controlled sandbox result. It does not authorize production schema/data writes, email, payment, file copying, retry creation, or cleanup.
+Status: **CONNOR RESPONSE RECEIVED; ONE MARKED SANDBOX REQUEST CREATED; FULL DOCUMENT-WORKFLOW REHEARSAL BLOCKED BY DISABLED SANDBOX BACKGROUND PROCESSING; PRODUCTION ENABLEMENT BLOCKED.** This handoff records Connor's 2026-09-21 answers, the owner's fixture-isolation decision, and both controlled sandbox attempts. It does not authorize production schema/data writes, email, payment, file copying, another Request create, or cleanup.
 
 ## Questions and Connor's answers
 
@@ -42,8 +42,21 @@ The bounded failure-log probe (sanitized receipt `docs/plans/evidence/test-reque
 
 Both failed during an internal Dataverse Update with the remote 500. This proves the sandbox create path currently cannot satisfy Connor's expected normal workflow behavior. It does not prove the marker or reminder fields caused the failure.
 
+## Authorized GoVerify bypass and successful create — 2026-09-21 UTC
+
+The owner confirmed that GoVerify only supplies a non-blocking nonprofit-status warning in AkoyaGO and is irrelevant to the intended tests. They authorized a GoVerify bypass and one new sandbox Request create. The operator temporarily deactivated only the editable sandbox GoVerify workflow definition around the single POST, then restored it. Read-only follow-up verified the definition active with exactly one current active activation; Dataverse retained the deactivated activation as an inactive historical row.
+
+The fresh manifest and raw receipt are `sandbox-rehearsal-manifest-goverify-bypass-2026-09-21.json` and `sandbox-rehearsal-create-receipt-goverify-bypass-2026-09-21.json`. Dataverse returned HTTP 201 and created Request **1000338** (`46ff3ea9-8933-4f5d-91a9-3ee8ac54dad5`) under W. M. Keck Foundation. The marker, run ID, fiscal year, Grant type, and both false reminder flags survived readback. The ordinary Copy Applicant to Payee behavior populated the Foundation as payee. There were zero payment rows, regarding emails, Foundation account changes, or Foundation child-Contact changes.
+
+The operator's first post-restore assertion expected one total activation row and stopped before its observation phase when Dataverse returned one current active activation plus the historical inactive activation. No retry occurred. The reconciled read-only receipt is `sandbox-rehearsal-verification-goverify-bypass-2026-09-21.json`.
+
+Two Stage 0 discrepancies remain:
+
+- The requested meeting date `2099-12-01` read back as `2024-12-13`; the responsible synchronous default/workflow is not yet identified.
+- No Dynamics SharePoint document location appeared. Bounded async-operation readback showed that the sandbox is in **Disable Background Processing** mode and canceled every observed asynchronous Request workflow in the attempt window. This prevents the sandbox from validating Connor's expected document/folder behavior, but does not by itself identify the location provisioner.
+
 ## Remaining platform-owner action
 
-Before any second create is proposed, identify and repair/configure the sandbox dependency behind those two synchronous workflows, or document the ordinary user-path prerequisite that prevents their failure. Then authorize a new single-create manifest explicitly. Do not work around the failure by disabling mandatory workflows, omitting the required Foundation applicant, changing production, or retrying the consumed manifest.
+GoVerify is no longer the immediate create blocker for this exercise, and Copy Applicant to Payee is not independently broken. Before relying on this sandbox for document-generation tests, the platform owner must enable/restore the required sandbox background processing or provide another isolated environment where those async workflows run; identify the actual SharePoint location provisioner and its trigger; and explain or configure the meeting-date rewrite so a recipe can produce deterministic state. Do not treat background-disabled success as proof that normal create/update automations are safe.
 
-Production remains blocked until marker-aware ordinary consumer guards, automation exclusions, and the location/folder contract are implemented and independently verified. The failed sandbox transaction did not test number allocation, marker/reminder persistence, folder uniqueness, or file-history isolation.
+Production remains blocked until marker-aware ordinary consumer guards, automation exclusions, and the location/folder contract are implemented and independently verified. The successful sandbox Request proves effective create permission, server number allocation, marker/run/reminder persistence, and absence of the checked synchronous payment/email/account/Contact effects. It does not prove folder uniqueness, SharePoint file-history isolation, deterministic meeting-date handling, or behavior with normal background processing enabled.

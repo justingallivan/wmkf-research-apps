@@ -1,6 +1,6 @@
 # Test Request Factory — Stage 0 platform contract
 
-Status: **PARTIAL: source census, tenant schema metadata, visible automation registrations, sandbox schema apply, and one rejected sandbox create are verified; production suppression and provisioning remain unresolved.** The 2026-09-21 create rolled back completely before number/location verification. No production write or deployment was performed. The offline census is reproducible with `node scripts/probe-test-request-factory-preflight.js --json`; it does not verify tenant state.
+Status: **PARTIAL: source census, tenant schema metadata, visible automation registrations, sandbox schema apply, and one successful marked sandbox Request create are verified; deterministic meeting-date handling, async document provisioning, and production suppression remain unresolved.** Request 1000338 proved effective create permission and number/marker/reminder readback after a bounded GoVerify bypass. No production write or deployment was performed. The offline census is reproducible with `node scripts/probe-test-request-factory-preflight.js --json`; it does not verify tenant state.
 
 ## Source contract
 
@@ -64,7 +64,11 @@ The reproducible probe exports selected metadata and definition hashes, not raw 
 
 [VERIFIED via tracked schema runner and `scripts/rehearse-test-request-sandbox.mjs`] Sandbox now has the two marker/run fields and the separately applied two-field reminder-control parity wave. Post-apply metadata confirms all four are createable. The exact manifest under `docs/plans/evidence/test-request-factory/` omitted payment, status, contact, submission, triage, and document fields.
 
-The one authorized POST was rejected transactionally with HTTP 400 / `0x80040265` wrapping a remote 500. Read-only recovery found no Request, location, payment, or regarding email and unchanged Foundation account/Contact versions. `scripts/probe-sandbox-request-create-failure.mjs` and its sanitized receipt `docs/plans/evidence/test-request-factory/sandbox-create-failure-diagnostic-2026-09-21.json` resolved the two failed synchronous process sessions to `GOverify- check Publication 78 on create of a request record` and `Copy Applicant to Payee when Grant is Entered`; both failed during an internal Update. This closes the question of effective create permission only partially: the principal reached the normal synchronous workflow chain, but the transaction could not complete. Number allocation and folder provisioning remain unproved.
+The first authorized POST was rejected transactionally with HTTP 400 / `0x80040265` wrapping a remote 500. Read-only recovery found no Request, location, payment, or regarding email and unchanged Foundation account/Contact versions. `scripts/probe-sandbox-request-create-failure.mjs` and its sanitized receipt `docs/plans/evidence/test-request-factory/sandbox-create-failure-diagnostic-2026-09-21.json` resolved the failed synchronous sessions to `GOverify- check Publication 78 on create of a request record` and `Copy Applicant to Payee when Grant is Entered`.
+
+[VERIFIED via manifest, HTTP receipt, exact-GUID readback, workflow-definition/activation readback, and bounded async-operation probe] The owner then classified GoVerify as irrelevant to this exercise and authorized a temporary sandbox bypass plus one fresh create. The operator deactivated only the editable GoVerify definition around the POST and restored it immediately afterward. Dataverse returned HTTP 201 and created Request 1000338. The marker, run ID, Grant type, fiscal year and reminder-false values persisted; the Foundation was copied to payee; no payment, regarding email, Foundation account change or Foundation child-Contact change was observed. This proves effective create permission and server number allocation. The requested `2099-12-01` meeting date read back as `2024-12-13`, so deterministic cycle state remains unproved.
+
+No SharePoint document location appeared. The bounded attempt-window probe found that sandbox asynchronous Request workflows were canceled because the organization is in `Disable Background Processing` mode. That configuration prevents a full document/folder rehearsal and is consistent with missing asynchronous side effects, but does not identify the location provisioner. Sanitized reconciliation evidence is `docs/plans/evidence/test-request-factory/sandbox-rehearsal-verification-goverify-bypass-2026-09-21.json`.
 
 ### Registered owner and browser follow-up
 
@@ -87,9 +91,9 @@ The [schema proposal](TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md) specif
 
 ## Remaining gates
 
-1. Provision reviewed marker schema and missing environment-specific controls only under a separately reviewed deployment step. No live schema apply occurred here.
+1. Keep the reviewed marker/reminder schema sandbox-only until production schema and reader/transport guards receive a separately reviewed deployment step. The four rehearsal fields are live only in sandbox.
 2. Name the SharePoint location provisioner, trigger, bounded recovery and uniqueness contract. Basic cannot become ready without verified location resolution; IA/materials remain blocked.
-3. Verify platform/plugin number allocation, effective creation privileges and required defaults with an approved isolated rehearsal after suppression is established.
+3. Explain or configure the sandbox meeting-date rewrite and verify required recipe defaults; effective creation privileges and server number allocation are now proven in sandbox.
 4. Verify marker list/filter/search support and every ordinary read/worker/transport consumer. Unknown marker state must fail closed without redefining eligibility.
 5. Obtain current platform-owner evidence for create/update flows, including narrative/package overwrites and status-driven automation. Repository docs alone cannot close this gate.
 6. Establish approved test organization/personas, content boundary, retention and file limits. No identity is silently inferred from source.
@@ -98,4 +102,4 @@ The [schema proposal](TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md) specif
 
 The preflight checks required source anchors and negative fixtures for lost evidence, unexpected location creation and incorrect field roles. Read-only behavior is established by source review, not by the script's static safety declarations. Tests do not prove remote suppression or runtime readiness.
 
-Stage 0 remains partial pending repair/configuration evidence for the two failing sandbox workflows and the external evidence above. Offline policy development may continue under the accepted design; no create route or retry is enabled by this receipt.
+Stage 0 remains partial pending a background-enabled isolated document/folder rehearsal, identification of the location provisioner, deterministic meeting-date behavior, and the external production-suppression evidence above. Offline policy development may continue under the accepted design; no create route or retry is enabled by this receipt.

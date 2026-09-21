@@ -155,7 +155,12 @@ async function assertGoverifyActivationState(client, expectedActive) {
     !guidEqual(workflow._parentworkflowid_value, GOVERIFY_WORKFLOW.definitionId));
   if (unexpectedIdentity) throw new Error('GoVerify activation identity mismatch.');
   const active = activations.filter((workflow) => workflow.statecode === 1 && workflow.statuscode === 2);
-  if (expectedActive && (activations.length !== 1 || active.length !== 1)) {
+  const invalidInactive = activations.filter((workflow) =>
+    workflow.statecode !== 1 && !(workflow.statecode === 0 && workflow.statuscode === 1));
+  if (invalidInactive.length) {
+    throw new Error(`Found ${invalidInactive.length} GoVerify activation(s) in an unexpected inactive state.`);
+  }
+  if (expectedActive && active.length !== 1) {
     throw new Error(`Expected one active GoVerify activation; found ${active.length} active of ${activations.length}.`);
   }
   if (!expectedActive && active.length !== 0) {
