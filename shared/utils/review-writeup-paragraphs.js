@@ -137,16 +137,29 @@ const ORGANIZATION_TERM = /(?<![\p{L}\p{N}])(?:institut(?:e|o|ion)?|istituto|hos
 const INSTITUTION_TIER_ORG_TERM = /(?<![\p{L}\p{N}])(?:hospital|clinic|klinik|medical\s+(?:center|centre)|medical\s+school|school\s+of\s+medicine|cancer\s+(?:center|centre)|national\s+laboratory|laboratories|foundation|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)(?![\p{L}\p{N}])/iu;
 // A whole institute, not a sub-institute lead ("Institute of X" inside a run
 // that also has a university is a sub-institute — see SUBUNIT_SEGMENT).
-const INSTITUTE_WORD = /(?<![\p{L}\p{N}])(?:institute|institut|instituto)(?![\p{L}\p{N}])/iu;
-const INSTITUTE_SUBUNIT_LEAD = /^(?:institute\s+of|institute\s+for|institut\s+de|institut\s+für|instituto\s+de)(?![\p{L}\p{N}])/iu;
+const INSTITUTE_WORD = /(?<![\p{L}\p{N}])(?:institute|institut|instituto|istituto)(?![\p{L}\p{N}])/iu;
+const INSTITUTE_SUBUNIT_LEAD = /^(?:institute\s+of|institute\s+for|institut\s+de|institut\s+für|instituto\s+de|istituto\s+di)(?![\p{L}\p{N}])/iu;
+
+// Bare, proper-noun-free institution-tier labels (2026-09-21 tightening): a
+// segment that is ONLY a generic descriptor ("Cancer Center") names no
+// institution by itself — it is a sub-unit or department-shaped fragment
+// left over after splitting, not the whole organization. The leading-word
+// form ("Cancer Center of Excellence") is excluded too, but only for
+// cancer/medical center — "Hospital for Sick Children" is a real, named
+// institution and must not be caught by this rule.
+const BARE_INSTITUTION_TIER_LABEL = /^(?:cancer\s+(?:center|centre)|medical\s+(?:center|centre|school)|hospital|clinic|institute|institut|laboratory|laboratories|foundation)$/iu;
+const GENERIC_LEAD_WITH_OF = /^(?:cancer\s+(?:center|centre)|medical\s+(?:center|centre))\s+(?:of|for)(?![\p{L}\p{N}])/iu;
 
 // Institution-tier part (Fix 2): a university-tier part, OR an
 // organization-shaped part matching the narrower INSTITUTION_TIER_ORG_TERM
-// whitelist, OR a whole institute that is not a sub-institute lead.
+// whitelist, OR a whole institute that is not a sub-institute lead. A bare
+// generic label with no proper-noun content is never promoted (2026-09-21).
 function isInstitutionTierPart(part) {
+  const trimmed = part.trim();
+  if (BARE_INSTITUTION_TIER_LABEL.test(trimmed) || GENERIC_LEAD_WITH_OF.test(trimmed)) return false;
   if (UNIVERSITY_TERM.test(part)) return true;
   if (INSTITUTION_TIER_ORG_TERM.test(part)) return true;
-  if (INSTITUTE_WORD.test(part) && !INSTITUTE_SUBUNIT_LEAD.test(part.trim())) return true;
+  if (INSTITUTE_WORD.test(part) && !INSTITUTE_SUBUNIT_LEAD.test(trimmed)) return true;
   return false;
 }
 // Geography that never names an institution on its own.
@@ -176,12 +189,16 @@ const MULTI_CAMPUS_SYSTEM = /^university of (?:california|texas|illinois|colorad
 // adversarial review 2026-09-21): that dropped organization names that
 // happen to contain a digit ("3M Corporate Research Laboratory", "Institut
 // Curie U1234"). Only narrow postal/address shapes are geographic:
-//  - a postal code with an optional short country/region letter prefix
-//    ("SE-22362", "02139", "77030", "D-69120"), or a UK/Irish-style
-//    outward+inward code ("CB2 1TN", "SW7 2AZ", "EC1A 1BB")
-//  - "City ST 12345" / "ST 12345" (last token is all digits)
+//  - a postal code standing alone, with an optional short country/region
+//    letter prefix and an optional short suffix digit group ("SE-22362",
+//    "02139", "77030", "D-69120", "12345-6789"), or a UK/Irish-style
+//    outward+inward code ("CB2 1TN", "SW7 2AZ", "EC1A 1BB") — no trailing
+//    word content is accepted ("U1234 Research Institute" is rejected)
+//  - "City ST 12345" / "ST 12345" (last token is all digits AND the
+//    preceding token is a US state code — 2026-09-21 tightening; "ETH 2"
+//    is not geographic, it is an organization name)
 //  - a street address ("77030 Main Street") — a leading street number
-const POSTAL_CODE_SHAPE = /^(?:(?:[A-Z]{1,2}[- ]?)?\d{3,}[A-Z0-9 -]*|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/i;
+const POSTAL_CODE_SHAPE = /^(?:(?:[A-Z]{1,2}[- ]?)?\d{3,}(?:[- ]?\d{1,4})?|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/i;
 const STREET_ADDRESS_SHAPE = /^\d+\s+\S/;
 
 function isGeographicSegment(segment) {
@@ -192,7 +209,10 @@ function isGeographicSegment(segment) {
   const words = segment.split(/\s+/);
   const lastWord = words[words.length - 1];
   if (words.length >= 2 && US_STATE_CODE.test(lastWord)) return true;
-  if (/^\d+$/.test(lastWord)) return true; // "City ST 12345" / "ST 12345"
+  // "City ST 12345" / "ST 12345" — only when a US state code precedes the
+  // trailing digit group (2026-09-21); a bare trailing digit on its own no
+  // longer marks a segment geographic ("ETH 2").
+  if (words.length >= 2 && /^\d+$/.test(lastWord) && US_STATE_CODE.test(words[words.length - 2])) return true;
   if (POSTAL_CODE_SHAPE.test(segment)) return true;
   if (STREET_ADDRESS_SHAPE.test(segment)) return true;
   return false;
@@ -214,7 +234,7 @@ function reattachMultiCampus(ranked, parts) {
   const next = parts[parts.indexOf(ranked) + 1];
   const lastWord = ranked.split(/\s+/).pop().toLowerCase();
   if (next && /^[A-Za-z][A-Za-z .'-]*$/.test(next) && !isGeographicSegment(next)
-    && !SUBUNIT_SEGMENT.test(next) && next.toLowerCase() !== lastWord) {
+    && !SUBUNIT_SEGMENT.test(next) && !isInstitutionTierPart(next) && next.toLowerCase() !== lastWord) {
     return `${ranked}, ${next}`;
   }
   return ranked;

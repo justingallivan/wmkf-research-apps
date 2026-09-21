@@ -353,6 +353,67 @@ describe('institutionNameOf (byline → institution name for display)', () => {
     // negative lookahead for "medicine" now sits inside a Unicode boundary.
     expect(institutionNameOf('University of California, School of Engineering')).toBe('University of California');
   });
+
+  it('does not re-attach a campus when the next part is itself institution-tier (owner decision 2026-09-21, after Codex round 3)', () => {
+    // Before this fix, reattachMultiCampus pooled Fred Hutchinson Cancer
+    // Center onto "University of California" AND it was picked again as its
+    // own institution-tier part, duplicating it.
+    expect(institutionNameOf('University of California, Fred Hutchinson Cancer Center, Seattle, WA'))
+      .toBe('University of California and Fred Hutchinson Cancer Center');
+    // Unchanged: "San Francisco" is not institution-tier, so the campus still
+    // re-attaches.
+    expect(institutionNameOf('Department of Biochemistry, University of California, San Francisco, CA; Howard Hughes Medical Institute'))
+      .toBe('University of California, San Francisco and Howard Hughes Medical Institute');
+  });
+
+  it('does not promote a bare generic label with no proper-noun content to institution tier (owner decision 2026-09-21, after Codex round 3)', () => {
+    expect(institutionNameOf('Cancer Center, University of X')).toBe('University of X');
+    // Unchanged: "Massachusetts General Hospital" and "Harvard Medical School"
+    // both name real institutions, not bare labels.
+    expect(institutionNameOf('Department of Medicine, Massachusetts General Hospital, Harvard Medical School, Boston, MA'))
+      .toBe('Massachusetts General Hospital and Harvard Medical School');
+    // Unchanged: "Fred Hutchinson Cancer Center" is a full proper name, not
+    // the bare label "Cancer Center".
+    expect(institutionNameOf('Fred Hutchinson Cancer Center, Seattle, WA')).toBe('Fred Hutchinson Cancer Center');
+    // "Hospital for Sick Children" is a real, named institution: the
+    // leading-word exclusion applies only to cancer/medical center, not
+    // hospital, so it is not caught by the bare-label rule.
+    expect(institutionNameOf('Hospital for Sick Children, University of Toronto, Toronto, ON'))
+      .toBe('Hospital for Sick Children and University of Toronto');
+  });
+
+  it('recognizes "Istituto" as a whole-institute lead, matching "Institute"/"Instituto" (owner decision 2026-09-21, after Codex round 3)', () => {
+    expect(institutionNameOf('Istituto Italiano di Tecnologia, Genova, Italy')).toBe('Istituto Italiano di Tecnologia');
+    // A proper-noun institute, not a sub-unit lead: both are kept.
+    expect(institutionNameOf('Istituto Italiano di Tecnologia, University of Genoa, Genova, Italy'))
+      .toBe('Istituto Italiano di Tecnologia and University of Genoa');
+    // Pinning the accepted trade-off (Codex round 3 finding 2): a named
+    // whole institute that starts "Institute of/for …" is omitted when a
+    // university is present in the same run. The owner has accepted this.
+    expect(institutionNameOf('Institute of Science and Technology Austria, University of Vienna, Vienna, Austria'))
+      .toBe('University of Vienna');
+    // Unchanged: with no university present, the whole institute still wins.
+    expect(institutionNameOf('Institute of Science and Technology Austria, Klosterneuburg, Austria'))
+      .toBe('Institute of Science and Technology Austria');
+  });
+
+  it('requires a preceding US state code for the trailing-digit geographic rule (owner decision 2026-09-21, after Codex round 3)', () => {
+    // "2" alone no longer marks "ETH 2" geographic; ETH is a university.
+    expect(institutionNameOf('ETH 2, Zürich, Switzerland')).toBe('ETH 2');
+    // A digit-bearing organization name with a trailing word is not a postal
+    // code shape.
+    expect(institutionNameOf('U1234 Research Institute, Paris, France')).toBe('U1234 Research Institute');
+    // "IL-6 Lab" is not institution-tier; the university wins regardless of
+    // how the trailing "ST 12345" segment is classified.
+    expect(institutionNameOf('IL-6 Lab, University of Y, City, ST 12345')).toBe('University of Y');
+    // Existing postal-code shapes keep their expected values.
+    expect(institutionNameOf(
+      'Division of Biochemistry and Structural Biology, Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic address: herwig.schuler@biochemistry.lu.se.',
+    )).toBe('Lund University');
+    expect(institutionNameOf('Department of Bioengineering, Stanford University, Stanford, CA 94305.')).toBe('Stanford University');
+    expect(institutionNameOf('Department of Physics, University of Cambridge, Cambridge, CB2 1TN, UK')).toBe('University of Cambridge');
+    expect(institutionNameOf('Imperial College London, South Kensington Campus, London SW7 2AZ, UK')).toBe('Imperial College London');
+  });
 });
 
 describe('composeExpertiseSentence', () => {

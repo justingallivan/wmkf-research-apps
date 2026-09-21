@@ -971,7 +971,24 @@ composer's output changed, identical inputs would otherwise produce different
 bytes under the same version, which the contract forbids. Concretely: the
 generation key includes `renderVersion`, so post-change generations carry a
 new identity (a fresh key/row) — the input fingerprint itself is unchanged,
-since it hashes composer inputs, not outputs.
+since it hashes composer inputs, not outputs. Three further tightenings
+(owner decision 2026-09-21, after Codex round 3): a campus is never
+re-attached (`reattachMultiCampus`) when the next part is itself
+institution-tier, which previously duplicated a co-affiliation like "Fred
+Hutchinson Cancer Center"; a bare generic label with no proper-noun content
+("Cancer Center", "Hospital" alone, "Cancer Center of Excellence") is never
+promoted to institution tier, while a real named institution like "Hospital
+for Sick Children" or "Fred Hutchinson Cancer Center" still is; and
+`Istituto`/`istituto di` are now recognized alongside `Institute`/`Institut`/
+`Instituto` for the whole-institute and sub-institute-lead rules. The
+`INSTITUTE_SUBUNIT_LEAD` rule itself stays as owner-accepted: a named whole
+institute whose name starts "Institute of/for …" is still omitted when a
+university is present in the same run (e.g. "Institute of Science and
+Technology Austria, University of Vienna" shows only "University of Vienna");
+no curated whole-institute list was built to except this. The trailing-digit
+geographic rule ("City ST 12345" / "ST 12345") now requires a preceding US
+state code, not just a trailing digit group, so an organization name like
+"ETH 2" is no longer misread as geographic.
 
 **Expertise for applicant rows (2026-09-21):** applicant-recommended reviewers
 arrive with `expertiseAreas: []` (only Reviewer Finder candidates get Claude-written
