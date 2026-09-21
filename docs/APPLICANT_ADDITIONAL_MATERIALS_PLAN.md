@@ -364,9 +364,9 @@ per-file/per-action success and failure so the client updates only committed ite
    exact native document rather than adding a risky conversion to the deadline.
 5. **Physical SharePoint depth.** **Recommendation:** test the candidate hierarchy immediately in
    signed-in AkoyaGo; choose the nested form only if it is visibly navigable.
-6. **Email sender and copy.** **Recommendation:** PC initiates, both PI and liaison receive every
-   requirements/reminder message, and the visible sender/reply-to follows the current staff email
-   convention once the existing example is reviewed.
+6. **Email sender and copy. [DECIDED 2026-09-20]** PC initiates from the existing
+   staff mailbox contract; the PI is the To recipient and the institutional
+   liaison is Cc on every requirements/reminder message.
 7. **Update communication to Board/consultants.** **Recommendation:** stable link plus visible
    last-published timestamp; do not send a new message on every republish unless staff explicitly
    chooses Notify.
@@ -672,3 +672,75 @@ before claiming the collection row. The default body still uses the fixed server
 button and fallback link; an edited template may also place the server-minted URL with
 `{{uploadLink}}` and the sending PC’s signature with `{{signature}}`. This branch is not a
 production-live claim.
+
+### 16.9 2026-09-20: personal manual-send defaults and editable preview [ACCEPTED FEATURE-BRANCH SOURCE; NOT RELEASED]
+
+The Meeting Tracker feature branch adds personal invitation and reminder subject/body
+templates for every user with the Meeting Tracker app grant. The shared Admin defaults remain
+the fallback; the two own-profile overrides live in Dataverse `wmkf_appuserpreferences` and are
+saved only by **Save as my default**. Editing one preview or sending it does not change a saved
+default. **Use shared default** clears that kind's override. The unscheduled automatic reminder
+continues to read the shared Admin template and does not use the creator's personal override.
+
+Manual first invitation, later invitation, and reminder open an editable, read-only preview
+before an explicit Send. The first preview shows a conspicuous secure-link placeholder and
+does not create a collection, upload token, email activity, or reminder claim. Send requires a
+short-lived signed proof of the reviewed raw template and server-resolved request, visit,
+recipient, sender, checklist/missing-item, signature, and rendered-content context. The server
+rechecks those inputs and retains control of the real contributor URL and its email button and
+fallback link. Required `{{checklist}}` or `{{missingItems}}` tokens keep the requested items in
+the final text. On the first Send, the collection and sealed link are persisted before Dynamics
+transport, so a transport failure may leave a collection with no confirmed invitation; the
+card must report that partial result and allow a deliberate follow-up after checking email
+history. This source-built work passed cross-layer review and the combined 115-test
+run on 2026-09-20; it has not been released to production.
+
+### 16.10 2026-09-20: isolated email-modal rehearsal [VERIFIED IN PREVIEW; NOT RELEASED TO PRODUCTION]
+
+The feature branch also includes a local/Preview-only rehearsal page for the real
+materials email modal. An exact `_app` path bypass prevents the page from mounting
+the normal session, profile, app-access, and welcome providers; the page supplies
+an inert profile context and an injected in-memory transport instead. Synthetic
+first-invitation, resend, and reminder cases support editing, previewing, saving
+or resetting a sample default, and recording a fake send outcome without calling
+the materials APIs, persisting a preference or collection, or sending email.
+Non-Preview production deployments return 404. Focused rehearsal and modal tests
+passed on 2026-09-20. A built-app Chromium rehearsal exercised all three modal
+scenarios, preview invalidation after editing, sample default save/reset, and
+sample Send; it recorded zero `/api/` network requests and zero page errors, and
+the resulting screenshot was inspected. The webpack production build also
+passed. The interaction evidence above comes from the local production build.
+The feature was deployed Ready from commit `88aca3305a868ac265e3a06df355ac810d735001`
+as Preview deployment `dpl_HekqUG9SUrniPhnWa579nAVd97kX` at
+`https://wmkfresearchapps-ff0re4cjw-justin-gallivans-projects.vercel.app`.
+The Preview route `/meeting-tracker/materials-email-rehearsal` returns the
+expected 307 staff sign-in redirect while retaining its callback. The full
+modal interactions were independently verified against the local production
+build as recorded above. This Preview verification is not a production release.
+
+### 16.11 2026-09-20: named materials email copy [ACCEPTED FEATURE-BRANCH SOURCE; READY FOR RELEASE, NOT LIVE]
+
+The approved shared invitation and reminder copy addresses the PI as
+`Dear Dr. {{piLastName}}`, names the institutional liaison with
+`{{liaisonFullName}}`, and signs with `{{programCoordinatorName}}`. The PI
+last name comes from the project-leader contact's dedicated Dataverse
+`lastname` field; it is never derived by splitting a full name. The liaison
+name belongs to the actual liaison recipient, and the Program Coordinator comes
+from the request's assigned `_wmkf_programcoordinator_value`, not the staff
+member who happens to click Send.
+
+Every invitation and reminder envelope addresses the PI in **To** and the
+liaison in **Cc** when those roles have distinct email addresses. Preview
+displays the same separation. Manual preview proofs bind the resolved names and
+the complete To/Cc envelope; a changed name, role association, recipient or
+sender requires a fresh preview before any collection insert, reminder claim or
+email activity. Missing data for a name token fails before those side effects.
+The automatic reminder uses the same shared copy, authoritative name mapping and
+To/Cc envelope, while retaining its existing claim-before-send policy.
+
+Rollout order is compatibility-critical: deploy and verify runtime support for
+the three tokens first, then replace exactly the four shared Admin values
+(`email.site_visit_materials_invite.subject/.body` and
+`email.site_visit_materials_reminder.subject/.body`) with the approved seed
+text. Personal overrides remain untouched. This accepted feature-branch source is ready for release; the revised Admin
+values are not yet live.

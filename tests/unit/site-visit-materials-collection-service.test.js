@@ -57,6 +57,7 @@ function deps(overrides = {}) {
     getRequest: jest.fn(async () => request()),
     findActiveSiteVisit: jest.fn(async () => visit()),
     resolveRecipients: jest.fn(async () => ({ pi: { name: 'Pat Investigator', email: 'PI@example.edu', hasEmail: true }, liaison: { name: 'Lee Liaison', email: 'liaison@example.edu', hasEmail: true } })),
+    resolveMaterialNames: jest.fn(async () => ({ piLastName: 'Investigator', piEmail: 'PI@example.edu', liaisonFullName: 'Lee Liaison', liaisonEmail: 'liaison@example.edu', programCoordinatorName: 'Casey Coordinator' })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getOpenCollection: jest.fn(async () => stored),
     getLatestCollection: jest.fn(async () => stored),
@@ -120,15 +121,18 @@ test('create: advancing request + active visit → due two business days before 
   expect(tokenCiphertext).toContain('jwt-' + REQUEST_ID + '-materials');
   expect(JSON.stringify(rest)).not.toContain('jwt-' + REQUEST_ID + '-materials');
   const email = d.sendEmail.mock.calls[0][0];
-  expect(email.to).toEqual(['PI@example.edu', 'liaison@example.edu']);
+  expect(email.to).toEqual(['PI@example.edu']);
+  expect(email.cc).toEqual(['liaison@example.edu']);
   expect(email.from).toBe('pc@wmkeck.org');
   expect(email.actingUserSystemId).toBe(ACTOR);
   expect(email.correlationKey).toBe('wmkf-site-visit-materials-invite:44444444-4444-4444-8444-444444444444');
   expect(email.url).toContain('https://apps.test/external/materials/jwt-');
   expect(email.buttonLabel).toBe('Upload site visit materials');
-  expect(email.subject).toBe('Site visit materials requested — The Secret History of Our Sun');
+  expect(email.subject).toBe('W.M. Keck Foundation Research Presentation Materials Request');
   expect(email.bodyText).not.toContain('https://apps.test/external/materials/jwt-');
-  expect(email.bodyText).toContain('No login is needed. You may forward the link below to a colleague who is helping.');
+  expect(email.bodyText).toContain('Dear Dr. Investigator,');
+  expect(email.bodyText).toContain('Often, the participant bios are prepared by your institutional liaison (Lee Liaison)');
+  expect(email.bodyText).toContain('Sincerely,\nCasey Coordinator');
   expect(email.bodyText).not.toContain('The link stays open until');
   expect(email.bodyText).toContain('Presentation (PDF)');
   expect(email.bodyText).toContain('Monday, October 5, 2026');
@@ -192,7 +196,7 @@ test('read joins the registry: state moves missing → received → ready; waive
   expect(reminder.bodyText).not.toContain('https://apps.test/external/materials/');
   expect(reminder.url).toContain('https://apps.test/external/materials/');
   expect(reminder.buttonLabel).toBe('Upload the missing items');
-  expect(reminder.subject).toBe('Reminder: site visit materials — The Secret History of Our Sun');
+  expect(reminder.subject).toBe('W.M. Keck Foundation Research Presentation Materials Request');
   expect(reminder.correlationKey).toBe('wmkf-site-visit-materials-reminder:44444444-4444-4444-8444-444444444444:1');
   expect(collection.reminderCount).toBe(1);
 
@@ -246,8 +250,8 @@ test('a collection past its close instant reads as closed even before the sweep 
   const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
   expect(collection.state).toBe('closed');
   await expect(getMaterialsCollection({ requestId: REQUEST_ID }, deps({ schemaReady: () => false }))).rejects.toMatchObject({ httpStatus: 503 });
-  const body = invitationBodyText({ bodyTemplate: SITE_VISIT_MATERIALS_INVITE_SEED_BODY, institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z', timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z', checklist: [{ key: 'a', label: 'A', required: true, waived: false }, { key: 'b', label: 'B', required: true, waived: true }] });
-  expect(body).toBe('Ahead of the W. M. Keck Foundation site visit for "T" (U) on Wednesday, October 7, 2026, please upload the following by Monday, October 5, 2026:\n\n  - A\n\nNo login is needed. You may forward the link below to a colleague who is helping.\n\nThank you.');
+  const body = invitationBodyText({ bodyTemplate: SITE_VISIT_MATERIALS_INVITE_SEED_BODY, institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z', timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z', checklist: [{ key: 'a', label: 'A', required: true, waived: false }, { key: 'b', label: 'B', required: true, waived: true }], names: { piLastName: 'Investigator', liaisonFullName: 'Lee Liaison', programCoordinatorName: 'Casey Coordinator' } });
+  expect(body).toBe('Dear Dr. Investigator,\n\nAhead of your Research Presentation to the W.M. Keck Foundation on Wednesday, October 7, 2026, please upload the following by Monday, October 5, 2026:\n\n  - A\n\nOften, the participant bios are prepared by your institutional liaison (Lee Liaison) who is copied on this email and may use the same link below to upload the material.\n\nSincerely,\nCasey Coordinator');
 });
 
 test('edited invitation and reminder settings supply distinct subjects and bodies with resolved tokens', async () => {
@@ -341,11 +345,11 @@ test('an invitation receipt failure preserves the accepted Dynamics activity id 
 test('seed reminder retains singular grammar and excludes received items', () => {
   const text = reminderBodyText({
     bodyTemplate: SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
-    institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z',
+    institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z', names: { piLastName: 'Investigator', liaisonFullName: 'Lee Liaison', programCoordinatorName: 'Casey Coordinator' },
     timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z',
     missing: [{ label: 'Presentation source (PowerPoint or Keynote)' }],
   });
-  expect(text).toBe('A reminder for the W. M. Keck Foundation site visit for "T" (U) on Wednesday, October 7, 2026. The following item is still needed (due Monday, October 5, 2026):\n\n  - Presentation source (PowerPoint or Keynote)\n\nThank you.');
+  expect(text).toBe('Dear Dr. Investigator,\n\nThis is a reminder to submit materials for your Research Presentation to the W.M. Keck Foundation on Wednesday, October 7, 2026. The following item is still needed by Monday, October 5, 2026:\n\n  - Presentation source (PowerPoint or Keynote)\n\nOften, the participant bios are prepared by your institutional liaison (Lee Liaison) who is copied on this email and may use the same link below to upload the material.\n\nSincerely,\nCasey Coordinator');
 });
 
 test('summarizeCollection keeps state, counts, and the window; drops the link, contacts, and per-item detail; waived items leave the denominator', async () => {

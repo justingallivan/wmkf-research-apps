@@ -48,6 +48,19 @@ sequence.
 | 12 | Pre-Research Presentation Brief: fourth governed artifact replacing the Pre-Site writeup as the Board distribution source | **[SHIPPED 2026-09-17 — PR #307 merged `f1cf8fe3`, hotfix PR #308 `9ab5fe71`, CI repair PR #309 `de349928`; migration 052 applied and read back.]** Owner decisions B1–B14 and Codex rounds in `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`. Follow-ups built S516 and **merged 2026-09-17**: PR #310 `0eba7358` (items 2–10), PR #311 `248233c7` (guarded regeneration of a sent brief), PR #312 `7f776e36` (review bundle PDF; migration 053 applied and read back exact). | ZZTEST-03 smoke run 2026-09-17 (plan §12): generate, lock, share with bundle, briefing page, drift detection, guarded regeneration pass. Email link confirmed by the owner. Finding A (snapshot hash mismatch) fixed in PR #313 `b5af962b`, deployed and smoked on ZZTEST-03 2026-09-17: Staff Brief download and same-version re-preview pass. **Met.** |
 | 13 | Client request layer: fix unguarded response handling (D1) after each file migrates onto `shared/utils/api-request.js` | **[RELEASED 2026-09-20; merge `8623c2f7b`, production `dpl_9rNyDMfuEMHPHo6ndSNh3di9d9eQ`.]** The roles, providers, scheduled-email posture GETs, and remaining D9 `ErrorAlert` props are implemented with focused tests. [VERIFIED via Git, Vercel API and signed-in smoke] Release evidence: `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`. Source plan and execution details remain in `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` and `docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md`; Luna built, Sol reviewed, root accepted, and the owner authorized promotion. | Every confirmed unguarded site shows the server error on non-2xx, each with a test; execution log carries a "D1 fixes" section; campaign-critical rows released under Tier 2. |
 
+## Owner-requested product follow-ups
+
+- **Personal email defaults and editable send previews (2026-09-20).**
+  [ACCEPTED FEATURE-BRANCH IMPLEMENTATION; NOT RELEASED] Meeting Tracker's first and later
+  materials invitations and manual reminders now have personal defaults and
+  editable previews in the candidate source. Luna built, Sol reviewed and root
+  accepted; implementation and evidence are recorded in
+  `docs/plans/MATERIALS_EMAIL_PERSONALIZATION_PLAN_2026-09-20.md`. No main merge or
+  production release is included. Suite-wide adoption remains a separate to-do:
+  inventory support and gaps for every app-authorized user, then extend existing
+  mechanisms in bounded changes. Requirements and remaining follow-ups:
+  `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+
 ## Audit follow-ups — verified open, not silently prioritized
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
   smoke).** `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from

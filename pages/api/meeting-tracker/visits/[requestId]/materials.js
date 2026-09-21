@@ -2,7 +2,7 @@
  * GET/POST the applicant materials collection for a request's site visit
  * (docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16, PR 1). Tracker grant, the
  * tracker readiness check, then the materials readiness check. POST carries
- * exactly one `action`: create | invite | remind | waive | ready. Request id
+ * exactly one `action`: create | invite | remind | waive | ready | preview. Request id
  * from the path; actor and sender from the session; body identity ignored.
  */
 import { requireAppAccess } from '../../../../../lib/utils/auth';
@@ -18,18 +18,21 @@ import {
   getMaterialsCollection,
   inviteMaterialsContributors,
   remindMaterialsContributors,
+  previewMaterialsEmail,
   waiveMaterialsItem,
 } from '../../../../../lib/services/site-visit-materials/collection-service';
+import { verifyMaterialsPreviewProof } from '../../../../../lib/services/site-visit-materials/email-personalization';
 
 export const config = { api: { bodyParser: { sizeLimit: '16kb' } }, maxDuration: 60 };
 
-const ACTIONS = new Set(['create', 'invite', 'remind', 'waive', 'ready']);
-const BODY_KEYS = new Set(['action', 'key', 'waived']);
-
+const ACTIONS = new Set(['create', 'invite', 'remind', 'waive', 'ready', 'preview']);
 function exactBody(body) {
-  return body && typeof body === 'object' && !Array.isArray(body)
-    && Object.keys(body).every((key) => BODY_KEYS.has(key))
-    && ACTIONS.has(body.action);
+  if (!body || typeof body !== 'object' || Array.isArray(body) || !ACTIONS.has(body.action)) return false;
+  const allowed = body.action === 'waive' ? new Set(['action', 'key', 'waived'])
+    : body.action === 'preview' ? new Set(['action', 'sendAction', 'emailTemplate'])
+      : ['create', 'invite', 'remind'].includes(body.action) ? new Set(['action', 'emailTemplate', 'proof'])
+        : new Set(['action']);
+  return Object.keys(body).every((key) => allowed.has(key));
 }
 
 export default async function handler(req, res) {
@@ -62,9 +65,23 @@ export default async function handler(req, res) {
       if ((action === 'create' || action === 'invite' || action === 'remind') && !fromEmail) {
         return res.status(400).json({ error: 'Your account has no sending email address.' });
       }
-      const result = action === 'create' ? await createMaterialsCollection({ requestId, actorId, fromEmail })
-        : action === 'invite' ? await inviteMaterialsContributors({ requestId, actorId, fromEmail })
-          : action === 'remind' ? await remindMaterialsContributors({ requestId, actorId, fromEmail })
+      const template = req.body.emailTemplate;
+      if (action === 'preview') {
+        const previewAction = req.body.sendAction;
+        if (!['create', 'invite', 'remind'].includes(previewAction)) return res.status(400).json({ error: 'A valid preview send action is required.' });
+        return res.status(200).json({ success: true, ...(await previewMaterialsEmail({ requestId, action: previewAction, actorId, profileId: access.profileId, fromEmail, emailTemplate: template })) });
+      }
+      if (['create', 'invite', 'remind'].includes(action) && (!template || !req.body.proof)) return res.status(400).json({ error: 'Refresh the preview before sending.', code: 'site_visit_materials_preview_required' });
+      let preparedEmail = null;
+      if (['create', 'invite', 'remind'].includes(action)) {
+        const current = await previewMaterialsEmail({ requestId, action, actorId, profileId: access.profileId, fromEmail, emailTemplate: template });
+        const proof = await verifyMaterialsPreviewProof(req.body.proof, { digest: current.digest, action });
+        if (!proof.valid) return res.status(409).json({ error: 'The preview is stale. Refresh it before sending.', code: 'site_visit_materials_preview_stale' });
+        preparedEmail = { subject: current.subject, bodyText: current.bodyText, names: current.names, recipients: current.allRecipients || [...(current.recipients || []), ...(current.ccRecipients || [])].map((person) => person.email), toRecipients: (current.recipients || []).map((person) => person.email), ccRecipients: (current.ccRecipients || []).map((person) => person.email), missingKeys: current.missingKeys, collectionId: current.collectionId, dueAt: current.dueAt, visitSnapshot: current.visitSnapshot, template };
+      }
+      const result = action === 'create' ? await createMaterialsCollection({ requestId, actorId, profileId: access.profileId, fromEmail, emailTemplate: template, preparedEmail })
+        : action === 'invite' ? await inviteMaterialsContributors({ requestId, actorId, profileId: access.profileId, fromEmail, emailTemplate: template, preparedEmail })
+          : action === 'remind' ? await remindMaterialsContributors({ requestId, actorId, profileId: access.profileId, fromEmail, emailTemplate: template, preparedEmail })
             : action === 'waive' ? await waiveMaterialsItem({ requestId, key: String(req.body.key || ''), waived: req.body.waived === true })
               : await confirmMaterialsReady({ requestId, actorId });
       return res.status(200).json({ success: true, ...result });

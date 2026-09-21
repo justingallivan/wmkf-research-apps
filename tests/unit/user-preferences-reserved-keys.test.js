@@ -30,6 +30,10 @@ import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 const RESERVED = PREFERENCE_KEYS.PROMPT_OVERRIDES;
 const EMAIL_AUTOMATION_RESERVED = PREFERENCE_KEYS.EMAIL_AUTOMATION;
 const EMAIL_TEMPLATES = PREFERENCE_KEYS.EMAIL_TEMPLATES;
+const MATERIALS_KEYS = [
+  PREFERENCE_KEYS.SITE_VISIT_MATERIALS_INVITATION_TEMPLATE,
+  PREFERENCE_KEYS.SITE_VISIT_MATERIALS_REMINDER_TEMPLATE,
+];
 
 function mockRes() {
   return {
@@ -85,6 +89,34 @@ describe('reserved-key guard', () => {
     }, res);
     expect(res.statusCode).toBe(403);
     expect(DatabaseService.setUserPreference).not.toHaveBeenCalled();
+  });
+
+  it.each(MATERIALS_KEYS)('blocks single materials key %s through generic POST', async (reservedKey) => {
+    const res = mockRes();
+    await handler({ method: 'POST', body: { key: reservedKey, value: '{}' } }, res);
+    expect(res.statusCode).toBe(403);
+    expect(DatabaseService.setUserPreference).not.toHaveBeenCalled();
+  });
+
+  it('blocks a bulk POST containing either materials key', async () => {
+    const res = mockRes();
+    await handler({ method: 'POST', body: { preferences: { safe: '1', [MATERIALS_KEYS[1]]: '{}' } } }, res);
+    expect(res.statusCode).toBe(403);
+    expect(DatabaseService.setUserPreferences).not.toHaveBeenCalled();
+  });
+
+  it.each(MATERIALS_KEYS)('blocks single materials key %s through generic DELETE', async (reservedKey) => {
+    const res = mockRes();
+    await handler({ method: 'DELETE', body: { key: reservedKey } }, res);
+    expect(res.statusCode).toBe(403);
+    expect(DatabaseService.deleteUserPreference).not.toHaveBeenCalled();
+  });
+
+  it('blocks a bulk DELETE containing either materials key', async () => {
+    const res = mockRes();
+    await handler({ method: 'DELETE', body: { keys: ['safe', MATERIALS_KEYS[0]] } }, res);
+    expect(res.statusCode).toBe(403);
+    expect(DatabaseService.deleteUserPreference).not.toHaveBeenCalled();
   });
 
   it('rejects an invitation-template save without {{externalLink}} before persistence', async () => {

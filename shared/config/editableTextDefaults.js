@@ -404,9 +404,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.site_visit_materials_invite.body',
     label: 'Site-visit materials invitation body',
-    description: 'The checklist is built from active items. {{uploadLink}} is the secure URL, also shown in the fixed upload button and fallback link. {{signature}} is the sending PC’s signature. Mustache {{tokens}} only.',
+    description: 'The checklist is built from active items. {{piLastName}} and {{liaisonFullName}} come from the actual email recipients; {{programCoordinatorName}} comes from the request\'s assigned Program Coordinator. {{signature}} is the optional sender signature. Mustache {{tokens}} only.',
     multiline: true,
-    placeholders: ['{{proposalTitle}}', '{{institution}}', '{{visitDate}}', '{{dueDate}}', '{{checklist}}', '{{uploadLink}}', '{{signature}}'],
+    placeholders: ['{{proposalTitle}}', '{{institution}}', '{{visitDate}}', '{{dueDate}}', '{{checklist}}', '{{uploadLink}}', '{{signature}}', '{{piLastName}}', '{{liaisonFullName}}', '{{programCoordinatorName}}'],
     requiredPlaceholders: ['{{checklist}}'],
     group: 'applicants',
     emailKey: 'email.site_visit_materials_invite',
@@ -425,9 +425,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.site_visit_materials_reminder.body',
     label: 'Site-visit materials reminder body',
-    description: 'The missing-item list and singular/plural phrase are built from current required items. {{uploadLink}} is the secure URL, also shown in the fixed upload button and fallback link. {{signature}} is the sending PC’s signature. Mustache {{tokens}} only.',
+    description: 'The missing-item list and singular/plural phrase are built from current required items. {{piLastName}} and {{liaisonFullName}} come from the actual email recipients; {{programCoordinatorName}} comes from the request\'s assigned Program Coordinator. {{signature}} is the optional sender signature. Mustache {{tokens}} only.',
     multiline: true,
-    placeholders: ['{{proposalTitle}}', '{{institution}}', '{{visitDate}}', '{{dueDate}}', '{{missingItemsGrammar}}', '{{missingItems}}', '{{uploadLink}}', '{{signature}}'],
+    placeholders: ['{{proposalTitle}}', '{{institution}}', '{{visitDate}}', '{{dueDate}}', '{{missingItemsGrammar}}', '{{missingItems}}', '{{uploadLink}}', '{{signature}}', '{{piLastName}}', '{{liaisonFullName}}', '{{programCoordinatorName}}'],
     requiredPlaceholders: ['{{missingItems}}'],
     group: 'applicants',
     emailKey: 'email.site_visit_materials_reminder',

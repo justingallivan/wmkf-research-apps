@@ -22,6 +22,21 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
     router.pathname.startsWith('/external/') ||
     router.pathname.startsWith('/apply');
 
+  // The rehearsal page has a server-side Preview/development guard and its own
+  // inert ProfileContext. Keep the normal auth/session providers out of it so
+  // opening the page cannot initialize live profile or session requests.
+  if (router.pathname === '/meeting-tracker/materials-email-rehearsal' && pageProps.rehearsalEnabled === true) {
+    return (
+      <>
+        <Head>
+          <meta name="robots" content="noindex, nofollow" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        </Head>
+        <Component {...pageProps} />
+      </>
+    );
+  }
+
   const inner = isPublicPage ? (
     <Component {...pageProps} />
   ) : (
