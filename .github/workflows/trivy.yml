@@ -7,6 +7,9 @@ on:
   schedule:
     - cron: '0 8 * * 1' # Weekly Monday 8am UTC
 
+permissions:
+  contents: read
+
 jobs:
   trivy:
     name: Trivy CVE Scan
