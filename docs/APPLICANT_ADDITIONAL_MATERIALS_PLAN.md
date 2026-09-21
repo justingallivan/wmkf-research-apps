@@ -694,3 +694,19 @@ transport, so a transport failure may leave a collection with no confirmed invit
 card must report that partial result and allow a deliberate follow-up after checking email
 history. This source-built work passed cross-layer review and the combined 115-test
 run on 2026-09-20; it has not been released to production.
+
+### 16.10 2026-09-20: isolated email-modal rehearsal [ACCEPTED FEATURE-BRANCH SOURCE; NOT RELEASED]
+
+The feature branch also includes a local/Preview-only rehearsal page for the real
+materials email modal. An exact `_app` path bypass prevents the page from mounting
+the normal session, profile, app-access, and welcome providers; the page supplies
+an inert profile context and an injected in-memory transport instead. Synthetic
+first-invitation, resend, and reminder cases support editing, previewing, saving
+or resetting a sample default, and recording a fake send outcome without calling
+the materials APIs, persisting a preference or collection, or sending email.
+Non-Preview production deployments return 404. Focused rehearsal and modal tests
+passed on 2026-09-20. A built-app Chromium rehearsal exercised all three modal
+scenarios, preview invalidation after editing, sample default save/reset, and
+sample Send; it recorded zero `/api/` network requests and zero page errors, and
+the resulting screenshot was inspected. The webpack production build also
+passed. This is a source-state verification claim; deployment remains pending.

@@ -6,7 +6,7 @@ import { useProfile } from '../../context/ProfileContext';
 const LABELS = { create: 'Invitation', invite: 'Invitation', remind: 'Reminder' };
 const UNCERTAIN_COPY = 'The email result could not be confirmed. Check the recipient before trying again.';
 
-export default function MaterialsEmailModal({ requestId, action, onClose, onSent }) {
+export default function MaterialsEmailModal({ requestId, action, onClose, onSent, notice, requestEnvelope: request = requestEnvelope }) {
   const kind = action === 'remind' ? 'reminder' : 'invitation';
   const profile = useProfile();
   const profileId = profile?.currentProfile?.id ?? profile?.profileId ?? profile?.session?.user?.profileId ?? null;
@@ -46,7 +46,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
     sendingRef.current = false;
     activeSendRef.current = null;
     const controller = new AbortController();
-    requestEnvelope(`/api/meeting-tracker/materials-email-preferences?kind=${kind}`, { tolerantBody: true, signal: controller.signal })
+    request(`/api/meeting-tracker/materials-email-preferences?kind=${kind}`, { tolerantBody: true, signal: controller.signal })
       .then((result) => {
         if (!current(generation)) return;
         if (!result.ok) throw new Error(result.data?.error || 'The email default could not be loaded.');
@@ -57,7 +57,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
       })
       .finally(() => { if (current(generation)) setBusy(false); });
     return () => { controller.abort(); };
-  }, [contextKey, current, kind]);
+  }, [contextKey, current, kind, request]);
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -78,7 +78,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
     const expectedContext = contextKey;
     setBusy(true); setError(null); setFeedback(null); setSavedMessage(null);
     try {
-      const result = await requestEnvelope(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, {
+      const result = await request(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: { action: 'preview', sendAction: action, emailTemplate: template }, tolerantBody: true,
       });
@@ -100,7 +100,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
     const expectedContext = contextKey;
     setSaving(true); setError(null); setSavedMessage(null);
     try {
-      const result = await requestEnvelope('/api/meeting-tracker/materials-email-preferences', {
+      const result = await request('/api/meeting-tracker/materials-email-preferences', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: { kind, template }, tolerantBody: true,
       });
       if (!current(generation, expectedContext)) return;
@@ -119,12 +119,12 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
     const expectedContext = contextKey;
     setSaving(true); setError(null); setSavedMessage(null);
     try {
-      const result = await requestEnvelope('/api/meeting-tracker/materials-email-preferences', {
+      const result = await request('/api/meeting-tracker/materials-email-preferences', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: { kind }, tolerantBody: true,
       });
       if (!current(generation, expectedContext)) return;
       if (!result.ok || result.data?.ok !== true) throw new Error(result.data?.error || 'The shared default could not be restored.');
-      const refreshed = await requestEnvelope(`/api/meeting-tracker/materials-email-preferences?kind=${kind}`, { tolerantBody: true });
+      const refreshed = await request(`/api/meeting-tracker/materials-email-preferences?kind=${kind}`, { tolerantBody: true });
       if (!current(generation, expectedContext)) return;
       if (!refreshed.ok) throw new Error(refreshed.data?.error || 'The shared default could not be loaded.');
       setTemplate(refreshed.data?.shared || refreshed.data?.template || { subject: '', body: '' });
@@ -146,7 +146,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
     activeSendRef.current = sendMarker;
     setBusy(true); setError(null); setFeedback(null); setSavedMessage(null);
     try {
-      const result = await requestEnvelope(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, {
+      const result = await request(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: { action, emailTemplate: template, proof: preview.proof }, tolerantBody: true,
       });
@@ -192,6 +192,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
     <div role="dialog" aria-modal="true" aria-labelledby="materials-email-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4"><div><h2 id="materials-email-title" className="text-lg font-semibold">{LABELS[action]} email</h2><p className="mt-1 text-sm text-gray-600">Edit this send, then refresh the preview before sending.</p></div><button type="button" onClick={onClose} disabled={sending || saving} className="text-sm underline">Close</button></div>
+        {notice && <div role="note" className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm">{notice}</div>}
         {error && <div role="alert" className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
         {feedback && <EmailSendFeedback className="mt-4" status={feedback.status} message={feedback.message} data-testid="materials-email-feedback" />}
         {savedMessage && <div role="status" className="mt-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">{savedMessage}</div>}
