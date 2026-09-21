@@ -120,6 +120,33 @@ describe('isolated schema body', () => {
     }));
   });
 
+  test('sandbox reminder parity wave contains only the two existing disable controls', async () => {
+    const schemaPath = path.resolve(process.cwd(), 'lib/dataverse/schema/wave29-test-request-reminder-controls/akoya_request-test-request-reminder-controls.json');
+    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+    expect(schema.kind).toBe('extensions-on-existing');
+    expect(schema.entityLogicalName).toBe('akoya_request');
+    expect(schema.attributes).toHaveLength(2);
+    expect(schema.attributes.map((attribute) => attribute.schemaName)).toEqual([
+      'wmkf_RespondReminderEnabled', 'wmkf_ReviewDueReminderEnabled',
+    ]);
+    expect(schema.attributes.every((attribute) => attribute.type === 'Boolean' && attribute.default === true)).toBe(true);
+    expect(schema).not.toHaveProperty('relationships');
+
+    const posts = [];
+    const client = {
+      get: async () => ({ ok: true, body: { value: [] } }),
+      post: async (_url, body) => { posts.push(body); return { ok: true }; },
+    };
+    for (const attribute of schema.attributes) {
+      await ensureAttribute(client, schema.entityLogicalName, attribute);
+    }
+    expect(posts).toHaveLength(2);
+    expect(posts.map((body) => body.SchemaName)).toEqual([
+      'wmkf_RespondReminderEnabled', 'wmkf_ReviewDueReminderEnabled',
+    ]);
+    expect(posts.every((body) => body.DefaultValue === true)).toBe(true);
+  });
+
   test('schema body does not smuggle reminder, triage, or relationship changes', () => {
     const schemaPath = path.resolve(process.cwd(), 'lib/dataverse/schema/wave29-test-request-isolation/akoya_request-test-request-isolation.json');
     const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));

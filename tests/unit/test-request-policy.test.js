@@ -13,6 +13,7 @@ const bodyFields = [
   'akoya_purpose',
   'akoya_request',
   'akoya_fiscalyear',
+  TEST_REQUEST_FIXED_FIELDS.requestType,
   'wmkf_meetingdate',
   TEST_REQUEST_FIXED_FIELDS.marker,
   TEST_REQUEST_FIXED_FIELDS.runId,
@@ -26,7 +27,8 @@ function metadata(overrides = {}) {
     requiredLevel: 'None',
     type: field === 'akoya_request' ? 'Money'
       : field === 'akoya_purpose' ? 'Memo'
-        : field === 'akoya_requestid' ? 'Uniqueidentifier'
+          : field === 'akoya_requestid' ? 'Uniqueidentifier'
+            : field === TEST_REQUEST_FIXED_FIELDS.requestType ? 'Picklist'
           : field.includes('reminder') || field === TEST_REQUEST_FIXED_FIELDS.marker ? 'Boolean'
             : field === TEST_REQUEST_FIXED_FIELDS.runId ? 'Uniqueidentifier'
               : field === 'wmkf_meetingdate' ? 'DateOnly' : 'String',
@@ -51,6 +53,7 @@ function input(overrides = {}) {
     },
     testLabel: 'Fixture one',
     fiscalYear: 'December 2026',
+    requestType: 100000000,
     meetingDate: '2026-12-01',
     metadata: metadata(),
     ...ids,
@@ -70,6 +73,7 @@ describe('compileTestRequestDraft', () => {
       akoya_purpose: 'Synthetic purpose',
       akoya_request: 1250,
       akoya_fiscalyear: 'December 2026',
+      akoya_requesttype: 100000000,
       wmkf_meetingdate: '2026-12-01',
       [TEST_REQUEST_FIXED_FIELDS.marker]: true,
       [TEST_REQUEST_FIXED_FIELDS.runId]: ids.runId,
@@ -107,6 +111,7 @@ describe('compileTestRequestDraft', () => {
     ['runId', { runId: 'bad' }],
     ['testOrganizationId', { testOrganizationId: 'bad' }],
     ['meetingDate', { meetingDate: '2026-99-99' }],
+    ['requestType', { requestType: 'Grant' }],
     ['amount', { sourceRequest: { ...input().sourceRequest, akoya_request: -1 } }],
   ])('rejects invalid %s', (_label, overrides) => {
     const result = compileTestRequestDraft(input(overrides));
