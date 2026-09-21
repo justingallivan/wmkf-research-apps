@@ -920,6 +920,23 @@ Contact enrichment partial-timeout behavior is unchanged.
 
 **Publication count for applicant rows (S264):** Applicant-recommended reviewers skip PubMed/preprint discovery, so they carry no publications list and used to show a FALSE "0 publications" beside a real h-index. `enrich-recommended.js` now backfills `publicationCount5yr` from the OpenAlex author it already resolves for the metrics — `OpenAlexService.getWorksByAuthor(openAlexId, { yearFrom: year - DiscoveryService.YEARS_LOOKBACK, limit: 1 }).totalCount` (count-only query; same window as `DiscoveryService.countRecentPublications`). Gated on `blockScholar` like the other metrics (no count for an unconfirmed/wrong-person match); best-effort (a failure leaves it null). One extra OpenAlex call per applicant reviewer.
 
+**Expertise for applicant rows (2026-09-21):** applicant-recommended reviewers
+arrive with `expertiseAreas: []` (only Reviewer Finder candidates get Claude-written
+areas, which promotion writes to `wmkf_areaofexpertise`), so their person rows
+never had `wmkf_keywords` either and the Pre-Site Visit Reviews paragraph's
+expertise sentence silently omitted them. `enrich-recommended-service.js`
+`expertiseKeywordsFor` now falls back to the accepted OpenAlex author's
+`researchTopics` (`OpenAlexService.mapAuthorRecord`, from the current author
+object's specific `topics` list sorted by count — NOT the broad deprecated
+`x_concepts` that `topics`/`topTopics` read for identity grounding), sentence-cased
+for mid-sentence use, top three, carried on `ce.openAlexResearchTopics` past the
+identity gate. Gated on `blockScholar` like the h-index; `wmkf_keywords` is
+fill-if-empty in the researcher adapter, so staff edits are never overwritten.
+**Reach:** enrichment skips `handled` suggestion rows (selected/invited/…), so this
+fixes future applicant rows enriched before promotion; an already-promoted row
+(request 1002852) needs a one-time hand fill of the person's Keywords or Area of
+Expertise, then a brief regenerate.
+
 **"Scholar profile" vs "Scholar search" label (S266):** Enrichment populates `googleScholarUrl` with a Google Scholar *search* URL by default (`ContactEnrichmentService.buildGoogleScholarUrl` — OpenAlex exposes no Scholar `user=` id), so the card's label MUST NOT be a truthiness check on `googleScholarUrl` (that mislabels every enriched reviewer as having a "profile"). The label is gated on `isRealScholarProfileUrl(url)` (`lib/utils/scholar-url.js`) — true only for `scholar.google.com/citations?user=<id>`, false for `?view_op=search_authors&mauthors=…`. Applied at all three render/export sites (`ReviewerInvitePanel.js`, `ReviewerSearchSection.js` card + export). Today no flow produces a real `user=` profile URL for these reviewers, so they correctly read "Scholar search". **S388 adds a FOURTH site with a stricter rule:** the identity-evidence disclosure on `identityUnverified` cards always builds its link with `buildScholarSearchUrl(name, affiliation)` and never reads `googleScholarUrl`, so a stored `user=` profile can never surface there even if one appears later. That is deliberate and must not be "fixed" into label-gating like the other three — on an unresolved row a real profile URL is the namesake trap itself, not a better link.
 
 **Board-writeup identity edit (S308):** clicking a reviewer in the workbench opens `CandidateEditModal`, which now also edits three person-level confirmed fields — academic rank, primary department, main institution (saved-candidate edit mode only; hidden in the pre-save Find-card `onApply` + `confirmMode` paths). They PATCH `my-candidates` → `potentialReviewerAdapter.update` (server-derived `personId`, never client-supplied) → dedicated person columns (`wmkf_academicrank`/`wmkf_primarydepartment`/`wmkf_maininstitution`), emitted on the candidate DTO. These are first captured (required) at Stage 2a accept (see external-reviewer-portal topic). **Main-institution fallback (S310):** when `wmkf_maininstitution` is empty the modal prefills Main institution from the enrichment Affiliation (`mainInstitutionFallback` = `candidate.mainInstitution ‖ candidate.affiliation`), mirroring the reviewer accept-form prefill (`context.js buildStage2aPrefill`) so staff see the same value the reviewer will. The same fallback is the change-comparison baseline, so opening + saving never silently writes the affiliation into the dedicated column — only a genuine staff edit persists. (h-index was dropped from the modal S310 — auto-fetched, not staff-editable.) See reviewer-identity for the field rationale.
@@ -1499,7 +1516,12 @@ modelled on the existing `funding_history_manual` note. **Wrap-up
 fails closed separately as `pre_site_visit_referee_compose_failed`; a
 submitted review with an unlabelled (pre-current-scale) rating emits
 `referee_rating_unlabelled` instead of silently vanishing from the score
-tally; `renderPreSiteVisitDocx` treats a blank/whitespace-only
+tally; **(2026-09-21)** a submitted reviewer with neither `wmkf_keywords` nor
+`wmkf_areaofexpertise` emits a named `referee_expertise_missing` diagnostic
+(shared `expertiseAreasOf` helper, so the sentence and the diagnostic cannot
+disagree about who was omitted) — observed on request 1002852, where the
+applicant-recommended reviewer had no expertise while both Finder reviewers
+did; `renderPreSiteVisitDocx` treats a blank/whitespace-only
 `refereeSection.text` as `null`; and `review-synthesis-readiness.js` exports
 `REVIEW_SYNTHESIS_BLOCKER_REASONS` so the allowlist test iterates the live
 reason set rather than a hand-copied list. **Codex adversarial review

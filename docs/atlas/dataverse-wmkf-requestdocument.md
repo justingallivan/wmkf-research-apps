@@ -436,7 +436,11 @@ Production Request Document row was created by this release smoke.
   `null` (token preserved, not filled with an empty paragraph). A submitted
   review whose rating falls outside the current form scale is tallied as an
   unlabelled `referee_rating_unlabelled` diagnostic rather than silently
-  dropped from the score sentence.
+  dropped from the score sentence. A submitted reviewer whose person row has
+  neither `wmkf_keywords` nor `wmkf_areaofexpertise` emits a named
+  `referee_expertise_missing` diagnostic (2026-09-21) rather than silently
+  dropping out of the expertise sentence — the applicant-recommended case,
+  whose ingestion path writes neither field.
   [RECHECKED after lib/services/pre-site-visit/docx-renderer.js change:
   2026-09-14 wrap-up — blank-text normalization added.]
 

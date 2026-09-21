@@ -850,6 +850,79 @@ test('a top-level email cannot borrow the scholarly name-guard bypass for anothe
   );
 });
 
+test('applicant reviewer with no claimed expertise: accepted OpenAlex research topics are written as sentence-cased keywords (top three)', async () => {
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      expertiseAreas: [],
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        tierResults: { openalex_author: { openAlexId: 'https://openalex.org/A1' } },
+        openAlexResearchTopics: [
+          'Research Data Management Practices',
+          'CRISPR Gene Editing',
+          'Bacteriophage Biology and Therapy',
+          'A Fourth Topic That Is Dropped',
+        ],
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({
+      keywords: 'Research data management practices; CRISPR gene editing; Bacteriophage biology and therapy',
+    }),
+    expect.anything(),
+  );
+});
+
+test('OpenAlex research topics are NOT written when the OpenAlex match was skipped (blockScholar), mirroring the h-index gate', async () => {
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      expertiseAreas: [],
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        tierResults: { openalex_author: { skipped: 'identity_gate_failed' } },
+        openAlexResearchTopics: ['Namesake Topic'],
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({ keywords: null }),
+    expect.anything(),
+  );
+});
+
+test('claimed expertise areas the verifier checked win over OpenAlex research topics', async () => {
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      expertiseAreas: ['Phage biology', 'Microbial ecology'],
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        tierResults: { openalex_author: { openAlexId: 'https://openalex.org/A1' } },
+        openAlexResearchTopics: ['Something Else'],
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({ keywords: 'Phage biology; Microbial ecology' }),
+    expect.anything(),
+  );
+});
+
 test('a stored affiliation does not exempt an applicant reviewer from the identity gate', async () => {
   enrichCandidates.mockImplementation(async (candidates) => ({
     enriched: candidates.map((c) => ({

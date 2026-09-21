@@ -22,6 +22,8 @@ function reviewer(overrides = {}) {
     ...overrides,
   };
 }
+// Alias for describe blocks that shadow `reviewer` with a wrapper.
+const withExpertise = reviewer;
 
 describe('composeScoreSentence', () => {
   it('tallies descending by rating, number words up to twelve', () => {
@@ -841,6 +843,13 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
 });
 
 describe('composeRefereeSection (Slice 4)', () => {
+  // These cases are about blockers and the score tally. Give every reviewer
+  // recorded expertise so the `referee_expertise_missing` diagnostic (tested
+  // in its own block below) does not join their exact diagnostics arrays.
+  function reviewer(overrides = {}) {
+    return withExpertise({ keywords: 'Microbial ecology', ...overrides });
+  }
+
   it('returns null when zero reviews are submitted', () => {
     expect(composeRefereeSection({ reviewers: [reviewer({ reviewReceivedAt: null })], blockers: [] })).toBeNull();
     expect(composeRefereeSection({ reviewers: [], blockers: [] })).toBeNull();
@@ -961,5 +970,48 @@ describe('composeRefereeSection (Slice 4)', () => {
     // The tally sentence still excludes the unlabelled rating (unchanged
     // behavior), the diagnostic is additive.
     expect(result.text).toContain('We received two reviews with scores of one Excellent.');
+  });
+});
+
+describe('composeRefereeSection — referee_expertise_missing', () => {
+  it('names a submitted reviewer with neither keywords nor areaOfExpertise, and still renders the others', () => {
+    const result = composeRefereeSection({
+      reviewers: [
+        reviewer({ suggestionId: 'a', name: 'Carey Nadell', lastName: 'Nadell', keywords: 'Microbial ecology' }),
+        reviewer({ suggestionId: 'b', name: 'Applicant Pick', lastName: 'Pick' }),
+      ],
+      blockers: [],
+    });
+    expect(result.diagnostics).toEqual([{ code: 'referee_expertise_missing', name: 'Applicant Pick' }]);
+    expect(result.text).toContain('Nadell has expertise in microbial ecology.');
+    expect(result.text).not.toContain('Pick has expertise');
+  });
+
+  it('is not emitted for a reviewer whose expertise comes from areaOfExpertise alone', () => {
+    const result = composeRefereeSection({
+      reviewers: [reviewer({ name: 'Dr. A', areaOfExpertise: 'Phage biology' })],
+      blockers: [],
+    });
+    expect(result.diagnostics).toEqual([]);
+    expect(result.text).toContain('A has expertise in phage biology.');
+  });
+
+  it('is not emitted for an unsubmitted reviewer (they are not in the expertise sentence either)', () => {
+    const result = composeRefereeSection({
+      reviewers: [
+        reviewer({ suggestionId: 'a', name: 'Dr. A', keywords: 'Phage biology' }),
+        reviewer({ suggestionId: 'b', name: 'Dr. Pending', reviewReceivedAt: null }),
+      ],
+      blockers: [],
+    });
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('carries name: null when the reviewer has no display name, and treats whitespace-only fields as missing', () => {
+    const result = composeRefereeSection({
+      reviewers: [reviewer({ name: '   ', keywords: ' ; ', areaOfExpertise: '  ' })],
+      blockers: [],
+    });
+    expect(result.diagnostics).toEqual([{ code: 'referee_expertise_missing', name: null }]);
   });
 });

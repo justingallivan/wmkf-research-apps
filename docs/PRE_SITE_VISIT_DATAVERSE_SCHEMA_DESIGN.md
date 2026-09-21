@@ -349,7 +349,10 @@ Slice 4 (`docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md`
 input snapshot adds deterministic, model-free `request.refereeSection`
 (fills `[[STAFF:RefereeSection]]`), and the proposal-core diagnostics add
 `referee_section_manual`, `referee_name_not_matched`,
-`referee_blocker_unnamed`, and `referee_rating_unlabelled`. Reviewer-roster
+`referee_blocker_unnamed`, `referee_rating_unlabelled`, and (2026-09-21)
+`referee_expertise_missing` (a submitted reviewer with neither `wmkf_keywords`
+nor `wmkf_areaofexpertise`, named so staff fill the field instead of the
+expertise sentence silently omitting them). Reviewer-roster
 read failures and composer failures remain distinct fail-closed errors. See
 `docs/atlas/dataverse-wmkf-requestdocument.md` for the authoritative live
 shape.

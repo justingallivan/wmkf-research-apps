@@ -357,6 +357,28 @@ export function composeReviewerSentence(reviewers) {
 }
 
 /**
+ * The expertise areas recorded for a reviewer: `keywords` split on ";",
+ * falling back to `areaOfExpertise`; trimmed, empties dropped, first three.
+ * Shared by the expertise sentence and `composeRefereeSection`'s
+ * `referee_expertise_missing` diagnostic so the two can never disagree about
+ * which reviewer was omitted. Exported for the same reason.
+ *
+ * @param {Object} reviewer
+ * @returns {string[]}
+ */
+export function expertiseAreasOf(reviewer) {
+  const source = (typeof reviewer?.keywords === 'string' && reviewer.keywords.trim())
+    ? reviewer.keywords
+    : reviewer?.areaOfExpertise;
+  if (typeof source !== 'string' || !source.trim()) return [];
+  return source
+    .split(';')
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+/**
  * "Nadell has expertise in X, Y, and Z, while Breitbart has expertise in …"
  * Keyed by last name (fallback: last token of `name`). Areas come from
  * `keywords` split on ";", falling back to `areaOfExpertise`; first three
@@ -378,16 +400,7 @@ export function composeExpertiseSentence(reviewers) {
 
   const clauses = [];
   for (const reviewer of ordered) {
-    const source = (typeof reviewer.keywords === 'string' && reviewer.keywords.trim())
-      ? reviewer.keywords
-      : reviewer.areaOfExpertise;
-    if (typeof source !== 'string' || !source.trim()) continue;
-    const areas = source
-      .split(';')
-      .map((a) => a.trim())
-      .filter(Boolean)
-      .slice(0, 3)
-      .map(lowercaseFirstLetterUnlessAcronym);
+    const areas = expertiseAreasOf(reviewer).map(lowercaseFirstLetterUnlessAcronym);
     if (areas.length === 0) continue;
     const lastName = lastNameOf(reviewer);
     if (!lastName) continue;
@@ -709,6 +722,18 @@ export function composeRefereeSection({ reviewers, blockers } = {}) {
   const { unlabelled } = tallyScoreLabels(submitted);
   for (const entry of unlabelled) {
     diagnostics.push({ code: 'referee_rating_unlabelled', name: entry.name || null });
+  }
+
+  // A submitted reviewer with no recorded expertise (neither `keywords` nor
+  // `areaOfExpertise` on the person row — the applicant-recommended case,
+  // whose ingestion path never writes either) is silently absent from the
+  // expertise sentence. Name them so the Workbench warning panel tells staff
+  // to fill the field in, instead of the sentence quietly shrinking.
+  for (const reviewer of submitted) {
+    if (expertiseAreasOf(reviewer).length === 0) {
+      const name = typeof reviewer.name === 'string' && reviewer.name.trim() ? reviewer.name.trim() : null;
+      diagnostics.push({ code: 'referee_expertise_missing', name });
+    }
   }
 
   if (countSentence) sentences.push(countSentence);

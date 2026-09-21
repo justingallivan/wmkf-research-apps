@@ -29,6 +29,7 @@ const AUTHOR = {
   i10Index: 88,
   citedByCount: 9999,
   topics: [],
+  researchTopics: ['Attosecond Physics', 'Ultrafast Lasers'],
   worksCount: 100,
 };
 
@@ -76,6 +77,8 @@ describe('enrichCandidate — OpenAlex metrics fetched even for early-email cand
     expect(out.contactEnrichment.i10Index).toBe(88);
     expect(out.contactEnrichment.totalCitations).toBe(9999);
     expect(out.contactEnrichment.tierResults.openalex_author.acceptPath).toBe('orcid');
+    // Research topics ride on `ce` (not the DTO) for the Enrich-recommended keywords write.
+    expect(out.contactEnrichment.openAlexResearchTopics).toEqual(['Attosecond Physics', 'Ultrafast Lasers']);
     // #2 dropped: new candidates carry no exact Scholar deep-link id.
     expect(out.contactEnrichment.googleScholarId).toBeNull();
   });
@@ -136,6 +139,7 @@ describe('enrichCandidate — OpenAlex metrics fetched even for early-email cand
 
     expect(out.contactEnrichment.hIndex == null).toBe(true);
     expect(out.contactEnrichment.scholarPersistAllowed).toBe(false);
+    expect(out.contactEnrichment.openAlexResearchTopics).toBeUndefined();
     expect(out.contactEnrichment.tierResults.openalex_author.skipped).toBe('openalex_error');
   });
 

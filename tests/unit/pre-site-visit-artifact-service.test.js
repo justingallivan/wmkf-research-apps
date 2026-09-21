@@ -1127,6 +1127,32 @@ test('composer-time referee_rating_unlabelled diagnostics survive persistence an
   ]));
 });
 
+test('composer-time referee_expertise_missing diagnostics survive persistence and surface as a named warning', async () => {
+  const harness = createHarness();
+  harness.dependencies.loadInputs.mockResolvedValueOnce(inputFixture({
+    context: {
+      ...inputFixture().context,
+      refereeSectionDiagnostics: [{ code: 'referee_expertise_missing', name: 'Applicant Pick' }],
+    },
+  }));
+
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  const core = JSON.parse(harness.row.wmkf_presiteproposalcorejson);
+  expect(core.diagnostics).toEqual(expect.arrayContaining([
+    { code: 'referee_expertise_missing', name: 'Applicant Pick' },
+  ]));
+
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(status.currentArtifact.warnings).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'referee_expertise_missing',
+      name: 'Applicant Pick',
+      message: expect.stringContaining('Applicant Pick has no recorded expertise'),
+    }),
+  ]));
+});
+
 test('a reviewer name never joins personnelNames, so it can never trigger personnel_name_not_matched (plan §4.5)', async () => {
   const harness = createHarness();
   harness.dependencies.loadInputs.mockResolvedValueOnce(inputFixture({

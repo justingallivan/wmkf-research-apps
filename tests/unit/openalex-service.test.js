@@ -37,6 +37,13 @@ describe('OpenAlexService.searchAuthors', () => {
           { display_name: 'Attosecond physics', score: 91 },
           { display_name: 'Low score', score: 12 },
         ],
+        // Current author objects also carry specific `topics` (verified live
+        // 2026-09-21); `researchTopics` sorts them by count, not API order.
+        topics: [
+          { display_name: 'Ultrafast laser physics', count: 4 },
+          { display_name: 'Attosecond and high-harmonic generation', count: 30 },
+          { display_name: '   ', count: 99 },
+        ],
         works_count: 345,
       }],
     }));
@@ -55,6 +62,7 @@ describe('OpenAlexService.searchAuthors', () => {
       i10Index: null,
       citedByCount: null,
       topics: ['Attosecond physics'],
+      researchTopics: ['Attosecond and high-harmonic generation', 'Ultrafast laser physics'],
       worksCount: 345,
     }]);
     expect(safeFetch.mock.calls[0][0]).toMatch(/api\.openalex\.org\/authors/);
