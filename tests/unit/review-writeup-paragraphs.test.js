@@ -223,11 +223,29 @@ describe('composeReviewerSentence', () => {
     expect(runs.map((r) => r.text).join('')).toBe('The reviewer was Herwig Schüler, an associate professor at Lund University.');
   });
 
-  it('shows a self-confirmed mainInstitution verbatim, never reduced', () => {
+  it('reduces a byline captured as mainInstitution (request 1002852: accept-form pre-fill) to the institution name', () => {
     const { runs } = composeReviewerSentence([
-      reviewer({ name: 'A', mainInstitution: 'Department of Chemistry, Lund University' }),
+      reviewer({
+        name: 'Herwig Schüler',
+        academicRank: 'Associate Professor',
+        mainInstitution: 'Division of Biochemistry and Structural Biology, Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic address: herwig.schuler@biochemistry.lu.se.',
+      }),
     ]);
-    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of Department of Chemistry, Lund University.');
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was Herwig Schüler, an associate professor at Lund University.');
+  });
+
+  it('renders a clean mainInstitution unchanged (no separators to reduce)', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'Stanford University' }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of Stanford University.');
+  });
+
+  it('still prefers mainInstitution over a different reviewerAffiliation (precedence unchanged)', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'Stanford University', reviewerAffiliation: 'MIT' }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of Stanford University.');
   });
 
   it('chooses "a" (not "an") for consonant-sound vowel-letter ranks (Opus follow-up)', () => {

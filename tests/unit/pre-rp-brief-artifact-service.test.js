@@ -1040,7 +1040,7 @@ describe('projectPreRpBriefArtifact', () => {
       templateVersion: PRE_RP_BRIEF_CONTRACT.templateVersion,
       renderVersion: PRE_RP_BRIEF_CONTRACT.renderVersion,
     })).digest('hex');
-    expect(PRE_RP_BRIEF_CONTRACT.renderVersion).toBe('3');
+    expect(PRE_RP_BRIEF_CONTRACT.renderVersion).toBe('4');
     expect(key).toBe(expected);
   });
 

@@ -112,7 +112,9 @@ function preSiteArtifact(lifecycleState = DRAFT) {
   };
 }
 
-function briefArtifact(lifecycleState = DRAFT, { receivedReviewCount = 1, artifactId = BRIEF_ARTIFACT_ID } = {}) {
+function briefArtifact(lifecycleState = DRAFT, {
+  receivedReviewCount = 1, artifactId = BRIEF_ARTIFACT_ID, lastModified,
+} = {}) {
   return {
     artifactId,
     operationStatus: READY,
@@ -120,6 +122,7 @@ function briefArtifact(lifecycleState = DRAFT, { receivedReviewCount = 1, artifa
     file: {
       name: '1002379 Pre-RP Brief.docx',
       webUrl: 'https://sharepoint.test/brief.docx',
+      ...(lastModified ? { lastModified } : {}),
     },
     milestone: lifecycleState === REVIEW ? {
       versionId: '3.0',
@@ -515,6 +518,28 @@ test('H3a/B10: Share is enabled once at least one review is received', async () 
   const shareButton = await screen.findByRole('button', { name: 'Share…' });
   expect(shareButton).toBeEnabled();
   expect(screen.queryByText(/Share is blocked until at least one review is received/)).not.toBeInTheDocument();
+});
+
+test('Pre-RP brief card shows "generated <date>" for a draft with a lastModified timestamp', async () => {
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(DRAFT, { lastModified: '2026-09-10T12:00:00Z' }),
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  const link = await screen.findByRole('link', {
+    name: `Word draft · generated ${new Date('2026-09-10T12:00:00Z').toLocaleDateString()}`,
+  });
+  expect(link).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
+});
+
+test('Pre-RP brief card shows plain "Word draft" when lastModified is absent', async () => {
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: briefArtifact(DRAFT),
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  const link = await screen.findByRole('link', { name: 'Word draft' });
+  expect(link).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
 });
 
 test('H3b/B12/NEW-1: Regenerate Brief is offered while the brief is shared but not yet sent, with replacement copy', async () => {

@@ -116,8 +116,14 @@ export function reviewerAffiliationOf(reviewer) {
 // untouched sends the whole byline into the Reviews paragraph. These helpers
 // reduce such text to the institution name(s) for DISPLAY only; the stored
 // value and `reviewerAffiliationOf` (which fingerprints and tab cards depend
-// on) are untouched. A self-confirmed `mainInstitution` never passes through
-// here.
+// on) are untouched. A self-confirmed `mainInstitution` also passes through
+// here (request 1002852, 2026-09-21): the accept form's required "Main
+// institution" field used to be pre-filled from that same raw byline, and a
+// reviewer who left it unchanged carried the byline into the stored,
+// confirmed value. `context-service.js` now seeds the pre-fill with the
+// reduced name instead, but the composer-side reduction still matters for
+// values stored before that fix (1002852 itself) and for any staff edit
+// (`CandidateEditModal`) that pastes a byline back in.
 
 // Segments that are sub-units of an institution, never the institution.
 // Unicode-aware (`u` flag, explicit lookaround boundaries in place of ASCII-
@@ -328,8 +334,11 @@ export function institutionNameOf(text) {
  * accept-time affiliation (`reviewerAffiliationOf`, email-suffix stripped) →
  * `affiliation` (the person projection's `primaryAffiliation`/
  * `organizationName`, already collapsed by `reviewers-service.js`) → fallback.
- * The two free-text sources are reduced to institution name(s) by
- * `institutionNameOf` (2026-09-21); `mainInstitution` is shown verbatim.
+ * All three sources are reduced to institution name(s) by `institutionNameOf`
+ * (2026-09-21 for the free-text sources; 2026-09-21/request-1002852 for
+ * `mainInstitution` too, since a stored value may still be a raw PubMed
+ * byline — from before the accept-form pre-fill seed was fixed, or from a
+ * staff edit). A clean value with no separators passes through unchanged.
  *
  * Opus Slice 1 follow-up: `reviewerAffiliationOf` can strip the accept-time
  * value down to an empty string (e.g. `reviewerAffiliation` IS the reviewer's
@@ -341,11 +350,17 @@ export function institutionNameOf(text) {
  */
 function institutionOf(reviewer) {
   const main = typeof reviewer?.mainInstitution === 'string' ? reviewer.mainInstitution.trim() : '';
-  if (main) return main;
+  if (main) return institutionNameOf(main) || main;
   // Free-text sources (accept-time field, person affiliation) may be a whole
   // PubMed byline (observed on request 1002852, 2026-09-21): reduce them to
   // the institution name(s) for display. `mainInstitution` above is
-  // reviewer/staff-confirmed and is shown verbatim.
+  // reviewer/staff-confirmed but is reduced the same way (request 1002852,
+  // 2026-09-21): the accept form's required field used to be pre-filled from
+  // a raw PubMed byline and a reviewer could submit it unchanged, so a
+  // stored value may still be the whole byline (and staff can paste one back
+  // in via `CandidateEditModal`) — it is no longer shown verbatim. A clean
+  // value with no separators ("Stanford University", "MIT") has nothing to
+  // reduce and passes through `institutionNameOf` unchanged.
   const accepted = reviewerAffiliationOf(reviewer);
   if (accepted) return institutionNameOf(accepted) || accepted;
   const personAffiliation = typeof reviewer?.affiliation === 'string' ? reviewer.affiliation.trim() : '';

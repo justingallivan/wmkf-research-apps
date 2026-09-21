@@ -149,7 +149,8 @@ export const PRE_RP_BRIEF_CONTRACT = Object.freeze({
   // produce different bytes under an identical generation identity.
   // '2' (2026-09-16): PI/PD role prefixes on the two people tokens.
   // '3' (2026-09-21): reviewer-sentence institution reduced from a byline by institutionNameOf.
-  renderVersion: '3',
+  // '4' (2026-09-21): self-confirmed main institution also reduced from a byline.
+  renderVersion: '4',
   snapshotArtifactType: 'pre-rp-brief',
   snapshotSchemaVersion: 1,
   relativeFolder: 'Artifacts/Pre-Research Presentation Brief',

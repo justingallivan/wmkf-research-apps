@@ -1143,7 +1143,11 @@ export default function StaffDeliberationsTab({
                       title={briefReadyFile.name || undefined}
                       className="font-medium text-green-800 underline"
                     >
-                      {briefShared ? 'Word document' : 'Word draft'}
+                      {briefShared
+                        ? 'Word document'
+                        : briefReadyFile.lastModified
+                          ? `Word draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
+                          : 'Word draft'}
                     </a>
                   </p>
                   <FileDetails file={briefReadyFile} />

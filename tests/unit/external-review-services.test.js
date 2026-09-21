@@ -277,6 +277,33 @@ describe('buildReviewContext', () => {
 
     expect(getSystemUserByIdWithSelect).not.toHaveBeenCalled();
   });
+
+  it('seeds the Main institution prefill with a byline reduced to the institution name (request 1002852)', async () => {
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion(),
+      request,
+      reviewer: {
+        ...reviewer,
+        wmkf_primaryaffiliation: 'Division of Biochemistry and Structural Biology, Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic address: herwig.schuler@biochemistry.lu.se.',
+      },
+    });
+
+    expect(payload.prefill.mainInstitution).toBe('Lund University');
+  });
+
+  it('does not re-reduce a reviewer prior confirmed mainInstitution at prefill', async () => {
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion(),
+      request,
+      reviewer: {
+        ...reviewer,
+        wmkf_maininstitution: 'Prior Confirmed U',
+        wmkf_primaryaffiliation: 'Division of Biochemistry, Lund University',
+      },
+    });
+
+    expect(payload.prefill.mainInstitution).toBe('Prior Confirmed U');
+  });
 });
 
 describe('applyReviewerResponse', () => {

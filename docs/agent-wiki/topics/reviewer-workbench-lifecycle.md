@@ -961,11 +961,21 @@ de, département de, laboratoire de, institut de/für, instituto de, abteilung).
 without campus re-attachment. Owner decisions: every distinct institution in a
 byline is shown, joined with "and"/Oxford commas; with no institution-shaped
 part the first non-geographic part is shown. A self-confirmed `mainInstitution`
-is shown verbatim. `reviewerAffiliationOf` itself is untouched (tab cards and
-the review-bundle fingerprint depend on it). Reaches the Reviews tab, the
-Pre-Site Reviews paragraph, and the Pre-RP brief (all use
-`composeReviewerSentence`). `PRE_RP_BRIEF_CONTRACT.renderVersion` moved `'2'`
-→ `'3'` for this change: the Pre-RP generation key binds `renderVersion`
+is now reduced through `institutionNameOf` as well, because the accept form's
+required "Main institution" field was pre-filled from `wmkf_primaryaffiliation`
+(a PubMed byline for enriched reviewers) and reviewers submit it unchanged
+(request 1002852, Herwig Schüler): the pre-fill in
+`lib/services/external-review/context-service.js` now seeds the reduced name
+instead of the raw byline (a prior confirmed `wmkf_maininstitution` is not
+re-reduced at pre-fill — it is used as-is, since it is the reviewer's own
+prior value; the composer reduces it for display). `reviewerAffiliationOf`
+itself is untouched (tab cards and the review-bundle fingerprint depend on
+it). Reaches the Reviews tab, the Pre-Site Reviews paragraph, and the Pre-RP
+brief (all use `composeReviewerSentence`); the Pre-Research Presentation Brief
+card also now shows `generated <date>` next to the draft link, matching
+the Pre-Site card. `PRE_RP_BRIEF_CONTRACT.renderVersion` moved `'2'` → `'3'`
+for the free-text-source change, then `'3'` → `'4'` for the mainInstitution
+reduction above: the Pre-RP generation key binds `renderVersion`
 (`lib/services/pre-rp-brief/artifact-service.js:746`), and since the
 composer's output changed, identical inputs would otherwise produce different
 bytes under the same version, which the contract forbids. Concretely: the
