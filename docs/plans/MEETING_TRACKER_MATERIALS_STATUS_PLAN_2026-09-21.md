@@ -3,7 +3,7 @@ title: Meeting Tracker materials status and filters
 domain: workbench
 kind: plan
 status: active
-summary: Planned materials status pills and scoped count filters for program coordinators, with bounded Luna/Sol implementation review and a final Claude Opus adversarial review.
+summary: Built feature-branch materials status pills and scoped filters; Opus adversarial review passed, root hardening verified, production promotion remains separate.
 owner: product-engineering
 related:
   - docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md
@@ -92,4 +92,23 @@ Verification: 100 focused tests; full local CI test command passed 1,053 suites 
 
 Reproduce the synthetic no-send browser preview with `node scripts/rehearse-meeting-materials-status.js` (default local port 3131). It bundles the actual tracker UI with synthetic networking and navigation, excluding the authenticated shell; it does not prove live authentication or external-service availability.
 
-Claude Opus final adversarial review is pending. The attempted host-executed subscription/OAuth CLI review was blocked by automatic approval review because potential usage/credit consumption had not been explicitly disclosed and approved. Root asked the owner for that specific authorization. The command did not run; no substitute reviewer or metered product was used. Final adjudication and release remain pending this required review. No claim of completed adversarial review or production readiness is made.
+## Opus review and root adjudication — 2026-09-21
+
+[VERIFIED via Claude CLI review result] The owner explicitly approved potential subscription usage/credits after the initial automatic approval rejection. The requested host-executed OAuth/subscription Claude Opus review then ran successfully. Review session `dbd378dc-551b-4bd4-9af4-d99ec8c1ca95` examined candidate `dd4c4d438` against `41f44da41` and returned **PASS**, with no blocking findings. It independently reran 71 focused tests; it did not rerun the earlier full suite. No API key or substitute metered review product was used.
+
+Root accepted five low-severity suggestions and one informational navigation edge case in a single bounded correction batch:
+
+| Finding | Adjudication and evidence |
+|---|---|
+| Missing availability defaulted to available | Accepted: classifier now defaults unavailable; row fixtures explicitly carry available. New classifier and rendered-list tests verify omitted availability cannot mean Not requested or Waiting. |
+| Recovery copy suggested an absent retry control | Accepted: copy now says “Reload this page to refresh materials.” |
+| No-collection-with-visit lacked next-step detail | Accepted: Not requested now has “Request materials.” supporting text. |
+| Cycle discovery briefly rendered a false empty state | Accepted: keep loading while awaiting default-cycle navigation, and let the next scoped load settle it. A deferred-navigation test proves no false empty state and cancellation recovery. |
+| Date assertion depended on machine timezone | Accepted: test derives its expected local date using the same locale/date contract. |
+| One malformed row degrades the whole batch | No change: conservative complete-batch availability preserves the legacy reader contract. The partial-row failure integration test verifies it. |
+| Scope navigation rejection could leave loading stuck | Accepted: catch rejection/cancellation, show recoverable error, and guard state changes by the current request generation. Tests cover both false-return and rejection cases. |
+| Empty optional filter may disappear while selected | No change: preserve the explicitly selected filter and show a truthful empty result with Show all requests. Do not silently switch filters or misrepresent counts. |
+
+After the hardening batch, 106 focused tests across eight suites passed, including the actual reader→dashboard→classifier contract and rendered filter behavior. Scoped ESLint/types and diff checks passed. These results supplement, rather than replace, the earlier full-suite/build evidence above. The local no-send rehearsal remains the owner review surface; authentication and live external services were not exercised by that synthetic harness. Production promotion remains a separate owner decision.
+
+Sol independently re-reviewed the post-Opus hardening and returned READY. Root accepted that verdict. One nonblocking residual is retained deliberately: after a failed scope navigation, the controls retain the attempted scope while the URL retains the old scope; Try again loads the attempted scope directly. The page shows a recovery error, no previous-scope requests or false counts, and late navigation failures cannot overwrite a newer load. Further navigation/history refinement is outside this bounded change.

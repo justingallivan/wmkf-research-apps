@@ -16,9 +16,9 @@ export default function MaterialsStatusPill({ summary, availability, hasSiteVisi
   const dueText = due && Number.isFinite(due.getTime()) ? ` · due ${due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '';
   const countText = count && summary?.requiredCount === 0 ? 'No required items' : count ? `${count} received` : null;
   const detail = status.key === 'unavailable'
-    ? 'Retry the schedule to refresh materials.'
+    ? 'Reload this page to refresh materials.'
     : status.key === 'no_visit' ? 'Schedule a visit first.'
-      : status.key === 'not_requested' && summary?.invited === false ? 'Invitation not sent.'
+      : status.key === 'not_requested' ? (summary ? 'Invitation not sent.' : 'Request materials.')
         : countText ? `${countText}${summary?.state === 'received' ? '; awaiting confirmation' : ''}${status.key === 'waiting' || status.key === 'late' ? dueText : ''}.` : '';
   const Icon = ICONS[status.key] || CircleHelp;
   return (

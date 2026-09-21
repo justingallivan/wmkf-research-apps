@@ -18,10 +18,14 @@ describe('classifySiteVisitMaterialsStatus', () => {
     [summary(), { availability: 'unavailable' }, MATERIALS_STATUS.UNAVAILABLE],
     [{ state: 'wat', invited: true, overdue: false, receivedCount: 0, requiredCount: 0 }, {}, MATERIALS_STATUS.UNAVAILABLE],
   ])('classifies the complete row state', (value, options, expected) => {
-    expect(classifySiteVisitMaterialsStatus(value, options).key).toBe(expected);
+    expect(classifySiteVisitMaterialsStatus(value, { availability: 'available', ...options }).key).toBe(expected);
   });
 
   test('does not treat a collection as no visit', () => {
-    expect(classifySiteVisitMaterialsStatus(summary({ state: 'ready' }), { hasSiteVisit: false }).key).toBe(MATERIALS_STATUS.READY);
+    expect(classifySiteVisitMaterialsStatus(summary({ state: 'ready' }), { availability: 'available', hasSiteVisit: false }).key).toBe(MATERIALS_STATUS.READY);
   });
+});
+
+test.each([null, summary()])('missing availability is unknown rather than known absence: %p', (value) => {
+  expect(classifySiteVisitMaterialsStatus(value).key).toBe(MATERIALS_STATUS.UNAVAILABLE);
 });

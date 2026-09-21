@@ -17,7 +17,7 @@ function validSummary(summary) {
     && summary.receivedCount <= summary.requiredCount;
 }
 
-export function classifySiteVisitMaterialsStatus(summary, { availability = 'available', hasSiteVisit = false } = {}) {
+export function classifySiteVisitMaterialsStatus(summary, { availability = 'unavailable', hasSiteVisit = false } = {}) {
   if (availability !== 'available' || (summary !== null && !validSummary(summary))) {
     return { key: MATERIALS_STATUS.UNAVAILABLE, label: 'Status unavailable', tone: 'neutral' };
   }

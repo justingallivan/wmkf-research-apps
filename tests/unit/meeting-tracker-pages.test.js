@@ -29,6 +29,7 @@ function proposal(overrides = {}) {
     requestId: '44444444-4444-4444-8444-444444444444',
     requestNumber: '1002003',
     title: 'Programmable tissue repair',
+    materialsAvailability: 'available',
     programDirector: 'Alex Staff',
     projectLeader: 'Jordan Investigator',
     shareState: { lifecycleLabel: 'Ready for review' },
@@ -564,7 +565,8 @@ test('the materials section carries the applicant-materials status and count', (
   rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: { state: 'missing', receivedCount: 2, requiredCount: 3, otherCount: 0, dueAt: '2026-09-18T19:00:00Z', closesAt: '2026-09-27T17:00:00Z', overdue: true, invited: true } })} cycleCode="D26" programId="p1" />);
   expect(screen.getByTestId('materials-status')).toHaveTextContent('Late');
   expect(screen.getByText(/2\/3 received/)).toBeInTheDocument();
-  expect(screen.getByText(/due Sep 18/)).toBeInTheDocument();
+  const expectedDue = new Date('2026-09-18T19:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  expect(screen.getByTestId('materials-status')).toHaveTextContent(`due ${expectedDue}`);
   rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null, materials: null })} cycleCode="D26" programId="p1" />);
   expect(screen.getByTestId('materials-status')).toHaveTextContent('No visit');
 });

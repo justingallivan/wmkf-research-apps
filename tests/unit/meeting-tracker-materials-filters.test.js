@@ -71,3 +71,34 @@ test('a late response from the old scope cannot overwrite the new scope',async()
  await act(async()=>{resolveOld(response(fixtures()));});
  expect(titles()).toEqual(['#900']);expect(filter('All (1)')).toBeInTheDocument();
 });
+
+test('missing availability renders unknown even with a valid summary or known-looking null', async()=>{
+ rows=[{...fixtures()[0],materialsAvailability:undefined},{...fixtures()[1],materialsAvailability:undefined}];
+ render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (2)'});
+ expect(filter('Status unavailable (2)')).toBeInTheDocument();
+ expect(filter('Not requested (0)')).toBeInTheDocument();
+ expect(screen.getAllByText('Reload this page to refresh materials.')).toHaveLength(2);
+});
+
+test('cycle discovery keeps loading until navigation completes, without a false empty state',async()=>{
+ mockRouter.query={programId:'p2'};
+ let finishNavigation;mockRouter.replace.mockImplementationOnce(()=>new Promise(resolve=>{finishNavigation=resolve}));
+ global.fetch=jest.fn(async()=>({ok:true,status:200,json:async()=>({programId:'p2',cycles:[{code:'D26'}],proposals:[],sessions:[]})}));
+ render(<MeetingTrackerList/>);
+ await waitFor(()=>expect(mockRouter.replace).toHaveBeenCalled());
+ expect(screen.getByText('Loading the cycle schedule…')).toBeInTheDocument();
+ expect(screen.queryByText('No advancing requests are in this view')).not.toBeInTheDocument();
+ await act(async()=>{finishNavigation(false)});
+ expect(await screen.findByRole('alert')).toHaveTextContent('The cycle view could not be opened');
+ expect(screen.queryByText('Loading the cycle schedule…')).not.toBeInTheDocument();
+});
+
+test.each(['reject','cancel'])('scope navigation %s offers recovery instead of remaining stuck loading',async(kind)=>{
+ render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (25)'});
+ if(kind==='reject')mockRouter.replace.mockRejectedValueOnce(new Error('navigation failed'));
+ else mockRouter.replace.mockResolvedValueOnce(false);
+ fireEvent.click(screen.getByRole('button',{name:'All program directors'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('The view could not be changed');
+ expect(screen.queryByText('Loading the cycle schedule…')).not.toBeInTheDocument();
+ expect(screen.queryByRole('heading',{name:'#1',exact:true})).not.toBeInTheDocument();
+});

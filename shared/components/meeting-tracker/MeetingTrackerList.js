@@ -123,6 +123,7 @@ export default function MeetingTrackerList() {
 
   const load = useCallback(async (selectedProgramId, selectedCycleCode, selectedScope) => {
     const token = ++loadToken.current;
+    let navigatingToCycle = false;
     setLoading(true);
     setError(null);
     setProposals([]);
@@ -156,7 +157,8 @@ export default function MeetingTrackerList() {
         const nextCycle = dashboard.defaultCycleCode || dashboard.cycles?.[0]?.code || '';
         setCycleCode(nextCycle);
         if (nextCycle) {
-          void router.replace({
+          navigatingToCycle = true;
+          const navigated = await router.replace({
             pathname: '/meeting-tracker',
             query: {
               programId: selectedProgramId || dashboard.programId || '',
@@ -164,15 +166,17 @@ export default function MeetingTrackerList() {
               ...(selectedScope === 'all' ? { scope: 'all' } : {}),
             },
           }, undefined, { shallow: true });
+          if (navigated === false) throw new Error('The cycle view could not be opened. Please try again.');
         }
       } else {
         setProposals(dashboard.proposals || []);
         setNotices(dashboard.notices || []);
       }
     } catch (loadError) {
+      navigatingToCycle = false;
       if (token === loadToken.current) setError(loadError.message);
     } finally {
-      if (token === loadToken.current) setLoading(false);
+      if (token === loadToken.current && !navigatingToCycle) setLoading(false);
     }
   }, [router]);
 
@@ -194,12 +198,12 @@ export default function MeetingTrackerList() {
     };
   }, [load, router.isReady, router.query.cycleCode, router.query.programId, router.query.scope]);
 
-  const changeFilters = (next) => {
+  const changeFilters = async (next) => {
     const nextProgram = next.programId ?? programId;
     const nextCycle = next.cycleCode ?? cycleCode;
     const nextScope = next.scope ?? scope;
     if (nextProgram === programId && nextCycle === cycleCode && nextScope === scope) return;
-    loadToken.current += 1;
+    const token = ++loadToken.current;
     setLoading(true);
     setProposals([]);
     setNotices([]);
@@ -208,7 +212,14 @@ export default function MeetingTrackerList() {
     setCycleCode(nextCycle);
     setScope(nextScope);
     setMaterialsFilter('all');
-    void router.replace({ pathname: '/meeting-tracker', query: { programId: nextProgram, cycleCode: nextCycle, ...(nextScope === 'all' ? { scope: 'all' } : {}) } }, undefined, { shallow: true });
+    try {
+      const navigated = await router.replace({ pathname: '/meeting-tracker', query: { programId: nextProgram, cycleCode: nextCycle, ...(nextScope === 'all' ? { scope: 'all' } : {}) } }, undefined, { shallow: true });
+      if (navigated === false) throw new Error('The view could not be changed. Please try again.');
+    } catch {
+      if (token !== loadToken.current) return;
+      setError('The view could not be changed. Please try again.');
+      setLoading(false);
+    }
   };
 
   const classified = proposals.map((proposal) => ({
