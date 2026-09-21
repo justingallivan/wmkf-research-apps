@@ -672,3 +672,25 @@ before claiming the collection row. The default body still uses the fixed server
 button and fallback link; an edited template may also place the server-minted URL with
 `{{uploadLink}}` and the sending PC’s signature with `{{signature}}`. This branch is not a
 production-live claim.
+
+### 16.9 2026-09-20: personal manual-send defaults and editable preview [ACCEPTED FEATURE-BRANCH SOURCE; NOT RELEASED]
+
+The Meeting Tracker feature branch adds personal invitation and reminder subject/body
+templates for every user with the Meeting Tracker app grant. The shared Admin defaults remain
+the fallback; the two own-profile overrides live in Dataverse `wmkf_appuserpreferences` and are
+saved only by **Save as my default**. Editing one preview or sending it does not change a saved
+default. **Use shared default** clears that kind's override. The unscheduled automatic reminder
+continues to read the shared Admin template and does not use the creator's personal override.
+
+Manual first invitation, later invitation, and reminder open an editable, read-only preview
+before an explicit Send. The first preview shows a conspicuous secure-link placeholder and
+does not create a collection, upload token, email activity, or reminder claim. Send requires a
+short-lived signed proof of the reviewed raw template and server-resolved request, visit,
+recipient, sender, checklist/missing-item, signature, and rendered-content context. The server
+rechecks those inputs and retains control of the real contributor URL and its email button and
+fallback link. Required `{{checklist}}` or `{{missingItems}}` tokens keep the requested items in
+the final text. On the first Send, the collection and sealed link are persisted before Dynamics
+transport, so a transport failure may leave a collection with no confirmed invitation; the
+card must report that partial result and allow a deliberate follow-up after checking email
+history. This source-built work passed cross-layer review and the combined 115-test
+run on 2026-09-20; it has not been released to production.

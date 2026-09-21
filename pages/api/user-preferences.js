@@ -24,6 +24,8 @@ import { validateInvitationTemplateForSave } from '../../lib/utils/invitation-li
 const RESERVED_WRITE_KEYS = new Set([
   PREFERENCE_KEYS.PROMPT_OVERRIDES,
   PREFERENCE_KEYS.EMAIL_AUTOMATION,
+  PREFERENCE_KEYS.SITE_VISIT_MATERIALS_INVITATION_TEMPLATE,
+  PREFERENCE_KEYS.SITE_VISIT_MATERIALS_REMINDER_TEMPLATE,
 ]);
 
 const INVITATION_TEMPLATE_SAVE_ERROR = 'Invitation templates must include {{externalLink}} in the subject or body.';

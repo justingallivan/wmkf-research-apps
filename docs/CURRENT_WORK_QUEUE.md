@@ -51,14 +51,15 @@ sequence.
 ## Owner-requested product follow-ups
 
 - **Personal email defaults and editable send previews (2026-09-20).**
-  [PLANNED; owner-requested] Every user authorized to use an app should be able
-  to save their own email modifications. Meeting Tracker's applicant-materials
-  invitation and reminder are the immediate use case: load personal defaults,
-  then allow recipient-specific tone and wording edits in the preview before
-  sending. Record the same capability across the app suite as a to-do; inventory
-  and reuse existing mechanisms before expanding implementation. Requirements:
-  `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`. This records product
-  intent, not implementation or a reprioritization of unrelated commitments.
+  [ACCEPTED FEATURE-BRANCH IMPLEMENTATION; NOT RELEASED] Meeting Tracker's first and later
+  materials invitations and manual reminders now have personal defaults and
+  editable previews in the candidate source. Luna built, Sol reviewed and root
+  accepted; implementation and evidence are recorded in
+  `docs/plans/MATERIALS_EMAIL_PERSONALIZATION_PLAN_2026-09-20.md`. No main merge or
+  production release is included. Suite-wide adoption remains a separate to-do:
+  inventory support and gaps for every app-authorized user, then extend existing
+  mechanisms in bounded changes. Requirements and remaining follow-ups:
+  `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration

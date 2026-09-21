@@ -29,7 +29,7 @@ related:
 
 ## Proposed interaction contract
 
-[PLANNED; implementation design still required]
+[Owner contract; Meeting Tracker feature-branch implementation accepted, not released]
 
 Shared default → sender's saved default → edits for this particular send → send.
 Invitation and reminder defaults are separate. Saving personal defaults is an
@@ -40,22 +40,33 @@ templates remain the starting point when no personal default is saved.
 Preserve server-controlled recipients, upload links, current required/missing
 items, authorization and truthful send outcomes. Required content must remain
 correct when the surrounding wording is personalized. Reuse the suite's existing
-preference and preview mechanisms after tracing their contracts; no new schema,
-API, persistence strategy or generalized editor has been selected by this note.
+preference and preview mechanisms after tracing their contracts. The Meeting
+Tracker branch selects its own route and existing preference store; this note
+does not select an API or generalized editor for suite-wide use.
 
 ## Current evidence and next work
 
-[VERIFIED via source read 2026-09-20] `shared/config/editableTextDefaults.js`
-registers shared subject/body defaults for `email.site_visit_materials_invite`
-and `email.site_visit_materials_reminder`. `SiteVisitMaterialsCard.js` currently
-invokes create/invite/remind directly, and its API accepts actions plus waiver
-fields, not custom email content. `InviteEmailModal.js` documents an existing
-editable-preview workflow and per-user settings precedent. These are reuse
-candidates, not proof of an interchangeable shared implementation.
+[VERIFIED via feature-branch source and 115 passing tests 2026-09-20; implementation accepted, not released]
+`shared/config/editableTextDefaults.js` registers shared subject/body defaults
+for `email.site_visit_materials_invite` and `email.site_visit_materials_reminder`.
+The Meeting Tracker branch introduces a personal-template preference route,
+separate invitation/reminder own-profile override keys, and an editable preview
+for the first invitation, later invitation, and manual reminder. Preview does
+not create the collection or send; explicit Send is bound to a short-lived
+server-signed proof and renders the contributor URL server-side. The automatic
+reminder's template remains the shared Admin default. The branch has not been
+promoted to production. Cross-layer source review and the 115-test combined run
+have passed; release remains a separate step.
 
-- [ ] Trace the existing personal-template persistence and preview/send contracts.
-- [ ] Design and implement personal defaults plus editable previews for Meeting
-  Tracker invitations and reminders, with cross-user isolation and draft tests.
+- [x] Trace the existing personal-template persistence and preview/send contracts.
+- [x] Finish review, tests, and acceptance of the Meeting Tracker feature-branch
+  personal defaults and editable previews, including cross-user isolation and
+  partial/uncertain send outcomes.
+- [ ] Track the inherited personal-preference read limitation: the shared
+  Dataverse preference reader maps read errors to an empty result, so a transient
+  failure can make an existing personal override appear absent. The explicit
+  Save action is still required to change that override; see the feature
+  execution plan's residuals.
 - [ ] Inventory suite-wide email flows and record each gap against this requirement.
 - [ ] Extend the capability consistently in bounded, reviewed follow-ups.
 

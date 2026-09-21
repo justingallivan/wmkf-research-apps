@@ -50,6 +50,8 @@ export const PREFERENCE_KEYS = {
   // the generic /api/user-preferences endpoint (not reserved); "Reset to default"
   // DELETEs the key.
   GRANTEE_INVITE_BODY: 'grantee_invite_body',
+  SITE_VISIT_MATERIALS_INVITATION_TEMPLATE: 'site_visit_materials_invitation_template',
+  SITE_VISIT_MATERIALS_REMINDER_TEMPLATE: 'site_visit_materials_reminder_template',
   // Explicit per-PD choice for automatic outbound email handling:
   //   { mode: 'automatic' }
   //   { mode: 'review', leadDays: 1..14 }

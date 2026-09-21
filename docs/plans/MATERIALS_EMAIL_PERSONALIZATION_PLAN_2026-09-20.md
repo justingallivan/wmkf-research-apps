@@ -3,7 +3,7 @@ title: Meeting Tracker materials email personalization
 domain: workbench
 kind: plan
 status: active
-summary: Build per-user invitation and reminder defaults with editable, read-only previews before explicit sending.
+summary: Accepted feature-branch implementation of personal invitation/reminder defaults and editable previews; release remains separate.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -23,8 +23,9 @@ reminder in Meeting Tracker. Suite-wide adoption remains the separate recorded
 to-do; do not migrate other email flows in this change. No production writes,
 real sends, migration, main merge or deployment during implementation.
 
-Luna owns runtime and tests. Root owns docs/status, gates coordination and final
-adjudication. Sol reviews read-only, sends concrete findings to Luna and root;
+Luna owns runtime and tests. Root owns status, gates coordination and final
+adjudication. Sol owns scoped matrix/catalog/Atlas/workflow documentation and
+reviews runtime read-only, sending concrete findings to Luna and root;
 Luna fixes and resubmits until no blocking findings remain. Agents report blockers
 promptly; root resolves scope/contract questions rather than letting retries loop.
 
@@ -133,3 +134,59 @@ canonical digest subject. Normalize recipient order and bind raw template bytes,
 session actor/profile, request and rendered signature. For `{{uploadLink}}`, bind
 the server-generated placeholder render and substitute only that sentinel with
 the authoritative URL after mint; test both body URL and fixed CTA/fallback.
+
+Implementation review clarification: the existing token verifier returns the
+normalized subject as `payload.subject`, but retains the audience field name
+`payload.aud`. A real signed positive round trip must establish compatibility;
+mocked claim objects alone do not verify that contract.
+
+## Named residuals accepted during review
+
+The existing Dataverse preference reader catches backend read failures and
+returns an empty preference map (`dataverse-prefs-service.js`). A transient
+personal-preference read failure can therefore display shared copy without a
+warning. Opening or sending never saves that fallback, but an explicit Save
+could replace the personal override. Shared-default read failures and preference
+write failures remain explicit failures. Strict personal-preference reads are a
+bounded follow-up for the suite-wide defaults work, not a change to the shared
+reader's historical contract in this feature.
+
+The preview proof does not add exactly-once invitation delivery. Existing
+invitation resends can still be duplicated across independent tabs. A registry
+upload can arrive after the final missing-item check because the registry and
+reminder claim use different stores. These limits are distinct from the
+reproduced intra-request races, which are rejected before creation or claim.
+
+## Execution and adjudication — 2026-09-20
+
+[VERIFIED via source, tests and Sol review] Implementation accepted on
+`codex/materials-email-personalization`; not merged or deployed to production.
+Luna built the preference/proof layer and the preview/send/UI layer. Sol reviewed
+the plan and successive diffs. Root reproduced findings with independent tests,
+required fixes, and accepted the final source after Sol's READY verdict.
+
+The final focused run passed **13 suites / 115 tests**: collection, contributor,
+reminder sweep, email rendering, materials route, preference route, personal
+templates/real signed tokens, reserved generic keys, modal/card regression suites,
+and root's independent modal and route→service→proof contract suites. Fixtures
+replace storage and transport; no live email or database mutation was performed.
+The integrated tests exercise successful read-only preview, stale identity,
+recipients, signature, template, visit, collection and missing-item state; proof
+verification occurs against real signed tokens. UI tests cover edits during
+preview, context changes, double-click protection, partial/uncertain outcomes,
+reset failures and request navigation.
+
+Validation: scoped ESLint has zero errors, with React set-state-in-effect
+warnings for intentional context resets/loading; types and diff checks pass.
+API matrix, route/service, DAL, Dynamics context, route lifecycle, GUID boundary,
+Atlas, fact-consistency and doc-currency gates and their sequential self-tests
+pass; docs catalog passes. Existing external-materials guard-recognition warnings
+remain unchanged. The default Turbopack build cannot traverse this worktree's
+linked `node_modules` outside its filesystem root. The supported webpack
+production build passes, with dependency-expression warnings in unchanged shared
+services. No migration or environment change is needed.
+
+Scoped changed-fact reconciliation covered the security matrix, service catalog,
+Atlas collection entry, materials workflow plan, personal-defaults to-do, current
+queue and generated canonical route counts. These describe accepted branch source,
+not production state. Suite-wide rollout and deliberate release remain follow-ups.

@@ -7,8 +7,9 @@ jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((_label, fn) => fn()) }));
 jest.mock('../../lib/services/site-visit-materials/collection-service', () => ({
   confirmMaterialsReady: jest.fn(), createMaterialsCollection: jest.fn(), getMaterialsCollection: jest.fn(),
-  inviteMaterialsContributors: jest.fn(), remindMaterialsContributors: jest.fn(), waiveMaterialsItem: jest.fn(),
+  inviteMaterialsContributors: jest.fn(), remindMaterialsContributors: jest.fn(), waiveMaterialsItem: jest.fn(), previewMaterialsEmail: jest.fn(),
 }));
+jest.mock('../../lib/services/site-visit-materials/email-personalization', () => ({ verifyMaterialsPreviewProof: jest.fn(async () => ({ valid: true })) }));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import * as service from '../../lib/services/site-visit-materials/collection-service';
@@ -25,6 +26,7 @@ beforeEach(() => {
   requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: { dynamicsSystemuserId: ACTOR, azureEmail: 'PC@wmkeck.org' } } });
   service.getMaterialsCollection.mockResolvedValue({ collection: null });
   service.createMaterialsCollection.mockResolvedValue({ collection: { id: 'c' }, invitationSent: true });
+  service.previewMaterialsEmail.mockResolvedValue({ subject: 'Reviewed subject', bodyText: 'Reviewed body', digest: 'd', proof: 'proof', recipients: [{ email: 'pc@wmkeck.org' }] });
 });
 
 test('id validated before auth; both readiness flags checked after auth; GET returns the collection', async () => {
@@ -40,8 +42,8 @@ test('id validated before auth; both readiness flags checked after auth; GET ret
 });
 
 test('POST dispatches by action with the session actor and lowercased sender; unknown actions and extra keys are 400', async () => {
-  const create = mockRes(); await handler(req('POST', { action: 'create' }), create);
-  expect(service.createMaterialsCollection).toHaveBeenCalledWith({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' });
+  const create = mockRes(); await handler(req('POST', { action: 'create', emailTemplate: { subject: 'x', body: '{{checklist}}' }, proof: 'proof' }), create);
+  expect(service.createMaterialsCollection).toHaveBeenCalledWith(expect.objectContaining({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate: { subject: 'x', body: '{{checklist}}' }, preparedEmail: { subject: 'Reviewed subject', bodyText: 'Reviewed body', recipients: ['pc@wmkeck.org'] } }));
   expect(create.body).toEqual({ success: true, collection: { id: 'c' }, invitationSent: true });
   service.waiveMaterialsItem.mockResolvedValueOnce({ collection: { id: 'c' } });
   await handler(req('POST', { action: 'waive', key: 'participant_bios', waived: true }), mockRes());

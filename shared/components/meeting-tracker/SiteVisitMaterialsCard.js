@@ -6,10 +6,11 @@
  * and confirms the files open. Files themselves arrive through the
  * applicant's contributor link (PR 2) and show on the briefing page.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Button } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
+import MaterialsEmailModal from './MaterialsEmailModal';
 
 function formatDate(iso) {
   const date = new Date(iso || '');
@@ -37,26 +38,54 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
   const [emailFeedback, setEmailFeedback] = useState(null);
   const [unavailable, setUnavailable] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [composerAction, setComposerAction] = useState(null);
+  const generationRef = useRef(0);
+  const loadGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     if (!requestId) return;
+    const generation = generationRef.current;
+    const loadGeneration = ++loadGenerationRef.current;
     setLoading(true);
     try {
       const { ok: resOk, status: resStatus, data: body } = await requestEnvelope(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/materials`, { tolerantBody: true });
+      if (!mountedRef.current || generation !== generationRef.current || loadGeneration !== loadGenerationRef.current) return;
       if (resStatus === 503) { setUnavailable(true); return; }
       if (!resOk) throw new Error(body.error || 'The materials collection could not be loaded.');
       setCollection(body.collection || null);
       setError(null);
     } catch (loadError) {
-      setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
+      if (mountedRef.current && generation === generationRef.current && loadGeneration === loadGenerationRef.current) setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
-      setLoading(false);
+      if (mountedRef.current && generation === generationRef.current && loadGeneration === loadGenerationRef.current) setLoading(false);
     }
+  }, [requestId]);
+
+  useEffect(() => {
+    generationRef.current += 1;
+    setCollection(null);
+    setUnavailable(false);
+    setError(null);
+    setEmailFeedback(null);
+    setBusy(false);
+    setNotice(null);
+    setCopied(false);
+    setComposerAction(null);
   }, [requestId]);
 
   useEffect(() => { void load(); }, [load]);
 
   const act = async (action, extra = {}, successNotice = null) => {
+    const generation = generationRef.current;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -73,6 +102,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
         actionError.outcome = body.outcome || 'failed';
         throw actionError;
       }
+      if (!mountedRef.current || generation !== generationRef.current) return;
       if (body.outcome === 'uncertain') {
         setEmailFeedback({ outcome: 'uncertain', detail: body.error });
         await load();
@@ -89,6 +119,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
         setNotice(successNotice);
       }
     } catch (actionError) {
+      if (!mountedRef.current || generation !== generationRef.current) return;
       if (['create', 'invite', 'remind'].includes(action)) {
         const outcome = actionError.outcome === 'failed' ? 'failed' : 'uncertain';
         setEmailFeedback({
@@ -101,7 +132,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
         setError(`${actionError.message} Please try again. If the problem continues, contact an administrator.`);
       }
     } finally {
-      setBusy(false);
+      if (mountedRef.current && generation === generationRef.current) setBusy(false);
     }
   };
 
@@ -131,7 +162,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
           </p>
         </div>
         {!loading && !collection && (
-          <Button type="button" loading={busy} onClick={() => act('create')}>Request materials</Button>
+          <Button type="button" loading={busy} onClick={() => setComposerAction('create')}>Request materials</Button>
         )}
       </div>
 
@@ -181,11 +212,11 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               {collection.contributorUrl && (
                 <button type="button" onClick={copyLink} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">{copied ? 'Copied' : 'Copy contributor link'}</button>
               )}
-              <button type="button" disabled={busy} onClick={() => act('invite')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">
+              <button type="button" disabled={busy} onClick={() => setComposerAction('invite')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">
                 {collection.invitedAt ? 'Send invitation again' : 'Send invitation'}
               </button>
               {collection.state === 'missing' && (
-                <button type="button" disabled={busy} onClick={() => act('remind')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">Send reminder</button>
+                <button type="button" disabled={busy} onClick={() => setComposerAction('remind')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">Send reminder</button>
               )}
               {collection.state === 'received' && (
                 <Button type="button" loading={busy} onClick={() => act('ready', {}, 'Marked ready.')}>Confirm the files open</Button>
@@ -195,6 +226,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
         </>
       )}
       {!loading && !collection && requestNumber && <p className="mt-3 text-xs text-gray-500">Files are named from #{requestNumber} automatically.</p>}
+      {composerAction && <MaterialsEmailModal requestId={requestId} action={composerAction} onClose={() => setComposerAction(null)} onSent={(result) => { const explicit = ['sent', 'failed', 'uncertain'].includes(result?.outcome) ? result.outcome : null; if (explicit) setEmailFeedback({ outcome: explicit, detail: explicit === 'failed' ? (result.error || 'The email was not sent.') : explicit === 'uncertain' ? 'The email result could not be confirmed. Check the recipient before trying again.' : undefined }); else if (result?.invitationSent === false) setEmailFeedback({ outcome: result.invitationOutcome === 'uncertain' ? 'uncertain' : 'failed', detail: result.invitationOutcome === 'uncertain' ? 'The invitation result could not be confirmed.' : 'The invitation email was not sent.' }); else if (result?.success === true && result.collection) setEmailFeedback({ outcome: 'sent' }); else setEmailFeedback({ outcome: 'uncertain', detail: 'The email result could not be confirmed. Check the recipient before trying again.' }); void load(); }} />}
     </section>
   );
 }
