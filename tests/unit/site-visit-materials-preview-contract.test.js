@@ -257,3 +257,95 @@ test.each(['absent', 'identity'])('a %s visit after reminder validation cannot c
   expect(mockDeps.claimManualReminder).not.toHaveBeenCalled();
   expect(mockDeps.sendEmail).not.toHaveBeenCalled();
 });
+
+const namedInvitation = {
+  subject: 'W.M. Keck Foundation Research Presentation Materials Request',
+  body: 'Dear Dr. {{piLastName}},\n{{checklist}}\nLiaison: {{liaisonFullName}}\nSincerely,\n{{programCoordinatorName}}',
+};
+const namedReminder = { ...namedInvitation, body: namedInvitation.body.replace('{{checklist}}', '{{missingItems}}') };
+const namedValues = { piEmail: 'pat@example.edu', liaisonEmail: 'liaison@example.edu', piLastName: 'de la Cruz', liaisonFullName: 'Alex Liaison', programCoordinatorName: 'Assigned Coordinator' };
+function namedFixture(action) {
+  const contacts = { pi: { role: 'pi', name: 'Pat de la Cruz', email: 'pat@example.edu' }, liaison: { role: 'liaison', name: 'Alex Liaison', email: 'liaison@example.edu' } };
+  mockDeps.resolveRecipients.mockResolvedValue(contacts);
+  mockDeps.resolveMaterialNames = jest.fn(async () => ({ ...namedValues }));
+  if (action !== 'create') mockDeps.setRow({ ...existingRow(), contacts });
+  return action === 'remind' ? namedReminder : namedInvitation;
+}
+
+test.each(['create', 'invite', 'remind'])('named %s sends reviewed names with PI To and liaison Cc', async (action) => {
+  const template = namedFixture(action);
+  const draft = await preview(action, template);
+  expect(draft.bodyText).toContain('Dear Dr. de la Cruz,');
+  expect(draft.bodyText).toContain('Sincerely,\nAssigned Coordinator');
+  expect(draft.bodyText).not.toContain('{{');
+  const result = await post({ action, emailTemplate: template, proof: draft.proof });
+  expect(result.statusCode).toBe(200);
+  expect(mockDeps.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: ['pat@example.edu'], cc: ['liaison@example.edu'], bodyText: draft.bodyText }));
+});
+
+test.each(['piLastName', 'liaisonFullName', 'programCoordinatorName'])('missing %s blocks named preview without side effects', async (field) => {
+  const template = namedFixture('create');
+  mockDeps.resolveMaterialNames.mockResolvedValue({ ...namedValues, [field]: '' });
+  if (field === 'liaisonFullName') {
+    const contacts = await mockDeps.resolveRecipients();
+    contacts.liaison.name = '';
+    mockDeps.resolveRecipients.mockResolvedValue(contacts);
+  }
+  const result = await post({ action: 'preview', sendAction: 'create', emailTemplate: template });
+  expect(result.statusCode).toBeGreaterThanOrEqual(400);
+  expect(mockDeps.insertCollection).not.toHaveBeenCalled();
+  expect(mockDeps.mint).not.toHaveBeenCalled();
+  expect(mockDeps.sendEmail).not.toHaveBeenCalled();
+});
+
+test.each(['create', 'invite', 'remind'])('changed names invalidate %s preview before side effects', async (action) => {
+  const template = namedFixture(action);
+  const draft = await preview(action, template);
+  mockDeps.resolveMaterialNames.mockResolvedValue({ ...namedValues, programCoordinatorName: 'Reassigned Coordinator' });
+  const result = await post({ action, emailTemplate: template, proof: draft.proof });
+  expect(result.statusCode).toBe(409);
+  expect(mockDeps.insertCollection).not.toHaveBeenCalled();
+  expect(mockDeps.claimManualReminder).not.toHaveBeenCalled();
+  expect(mockDeps.sendEmail).not.toHaveBeenCalled();
+});
+
+test.each(['create', 'invite', 'remind'])('names changing between route and %s service cannot send stale personalization', async (action) => {
+  const template = namedFixture(action);
+  const draft = await preview(action, template);
+  mockDeps.resolveMaterialNames.mockResolvedValueOnce({ ...namedValues }).mockResolvedValue({ ...namedValues, programCoordinatorName: 'Reassigned Coordinator' });
+  const result = await post({ action, emailTemplate: template, proof: draft.proof });
+  expect(result.statusCode).toBe(409);
+  expect(mockDeps.insertCollection).not.toHaveBeenCalled();
+  expect(mockDeps.claimManualReminder).not.toHaveBeenCalled();
+  expect(mockDeps.sendEmail).not.toHaveBeenCalled();
+});
+
+test('same-address PI and liaison produce one To recipient and no duplicate Cc', async () => {
+  const template = namedFixture('create');
+  mockDeps.resolveRecipients.mockResolvedValue({ pi: { name: 'Pat', email: 'pat@example.edu' }, liaison: { name: 'Pat', email: 'PAT@example.edu' } });
+  const draft = await preview('create', template);
+  const result = await post({ action: 'create', emailTemplate: template, proof: draft.proof });
+  expect(result.statusCode).toBe(200);
+  expect(mockDeps.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: ['pat@example.edu'], cc: [] }));
+});
+
+test.each(['pi', 'liaison'])('a named %s who is not a recipient cannot be implied by the email', async (role) => {
+  const template = namedFixture('create');
+  const contacts = await mockDeps.resolveRecipients();
+  delete contacts[role];
+  mockDeps.resolveRecipients.mockResolvedValue(contacts);
+  const result = await post({ action: 'preview', sendAction: 'create', emailTemplate: template });
+  expect(result.statusCode).toBeGreaterThanOrEqual(400);
+  expect(mockDeps.sendEmail).not.toHaveBeenCalled();
+});
+
+test('recipient role swap after route validation is rejected even with legacy name-free copy', async () => {
+  const contacts = { pi: { name: 'PI', email: 'pi@example.edu' }, liaison: { name: 'Liaison', email: 'liaison@example.edu' } };
+  mockDeps.resolveRecipients.mockResolvedValue(contacts);
+  const draft = await preview('create', invitation);
+  mockDeps.resolveRecipients.mockResolvedValueOnce(contacts).mockResolvedValue({ pi: { name: 'PI', email: 'liaison@example.edu' }, liaison: { name: 'Liaison', email: 'pi@example.edu' } });
+  const result = await post({ action: 'create', emailTemplate: invitation, proof: draft.proof });
+  expect(result.statusCode).toBe(409);
+  expect(mockDeps.insertCollection).not.toHaveBeenCalled();
+  expect(mockDeps.sendEmail).not.toHaveBeenCalled();
+});

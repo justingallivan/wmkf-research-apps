@@ -30,6 +30,12 @@ import {
   verifyMaterialsPreviewProof,
 } from '../../lib/services/site-visit-materials/email-personalization';
 import { DatabaseService } from '../../lib/services/database-service';
+import {
+  SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
+  SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT,
+  SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
+  SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT,
+} from '../../lib/seed/email-defaults/site-visit-materials';
 
 const INVITE = { subject: 'Materials for {{proposalTitle}}', body: 'Hello {{institution}}\n{{checklist}}\n{{signature}}' };
 const REMINDER = { subject: 'Reminder {{proposalTitle}}', body: 'Please provide {{missingItems}} {{signature}}' };
@@ -54,6 +60,10 @@ test('enforces renderer token grammar, shapes, kinds, and required per-kind toke
   expect(validatePartialMaterialsEmailTemplate(MATERIALS_EMAIL_KINDS.invitation, { body: '' }).valid).toBe(false);
   expect(validatePartialMaterialsEmailTemplate(MATERIALS_EMAIL_KINDS.invitation, { body: '{{unknown}}' }).valid).toBe(false);
   expect(validatePartialMaterialsEmailTemplate('unknown', { subject: 'x' }).valid).toBe(false);
+  expect(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT).toBe('W.M. Keck Foundation Research Presentation Materials Request');
+  expect(SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT).toBe(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT);
+  expect(validateMaterialsEmailTemplate('invitation', { subject: SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT, body: SITE_VISIT_MATERIALS_INVITE_SEED_BODY }).valid).toBe(true);
+  expect(validateMaterialsEmailTemplate('reminder', { subject: SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT, body: SITE_VISIT_MATERIALS_REMINDER_SEED_BODY }).valid).toBe(true);
 });
 
 test('partial overrides load safely and save only validated fields', async () => {

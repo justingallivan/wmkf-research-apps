@@ -364,9 +364,9 @@ per-file/per-action success and failure so the client updates only committed ite
    exact native document rather than adding a risky conversion to the deadline.
 5. **Physical SharePoint depth.** **Recommendation:** test the candidate hierarchy immediately in
    signed-in AkoyaGo; choose the nested form only if it is visibly navigable.
-6. **Email sender and copy.** **Recommendation:** PC initiates, both PI and liaison receive every
-   requirements/reminder message, and the visible sender/reply-to follows the current staff email
-   convention once the existing example is reviewed.
+6. **Email sender and copy. [DECIDED 2026-09-20]** PC initiates from the existing
+   staff mailbox contract; the PI is the To recipient and the institutional
+   liaison is Cc on every requirements/reminder message.
 7. **Update communication to Board/consultants.** **Recommendation:** stable link plus visible
    last-published timestamp; do not send a new message on every republish unless staff explicitly
    chooses Notify.
@@ -717,3 +717,30 @@ The Preview route `/meeting-tracker/materials-email-rehearsal` returns the
 expected 307 staff sign-in redirect while retaining its callback. The full
 modal interactions were independently verified against the local production
 build as recorded above. This Preview verification is not a production release.
+
+### 16.11 2026-09-20: named materials email copy [ACCEPTED FEATURE-BRANCH SOURCE; READY FOR RELEASE, NOT LIVE]
+
+The approved shared invitation and reminder copy addresses the PI as
+`Dear Dr. {{piLastName}}`, names the institutional liaison with
+`{{liaisonFullName}}`, and signs with `{{programCoordinatorName}}`. The PI
+last name comes from the project-leader contact's dedicated Dataverse
+`lastname` field; it is never derived by splitting a full name. The liaison
+name belongs to the actual liaison recipient, and the Program Coordinator comes
+from the request's assigned `_wmkf_programcoordinator_value`, not the staff
+member who happens to click Send.
+
+Every invitation and reminder envelope addresses the PI in **To** and the
+liaison in **Cc** when those roles have distinct email addresses. Preview
+displays the same separation. Manual preview proofs bind the resolved names and
+the complete To/Cc envelope; a changed name, role association, recipient or
+sender requires a fresh preview before any collection insert, reminder claim or
+email activity. Missing data for a name token fails before those side effects.
+The automatic reminder uses the same shared copy, authoritative name mapping and
+To/Cc envelope, while retaining its existing claim-before-send policy.
+
+Rollout order is compatibility-critical: deploy and verify runtime support for
+the three tokens first, then replace exactly the four shared Admin values
+(`email.site_visit_materials_invite.subject/.body` and
+`email.site_visit_materials_reminder.subject/.body`) with the approved seed
+text. Personal overrides remain untouched. This accepted feature-branch source is ready for release; the revised Admin
+values are not yet live.

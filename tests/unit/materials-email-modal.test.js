@@ -13,11 +13,12 @@ const ok = (body) => ({ ok: true, status: 200, json: async () => body });
 test('editing after preview disables send until refresh', async () => {
   global.fetch = jest.fn(async (url, options = {}) => {
     if (!options.method) return ok({ template: shared, shared });
-    return ok({ subject: 'Rendered', bodyText: 'Body', proof: 'proof', recipients: [], secureLinkPlaceholder: true });
+    return ok({ subject: 'Rendered', bodyText: 'Body', proof: 'proof', recipients: [{ email: 'pi@example.edu' }], ccRecipients: [{ email: 'liaison@example.edu' }], secureLinkPlaceholder: true });
   });
   render(<MaterialsEmailModal requestId={ID} action="create" onClose={jest.fn()} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Refresh preview' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).not.toBeDisabled());
+  expect(screen.getByText('Cc:').parentElement).toHaveTextContent('liaison@example.edu');
   fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Changed' } });
   expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
 });

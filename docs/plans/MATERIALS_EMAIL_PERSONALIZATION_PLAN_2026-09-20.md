@@ -190,3 +190,20 @@ Scoped changed-fact reconciliation covered the security matrix, service catalog,
 Atlas collection entry, materials workflow plan, personal-defaults to-do, current
 queue and generated canonical route counts. These describe accepted branch source,
 not production state. Suite-wide rollout and deliberate release remain follow-ups.
+
+## Named-copy extension — 2026-09-20 [ACCEPTED FEATURE-BRANCH SOURCE; READY FOR RELEASE, NOT LIVE]
+
+The approved shared materials templates add `{{piLastName}}`,
+`{{liaisonFullName}}`, and `{{programCoordinatorName}}` to the body-token
+allowlists without retiring the existing supported tokens. Their authoritative
+sources are the request project-leader contact's explicit `lastname`, the
+liaison who is actually copied on the email, and the request's assigned Program
+Coordinator system user. No name is inferred from a full-name split or from the
+current actor.
+
+Create, resend, manual reminder and the automatic reminder must use PI in To and
+liaison in Cc. A manual proof binds the resolved names, sender and full To/Cc
+envelope; the service rechecks them before insert, claim or transport. Missing
+required names fail before side effects. Runtime support must reach production
+before the four shared Admin template values are reseeded, so an older runtime
+can never encounter unknown live tokens. Personal overrides are not reseeded.

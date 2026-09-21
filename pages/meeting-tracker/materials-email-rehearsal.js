@@ -14,6 +14,7 @@ const SHARED_TEMPLATES = {
 };
 
 const SAMPLE_RECIPIENT = { name: 'Sample recipient', email: 'sample-recipient@example.invalid' };
+const SAMPLE_LIAISON = { name: 'Sample liaison', email: 'sample-liaison@example.invalid' };
 
 export function createRehearsalTransport() {
   const overrides = {};
@@ -46,12 +47,15 @@ export function createRehearsalTransport() {
         if (!String(body.emailTemplate?.body || '').includes(requiredToken)) {
           return { ok: false, status: 400, data: { error: `Keep ${requiredToken} in the sample message.` } };
         }
-        const allowedTokens = new Set(['checklist', 'dueDate', 'institution', 'missingItems', 'missingItemsGrammar', 'proposalTitle', 'signature', 'uploadLink', 'visitDate']);
+        const allowedTokens = new Set(['checklist', 'dueDate', 'institution', 'liaisonFullName', 'missingItems', 'missingItemsGrammar', 'piLastName', 'programCoordinatorName', 'proposalTitle', 'signature', 'uploadLink', 'visitDate']);
         const unknownToken = String(body.emailTemplate?.body || '').match(/\{\{(\w+)\}\}/g)?.find((token) => !allowedTokens.has(token.slice(2, -2)));
         if (unknownToken) return { ok: false, status: 400, data: { error: `Unsupported sample placeholder ${unknownToken}.` } };
         const values = {
           institution: 'Sample institution',
           proposalTitle: 'Sample proposal',
+          piLastName: 'Doe',
+          liaisonFullName: 'Sample liaison',
+          programCoordinatorName: 'Sample program coordinator',
           visitDate: 'October 3, 2030',
           dueDate: 'October 1, 2030',
           checklist: '  - Sample budget\n  - Sample project plan',
@@ -70,6 +74,7 @@ export function createRehearsalTransport() {
             subject,
             bodyText,
             recipients: [SAMPLE_RECIPIENT],
+            ccRecipients: [SAMPLE_LIAISON],
             fromEmail: 'materials-rehearsal@example.invalid',
             secureLinkPlaceholder: true,
             missingItems: isReminder ? ['Sample missing item'] : undefined,

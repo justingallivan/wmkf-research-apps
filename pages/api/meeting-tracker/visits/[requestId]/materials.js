@@ -77,7 +77,7 @@ export default async function handler(req, res) {
         const current = await previewMaterialsEmail({ requestId, action, actorId, profileId: access.profileId, fromEmail, emailTemplate: template });
         const proof = await verifyMaterialsPreviewProof(req.body.proof, { digest: current.digest, action });
         if (!proof.valid) return res.status(409).json({ error: 'The preview is stale. Refresh it before sending.', code: 'site_visit_materials_preview_stale' });
-        preparedEmail = { subject: current.subject, bodyText: current.bodyText, recipients: current.recipients.map((person) => person.email), missingKeys: current.missingKeys, collectionId: current.collectionId, dueAt: current.dueAt, visitSnapshot: current.visitSnapshot };
+        preparedEmail = { subject: current.subject, bodyText: current.bodyText, names: current.names, recipients: current.allRecipients || [...(current.recipients || []), ...(current.ccRecipients || [])].map((person) => person.email), toRecipients: (current.recipients || []).map((person) => person.email), ccRecipients: (current.ccRecipients || []).map((person) => person.email), missingKeys: current.missingKeys, collectionId: current.collectionId, dueAt: current.dueAt, visitSnapshot: current.visitSnapshot, template };
       }
       const result = action === 'create' ? await createMaterialsCollection({ requestId, actorId, profileId: access.profileId, fromEmail, emailTemplate: template, preparedEmail })
         : action === 'invite' ? await inviteMaterialsContributors({ requestId, actorId, profileId: access.profileId, fromEmail, emailTemplate: template, preparedEmail })

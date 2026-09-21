@@ -26,7 +26,7 @@ beforeEach(() => {
   requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: { dynamicsSystemuserId: ACTOR, azureEmail: 'PC@wmkeck.org' } } });
   service.getMaterialsCollection.mockResolvedValue({ collection: null });
   service.createMaterialsCollection.mockResolvedValue({ collection: { id: 'c' }, invitationSent: true });
-  service.previewMaterialsEmail.mockResolvedValue({ subject: 'Reviewed subject', bodyText: 'Reviewed body', digest: 'd', proof: 'proof', recipients: [{ email: 'pc@wmkeck.org' }] });
+  service.previewMaterialsEmail.mockResolvedValue({ subject: 'W.M. Keck Foundation Research Presentation Materials Request', bodyText: 'Reviewed body', names: { piLastName: 'Investigator', liaisonFullName: 'Lee Liaison', programCoordinatorName: 'Casey Coordinator' }, digest: 'd', proof: 'proof', template: { subject: 'W.M. Keck Foundation Research Presentation Materials Request', body: '{{checklist}}' }, recipients: [{ name: 'Pat Investigator', email: 'pi@wmkeck.org' }], ccRecipients: [{ name: 'Lee Liaison', email: 'liaison@wmkeck.org' }], allRecipients: ['pi@wmkeck.org', 'liaison@wmkeck.org'] });
 });
 
 test('id validated before auth; both readiness flags checked after auth; GET returns the collection', async () => {
@@ -43,7 +43,7 @@ test('id validated before auth; both readiness flags checked after auth; GET ret
 
 test('POST dispatches by action with the session actor and lowercased sender; unknown actions and extra keys are 400', async () => {
   const create = mockRes(); await handler(req('POST', { action: 'create', emailTemplate: { subject: 'x', body: '{{checklist}}' }, proof: 'proof' }), create);
-  expect(service.createMaterialsCollection).toHaveBeenCalledWith(expect.objectContaining({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate: { subject: 'x', body: '{{checklist}}' }, preparedEmail: { subject: 'Reviewed subject', bodyText: 'Reviewed body', recipients: ['pc@wmkeck.org'] } }));
+  expect(service.createMaterialsCollection).toHaveBeenCalledWith(expect.objectContaining({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate: { subject: 'x', body: '{{checklist}}' }, preparedEmail: expect.objectContaining({ subject: 'W.M. Keck Foundation Research Presentation Materials Request', bodyText: 'Reviewed body', names: { piLastName: 'Investigator', liaisonFullName: 'Lee Liaison', programCoordinatorName: 'Casey Coordinator' }, recipients: ['pi@wmkeck.org', 'liaison@wmkeck.org'] }) }));
   expect(create.body).toEqual({ success: true, collection: { id: 'c' }, invitationSent: true });
   service.waiveMaterialsItem.mockResolvedValueOnce({ collection: { id: 'c' } });
   await handler(req('POST', { action: 'waive', key: 'participant_bios', waived: true }), mockRes());
