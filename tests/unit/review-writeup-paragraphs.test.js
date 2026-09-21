@@ -357,6 +357,17 @@ describe('composeWriteupParagraphs', () => {
     expect(result.quotations).toEqual([]);
     expect(result.droppedQuotationCount).toBe(0);
   });
+
+  it('warns for a submitted reviewer with no recorded expertise, and still names the reviewer who has it', () => {
+    const reviewers = [
+      reviewer({ suggestionId: 'a', name: 'Carey Nadell', lastName: 'Nadell', keywords: 'Microbial ecology' }),
+      reviewer({ suggestionId: 'b', name: 'Applicant Pick', lastName: 'Pick' }),
+    ];
+    const { warnings } = composeWriteupParagraphs({ reviewers });
+    expect(warnings).toEqual([
+      'Applicant Pick has no recorded expertise, so the expertise sentence omits them. Add keywords or an area of expertise to their reviewer record.',
+    ]);
+  });
 });
 
 describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {

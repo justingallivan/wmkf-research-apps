@@ -636,10 +636,24 @@ export function composeWriteupParagraphs({ reviewers, synthesis } = {}) {
 
   const paragraphs = [...deterministicParagraphs];
 
+  const submitted = submittedReviewersOf(reviewers);
+
+  // A submitted reviewer with no recorded expertise is silently absent from
+  // the expertise sentence above (composeExpertiseSentence skips them). This
+  // is the same condition composeRefereeSection's `referee_expertise_missing`
+  // diagnostic names — but that diagnostic only reaches the Pre-Site panel.
+  // Staff also review and export from the Reviews tab, which renders this
+  // `warnings` list as plain strings, so name it here too.
+  for (const reviewer of submitted) {
+    if (expertiseAreasOf(reviewer).length === 0) {
+      const name = typeof reviewer.name === 'string' && reviewer.name.trim() ? reviewer.name.trim() : 'A reviewer';
+      warnings.push(`${name} has no recorded expertise, so the expertise sentence omits them. Add keywords or an area of expertise to their reviewer record.`);
+    }
+  }
+
   const themesText = typeof synthesis?.writeupThemes === 'string' ? synthesis.writeupThemes.trim() : '';
   if (themesText) paragraphs.push([{ text: themesText }]);
 
-  const submitted = submittedReviewersOf(reviewers);
   const { kept: quotations, droppedQuotationCount } = verifyAndSelectQuotations(
     synthesis?.writeupQuotations,
     submitted,

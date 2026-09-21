@@ -879,6 +879,66 @@ test('applicant reviewer with no claimed expertise: accepted OpenAlex research t
   );
 });
 
+// Codex adversarial review: the old sentence-caser lowercased every word not
+// matching a strict all-caps-acronym regex, which destroyed scientific
+// tokens whose casing IS the information (mTOR, scRNA-seq, p53). Only a
+// plain Title-Case word may be changed now.
+test('sentence-casing preserves mixed-case/hyphenated/digit-bearing scientific tokens untouched', async () => {
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      expertiseAreas: [],
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        tierResults: { openalex_author: { openAlexId: 'https://openalex.org/A1' } },
+        openAlexResearchTopics: [
+          'mTOR Signaling Pathways',
+          'scRNA-seq Analysis Methods',
+          'p53 Tumor Suppressor Function',
+        ],
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({
+      keywords: 'mTOR signaling pathways; scRNA-seq analysis methods; p53 tumor suppressor function',
+    }),
+    expect.anything(),
+  );
+});
+
+// The first-word capitalization rule only fires when the first word is
+// already ALL lowercase; a provider string that already starts lowercase
+// (not Title Case) must still be capitalized for the stored-keyword
+// convention ("Microbial ecology").
+test('sentence-casing capitalizes an all-lowercase first word from the provider', async () => {
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      expertiseAreas: [],
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        tierResults: { openalex_author: { openAlexId: 'https://openalex.org/A1' } },
+        openAlexResearchTopics: ['scientometrics and bibliometrics research'],
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({
+      keywords: 'Scientometrics and bibliometrics research',
+    }),
+    expect.anything(),
+  );
+});
+
 test('OpenAlex research topics are NOT written when the OpenAlex match was skipped (blockScholar), mirroring the h-index gate', async () => {
   enrichCandidates.mockImplementation(async (candidates) => ({
     enriched: candidates.map((c) => ({

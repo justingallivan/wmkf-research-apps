@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-17
+last_verified: 2026-09-21
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -931,7 +931,14 @@ object's specific `topics` list sorted by count — NOT the broad deprecated
 `x_concepts` that `topics`/`topTopics` read for identity grounding), sentence-cased
 for mid-sentence use, top three, carried on `ce.openAlexResearchTopics` past the
 identity gate. Gated on `blockScholar` like the h-index; `wmkf_keywords` is
-fill-if-empty in the researcher adapter, so staff edits are never overwritten.
+fill-if-empty in the researcher adapter, and **(S530)** that PATCH is
+ETag-conditional whenever the read row carries one — not only for the
+email-source-upgrade path — with one re-read-and-retry on a 412, so a
+concurrent staff edit wins the race rather than being silently overwritten.
+Sentence-casing (`sentenceCaseTopic`) only lowercases a plain Title-Case word
+(`/^[A-Z][a-z]+$/`); anything mixed-case, hyphenated, or digit-bearing is left
+exactly as the provider supplied it, so scientific tokens like `mTOR`,
+`scRNA-seq`, and `p53` are preserved rather than destroyed.
 **Reach:** enrichment skips `handled` suggestion rows (selected/invited/…), so this
 fixes future applicant rows enriched before promotion; an already-promoted row
 (request 1002852) needs a one-time hand fill of the person's Keywords or Area of
@@ -1521,7 +1528,15 @@ tally; **(2026-09-21)** a submitted reviewer with neither `wmkf_keywords` nor
 (shared `expertiseAreasOf` helper, so the sentence and the diagnostic cannot
 disagree about who was omitted) — observed on request 1002852, where the
 applicant-recommended reviewer had no expertise while both Finder reviewers
-did; `renderPreSiteVisitDocx` treats a blank/whitespace-only
+did. That structured diagnostic remains Pre-Site-only (`composeRefereeSection`
+never accepts a `synthesis` argument); **the Reviews tab has its own copy**
+— `composeWriteupParagraphs` (`review-writeup-paragraphs.js`) pushes the same
+condition, for the same reviewers, into its plain-string `warnings` array
+("`<name>` has no recorded expertise, so the expertise sentence omits them.
+Add keywords or an area of expertise to their reviewer record."), which
+`ReviewsTab.js`'s `WriteupParagraphsCard` already renders as a list beneath
+the composed paragraphs — so staff see the gap before exporting, not only in
+the Pre-Site artifact; `renderPreSiteVisitDocx` treats a blank/whitespace-only
 `refereeSection.text` as `null`; and `review-synthesis-readiness.js` exports
 `REVIEW_SYNTHESIS_BLOCKER_REASONS` so the allowlist test iterates the live
 reason set rather than a hand-copied list. **Codex adversarial review

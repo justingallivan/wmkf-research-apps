@@ -705,6 +705,25 @@ test('renders padded source names without spaces before reviewer-clause punctuat
   );
 });
 
+test('renders a no-recorded-expertise warning for a submitted reviewer with neither keywords nor areaOfExpertise', () => {
+  render(
+    <WriteupParagraphsCard
+      reviewers={[{
+        ...WRITEUP_REVIEWERS[0],
+        name: 'Applicant Pick',
+        keywords: undefined,
+      }]}
+      synthesis={null}
+      synthesisCurrent={false}
+    />,
+  );
+
+  expect(screen.getByText(
+    'Applicant Pick has no recorded expertise, so the expertise sentence omits them. '
+    + 'Add keywords or an area of expertise to their reviewer record.',
+  )).toBeInTheDocument();
+});
+
 test('does not render the Writeup paragraphs card when no review is submitted', async () => {
   fetch.mockResolvedValue({
     ok: true,

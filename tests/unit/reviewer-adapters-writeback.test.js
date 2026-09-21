@@ -666,7 +666,9 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
 
     await upsertByPotentialReviewer('pr-8', { email: 'same@y.edu', emailSource: incoming });
     expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
-    expect(update.mock.calls[0][3]?.ifMatch).toBeUndefined();
+    // S530: ifMatch is now set whenever the read row carries an _etag,
+    // independent of whether a source upgrade occurred.
+    expect(update.mock.calls[0][3]?.ifMatch).toBe('W/"8"');
   });
 
   test('an upgrade requires the same address, a known incoming source, and an ETag', async () => {
@@ -724,6 +726,71 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     update.mockClear();
     await upsertByPotentialReviewer('pr-4', { email: 'same@y.edu', emailSource: 'scholarly_multi' });
     expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+  });
+
+  // S530: the PATCH used to be ETag-conditional ONLY for the email-source
+  // upgrade, so a staff edit landing between the GET and the PATCH (e.g. a
+  // manual keyword correction) was silently overwritten by a concurrent
+  // enrichment write.
+  describe('S530: fill-if-empty race — ifMatch whenever the read row has an _etag', () => {
+    test('(a) first PATCH carries ifMatch equal to the GET etag even with no email-source upgrade', async () => {
+      jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+        wmkf_potentialreviewersid: 'pr-9', _etag: 'W/"9"',
+      });
+      const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+      await upsertByPotentialReviewer('pr-9', { affiliation: 'MIT' });
+      expect(update.mock.calls[0][3].ifMatch).toBe('W/"9"');
+    });
+
+    test('(b) 412 on first PATCH → re-read once, retry with the fresh row and fresh etag (discriminating)', async () => {
+      const get = jest.spyOn(DynamicsService, 'getRecord')
+        .mockResolvedValueOnce({ wmkf_potentialreviewersid: 'pr-10', wmkf_keywords: null, _etag: 'W/"1"' })
+        .mockResolvedValueOnce({ wmkf_potentialreviewersid: 'pr-10', wmkf_keywords: 'Staff entered', _etag: 'W/"2"' });
+      const update = jest.spyOn(DynamicsService, 'updateRecord')
+        .mockRejectedValueOnce(err412())
+        .mockResolvedValueOnce(undefined);
+
+      await upsertByPotentialReviewer('pr-10', { keywords: 'Microbial ecology' });
+
+      expect(get).toHaveBeenCalledTimes(2);
+      expect(update).toHaveBeenCalledTimes(2);
+      expect(update.mock.calls[1][2]).not.toHaveProperty('wmkf_keywords');
+      expect(update.mock.calls[1][3].ifMatch).toBe('W/"2"');
+    });
+
+    test('(c) a second 412 rethrows; getRecord called exactly twice', async () => {
+      const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+        wmkf_potentialreviewersid: 'pr-11', _etag: 'W/"1"',
+      });
+      jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValue(err412());
+
+      await expect(upsertByPotentialReviewer('pr-11', { affiliation: 'MIT' })).rejects.toThrow();
+      expect(get).toHaveBeenCalledTimes(2);
+    });
+
+    test('(d) a 412 translateDuplicateKeyError recognizes rethrows without a re-read', async () => {
+      const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+        wmkf_potentialreviewersid: 'pr-12', _etag: 'W/"1"',
+      });
+      const dupErr = new Error(
+        'Entity Key wmkf_potentialreviewers_emailaddress_key violated: '
+        + '<DuplicateAttributes><wmkf_emailaddress>dup@y.edu</wmkf_emailaddress></DuplicateAttributes>'
+      );
+      dupErr.status = 412;
+      jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValue(dupErr);
+
+      await expect(upsertByPotentialReviewer('pr-12', { email: 'dup@y.edu' })).rejects.toBe(dupErr);
+      expect(get).toHaveBeenCalledTimes(1);
+    });
+
+    test('(e) no _etag on the GET → PATCH has no ifMatch (unchanged behavior)', async () => {
+      jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-13' });
+      const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+      await upsertByPotentialReviewer('pr-13', { affiliation: 'MIT' });
+      expect(update.mock.calls[0][3].ifMatch).toBeUndefined();
+    });
   });
 });
 
