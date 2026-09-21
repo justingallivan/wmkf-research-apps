@@ -4,6 +4,7 @@
  */
 import {
   reviewerAffiliationOf,
+  institutionNameOf,
   composeScoreSentence,
   composeReviewerSentence,
   composeExpertiseSentence,
@@ -207,6 +208,28 @@ describe('composeReviewerSentence', () => {
     expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of Real University.');
   });
 
+  it('reduces a byline affiliation to the institution name even when the echoed email differs from the stored one (request 1002852)', () => {
+    // Discriminating: the stored email does not match the echoed address, so
+    // reviewerAffiliationOf leaves the whole byline intact; only the composer's
+    // institutionNameOf reduction can produce "Lund University" here.
+    const { runs } = composeReviewerSentence([
+      reviewer({
+        name: 'Herwig Schüler',
+        academicRank: 'Associate Professor',
+        reviewerAffiliation: 'Division of Biochemistry and Structural Biology, Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic address: herwig.schuler@biochemistry.lu.se.',
+        email: 'other.address@example.org',
+      }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was Herwig Schüler, an associate professor at Lund University.');
+  });
+
+  it('shows a self-confirmed mainInstitution verbatim, never reduced', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'Department of Chemistry, Lund University' }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of Department of Chemistry, Lund University.');
+  });
+
   it('chooses "a" (not "an") for consonant-sound vowel-letter ranks (Opus follow-up)', () => {
     expect(
       composeReviewerSentence([reviewer({ name: 'A', academicRank: 'University Professor', mainInstitution: 'X' })])
@@ -228,6 +251,58 @@ describe('composeReviewerSentence', () => {
     const { runs } = composeReviewerSentence(reviewers);
     const underlineNames = runs.filter((r) => r.underline).map((r) => r.text);
     expect(underlineNames).toEqual(['Zed', 'Abe']);
+  });
+});
+
+describe('institutionNameOf (byline → institution name for display)', () => {
+  it('reduces a full PubMed byline with an echoed email to the university (request 1002852 case)', () => {
+    expect(institutionNameOf(
+      'Division of Biochemistry and Structural Biology, Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic address: herwig.schuler@biochemistry.lu.se.',
+    )).toBe('Lund University');
+  });
+
+  it('drops department, city, state, postal code and country parts', () => {
+    expect(institutionNameOf('Department of Bioengineering, Stanford University, Stanford, CA 94305.')).toBe('Stanford University');
+    expect(institutionNameOf('Professor of Chemistry, Department of Chemistry, Yale University, New Haven, CT')).toBe('Yale University');
+    expect(institutionNameOf('Max Planck Institute for Biophysical Chemistry, Göttingen, Germany')).toBe('Max Planck Institute for Biophysical Chemistry');
+  });
+
+  it('prefers the university over a sub-unit college and keeps a whole "X University School of Medicine"', () => {
+    expect(institutionNameOf('Department of Biochemistry, Duke University School of Medicine, Durham, NC, USA.')).toBe('Duke University School of Medicine');
+    // "College of Medicine" is a sub-unit even though it says "college"; the two
+    // semicolon runs name the same university, so it is shown once.
+    expect(institutionNameOf(
+      'Center for Translational Cancer Research, Institute of Biosciences and Technology, Texas A&M University, Houston, TX 77030, USA; Department of Medical Physiology, College of Medicine, Texas A&M University, Bryan, TX, USA',
+    )).toBe('Texas A&M University');
+  });
+
+  it('shows two distinct institutions joined with "and", re-attaching a multi-campus system campus (owner decision 2026-09-21)', () => {
+    expect(institutionNameOf('Department of Biochemistry, University of California, San Francisco, CA; Howard Hughes Medical Institute'))
+      .toBe('University of California, San Francisco and Howard Hughes Medical Institute');
+    // Not a multi-campus system: the city is not re-attached.
+    expect(institutionNameOf('University of Oxford, Oxford, UK')).toBe('University of Oxford');
+  });
+
+  it('keeps a whole institution whose name starts like a sub-unit when nothing else is organization-shaped', () => {
+    expect(institutionNameOf('Institute of Science and Technology Austria, Klosterneuburg, Austria')).toBe('Institute of Science and Technology Austria');
+  });
+
+  it('falls back to the first non-geographic part when nothing looks like an institution (owner decision 2026-09-21)', () => {
+    expect(institutionNameOf('Broad Genomics Platform, Cambridge, MA')).toBe('Broad Genomics Platform');
+  });
+
+  it('prefers a sub-unit over a bare one-word proper noun that is probably an unlisted town', () => {
+    expect(institutionNameOf('Department of Chemistry, Klosterneuburg')).toBe('Department of Chemistry');
+    expect(institutionNameOf('Dept of Biology, Tromsø, Norway')).toBe('Dept of Biology');
+  });
+
+  it('passes a short value through and returns null for blank or email-only input', () => {
+    expect(institutionNameOf('MIT')).toBe('MIT');
+    expect(institutionNameOf('Real University')).toBe('Real University');
+    expect(institutionNameOf('MIT, Electronic address: jane@mit.edu')).toBe('MIT');
+    expect(institutionNameOf('someone@x.org')).toBeNull();
+    expect(institutionNameOf('')).toBeNull();
+    expect(institutionNameOf(null)).toBeNull();
   });
 });
 

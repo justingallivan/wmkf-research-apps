@@ -107,11 +107,145 @@ export function reviewerAffiliationOf(reviewer) {
     .trim() || null;
 }
 
+// --- Institution-name extraction from a free-text affiliation/byline -------
+//
+// The accept form's "Title & Organization" field is pre-filled from the CRM
+// affiliation, which for a reviewer enriched from PubMed is the raw
+// publication byline ("Division of X, Department of Y, Lund University,
+// SE-22362, Lund, Sweden. Electronic address: …"). A reviewer who leaves it
+// untouched sends the whole byline into the Reviews paragraph. These helpers
+// reduce such text to the institution name(s) for DISPLAY only; the stored
+// value and `reviewerAffiliationOf` (which fingerprints and tab cards depend
+// on) are untouched. A self-confirmed `mainInstitution` never passes through
+// here.
+
+// Segments that are sub-units of an institution, never the institution.
+const SUBUNIT_SEGMENT = /^(?:dept\.?|department|division|section|unit|group|program(?:me)?|lab(?:oratory)?\s+(?:of|for)|faculty\s+of|graduate\s+school\s+of|school\s+of\s+(?!medicine\b)|college\s+of|centre?\s+(?:for|of)|institute\s+(?:for|of)|chair\s+of)\b/i;
+// A university-tier organization: preferred over any other segment.
+const UNIVERSITY_TERM = /\b(?:university|universit(?:[äa]t|[ée]|y|a|eit|as|ad|ade)|polytechnic|hochschule|college)\b|\bETH\b|\bMIT\b|\bCaltech\b/i;
+// Any other organization-shaped segment (second preference).
+const ORGANIZATION_TERM = /\b(?:institut(?:e|o|ion)?|hospital|clinic|klinik|medical\s+(?:center|centre|school)|school\s+of\s+medicine|laborator(?:y|ies)|foundation|academy|center|centre|research\s+council|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)\b/i;
+// Geography that never names an institution on its own.
+const US_STATE_CODE = /^(?:A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY])$/;
+const GEOGRAPHIC_TOKEN = new Set([
+  'usa', 'us', 'u.s.a.', 'u.s.', 'united states', 'united states of america', 'uk', 'u.k.', 'united kingdom',
+  'england', 'scotland', 'wales', 'northern ireland', 'ireland', 'canada', 'australia', 'new zealand',
+  'germany', 'deutschland', 'france', 'italy', 'italia', 'spain', 'españa', 'portugal', 'netherlands',
+  'the netherlands', 'belgium', 'switzerland', 'austria', 'sweden', 'norway', 'denmark', 'finland', 'iceland',
+  'poland', 'czech republic', 'czechia', 'hungary', 'greece', 'israel', 'japan', 'china', "people's republic of china",
+  'pr china', 'p.r. china', 'south korea', 'republic of korea', 'korea', 'taiwan', 'singapore', 'india',
+  'brazil', 'brasil', 'mexico', 'méxico', 'argentina', 'chile', 'south africa', 'russia', 'turkey', 'türkiye',
+  'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware', 'florida',
+  'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine',
+  'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri', 'montana', 'nebraska',
+  'nevada', 'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio',
+  'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina', 'south dakota', 'tennessee', 'texas',
+  'utah', 'vermont', 'virginia', 'washington', 'west virginia', 'wisconsin', 'wyoming', 'district of columbia',
+  'ontario', 'quebec', 'québec', 'british columbia', 'alberta',
+]);
+// "University of <system>" names whose campus follows as its own comma segment
+// ("University of California, San Francisco"). Only these re-attach the next
+// segment; "University of Oxford, Oxford" must not become a two-part name.
+const MULTI_CAMPUS_SYSTEM = /^university of (?:california|texas|illinois|colorado|massachusetts|maryland|minnesota|wisconsin|nebraska|tennessee|north carolina|alabama|hawaii|missouri|michigan|pittsburgh)$/i;
+
+function isGeographicSegment(segment) {
+  const lower = segment.toLowerCase().replace(/\.$/, '');
+  if (GEOGRAPHIC_TOKEN.has(lower)) return true;
+  if (/\d/.test(segment)) return true; // postal codes, "TX 77030", "SE-22362"
+  if (US_STATE_CODE.test(segment)) return true;
+  // "Houston TX", "Cambridge MA", "Lund, Sweden" already split; "City ST".
+  const words = segment.split(/\s+/);
+  if (words.length >= 2 && US_STATE_CODE.test(words[words.length - 1])) return true;
+  return false;
+}
+
+function stripEchoedContact(text) {
+  return String(text || '')
+    .replace(/\b(?:electronic\s+address|e-?mail(?:\s+address)?)\s*:?\s*\S+@\S+/gi, '')
+    .replace(/\S+@\S+/g, '')
+    .replace(/\b(?:electronic\s+address|e-?mail(?:\s+address)?)\s*:?\s*$/i, '')
+    .replace(/[\s,.;:]+$/g, '')
+    .trim();
+}
+
+function pickInstitutionFromRun(parts) {
+  const candidates = parts.filter((part) => !isGeographicSegment(part));
+  const pool = candidates.length > 0 ? candidates : parts;
+  const nonSubunit = pool.filter((part) => !SUBUNIT_SEGMENT.test(part));
+  // Rank: a university-tier part that is not a sub-unit ("College of
+  // Medicine" is a sub-unit even though it says "college"); then any other
+  // organization-shaped non-sub-unit part; then an organization-shaped part
+  // even if it LOOKS like a sub-unit ("Institute of Science and Technology
+  // Austria" is a whole institution); then the first non-sub-unit part; then
+  // the first part at all.
+  const organizationShaped = nonSubunit.find((part) => UNIVERSITY_TERM.test(part))
+    || nonSubunit.find((part) => ORGANIZATION_TERM.test(part))
+    || pool.find((part) => UNIVERSITY_TERM.test(part) || ORGANIZATION_TERM.test(part))
+    || null;
+  // No organization-shaped part at all: the first non-sub-unit part — unless
+  // that is a bare one-word proper noun, which is almost always a town the
+  // geographic list does not know ("Department of Chemistry, Klosterneuburg").
+  // A sub-unit ("Department of Chemistry") is then less wrong than a city.
+  const fallback = nonSubunit[0] || pool[0] || null;
+  const subunit = pool.find((part) => SUBUNIT_SEGMENT.test(part)) || null;
+  const bareWord = typeof fallback === 'string' && !/\s/.test(fallback);
+  const ranked = organizationShaped || (bareWord && subunit ? subunit : fallback);
+  if (!ranked) return null;
+  if (MULTI_CAMPUS_SYSTEM.test(ranked)) {
+    const next = parts[parts.indexOf(ranked) + 1];
+    const lastWord = ranked.split(/\s+/).pop().toLowerCase();
+    if (next && /^[A-Za-z][A-Za-z .'-]*$/.test(next) && !isGeographicSegment(next)
+      && !SUBUNIT_SEGMENT.test(next) && next.toLowerCase() !== lastWord) {
+      return `${ranked}, ${next}`;
+    }
+  }
+  return ranked;
+}
+
+/**
+ * Reduce a free-text affiliation/byline to its institution name(s) for
+ * display in the reviewer clause. Semicolons separate independent bylines
+ * (each yields one institution; distinct results are joined with "and");
+ * commas separate the parts of one byline. Within a byline, geographic
+ * parts (cities, states, postal codes, countries) and an echoed email are
+ * dropped; a university-tier part is preferred, then any other
+ * organization-shaped part, then the first part that is not a department or
+ * division, then the first part. A short value with no commas ("MIT") passes
+ * through unchanged. Returns null for blank input.
+ *
+ * Owner decisions (2026-09-21): two institutions in one byline are BOTH
+ * shown, joined with "and"; when nothing looks like an institution the first
+ * non-geographic part is shown.
+ *
+ * @param {string} text
+ * @returns {string|null}
+ */
+export function institutionNameOf(text) {
+  const cleaned = stripEchoedContact(text);
+  if (!cleaned) return null;
+  const runs = cleaned.split(';').map((run) => run.trim()).filter(Boolean);
+  const picked = [];
+  const seen = new Set();
+  for (const run of runs) {
+    const parts = run.split(',').map((part) => part.replace(/\.$/, '').trim()).filter(Boolean);
+    const institution = pickInstitutionFromRun(parts);
+    if (!institution) continue;
+    const key = institution.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(institution);
+  }
+  if (picked.length === 0) return cleaned;
+  return joinWithOxfordComma(picked);
+}
+
 /**
  * Institution precedence for the reviewer clause (W1): `mainInstitution` →
  * accept-time affiliation (`reviewerAffiliationOf`, email-suffix stripped) →
  * `affiliation` (the person projection's `primaryAffiliation`/
  * `organizationName`, already collapsed by `reviewers-service.js`) → fallback.
+ * The two free-text sources are reduced to institution name(s) by
+ * `institutionNameOf` (2026-09-21); `mainInstitution` is shown verbatim.
  *
  * Opus Slice 1 follow-up: `reviewerAffiliationOf` can strip the accept-time
  * value down to an empty string (e.g. `reviewerAffiliation` IS the reviewer's
@@ -124,10 +258,14 @@ export function reviewerAffiliationOf(reviewer) {
 function institutionOf(reviewer) {
   const main = typeof reviewer?.mainInstitution === 'string' ? reviewer.mainInstitution.trim() : '';
   if (main) return main;
+  // Free-text sources (accept-time field, person affiliation) may be a whole
+  // PubMed byline (observed on request 1002852, 2026-09-21): reduce them to
+  // the institution name(s) for display. `mainInstitution` above is
+  // reviewer/staff-confirmed and is shown verbatim.
   const accepted = reviewerAffiliationOf(reviewer);
-  if (accepted) return accepted;
+  if (accepted) return institutionNameOf(accepted) || accepted;
   const personAffiliation = typeof reviewer?.affiliation === 'string' ? reviewer.affiliation.trim() : '';
-  if (personAffiliation) return personAffiliation;
+  if (personAffiliation) return institutionNameOf(personAffiliation) || personAffiliation;
   return 'institution not recorded';
 }
 

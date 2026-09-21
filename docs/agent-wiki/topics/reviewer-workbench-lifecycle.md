@@ -920,6 +920,28 @@ Contact enrichment partial-timeout behavior is unchanged.
 
 **Publication count for applicant rows (S264):** Applicant-recommended reviewers skip PubMed/preprint discovery, so they carry no publications list and used to show a FALSE "0 publications" beside a real h-index. `enrich-recommended.js` now backfills `publicationCount5yr` from the OpenAlex author it already resolves for the metrics — `OpenAlexService.getWorksByAuthor(openAlexId, { yearFrom: year - DiscoveryService.YEARS_LOOKBACK, limit: 1 }).totalCount` (count-only query; same window as `DiscoveryService.countRecentPublications`). Gated on `blockScholar` like the other metrics (no count for an unconfirmed/wrong-person match); best-effort (a failure leaves it null). One extra OpenAlex call per applicant reviewer.
 
+**Institution names in the reviewer sentence (2026-09-21):** the composer's
+`institutionOf` precedence is unchanged (`mainInstitution` → accept-time
+`reviewerAffiliationOf` → person `affiliation`), but the two free-text sources
+now pass through `institutionNameOf` (`review-writeup-paragraphs.js`) before
+display: the accept form's "Title & Organization" field is pre-filled from the
+CRM affiliation, which for a PubMed-enriched reviewer is the whole byline, and
+request 1002852 rendered "Division of Biochemistry and Structural Biology,
+Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic
+address: …" because the echoed email differed from the stored one, so the
+exact-match strip in `reviewerAffiliationOf` never fired. `institutionNameOf`
+strips any echoed email, splits on `;` (independent bylines) and `,`, drops
+geographic parts (cities, US states, postal codes, countries), and ranks
+university-tier > other organization-shaped > organization-shaped-but-sub-unit-
+looking ("Institute of Science and Technology Austria") > first non-sub-unit
+part. Owner decisions: two institutions in one byline are BOTH shown joined with
+"and"; with no institution-shaped part the first non-geographic part is shown.
+A self-confirmed `mainInstitution` is shown verbatim. `reviewerAffiliationOf`
+itself is untouched (tab cards and the review-bundle fingerprint depend on it).
+Reaches the Reviews tab, the Pre-Site Reviews paragraph, and the Pre-RP brief
+(all use `composeReviewerSentence`); the Pre-RP fingerprint hashes composer
+INPUTS, so existing briefs re-render with the shorter name without a drift flag.
+
 **Expertise for applicant rows (2026-09-21):** applicant-recommended reviewers
 arrive with `expertiseAreas: []` (only Reviewer Finder candidates get Claude-written
 areas, which promotion writes to `wmkf_areaofexpertise`), so their person rows

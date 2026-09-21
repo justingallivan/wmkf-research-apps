@@ -440,7 +440,11 @@ Production Request Document row was created by this release smoke.
   neither `wmkf_keywords` nor `wmkf_areaofexpertise` emits a named
   `referee_expertise_missing` diagnostic (2026-09-21) rather than silently
   dropping out of the expertise sentence — the applicant-recommended case,
-  whose ingestion path writes neither field.
+  whose ingestion path writes neither field. The reviewer sentence's
+  institution is reduced from a free-text byline to the institution name(s)
+  by `institutionNameOf` (2026-09-21; self-confirmed `wmkf_maininstitution`
+  is shown verbatim); a `refereeSection.text` stored in a v4 snapshot before
+  that change keeps its longer form until the document is regenerated.
   [RECHECKED after lib/services/pre-site-visit/docx-renderer.js change:
   2026-09-14 wrap-up — blank-text normalization added.]
 
