@@ -1522,8 +1522,9 @@ back), so one instance could still be pending when the test switched
 programs. `93b1f3384` additionally waits for the p2 count to render and
 drains pending passive effects across a macrotask boundary (`act` +
 `setTimeout(0)`) before the switch. Green under Node 20/26 locally, still RED
-under the generation-guard mutation, and green on the first CI run; rerun
-probes recorded below when done. The adoption-effect double-fire and its
+under the generation-guard mutation, and green on three consecutive CI runs (first run on `93b1f3384`, its
+rerun, and the `e2e445298` docs commit), versus 3/3 red before the first fix
+and 1/3 red after it. The adoption-effect double-fire and its
 stale-closure `navigate` remain an observation for the owner (a code
 hardening — skip adoption when a program change is already in flight — is the
 durable fix if the test ever flakes again).
