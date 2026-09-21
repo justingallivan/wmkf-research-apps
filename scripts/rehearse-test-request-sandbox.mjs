@@ -31,6 +31,11 @@ const REHEARSAL_FISCAL_YEAR = 'December 2099';
 const MANIFEST_TTL_MS = 60 * 60 * 1000;
 const POLL_MS = 5_000;
 const OBSERVATION_MS = 60_000;
+const GOVERIFY_WORKFLOW = Object.freeze({
+  id: 'efc7d476-6985-ee11-8179-000d3a341b5a',
+  name: 'GOverify- check Publication 78 on create of a request record',
+  primaryEntity: 'akoya_request',
+});
 
 const CREATE_FIELDS = Object.freeze([
   'akoya_requestid',
@@ -69,12 +74,19 @@ const READBACK_FIELDS = Object.freeze([
 ]);
 
 function parseArgs(argv) {
-  const parsed = { prepare: null, execute: null, inspect: null, receipt: null };
+  const parsed = {
+    prepare: null,
+    execute: null,
+    inspect: null,
+    receipt: null,
+    bypassGoverify: false,
+  };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
     else if (arg.startsWith('--execute=')) parsed.execute = arg.slice('--execute='.length);
     else if (arg.startsWith('--inspect=')) parsed.inspect = arg.slice('--inspect='.length);
     else if (arg.startsWith('--receipt=')) parsed.receipt = arg.slice('--receipt='.length);
+    else if (arg === '--bypass-goverify') parsed.bypassGoverify = true;
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -83,6 +95,9 @@ function parseArgs(argv) {
   }
   if (parsed.execute && !parsed.receipt) throw new Error('--execute requires --receipt.');
   if (!parsed.execute && parsed.receipt) throw new Error('--receipt is valid only with --execute.');
+  if (parsed.bypassGoverify && !parsed.execute) {
+    throw new Error('--bypass-goverify is valid only with --execute.');
+  }
   for (const value of [parsed.prepare, parsed.execute, parsed.inspect, parsed.receipt].filter(Boolean)) {
     if (!path.isAbsolute(value)) throw new Error('Manifest and receipt paths must be absolute.');
   }
@@ -93,7 +108,60 @@ function printHelp() {
   console.log('Read-only: node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs');
   console.log('Prepare:  ... --prepare=/absolute/new-manifest.json');
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
+  console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
+}
+
+async function getGoverifyWorkflow(client) {
+  const fields = [
+    'workflowid',
+    'workflowidunique',
+    'name',
+    'category',
+    'type',
+    'mode',
+    'primaryentity',
+    'statecode',
+    'statuscode',
+    'componentstate',
+    'triggeroncreate',
+    'triggeronupdateattributelist',
+    'modifiedon',
+    'versionnumber',
+  ];
+  const response = await client.get(
+    `/workflows(${GOVERIFY_WORKFLOW.id})?$select=${fields.join(',')}`,
+  );
+  return bodyOrThrow('GoVerify workflow readback', response);
+}
+
+function assertExpectedGoverifyWorkflow(workflow, expectedState) {
+  const mismatches = [];
+  if (!guidEqual(workflow.workflowid, GOVERIFY_WORKFLOW.id)) mismatches.push('workflow ID');
+  if (workflow.name !== GOVERIFY_WORKFLOW.name) mismatches.push('workflow name');
+  if (workflow.primaryentity !== GOVERIFY_WORKFLOW.primaryEntity) mismatches.push('primary entity');
+  if (workflow.category !== 0) mismatches.push('category');
+  if (workflow.type !== 2) mismatches.push('type');
+  if (workflow.mode !== 1) mismatches.push('mode');
+  if (workflow.componentstate !== 0) mismatches.push('component state');
+  if (workflow.triggeroncreate !== true) mismatches.push('create trigger');
+  if (workflow.statecode !== expectedState.statecode) mismatches.push('state');
+  if (workflow.statuscode !== expectedState.statuscode) mismatches.push('status');
+  if (mismatches.length) {
+    throw new Error(`GoVerify workflow precondition mismatch: ${mismatches.join(', ')}.`);
+  }
+}
+
+async function setGoverifyWorkflowState(client, before, nextState) {
+  const response = await client.patch(
+    `/workflows(${GOVERIFY_WORKFLOW.id})`,
+    nextState,
+    { 'If-Match': before['@odata.etag'] },
+  );
+  bodyOrThrow('GoVerify workflow state change', response);
+  const after = await getGoverifyWorkflow(client);
+  assertExpectedGoverifyWorkflow(after, nextState);
+  return after;
 }
 
 function bodyOrThrow(label, response) {
@@ -500,7 +568,7 @@ function verify(manifest, preflightBefore, observation, files, foundationAfter, 
   return { ok: failures.length === 0, failures, accountChanges, contactChanges };
 }
 
-async function executeManifest(client, manifest, receiptPath) {
+async function executeManifest(client, manifest, receiptPath, { bypassGoverify = false } = {}) {
   validateManifest(manifest);
   const receipt = {
     kind: 'test-request-sandbox-rehearsal-receipt/v1',
@@ -528,12 +596,57 @@ async function executeManifest(client, manifest, receiptPath) {
       throw new Error(`Preallocated request GUID is not absent (status ${existing.status}).`);
     }
 
-    receipt.createAttempted = true;
-    const created = await client.post('/akoya_requests', manifest.createBody, {
-      Prefer: 'return=representation',
-    });
-    receipt.createResponseStatus = created.status;
-    if (!created.ok) bodyOrThrow('single Request create', created);
+    let created;
+    let goverifyRestoreRequired = false;
+    try {
+      if (bypassGoverify) {
+        const workflowBefore = await getGoverifyWorkflow(client);
+        assertExpectedGoverifyWorkflow(workflowBefore, { statecode: 1, statuscode: 2 });
+        receipt.goverifyBypass = {
+          workflowId: workflowBefore.workflowid,
+          workflowName: workflowBefore.name,
+          originalVersionNumber: workflowBefore.versionnumber,
+          deactivationAttemptedAt: new Date().toISOString(),
+          restored: false,
+        };
+        // From this point forward a failed or ambiguous PATCH still requires
+        // a readback and explicit restoration attempt in the finally block.
+        goverifyRestoreRequired = true;
+        const workflowDeactivated = await setGoverifyWorkflowState(
+          client,
+          workflowBefore,
+          { statecode: 0, statuscode: 1 },
+        );
+        receipt.goverifyBypass.deactivatedAt = new Date().toISOString();
+        receipt.goverifyBypass.deactivatedVersionNumber = workflowDeactivated.versionnumber;
+      }
+
+      receipt.createAttempted = true;
+      created = await client.post('/akoya_requests', manifest.createBody, {
+        Prefer: 'return=representation',
+      });
+      receipt.createResponseStatus = created.status;
+    } finally {
+      if (goverifyRestoreRequired) {
+        const workflowCurrent = await getGoverifyWorkflow(client);
+        let workflowRestored = workflowCurrent;
+        if (workflowCurrent.statecode === 0 && workflowCurrent.statuscode === 1) {
+          assertExpectedGoverifyWorkflow(workflowCurrent, { statecode: 0, statuscode: 1 });
+          workflowRestored = await setGoverifyWorkflowState(
+            client,
+            workflowCurrent,
+            { statecode: 1, statuscode: 2 },
+          );
+        } else {
+          assertExpectedGoverifyWorkflow(workflowCurrent, { statecode: 1, statuscode: 2 });
+          receipt.goverifyBypass.restoreWasAlreadyActive = true;
+        }
+        receipt.goverifyBypass.restored = true;
+        receipt.goverifyBypass.restoredAt = new Date().toISOString();
+        receipt.goverifyBypass.restoredVersionNumber = workflowRestored.versionnumber;
+      }
+    }
+    if (!created?.ok) bodyOrThrow('single Request create', created);
 
     const observation = await observe(client, manifest.values.requestId);
     let files = null;
@@ -598,7 +711,9 @@ async function main() {
   });
 
   if (args.execute) {
-    await executeManifest(client, readJson(args.execute), args.receipt);
+    await executeManifest(client, readJson(args.execute), args.receipt, {
+      bypassGoverify: args.bypassGoverify,
+    });
     return;
   }
   if (args.inspect) {
