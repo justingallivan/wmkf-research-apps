@@ -297,6 +297,11 @@ test('does not apply a delayed triage count patch after returning to the origina
   // back. Switching in the same tick races the URL-adoption effect, which
   // then writes p2's cycle into the p1 URL (seen only on the CI runner).
   await waitFor(() => expect(routerState.query.cycleCode).toBe('B'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
+  // The adoption effect re-fires once more on the render that reads the
+  // adopted URL back; drain pending passive effects across a macrotask
+  // boundary so none is left to run after the switch below.
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   fireEvent.change(mainProgram(), { target: { value: 'p1' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p1'));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
