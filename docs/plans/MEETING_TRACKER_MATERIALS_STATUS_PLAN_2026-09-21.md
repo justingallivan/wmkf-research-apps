@@ -14,7 +14,7 @@ related:
 
 ## Decision and scope
 
-[PLANNED; owner request 2026-09-20 PT] Help a program coordinator scan approximately 25 requests and identify the next materials task. Preserve the incumbent restrained design: neutral request cards, compact labeled status pills, adjacent counts/dates, and clickable status counts above the request list. The owner authorized implementation with “Build it.” Work proceeds on an isolated feature branch; production promotion remains a separate owner decision.
+[PLANNED; owner request 2026-09-20 PT] Help a program coordinator scan approximately 25 requests and identify the next materials task. Preserve the incumbent restrained design: neutral request cards, compact labeled status pills, counts/dates beneath each pill, and clickable status counts above the request list. The owner authorized implementation with “Build it.” Work proceeds on an isolated feature branch; production promotion remains a separate owner decision.
 
 Root orchestrates and adjudicates. Luna performs reconnaissance and builds. Sol reviews Luna's work and requests bounded corrections. Root reviews the resulting diff and may take over fixes. Claude Opus performs the final independent adversarial review through the existing Claude CLI subscription/OAuth session; root adjudicates every finding. This is an ordinary requested model review, not authorization for Ultrareview or another metered review product.
 
@@ -52,12 +52,12 @@ Five normal filters are Not requested, Waiting, Late, Check files and Ready. Add
 
 [PLANNED]
 - Give Materials a consistent visible position in every card; preserve scheduling, share state and meeting information. No full-card status tint or automatic reordering.
-- Keep pill text short, counts and dates adjacent, and adequate contrast. Pair color with text and a small meaningful icon; use existing tokens and control conventions.
+- Keep pill text short, counts and dates beneath each pill at every width, and adequate contrast. Pair color with text and a small meaningful icon; use existing tokens and control conventions.
 - Count filters use real buttons with selected state, keyboard focus and accessible names including counts. Pills are informational, not disguised buttons. Preserve current card links to the request's visit/materials controls; opening a status must never send an email or mutate readiness.
 - Compute counts from the full loaded scope before applying the materials filter. Changing filters does not change totals. Keep the existing request order within each result.
 - Reset materials filter to All when program, cycle or My/All scope changes. A filter that becomes empty after refresh shows a truthful empty result with an All action; never silently switch filters or show unrelated rows.
 - Initial/load-transition state must not flash false zero counts or stale actionable cards. Reuse and verify existing stale-response guards.
-- At narrow widths wrap filter controls and place progress text below the pill. No horizontal overflow or reliance on hover-only explanations.
+- At narrow widths wrap filter controls. Keep progress text below the pill at every width. No horizontal overflow or reliance on hover-only explanations.
 
 ## Implementation sequence and ownership
 
@@ -112,3 +112,7 @@ Root accepted five low-severity suggestions and one informational navigation edg
 After the hardening batch, 106 focused tests across eight suites passed, including the actual reader→dashboard→classifier contract and rendered filter behavior. Scoped ESLint/types and diff checks passed. These results supplement, rather than replace, the earlier full-suite/build evidence above. The local no-send rehearsal remains the owner review surface; authentication and live external services were not exercised by that synthetic harness. Production promotion remains a separate owner decision.
 
 Sol independently re-reviewed the post-Opus hardening and returned READY. Root accepted that verdict. One nonblocking residual is retained deliberately: after a failed scope navigation, the controls retain the attempted scope while the URL retains the old scope; Try again loads the attempted scope directly. The page shows a recovery error, no previous-scope requests or false counts, and late navigation failures cannot overwrite a newer load. Further navigation/history refinement is outside this bounded change.
+
+### Owner preview refinement — 2026-09-21
+
+[VERIFIED via source, focused tests and local browser] Supporting details now remain beneath their pill at every width. For a confirmed absent collection with an existing visit, “Request materials” links to the existing visit editor containing materials controls, preserving cycle, program and request-number context. No-visit and unavailable rows do not offer this action. The synthetic rehearsal still intercepts navigation. All 45 tests across the tracker pages/filter suites and scoped ESLint passed. Browser geometry confirmed all 25 rows keep details beneath the pill at narrow and desktop widths; the temporary viewport override was reset. Sol reviewed the refinement and returned READY. These changes remain on the feature branch, not deployed.

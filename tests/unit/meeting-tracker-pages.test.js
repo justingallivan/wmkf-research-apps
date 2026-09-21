@@ -562,6 +562,7 @@ test('the materials section carries the applicant-materials status and count', (
   const visit = { activityId: 'v', scheduledStartIso: '2026-09-20T16:00:00.000Z', formatLabel: 'Hybrid', location: 'Board room' };
   const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: null })} cycleCode="D26" programId="p1" />);
   expect(screen.getByTestId('materials-status')).toHaveTextContent('Not requested');
+  expect(screen.getByRole('link', { name: 'Request materials' })).toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003`);
   rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: { state: 'missing', receivedCount: 2, requiredCount: 3, otherCount: 0, dueAt: '2026-09-18T19:00:00Z', closesAt: '2026-09-27T17:00:00Z', overdue: true, invited: true } })} cycleCode="D26" programId="p1" />);
   expect(screen.getByTestId('materials-status')).toHaveTextContent('Late');
   expect(screen.getByText(/2\/3 received/)).toBeInTheDocument();
@@ -569,4 +570,7 @@ test('the materials section carries the applicant-materials status and count', (
   expect(screen.getByTestId('materials-status')).toHaveTextContent(`due ${expectedDue}`);
   rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null, materials: null })} cycleCode="D26" programId="p1" />);
   expect(screen.getByTestId('materials-status')).toHaveTextContent('No visit');
+  expect(screen.queryByRole('link', { name: 'Request materials' })).not.toBeInTheDocument();
+  rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: null, materialsAvailability: 'unavailable' })} cycleCode="D26" programId="p1" />);
+  expect(screen.queryByRole('link', { name: 'Request materials' })).not.toBeInTheDocument();
 });

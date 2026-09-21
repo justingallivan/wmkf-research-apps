@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { classifySiteVisitMaterialsStatus } from '../../utils/site-visit-materials-status';
 import { Archive, CalendarX2, CheckCircle2, CircleHelp, Clock3, FileCheck2, MinusCircle, TriangleAlert } from 'lucide-react';
 
@@ -8,7 +9,7 @@ const TONE = {
 };
 const ICONS = { unavailable: CircleHelp, no_visit: CalendarX2, not_requested: MinusCircle, waiting: Clock3, late: TriangleAlert, check_files: FileCheck2, ready: CheckCircle2, closed: Archive };
 
-export default function MaterialsStatusPill({ summary, availability, hasSiteVisit }) {
+export default function MaterialsStatusPill({ summary, availability, hasSiteVisit, requestMaterialsHref }) {
   const status = classifySiteVisitMaterialsStatus(summary, { availability, hasSiteVisit });
   const count = summary && Number.isFinite(summary.receivedCount) && Number.isFinite(summary.requiredCount)
     ? (summary.requiredCount === 0 ? 'No required items' : `${summary.receivedCount}/${summary.requiredCount}`) : null;
@@ -22,12 +23,14 @@ export default function MaterialsStatusPill({ summary, availability, hasSiteVisi
         : countText ? `${countText}${summary?.state === 'received' ? '; awaiting confirmation' : ''}${status.key === 'waiting' || status.key === 'late' ? dueText : ''}.` : '';
   const Icon = ICONS[status.key] || CircleHelp;
   return (
-    <div data-testid="materials-status" className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+    <div data-testid="materials-status" className="mt-1 flex flex-col items-start gap-1 text-sm">
       <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE[status.tone] || TONE.neutral}`}>
         <Icon aria-hidden="true" size={14} strokeWidth={2} className="mr-1" />
         {status.label}
       </span>
-      {detail && <span className="text-gray-600">{detail}</span>}
+      {status.key === 'not_requested' && !summary && requestMaterialsHref ? (
+        <Link href={requestMaterialsHref} className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Request materials</Link>
+      ) : detail && <span className="text-gray-600">{detail}</span>}
     </div>
   );
 }

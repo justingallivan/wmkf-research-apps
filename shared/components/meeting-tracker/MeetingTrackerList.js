@@ -94,7 +94,7 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
         </section>
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Materials</h3>
-          <MaterialsStatusPill summary={proposal.materials} availability={proposal.materialsAvailability} hasSiteVisit={Boolean(proposal.siteVisit)} />
+          <MaterialsStatusPill summary={proposal.materials} availability={proposal.materialsAvailability} hasSiteVisit={Boolean(proposal.siteVisit)} requestMaterialsHref={visitHref} />
         </section>
       </div>
     </article>
