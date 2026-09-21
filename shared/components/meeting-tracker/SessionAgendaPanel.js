@@ -302,7 +302,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setError(null);
     setSendFeedback(null);
     try {
-      const { ok: resOk, error: envelopeError, data: body } = await requestEnvelope(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
+      const { ok: resOk, data: body } = await requestEnvelope(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: { operationId: preview.operationId },
@@ -315,8 +315,12 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
           setPreview(body.pendingSend);
           setConfirmed(false);
           setNotice('Another session agenda send is unresolved. Review and retry that same agenda before creating or sending another one.');
+          setSendFeedback({
+            status: 'failed',
+            message: 'This agenda was not sent. Review the earlier unresolved send before sending another agenda.',
+          });
         }
-        throw new Error(body.error || envelopeError.message);
+        return;
       }
       if (!resOk && body.code === 'agenda_operation_stale') {
         if (sequence.current === currentSequence) {

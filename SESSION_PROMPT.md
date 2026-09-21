@@ -73,10 +73,13 @@ decision.** **Update 16:20 PT: the owner said "merge"; merge commit
    `write_failed` status word (Stage 6 review finding 3); the `failure` code is
    on the same row. Route it through the same cause/recovery copy, or record the
    asymmetry as deliberate.
-4. **`SessionAgendaPanel.js` send**: a 409 `agenda_send_unresolved` renders the
-   "Send status is uncertain" banner although it is a definite refusal
-   (pre-existing; execution log deviation (6) closure). Decide whether to
-   reclassify as `failed`.
+4. **Agenda-send refusal fix — branch candidate, not deployed.**
+   [VERIFIED via source, 56 focused tests, and Sol review] On
+   `codex/agenda-send-feedback`, a competing-send 409 `agenda_send_unresolved`
+   now renders "Not sent." and preserves the earlier unresolved operation for
+   explicit reconciliation. Luna built; Sol reviewed; root accepted. Promotion
+   remains an owner decision. Evidence:
+   `docs/plans/AGENDA_SEND_REFUSAL_FIX_2026-09-20.md`.
 
 ### Verified Open
 

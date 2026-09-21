@@ -218,6 +218,66 @@ test('a prepare-time unresolved conflict pins the existing operation', async () 
   expect(JSON.parse(sendCall[1].body)).toEqual({ operationId: pending.operationId });
 });
 
+test('a send-time unresolved conflict marks B not sent and preserves A for explicit reconciliation', async () => {
+  const earlierPending = prepared({
+    operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    state: 'send_requested',
+    sendRequestedAt: '2026-09-10T19:00:00.000Z',
+  });
+  const competingPreview = prepared({
+    operationId: OPERATION_ID,
+    subject: 'Competing B subject',
+  });
+  global.fetch
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
+    .mockResolvedValueOnce(response({ success: true, agenda: competingPreview }))
+    .mockResolvedValueOnce(response({
+      error: 'A session agenda send is still unresolved.',
+      code: 'agenda_send_unresolved',
+      pendingSend: earlierPending,
+    }, 409))
+    .mockResolvedValueOnce(response({
+      success: true,
+      agenda: prepared({
+        operationId: earlierPending.operationId,
+        state: 'sent',
+        transportAccepted: true,
+        sentAt: '2026-09-10T19:02:00.000Z',
+      }),
+    }));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  await flushLoadStatus();
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await screen.findByText('Competing B subject');
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
+
+  const feedback = await screen.findByTestId('agenda-send-feedback');
+  expect(feedback).toHaveRole('alert');
+  expect(feedback).toHaveTextContent('Not sent.');
+  expect(feedback).toHaveTextContent('This agenda was not sent. Review the earlier unresolved send before sending another agenda.');
+  expect(feedback).not.toHaveTextContent('Send status is uncertain.');
+  expect(feedback).not.toHaveTextContent('Please try again.');
+  expect(screen.getByText(earlierPending.subject)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Create preview' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Subject')).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/I reviewed the recipients/)).not.toBeChecked();
+  expect(screen.getByRole('button', { name: 'Send agenda' })).toBeDisabled();
+  expect(global.fetch.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1);
+  const firstPatchCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');
+  expect(firstPatchCalls).toHaveLength(1);
+  expect(JSON.parse(firstPatchCalls[0][1].body)).toEqual({ operationId: competingPreview.operationId });
+
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
+  expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
+  const patchCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');
+  expect(patchCalls).toHaveLength(2);
+  expect(JSON.parse(patchCalls[1][1].body)).toEqual({ operationId: earlierPending.operationId });
+});
+
 test('a terminal retry unblocks a new preview without retaining the failed operation', async () => {
   const pending = prepared({
     state: 'send_requested',
