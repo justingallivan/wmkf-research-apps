@@ -55,7 +55,7 @@ function dependencies(overrides = {}) {
       }],
       [REQUEST_B, null],
     ])),
-    getMaterialsSummaries: jest.fn(async ({ requestIds }) => new Map(requestIds.map((id) => [id, id === REQUEST_A ? MATERIALS_A : null]))),
+    getMaterialsSummariesWithAvailability: jest.fn(async ({ requestIds }) => ({ summaries: new Map(requestIds.map((id) => [id, id === REQUEST_A ? MATERIALS_A : null])), availability: new Map(requestIds.map((id) => [id, 'available'])) })),
     ...overrides,
   };
 }
@@ -75,7 +75,7 @@ test('joins share, deliberation, and visit state and sorts by the next meeting',
     siteVisit: { formatLabel: 'Hybrid', location: 'Board room' },
     materials: MATERIALS_A,
   });
-  expect(deps.getMaterialsSummaries).toHaveBeenCalledWith({
+  expect(deps.getMaterialsSummariesWithAvailability).toHaveBeenCalledWith({
     requestIds: [REQUEST_B, REQUEST_A],
     requestNumbers: new Map([[REQUEST_B, '1002'], [REQUEST_A, '1001']]),
     cycleCode: 'D26',
@@ -92,7 +92,7 @@ test('joins share, deliberation, and visit state and sorts by the next meeting',
 });
 
 test('a failing materials reader degrades every row to null instead of failing the cycle page', async () => {
-  const deps = dependencies({ getMaterialsSummaries: jest.fn(async () => { throw new Error('pg down'); }) });
+  const deps = dependencies({ getMaterialsSummariesWithAvailability: jest.fn(async () => { throw new Error('pg down'); }) });
   const result = await loadMeetingTrackerDashboard({ cycleCode: 'D26' }, deps);
   expect(result.proposals.map((row) => row.materials)).toEqual([null, null]);
 });

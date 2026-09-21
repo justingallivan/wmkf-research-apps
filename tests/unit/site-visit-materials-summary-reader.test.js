@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { getMaterialsSummaryByRequests, getMaterialsSummaryForRequest } from '../../lib/services/site-visit-materials/summary-reader';
+import { getMaterialsSummaryByRequests, getMaterialsSummaryByRequestsWithAvailability, getMaterialsSummaryForRequest } from '../../lib/services/site-visit-materials/summary-reader';
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 
@@ -67,6 +67,17 @@ test('fail-open: readiness off, an empty id list, or any throw returns the compl
   expect([...(await getMaterialsSummaryByRequests({ requestIds: [R1, R2], requestNumbers: NUMBERS }, broken)).values()]).toEqual([null, null]);
   const brokenRegistry = deps({ findDocumentsByCycle: async () => { throw new Error('dataverse 503'); } });
   expect((await getMaterialsSummaryByRequests({ requestIds: [R1], requestNumbers: NUMBERS, cycleCode: 'D26' }, brokenRegistry)).get(R1)).toBeNull();
+  log.mockRestore();
+});
+
+test('availability distinguishes a confirmed empty read from a failed read', async () => {
+  const empty = await getMaterialsSummaryByRequestsWithAvailability({ requestIds: [R1, R2], requestNumbers: NUMBERS }, deps({ listLatestCollections: async () => [] }));
+  expect(empty.summaries.get(R1)).toBeNull();
+  expect(empty.availability.get(R1)).toBe('available');
+  const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  const failed = await getMaterialsSummaryByRequestsWithAvailability({ requestIds: [R1, R2], requestNumbers: NUMBERS }, deps({ listLatestCollections: async () => { throw new Error('db'); } }));
+  expect(failed.summaries.get(R1)).toBeNull();
+  expect(failed.availability.get(R1)).toBe('unavailable');
   log.mockRestore();
 });
 

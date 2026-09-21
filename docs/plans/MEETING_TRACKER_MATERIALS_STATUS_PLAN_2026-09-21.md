@@ -14,7 +14,7 @@ related:
 
 ## Decision and scope
 
-[PLANNED; owner request 2026-09-20 PT] Help a program coordinator scan approximately 25 requests and identify the next materials task. Preserve the incumbent restrained design: neutral request cards, compact labeled status pills, adjacent counts/dates, and clickable status counts above the request list. Planning is authorized now; runtime implementation and release await the owner's go-ahead.
+[PLANNED; owner request 2026-09-20 PT] Help a program coordinator scan approximately 25 requests and identify the next materials task. Preserve the incumbent restrained design: neutral request cards, compact labeled status pills, adjacent counts/dates, and clickable status counts above the request list. The owner authorized implementation with “Build it.” Work proceeds on an isolated feature branch; production promotion remains a separate owner decision.
 
 Root orchestrates and adjudicates. Luna performs reconnaissance and builds. Sol reviews Luna's work and requests bounded corrections. Root reviews the resulting diff and may take over fixes. Claude Opus performs the final independent adversarial review through the existing Claude CLI subscription/OAuth session; root adjudicates every finding. This is an ordinary requested model review, not authorization for Ultrareview or another metered review product.
 
@@ -86,4 +86,4 @@ For visual verification use one desktop/mobile pass, one batched fix pass, and a
 
 ## Current status
 
-Planning only. No runtime code or live configuration changed by this task. Luna completed read-only reconnaissance and Atlas checks. Sol returned READY TO IMPLEMENT after a focused contract review; root accepted that verdict and independently verified the summary failure and classification paths. Root rejected the preliminary suggestions to map unsent invitations to Waiting or to conceal existing collections behind missing visits. No unresolved owner design question is required to begin the planned work after approval. Claude Opus adversarial review remains a required post-build step; it has not yet been performed. Documentation catalog and currency checks (including the currency self-test) passed.
+Implementation in progress on `codex/meeting-tracker-materials-status`; no live configuration or production code changed by this task. Luna completed read-only reconnaissance and Atlas checks. Sol returned READY TO IMPLEMENT after a focused contract review; root accepted that verdict and independently verified the summary failure and classification paths. Root rejected the preliminary suggestions to map unsent invitations to Waiting or to conceal existing collections behind missing visits. No unresolved owner design question blocks implementation. Claude Opus adversarial review remains a required post-build step; it has not yet been performed. Documentation catalog and currency checks (including the currency self-test) passed.

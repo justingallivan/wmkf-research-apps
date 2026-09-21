@@ -557,12 +557,14 @@ describe('SessionEditor optimistic reorder', () => {
   });
 });
 
-test('the site-visit section carries the applicant-materials cue: counts when a collection exists, "not requested" otherwise (plan §16.3, PR 3)', () => {
+test('the materials section carries the applicant-materials status and count', () => {
   const visit = { activityId: 'v', scheduledStartIso: '2026-09-20T16:00:00.000Z', formatLabel: 'Hybrid', location: 'Board room' };
   const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: null })} cycleCode="D26" programId="p1" />);
-  expect(screen.getByTestId('tracker-materials-line')).toHaveTextContent('Materials not requested.');
+  expect(screen.getByTestId('materials-status')).toHaveTextContent('Not requested');
   rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: { state: 'missing', receivedCount: 2, requiredCount: 3, otherCount: 0, dueAt: '2026-09-18T19:00:00Z', closesAt: '2026-09-27T17:00:00Z', overdue: true, invited: true } })} cycleCode="D26" programId="p1" />);
-  expect(screen.getByTestId('tracker-materials-line')).toHaveTextContent('Materials: 2 of 3 received · overdue');
+  expect(screen.getByTestId('materials-status')).toHaveTextContent('Late');
+  expect(screen.getByText(/2\/3 received/)).toBeInTheDocument();
+  expect(screen.getByText(/due Sep 18/)).toBeInTheDocument();
   rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null, materials: null })} cycleCode="D26" programId="p1" />);
-  expect(screen.queryByTestId('tracker-materials-line')).not.toBeInTheDocument();
+  expect(screen.getByTestId('materials-status')).toHaveTextContent('No visit');
 });

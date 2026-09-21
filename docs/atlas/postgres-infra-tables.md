@@ -686,7 +686,10 @@ delivered email whose id could not be attached (`receiptFailed`; the run log and
 details carry the id for repair); neither is retried automatically. Staff list surfaces (Staff Deliberations tab and cycle
 view, tracker list row) read a counts-only summary through `summary-reader.js`
 (`listLatestCollectionsForRequests`, `DISTINCT ON (request_id)`); the contributor link and contacts
-never leave the tracker grant.
+never leave the tracker grant. The legacy batch reader remains a fail-open summary map for sibling
+consumers. Its additive Meeting Tracker reader also returns per-request availability, allowing that
+dashboard to distinguish a successful read with no collection from readiness-off, Postgres,
+registry, malformed-result, or thrown dependency failures and render those rows as unavailable.
 **Production-live via PR #320 / merge `834b83d8382` (2026-09-20):** the first invitation preview is read-only;
 the collection row and sealed contributor link are created only on explicit Send. A user's
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
