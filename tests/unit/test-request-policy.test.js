@@ -173,6 +173,15 @@ describe('draft compiler negative boundaries', () => {
     const requestId = input().sourceRequest.akoya_requestid.toUpperCase();
     expect(compileTestRequestDraft(input({requestId})).blockers).toEqual(expect.arrayContaining([expect.objectContaining({code:'SOURCE_ID_REUSED'})]));
   });
+  test('accepts canonical Dataverse GUIDs without RFC version or variant nibbles', () => {
+    const result = compileTestRequestDraft(input({
+      testOrganizationId: '537e3b60-c18f-ee11-8179-000d3a341e8f',
+    }));
+    expect(result.blockers).toEqual([]);
+    expect(result.createBody['akoya_applicantid@odata.bind']).toBe(
+      '/accounts(537e3b60-c18f-ee11-8179-000d3a341e8f)',
+    );
+  });
   test('normal metadata Recommended and required logical lookup are supported', () => {
     const m = metadata();
     m.fields.akoya_title.requiredLevel = 'Recommended';
