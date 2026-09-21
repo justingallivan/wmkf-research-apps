@@ -28,6 +28,7 @@ const DIAGNOSTICS = Object.freeze([
       'performanceexecutionduration', 'correlationid', 'requestid', 'pluginstepid',
       'createdon',
     ],
+    virtualFields: [],
   },
   {
     logicalName: 'processsession',
@@ -35,8 +36,8 @@ const DIAGNOSTICS = Object.freeze([
     fields: [
       'processsessionid', 'name', 'startedon', 'completedon', 'executedon', 'createdon',
       'statecode', 'statuscode', 'comments', 'errorcode', 'correlationid',
-      '_processid_value', '_regardingobjectid_value',
     ],
+    virtualFields: ['_processid_value'],
   },
   {
     logicalName: 'asyncoperation',
@@ -44,16 +45,18 @@ const DIAGNOSTICS = Object.freeze([
     fields: [
       'asyncoperationid', 'name', 'operationtype', 'createdon', 'startedon',
       'completedon', 'statecode', 'statuscode', 'message', 'friendlymessage',
-      'errorcode', 'correlationid', 'correlationupdatedtime', '_regardingobjectid_value',
+      'errorcode', 'correlationid', 'correlationupdatedtime',
     ],
+    virtualFields: [],
   },
   {
     logicalName: 'workflowlog',
     timeCandidates: ['createdon'],
     fields: [
       'workflowlogid', 'name', 'createdon', 'stage', 'status', 'message',
-      'errorcode', '_asyncoperationid_value', '_processsessionid_value',
+      'errorcode',
     ],
+    virtualFields: [],
   },
 ]);
 
@@ -105,17 +108,22 @@ async function queryDiagnostic(client, spec, from, to) {
   if (!metadata) return { logicalName: spec.logicalName, status: 'entity_absent', rows: [] };
   const timeField = spec.timeCandidates.find((field) => metadata.attributes.has(field));
   if (!timeField) return { logicalName: spec.logicalName, status: 'time_field_absent', rows: [] };
-  const fields = spec.fields.filter((field) => metadata.attributes.has(field));
+  const fields = [
+    ...spec.fields.filter((field) => metadata.attributes.has(field)),
+    ...(spec.virtualFields || []),
+  ];
   const filter = `${timeField} ge ${from} and ${timeField} lt ${to}`;
   const response = await client.get(
     `/${metadata.entitySetName}?$select=${fields.join(',')}` +
       `&$filter=${encodeURIComponent(filter)}&$orderby=${timeField} asc&$top=100`,
+    { Prefer: 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"' },
   );
   if (!response.ok) {
     return {
       logicalName: spec.logicalName,
       entitySetName: metadata.entitySetName,
       status: `read_${response.status}`,
+      detail: scrub(response.text || ''),
       rows: [],
     };
   }
@@ -159,4 +167,3 @@ main().catch((error) => {
   console.error(`FATAL: ${error.message}`);
   process.exit(1);
 });
-
