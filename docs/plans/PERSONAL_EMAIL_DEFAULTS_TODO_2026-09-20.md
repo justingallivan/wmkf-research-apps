@@ -29,7 +29,7 @@ related:
 
 ## Proposed interaction contract
 
-[Owner contract; Meeting Tracker feature-branch implementation accepted, not released]
+[Owner contract; Meeting Tracker implementation Production-live]
 
 Shared default → sender's saved default → edits for this particular send → send.
 Invitation and reminder defaults are separate. Saving personal defaults is an
@@ -46,17 +46,20 @@ does not select an API or generalized editor for suite-wide use.
 
 ## Current evidence and next work
 
-[VERIFIED via feature-branch source and 115 passing tests 2026-09-20; implementation accepted, not released]
+[VERIFIED via source, tests, merge and Production evidence 2026-09-20]
 `shared/config/editableTextDefaults.js` registers shared subject/body defaults
 for `email.site_visit_materials_invite` and `email.site_visit_materials_reminder`.
-The Meeting Tracker branch introduces a personal-template preference route,
+Meeting Tracker provides a personal-template preference route,
 separate invitation/reminder own-profile override keys, and an editable preview
 for the first invitation, later invitation, and manual reminder. Preview does
 not create the collection or send; explicit Send is bound to a short-lived
 server-signed proof and renders the contributor URL server-side. The automatic
-reminder's template remains the shared Admin default. The branch has not been
-promoted to production. Cross-layer source review and the 115-test combined run
-have passed; release remains a separate step.
+reminder's template remains the shared Admin default. PR #320 promoted the
+implementation at merge `834b83d8382`. GitHub CI passed 1,050 suites / 15,513
+tests; Production deployment
+`dpl_FRtcw4uqBB12jAH7Ug1aPfYTB8nQ` reached Ready. The four shared Admin values
+were saved only after runtime promotion and independently read back exact against
+the tracked seeds. No email was sent.
 
 - [x] Trace the existing personal-template persistence and preview/send contracts.
 - [x] Finish review, tests, and acceptance of the Meeting Tracker feature-branch

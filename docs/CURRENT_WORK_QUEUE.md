@@ -51,12 +51,14 @@ sequence.
 ## Owner-requested product follow-ups
 
 - **Personal email defaults and editable send previews (2026-09-20).**
-  [ACCEPTED FEATURE-BRANCH IMPLEMENTATION; NOT RELEASED] Meeting Tracker's first and later
+  [PRODUCTION-LIVE — PR #320, merge `834b83d8382`, deployment
+  `dpl_FRtcw4uqBB12jAH7Ug1aPfYTB8nQ`] Meeting Tracker's first and later
   materials invitations and manual reminders now have personal defaults and
-  editable previews in the candidate source. Luna built, Sol reviewed and root
-  accepted; implementation and evidence are recorded in
-  `docs/plans/MATERIALS_EMAIL_PERSONALIZATION_PLAN_2026-09-20.md`. No main merge or
-  production release is included. Suite-wide adoption remains a separate to-do:
+  editable previews in Production. Named copy resolves the actual PI, liaison and
+  request-assigned Program Coordinator; the shared four-key Admin readback matched
+  tracked seeds exactly after runtime promotion. Implementation and evidence are
+  recorded in `docs/plans/MATERIALS_EMAIL_PERSONALIZATION_PLAN_2026-09-20.md`.
+  Suite-wide adoption remains a separate to-do:
   inventory support and gaps for every app-authorized user, then extend existing
   mechanisms in bounded changes. Requirements and remaining follow-ups:
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.

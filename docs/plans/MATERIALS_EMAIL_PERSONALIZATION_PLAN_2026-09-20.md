@@ -3,7 +3,7 @@ title: Meeting Tracker materials email personalization
 domain: workbench
 kind: plan
 status: active
-summary: Accepted feature-branch implementation of personal invitation/reminder defaults and editable previews; release remains separate.
+summary: Production implementation of personal invitation/reminder defaults, editable previews, and authoritative named materials copy.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -160,7 +160,8 @@ reproduced intra-request races, which are rejected before creation or claim.
 ## Execution and adjudication — 2026-09-20
 
 [VERIFIED via source, tests and Sol review] Implementation accepted on
-`codex/materials-email-personalization`; not merged or deployed to production.
+`codex/materials-email-personalization` and released through PR #320 at merge
+`834b83d8382ebe4bf5ac808ab5c58b58fa93b8a4`.
 Luna built the preference/proof layer and the preview/send/UI layer. Sol reviewed
 the plan and successive diffs. Root reproduced findings with independent tests,
 required fixes, and accepted the final source after Sol's READY verdict.
@@ -188,10 +189,11 @@ services. No migration or environment change is needed.
 
 Scoped changed-fact reconciliation covered the security matrix, service catalog,
 Atlas collection entry, materials workflow plan, personal-defaults to-do, current
-queue and generated canonical route counts. These describe accepted branch source,
-not production state. Suite-wide rollout and deliberate release remain follow-ups.
+queue and generated canonical route counts. These initially described accepted
+branch source. PR #320 and the Production evidence below supersede that
+release-pending status. Suite-wide rollout remains a follow-up.
 
-## Named-copy extension — 2026-09-20 [ACCEPTED FEATURE-BRANCH SOURCE; READY FOR RELEASE, NOT LIVE]
+## Named-copy extension — 2026-09-20 [PRODUCTION-LIVE]
 
 The approved shared materials templates add `{{piLastName}}`,
 `{{liaisonFullName}}`, and `{{programCoordinatorName}}` to the body-token
@@ -207,3 +209,13 @@ envelope; the service rechecks them before insert, claim or transport. Missing
 required names fail before side effects. Runtime support must reach production
 before the four shared Admin template values are reseeded, so an older runtime
 can never encounter unknown live tokens. Personal overrides are not reseeded.
+
+Release evidence: PR #320 merged at `2026-09-21T04:27:36Z`, merge
+`834b83d8382ebe4bf5ac808ab5c58b58fa93b8a4`. GitHub run `35560620715`
+passed **1,050/1,050 suites and 15,513/15,513 tests**, with all required checks
+green. Production deployment `dpl_FRtcw4uqBB12jAH7Ug1aPfYTB8nQ` reached Ready
+at `https://wmkfresearchapps-2wt7pappk-justin-gallivans-projects.vercel.app`
+and carries the `applications.wmkeck.org` alias. Runtime-first ordering was
+preserved. The four shared Admin values were then saved through the UI and
+independently read back from Dataverse exact against the tracked seeds at
+`2026-09-21T04:29:49.271420Z`. No email was sent.

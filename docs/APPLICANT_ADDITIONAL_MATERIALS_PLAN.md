@@ -673,7 +673,7 @@ button and fallback link; an edited template may also place the server-minted UR
 `{{uploadLink}}` and the sending PC’s signature with `{{signature}}`. This branch is not a
 production-live claim.
 
-### 16.9 2026-09-20: personal manual-send defaults and editable preview [ACCEPTED FEATURE-BRANCH SOURCE; NOT RELEASED]
+### 16.9 2026-09-20: personal manual-send defaults and editable preview [PRODUCTION-LIVE 2026-09-20]
 
 The Meeting Tracker feature branch adds personal invitation and reminder subject/body
 templates for every user with the Meeting Tracker app grant. The shared Admin defaults remain
@@ -692,10 +692,11 @@ fallback link. Required `{{checklist}}` or `{{missingItems}}` tokens keep the re
 the final text. On the first Send, the collection and sealed link are persisted before Dynamics
 transport, so a transport failure may leave a collection with no confirmed invitation; the
 card must report that partial result and allow a deliberate follow-up after checking email
-history. This source-built work passed cross-layer review and the combined 115-test
-run on 2026-09-20; it has not been released to production.
+history. This work passed cross-layer review and the combined 115-test run on
+2026-09-20, then shipped in PR #320 at merge
+`834b83d8382ebe4bf5ac808ab5c58b58fa93b8a4`.
 
-### 16.10 2026-09-20: isolated email-modal rehearsal [VERIFIED IN PREVIEW; NOT RELEASED TO PRODUCTION]
+### 16.10 2026-09-20: isolated email-modal rehearsal [PRODUCTION SOURCE; PREVIEW/LOCAL ACCESS ONLY]
 
 The feature branch also includes a local/Preview-only rehearsal page for the real
 materials email modal. An exact `_app` path bypass prevents the page from mounting
@@ -716,9 +717,11 @@ as Preview deployment `dpl_HekqUG9SUrniPhnWa579nAVd97kX` at
 The Preview route `/meeting-tracker/materials-email-rehearsal` returns the
 expected 307 staff sign-in redirect while retaining its callback. The full
 modal interactions were independently verified against the local production
-build as recorded above. This Preview verification is not a production release.
+build as recorded above. The source shipped with PR #320, but the rehearsal
+route intentionally returns 404 outside local development and Vercel Preview;
+it is not an available Production product surface.
 
-### 16.11 2026-09-20: named materials email copy [ACCEPTED FEATURE-BRANCH SOURCE; READY FOR RELEASE, NOT LIVE]
+### 16.11 2026-09-20: named materials email copy [PRODUCTION-LIVE 2026-09-20]
 
 The approved shared invitation and reminder copy addresses the PI as
 `Dear Dr. {{piLastName}}`, names the institutional liaison with
@@ -742,5 +745,13 @@ Rollout order is compatibility-critical: deploy and verify runtime support for
 the three tokens first, then replace exactly the four shared Admin values
 (`email.site_visit_materials_invite.subject/.body` and
 `email.site_visit_materials_reminder.subject/.body`) with the approved seed
-text. Personal overrides remain untouched. This accepted feature-branch source is ready for release; the revised Admin
-values are not yet live.
+text. Personal overrides remain untouched.
+
+PR #320 merged at `834b83d8382ebe4bf5ac808ab5c58b58fa93b8a4` at
+`2026-09-21T04:27:36Z` after all GitHub checks passed. Vercel Production
+deployment `dpl_FRtcw4uqBB12jAH7Ug1aPfYTB8nQ` reached Ready at
+`https://wmkfresearchapps-2wt7pappk-justin-gallivans-projects.vercel.app`
+and serves `applications.wmkeck.org`. After that compatible runtime was live, exactly the
+four shared invitation/reminder subject/body values were saved through Admin.
+Independent Dataverse readback at `2026-09-21T04:29:49.271420Z` matched all
+four tracked seed values exactly. No email was sent during release verification.

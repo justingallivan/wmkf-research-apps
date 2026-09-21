@@ -687,7 +687,7 @@ details carry the id for repair); neither is retried automatically. Staff list s
 view, tracker list row) read a counts-only summary through `summary-reader.js`
 (`listLatestCollectionsForRequests`, `DISTINCT ON (request_id)`); the contributor link and contacts
 never leave the tracker grant.
-**Accepted feature-branch change, not released (2026-09-20):** the first invitation preview is read-only;
+**Production-live via PR #320 / merge `834b83d8382` (2026-09-20):** the first invitation preview is read-only;
 the collection row and sealed contributor link are created only on explicit Send. A user's
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
 this Postgres row. One-off edits are not saved as defaults.
