@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import MaterialsEmailModal from '../../shared/components/meeting-tracker/MaterialsEmailModal';
 import ProfileContext from '../../shared/context/ProfileContext';
-
-const SAMPLE_TEMPLATE = {
-  subject: 'Materials needed for your site visit',
-  body: 'Hello {{institution}},\n\nPlease upload the following materials for {{proposalTitle}}:\n{{checklist}}\n\n{{uploadLink}}\n\n{{signature}}',
-};
+import {
+  SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
+  SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT,
+  SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
+  SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT,
+} from '../../lib/seed/email-defaults/site-visit-materials';
 
 const SHARED_TEMPLATES = {
-  invitation: { ...SAMPLE_TEMPLATE },
-  reminder: { subject: 'Reminder: materials needed', body: 'Hello {{institution}},\n\nWe still need these materials for {{proposalTitle}}:\n{{missingItems}}\n\n{{uploadLink}}\n\n{{signature}}' },
+  invitation: { subject: SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT, body: SITE_VISIT_MATERIALS_INVITE_SEED_BODY },
+  reminder: { subject: SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT, body: SITE_VISIT_MATERIALS_REMINDER_SEED_BODY },
 };
 
 const SAMPLE_RECIPIENT = { name: 'Sample recipient', email: 'sample-recipient@example.invalid' };
