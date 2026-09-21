@@ -1437,6 +1437,23 @@ and two modals with no shared constant / parity gate — noted, not changed
 (tests catch drift today). (5) nit: `REISSUE_REFUSAL_FALLBACKS` declared inside
 the branch body.
 
+### D1 remainder + D9 implementation — 2026-09-20, branch-built; reviewed and accepted
+
+On `codex/d1-response-handling`, the remaining D1 sites were guarded after
+tests were written against the pre-fix behavior. `pages/dynamics-explorer.js`
+now rejects non-2xx role envelopes, resets role state on profile changes, and
+ignores stale completions while showing a new minimal inline role-load error because that page had no standalone alert surface. The provider
+load in `pages/virtual-review-panel.js` keeps defaults on failed HTTP loads,
+shows the existing `ErrorAlert`, and ignores stale completions. The two
+scheduled-email posture loads run independently with per-load errors, reset
+unknown posture on profile changes, and keep VIP controls disabled until a
+successful flags response. The three remaining D9 call sites now pass
+`error=` to `ErrorAlert`.
+
+Focused verification: 6 suites / 66 tests green, including 2xx, non-2xx,
+malformed 2xx, stale completion, asymmetric posture failures, and a real
+`ErrorAlert` visibility check. Sol's final review accepted the candidate at diff SHA256 `aac1a09bae999b6f7292fa3a384acd9455e0df22cf0b26e39768fee606c8e804`; root's source adjudication accepted it and independently reproduced 66/66 focused tests. This records branch-built state only; no release or deployment claim is made here.
+
 ### Stage 6 acceptance — 2026-09-20, orchestrator (Fable), at `9f64a364a`
 
 Accepted. Gate G green at `c9dd84e2e` (above); commits since are docs and

@@ -132,6 +132,7 @@ function DynamicsExplorer() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [thinkingStatus, setThinkingStatus] = useState('');
   const [userRole, setUserRole] = useState('read_only');
+  const [roleError, setRoleError] = useState(null);
   const [sessionId] = useState(() => `de-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const [feedbackMap, setFeedbackMap] = useState({});       // { messageId: 'positive'|'negative' }
   const [suggestFeedbackId, setSuggestFeedbackId] = useState(null);
@@ -150,10 +151,24 @@ function DynamicsExplorer() {
   useEffect(() => {
     const profileId = currentProfile?.id;
     if (!profileId) return;
+    let cancelled = false;
+    setUserRole('read_only');
+    setRoleError(null);
 
     requestEnvelope(`/api/dynamics-explorer/roles?userProfileId=${profileId}`, { tolerantBody: true })
-      .then(envelope => setUserRole(envelope.data.callerRole || envelope.data.role || 'read_only'))
-      .catch(() => {});
+      .then(envelope => {
+        if (cancelled) return;
+        if (!envelope.ok) {
+          setRoleError(envelope.error?.message || `Request failed (${envelope.status})`);
+          return;
+        }
+        setRoleError(null);
+        setUserRole(envelope.data.callerRole || envelope.data.role || 'read_only');
+      })
+      .catch(err => {
+        if (!cancelled && err.name !== 'AbortError') setRoleError(err.message);
+      });
+    return () => { cancelled = true; };
   }, [currentProfile?.id]);
 
   // Auto-scroll to bottom
@@ -563,6 +578,7 @@ function DynamicsExplorer() {
               </button>
             )}
           </div>
+          {roleError && <p role="alert" className="mt-2 text-sm text-red-700">{roleError}</p>}
           <p className="mt-3 text-xs leading-5 text-gray-500">
             Answers use approved Dynamics 365 and SharePoint sources. Verify important results in the linked records or documents before acting on them.
           </p>

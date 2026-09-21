@@ -148,7 +148,7 @@ function PhaseIDynamics() {
         description="Single-request Phase I summarization with writeback to akoya_request.wmkf_ai_summary."
       />
 
-      <ErrorAlert message={error} onDismiss={() => setError(null)} />
+      <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
       {/* Step 1: Lookup */}
       <Card className="mb-6">

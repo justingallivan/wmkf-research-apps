@@ -474,7 +474,7 @@ function DataverseBulkExport() {
         subtitle="A plain-English filter builder over the grant request store. Every fan-out is an explicit choice; the true total is the real FetchXML count (never the 5,000 cap); truncation is loud; the artifact ships with a baked-in Methods sheet."
       />
 
-      <ErrorAlert message={topError} onDismiss={() => setTopError(null)} />
+      <ErrorAlert error={topError} onDismiss={() => setTopError(null)} />
 
       {/* Fail-loud taxonomy state */}
       {taxLoading && (

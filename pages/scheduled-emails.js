@@ -50,25 +50,42 @@ export default function ScheduledEmailsPage() {
   // Review posture: the coarse review-all override plus this PD's VIP flags.
   const [reviewAll, setReviewAll] = useState(null);
   const [savingReviewAll, setSavingReviewAll] = useState(false);
-  const [vipContactIds, setVipContactIds] = useState(new Set());
+  const [vipContactIds, setVipContactIds] = useState(null);
+  const [postureErrors, setPostureErrors] = useState({ preference: null, vip: null });
   const [savingVip, setSavingVip] = useState(false);
 
   useEffect(() => {
     if (profileStatus !== 'ready' || !currentProfile?.id) return;
     const controller = new AbortController();
-    // D1-preserve: unguarded today (no `response.ok` check before reading the
-    // body), so the migration keeps reading `.data` regardless of status.
-    Promise.all([
-      requestEnvelope('/api/email-automation-preferences', { signal: controller.signal, tolerantBody: true })
-        .then((envelope) => envelope.data),
-      requestEnvelope('/api/scheduled-emails/vip-flags', { signal: controller.signal, tolerantBody: true })
-        .then((envelope) => envelope.data),
-    ])
-      .then(([preference, flags]) => {
-        setReviewAll(preference?.preference?.reviewAll === true);
-        setVipContactIds(new Set((flags?.flags || []).map((flag) => flag.contactId)));
-      })
-      .catch(() => {});
+    setReviewAll(null);
+    setVipContactIds(null);
+    setPostureErrors({ preference: null, vip: null });
+    const loadPosture = (kind, url, onSuccess) => {
+      requestEnvelope(url, { signal: controller.signal, tolerantBody: true })
+        .then((envelope) => {
+          if (controller.signal.aborted) return;
+          if (!envelope.ok) {
+            setPostureErrors((current) => ({
+              ...current,
+              [kind]: envelope.error?.message || `Request failed (${envelope.status})`,
+            }));
+            return;
+          }
+          setPostureErrors((current) => ({ ...current, [kind]: null }));
+          onSuccess(envelope.data);
+        })
+        .catch((err) => {
+          if (!controller.signal.aborted && err.name !== 'AbortError') {
+            setPostureErrors((current) => ({ ...current, [kind]: err.message }));
+          }
+        });
+    };
+    loadPosture('preference', '/api/email-automation-preferences', (data) => {
+      setReviewAll(data?.preference?.reviewAll === true);
+    });
+    loadPosture('vip', '/api/scheduled-emails/vip-flags', (data) => {
+      setVipContactIds(new Set((data?.flags || []).map((flag) => flag.contactId)));
+    });
     return () => controller.abort();
   }, [profileStatus, currentProfile?.id]);
 
@@ -212,6 +229,12 @@ export default function ScheduledEmailsPage() {
         subtitle="Review personalized messages that will be sent automatically on your behalf."
       />
       <div className="py-8">
+        {(postureErrors.preference || postureErrors.vip) && (
+          <div role="alert" className="mb-4 space-y-1 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {postureErrors.preference && <p>Review preference: {postureErrors.preference}</p>}
+            {postureErrors.vip && <p>VIP flags: {postureErrors.vip}</p>}
+          </div>
+        )}
         {error && (
           <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
         )}
@@ -295,8 +318,8 @@ export default function ScheduledEmailsPage() {
                     <label className="mt-4 flex items-center gap-3 text-sm text-gray-700">
                       <input
                         type="checkbox"
-                        checked={vipContactIds.has(selected.recipientContactIds[0])}
-                        disabled={savingVip}
+                        checked={vipContactIds?.has(selected.recipientContactIds[0]) || false}
+                        disabled={savingVip || vipContactIds === null}
                         onChange={(event) => saveVipFlag(selected.recipientContactIds[0], event.target.checked)}
                         className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />

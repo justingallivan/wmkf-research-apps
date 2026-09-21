@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
@@ -362,9 +362,8 @@ describe('Dynamics Explorer SSE terminal state', () => {
 });
 
 // ── T5 (client-request-layer Stage 5a, plan §5) matrix for the :153 roles
-// GET (D1-preserve: no `ok` check today — `.then(r => r.json()).then(...).
-// catch(() => {})` swallows ANY failure, so every axis below converges on
-// the same visible default (badge stays "Read Only")) and the :476 feedback
+// GET now guards non-2xx envelopes while preserving tolerant malformed-2xx
+// behavior. The :476 feedback
 // POST (fire-and-forget: the response is never read today, only a network
 // rejection reaches the console.error catch). ──────────────────────────
 
@@ -383,10 +382,11 @@ describe('roles GET (:153, D1-preserve)', () => {
     expect(await screen.findByText('Superuser')).toBeInTheDocument();
   });
 
-  test('T5(b) non-2xx body is still read unguarded and can set the role (D1-preserve)', async () => {
+  test('T5(b) non-2xx body leaves the safe role and shows the load error', async () => {
     fetch.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ role: 'read_write' }) });
     renderWithProfile();
-    expect(await screen.findByText('Read/Write')).toBeInTheDocument();
+    expect(await screen.findByText('Request failed (500)')).toBeInTheDocument();
+    expect(screen.getByText('Read Only')).toBeInTheDocument();
   });
 
   test('T5(c) network rejection is swallowed, badge stays the default', async () => {
@@ -401,6 +401,21 @@ describe('roles GET (:153, D1-preserve)', () => {
     renderWithProfile();
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(screen.getByText('Read Only')).toBeInTheDocument();
+  });
+
+  test('stale role response cannot overwrite the current profile', async () => {
+    let resolveOld;
+    fetch
+      .mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ callerRole: 'superuser' }) });
+    const view = renderWithProfile('old');
+    view.rerender(<ProfileContext.Provider value={{ currentProfile: { id: 'new' } }}><DynamicsExplorerPage /></ProfileContext.Provider>);
+    expect(await screen.findByText('Superuser')).toBeInTheDocument();
+    await act(async () => {
+      resolveOld({ ok: true, status: 200, json: async () => ({ callerRole: 'read_write' }) });
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Superuser')).toBeInTheDocument();
   });
 });
 
