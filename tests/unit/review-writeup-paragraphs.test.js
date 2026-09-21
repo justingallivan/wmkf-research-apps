@@ -5,6 +5,7 @@
 import {
   reviewerAffiliationOf,
   institutionNameOf,
+  looksLikeByline,
   composeScoreSentence,
   composeReviewerSentence,
   composeExpertiseSentence,
@@ -241,6 +242,20 @@ describe('composeReviewerSentence', () => {
     expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of Stanford University.');
   });
 
+  it('shows a clean comma-bearing mainInstitution verbatim, not reduced to one institution (Codex round 4 finding: discriminating on 8ad57295a)', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'Weill Cornell Medicine, Cornell University' }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of Weill Cornell Medicine, Cornell University.');
+  });
+
+  it('shows a clean multi-campus mainInstitution verbatim, not reduced', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'University of California, San Francisco' }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of University of California, San Francisco.');
+  });
+
   it('still prefers mainInstitution over a different reviewerAffiliation (precedence unchanged)', () => {
     const { runs } = composeReviewerSentence([
       reviewer({ name: 'A', mainInstitution: 'Stanford University', reviewerAffiliation: 'MIT' }),
@@ -431,6 +446,42 @@ describe('institutionNameOf (byline → institution name for display)', () => {
     expect(institutionNameOf('Department of Bioengineering, Stanford University, Stanford, CA 94305.')).toBe('Stanford University');
     expect(institutionNameOf('Department of Physics, University of Cambridge, Cambridge, CB2 1TN, UK')).toBe('University of Cambridge');
     expect(institutionNameOf('Imperial College London, South Kensington Campus, London SW7 2AZ, UK')).toBe('Imperial College London');
+  });
+
+  it('treats "medicine" and "laboratory" as whole-institution words, guarded against bare promotion (Fix D, Codex round 4 finding, 2026-09-21)', () => {
+    expect(institutionNameOf('Department of Medicine, Weill Cornell Medicine, Cornell University, New York, NY'))
+      .toBe('Weill Cornell Medicine and Cornell University');
+    expect(institutionNameOf('Cold Spring Harbor Laboratory, Stony Brook University, Stony Brook, NY'))
+      .toBe('Cold Spring Harbor Laboratory and Stony Brook University');
+    // "MRC Laboratory of Molecular Biology" does not START with the
+    // "Laboratory of/for" sub-unit lead, so it is a whole institution.
+    expect(institutionNameOf('MRC Laboratory of Molecular Biology, Cambridge, UK')).toBe('MRC Laboratory of Molecular Biology');
+    // Bare "Medicine" alone is not promoted to institution tier.
+    expect(institutionNameOf('Medicine, University of X')).toBe('University of X');
+  });
+});
+
+describe('looksLikeByline', () => {
+  it('is true for byline markers: echoed email, geographic segment, department lead', () => {
+    expect(looksLikeByline(
+      'Division of Biochemistry and Structural Biology, Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic address: herwig.schuler@biochemistry.lu.se.',
+    )).toBe(true);
+    expect(looksLikeByline('Department of Chemistry, Yale University')).toBe(true);
+    expect(looksLikeByline('Stanford University, Stanford, CA 94305')).toBe(true);
+    expect(looksLikeByline('MIT, Electronic address: jane@mit.edu')).toBe(true);
+  });
+
+  it('is false for a clean reviewer/staff-confirmed institution name, even with commas', () => {
+    expect(looksLikeByline('Weill Cornell Medicine, Cornell University')).toBe(false);
+    expect(looksLikeByline('University of California, San Francisco')).toBe(false);
+    expect(looksLikeByline('MIT')).toBe(false);
+    expect(looksLikeByline('Cold Spring Harbor Laboratory, Stony Brook University')).toBe(false);
+  });
+
+  it('is false for blank or null input', () => {
+    expect(looksLikeByline('')).toBe(false);
+    expect(looksLikeByline(null)).toBe(false);
+    expect(looksLikeByline(undefined)).toBe(false);
   });
 });
 

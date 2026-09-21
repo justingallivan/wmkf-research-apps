@@ -1000,6 +1000,39 @@ geographic rule ("City ST 12345" / "ST 12345") now requires a preceding US
 state code, not just a trailing digit group, so an organization name like
 "ETH 2" is no longer misread as geographic.
 
+**`mainInstitution` reduction is gated on byline markers (Codex round 4
+finding, 2026-09-21):** `institutionOf` (and the accept-form pre-fill in
+`context-service.js`) no longer runs EVERY `mainInstitution`/enrichment-affiliation
+value through `institutionNameOf` unconditionally — that was lossy on a
+clean, reviewer- or staff-confirmed name that happens to contain its own
+commas, e.g. "Weill Cornell Medicine, Cornell University" was reduced to just
+"Cornell University", and "Cold Spring Harbor Laboratory, Stony Brook
+University" to just "Stony Brook University". A new exported helper,
+`looksLikeByline(text)`, returns true only when the text carries a marker a
+confirmed institution name never has — an echoed email address
+(`/\S+@\S+/` or "electronic address"), a comma/semicolon segment that
+`isGeographicSegment` already treats as geographic (postal code, US state,
+listed country/state name, "City ST 12345", a street address), or a segment
+matching the existing `SUBUNIT_SEGMENT` (department/division/lab-of/etc.
+lead). `institutionOf`'s `mainInstitution` branch and the accept-form's
+`wmkf_primaryaffiliation`/`wmkf_organizationname` seed now reduce through
+`institutionNameOf` ONLY when `looksLikeByline` is true; otherwise the value
+is shown/seeded verbatim. The other two `institutionOf` branches
+(accept-time `reviewerAffiliationOf`, person `affiliation`) are unconditionally
+reduced as before — those are free-text sources, never reviewer/staff-
+confirmed. A prior confirmed `wmkf_maininstitution` is still never re-reduced
+at pre-fill, unchanged from the paragraph above. Separately, `medicine` and
+`laboratory` (singular) were added to `INSTITUTION_TIER_ORG_TERM` as
+whole-institution words, so "Weill Cornell Medicine", "Cold Spring Harbor
+Laboratory", and "MRC Laboratory of Molecular Biology" count as institutions
+beside a university when `institutionNameOf` DOES run (a byline-shaped
+value, or the two always-reduced free-text branches); bare "Medicine" alone
+is excluded via `BARE_INSTITUTION_TIER_LABEL` so it is not promoted on its
+own, and "Department/Faculty/School of Medicine" stay handled by the
+existing `SUBUNIT_SEGMENT`/`ORGANIZATION_TERM` rules, unchanged.
+`PRE_RP_BRIEF_CONTRACT.renderVersion` stays `'4'` — the gating and tier
+change are unreleased on this branch, so no version bump was needed.
+
 **Expertise for applicant rows (2026-09-21):** applicant-recommended reviewers
 arrive with `expertiseAreas: []` (only Reviewer Finder candidates get Claude-written
 areas, which promotion writes to `wmkf_areaofexpertise`), so their person rows

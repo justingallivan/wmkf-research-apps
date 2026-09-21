@@ -291,18 +291,31 @@ describe('buildReviewContext', () => {
     expect(payload.prefill.mainInstitution).toBe('Lund University');
   });
 
-  it('does not re-reduce a reviewer prior confirmed mainInstitution at prefill', async () => {
+  it('does not re-reduce a reviewer prior confirmed mainInstitution at prefill, even a clean comma-bearing one (Codex round 4 finding, 2026-09-21)', async () => {
     const payload = await buildReviewContext({
       suggestion: baseSuggestion(),
       request,
       reviewer: {
         ...reviewer,
-        wmkf_maininstitution: 'Prior Confirmed U',
-        wmkf_primaryaffiliation: 'Division of Biochemistry, Lund University',
+        wmkf_maininstitution: 'Weill Cornell Medicine, Cornell University',
+        wmkf_primaryaffiliation: 'Division of Biochemistry and Structural Biology, Department of Chemistry, Lund University, SE-22362, Lund, Sweden. Electronic address: herwig.schuler@biochemistry.lu.se.',
       },
     });
 
-    expect(payload.prefill.mainInstitution).toBe('Prior Confirmed U');
+    expect(payload.prefill.mainInstitution).toBe('Weill Cornell Medicine, Cornell University');
+  });
+
+  it('seeds a clean, non-byline-shaped enrichment affiliation unchanged, not reduced (Codex round 4 finding, 2026-09-21)', async () => {
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion(),
+      request,
+      reviewer: {
+        ...reviewer,
+        wmkf_primaryaffiliation: 'Weill Cornell Medicine, Cornell University',
+      },
+    });
+
+    expect(payload.prefill.mainInstitution).toBe('Weill Cornell Medicine, Cornell University');
   });
 });
 

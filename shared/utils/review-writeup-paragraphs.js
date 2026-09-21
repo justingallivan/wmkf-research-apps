@@ -140,7 +140,15 @@ const ORGANIZATION_TERM = /(?<![\p{L}\p{N}])(?:institut(?:e|o|ion)?|istituto|hos
 // organization-shaped sub-unit ("Center for Translational Cancer Research"
 // stays a sub-unit-shaped fallback only — bare "center"/"centre" is excluded
 // here even though it is in the broader ORGANIZATION_TERM above).
-const INSTITUTION_TIER_ORG_TERM = /(?<![\p{L}\p{N}])(?:hospital|clinic|klinik|medical\s+(?:center|centre)|medical\s+school|school\s+of\s+medicine|cancer\s+(?:center|centre)|national\s+laboratory|laboratories|foundation|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)(?![\p{L}\p{N}])/iu;
+// `medicine` and `laboratory` (Fix D, Codex round 4 finding, 2026-09-21):
+// whole-institution words so "Weill Cornell Medicine" and "Cold Spring
+// Harbor Laboratory"/"MRC Laboratory of Molecular Biology" count as
+// institutions beside a university. Guarded by BARE_INSTITUTION_TIER_LABEL
+// (bare "Medicine" alone is not an institution) and by SUBUNIT_SEGMENT's
+// existing `lab(oratory)?\s+(of|for)` lead ("Laboratory of Molecular
+// Biology" alone, at the START of a segment, is a sub-unit — "MRC
+// Laboratory of Molecular Biology" does not start with that lead).
+const INSTITUTION_TIER_ORG_TERM = /(?<![\p{L}\p{N}])(?:hospital|clinic|klinik|medical\s+(?:center|centre)|medical\s+school|school\s+of\s+medicine|cancer\s+(?:center|centre)|national\s+laboratory|laboratory|laboratories|medicine|foundation|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)(?![\p{L}\p{N}])/iu;
 // A whole institute, not a sub-institute lead ("Institute of X" inside a run
 // that also has a university is a sub-institute — see SUBUNIT_SEGMENT).
 const INSTITUTE_WORD = /(?<![\p{L}\p{N}])(?:institute|institut|instituto|istituto)(?![\p{L}\p{N}])/iu;
@@ -153,7 +161,7 @@ const INSTITUTE_SUBUNIT_LEAD = /^(?:institute\s+of|institute\s+for|institut\s+de
 // form ("Cancer Center of Excellence") is excluded too, but only for
 // cancer/medical center — "Hospital for Sick Children" is a real, named
 // institution and must not be caught by this rule.
-const BARE_INSTITUTION_TIER_LABEL = /^(?:cancer\s+(?:center|centre)|medical\s+(?:center|centre|school)|hospital|clinic|institute|institut|laboratory|laboratories|foundation)$/iu;
+const BARE_INSTITUTION_TIER_LABEL = /^(?:cancer\s+(?:center|centre)|medical\s+(?:center|centre|school)|hospital|clinic|institute|institut|laboratory|laboratories|medicine|foundation)$/iu;
 const GENERIC_LEAD_WITH_OF = /^(?:cancer\s+(?:center|centre)|medical\s+(?:center|centre))\s+(?:of|for)(?![\p{L}\p{N}])/iu;
 
 // Institution-tier part (Fix 2): a university-tier part, OR an
@@ -287,6 +295,28 @@ function pickInstitutionsFromRun(parts) {
 }
 
 /**
+ * True when `text` carries a marker a reviewer- or staff-confirmed
+ * institution name never has: an echoed email address, a geographic segment
+ * (postal code, US state, listed country/state name, "City ST 12345", a
+ * street address), or a department/division-shaped sub-unit lead. A
+ * confirmed value may legitimately contain commas of its own ("Weill Cornell
+ * Medicine, Cornell University", "University of California, San Francisco")
+ * and must be shown verbatim in that case; only a value that still looks like
+ * a pasted publication byline (what the accept form used to pre-fill) is
+ * reduced by `institutionNameOf` (Codex round 4 finding, 2026-09-21).
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function looksLikeByline(text) {
+  const trimmed = typeof text === 'string' ? text.trim() : '';
+  if (!trimmed) return false;
+  if (/\S+@\S+/.test(trimmed) || /electronic\s+address/i.test(trimmed)) return true;
+  const segments = trimmed.split(/[,;]/).map((part) => part.trim()).filter(Boolean);
+  return segments.some((segment) => isGeographicSegment(segment) || SUBUNIT_SEGMENT.test(segment));
+}
+
+/**
  * Reduce a free-text affiliation/byline to its institution name(s) for
  * display in the reviewer clause. Semicolons separate independent bylines;
  * commas separate the parts of one byline, including comma-delimited
@@ -335,10 +365,13 @@ export function institutionNameOf(text) {
  * `affiliation` (the person projection's `primaryAffiliation`/
  * `organizationName`, already collapsed by `reviewers-service.js`) → fallback.
  * All three sources are reduced to institution name(s) by `institutionNameOf`
- * (2026-09-21 for the free-text sources; 2026-09-21/request-1002852 for
- * `mainInstitution` too, since a stored value may still be a raw PubMed
- * byline — from before the accept-form pre-fill seed was fixed, or from a
- * staff edit). A clean value with no separators passes through unchanged.
+ * (2026-09-21 for the free-text sources). `mainInstitution` is reduced only
+ * when `looksLikeByline` says it still looks like a raw PubMed byline — from
+ * before the accept-form pre-fill seed was fixed, or from a staff edit
+ * (2026-09-21/request-1002852) — never for a reviewer- or staff-confirmed
+ * value that merely contains commas of its own ("Weill Cornell Medicine,
+ * Cornell University"), which is shown verbatim (Codex round 4 finding,
+ * 2026-09-21). A clean value with no separators passes through unchanged.
  *
  * Opus Slice 1 follow-up: `reviewerAffiliationOf` can strip the accept-time
  * value down to an empty string (e.g. `reviewerAffiliation` IS the reviewer's
@@ -350,17 +383,22 @@ export function institutionNameOf(text) {
  */
 function institutionOf(reviewer) {
   const main = typeof reviewer?.mainInstitution === 'string' ? reviewer.mainInstitution.trim() : '';
-  if (main) return institutionNameOf(main) || main;
+  // `mainInstitution` is reviewer/staff-confirmed, so a comma-bearing value
+  // may legitimately be a clean multi-part institution name ("Weill Cornell
+  // Medicine, Cornell University", "University of California, San
+  // Francisco") that must be shown verbatim. Only reduce it when
+  // `looksLikeByline` finds a marker (echoed email, geographic segment, or
+  // department lead) showing it is still a raw pasted byline — from before
+  // the accept-form pre-fill seed was fixed, or from a staff edit via
+  // `CandidateEditModal` (request 1002852, 2026-09-21; gated Codex round 4,
+  // 2026-09-21).
+  if (main) return looksLikeByline(main) ? (institutionNameOf(main) || main) : main;
   // Free-text sources (accept-time field, person affiliation) may be a whole
   // PubMed byline (observed on request 1002852, 2026-09-21): reduce them to
-  // the institution name(s) for display. `mainInstitution` above is
-  // reviewer/staff-confirmed but is reduced the same way (request 1002852,
-  // 2026-09-21): the accept form's required field used to be pre-filled from
-  // a raw PubMed byline and a reviewer could submit it unchanged, so a
-  // stored value may still be the whole byline (and staff can paste one back
-  // in via `CandidateEditModal`) — it is no longer shown verbatim. A clean
-  // value with no separators ("Stanford University", "MIT") has nothing to
-  // reduce and passes through `institutionNameOf` unchanged.
+  // the institution name(s) for display, unconditionally — these fields are
+  // not reviewer/staff-confirmed the way `mainInstitution` is. A clean value
+  // with no separators ("Stanford University", "MIT") has nothing to reduce
+  // and passes through `institutionNameOf` unchanged.
   const accepted = reviewerAffiliationOf(reviewer);
   if (accepted) return institutionNameOf(accepted) || accepted;
   const personAffiliation = typeof reviewer?.affiliation === 'string' ? reviewer.affiliation.trim() : '';

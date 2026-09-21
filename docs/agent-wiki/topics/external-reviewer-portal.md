@@ -376,8 +376,13 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   and the workbench edit (`CandidateEditModal`) ships alongside so staff can repair. Prefill seeds
   department/institution from the person's enrichment fields (`wmkf_department`/`wmkf_primaryaffiliation`);
   rank starts blank. The institution seed is reduced through `institutionNameOf`
-  (request 1002852, 2026-09-21) so a PubMed-enriched reviewer's raw byline in
-  `wmkf_primaryaffiliation` seeds a clean institution name, not the whole byline
+  (request 1002852, 2026-09-21) ONLY when the enrichment value still
+  `looksLikeByline` (Codex round 4 finding, 2026-09-21: an echoed email, a
+  geographic segment, or a department lead) — so a PubMed-enriched reviewer's
+  raw byline in `wmkf_primaryaffiliation` seeds a clean institution name, not
+  the whole byline, while a clean enrichment affiliation that merely contains
+  its own commas ("Weill Cornell Medicine, Cornell University") seeds
+  unchanged, since reducing it would drop a real co-affiliation
   (a prior confirmed `wmkf_maininstitution` is used as-is here). Person-level, one canonical current value — board write-ups freeze it (no per-request
   snapshot). Repeat/legacy accepts skip the gate (back-compat). Full trace: `docs/REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md`.
 - **Accept form simplified to remove duplicate fields (2026-06-30, S309).** The contact card no

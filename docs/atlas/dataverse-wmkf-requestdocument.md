@@ -443,9 +443,10 @@ Production Request Document row was created by this release smoke.
   whose ingestion path writes neither field. The reviewer sentence's
   institution is reduced from a free-text byline to the institution name(s)
   by `institutionNameOf` (2026-09-21; self-confirmed `wmkf_maininstitution`
-  is reduced too, request 1002852); a `refereeSection.text` stored in a v4
-  snapshot before that change keeps its longer form until the document is
-  regenerated.
+  is reduced only when byline-shaped, Codex round 4 finding, 2026-09-21 —
+  a clean comma-bearing confirmed name is shown verbatim); a
+  `refereeSection.text` stored in a v4 snapshot before that change keeps its
+  longer form until the document is regenerated.
   [RECHECKED after lib/services/pre-site-visit/docx-renderer.js change:
   2026-09-14 wrap-up — blank-text normalization added.]
 
