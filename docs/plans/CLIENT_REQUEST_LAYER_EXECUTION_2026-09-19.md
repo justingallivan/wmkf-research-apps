@@ -1511,3 +1511,19 @@ the `patchCycleCounts` generation guard is removed. Observation, not acted on:
 the adoption effect navigates from a stale render closure and could in
 principle write a superseded cycle into a URL whose program changed within the
 same tick; harmless in practice.
+
+Second pass (same day): the first test-only fix (`b65a392be`) did not hold —
+the `Tests` run on the following docs commit (`8132194ee`) failed the same
+case one line later, while runs on `b65a392be` and on a second instrumented
+PR (#319, closed) passed, so the fix had turned a deterministic CI failure
+into an intermittent one. The #319 snapshot showed the URL-adoption effect
+fires twice per adoption (once more on the render that reads the adopted URL
+back), so one instance could still be pending when the test switched
+programs. `93b1f3384` additionally waits for the p2 count to render and
+drains pending passive effects across a macrotask boundary (`act` +
+`setTimeout(0)`) before the switch. Green under Node 20/26 locally, still RED
+under the generation-guard mutation, and green on the first CI run; rerun
+probes recorded below when done. The adoption-effect double-fire and its
+stale-closure `navigate` remain an observation for the owner (a code
+hardening — skip adoption when a program change is already in flight — is the
+durable fix if the test ever flakes again).
