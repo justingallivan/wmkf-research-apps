@@ -297,9 +297,20 @@ test('does not apply a delayed triage count patch after returning to the origina
   // back. Switching in the same tick races the URL-adoption effect, which
   // then writes p2's cycle into the p1 URL (seen only on the CI runner).
   await waitFor(() => expect(routerState.query.cycleCode).toBe('B'));
+  const __snap = (tag) => `[diag ${tag}] buttons: ${screen.getAllByRole('button').map((b) => b.textContent).join(' | ')}; selects: ${screen.getAllByRole('combobox').map((s) => `${s.id}=${s.value}`).join(' | ')}; query: ${JSON.stringify(routerState.query)}; loading: ${Boolean(screen.queryByText('Loading cycle and status filters…'))}; replace calls: ${JSON.stringify(replace.mock.calls.map((c) => String(c[0])))}; push calls: ${JSON.stringify(push.mock.calls.map((c) => String(c[0])))}; fetch urls: ${global.fetch.mock.calls.map((c) => String(c[0])).join(' | ')}`;
+  // eslint-disable-next-line no-console
+  console.log(__snap('before p1 switch'));
   fireEvent.change(mainProgram(), { target: { value: 'p1' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p1'));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
+  // eslint-disable-next-line no-console
+  console.log(__snap('after p1 select'));
+  const __t0 = Date.now();
+  try {
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument(), { timeout: 8000 });
+  } finally {
+    // eslint-disable-next-line no-console
+    console.log(`waited ${Date.now() - __t0}ms; ` + __snap('at (1) wait end'));
+  }
 
   await act(async () => {
     triage.resolve(response({ body: { success: true } }));
