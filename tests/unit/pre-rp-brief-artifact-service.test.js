@@ -21,9 +21,9 @@ const OLDER_ARTIFACT_ID = '33333333-3333-4333-8333-333333333333';
 const NEWER_ARTIFACT_ID = '44444444-4444-4444-8444-444444444444';
 const CLAIM_ID = '55555555-5555-4555-8555-555555555555';
 
-// Phase 1 of the snapshot versioning (2026-09-21): the production writer
-// still emits schemaVersion 1; v2 is reader-only until phase 2. Reader tests
-// that need a v2 row build one explicitly.
+// Legacy stored-row fixture (schemaVersion 1, written by the phase-1
+// deployment of 2026-09-21). The writer emits schemaVersion 2 since phase 2
+// (2026-09-21, PR #324); reader tests that need a v2 row build one explicitly.
 const ENVELOPE = Object.freeze({
   schemaVersion: 1,
   artifactType: 'pre-rp-brief',

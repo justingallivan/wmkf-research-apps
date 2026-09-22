@@ -811,8 +811,8 @@ describe('prepare-time review/drift gate (plan §3.4b)', () => {
   });
 
   test('a v2 stored snapshot drifts when only keywords changes (a field the legacy list never covered)', async () => {
-    // Explicit schemaVersion 2: phase 1 of the two-phase rollout still WRITES
-    // v1 (the contract constant), so this must not derive its version from it.
+    // Explicit schemaVersion 2 so this test pins v2 semantics regardless of
+    // the contract constant's value (it was 1 during phase 1 of the rollout).
     const generatedV2 = briefEnvelope({ schemaVersion: 2 });
     const liveV2 = briefEnvelope({
       schemaVersion: 2,

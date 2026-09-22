@@ -96,9 +96,9 @@ function reviewer(overrides = {}) {
 // list). Legacy (v1) row tests build their own `schemaVersion: 1` envelope
 // explicitly instead of overriding this default.
 // Reader/fingerprint fixture: defaults to schemaVersion 2 (the wider field
-// list) so v2 reader paths are exercised; the production WRITER is still v1
-// in phase 1 (see tests/unit/pre-rp-brief-input-service.test.js), and v1
-// cases here pass schemaVersion: 1 explicitly.
+// list), matching what the writer emits since phase 2 (pinned in
+// tests/unit/pre-rp-brief-input-service.test.js); legacy v1 cases here pass
+// schemaVersion: 1 explicitly.
 function envelope({ request = requestFixture(), reviews = [reviewer()], schemaVersion = 2 } = {}) {
   return { schemaVersion, artifactType: 'pre-rp-brief', request, reviews };
 }

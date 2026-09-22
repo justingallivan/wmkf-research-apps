@@ -564,18 +564,20 @@ that same envelope with reviews ordered by `compareReviewersByName`, for the
 prepare-time drift gate (plan §3.4b). `REVIEW_FINGERPRINT_FIELDS` includes
 `lastName`/`keywords`/`areaOfExpertise` (the expertise composer's inputs) so
 the fingerprint moves when a reviewer's expertise data changes — for v2
-snapshots; phase-1 rows are written and compared as v1, so an expertise-only
-change does not move their fingerprint until phase 2. A reclaimed generation
+snapshots (written since phase 2, 2026-09-21, PR #324); rows written by the phase-1
+deployment are compared as v1, so an expertise-only change does not move
+their fingerprint. A reclaimed generation
 row renders from its own verified stored snapshot, never from fresher inputs
 (`storedBriefEnvelopeForRender`), so the document and its frozen provenance
 cannot disagree. Because that
 widened the field list every existing brief row's `wmkf_inputfingerprint` was
-computed under, the readers accept snapshot schemaVersion `1` and `2` (the writer
-flips `1` → `2` in a phase-2 follow-up, so the prior deployment stays a safe rollback target):
+computed under, the readers accept snapshot schemaVersion `1` and `2` (phase 1, main `90b6c6838`,
+kept writing v1 so the prior deployment stayed a safe rollback target; phase 2,
+2026-09-21, PR #324, flipped the writer to `2`):
 a v1 stored row is re-verified, and compared against a live envelope, with
 the frozen 8-field `LEGACY_REVIEW_FINGERPRINT_FIELDS_V1` list (the exact
 pre-2026-09-21 list) instead of the current 11-field list; new snapshots get
-schemaVersion 2 once phase 2 lands. Every reader that re-hashes a stored snapshot
+schemaVersion 2. Every reader that re-hashes a stored snapshot
 (`receivedReviewCountOf` in `artifact-service.js`, `assertBriefInputsReady`
 in `lib/services/pre-site-visit/distribution/context.js`) picks the field
 list from the row's own `schemaVersion`, and the live fingerprint the UI

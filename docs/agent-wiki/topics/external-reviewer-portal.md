@@ -515,23 +515,24 @@ a historical record). The expertise sentence comes from the same
 (`lib/services/pre-rp-brief/docx-renderer.js`'s `composeRefereeRunSegments`);
 the input fingerprint's `REVIEW_FINGERPRINT_FIELDS` now includes
 `lastName`/`keywords`/`areaOfExpertise` (the composer's inputs) so a brief
-regenerates when a reviewer's expertise data changes — once phase 2 writes v2
-snapshots; phase-1 rows are still compared under the v1 list, so an
-expertise-only change renders on regenerate but does not register as drift
-until then — and
+regenerates when a reviewer's expertise data changes (phase 2, 2026-09-21, PR #324,
+writes v2 snapshots; rows written by the phase-1 deployment are still
+compared under the v1 list, so an expertise-only change registers as drift
+only for briefs generated after phase 2) — and
 `PRE_RP_BRIEF_CONTRACT.renderVersion` moved `'4'` → `'5'` alongside it, since
 the change binds both together (`lib/services/pre-rp-brief/artifact-service.js:748`).
 Widening that list would have invalidated every stored brief's fingerprint
 (re-hashing a v1 row's snapshot with the new 11-field list no longer equals
-the fingerprint that row was written with), so the readers now accept snapshot schemaVersion `1` and `2`; `PRE_RP_BRIEF_CONTRACT
-.snapshotSchemaVersion` flips `1` → `2` in a phase-2 follow-up (phase 1 keeps WRITING v1 so the
-prior deployment stays a safe rollback target — Codex adversarial review, 2026-09-21)
+the fingerprint that row was written with), so the readers accept snapshot schemaVersion `1` and `2`; phase 1 (main `90b6c6838`)
+kept writing v1 so the prior deployment stayed a safe rollback target, and phase 2
+(2026-09-21, PR #324) flipped `PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion` `1` → `2`
+(Codex adversarial review, 2026-09-21)
 (`[RECHECKED after lib/services/pre-rp-brief/docx-renderer.js change:
 lib/services/pre-rp-brief/docx-renderer.js:92-135]`): a v1 stored row is
 re-verified and, when compared to a live envelope, diffed using the frozen
 8-field `LEGACY_REVIEW_FINGERPRINT_FIELDS_V1` list it was always
 fingerprinted with, never the current list; new snapshots get
-schemaVersion 2 once phase 2 lands. Every reader that re-hashes a stored snapshot —
+schemaVersion 2. Every reader that re-hashes a stored snapshot —
 `receivedReviewCountOf` (`lib/services/pre-rp-brief/artifact-service.js`)
 and `assertBriefInputsReady` (`lib/services/pre-site-visit/distribution/context.js`)
 — accepts both schema versions and picks the field list from the row's own
