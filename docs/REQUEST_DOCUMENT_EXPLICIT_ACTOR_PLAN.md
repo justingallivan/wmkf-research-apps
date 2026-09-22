@@ -165,6 +165,13 @@ restrictive:
   null, render “Not captured,” and write a bounded durable operational event
   `request_document_actor_not_captured`. Do not manufacture the service
   principal or current viewer as the actor.
+- Applicant-side Site Visit materials uploads (producer
+  `site-visit-materials-portal`) have no staff actor by design. Since
+  2026-09-22 they use `REQUEST_DOCUMENT_ACTOR_POLICY.EXTERNAL_CONTRIBUTOR`:
+  no systemuser read, no bind, and no missing-actor event. The census classifies
+  them as `external-contributor`. Staff-side consultant feedback attachments
+  pass the session actor under the availability-first policy, so their event
+  now means a genuinely unlinked staff identity.
 - Before any explicit bind, freshly read the proposed `systemuser` and require
   the exact GUID with `isdisabled === false`. A missing/disabled/stale mapping
   follows that flow's policy above rather than sending a lookup bind that can

@@ -512,7 +512,8 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
   row, downloads only its persisted pathname, verifies size/type/magic, scans through
   `lib/services/cloudmersive-scan.js` (`scanBytes`), uploads with `GraphService.uploadFileLarge`, then
   creates the `wmkf_requestdocument` row (Applicant Slides for both presentation formats, Other
-  Applicant Materials for bios and Other) with the external contributor's unattributed actor policy.
+  Applicant Materials for bios and Other) under the `EXTERNAL_CONTRIBUTOR` actor policy (no staff
+  actor bound, no `request_document_actor_not_captured` event; since 2026-09-22).
 - Email: Dynamics email activity from the PC's mailbox (`createEmailActivity` + `sendEmail`),
   plain-text body rendered with `lib/external/plain-text-email-html.js`.
 - Admin setting: `lib/services/settings-service.js` `getSettingStrict`/`setSetting`, surfaced like
@@ -555,7 +556,7 @@ merged and production-smoked (ZZTEST-03, 2026-09-10). PR 3 was built 2026-09-11 
   `GraphService.uploadFileLarge` (upload session, 10 MiB chunks above the 60 MB simple cap);
   `lib/services/site-visit-materials/contributor-service.js` files under the canonical name with
   `replace` (SharePoint version history), registers a READY/DRAFT `wmkf_requestdocument` row
-  (producer `site-visit-materials-portal`, unattributed actor policy), supersedes the slot's prior
+  (producer `site-visit-materials-portal`, `EXTERNAL_CONTRIBUTOR` actor policy), supersedes the slot's prior
   row, and flags PDF/source receipts more than an hour apart as out of sync. A conditional
   five-minute lease in `site_visit_material_collections.slot_leases` serializes each canonical
   request slot. Before the Dataverse create, staging `candidate_result` freezes the predecessor
