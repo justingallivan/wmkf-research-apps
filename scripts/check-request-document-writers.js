@@ -20,7 +20,7 @@ const WRITERS = Object.freeze([
   ['lib/services/pre-site-visit/reopen-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/pre-site-visit/distribution/retained-snapshot.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/final-writeup/transition-service.js', 'dependencies.createDocument(', 'REQUIRED'],
-  ['lib/services/site-visit-materials/contributor-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
+  ['lib/services/site-visit-materials/contributor-service.js', 'dependencies.createDocument(', 'EXTERNAL_CONTRIBUTOR'],
   ['lib/services/consultant-feedback-attachment-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/pre-rp-brief/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
 ]);

@@ -88,6 +88,7 @@ export default async function handler(req, res) {
       finalizeAttachmentUpload({
         requestId,
         actorProfileId: access.profileId,
+        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
         file,
         stagingId,
         entryId: entryId != null ? Number(entryId) : null,

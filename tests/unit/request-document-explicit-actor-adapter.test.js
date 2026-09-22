@@ -125,6 +125,42 @@ test('repairs missing-actor evidence when a create response is lost but the row 
   }));
 });
 
+test('external-contributor create binds no actor, reads no systemuser, and records no missing-actor event', async () => {
+  await create({
+    'wmkf_Request@odata.bind': '/akoya_requests(11111111-1111-4111-8111-111111111111)',
+    wmkf_generationkey: 'generation-key',
+    wmkf_producer: 'site-visit-materials-portal',
+  }, {
+    actingUserSystemId: ACTOR_ID,
+    actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.EXTERNAL_CONTRIBUTOR,
+    actorContext: { operation: 'site-visit-materials-upload' },
+  });
+  const payload = DynamicsService.createRecord.mock.calls[0][1];
+  expect(payload).not.toHaveProperty('wmkf_InitiatedBy@odata.bind');
+  expect(payload).not.toHaveProperty('wmkf_initiatedat');
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  expect(OperationalEventService.recordEvent).not.toHaveBeenCalled();
+});
+
+test('external-contributor lost-response create records no missing-actor event', async () => {
+  DynamicsService.createRecord.mockRejectedValueOnce(new Error('response lost'));
+  DynamicsService.queryRecords.mockResolvedValueOnce({
+    records: [{
+      wmkf_requestdocumentid: '22222222-2222-4222-8222-222222222222',
+      wmkf_initiatedat: null,
+      _wmkf_initiatedby_value: null,
+    }],
+  });
+  await expect(create({
+    wmkf_generationkey: 'generation-key',
+    wmkf_producer: 'site-visit-materials-portal',
+  }, {
+    actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.EXTERNAL_CONTRIBUTOR,
+    actorContext: { operation: 'site-visit-materials-upload' },
+  })).rejects.toThrow('response lost');
+  expect(OperationalEventService.recordEvent).not.toHaveBeenCalled();
+});
+
 test('update rejects immutable explicit origin fields before transport', async () => {
   await expect(update('id', { wmkf_initiatedat: '2026-08-31T20:00:00Z' }))
     .rejects.toThrow(/immutable/);
