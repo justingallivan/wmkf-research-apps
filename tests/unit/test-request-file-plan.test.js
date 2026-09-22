@@ -100,6 +100,11 @@ describe('compileBasicCloneFilePlan', () => {
     expect(result.plannedFiles.map(file => file.source.id)).toEqual(['biosketches', 'project-description']);
   });
 
+  test('keeps eTag identity separate when no publication version is available', () => {
+    const result = compile({ sourceDocuments: [document({ eTag: 'etag-only', versionId: null })] });
+    expect(result.plannedFiles[0].source).toMatchObject({ eTag: 'etag-only', versionId: null });
+  });
+
   test('shows a non-executable template and blocks generated artifacts without a transformer', () => {
     const reviewer = document({
       folder: '1000123_GUID/Reviewer Materials',

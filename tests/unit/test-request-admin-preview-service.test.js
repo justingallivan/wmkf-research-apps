@@ -222,6 +222,7 @@ test('re-resolves and hashes the selected file, but strips every executable payl
   expect(result.preview.executionReady).toBe(false);
   expect(result.preview.requestPlan.createBody).toBeNull();
   expect(result.preview.filePlan.plannedFiles).toEqual([]);
+  expect(result.preview.filePlan.previewFiles).toEqual([]);
   expect(result.preview.preview.files).toEqual([
     expect.objectContaining({ operation: 'blocked', source: expect.objectContaining({ id: documentId }) }),
   ]);
@@ -240,12 +241,16 @@ test('re-resolves and hashes the selected file, but strips every executable payl
   ]));
   expect(JSON.stringify(result.preview.preview.request)).not.toContain(DESTINATION_ID);
   expect(JSON.stringify(result.preview.preview.request)).not.toContain(FOUNDATION_ID);
-  expect(result.preview.preview.files[0].source).toMatchObject({
-    eTag: 'etag-1',
+  expect(result.preview.preview.files[0].source).toEqual({
+    id: documentId,
+    kind: 'projectDescription',
+    name: 'ProjectDescription.pdf',
     folder: 'Phase I',
-    versionId: '1.0',
   });
-  expect(result.preview.preview.files[0].source).not.toHaveProperty('library');
+  const publicResult = JSON.stringify(result);
+  expect(publicResult).not.toContain('etag-1');
+  expect(publicResult).not.toContain('contentHash');
+  expect(publicResult).not.toContain('1002001_GUID/Phase I');
 });
 
 test('turns a truncated SharePoint inventory into an explicit blocker', async () => {
@@ -280,6 +285,18 @@ test('preserves transport failures instead of converting them to source-not-foun
   }, deps)).rejects.toBe(transportError);
 });
 
+test('maps a missing source Request to the typed 404 contract', async () => {
+  const missing = Object.assign(new Error('dataverse failed (404)'), { status: 404 });
+  const deps = dependencies({ getRequestById: jest.fn(async () => { throw missing; }) });
+  await expect(buildTestRequestAdminPreview({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [],
+    testLabel: 'Preview fixture',
+    fiscalYear: 'December 2027',
+    meetingDate: '2027-12-03',
+  }, deps)).rejects.toMatchObject({ code: 'test_request_source_not_found', httpStatus: 404 });
+});
+
 test('rejects ambiguous request-number matches explicitly', async () => {
   const deps = dependencies({ findRequestByNumber: jest.fn(async () => ({ records: [source, { ...source }] })) });
   await expect(loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps))
@@ -308,7 +325,7 @@ test('rejects MIME drift before downloading selected bytes', async () => {
   expect(deps.downloadFile).not.toHaveBeenCalled();
 });
 
-test('keeps eTag and publication version as separate source identities', async () => {
+test('accepts an eTag without conflating it with a missing publication version', async () => {
   const deps = dependencies();
   const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
   const metadataWithoutPublicationVersion = {
@@ -328,10 +345,9 @@ test('keeps eTag and publication version as separate source identities', async (
     meetingDate: '2027-12-03',
   }, deps);
 
-  expect(result.preview.preview.files[0].source).toMatchObject({
-    eTag: 'etag-only',
-    versionId: null,
-  });
+  expect(result.preview.preview.files[0].source).not.toHaveProperty('eTag');
+  expect(result.preview.preview.files[0].source).not.toHaveProperty('versionId');
+  expect(result.preview.filePlan.previewFiles).toEqual([]);
 });
 
 test('unknown browser inventory IDs stay blocked and are never sent to Graph', async () => {
