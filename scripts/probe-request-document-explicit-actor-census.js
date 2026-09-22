@@ -156,6 +156,13 @@ function runSelfTest() {
       wmkf_initiatedat: null,
       _wmkf_initiatedby_value: null,
     },
+    {
+      ...base,
+      wmkf_requestdocumentid: '14141414-1414-4141-8141-141414141414',
+      wmkf_producer: 'consultant-feedback',
+      wmkf_initiatedat: null,
+      _wmkf_initiatedby_value: null,
+    },
   ];
   const events = [
     {
@@ -179,6 +186,12 @@ function runSelfTest() {
       entity_refs: { requestDocumentId: rows[7].wmkf_requestdocumentid },
       metadata: { operation: 'consultant-feedback-attachment', producer: 'consultant-feedback' },
     },
+    {
+      // Consultant row whose event names another producer: not allowed evidence.
+      stage: 'consultant-feedback-attachment',
+      entity_refs: { requestDocumentId: rows[8].wmkf_requestdocumentid },
+      metadata: { operation: 'consultant-feedback-attachment', producer: 'pre-rp-brief' },
+    },
   ];
   const results = classifyRows(rows, events, since);
   const counts = results.reduce((out, result) => {
@@ -186,11 +199,12 @@ function runSelfTest() {
     return out;
   }, {});
   const status = (id) => results.find((result) => result.documentId === id && result.kind === 'origin')?.status;
-  if (counts.attributed !== 2 || counts['event-backed-unattributed'] !== 3 || counts.violation !== 3
+  if (counts.attributed !== 2 || counts['event-backed-unattributed'] !== 3 || counts.violation !== 4
     || counts['external-contributor'] !== 1
     || status(rows[5].wmkf_requestdocumentid) !== 'violation'
     || status(rows[6].wmkf_requestdocumentid) !== 'event-backed-unattributed'
-    || status(rows[7].wmkf_requestdocumentid) !== 'violation') {
+    || status(rows[7].wmkf_requestdocumentid) !== 'violation'
+    || status(rows[8].wmkf_requestdocumentid) !== 'violation') {
     throw new Error(`Unexpected self-test classification: ${JSON.stringify(counts)}`);
   }
   console.log('PASS: Wave 24 attribution census classifier distinguishes attributed, event-backed, external-contributor, and missing evidence.');
