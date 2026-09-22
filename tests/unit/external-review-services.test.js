@@ -317,6 +317,32 @@ describe('buildReviewContext', () => {
 
     expect(payload.prefill.mainInstitution).toBe('Weill Cornell Medicine, Cornell University');
   });
+
+  it('seeds the Main institution prefill reduced when the enrichment affiliation has a structural "…Medicine" sub-unit lead (Fix A, Codex round 5, 2026-09-21)', async () => {
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion(),
+      request,
+      reviewer: {
+        ...reviewer,
+        wmkf_primaryaffiliation: 'Laboratory Medicine, University of X, Seattle, WA',
+      },
+    });
+
+    expect(payload.prefill.mainInstitution).toBe('University of X');
+  });
+
+  it('seeds the Main institution prefill reduced when the enrichment affiliation has a trailing unlisted-city marker (Fix B, Codex round 5, 2026-09-21)', async () => {
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion(),
+      request,
+      reviewer: {
+        ...reviewer,
+        wmkf_primaryaffiliation: 'Weill Cornell Medicine, Cornell University, Doha',
+      },
+    });
+
+    expect(payload.prefill.mainInstitution).toBe('Weill Cornell Medicine and Cornell University');
+  });
 });
 
 describe('applyReviewerResponse', () => {

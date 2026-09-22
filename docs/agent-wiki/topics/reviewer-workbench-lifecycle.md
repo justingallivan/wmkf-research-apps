@@ -1021,15 +1021,41 @@ is shown/seeded verbatim. The other two `institutionOf` branches
 (accept-time `reviewerAffiliationOf`, person `affiliation`) are unconditionally
 reduced as before — those are free-text sources, never reviewer/staff-
 confirmed. A prior confirmed `wmkf_maininstitution` is still never re-reduced
-at pre-fill, unchanged from the paragraph above. Separately, `medicine` and
-`laboratory` (singular) were added to `INSTITUTION_TIER_ORG_TERM` as
-whole-institution words, so "Weill Cornell Medicine", "Cold Spring Harbor
-Laboratory", and "MRC Laboratory of Molecular Biology" count as institutions
-beside a university when `institutionNameOf` DOES run (a byline-shaped
-value, or the two always-reduced free-text branches); bare "Medicine" alone
-is excluded via `BARE_INSTITUTION_TIER_LABEL` so it is not promoted on its
-own, and "Department/Faculty/School of Medicine" stay handled by the
-existing `SUBUNIT_SEGMENT`/`ORGANIZATION_TERM` rules, unchanged.
+at pre-fill, unchanged from the paragraph above.
+
+**"…Medicine"/"…Laboratory" institutions are recognized structurally, not by
+bare word (Fix A, Codex round 5, 2026-09-21):** bare `medicine` and
+`laboratory` were removed from `INSTITUTION_TIER_ORG_TERM` — matching the bare
+word anywhere in a segment wrongly promoted structurally unrelated text like
+"Laboratory Medicine" and "Sports Medicine" to institution tier. Instead,
+`isInstitutionTierPart` recognizes a whole institution named this way only
+when the segment ENDS with "Medicine" or "Laboratory" and has at least two
+preceding, uppercase-initial (proper-noun-shaped) words directly before the
+tail (`NAMED_INSTITUTION_TAIL`) — "Weill Cornell Medicine" and "Cold Spring
+Harbor Laboratory" qualify, but "Sports Medicine"/"Laboratory Medicine"
+(one preceding word) do not — or when an all-caps acronym (2+ letters) leads
+straight into "Laboratory" (`ACRONYM_LABORATORY_LEAD`) — "MRC Laboratory of
+Molecular Biology" qualifies. Bare "Medicine" alone is still excluded via
+`BARE_INSTITUTION_TIER_LABEL`, and "Department/Faculty/School of Medicine"
+stay handled by the existing `SUBUNIT_SEGMENT`/`ORGANIZATION_TERM` rules,
+unchanged. `national laboratory` and `laboratories` (plural) remain in
+`INSTITUTION_TIER_ORG_TERM` since they are unambiguous without a proper-noun
+lead.
+
+**`looksLikeByline` also fires on a trailing single-word location (Fix B,
+Codex round 5, 2026-09-21):** when there are at least two comma/semicolon
+segments and the LAST one is a single letters-only word that is not itself an
+institution-tier part, `looksLikeByline` returns true — this catches an
+unlisted trailing city ("Doha", "Ithaca", "Houston") that `isGeographicSegment`'s
+finite lists don't know, e.g. "Weill Cornell Medicine, Cornell University,
+Doha". Two documented limits: "University of California, Davis" is still safe
+even though "Davis" trips this marker, because `institutionNameOf`'s
+multi-campus re-attach restores the exact "University of California, Davis"
+string on either path; and a two-word trailing campus such as "New York
+University, Abu Dhabi" is deliberately NOT treated as a marker (it stays
+verbatim), so a multi-word unlisted city ("Yale University, New Haven") is a
+known miss.
+
 `PRE_RP_BRIEF_CONTRACT.renderVersion` stays `'4'` — the gating and tier
 change are unreleased on this branch, so no version bump was needed.
 

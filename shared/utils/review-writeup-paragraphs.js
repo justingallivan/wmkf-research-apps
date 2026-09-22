@@ -140,15 +140,32 @@ const ORGANIZATION_TERM = /(?<![\p{L}\p{N}])(?:institut(?:e|o|ion)?|istituto|hos
 // organization-shaped sub-unit ("Center for Translational Cancer Research"
 // stays a sub-unit-shaped fallback only — bare "center"/"centre" is excluded
 // here even though it is in the broader ORGANIZATION_TERM above).
-// `medicine` and `laboratory` (Fix D, Codex round 4 finding, 2026-09-21):
-// whole-institution words so "Weill Cornell Medicine" and "Cold Spring
-// Harbor Laboratory"/"MRC Laboratory of Molecular Biology" count as
-// institutions beside a university. Guarded by BARE_INSTITUTION_TIER_LABEL
-// (bare "Medicine" alone is not an institution) and by SUBUNIT_SEGMENT's
-// existing `lab(oratory)?\s+(of|for)` lead ("Laboratory of Molecular
-// Biology" alone, at the START of a segment, is a sub-unit — "MRC
-// Laboratory of Molecular Biology" does not start with that lead).
-const INSTITUTION_TIER_ORG_TERM = /(?<![\p{L}\p{N}])(?:hospital|clinic|klinik|medical\s+(?:center|centre)|medical\s+school|school\s+of\s+medicine|cancer\s+(?:center|centre)|national\s+laboratory|laboratory|laboratories|medicine|foundation|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)(?![\p{L}\p{N}])/iu;
+// Bare `medicine` and `laboratory` were removed from this whitelist (Fix A,
+// Codex round 5 finding, 2026-09-21): a bare word match promoted structurally
+// unrelated segments like "Laboratory Medicine" and "Sports Medicine" to
+// institution tier just because they contained the word. Whole-institution
+// names built on those words ("Weill Cornell Medicine", "Cold Spring Harbor
+// Laboratory", "MRC Laboratory of Molecular Biology") are now recognized
+// structurally by NAMED_INSTITUTION_TAIL / ACRONYM_LABORATORY_LEAD below,
+// which require a proper-noun lead rather than matching the bare word
+// anywhere in the segment. `national\s+laboratory` and `laboratories` stay
+// here since they are unambiguous even without a proper-noun lead.
+const INSTITUTION_TIER_ORG_TERM = /(?<![\p{L}\p{N}])(?:hospital|clinic|klinik|medical\s+(?:center|centre)|medical\s+school|school\s+of\s+medicine|cancer\s+(?:center|centre)|national\s+laboratory|laboratories|foundation|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)(?![\p{L}\p{N}])/iu;
+// Structural whole-institution names ending in "Medicine"/"Laboratory" (Fix
+// A, Codex round 5, 2026-09-21): the segment must END with the tail word and
+// have at least two preceding, uppercase-initial (proper-noun-shaped) words
+// directly before it — "Weill Cornell Medicine" ✓, "Cold Spring Harbor
+// Laboratory" ✓, but "Sports Medicine" ✗ (one preceding word), "Laboratory
+// Medicine" ✗ (one preceding word), "Department of Medicine" / "Faculty of
+// Medicine" ✗ ("of" is not uppercase-initial, so the repeated group cannot
+// reach the tail), "Regenerative Medicine" ✗ (one preceding word). Written
+// WITHOUT the `i` flag for the leading words so the uppercase-initial
+// requirement is not defeated; the tail is matched case-insensitively via an
+// explicit alternation instead.
+const NAMED_INSTITUTION_TAIL = /^(?:\p{Lu}[\p{L}\p{N}.&'’-]*\s+){2,}(?:Medicine|Laboratory|medicine|laboratory)$/u;
+// An all-caps acronym (2+ letters) leading straight into "Laboratory" (Fix A):
+// "MRC Laboratory of Molecular Biology" ✓, "LMB Laboratory" ✓.
+const ACRONYM_LABORATORY_LEAD = /^[A-Z]{2,}\s+Laboratory(?![\p{L}\p{N}])/u;
 // A whole institute, not a sub-institute lead ("Institute of X" inside a run
 // that also has a university is a sub-institute — see SUBUNIT_SEGMENT).
 const INSTITUTE_WORD = /(?<![\p{L}\p{N}])(?:institute|institut|instituto|istituto)(?![\p{L}\p{N}])/iu;
@@ -166,14 +183,17 @@ const GENERIC_LEAD_WITH_OF = /^(?:cancer\s+(?:center|centre)|medical\s+(?:center
 
 // Institution-tier part (Fix 2): a university-tier part, OR an
 // organization-shaped part matching the narrower INSTITUTION_TIER_ORG_TERM
-// whitelist, OR a whole institute that is not a sub-institute lead. A bare
-// generic label with no proper-noun content is never promoted (2026-09-21).
+// whitelist, OR a whole institute that is not a sub-institute lead, OR a
+// structurally named "…Medicine"/"…Laboratory" institution (Fix A,
+// 2026-09-21). A bare generic label with no proper-noun content is never
+// promoted (2026-09-21).
 function isInstitutionTierPart(part) {
   const trimmed = part.trim();
   if (BARE_INSTITUTION_TIER_LABEL.test(trimmed) || GENERIC_LEAD_WITH_OF.test(trimmed)) return false;
   if (UNIVERSITY_TERM.test(part)) return true;
   if (INSTITUTION_TIER_ORG_TERM.test(part)) return true;
   if (INSTITUTE_WORD.test(part) && !INSTITUTE_SUBUNIT_LEAD.test(trimmed)) return true;
+  if (NAMED_INSTITUTION_TAIL.test(trimmed) || ACRONYM_LABORATORY_LEAD.test(trimmed)) return true;
   return false;
 }
 // Geography that never names an institution on its own.
@@ -298,8 +318,21 @@ function pickInstitutionsFromRun(parts) {
  * True when `text` carries a marker a reviewer- or staff-confirmed
  * institution name never has: an echoed email address, a geographic segment
  * (postal code, US state, listed country/state name, "City ST 12345", a
- * street address), or a department/division-shaped sub-unit lead. A
- * confirmed value may legitimately contain commas of its own ("Weill Cornell
+ * street address), a department/division-shaped sub-unit lead, or a trailing
+ * single-word location (Fix B, Codex round 5, 2026-09-21) — e.g. "Weill
+ * Cornell Medicine, Cornell University, Doha" or "Cornell University,
+ * Ithaca", where the last segment is one letters-only word that is not
+ * itself an institution-tier part. This catches an unlisted trailing city
+ * that `isGeographicSegment`'s finite lists don't know. Two documented
+ * limits: "University of California, Davis" stays safe even though "Davis"
+ * trips this marker, because `institutionNameOf`'s multi-campus re-attach
+ * restores the exact "University of California, Davis" string regardless of
+ * which path is taken; and a two-word trailing campus such as "New York
+ * University, Abu Dhabi" is deliberately NOT treated as a marker (it stays
+ * verbatim), so a multi-word unlisted city ("Yale University, New Haven") is
+ * a known miss.
+ *
+ * A confirmed value may legitimately contain commas of its own ("Weill Cornell
  * Medicine, Cornell University", "University of California, San Francisco")
  * and must be shown verbatim in that case; only a value that still looks like
  * a pasted publication byline (what the accept form used to pre-fill) is
@@ -313,7 +346,13 @@ export function looksLikeByline(text) {
   if (!trimmed) return false;
   if (/\S+@\S+/.test(trimmed) || /electronic\s+address/i.test(trimmed)) return true;
   const segments = trimmed.split(/[,;]/).map((part) => part.trim()).filter(Boolean);
-  return segments.some((segment) => isGeographicSegment(segment) || SUBUNIT_SEGMENT.test(segment));
+  if (segments.some((segment) => isGeographicSegment(segment) || SUBUNIT_SEGMENT.test(segment))) return true;
+  const lastSegment = segments[segments.length - 1];
+  if (segments.length >= 2 && lastSegment && !/\s/.test(lastSegment)
+    && /^\p{L}[\p{L}'’.-]*$/u.test(lastSegment) && !isInstitutionTierPart(lastSegment)) {
+    return true;
+  }
+  return false;
 }
 
 /**

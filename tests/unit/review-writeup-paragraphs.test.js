@@ -256,6 +256,35 @@ describe('composeReviewerSentence', () => {
     expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of University of California, San Francisco.');
   });
 
+  it('reduces a mainInstitution byline with a trailing unlisted-city marker (Fix B, Codex round 5, 2026-09-21)', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'Weill Cornell Medicine, Cornell University, Doha' }),
+    ]);
+    expect(runs.map((r) => r.text).join(''))
+      .toBe('The reviewer was A of Weill Cornell Medicine and Cornell University.');
+  });
+
+  it('keeps University of California, Davis exact despite the trailing-city marker (multi-campus re-attach restores it)', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'University of California, Davis' }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of University of California, Davis.');
+  });
+
+  it('keeps a two-word trailing campus verbatim (Fix B documented limit: not a marker)', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'New York University, Abu Dhabi' }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of New York University, Abu Dhabi.');
+  });
+
+  it('reduces "Laboratory Medicine, University of X, Seattle, WA" to the university (Fix A structural rule)', () => {
+    const { runs } = composeReviewerSentence([
+      reviewer({ name: 'A', mainInstitution: 'Laboratory Medicine, University of X, Seattle, WA' }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of University of X.');
+  });
+
   it('still prefers mainInstitution over a different reviewerAffiliation (precedence unchanged)', () => {
     const { runs } = composeReviewerSentence([
       reviewer({ name: 'A', mainInstitution: 'Stanford University', reviewerAffiliation: 'MIT' }),
@@ -459,6 +488,20 @@ describe('institutionNameOf (byline → institution name for display)', () => {
     // Bare "Medicine" alone is not promoted to institution tier.
     expect(institutionNameOf('Medicine, University of X')).toBe('University of X');
   });
+
+  it('recognizes "…Medicine"/"…Laboratory" institutions structurally, not by bare word (Fix A, Codex round 5, 2026-09-21)', () => {
+    // "Laboratory Medicine" and "Sports Medicine" are department-shaped, not
+    // whole institutions — only one proper-noun-shaped word precedes the tail.
+    expect(institutionNameOf('Laboratory Medicine, University of X, Seattle, WA')).toBe('University of X');
+    expect(institutionNameOf('Sports Medicine, University of Y, Seattle, WA')).toBe('University of Y');
+    // A trailing unlisted city ("Doha") does not stop "Weill Cornell Medicine"
+    // and "Cornell University" from both being recognized as institutions.
+    expect(institutionNameOf('Weill Cornell Medicine, Cornell University, Doha'))
+      .toBe('Weill Cornell Medicine and Cornell University');
+    // An acronym leading into "Laboratory" is a whole institution too.
+    expect(institutionNameOf('MRC Laboratory of Molecular Biology, University of Cambridge, Cambridge, UK'))
+      .toBe('MRC Laboratory of Molecular Biology and University of Cambridge');
+  });
 });
 
 describe('looksLikeByline', () => {
@@ -476,6 +519,19 @@ describe('looksLikeByline', () => {
     expect(looksLikeByline('University of California, San Francisco')).toBe(false);
     expect(looksLikeByline('MIT')).toBe(false);
     expect(looksLikeByline('Cold Spring Harbor Laboratory, Stony Brook University')).toBe(false);
+  });
+
+  it('is true when the last segment is a trailing single-word location (Fix B, Codex round 5, 2026-09-21)', () => {
+    expect(looksLikeByline('Weill Cornell Medicine, Cornell University, Doha')).toBe(true);
+    expect(looksLikeByline('Cornell University, Ithaca')).toBe(true);
+  });
+
+  it('is false when the trailing segment is a two-word campus or the value has no comma (Fix B limits)', () => {
+    // Two-word trailing campus is deliberately not a marker — stays verbatim.
+    expect(looksLikeByline('New York University, Abu Dhabi')).toBe(false);
+    expect(looksLikeByline('Weill Cornell Medicine, Cornell University')).toBe(false);
+    expect(looksLikeByline('University of California, San Francisco')).toBe(false);
+    expect(looksLikeByline('Washington University in St. Louis')).toBe(false);
   });
 
   it('is false for blank or null input', () => {
