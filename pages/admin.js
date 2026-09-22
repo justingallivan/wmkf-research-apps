@@ -17,6 +17,7 @@ import DataverseFieldInfoButton, {
   appSystemSettingPattern,
 } from '../shared/components/admin/DataverseFieldInfoButton';
 import AdminOverviewSection from '../shared/components/admin/AdminOverviewSection';
+import TestRequestPreviewSection from '../shared/components/admin/TestRequestPreviewSection';
 import {
   AdminEditorPanel,
   AdminViewNavigation,
@@ -3407,6 +3408,19 @@ export function AiWorkspace({ view }) {
   }
 }
 
+function TestRequestsWorkspace() {
+  return (
+    <AdminEditorPanel
+      id="test-request-preview"
+      title="Basic Request clone preview"
+      description="Resolve one sandbox Request, choose proposal files, and inspect the server-controlled field and filename plan. This panel has no create or copy action."
+      scope="Registered sandbox · Read-only"
+    >
+      <TestRequestPreviewSection />
+    </AdminEditorPanel>
+  );
+}
+
 export function PeopleWorkspace({ view }) {
   switch (view) {
     case 'app-access':
@@ -3474,6 +3488,8 @@ function WorkspaceContent({ workspace, view }) {
       return <OperationsWorkspace view={view} />;
     case 'workflows':
       return <WorkflowsWorkspace view={view} />;
+    case 'test-requests':
+      return <TestRequestsWorkspace />;
     case 'ai':
       return <AiWorkspace view={view} />;
     case 'people':

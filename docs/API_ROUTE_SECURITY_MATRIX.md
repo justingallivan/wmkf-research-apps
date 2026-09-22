@@ -6,7 +6,7 @@ status: canonical
 summary: This document is the living authorization inventory for pages/api. It is meant to do two jobs:.
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-16
+last_verified: 2026-09-21
 owner: product-engineering
 related:
   - pages/api
@@ -17,7 +17,7 @@ related:
 
 # API Route Security Matrix
 
-Last updated: 2026-09-16
+Last updated: 2026-09-21
 
 > **Wave 18 production boundary:** main includes a nullable per-engagement
 > due-date override and the route behaviors noted below. [VERIFIED via production
@@ -141,6 +141,7 @@ and remain authoritative.
 | `/api/admin/secrets` | GET, PUT | Superuser | `requireSuperuser` | Global admin | Reads/writes `wmkf_appsystemsettings` (DV) via dispatcher | Low | Tracks metadata, not secret values. |
 | `/api/admin/users` | DELETE | Superuser | `requireSuperuser` | Global admin | Updates `user_profiles.is_active` (PG); clears app-access cache | Medium | Soft-archive; refuses self-archive. Profile row preserved for audit FK integrity. |
 | `/api/admin/stats` | GET | Superuser | `requireSuperuser` | Global admin | Read-only (PG SELECTs across usage tables) | Low | Usage statistics across users. |
+| `/api/admin/test-requests/preview` | GET, POST | Superuser | `requireSuperuser`; `withDalContext` | Global admin source read, further constrained server-side to a non-production deployment connected to the registered Dataverse sandbox. GET accepts only one bounded Request number. POST accepts only a source Request GUID plus selected opaque inventory IDs, label, fiscal year, and meeting date; all trusted target, organization, type, metadata, path, file identity, and policy values are server-derived. | Read-only Dataverse request/account/metadata and SharePoint inventory/metadata/file bytes for stable SHA-256 hashing. No Dataverse, SharePoint, Blob, provider, email, or database write. | Medium | **[SOURCE-BUILT AND MOCK-VERIFIED 2026-09-21; NO LIVE RUNTIME CALL.]** The route cannot create a Request or copy a file. Unknown targets and Production fail before source reads. Both methods re-resolve authoritative state; selected bytes are bounded by technical read ceilings and checked before/after download. The response remains blocked and strips executable request/file plans until the owner approves the separate copy-executor policy and later stages supply isolation, provisioning, ledger, and execution contracts. |
 | `/api/analyze-funding-gap` | POST | App | `requireAppAccess('funding-gap-analyzer')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | AI payload review still needed. |
 | `/api/analyze-literature` | POST | App | `requireAppAccess('literature-analyzer')` | Request payload | Writes `api_usage_log` (PG); external lit-search APIs | Low | External research APIs / AI payload review. |
 | `/api/api-capabilities` | GET | Authenticated | `requireAuth` | Shared metadata | Read-only | Low | Authenticated capability metadata. |
