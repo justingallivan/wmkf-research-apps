@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { requestJson } from '../../utils/api-request';
 import { StatusChip } from './AdminWorkspaceNavigation';
 
 function formatBytes(value) {
@@ -82,12 +83,11 @@ export default function TestRequestPreviewSection() {
     setError('');
     setResult(null);
     try {
-      const response = await fetch(`/api/admin/test-requests/preview?sourceRequestNumber=${encodeURIComponent(normalized)}`, {
+      const body = await requestJson(`/api/admin/test-requests/preview?sourceRequestNumber=${encodeURIComponent(normalized)}`, {
         signal: controller.signal,
+        fallbackMessage: 'The source Request could not be loaded.',
       });
-      const body = await response.json();
       if (controller.signal.aborted || contextVersion !== contextVersionRef.current) return;
-      if (!response.ok) throw new Error(body?.error || 'The source Request could not be loaded.');
       setSourceState(body);
       setSourceNumber(body.source.requestNumber);
       setSelectedIds(body.documents.filter((document) => document.copyMode === 'copy').map((document) => document.id));
@@ -132,23 +132,21 @@ export default function TestRequestPreviewSection() {
     setLoadingPreview(true);
     setError('');
     try {
-      const response = await fetch('/api/admin/test-requests/preview', {
+      const body = await requestJson('/api/admin/test-requests/preview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({
+        fallbackMessage: 'The preview could not be prepared.',
+        body: {
           sourceRequestId: sourceState.source.requestId,
           selectedDocumentIds: selectedIds,
           testLabel: form.testLabel,
           fiscalYear: form.fiscalYear,
           meetingDate: form.meetingDate,
-        }),
+        },
       });
-      const body = await response.json();
       if (controller.signal.aborted
           || contextVersion !== contextVersionRef.current
           || previewSequence !== previewSequenceRef.current) return;
-      if (!response.ok) throw new Error(body?.error || 'The preview could not be prepared.');
       setResult(body);
     } catch (previewError) {
       if (previewError.name !== 'AbortError'

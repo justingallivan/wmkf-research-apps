@@ -73,15 +73,20 @@ test('listFiles enforces the total walk deadline before the first request', asyn
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
-test('empty paths preserve each read method\'s root behavior and listing consumes only the first page', async () => {
-  global.fetch = jest.fn().mockResolvedValue(response(200, {
-    value: [{ name: 'root.txt', id: 'root', file: { mimeType: 'text/plain' } }],
-    '@odata.nextLink': 'https://graph.microsoft.com/v1.0/should-not-be-followed',
-  }));
+test('empty paths preserve each read method\'s root behavior and listing follows governed pagination', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(200, {
+      value: [{ name: 'root.txt', id: 'root', file: { mimeType: 'text/plain' } }],
+      '@odata.nextLink': 'https://graph.microsoft.com/v1.0/drives/drive/root:/:/children?$skiptoken=next',
+    }))
+    .mockResolvedValueOnce(response(200, {
+      value: [{ name: 'second.txt', id: 'second', file: { mimeType: 'text/plain' } }],
+    }));
   await expect(GraphService.listFiles('akoya_request', '')).resolves.toEqual([
     { name: 'root.txt', size: undefined, lastModified: undefined, mimeType: 'text/plain', webUrl: undefined, id: 'root', folder: '' },
+    { name: 'second.txt', size: undefined, lastModified: undefined, mimeType: 'text/plain', webUrl: undefined, id: 'second', folder: '' },
   ]);
-  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(global.fetch).toHaveBeenCalledTimes(2);
 
   global.fetch = jest.fn().mockResolvedValue(response(404));
   await expect(GraphService.getFileMetadataByPath('akoya_request', '', 'root.txt', { siteId: 'site', driveId: 'drive' }))
