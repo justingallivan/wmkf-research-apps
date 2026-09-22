@@ -107,6 +107,65 @@ test('status can resume a live session, while the cleanup permit survives sessio
   expect(deps.cancelSession).toHaveBeenCalledWith('https://upload.example/session-secret');
 });
 
+test('status recognizes only the exact full-size path item as committed', async () => {
+  const committed = {
+    driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES,
+  };
+  const deps = dependencies({ getByPath: jest.fn(async () => committed) });
+  const started = await begin(deps);
+
+  await expect(getPresentationMediaProofUploadStatus({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .resolves.toMatchObject({ complete: true, canFinalize: true });
+  expect(deps.getSessionStatus).not.toHaveBeenCalled();
+});
+
+test('status treats a same-path partial SharePoint placeholder as resumable while the session is live', async () => {
+  const partial = {
+    driveId: 'drive-1', id: 'partial-item', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024,
+  };
+  const deps = dependencies({ getByPath: jest.fn(async () => partial) });
+  const started = await begin(deps);
+
+  await expect(getPresentationMediaProofUploadStatus({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .resolves.toMatchObject({
+      complete: false,
+      canFinalize: false,
+      uploadUrl: 'https://upload.example/session-secret',
+      nextExpectedRanges: ['10485760-'],
+    });
+  expect(deps.getSessionStatus).toHaveBeenCalledWith('https://upload.example/session-secret');
+});
+
+test('status never treats a partial placeholder as resumable after Microsoft reports the session gone', async () => {
+  const partial = {
+    driveId: 'drive-1', id: 'partial-item', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024,
+  };
+  const sessionError = Object.assign(new Error('gone'), { status: 404 });
+  const deps = dependencies({
+    getByPath: jest.fn(async () => partial),
+    getSessionStatus: jest.fn(async () => { throw sessionError; }),
+  });
+  const started = await begin(deps);
+
+  await expect(getPresentationMediaProofUploadStatus({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 410, code: 'presentation_media_proof_session_expired' });
+});
+
+test.each([
+  ['drive', { driveId: 'other-drive', id: 'item-1', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024 }],
+  ['name', { driveId: 'drive-1', id: 'item-1', name: 'other.mp4', size: 10 * 1024 * 1024 }],
+  ['missing id', { driveId: 'drive-1', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024 }],
+  ['negative size', { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: -1 }],
+  ['oversized', { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES + 1 }],
+])('status rejects a partial-path item with mismatched %s before exposing resume authority', async (_field, mismatched) => {
+  const deps = dependencies({ getByPath: jest.fn(async () => mismatched) });
+  const started = await begin(deps);
+
+  await expect(getPresentationMediaProofUploadStatus({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 409, code: 'presentation_media_proof_identity_mismatch' });
+  expect(deps.getSessionStatus).not.toHaveBeenCalled();
+});
+
 test('finalize validates the committed item and MP4 signature, then mints an encrypted five-minute audience token', async () => {
   const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
   const deps = dependencies({ getByPath: jest.fn(async () => item) });
