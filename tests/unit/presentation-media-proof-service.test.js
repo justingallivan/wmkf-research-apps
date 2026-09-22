@@ -76,14 +76,15 @@ test('begin derives an exact disposable server path and returns an opaque staff-
   const result = await begin(deps);
   expect(deps.ensureFolder).toHaveBeenCalledWith(
     'akoya_request',
-    `Requests/24-1000/Artifacts/Presentation Media Proof/${PROOF_ID}`,
+    'Requests/24-1000/Artifacts/Presentation Media Proof',
   );
   expect(deps.createSession).toHaveBeenCalledWith(
     'akoya_request',
-    `Requests/24-1000/Artifacts/Presentation Media Proof/${PROOF_ID}`,
+    'Requests/24-1000/Artifacts/Presentation Media Proof',
     `${PROOF_ID}.mp4`,
     { conflictBehavior: 'fail', siteId: 'site-1', driveId: 'drive-1' },
   );
+  expect(result.chunkBytes).toBe(320 * 1024);
   expect(result.uploadUrl).toBe('https://upload.example/session-secret');
   expect(result.permit).not.toContain('session-secret');
 
