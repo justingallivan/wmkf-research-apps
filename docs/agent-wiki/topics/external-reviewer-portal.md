@@ -515,7 +515,10 @@ a historical record). The expertise sentence comes from the same
 (`lib/services/pre-rp-brief/docx-renderer.js`'s `composeRefereeRunSegments`);
 the input fingerprint's `REVIEW_FINGERPRINT_FIELDS` now includes
 `lastName`/`keywords`/`areaOfExpertise` (the composer's inputs) so a brief
-regenerates when a reviewer's expertise data changes, and
+regenerates when a reviewer's expertise data changes — once phase 2 writes v2
+snapshots; phase-1 rows are still compared under the v1 list, so an
+expertise-only change renders on regenerate but does not register as drift
+until then — and
 `PRE_RP_BRIEF_CONTRACT.renderVersion` moved `'4'` → `'5'` alongside it, since
 the change binds both together (`lib/services/pre-rp-brief/artifact-service.js:748`).
 Widening that list would have invalidated every stored brief's fingerprint

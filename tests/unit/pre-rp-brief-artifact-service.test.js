@@ -21,8 +21,11 @@ const OLDER_ARTIFACT_ID = '33333333-3333-4333-8333-333333333333';
 const NEWER_ARTIFACT_ID = '44444444-4444-4444-8444-444444444444';
 const CLAIM_ID = '55555555-5555-4555-8555-555555555555';
 
+// Phase 1 of the snapshot versioning (2026-09-21): the production writer
+// still emits schemaVersion 1; v2 is reader-only until phase 2. Reader tests
+// that need a v2 row build one explicitly.
 const ENVELOPE = Object.freeze({
-  schemaVersion: 2,
+  schemaVersion: 1,
   artifactType: 'pre-rp-brief',
   request: {
     institutionName: 'Applicant University',
@@ -363,6 +366,80 @@ describe('generatePreRpBrief', () => {
     );
     expect(result.reused).toBe(true);
     expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+  });
+
+  // A non-pointer FAILED row that the generator finds by generation key and
+  // reclaims: the harness only knows rows it created or the pointer row, so
+  // route reads and conditional writes for this row to a mutable copy.
+  function wireReclaimableRow(harness, failedRow) {
+    const live = { ...failedRow };
+    let etag = 1;
+    const originalUpdate = harness.dependencies.updateDocument.getMockImplementation();
+    const originalCommit = harness.dependencies.commitChangeset.getMockImplementation();
+    harness.dependencies.findByGenerationKey.mockImplementation(async () => ({ records: [{ ...live }] }));
+    harness.dependencies.findByRequest.mockImplementation(async () => ({ records: [{ ...live }] }));
+    harness.dependencies.updateDocument.mockImplementation(async (id, patch, options) => {
+      if (id !== live.wmkf_requestdocumentid) return originalUpdate(id, patch, options);
+      if (options?.ifMatch && options.ifMatch !== live._etag) {
+        const conflict = new Error('ETag mismatch'); conflict.status = 412; throw conflict;
+      }
+      Object.assign(live, patch); live._etag = `failed-${++etag}`; live.modifiedon = new Date().toISOString();
+      return undefined;
+    });
+    harness.dependencies.commitChangeset.mockImplementation(async (operations) => {
+      const mine = operations.filter((op) => op.entitySet === 'wmkf_requestdocuments' && op.key === live.wmkf_requestdocumentid);
+      for (const op of mine) { Object.assign(live, op.body); live._etag = `failed-${++etag}`; }
+      const rest = operations.filter((op) => !mine.includes(op));
+      if (rest.length) return originalCommit(rest);
+      return undefined;
+    });
+    return live;
+  }
+
+  it('renders a RECLAIMED failed row from its own stored snapshot, not from freshly loaded inputs that differ only in fields the v1 fingerprint ignores (Codex round 10, 2026-09-21)', async () => {
+    const storedReview = {
+      suggestionId: 's-1', reviewReceivedAt: '2026-09-01T00:00:00Z', name: 'Carey Nadell', lastName: 'Nadell',
+      academicRank: 'Associate Professor', reviewerOverallAssessment: 5, reviewerAffiliation: null,
+      mainInstitution: 'Dartmouth', affiliation: null, keywords: 'Old expertise',
+    };
+    const storedSnapshot = { ...ENVELOPE, schemaVersion: 1, reviews: [storedReview] };
+    const fingerprint = briefInputFingerprint(storedSnapshot);
+    const failed = briefRow({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      wmkf_inputfingerprint: fingerprint,
+      wmkf_presiteinputsnapshotjson: JSON.stringify(storedSnapshot),
+      wmkf_sharepointfolderpath: 'Requests/1002379/Artifacts/Pre-Research Presentation Brief',
+      wmkf_filename: 'Pre-RP-Brief_1002379_deadbeef.docx',
+    });
+    const harness = createHarness();
+    wireReclaimableRow(harness, failed);
+    // Live inputs: same v1 fingerprint (8 legacy fields unchanged), expertise edited.
+    const liveSnapshot = { ...storedSnapshot, reviews: [{ ...storedReview, keywords: 'New expertise' }] };
+    expect(briefInputFingerprint(liveSnapshot)).toBe(fingerprint);
+    harness.dependencies.loadInputs.mockResolvedValue(inputsFixture({ envelope: liveSnapshot }));
+
+    await generatePreRpBrief({ requestId: REQUEST_ID, clientOperationId: 'op-1' }, harness.dependencies);
+
+    expect(harness.dependencies.renderDocx).toHaveBeenCalledTimes(1);
+    expect(harness.dependencies.renderDocx.mock.calls[0][0].reviews[0].keywords).toBe('Old expertise');
+    expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  });
+
+  it('refuses to render a RECLAIMED row whose stored snapshot does not verify against its recorded fingerprint', async () => {
+    const storedSnapshot = { ...ENVELOPE, schemaVersion: 1, reviews: [] };
+    const failed = briefRow({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      wmkf_inputfingerprint: 'not-the-real-fingerprint',
+      wmkf_presiteinputsnapshotjson: JSON.stringify(storedSnapshot),
+      wmkf_sharepointfolderpath: 'Requests/1002379/Artifacts/Pre-Research Presentation Brief',
+      wmkf_filename: 'Pre-RP-Brief_1002379_deadbeef.docx',
+    });
+    const harness = createHarness();
+    wireReclaimableRow(harness, failed);
+    await expect(generatePreRpBrief({ requestId: REQUEST_ID, clientOperationId: 'op-1' }, harness.dependencies))
+      .rejects.toMatchObject({ code: 'pre_rp_brief_snapshot_invalid', httpStatus: 409 });
+    expect(harness.dependencies.renderDocx).not.toHaveBeenCalled();
     expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
   });
 

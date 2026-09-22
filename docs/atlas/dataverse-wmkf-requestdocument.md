@@ -563,7 +563,12 @@ exports `briefInputFingerprint`, a pure sha256-over-stable-keys function of
 that same envelope with reviews ordered by `compareReviewersByName`, for the
 prepare-time drift gate (plan §3.4b). `REVIEW_FINGERPRINT_FIELDS` includes
 `lastName`/`keywords`/`areaOfExpertise` (the expertise composer's inputs) so
-the fingerprint moves when a reviewer's expertise data changes. Because that
+the fingerprint moves when a reviewer's expertise data changes — for v2
+snapshots; phase-1 rows are written and compared as v1, so an expertise-only
+change does not move their fingerprint until phase 2. A reclaimed generation
+row renders from its own verified stored snapshot, never from fresher inputs
+(`storedBriefEnvelopeForRender`), so the document and its frozen provenance
+cannot disagree. Because that
 widened the field list every existing brief row's `wmkf_inputfingerprint` was
 computed under, the readers accept snapshot schemaVersion `1` and `2` (the writer
 flips `1` → `2` in a phase-2 follow-up, so the prior deployment stays a safe rollback target):
