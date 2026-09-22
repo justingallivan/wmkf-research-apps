@@ -811,8 +811,11 @@ describe('prepare-time review/drift gate (plan §3.4b)', () => {
   });
 
   test('a v2 stored snapshot drifts when only keywords changes (a field the legacy list never covered)', async () => {
-    const generatedV2 = briefEnvelope();
+    // Explicit schemaVersion 2: phase 1 of the two-phase rollout still WRITES
+    // v1 (the contract constant), so this must not derive its version from it.
+    const generatedV2 = briefEnvelope({ schemaVersion: 2 });
     const liveV2 = briefEnvelope({
+      schemaVersion: 2,
       reviews: [{ ...generatedV2.reviews[0], keywords: 'cryo-electron tomography' }],
     });
     const gate = briefGateFixture({ generated: generatedV2, live: liveV2 });

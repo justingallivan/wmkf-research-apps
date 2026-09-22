@@ -21,7 +21,7 @@ Every state claim below is labelled. `[VERIFIED]` means read in source this sess
 | # | Decision | Answer |
 |---|---|---|
 | B1 | Field sources | Institution, title, PI, PD from the request; abstract from the request's `wmkf_abstract`. |
-| B2 | Referee sentences | Reuse the deterministic Reviews-tab composers (score tally + reviewer roster sentence). No new prompt. |
+| B2 | Referee sentences | Reuse the deterministic Reviews-tab composers (score tally + reviewer roster sentence). No new prompt. **Superseded 2026-09-21 (owner decision):** the paragraph also carries the expertise sentence — see the note under §2 (line ~94). |
 | B3 | Issues section | Staff-written; heading only on generation. |
 | B4 | Where generated | Staff Deliberations tab. Name: **Pre-Research Presentation Brief**. |
 | B5 | Distribution | Briefing-page link email as today. Download stays as a backup. No email attachments (2026-09-10 decision stands). |
@@ -92,7 +92,7 @@ The brief uses those two sentences only,
 not the expertise sentence, themes, or quotations.
 
 > **Superseded 2026-09-21 (owner decision):** the Referee Comments paragraph now also carries
-> the expertise sentence; renderVersion 5, snapshot schemaVersion 2 (legacy v1 rows verify with
+> the expertise sentence; renderVersion 5, snapshot schemaVersion 2 readers — v2 writes follow in phase 2 (legacy v1 rows verify with
 > the v1 field list). Current description: docs/agent-wiki/topics/external-reviewer-portal.md.
 
 Rendering is deterministic: no model call, no prompt registry entry. The renderer is a
@@ -180,7 +180,7 @@ its shape is self-describing; no neutral field is added
 in this pass, preserving the settled two-write Dataverse plumbing.
 
 > **Superseded 2026-09-21 (owner decision):** the Referee Comments paragraph now also carries
-> the expertise sentence; renderVersion 5, snapshot schemaVersion 2 (legacy v1 rows verify with
+> the expertise sentence; renderVersion 5, snapshot schemaVersion 2 readers — v2 writes follow in phase 2 (legacy v1 rows verify with
 > the v1 field list). Current description: docs/agent-wiki/topics/external-reviewer-portal.md.
 
 The snapshot carries every
@@ -714,7 +714,7 @@ merge auto-deploys code naming the new columns.
    received-only canonical form and raw fields; a timestamp rewrite now appears in the
    changed-reviewer delta, while non-received suggestions affect neither representation.
    > **Superseded 2026-09-21 (owner decision):** `REVIEW_FINGERPRINT_FIELDS` gained
-   > lastName/keywords/areaOfExpertise; snapshot schemaVersion is now 2, with a
+   > lastName/keywords/areaOfExpertise; snapshot schemaVersion 2 is accepted by readers (the writer flips 1 → 2 in a phase-2 follow-up), with a
    > `LEGACY_REVIEW_FINGERPRINT_FIELDS_V1` 8-field list for re-verifying/comparing v1 stored
    > rows. Current description: docs/agent-wiki/topics/external-reviewer-portal.md.
    (b) no route test exists for

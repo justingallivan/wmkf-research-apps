@@ -153,10 +153,14 @@ export const PRE_RP_BRIEF_CONTRACT = Object.freeze({
   // '5' (2026-09-21): expertise sentence added to the Referee Comments paragraph (owner decision).
   renderVersion: '5',
   snapshotArtifactType: 'pre-rp-brief',
-  // 2 (2026-09-21): review fingerprint fields gained lastName/keywords/
-  // areaOfExpertise (expertise sentence). v1 rows verify with the legacy
-  // field list.
-  snapshotSchemaVersion: 2,
+  // Two-phase rollout (2026-09-21, Codex adversarial review): phase 1 ships
+  // readers that accept snapshot v1 AND v2 (v2 = review fingerprint fields
+  // lastName/keywords/areaOfExpertise for the expertise sentence; v1 rows
+  // verify with the legacy 8-field list) while still WRITING v1, so the
+  // deployment before this one remains a safe rollback target. Phase 2 (a
+  // follow-up, once this deployment is the rollback target) flips this to 2.
+  // Until then an expertise-only change does not register as brief drift.
+  snapshotSchemaVersion: 1,
   relativeFolder: 'Artifacts/Pre-Research Presentation Brief',
 });
 
