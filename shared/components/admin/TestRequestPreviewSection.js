@@ -365,7 +365,8 @@ export default function TestRequestPreviewSection() {
               <ul className="mt-2 space-y-2 text-sm leading-6 text-amber-900">
                 {blockers.map((blocker, index) => (
                   <li key={`${blocker.code}-${blocker.field || 'general'}-${index}`}>
-                    <span className="font-semibold">{blocker.code}</span>: {blocker.detail}
+                    <span className="font-semibold">{blocker.code}</span>
+                    {blocker.field ? ` (${blocker.field})` : ''}: {blocker.detail}
                   </li>
                 ))}
               </ul>

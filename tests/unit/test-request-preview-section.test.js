@@ -64,6 +64,7 @@ const previewResult = {
     planReady: false,
     blockers: [{
       code: 'FILE_POLICY_APPROVAL_REQUIRED',
+      field: 'filePolicy',
       detail: 'The copy limits have not been approved.',
       scope: 'files',
     }],
@@ -109,7 +110,8 @@ test('loads server inventory and posts only source identity plus browser choices
 
   fireEvent.click(screen.getByRole('button', { name: 'Build read-only preview' }));
   expect(await screen.findByRole('heading', { name: 'Preview result' })).toBeInTheDocument();
-  expect(screen.getByText(/FILE_POLICY_APPROVAL_REQUIRED/)).toBeInTheDocument();
+  const policyBlocker = screen.getByText(/FILE_POLICY_APPROVAL_REQUIRED/).closest('li');
+  expect(policyBlocker).toHaveTextContent('FILE_POLICY_APPROVAL_REQUIRED (filePolicy):');
   expect(screen.queryByRole('button', { name: /create/i })).not.toBeInTheDocument();
 
   const [, postOptions] = global.fetch.mock.calls[1];
