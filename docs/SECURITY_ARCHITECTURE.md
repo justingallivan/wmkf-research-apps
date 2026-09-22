@@ -969,7 +969,9 @@ The middleware generates a unique cryptographic nonce for each request via `cryp
 | `style-src` | `'self'`, `'unsafe-inline'` |
 | `img-src` | `'self'`, `data:`, `https:` |
 | `font-src` | `'self'` |
-| `connect-src` | `'self'`, `https://vercel.com`, `https://*.vercel-insights.com` |
+| `connect-src` | Baseline: `'self'`, `https://vercel.com`, `https://*.vercel-insights.com` |
+| `connect-src` (Preview presentation-upload proof only) | Baseline plus `https://*.up.1drv.com` and the exact canonical tenant `https://appriver3651007194.sharepoint.com` |
+| `media-src` (Preview presentation-playback proof only) | `'self'` and the exact canonical tenant `https://appriver3651007194.sharepoint.com` |
 | `frame-ancestors` | `'none'` |
 | `upgrade-insecure-requests` | (enforces HTTPS for all subresources) |
 
@@ -979,10 +981,14 @@ The middleware generates a unique cryptographic nonce for each request via `cryp
 - `'self'` allows same-origin script chunks (`/_next/static/...`); the nonce covers any inline scripts on SSR pages
 - `'unsafe-inline'` is retained only for `style-src` (standard practice; no script execution vector)
 - `https://va.vercel-scripts.com` is explicitly allowed for Vercel Web Analytics
+- The presentation-media transport spike has route-exact Microsoft exceptions: upload egress is
+  permitted only on `/meeting-tracker/presentation-media-proof`, and media loading only under
+  `/external/presentation-media-proof/`. Prefix-similar sibling routes and all ordinary pages retain
+  the baseline policy. Unit tests cover the positive and negative path boundaries.
 
 **Development mode differences:** `script-src` includes `'unsafe-inline'` and `'unsafe-eval'` (required by Turbopack HMR); `connect-src` adds `https://*.public.blob.vercel-storage.com`, `ws://localhost:3000`, and `ws://127.0.0.1:3000` for blob access and WebSocket hot reload; `upgrade-insecure-requests` is omitted (localhost is HTTP).
 
-**Note:** Pages are statically generated (SSG) at build time, so `'strict-dynamic'` is not used — it would override `'self'` per the CSP spec and block same-origin script chunks that lack nonce attributes. The `connect-src` allowlist covers Vercel Analytics; blob access goes through the authenticated proxy (`/api/blob-proxy`) which is same-origin. All Claude API calls are server-side and not subject to CSP.
+**Note:** Pages are statically generated (SSG) at build time, so `'strict-dynamic'` is not used — it would override `'self'` per the CSP spec and block same-origin script chunks that lack nonce attributes. The baseline `connect-src` allowlist covers Vercel Analytics; blob access goes through the authenticated proxy (`/api/blob-proxy`) which is same-origin. The narrowly scoped presentation-proof exceptions above are the only browser-to-Microsoft additions. All Claude API calls are server-side and not subject to CSP.
 
 ### 7.5 Input Validation
 

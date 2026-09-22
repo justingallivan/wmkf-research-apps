@@ -2,8 +2,8 @@
 title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
-status: blocked
-summary: "Blocked transport plan for Meeting Tracker to capture a Zoom recording link or SharePoint-hosted MP4 plus the latest transcript, surface them to program directors, and mint a 60-day materials-only Board link; the deployed Chrome proof falsified browser-direct Graph MP4 upload."
+status: active
+summary: "Active plan for Meeting Tracker to capture a Zoom recording link or SharePoint-hosted MP4 plus the latest transcript, surface them to program directors, and mint a 60-day materials-only Board link; deployed Chrome now proves direct Graph MP4 upload, playback, and download after a route-scoped CSP correction."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -40,7 +40,7 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
 | SharePoint video delivery | Offer Watch and Download without proxying the complete file through the application. |
 | First-slice MP4 cap | 2,000,000,000 bytes (about 1.86 GiB), so the exact byte count fits the existing Dataverse `wmkf_FileSize` integer. Raising the cap requires a reviewed larger-size schema field. |
 | Existing full briefing | Preserve D19/D28: the existing distributed briefing remains a superset and continues to include research-presentation materials. Add audience-specific non-buffering Watch/Download resolution for Zoom and large SharePoint recordings. The new copied link is an additional materials-only option. |
-| Transport proof | **FAILED 2026-09-22 for browser-direct Graph upload.** Desktop Chrome failed before receiving an HTTP response on both localhost and the registered HTTPS Preview origin, while Node PUTs to the same Microsoft upload service succeeded. Durable schema and full MP4 UI work remain blocked pending an owner transport decision. |
+| Transport proof | **CHROME CORE PATH PASSED 2026-09-22.** The original status-0 failure was the application CSP, not Graph transport. After adding route-scoped Microsoft upload/media origins, deployed Chrome uploaded a 96.0 MiB MP4 directly to Graph, finalized it, played it through both resolver shapes, and downloaded the complete bytes. Edge, macOS Safari, iPadOS Safari, reload/reselect resume, expiry recovery, and long-duration seeking remain required before Slice 0 is complete. |
 | Distribution | No new email composer or automatic distribution for the materials-only link. Meeting Tracker provides Copy link for staff to share through their chosen channel; the existing deliberation email continues distributing the full briefing link. |
 
 ## 2. Verified current state
@@ -94,18 +94,25 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
   preauthenticated download URL. See
   <https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0>
   and <https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0>.
-- **[VERIFIED 2026-09-22 via signed-in Chrome and Preview deployment
-  `dpl_9ExwJRWYntQ3F6dqKgJ5poygUVrq`]** the Preview proof route authenticated, resolved sanctioned
-  Request `1003222`, and minted a governed Graph upload session for a 96.0 MiB MP4. The first
-  browser XHR fragment failed at status `0` before any HTTP response on the registered
-  `https://wmkfresearchapps-preview.vercel.app` origin. The same failure occurred on localhost;
-  the earlier `fetch` implementation also failed before a response.
+- **[VERIFIED 2026-09-22 via signed-in Chrome, Preview deployment
+  `dpl_4zAYDFC4YDntkHFQsWBFxeTfTJD2`, and commit `35b9990bf`]** the earlier status-0 browser
+  failure was caused by the application CSP: `connect-src` did not permit the Graph upload host.
+  The route-scoped fix permits `https://*.up.1drv.com` plus the canonical SharePoint tenant only
+  on the Preview upload proof, and permits that exact tenant in `media-src` only on the Preview
+  playback proof. Ordinary routes keep the baseline policy.
+- **[VERIFIED 2026-09-22 via signed-in Chrome]** the corrected Preview resolved sanctioned Request
+  `1003222`, uploaded the 100,665,703-byte MP4 directly from Chrome to Microsoft, finalized the
+  exact item after a bounded 32-byte `ftyp` read, visibly played it through the 302 resolver,
+  successfully resolved the one-shot URL Watch path, and downloaded a complete 100,665,703-byte
+  copy. The resolver count advanced
+  once per explicit Watch/Download action and not for video range traffic. Microsoft supplied the
+  opaque physical filename on download, so production UX still needs an explicit display-filename
+  decision rather than relying on a cross-origin `download` attribute.
 - **[VERIFIED 2026-09-22 via direct Node transport probes]** Microsoft accepted aligned
   `Content-Range` PUTs from the same machine: 320 KiB and 1.25 MiB fragments returned `202` with
   advancing `nextExpectedRanges`, and the CORS preflight returned `200` with an allow-origin
-  response. This localizes the proven break to Chrome-to-Microsoft upload transport rather than
-  request resolution, Graph session creation, file choice, OAuth, or the deployed application
-  origin. It does not identify the browser/network-policy cause.
+  response. Together with the corrected browser proof, this confirms Graph transport and identifies
+  the application CSP as the original browser failure.
 
 ## 3. Invariant table
 
@@ -225,14 +232,14 @@ It continues to show applicant slides, other applicant materials, Recording, Tra
 Transcript Summary under D19/D28. The materials-only page never gains proposal, reviews, staff
 brief, or consultant feedback merely because the media helper is shared.
 
-**[ASSUMED — Slice 0 browser decision]** begin with a no-store 302 resolver. Observe whether
-subsequent media range requests go directly to Microsoft or re-enter the application route. If
-they re-enter, the accepted fallback is a no-store one-shot resolver response containing only the
-fresh short-lived Microsoft URL; the client assigns that URL to `video.src`. The URL is a bearer
-credential in either design and is visible to the browser in either a `Location` header or JSON,
-so it is never persisted, logged, or placed in the context payload. If neither design supports
-playback, seeking, and download without application byte proxying, stop for an owner transport
-decision rather than falling back to buffering the complete MP4.
+**[VERIFIED IN CHROME — Slice 0 browser decision]** both the no-store 302 resolver and the no-store
+one-shot URL response resolved successfully without application byte proxying; the 302 path visibly
+played and video range traffic
+did not increase the application resolver count. Prefer the 302 because it reveals the bearer URL
+only through the redirect chain rather than JSON, subject to the remaining Edge/Safari matrix and
+expiry-recovery tests. The URL is browser-visible in either design, so it is never persisted,
+logged, or placed in the context payload. If the remaining matrix falsifies 302 behavior, retain
+the one-shot response as the bounded fallback rather than buffering the complete MP4.
 
 If a Microsoft URL expires during playback, the client performs one bounded re-resolution,
 restores the last confirmed playback position after metadata loads, and exposes a manual Resume
@@ -520,29 +527,29 @@ resolvable through the presentation token.
 5. Response returns upload ID, preauthenticated upload URL, chunk contract, and Graph session
    expiry with `Cache-Control: no-store`. Neither token nor URL is logged.
 
-### 7.2 Browser upload — failed candidate
+### 7.2 Browser upload — selected candidate, browser matrix pending
 
-The failed candidate had the browser PUT sequential chunks directly to the preauthenticated Graph
-upload URL and follow `nextExpectedRanges`. The deployed proof reduced fragments to Graph's
-320 KiB alignment unit after larger Node probes showed high per-fragment latency, but Chrome still
-failed before the first response. The reload/reselect/fingerprint-resume design below therefore
-remains test-covered source for the disposable proof, not an approved production transport.
+The selected candidate has the browser PUT sequential chunks directly to the preauthenticated
+Graph upload URL and follow `nextExpectedRanges`. The deployed proof uses Graph's 320 KiB alignment
+unit and a 60-second XHR fragment timeout with byte-level progress. Chrome completed a 96.0 MiB
+upload after the proof route's CSP admitted only the Microsoft upload and canonical tenant origins.
+The reload/reselect/fingerprint-resume design remains to be exercised in the rest of the required
+browser matrix before production implementation.
 
 After reload, the materials GET makes unfinished intents discoverable. An in-progress intent shows
 Resume; a committed candidate with no registry row shows Finish saving. Only the creating actor
 may resume/finalize. If the active Site Visit no longer matches the intent, both actions refuse;
 the exact candidate is retained until the expiry reconciler can prove it unbound and clean it.
 
-**[FAILED — Slice 0 browser decision, 2026-09-22]** direct browser PUTs to the tenant-issued upload
-URL did not work in desktop Chrome. The first 320 KiB XHR fragment failed before an HTTP response
-from both localhost and the registered HTTPS Preview origin. The server-side begin action and
-Graph upload-session mint succeeded, and direct Node fragment PUTs succeeded, so changing the app
-origin from HTTP to HTTPS did not repair the browser boundary. Stop here for an owner transport
-decision; do not route the complete MP4 through a Function body as an unreviewed fallback.
+**[PASSED CORE CHROME PATH — Slice 0 browser decision, 2026-09-22]** direct browser PUTs to the
+tenant-issued upload URL work in deployed desktop Chrome after the route-scoped CSP correction.
+The browser sent the complete 100,665,703-byte file directly to Microsoft, and the application
+handled only session metadata, bounded validation, and resolver actions. Do not route the complete
+MP4 through a Function body; the direct Graph candidate now proceeds to the remaining matrix.
 
-The bounded replacement decision is:
+The bounded fallback decision, only if the remaining browser matrix fails, is:
 
-1. **Recommended:** Meeting Tracker resolves/ensures the governed request folder, opens that folder
+1. **Fallback:** Meeting Tracker resolves/ensures the governed request folder, opens that folder
    in SharePoint for Microsoft's first-party upload UI, then lets staff return and attach one
    server-enumerated MP4 from that exact folder. Finalization still revalidates parent, stable
    drive/item identity, size, signature, and malware posture before creating the Request Document.
@@ -744,14 +751,16 @@ Upload-specific rules:
 
 ### Slice 0 — Deployed-Preview browser proof
 
-**Implementation status (2026-09-22): FAILED AT THE REQUIRED FIRST BROWSER.** [VERIFIED via
+**Implementation status (2026-09-22): CHROME CORE PATH PASSED; SLICE REMAINS OPEN.** [VERIFIED via
 focused unit/contract tests] the isolated
 feature branch contains the Preview-only staff harness, browser-direct Graph upload session,
 encrypted staff permit, five-minute encrypted-subject proof token, fail-closed resolver limiter,
-302/one-shot playback comparison, and exact-item cleanup. [VERIFIED via signed-in Chrome] the
-deployed Preview created the session but the first 320 KiB fragment failed before any response,
-matching localhost. Because desktop Chrome is required, Slice 0 fails without continuing into
-playback/download or the remaining browser matrix. No CORS/range/Content-Disposition claim passed.
+302/one-shot playback comparison, scoped CSP, and exact-item cleanup. [VERIFIED via signed-in
+Chrome] the deployed Preview completed the 96.0 MiB upload, bounded finalize, visible 302 playback,
+successful one-shot Watch resolution, complete download, and exact-item deletion. Resolver counts stayed bounded
+to explicit actions. The downloaded filename was the opaque physical MP4 name, not the display
+name. The required Edge/macOS Safari/iPadOS Safari, reload/reselect resume, expiry recovery,
+long-duration seek, and 2 GB throughput-cap evidence remain open, so Slice 0 is not yet complete.
 
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
 authenticated proof route and minimal harness, but it creates no durable application schema and is
@@ -825,12 +834,15 @@ resolution shapes fail, stop before durable schema/full UI work and return to th
 redacted trace and a bounded alternative; do not silently route complete MP4 bytes through a
 Function.
 
-**Execution receipt (2026-09-22):** the direct-upload condition failed first, so the proof stopped
-before a committed item, playback, seeking, or Download. The shared OAuth alias was temporarily
-moved to immutable Preview deployment `dpl_9ExwJRWYntQ3F6dqKgJ5poygUVrq`, then restored and
-re-inspected at its prior exact target `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The proof deployment
-used one-off runtime settings; no branch-scoped Preview settings were created. Cleanup of the
-failed upload session remains an exact, separately confirmed UI action.
+**Execution receipt (2026-09-22):** after the scoped CSP fix, the shared OAuth alias was temporarily
+moved to immutable Preview deployment `dpl_4zAYDFC4YDntkHFQsWBFxeTfTJD2`. Chrome uploaded the
+100,665,703-byte MP4, finalized it, visibly played it through the 302 resolver, resolved the
+one-shot Watch path, and downloaded a byte-complete local copy. Two transient Microsoft range-fetch failures occurred while refreshing the
+five-minute proof; a later retry succeeded, so production finalization needs a bounded transient
+retry decision. With explicit user confirmation, cleanup deleted the exact committed SharePoint
+item. The alias was then restored and re-inspected at its prior exact target
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The proof deployment used one-off runtime settings; no
+branch-scoped Preview settings were created.
 
 Also verify tenant Safe Attachments and `DisallowInfectedFileDownload` posture. A security owner
 may supply sanctioned evidence that the Graph malware facet becomes non-null for a flagged item;
@@ -884,9 +896,9 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 
 ### Slice 4 — Large MP4 producer
 
-- **BLOCKED pending the owner transport decision above.** Do not build the browser-direct Graph
-  client or durable Graph-session-resume contract from the failed spike.
-- If the recommended SharePoint-first-party handoff is accepted, replace the upload-session intent
+- **PENDING completion of the Slice 0 browser matrix.** Use the proven browser-direct Graph
+  candidate only after Edge/macOS Safari/iPadOS Safari, resume, expiry, and throughput gates pass.
+- If the SharePoint-first-party fallback becomes necessary, replace the upload-session intent
   with a bounded attach intent: server-owned request/folder, creating actor, expected filename/size,
   exact-folder enumeration, independently authorized attach, and stable drive/item validation.
 - Preserve progress/cancel UI only for operations the chosen transport can truthfully observe;
@@ -993,7 +1005,7 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 - deployed-Preview real MP4 over 50 MB completes the owner-selected upload/attach transport and
   play/seek/download script without application buffering, repeated resolver throttling, or bearer
   values in logs across desktop Chrome, desktop Edge, macOS Safari, and iPadOS Safari; the
-  browser-direct Graph variant is a retained negative regression/evidence case;
+  browser-direct Graph variant remains the selected candidate unless the remaining matrix falsifies it;
 - expired/revoked tokens, Microsoft URL expiry recovery with playback-position restore, and fresh
   download action after URL expiry;
 - Preview proof harness rejects Production and is removed/disabled before release.
@@ -1050,10 +1062,10 @@ This is Tier 2 cross-store runtime work. Build on a feature branch and promote d
 
 Release order:
 
-1. **BLOCKED:** the fail-closed Slice 0 harness was deployed and desktop Chrome failed on the first
-   fragment before any response. Select and prove a replacement upload/attach transport before
-   schema work; only after that transport commits a disposable MP4 may the proof select 302 or
-   one-shot URL resolution from observed range behavior;
+1. **IN PROGRESS:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
+   route-scoped CSP correction. Complete Edge/macOS Safari/iPadOS Safari, resume, expiry, and
+   throughput gates before schema work; keep 302 as the leading resolver and the one-shot URL as
+   the bounded fallback;
 2. remove/convert the proof harness and merge the compatibility floor: deploy-safe readers,
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
@@ -1167,6 +1179,7 @@ The subsequent document-only Opus pass identified six further blockers, now inco
 - monotonic slot fencing plus renew/revalidate-before-write prevents an expired lease holder from
   becoming the visible winner or superseding an uncaptured row.
 
-The product behavior remains locked, but one implementation value is now open: choose the bounded
-MP4 transport after the failed browser-direct proof. This is an evidence-based blocker that returns
-to the owner; it is not permission to introduce application byte proxying.
+The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport after
+the corrected Chrome proof; the remaining implementation decision is whether it survives the full
+browser/resume/expiry matrix. Failure in that matrix returns to the bounded SharePoint-first-party
+fallback and is not permission to introduce application byte proxying.
