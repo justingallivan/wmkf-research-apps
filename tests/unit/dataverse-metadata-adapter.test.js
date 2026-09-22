@@ -2,12 +2,18 @@
  * @jest-environment node
  */
 
-jest.mock('../../lib/dataverse/client.js', () => ({
-  createClient: jest.fn(),
-  getAccessToken: jest.fn(),
+jest.mock('../../lib/services/dynamics-service.js', () => ({
+  DynamicsService: { getAccessToken: jest.fn() },
 }));
+jest.mock('../../lib/services/dynamics/http.js', () => ({
+  buildHeaders: jest.fn(token => ({ Authorization: `Bearer ${token}` })),
+  fetchWithTimeout: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/core/context.js', () => ({ hasTrustedDalContext: jest.fn() }));
 
-import { createClient, getAccessToken } from '../../lib/dataverse/client.js';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
+import { fetchWithTimeout } from '../../lib/services/dynamics/http.js';
+import { hasTrustedDalContext } from '../../lib/dataverse/core/context.js';
 import { getMetadataBatch } from '../../lib/dataverse/adapters/metadata.js';
 
 const originalUrl = process.env.DYNAMICS_URL;
@@ -15,6 +21,7 @@ const originalUrl = process.env.DYNAMICS_URL;
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.DYNAMICS_URL = 'https://sandbox.example.crm.dynamics.com';
+  hasTrustedDalContext.mockReturnValue(true);
 });
 
 afterAll(() => {
@@ -23,11 +30,10 @@ afterAll(() => {
 });
 
 test('uses one OAuth token and client for a bounded metadata batch', async () => {
-  getAccessToken.mockResolvedValue('token');
-  const get = jest.fn()
-    .mockResolvedValueOnce({ ok: true, body: { value: ['one'] } })
-    .mockResolvedValueOnce({ ok: true, body: { value: ['two'] } });
-  createClient.mockReturnValue({ get });
+  DynamicsService.getAccessToken.mockResolvedValue('token');
+  fetchWithTimeout
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ value: ['one'] }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ value: ['two'] }) });
   const paths = [
     "/EntityDefinitions(LogicalName='akoya_request')/Attributes",
     "/EntityDefinitions(LogicalName='akoya_request')/ManyToOneRelationships",
@@ -37,12 +43,23 @@ test('uses one OAuth token and client for a bounded metadata batch', async () =>
     { value: ['one'] },
     { value: ['two'] },
   ]);
-  expect(getAccessToken).toHaveBeenCalledTimes(1);
-  expect(createClient).toHaveBeenCalledTimes(1);
-  expect(get).toHaveBeenCalledTimes(2);
+  expect(DynamicsService.getAccessToken).toHaveBeenCalledTimes(1);
+  expect(fetchWithTimeout).toHaveBeenCalledTimes(2);
+  expect(fetchWithTimeout.mock.calls[0][0]).toContain('/api/data/v9.2/EntityDefinitions(');
+  expect(fetchWithTimeout.mock.calls[0][2]).toBe(30_000);
 });
 
 test('rejects unsupported paths before requesting a token', async () => {
   await expect(getMetadataBatch(['/akoya_requests'])).rejects.toThrow('Unsupported Dataverse metadata path.');
-  expect(getAccessToken).not.toHaveBeenCalled();
+  await expect(getMetadataBatch(['/EntityDefinitions(x)evil'])).rejects.toThrow('Unsupported Dataverse metadata path.');
+  await expect(getMetadataBatch(['/EntityDefinitions(x)/../../akoya_requests'])).rejects.toThrow('Unsupported Dataverse metadata path.');
+  await expect(getMetadataBatch(['/EntityDefinitions(x)/%2e%2e/akoya_requests'])).rejects.toThrow('Unsupported Dataverse metadata path.');
+  expect(DynamicsService.getAccessToken).not.toHaveBeenCalled();
+});
+
+test('requires a trusted DAL context before requesting a token', async () => {
+  hasTrustedDalContext.mockReturnValue(false);
+  await expect(getMetadataBatch(["/EntityDefinitions(LogicalName='akoya_request')/Attributes"]))
+    .rejects.toThrow('trusted DAL context');
+  expect(DynamicsService.getAccessToken).not.toHaveBeenCalled();
 });

@@ -39,6 +39,7 @@ function trusted(overrides = {}) {
     requestType: 100000000,
     sourceDocuments: [{
       contentHash: 'a'.repeat(64),
+      eTag: 'etag-1',
       folder: '1000123_GUID/Phase I',
       id: 'project-description',
       kind: 'projectDescription',

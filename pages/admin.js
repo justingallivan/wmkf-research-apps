@@ -3414,7 +3414,7 @@ function TestRequestsWorkspace() {
       id="test-request-preview"
       title="Basic Request clone preview"
       description="Resolve one sandbox Request, choose proposal files, and inspect the server-controlled field and filename plan. This panel has no create or copy action."
-      scope="Registered sandbox · Read-only"
+      scope="Sandbox data · Shared files · Read-only"
     >
       <TestRequestPreviewSection />
     </AdminEditorPanel>

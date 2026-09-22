@@ -164,7 +164,7 @@ export default function TestRequestPreviewSection() {
     }
   };
 
-  const requestBody = result?.preview?.preview?.request?.body || null;
+  const requestFields = result?.preview?.preview?.request?.fields || [];
   const blockers = result?.preview?.blockers || [];
   const disclosures = result?.preview?.disclosures || [];
 
@@ -176,7 +176,7 @@ export default function TestRequestPreviewSection() {
           <p className="font-semibold">This tool cannot create a Request or copy a file.</p>
         </div>
         <p className="mt-2 max-w-3xl leading-6 text-blue-900">
-          It reads one sandbox Request, inventories allowlisted proposal documents, and shows the exact field and filename plan that a future authorized run would use.
+          It reads one sandbox Request, inventories allowlisted proposal documents from the registered shared akoyaGO SharePoint site, and shows the field and filename plan that a future authorized run would use.
         </p>
       </div>
 
@@ -185,7 +185,7 @@ export default function TestRequestPreviewSection() {
           Source Request number
         </label>
         <p id="test-request-source-help" className="mt-1 text-sm leading-6 text-gray-600">
-          The source remains unchanged. Only the registered Dataverse sandbox is accepted.
+          The source remains unchanged. Dataverse must be the registered sandbox; documents come from the separately registered shared akoyaGO SharePoint site.
         </p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row">
           <input
@@ -226,8 +226,10 @@ export default function TestRequestPreviewSection() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                <StatusChip tone="green">Registered sandbox</StatusChip>
+                <StatusChip tone="green">Dataverse sandbox</StatusChip>
                 <span>{sourceState.environment.hostname}</span>
+                <StatusChip tone="gray">Shared SharePoint</StatusChip>
+                <span>{sourceState.environment.sharePoint.hostname}{sourceState.environment.sharePoint.pathname}</span>
               </div>
             </div>
           </section>
@@ -376,9 +378,9 @@ export default function TestRequestPreviewSection() {
             <section aria-labelledby="test-request-field-preview-heading">
               <h4 id="test-request-field-preview-heading" className="text-sm font-semibold text-gray-950">Request field preview</h4>
               <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
-                {requestBody ? (
+                {requestFields.length ? (
                   <dl className="divide-y divide-gray-200">
-                    {Object.entries(requestBody).map(([field, value]) => (
+                    {requestFields.map(({ field, value }) => (
                       <div key={field} className="grid gap-1 px-4 py-3 sm:grid-cols-[14rem_minmax(0,1fr)] sm:gap-4">
                         <dt className="text-xs font-semibold text-gray-600">{field}</dt>
                         <dd className="break-words text-sm text-gray-950">{valueText(value)}</dd>

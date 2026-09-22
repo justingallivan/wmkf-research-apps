@@ -25,7 +25,7 @@ Authorized scope was one sandbox-only rehearsal: add only the reviewed isolation
 - Applied the separately isolated `wave29-test-request-reminder-controls` sandbox parity subset: `wmkf_respondreminderenabled` and `wmkf_reviewduereminderenabled` only.
 - Post-apply metadata readback found all four fields createable with the reviewed types; applicant, Request Type, and meeting date are application-required.
 - Resolved exactly one active `W. M. Keck Foundation` account and one child Contact. Sandbox request type `Grant` is option `100000000`.
-- The sandbox default SharePoint site is the canonical `https://appriver3651007194.sharepoint.com/sites/akoyaGO` site.
+- The sandbox default SharePoint site is the canonical `https://appriver3651007194.sharepoint.com/sites/akoyaGO` site. That site is shared with ordinary akoyaGO document workflows; it is separately registered and must not be described as sandbox-isolated.
 
 ### Exact attempted body and result
 

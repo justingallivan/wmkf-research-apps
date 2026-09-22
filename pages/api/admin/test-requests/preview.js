@@ -10,6 +10,7 @@ import { withDalContext } from '../../../../lib/dataverse/core/context';
 import {
   buildTestRequestAdminPreview,
   loadTestRequestPreviewSource,
+  TEST_REQUEST_PREVIEW_READ_LIMITS,
 } from '../../../../lib/services/test-requests/admin-preview-service';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { requireSuperuser } from '../../../../lib/utils/auth';
@@ -65,6 +66,14 @@ export default async function handler(req, res) {
       } catch (error) {
         return sendError(res, error);
       }
+    });
+  }
+
+  if (Array.isArray(req.body?.selectedDocumentIds)
+      && req.body.selectedDocumentIds.length > TEST_REQUEST_PREVIEW_READ_LIMITS.maxFiles) {
+    return res.status(413).json({
+      error: `Select no more than ${TEST_REQUEST_PREVIEW_READ_LIMITS.maxFiles} documents for one preview.`,
+      code: 'test_request_preview_file_count_exceeded',
     });
   }
 

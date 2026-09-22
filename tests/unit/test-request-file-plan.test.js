@@ -25,6 +25,7 @@ function policy(overrides = {}) {
 function document(overrides = {}) {
   return {
     contentHash: HASH_A,
+    eTag: 'etag-1',
     folder: '1000123_GUID/Phase I',
     id: 'project-description',
     kind: TEST_REQUEST_DOCUMENT_KINDS.projectDescription,
@@ -76,6 +77,7 @@ describe('compileBasicCloneFilePlan', () => {
       operation: 'copy',
       source: expect.objectContaining({
         contentHash: HASH_A,
+        eTag: 'etag-1',
         id: 'project-description',
         versionId: 'version-1',
       }),
@@ -201,6 +203,27 @@ describe('compileBasicCloneFilePlan', () => {
     expect(result.blockers).toContainEqual(expect.objectContaining({ code: 'FILE_COUNT_EXCEEDED' }));
     expect(result.blockers).not.toContainEqual(expect.objectContaining({ code: 'FILE_SELECTION_DUPLICATE' }));
     expect(result.plannedFiles).toEqual([]);
+  });
+
+  test('blocks distinct source files that resolve to the same destination', () => {
+    const duplicateDestination = document({
+      contentHash: HASH_B,
+      eTag: 'etag-2',
+      folder: '1000123_ARCHIVE/Phase I',
+      id: 'archived-project-description',
+      versionId: null,
+    });
+    const result = compile(
+      { sourceDocuments: [document(), duplicateDestination] },
+      { selectedDocumentIds: ['project-description', 'archived-project-description'] },
+    );
+
+    expect(result.blockers).toContainEqual(expect.objectContaining({
+      code: 'DESTINATION_COLLISION',
+      field: 'selectedDocumentIds',
+    }));
+    expect(result.plannedFiles).toEqual([]);
+    expect(result.previewFiles.every(file => file.operation === 'blocked')).toBe(true);
   });
 
   test('marks policy-rejected previews blocked rather than copyable', () => {

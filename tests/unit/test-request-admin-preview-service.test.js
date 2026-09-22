@@ -65,6 +65,13 @@ function dependencies(overrides = {}) {
   let randomIndex = 0;
   return {
     getTargetInfo: jest.fn(() => ({ deployment: 'local', target: 'sandbox', hostname: 'orgd9e66399.crm.dynamics.com' })),
+    getSharePointTargetInfo: jest.fn(() => ({
+      key: 'akoyago-shared',
+      scope: 'shared',
+      registered: true,
+      hostname: 'appriver3651007194.sharepoint.com',
+      pathname: '/sites/akoyago',
+    })),
     getRequestById: jest.fn(async () => source),
     findRequestByNumber: jest.fn(async () => ({ records: [source] })),
     getRequestSharePointBuckets: jest.fn(async () => [{ library: 'akoya_request', folder: '1002001_ROOT', source: 'dynamics' }]),
@@ -105,6 +112,63 @@ test('fails closed from a production deployment before reading a Request or Shar
   expect(deps.getRequestSharePointBuckets).not.toHaveBeenCalled();
 });
 
+test.each([
+  ['production target', { deployment: 'local', target: 'production', hostname: 'wmkf.crm.dynamics.com' }],
+  ['unknown target', { deployment: 'local', target: 'unknown', hostname: 'unlisted.crm.dynamics.com' }],
+])('fails closed for a %s on both service entry points before reads', async (_label, target) => {
+  const deps = dependencies({ getTargetInfo: jest.fn(() => target) });
+
+  await expect(loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps))
+    .rejects.toMatchObject({ code: 'test_request_preview_sandbox_required' });
+  await expect(buildTestRequestAdminPreview({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [],
+    testLabel: 'Preview fixture',
+    fiscalYear: 'December 2027',
+    meetingDate: '2027-12-03',
+  }, deps)).rejects.toMatchObject({ code: 'test_request_preview_sandbox_required' });
+  expect(deps.findRequestByNumber).not.toHaveBeenCalled();
+  expect(deps.getRequestById).not.toHaveBeenCalled();
+  expect(deps.getRequestSharePointBuckets).not.toHaveBeenCalled();
+});
+
+test('fails closed for an unregistered SharePoint site before reading a Request', async () => {
+  const deps = dependencies({
+    getSharePointTargetInfo: jest.fn(() => ({
+      key: null,
+      scope: 'unknown',
+      registered: false,
+      hostname: 'appriver3651007194.sharepoint.com',
+      pathname: '/sites/unreviewed',
+    })),
+  });
+
+  await expect(loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps))
+    .rejects.toMatchObject({ code: 'test_request_preview_sharepoint_target_required' });
+  expect(deps.findRequestByNumber).not.toHaveBeenCalled();
+  expect(deps.getRequestSharePointBuckets).not.toHaveBeenCalled();
+});
+
+test.each([
+  'https://wmkf.crm.dynamics.com',
+  'https://unlisted.crm.dynamics.com',
+  'not-a-url',
+])('the real target resolver rejects %s before default dependency reads', async (dynamicsUrl) => {
+  const originalDynamicsUrl = process.env.DYNAMICS_URL;
+  const originalVercelEnv = process.env.VERCEL_ENV;
+  process.env.DYNAMICS_URL = dynamicsUrl;
+  process.env.VERCEL_ENV = 'preview';
+  try {
+    await expect(loadTestRequestPreviewSource({ requestNumber: '1002001' }))
+      .rejects.toMatchObject({ code: 'test_request_preview_sandbox_required' });
+  } finally {
+    if (originalDynamicsUrl === undefined) delete process.env.DYNAMICS_URL;
+    else process.env.DYNAMICS_URL = originalDynamicsUrl;
+    if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = originalVercelEnv;
+  }
+});
+
 test('loads a server-derived source summary and opaque allowlisted inventory', async () => {
   const deps = dependencies();
   const result = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
@@ -113,6 +177,10 @@ test('loads a server-derived source summary and opaque allowlisted inventory', a
     success: true,
     mode: 'read-only',
     executionEnabled: false,
+    environment: {
+      target: 'sandbox',
+      sharePoint: { key: 'akoyago-shared', scope: 'shared' },
+    },
     source: {
       requestId: SOURCE_ID,
       requestNumber: '1002001',
@@ -161,18 +229,108 @@ test('re-resolves and hashes the selected file, but strips every executable payl
     code: 'FILE_POLICY_APPROVAL_REQUIRED',
     scope: 'files',
   }));
-  expect(result.preview.preview.request).toMatchObject({
-    authoritative: false,
-    body: {
-      akoya_requestid: DESTINATION_ID,
-      'akoya_applicantid@odata.bind': `/accounts(${FOUNDATION_ID})`,
-      akoya_title: 'TEST: Preview fixture',
-      akoya_requesttype: 100000000,
-      wmkf_istestrequest: true,
-      wmkf_testcreationrunid: RUN_ID,
-      wmkf_respondreminderenabled: false,
-      wmkf_reviewduereminderenabled: false,
-    },
+  expect(result.preview.preview.request.authoritative).toBe(false);
+  expect(result.preview.preview.request).not.toHaveProperty('body');
+  expect(result.preview.preview.request.fields).toEqual(expect.arrayContaining([
+    { field: 'akoya_applicantid', value: 'W. M. Keck Foundation' },
+    { field: 'akoya_title', value: 'TEST: Preview fixture' },
+    { field: 'akoya_requesttype', value: 100000000 },
+    { field: 'wmkf_istestrequest', value: true },
+    { field: 'wmkf_testcreationrunid', value: RUN_ID },
+  ]));
+  expect(JSON.stringify(result.preview.preview.request)).not.toContain(DESTINATION_ID);
+  expect(JSON.stringify(result.preview.preview.request)).not.toContain(FOUNDATION_ID);
+  expect(result.preview.preview.files[0].source).toMatchObject({
+    eTag: 'etag-1',
+    folder: 'Phase I',
+    versionId: '1.0',
+  });
+  expect(result.preview.preview.files[0].source).not.toHaveProperty('library');
+});
+
+test('turns a truncated SharePoint inventory into an explicit blocker', async () => {
+  const error = Object.assign(new Error('bounded inventory'), { code: 'graph_file_list_truncated' });
+  const deps = dependencies({ listFiles: jest.fn(async () => { throw error; }) });
+  const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
+  expect(loaded.documents).toEqual([]);
+  expect(loaded.inventoryErrors).toEqual([{ source: 'dynamics', code: 'SOURCE_BUCKET_TRUNCATED' }]);
+
+  const result = await buildTestRequestAdminPreview({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [],
+    testLabel: 'Preview fixture',
+    fiscalYear: 'December 2027',
+    meetingDate: '2027-12-03',
+  }, deps);
+  expect(result.preview.blockers).toContainEqual(expect.objectContaining({
+    code: 'SOURCE_INVENTORY_INCOMPLETE',
+    detail: expect.stringContaining('bounded inventory limit'),
+  }));
+});
+
+test('preserves transport failures instead of converting them to source-not-found', async () => {
+  const transportError = new Error('transport unavailable');
+  const deps = dependencies({ getRequestById: jest.fn(async () => { throw transportError; }) });
+  await expect(buildTestRequestAdminPreview({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [],
+    testLabel: 'Preview fixture',
+    fiscalYear: 'December 2027',
+    meetingDate: '2027-12-03',
+  }, deps)).rejects.toBe(transportError);
+});
+
+test('rejects ambiguous request-number matches explicitly', async () => {
+  const deps = dependencies({ findRequestByNumber: jest.fn(async () => ({ records: [source, { ...source }] })) });
+  await expect(loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps))
+    .rejects.toMatchObject({ code: 'test_request_source_ambiguous', httpStatus: 409 });
+});
+
+test('rejects MIME drift before downloading selected bytes', async () => {
+  const deps = dependencies();
+  const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
+  deps.getFileMetadataById.mockResolvedValueOnce({
+    id: 'graph-item-1',
+    name: 'ProjectDescription.pdf',
+    size: Buffer.byteLength('preview-pdf'),
+    mimeType: 'text/html',
+    eTag: 'etag-1',
+    versionId: null,
+  });
+
+  await expect(buildTestRequestAdminPreview({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [loaded.documents[0].id],
+    testLabel: 'Preview fixture',
+    fiscalYear: 'December 2027',
+    meetingDate: '2027-12-03',
+  }, deps)).rejects.toMatchObject({ code: 'test_request_preview_source_changed' });
+  expect(deps.downloadFile).not.toHaveBeenCalled();
+});
+
+test('keeps eTag and publication version as separate source identities', async () => {
+  const deps = dependencies();
+  const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
+  const metadataWithoutPublicationVersion = {
+    id: 'graph-item-1',
+    name: 'ProjectDescription.pdf',
+    size: Buffer.byteLength('preview-pdf'),
+    mimeType: 'application/pdf',
+    eTag: 'etag-only',
+    versionId: null,
+  };
+  deps.getFileMetadataById.mockResolvedValue(metadataWithoutPublicationVersion);
+  const result = await buildTestRequestAdminPreview({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [loaded.documents[0].id],
+    testLabel: 'Preview fixture',
+    fiscalYear: 'December 2027',
+    meetingDate: '2027-12-03',
+  }, deps);
+
+  expect(result.preview.preview.files[0].source).toMatchObject({
+    eTag: 'etag-only',
+    versionId: null,
   });
 });
 

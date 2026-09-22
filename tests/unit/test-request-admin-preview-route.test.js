@@ -7,6 +7,7 @@ jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((
 jest.mock('../../lib/services/test-requests/admin-preview-service', () => ({
   buildTestRequestAdminPreview: jest.fn(),
   loadTestRequestPreviewSource: jest.fn(),
+  TEST_REQUEST_PREVIEW_READ_LIMITS: { maxFiles: 7 },
 }));
 
 import { requireSuperuser } from '../../lib/utils/auth';
@@ -90,6 +91,25 @@ test('POST rejects extra trusted-state fields and invalid source IDs', async () 
   res = mockRes();
   await handler({ method: 'POST', query: {}, body: { ...validBody, sourceRequestId: 'not-a-guid' } }, res);
   expect(res.statusCode).toBe(400);
+  expect(buildTestRequestAdminPreview).not.toHaveBeenCalled();
+});
+
+test('POST rejects selection arrays above the hashing ceiling before the service', async () => {
+  const res = mockRes();
+  await handler({
+    method: 'POST',
+    query: {},
+    body: {
+      sourceRequestId: SOURCE_ID,
+      selectedDocumentIds: Array.from({ length: 8 }, (_, index) => `opaque-${index}`),
+      testLabel: 'Fixture preview',
+      fiscalYear: 'December 2027',
+      meetingDate: '2027-12-03',
+    },
+  }, res);
+
+  expect(res.statusCode).toBe(413);
+  expect(res.body.code).toBe('test_request_preview_file_count_exceeded');
   expect(buildTestRequestAdminPreview).not.toHaveBeenCalled();
 });
 

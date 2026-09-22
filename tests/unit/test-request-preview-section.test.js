@@ -16,7 +16,16 @@ const loadedSource = {
   success: true,
   mode: 'read-only',
   executionEnabled: false,
-  environment: { target: 'sandbox', hostname: 'orgd9e66399.crm.dynamics.com' },
+  environment: {
+    target: 'sandbox',
+    hostname: 'orgd9e66399.crm.dynamics.com',
+    sharePoint: {
+      key: 'akoyago-shared',
+      scope: 'shared',
+      hostname: 'appriver3651007194.sharepoint.com',
+      pathname: '/sites/akoyago',
+    },
+  },
   source: {
     requestId: SOURCE_ID,
     requestNumber: '1002001',
@@ -62,10 +71,10 @@ const previewResult = {
     preview: {
       request: {
         authoritative: false,
-        body: {
-          akoya_title: 'TEST: Basic clone of Request 1002001',
-          wmkf_istestrequest: true,
-        },
+        fields: [
+          { field: 'akoya_title', value: 'TEST: Basic clone of Request 1002001' },
+          { field: 'wmkf_istestrequest', value: true },
+        ],
       },
       files: [],
     },
@@ -93,6 +102,8 @@ test('loads server inventory and posts only source identity plus browser choices
   fireEvent.click(screen.getByRole('button', { name: 'Load source' }));
 
   expect(await screen.findByRole('heading', { name: 'Request 1002001' })).toBeInTheDocument();
+  expect(screen.getByText('Dataverse sandbox')).toBeInTheDocument();
+  expect(screen.getByText('Shared SharePoint')).toBeInTheDocument();
   expect(screen.getByLabelText('Include Project Description')).toBeChecked();
   expect(screen.getByDisplayValue('Basic clone of Request 1002001')).toBeInTheDocument();
 
