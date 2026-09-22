@@ -717,6 +717,14 @@ Upload-specific rules:
 
 ### Slice 0 — Deployed-Preview browser proof
 
+**Implementation status (2026-09-22):** [VERIFIED via focused unit/contract tests] the isolated
+feature branch contains the Preview-only staff harness, browser-direct Graph upload session,
+encrypted staff permit, five-minute encrypted-subject proof token, fail-closed resolver limiter,
+302/one-shot playback comparison, and exact-item cleanup. [ASSUMED pending deployed evidence] no
+browser/CORS/range/Content-Disposition claim has passed yet. The Slice 0 decision remains open
+until the deployed multi-browser procedure below is completed with a sanctioned request and real
+Zoom MP4 larger than 50 MB.
+
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
 authenticated proof route and minimal harness, but it creates no durable application schema and is
 removed or converted into production code after the decision. Use a sanctioned test request,

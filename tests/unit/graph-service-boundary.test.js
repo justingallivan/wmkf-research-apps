@@ -15,6 +15,8 @@ const METHODS = [
   'restoreFileVersion', 'downloadFile', 'downloadFileVersion',
   'downloadFileAsPdf', 'downloadFileByPath', 'getFileMetadataByPath',
   'ensureFolderPath', 'searchFiles', 'uploadFile', 'uploadFileLarge',
+  'createBrowserUploadSession', 'getBrowserUploadSessionStatus',
+  'cancelBrowserUploadSession', 'resolveMediaDownloadUrl', 'readMediaRange',
   'replaceFileContent', 'deleteFile', 'clearCaches',
 ];
 const STATE = [
@@ -71,6 +73,11 @@ const REAL_SOURCE_OPTIONS = {
     replaceFileContent: `${GRAPH}/writes.js`,
     deleteFile: `${GRAPH}/writes.js`,
     uploadFileLarge: `${GRAPH}/upload-session.js`,
+    createBrowserUploadSession: `${GRAPH}/upload-session.js`,
+    getBrowserUploadSessionStatus: `${GRAPH}/upload-session.js`,
+    cancelBrowserUploadSession: `${GRAPH}/upload-session.js`,
+    resolveMediaDownloadUrl: `${GRAPH}/media.js`,
+    readMediaRange: `${GRAPH}/media.js`,
     searchFiles: `${GRAPH}/search.js`,
     searchCooldownUntil: `${GRAPH}/search.js`,
     searchCooldownStatus: `${GRAPH}/search.js`,
@@ -118,6 +125,11 @@ const REAL_SOURCE_OPTIONS = {
     replaceFileContent: { target: `${GRAPH}/writes.js`, binding: 'replaceFileContent' },
     deleteFile: { target: `${GRAPH}/writes.js`, binding: 'deleteFile' },
     uploadFileLarge: { target: `${GRAPH}/upload-session.js`, binding: 'uploadFileLarge' },
+    createBrowserUploadSession: { target: `${GRAPH}/upload-session.js`, binding: 'createBrowserUploadSession' },
+    getBrowserUploadSessionStatus: { target: `${GRAPH}/upload-session.js`, binding: 'getBrowserUploadSessionStatus' },
+    cancelBrowserUploadSession: { target: `${GRAPH}/upload-session.js`, binding: 'cancelBrowserUploadSession' },
+    resolveMediaDownloadUrl: { target: `${GRAPH}/media.js`, binding: 'resolveMediaDownloadUrl' },
+    readMediaRange: { target: `${GRAPH}/media.js`, binding: 'readMediaRange' },
     searchFiles: { target: `${GRAPH}/search.js`, binding: 'searchFiles' },
   },
 };
