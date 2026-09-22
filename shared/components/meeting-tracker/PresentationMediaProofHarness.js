@@ -148,11 +148,16 @@ export default function PresentationMediaProofHarness() {
     setBusy(true);
     try {
       const data = await proofAction({ action: 'cleanup', permit: saved.permit });
+      if (!['item_deleted', 'session_cancelled'].includes(data.cleanupOutcome)) {
+        throw new Error('Cleanup did not return a confirmed outcome. The retry permit was retained.');
+      }
       sessionStorage.removeItem(STORAGE_KEY);
       setSaved(null);
       setProof(null);
       setProgress(0);
-      setStatus(data.deletedItem ? 'The exact disposable SharePoint item was deleted.' : 'The upload session was cancelled; no committed item existed.');
+      setStatus(data.cleanupOutcome === 'item_deleted'
+        ? 'The exact disposable SharePoint item was deleted.'
+        : 'Microsoft confirmed the upload session was cancelled; no committed item existed.');
     } catch (error) {
       setStatus(error.message);
     } finally {
@@ -166,11 +171,11 @@ export default function PresentationMediaProofHarness() {
         <header>
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Preview-only transport proof</p>
           <h1 className="mt-1 text-2xl font-semibold">Presentation video upload and playback</h1>
-          <p className="mt-2 text-sm text-gray-700">Use only a sanctioned sandbox request and a real Zoom MP4. The file travels directly to Microsoft and must be removed with Cleanup after testing.</p>
+          <p className="mt-2 text-sm text-gray-700">Use only the owner-sanctioned disposable request and a real Zoom MP4. The file travels directly to Microsoft and must be removed with Cleanup after testing.</p>
         </header>
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <label className="block text-sm font-medium" htmlFor="proof-request">Sandbox request GUID</label>
+          <label className="block text-sm font-medium" htmlFor="proof-request">Sanctioned request GUID</label>
           <input id="proof-request" value={requestId} onChange={(event) => setRequestId(event.target.value)} disabled={Boolean(saved)} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm" />
           <label className="mt-4 block text-sm font-medium" htmlFor="proof-file">Zoom MP4 (over 50 MB)</label>
           <input id="proof-file" type="file" accept="video/mp4,.mp4" onChange={(event) => setFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-sm" />

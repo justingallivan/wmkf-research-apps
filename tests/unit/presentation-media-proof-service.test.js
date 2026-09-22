@@ -35,7 +35,7 @@ function dependencies(overrides = {}) {
       expiresAt: SESSION_EXPIRY, nextExpectedRanges: ['0-'],
     })),
     getSessionStatus: jest.fn(async () => ({ expiresAt: SESSION_EXPIRY, nextExpectedRanges: ['10485760-'] })),
-    cancelSession: jest.fn(async () => undefined),
+    cancelSession: jest.fn(async () => ({ outcome: 'cancelled', status: 204 })),
     getByPath: jest.fn(async () => null),
     getById: jest.fn(async () => ({ driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES })),
     readRange: jest.fn(async () => ({ bytes: mp4Signature(), malware: null })),
@@ -103,7 +103,7 @@ test('status can resume a live session, while the cleanup permit survives sessio
   await expect(getPresentationMediaProofUploadStatus({ permit: result.permit, profileId: 'profile-1' }, deps))
     .rejects.toMatchObject({ httpStatus: 410, code: 'presentation_media_proof_session_expired' });
   await expect(cleanupPresentationMediaProofUpload({ permit: result.permit, profileId: 'profile-1' }, deps))
-    .resolves.toEqual({ cleaned: true, deletedItem: false });
+    .resolves.toEqual({ cleaned: true, cleanupOutcome: 'session_cancelled', deletedItem: false });
   expect(deps.cancelSession).toHaveBeenCalledWith('https://upload.example/session-secret');
 });
 
@@ -132,14 +132,97 @@ test('finalize validates the committed item and MP4 signature, then mints an enc
   await expect(resolvePresentationMediaProof(verified, deps)).resolves.toMatchObject({ downloadUrl: 'https://media.example/one-shot' });
 });
 
+test('finalize rejects a committed item without an MP4 ftyp signature before token minting', async () => {
+  const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
+  const deps = dependencies({
+    getByPath: jest.fn(async () => item),
+    readRange: jest.fn(async () => ({ bytes: Buffer.alloc(32), malware: null })),
+  });
+  const started = await begin(deps);
+  await expect(finalizePresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 415, code: 'presentation_media_proof_signature_invalid' });
+  expect(deps.mint).not.toHaveBeenCalled();
+});
+
 test('cleanup deletes only the stable item resolved at the exact permit path', async () => {
   const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
   const deps = dependencies({ getByPath: jest.fn(async () => item) });
   const started = await begin(deps);
   await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
-    .resolves.toEqual({ cleaned: true, deletedItem: true });
+    .resolves.toEqual({ cleaned: true, cleanupOutcome: 'item_deleted', deletedItem: true });
   expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'item-1');
   expect(deps.deleteFile).toHaveBeenCalledTimes(1);
+});
+
+test('cleanup never deletes an exact-path item whose stable identity mismatches the permit', async () => {
+  const mismatched = { driveId: 'drive-1', id: 'item-1', name: 'other.mp4', size: PROOF_MIN_BYTES };
+  const deps = dependencies({ getByPath: jest.fn(async () => mismatched) });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 409, code: 'presentation_media_proof_identity_mismatch' });
+  expect(deps.deleteFile).not.toHaveBeenCalled();
+});
+
+test('cleanup retains retry authority when Microsoft does not confirm cancellation and no item exists', async () => {
+  const deps = dependencies({ cancelSession: jest.fn(async () => { throw new Error('no response'); }) });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 502, code: 'presentation_media_proof_cleanup_uncertain' });
+  expect(deps.deleteFile).not.toHaveBeenCalled();
+});
+
+test('cleanup treats a gone session with no visible item as uncertain rather than false success', async () => {
+  const deps = dependencies({ cancelSession: jest.fn(async () => ({ outcome: 'gone', status: 404 })) });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 502, code: 'presentation_media_proof_cleanup_uncertain' });
+  expect(deps.deleteFile).not.toHaveBeenCalled();
+});
+
+test('cleanup fails closed on an unknown Microsoft cancellation outcome', async () => {
+  const deps = dependencies({ cancelSession: jest.fn(async () => ({ outcome: 'unexpected', status: 299 })) });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 502, code: 'presentation_media_proof_cleanup_uncertain' });
+  expect(deps.deleteFile).not.toHaveBeenCalled();
+});
+
+test('a cancellation error cannot block deletion of an exact committed item', async () => {
+  const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
+  const deps = dependencies({
+    cancelSession: jest.fn(async () => { throw new Error('session already closed'); }),
+    getByPath: jest.fn(async () => item),
+  });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .resolves.toEqual({ cleaned: true, cleanupOutcome: 'item_deleted', deletedItem: true });
+  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'item-1');
+});
+
+test('tampered permits fail before any upload-session or committed-item lookup', async () => {
+  const deps = dependencies();
+  const started = await begin(deps);
+  const final = started.permit.slice(-1);
+  const tampered = `${started.permit.slice(0, -1)}${final === 'A' ? 'B' : 'A'}`;
+  await expect(getPresentationMediaProofUploadStatus({ permit: tampered, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 401, code: 'presentation_media_proof_permit_invalid' });
+  expect(deps.getByPath).not.toHaveBeenCalled();
+  expect(deps.getSessionStatus).not.toHaveBeenCalled();
+});
+
+test('playback resolution fails closed when fresh Microsoft metadata drifts from the token identity', async () => {
+  const deps = dependencies({
+    resolveMedia: jest.fn(async () => ({
+      driveId: 'drive-1', itemId: 'different-item', filename: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES,
+      malware: null, downloadUrl: 'https://media.example/one-shot', mimeType: 'video/mp4',
+    })),
+  });
+  const claims = {
+    requestId: REQUEST_ID, driveId: 'drive-1', itemId: 'item-1', physicalFilename: `${PROOF_ID}.mp4`,
+    displayName: 'Zoom recording.mp4', size: PROOF_MIN_BYTES,
+  };
+  await expect(resolvePresentationMediaProof({ claims }, deps))
+    .rejects.toMatchObject({ httpStatus: 409, code: 'presentation_media_proof_identity_mismatch' });
 });
 
 test('wrong-audience proof tokens fail before item resolution', async () => {

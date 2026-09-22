@@ -982,9 +982,10 @@ The middleware generates a unique cryptographic nonce for each request via `cryp
 - `'unsafe-inline'` is retained only for `style-src` (standard practice; no script execution vector)
 - `https://va.vercel-scripts.com` is explicitly allowed for Vercel Web Analytics
 - The presentation-media transport spike has route-exact Microsoft exceptions: upload egress is
-  permitted only on `/meeting-tracker/presentation-media-proof`, and media loading only under
-  `/external/presentation-media-proof/`. Prefix-similar sibling routes and all ordinary pages retain
-  the baseline policy. Unit tests cover the positive and negative path boundaries.
+  permitted only on the exact `/meeting-tracker/presentation-media-proof` path in Preview, and media
+  loading only on a Preview `/external/presentation-media-proof/<single-token-segment>` page.
+  Empty, trailing-segment, prefix-similar sibling, cross-page, non-Preview, and ordinary routes retain
+  the baseline policy. Unit tests cover these positive and negative path boundaries.
 
 **Development mode differences:** `script-src` includes `'unsafe-inline'` and `'unsafe-eval'` (required by Turbopack HMR); `connect-src` adds `https://*.public.blob.vercel-storage.com`, `ws://localhost:3000`, and `ws://127.0.0.1:3000` for blob access and WebSocket hot reload; `upgrade-insecure-requests` is omitted (localhost is HTTP).
 

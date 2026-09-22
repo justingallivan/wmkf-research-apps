@@ -26,6 +26,7 @@ import { NextResponse } from 'next/server';
 import { withAuth } from 'next-auth/middleware';
 import { isAuthRequired } from './lib/utils/auth-policy';
 import { SHAREPOINT_CANONICAL_SITE_URL } from './lib/services/graph/constants';
+import { classifyDeployment } from './lib/dataverse/core/interlock';
 
 const SHAREPOINT_CANONICAL_ORIGIN = new URL(SHAREPOINT_CANONICAL_SITE_URL).origin;
 const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
@@ -41,10 +42,16 @@ export default withAuth(
     const isDev = process.env.NODE_ENV === 'development';
     const hostname = req.nextUrl?.hostname;
     const pathname = req.nextUrl?.pathname || '';
+    const isPreview = classifyDeployment() === 'preview';
     const isLoopbackHttp = req.nextUrl?.protocol === 'http:'
       && ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
-    const isPresentationUploadProof = pathname === PRESENTATION_UPLOAD_PROOF_PATH;
-    const isPresentationPlaybackProof = pathname.startsWith(PRESENTATION_PLAYBACK_PROOF_PREFIX);
+    const isPresentationUploadProof = isPreview && pathname === PRESENTATION_UPLOAD_PROOF_PATH;
+    const playbackProofToken = pathname.startsWith(PRESENTATION_PLAYBACK_PROOF_PREFIX)
+      ? pathname.slice(PRESENTATION_PLAYBACK_PROOF_PREFIX.length)
+      : '';
+    const isPresentationPlaybackProof = isPreview
+      && playbackProofToken.length > 0
+      && !playbackProofToken.includes('/');
 
     // Build CSP directives
     // Dev: Turbopack injects inline scripts without nonces, needs unsafe-inline + unsafe-eval.

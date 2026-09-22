@@ -54,12 +54,15 @@ beforeAll(() => {
 });
 
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
 beforeEach(() => {
   nextCalls.length = 0;
   _resetWarningsForTests();
 });
 afterEach(() => {
   process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+  if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
+  else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
 });
 
 // A request whose headers Next would clone. The CSP fn reads req.headers via
@@ -156,6 +159,7 @@ describe('proxy CSP function', () => {
 
   test('presentation upload proof alone can connect to Microsoft upload origins', () => {
     process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
     const proof = proxyFn(makeReq({}, 'https://preview.example/meeting-tracker/presentation-media-proof'));
     const proofConnectSrc = proof.headers.get('Content-Security-Policy')
       .split('; ').find(d => d.startsWith('connect-src'));
@@ -168,10 +172,27 @@ describe('proxy CSP function', () => {
       .split('; ').find(d => d.startsWith('connect-src'));
     expect(ordinaryConnectSrc).not.toContain('up.1drv.com');
     expect(ordinaryConnectSrc).not.toContain('sharepoint.com');
+
+    for (const url of [
+      'https://preview.example/meeting-tracker/presentation-media-proof/',
+      'https://preview.example/meeting-tracker/presentation-media-proofish',
+      'https://preview.example/external/presentation-media-proof/token',
+    ]) {
+      const csp = proxyFn(makeReq({}, url)).headers.get('Content-Security-Policy');
+      const connectSrc = csp.split('; ').find(d => d.startsWith('connect-src'));
+      expect(connectSrc).not.toContain('up.1drv.com');
+      expect(connectSrc).not.toContain('sharepoint.com');
+    }
+
+    process.env.VERCEL_ENV = 'production';
+    const production = proxyFn(makeReq({}, 'https://applications.example/meeting-tracker/presentation-media-proof'));
+    expect(production.headers.get('Content-Security-Policy')).not.toContain('up.1drv.com');
+    expect(production.headers.get('Content-Security-Policy')).not.toContain('sharepoint.com');
   });
 
   test('presentation playback proof alone can load media from the canonical SharePoint tenant', () => {
     process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
     const proof = proxyFn(makeReq({}, 'https://preview.example/external/presentation-media-proof/token'));
     const mediaSrc = proof.headers.get('Content-Security-Policy')
       .split('; ').find(d => d.startsWith('media-src'));
@@ -180,6 +201,20 @@ describe('proxy CSP function', () => {
 
     const sibling = proxyFn(makeReq({}, 'https://preview.example/external/presentation-media-proofish/token'));
     expect(sibling.headers.get('Content-Security-Policy')).not.toContain('media-src');
+
+    for (const url of [
+      'https://preview.example/external/presentation-media-proof/',
+      'https://preview.example/external/presentation-media-proof/token/extra',
+    ]) {
+      expect(proxyFn(makeReq({}, url)).headers.get('Content-Security-Policy')).not.toContain('media-src');
+    }
+
+    const upload = proxyFn(makeReq({}, 'https://preview.example/meeting-tracker/presentation-media-proof'));
+    expect(upload.headers.get('Content-Security-Policy')).not.toContain('media-src');
+
+    process.env.VERCEL_ENV = 'production';
+    const production = proxyFn(makeReq({}, 'https://applications.example/external/presentation-media-proof/token'));
+    expect(production.headers.get('Content-Security-Policy')).not.toContain('media-src');
   });
 
   test('successive requests get distinct nonces', () => {

@@ -100,9 +100,12 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
   The route-scoped fix permits `https://*.up.1drv.com` plus the canonical SharePoint tenant only
   on the Preview upload proof, and permits that exact tenant in `media-src` only on the Preview
   playback proof. Ordinary routes keep the baseline policy.
-- **[VERIFIED 2026-09-22 via signed-in Chrome]** the corrected Preview resolved sanctioned Request
-  `1003222`, uploaded the 100,665,703-byte MP4 directly from Chrome to Microsoft, finalized the
-  exact item after a bounded 32-byte `ftyp` read, visibly played it through the 302 resolver,
+- **[VERIFIED 2026-09-22 via signed-in Chrome and the configured runtime targets]** the corrected
+  Preview read sanctioned Request `1003222` from Production Dataverse under the one-off read-only
+  allowance and uploaded the 100,665,703-byte MP4 to the canonical akoyaGO SharePoint site. The
+  repository has no separate Preview SharePoint target or SharePoint deployment/write interlock;
+  the Preview deployment label alone did not make that disposable write non-production. The proof
+  finalized the exact item after a bounded 32-byte `ftyp` read, visibly played it through the 302 resolver,
   successfully resolved the one-shot URL Watch path, and downloaded a complete 100,665,703-byte
   copy. The resolver count advanced
   once per explicit Watch/Download action and not for video range traffic. Microsoft supplied the
@@ -764,9 +767,11 @@ long-duration seek, and 2 GB throughput-cap evidence remain open, so Slice 0 is 
 
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
 authenticated proof route and minimal harness, but it creates no durable application schema and is
-removed or converted into production code after the decision. Use a sanctioned test request,
-SharePoint test folder, and a real Zoom-produced MP4 larger than 50 MB. Never log the token,
-upload URL, download URL, or passcode.
+removed or converted into production code after the decision. Use an owner-sanctioned disposable
+request, the server-chosen proof folder in that request's configured governed SharePoint site, and
+a real Zoom-produced MP4 larger than 50 MB. Record the actual Dataverse and SharePoint targets
+before each run; Preview is an application-deployment boundary, not automatic data-target isolation.
+Never log the token, upload URL, download URL, or passcode.
 
 The transport decision must pass in current stable desktop Chrome, desktop Edge, macOS Safari,
 and iPadOS Safari. These are the first-slice Board browser/device matrix; a resolver shape that
@@ -842,7 +847,10 @@ five-minute proof; a later retry succeeded, so production finalization needs a b
 retry decision. With explicit user confirmation, cleanup deleted the exact committed SharePoint
 item. The alias was then restored and re-inspected at its prior exact target
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The proof deployment used one-off runtime settings; no
-branch-scoped Preview settings were created.
+branch-scoped Preview settings were created. The request lookup was a read against Production
+Dataverse, while the disposable file write and deletion occurred in the canonical akoyaGO
+SharePoint site. The exact item was deleted; the shared `Artifacts/Presentation Media Proof`
+folder remains as the reusable proof container.
 
 Also verify tenant Safe Attachments and `DisallowInfectedFileDownload` posture. A security owner
 may supply sanctioned evidence that the Graph malware facet becomes non-null for a flagged item;
@@ -852,9 +860,12 @@ synchronous scan. The first-slice size cap is resolved at 2,000,000,000 bytes.
 Also send a sanctioned 25 MB clean transcript through the configured scanner in Preview and
 record success; if the scanner cannot accept the proposed cap, reduce the cap before Slice 3.
 
-Run this proof only against the Preview deployment's sandbox Dataverse organization and Preview
-SharePoint test location. Production is a separate target/readiness wave and receives no disposable
-proof writes.
+Run this harness only from the Preview application deployment and only with an owner-sanctioned
+disposable request. Before every run, explicitly record the configured Dataverse and SharePoint
+targets and obtain authorization appropriate to those targets. Do not describe Preview as a
+sandbox-data guarantee: the 2026-09-22 proof read Production Dataverse and wrote the disposable
+item to the canonical SharePoint site. Cleanup must delete the exact committed item; an uncertain
+session cancellation retains the encrypted permit for retry rather than claiming success.
 
 ### Slice 1 — Additive schema and readiness
 

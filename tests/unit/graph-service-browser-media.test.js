@@ -55,9 +55,19 @@ test('creates, reads, and cancels a browser-direct upload session without proxyi
     .resolves.toMatchObject({ nextExpectedRanges: ['10485760-'] });
   expect(global.fetch.mock.calls[1][1].headers).toBeUndefined();
 
-  await expect(GraphService.cancelBrowserUploadSession('https://upload.example/session-secret')).resolves.toBeUndefined();
+  await expect(GraphService.cancelBrowserUploadSession('https://upload.example/session-secret'))
+    .resolves.toEqual({ outcome: 'cancelled', status: 204 });
   expect(global.fetch.mock.calls[2][1].method).toBe('DELETE');
   expect(global.fetch.mock.calls[2][1].headers).toBeUndefined();
+});
+
+test.each([
+  [404, 'gone'],
+  [410, 'expired'],
+])('upload-session cancellation preserves Microsoft %s as %s', async (status, outcome) => {
+  global.fetch.mockResolvedValueOnce(response(status));
+  await expect(GraphService.cancelBrowserUploadSession('https://upload.example/session-secret'))
+    .resolves.toEqual({ outcome, status });
 });
 
 test('resolves one-shot media and reads only the requested signature range', async () => {

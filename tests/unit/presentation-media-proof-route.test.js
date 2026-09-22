@@ -36,7 +36,11 @@ beforeEach(() => {
   beginPresentationMediaProofUpload.mockResolvedValue({ permit: 'opaque', uploadUrl: 'https://upload.example/session' });
   getPresentationMediaProofUploadStatus.mockResolvedValue({ complete: false });
   finalizePresentationMediaProofUpload.mockResolvedValue({ proofUrl: '/external/proof' });
-  cleanupPresentationMediaProofUpload.mockResolvedValue({ cleaned: true });
+  cleanupPresentationMediaProofUpload.mockResolvedValue({
+    cleaned: true,
+    cleanupOutcome: 'session_cancelled',
+    deletedItem: false,
+  });
 });
 
 test('production denial occurs before authentication', async () => {
