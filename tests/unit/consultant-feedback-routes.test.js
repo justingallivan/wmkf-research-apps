@@ -316,11 +316,13 @@ describe('finalize route', () => {
   });
 
   test('binds with the actor from the session and completes on success', async () => {
+    const staffId = '55555555-5555-4555-8555-555555555555';
+    requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID, session: { user: { dynamicsSystemuserId: staffId } } });
     finalizeAttachmentUpload.mockResolvedValueOnce({ requestdocumentId: 'doc-1', feedbackId: '5', filename: 'x.pdf' });
     const res = mockRes();
-    await finalizeHandler({ method: 'POST', body: { requestId: REQUEST_ID, stagingId: STAGING_ID, entryId: 9, actorProfileId: 999 } }, res);
+    await finalizeHandler({ method: 'POST', body: { requestId: REQUEST_ID, stagingId: STAGING_ID, entryId: 9, actorProfileId: 999, actingUserSystemId: '99999999-9999-4999-8999-999999999999' } }, res);
     expect(res.statusCode).toBe(200);
-    expect(finalizeAttachmentUpload).toHaveBeenCalledWith(expect.objectContaining({ actorProfileId: PROFILE_ID, requestId: REQUEST_ID, stagingId: STAGING_ID, entryId: 9 }));
+    expect(finalizeAttachmentUpload).toHaveBeenCalledWith(expect.objectContaining({ actorProfileId: PROFILE_ID, actingUserSystemId: staffId, requestId: REQUEST_ID, stagingId: STAGING_ID, entryId: 9 }));
     expect(finalizeAttachmentUpload.mock.calls[0][0].actorProfileId).not.toBe(999);
     expect(completePortalUpload).toHaveBeenCalled();
   });

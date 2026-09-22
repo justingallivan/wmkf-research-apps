@@ -20,6 +20,12 @@ const ALLOWED_UNATTRIBUTED_ORIGIN_STAGES = new Set([
   'pre-site-generation',
 ]);
 
+// Applicant-side producers write under the EXTERNAL_CONTRIBUTOR actor policy:
+// no staff actor exists and no missing-actor event is recorded by design.
+const EXTERNAL_CONTRIBUTOR_PRODUCERS = new Set([
+  'site-visit-materials-portal',
+]);
+
 function normalizedId(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -53,6 +59,8 @@ function classifyRows(rows, events, since) {
       if (Boolean(actor) !== Boolean(at)) {
         status = 'violation';
         reason = 'origin actor/time is a partial pair';
+      } else if (!actor && !at && EXTERNAL_CONTRIBUTOR_PRODUCERS.has(row.wmkf_producer)) {
+        status = 'external-contributor';
       } else if (!actor && !at && allowedEvent) {
         status = 'event-backed-unattributed';
       } else if (!actor && !at) {
@@ -109,6 +117,13 @@ function runSelfTest() {
       wmkf_milestonecreatedat: '2026-09-01T00:01:00.000Z',
       _wmkf_milestonecreatedby_value: null,
     },
+    {
+      ...base,
+      wmkf_requestdocumentid: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      wmkf_producer: 'site-visit-materials-portal',
+      wmkf_initiatedat: null,
+      _wmkf_initiatedby_value: null,
+    },
   ];
   const events = [
     {
@@ -127,10 +142,11 @@ function runSelfTest() {
     out[result.status] = (out[result.status] || 0) + 1;
     return out;
   }, {});
-  if (counts.attributed !== 2 || counts['event-backed-unattributed'] !== 2 || counts.violation !== 1) {
+  if (counts.attributed !== 2 || counts['event-backed-unattributed'] !== 2 || counts.violation !== 1
+    || counts['external-contributor'] !== 1) {
     throw new Error(`Unexpected self-test classification: ${JSON.stringify(counts)}`);
   }
-  console.log('PASS: Wave 24 attribution census classifier distinguishes attributed, event-backed, and missing evidence.');
+  console.log('PASS: Wave 24 attribution census classifier distinguishes attributed, event-backed, external-contributor, and missing evidence.');
 }
 
 function parseSince(argv) {
@@ -161,6 +177,7 @@ async function main() {
     () => DynamicsService.queryAllRecords('wmkf_requestdocuments', {
       select: [
         'wmkf_requestdocumentid',
+        'wmkf_producer',
         'createdon',
         'wmkf_initiatedat',
         '_wmkf_initiatedby_value',
@@ -190,6 +207,7 @@ async function main() {
   console.log(`Wave 24 Request Document attribution census since ${since.toISOString()}`);
   console.log(`  attributed: ${counts.attributed || 0}`);
   console.log(`  event-backed unattributed: ${counts['event-backed-unattributed'] || 0}`);
+  console.log(`  external contributor: ${counts['external-contributor'] || 0}`);
   console.log(`  violations: ${counts.violation || 0}`);
   for (const result of results.filter((entry) => entry.status === 'violation')) {
     console.log(`  VIOLATION ${result.documentId} ${result.kind}: ${result.reason}`);
