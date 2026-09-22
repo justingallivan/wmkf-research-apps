@@ -1,4 +1,128 @@
-# Session 531 Prompt: Pre-Site / Pre-RP brief fixes released, snapshot versioning complete
+# Session 532 Prompt: Request Document missing-actor warning noise fixed and released
+
+## Session 531 Summary
+
+[VERIFIED via Git, PR #325 CI, `vercel inspect`, read-only Postgres query]
+The owner asked about an admin-panel warning, "A Request Document business
+action completed without a verified staff actor" (×2, 9/19 7:59–8:08 PM PT).
+A read-only query of `operational_events` showed that events 832 and 833 were
+`site-visit-materials-upload`, reason `missing`, from an applicant uploading via
+the materials contributor link. Every `request_document_actor_not_captured`
+event on record came from that path or from consultant feedback attachments.
+None came from a real staff identity gap, and five had already been dismissed
+by hand. Event 834 is the same shape, tagged `preview`.
+
+### What Was Completed
+
+1. **Applicant uploads stop warning.** New
+   `REQUEST_DOCUMENT_ACTOR_POLICY.EXTERNAL_CONTRIBUTOR` in
+   `lib/services/request-document-actor-service.js`: no systemuser read, no
+   bind, resolution reason `external-contributor`. `isActorNotCaptured()` gates
+   both event sites in `lib/dataverse/adapters/request-document.js` `create()`
+   (normal and lost-response recovery). `contributor-service.js` uses it, and
+   the writer gate pins it.
+2. **Consultant feedback attachments attribute the staff uploader.** Correction
+   made mid-session: these are staff uploads, not consultant uploads. Owner
+   chose "record the staff actor". The finalize route passes
+   `access.session?.user?.dynamicsSystemuserId` through
+   `finalizeAttachmentUpload` to the registry create, still under
+   `ALLOW_UNATTRIBUTED`. The warning now means a genuinely unlinked staff
+   identity.
+3. **Census probe** (`scripts/probe-request-document-explicit-actor-census.js`).
+   External-contributor rows are classified first, and any staff actor/time on
+   one is a violation. `consultant-feedback-attachment` events are allowed only
+   when both the row and the event name producer `consultant-feedback`.
+   Self-test fixtures cover each guard independently (mutation-checked).
+4. **Release.** Codex adversarial review (`gpt-5.6-sol`) took three rounds. Two
+   census findings were fixed; round 3 approved. PR #325 CI was all green. The
+   owner merged it as main `da401efa7`; production deployment
+   `dpl_ASNEuUWoqqg2ns7jbtEW92dnF5uZ` is Ready. Docs updated: actor plan,
+   applicant materials plan, service catalog.
+5. **Housekeeping.** `3cc311830` removed the impeccable plugin enablement from
+   `.claude/settings.json` (owner-intentional edit).
+
+### Commits
+- `3cc311830` — remove impeccable plugin enablement from project settings
+- `c101ae7d1` — external-contributor policy; consultant session actor
+- `12e1be098` — docs for the external-contributor policy
+- `c0a022efb`, `fa5671f4e` — census contract enforcement + discriminating fixtures (Codex rounds 1–2)
+- `da401efa7` — merge PR #325
+
+## Next Items
+
+### Verified Open
+
+1. **First natural production proof of PR #325.**
+   Evidence: `dpl_ASNEuUWoqqg2ns7jbtEW92dnF5uZ` Ready; no upload since release.
+   On the next real applicant materials upload, confirm no new
+   `request_document_actor_not_captured` event. On the next staff consultant
+   attachment, confirm `_wmkf_initiatedby_value` is set. Don't manufacture
+   records.
+2. **Census still treats Pre-RP brief fallback events as violations.**
+   Evidence: `ALLOWED_UNATTRIBUTED_ORIGIN_STAGES` lacks
+   `pre-rp-brief-generation` (a pre-existing gap). This matters only when the
+   manual census is rerun. Add it with its producer before the next census run.
+
+### Owner Action
+
+- Dismiss events 832/833 (production) and 834 (preview) in the admin panel.
+
+### Owner Decision Needed
+
+- Suite-wide personal email defaults (carried from S529): unchanged, see
+  `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+
+### Verify Before Acting
+
+- Older carryovers (Connor/Test Request Factory, cache telemetry, reviewer
+  follow-ups) were not re-probed this session or last; use their plans and live
+  checks.
+
+### Do Not Reopen Without New Decision
+
+- Consultant attachments record the staff actor (owner decision 2026-09-22);
+  applicant uploads use `EXTERNAL_CONTRIBUTOR` with no event.
+- S531 closures still stand: the scope of the institution-name heuristic, the
+  Pre-RP expertise sentence, and snapshot versioning complete.
+
+## Gotchas
+
+- The auto-mode classifier blocked `gh pr merge` even after the owner said
+  "merge". The owner ran it via `! gh pr merge ...`. Expect the same unless a
+  permission rule is added.
+- The Codex sandbox cannot run Jest (EPERM on the haste map); run suites locally.
+- Local `.env.local` `POSTGRES_URL` reaches the shared `operational_events`
+  table (production and preview rows, `environment` column).
+
+## Key Files
+
+- `lib/services/request-document-actor-service.js` — policies, `isActorNotCaptured`
+- `lib/dataverse/adapters/request-document.js` — `create()` event sites
+- `lib/services/site-visit-materials/contributor-service.js` — applicant upload create
+- `lib/services/consultant-feedback-attachment-service.js`, `pages/api/workbench/consultant-feedback/finalize.js` — staff actor wiring
+- `scripts/probe-request-document-explicit-actor-census.js` — census classifier
+
+## Testing
+
+```bash
+npx jest request-document consultant-feedback site-visit-materials   # 308 pass
+node scripts/probe-request-document-explicit-actor-census.js --self-test
+npm run check:request-document-writers && npm run check:request-document-writers:self-test
+```
+
+## Stop-time notes
+
+No milestone entry: a noise-reduction fix to an existing observability event,
+with no new capability or architecture. Claim-evidence pilot: no eligible
+plan/design edit was recorded, so no observation row was added. No memory
+changes.
+
+## Historical handoffs — not current instructions
+
+All text below is historical context. Session 532 guidance above is authoritative;
+older completion, cleanup and authorization statements apply to their named runs.
+
+## Prior Session 531 Prompt: Pre-Site / Pre-RP brief fixes released, snapshot versioning complete
 
 ## Session 530 Summary
 
