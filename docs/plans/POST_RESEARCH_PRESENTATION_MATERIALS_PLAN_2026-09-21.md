@@ -101,8 +101,8 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
   on the Preview upload proof, and permits that exact tenant in `media-src` only on the Preview
   playback proof. Ordinary routes keep the baseline policy.
 - **[VERIFIED 2026-09-22 via signed-in Chrome and the configured runtime targets]** the corrected
-  Preview read sanctioned Request `1003222` from Production Dataverse under the one-off read-only
-  allowance and uploaded the 100,665,703-byte MP4 to the canonical akoyaGO SharePoint site. The
+  Preview read owner-authorized Request `1003222` from Production Dataverse and uploaded the
+  100,665,703-byte MP4 to the canonical akoyaGO SharePoint site. The
   repository has no separate Preview SharePoint target or SharePoint deployment/write interlock;
   the Preview deployment label alone did not make that disposable write non-production. The proof
   finalized the exact item after a bounded 32-byte `ftyp` read, visibly played it through the 302 resolver,
@@ -845,12 +845,13 @@ moved to immutable Preview deployment `dpl_4zAYDFC4YDntkHFQsWBFxeTfTJD2`. Chrome
 one-shot Watch path, and downloaded a byte-complete local copy. Two transient Microsoft range-fetch failures occurred while refreshing the
 five-minute proof; a later retry succeeded, so production finalization needs a bounded transient
 retry decision. With explicit user confirmation, cleanup deleted the exact committed SharePoint
-item. The alias was then restored and re-inspected at its prior exact target
+item through Graph, moving it to the canonical site's recycle bin rather than permanently purging
+it. The alias was then restored and re-inspected at its prior exact target
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The proof deployment used one-off runtime settings; no
 branch-scoped Preview settings were created. The request lookup was a read against Production
 Dataverse, while the disposable file write and deletion occurred in the canonical akoyaGO
-SharePoint site. The exact item was deleted; the shared `Artifacts/Presentation Media Proof`
-folder remains as the reusable proof container.
+SharePoint site. The shared `Artifacts/Presentation Media Proof` folder remains as the reusable
+proof container, and the deleted item remains governed by the site's recycle-bin retention policy.
 
 Also verify tenant Safe Attachments and `DisallowInfectedFileDownload` posture. A security owner
 may supply sanctioned evidence that the Graph malware facet becomes non-null for a flagged item;
@@ -863,9 +864,10 @@ record success; if the scanner cannot accept the proposed cap, reduce the cap be
 Run this harness only from the Preview application deployment and only with an owner-sanctioned
 disposable request. Before every run, explicitly record the configured Dataverse and SharePoint
 targets and obtain authorization appropriate to those targets. Do not describe Preview as a
-sandbox-data guarantee: the 2026-09-22 proof read Production Dataverse and wrote the disposable
-item to the canonical SharePoint site. Cleanup must delete the exact committed item; an uncertain
-session cancellation retains the encrypted permit for retry rather than claiming success.
+sandbox-data guarantee: the owner-authorized 2026-09-22 proof read Request `1003222` from Production
+Dataverse and wrote the disposable item to the canonical SharePoint site. Cleanup must delete the
+exact committed item to the recycle bin or confirm that the upload session is cancelled, gone, or
+expired with no exact item; an uncertain transport retains the encrypted permit for retry.
 
 ### Slice 1 — Additive schema and readiness
 

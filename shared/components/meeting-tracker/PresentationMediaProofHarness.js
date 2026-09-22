@@ -148,16 +148,20 @@ export default function PresentationMediaProofHarness() {
     setBusy(true);
     try {
       const data = await proofAction({ action: 'cleanup', permit: saved.permit });
-      if (!['item_deleted', 'session_cancelled'].includes(data.cleanupOutcome)) {
+      const outcomeCopy = {
+        item_deleted: 'The exact disposable SharePoint item was moved to the site recycle bin.',
+        session_cancelled: 'Microsoft confirmed the upload session was cancelled; no committed item existed.',
+        session_gone: 'Microsoft reports the upload session no longer exists; no committed item was found.',
+        session_expired: 'Microsoft reports the upload session expired; no committed item was found.',
+      }[data.cleanupOutcome];
+      if (!outcomeCopy) {
         throw new Error('Cleanup did not return a confirmed outcome. The retry permit was retained.');
       }
       sessionStorage.removeItem(STORAGE_KEY);
       setSaved(null);
       setProof(null);
       setProgress(0);
-      setStatus(data.cleanupOutcome === 'item_deleted'
-        ? 'The exact disposable SharePoint item was deleted.'
-        : 'Microsoft confirmed the upload session was cancelled; no committed item existed.');
+      setStatus(outcomeCopy);
     } catch (error) {
       setStatus(error.message);
     } finally {

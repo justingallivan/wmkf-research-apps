@@ -154,8 +154,11 @@ test('cleanup deletes only the stable item resolved at the exact permit path', a
   expect(deps.deleteFile).toHaveBeenCalledTimes(1);
 });
 
-test('cleanup never deletes an exact-path item whose stable identity mismatches the permit', async () => {
-  const mismatched = { driveId: 'drive-1', id: 'item-1', name: 'other.mp4', size: PROOF_MIN_BYTES };
+test.each([
+  ['drive', { driveId: 'other-drive', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES }],
+  ['name', { driveId: 'drive-1', id: 'item-1', name: 'other.mp4', size: PROOF_MIN_BYTES }],
+  ['size', { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES + 1 }],
+])('cleanup never deletes an exact-path item whose stable %s mismatches the permit', async (_field, mismatched) => {
   const deps = dependencies({ getByPath: jest.fn(async () => mismatched) });
   const started = await begin(deps);
   await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
@@ -171,11 +174,19 @@ test('cleanup retains retry authority when Microsoft does not confirm cancellati
   expect(deps.deleteFile).not.toHaveBeenCalled();
 });
 
-test('cleanup treats a gone session with no visible item as uncertain rather than false success', async () => {
+test('cleanup treats a gone session with no visible item as a terminal no-item outcome', async () => {
   const deps = dependencies({ cancelSession: jest.fn(async () => ({ outcome: 'gone', status: 404 })) });
   const started = await begin(deps);
   await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
-    .rejects.toMatchObject({ httpStatus: 502, code: 'presentation_media_proof_cleanup_uncertain' });
+    .resolves.toEqual({ cleaned: true, cleanupOutcome: 'session_gone', deletedItem: false });
+  expect(deps.deleteFile).not.toHaveBeenCalled();
+});
+
+test('cleanup treats an expired session with no visible item as a terminal no-item outcome', async () => {
+  const deps = dependencies({ cancelSession: jest.fn(async () => ({ outcome: 'expired', status: 410 })) });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .resolves.toEqual({ cleaned: true, cleanupOutcome: 'session_expired', deletedItem: false });
   expect(deps.deleteFile).not.toHaveBeenCalled();
 });
 
@@ -202,8 +213,9 @@ test('a cancellation error cannot block deletion of an exact committed item', as
 test('tampered permits fail before any upload-session or committed-item lookup', async () => {
   const deps = dependencies();
   const started = await begin(deps);
-  const final = started.permit.slice(-1);
-  const tampered = `${started.permit.slice(0, -1)}${final === 'A' ? 'B' : 'A'}`;
+  const tamperedBytes = Buffer.from(started.permit, 'base64url');
+  tamperedBytes[tamperedBytes.length - 1] ^= 1;
+  const tampered = tamperedBytes.toString('base64url');
   await expect(getPresentationMediaProofUploadStatus({ permit: tampered, profileId: 'profile-1' }, deps))
     .rejects.toMatchObject({ httpStatus: 401, code: 'presentation_media_proof_permit_invalid' });
   expect(deps.getByPath).not.toHaveBeenCalled();

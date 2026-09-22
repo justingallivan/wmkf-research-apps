@@ -46,8 +46,10 @@ test('a malformed successful cleanup response also retains retry authority', asy
 });
 
 test.each([
-  ['item_deleted', 'The exact disposable SharePoint item was deleted.'],
+  ['item_deleted', 'The exact disposable SharePoint item was moved to the site recycle bin.'],
   ['session_cancelled', 'Microsoft confirmed the upload session was cancelled; no committed item existed.'],
+  ['session_gone', 'Microsoft reports the upload session no longer exists; no committed item was found.'],
+  ['session_expired', 'Microsoft reports the upload session expired; no committed item was found.'],
 ])('confirmed %s cleanup clears the permit', async (cleanupOutcome, message) => {
   requestJson.mockResolvedValueOnce({ ok: true, cleaned: true, cleanupOutcome });
   render(<PresentationMediaProofHarness />);
