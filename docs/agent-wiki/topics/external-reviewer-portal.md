@@ -506,7 +506,19 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 serve a read-only per-request page (the shared Pre-Research Presentation Brief snapshot — the Pre-Site writeup before Pre-RP Brief slice 4, **[BUILT on `claude/pre-rp-brief` — not merged, not deployed]** — plus a date-only "staff acknowledged newer inputs" notice when the send carried a drift acknowledgement; every received review with
 author and re-sanitized answers, the proposal as `Reviewer Materials/Proposal_<num>.pdf` since 2026-09-10 D20) to Board members and consultants
 who have no Dataverse login. Plan and owner decisions D13–D16:
-`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`. Verifier
+`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`. The brief's Referee Comments
+paragraph now carries score + reviewer + expertise sentences (owner decision
+2026-09-21, reversing the 2026-09-16 plan's "two sentences only" —
+`docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md:92` is left as
+a historical record). The expertise sentence comes from the same
+`composeExpertiseSentence` the Reviews tab and Pre-Site referee section use
+(`lib/services/pre-rp-brief/docx-renderer.js`'s `composeRefereeRunSegments`);
+the input fingerprint's `REVIEW_FINGERPRINT_FIELDS` now includes
+`lastName`/`keywords`/`areaOfExpertise` (the composer's inputs) so a brief
+regenerates when a reviewer's expertise data changes, and
+`PRE_RP_BRIEF_CONTRACT.renderVersion` moved `'4'` → `'5'` alongside it, since
+the change binds both together (`lib/services/pre-rp-brief/artifact-service.js:746`).
+Verifier
 `lib/external/verify-briefing-token.js` is the stored-digest pattern keyed on Postgres
 `deliberation_briefing_links` (`aud:'briefing'`, digest, revocation, row expiry, request
 binding, re-run on every request). Links are minted by Share

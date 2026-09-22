@@ -1083,7 +1083,14 @@ edit modal (Main institution), and a corrected value with no byline markers is
 shown verbatim.
 
 `PRE_RP_BRIEF_CONTRACT.renderVersion` stays `'4'` — the gating and tier
-change are unreleased on this branch, so no version bump was needed.
+change are unreleased on this branch, so no version bump was needed. (It
+later moved `'4'` → `'5'` for the unrelated expertise-sentence addition,
+owner decision 2026-09-21: the Referee Comments paragraph gains a third,
+non-underlined sentence from `composeExpertiseSentence`, and the fingerprint
+gained `lastName`/`keywords`/`areaOfExpertise` so the brief regenerates when
+expertise data changes — see `docs/atlas/dataverse-wmkf-requestdocument.md`
+and `docs/agent-wiki/topics/external-reviewer-portal.md` for the current
+description.)
 
 **Expertise for applicant rows (2026-09-21):** applicant-recommended reviewers
 arrive with `expertiseAreas: []` (only Reviewer Finder candidates get Claude-written

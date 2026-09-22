@@ -150,7 +150,8 @@ export const PRE_RP_BRIEF_CONTRACT = Object.freeze({
   // '2' (2026-09-16): PI/PD role prefixes on the two people tokens.
   // '3' (2026-09-21): reviewer-sentence institution reduced from a byline by institutionNameOf.
   // '4' (2026-09-21): self-confirmed main institution also reduced from a byline.
-  renderVersion: '4',
+  // '5' (2026-09-21): expertise sentence added to the Referee Comments paragraph (owner decision).
+  renderVersion: '5',
   snapshotArtifactType: 'pre-rp-brief',
   snapshotSchemaVersion: 1,
   relativeFolder: 'Artifacts/Pre-Research Presentation Brief',

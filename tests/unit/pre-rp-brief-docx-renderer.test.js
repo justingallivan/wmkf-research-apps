@@ -227,6 +227,74 @@ describe('renderBrief', () => {
     expect(refereeParagraph).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t>We received/);
   });
 
+  it('appends a non-underlined expertise sentence after the reviewer sentence', async () => {
+    const { docx } = await renderBrief(envelope({
+      reviews: [
+        reviewer({
+          suggestionId: 'a', name: 'Carey Nadell', lastName: 'Nadell', reviewerOverallAssessment: 5,
+          keywords: 'Microbial ecology; Evolutionary dynamics',
+        }),
+        reviewer({
+          suggestionId: 'b', name: 'Sagar Bharat', lastName: 'Bharat', reviewerOverallAssessment: 5,
+          areaOfExpertise: 'Cryo-electron tomography',
+        }),
+      ],
+    }));
+    const zip = await JSZip.loadAsync(docx);
+    const documentXml = await zip.file('word/document.xml').async('string');
+    const text = await wordText(docx);
+    expect(text).toContain(
+      'Nadell has expertise in microbial ecology and evolutionary dynamics, '
+      + 'while Bharat has expertise in cryo-electron tomography.',
+    );
+    const refereeParagraph = Array.from(documentXml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g))
+      .map((m) => m[0])
+      .find((paragraph) => paragraph.includes('We received'));
+    expect(refereeParagraph).toBeDefined();
+    // Discriminating: the expertise run must not be underlined, only the two
+    // reviewer-name runs (the reviewer sentence's own assertions cover those).
+    expect(refereeParagraph).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>Nadell has expertise/);
+    const underlineCount = (refereeParagraph.match(/<w:u w:val="single"\/>/g) || []).length;
+    expect(underlineCount).toBe(2);
+  });
+
+  it('omits a reviewer with no expertise data from the expertise sentence while keeping them in the reviewer sentence', async () => {
+    const { docx } = await renderBrief(envelope({
+      reviews: [
+        reviewer({
+          suggestionId: 'a', name: 'Carey Nadell', lastName: 'Nadell', reviewerOverallAssessment: 5,
+          keywords: 'Microbial ecology',
+        }),
+        reviewer({
+          suggestionId: 'b', name: 'No Expertise Reviewer', reviewerOverallAssessment: 5,
+        }),
+      ],
+    }));
+    const text = await wordText(docx);
+    expect(text).toContain('No Expertise Reviewer');
+    expect(text).toContain('Nadell has expertise in microbial ecology.');
+    expect(text).not.toContain('No Expertise Reviewer has expertise');
+  });
+
+  it('renders no expertise sentence when no reviewer has expertise data', async () => {
+    const { docx } = await renderBrief(envelope({
+      reviews: [reviewer({ name: 'Jeroen Roelofs', academicRank: 'professor', mainInstitution: 'University of Kansas Medical Center' })],
+    }));
+    const text = await wordText(docx);
+    expect(text).toContain('The reviewer was Jeroen Roelofs, a professor at University of Kansas Medical Center.');
+    expect(text).not.toContain('has expertise in');
+    // Discriminating: the referee paragraph ends after the reviewer sentence
+    // (a trailing space or empty run would indicate a dangling expertise
+    // segment that composeExpertiseSentence's null return failed to guard).
+    const zip = await JSZip.loadAsync(docx);
+    const documentXml = await zip.file('word/document.xml').async('string');
+    const refereeParagraph = Array.from(documentXml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g))
+      .map((m) => m[0])
+      .find((paragraph) => paragraph.includes('We received'));
+    expect(refereeParagraph).toBeDefined();
+    expect(refereeParagraph.endsWith('<w:r><w:t>.</w:t></w:r></w:p>')).toBe(true);
+  });
+
   it('renders a reviewer without an academic rank as "of Institution"', async () => {
     const { docx } = await renderBrief(envelope({
       reviews: [reviewer({ name: 'No Rank Reviewer', academicRank: null, mainInstitution: 'Institution X' })],
@@ -401,6 +469,9 @@ describe('briefInputFingerprint', () => {
     reviewerAffiliation: 'Some Reviewer Affiliation',
     mainInstitution: 'A Different Institution',
     affiliation: 'Some Personal Affiliation',
+    lastName: 'Different',
+    keywords: 'Some different keyword',
+    areaOfExpertise: 'Some different area of expertise',
   });
 
   it('pins the exact REVIEW_FINGERPRINT_FIELDS list (Round-2 finding 2)', () => {
@@ -414,6 +485,9 @@ describe('briefInputFingerprint', () => {
       'reviewerAffiliation',
       'mainInstitution',
       'affiliation',
+      'lastName',
+      'keywords',
+      'areaOfExpertise',
     ]);
   });
 

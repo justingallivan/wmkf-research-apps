@@ -554,11 +554,16 @@ B6) — is derived reproducibly from the owner's untracked example file by
 `scripts/build-pre-rp-brief-template.mjs`. The renderer,
 `lib/services/pre-rp-brief/docx-renderer.js`, fills those placeholders and
 composes the referee paragraph from the same deterministic
-`composeScoreSentence`/`composeReviewerSentence` composers the Reviews tab and
-Pre-Site writeup use (`shared/utils/review-writeup-paragraphs.js`); it also
+`composeScoreSentence`/`composeReviewerSentence`/`composeExpertiseSentence`
+composers the Reviews tab and Pre-Site writeup use
+(`shared/utils/review-writeup-paragraphs.js`) — the expertise sentence added
+2026-09-21 (owner decision, reversing the 2026-09-16 plan's "two sentences
+only"; `renderVersion` moved `'4'` → `'5'` alongside it); it also
 exports `briefInputFingerprint`, a pure sha256-over-stable-keys function of
 that same envelope with reviews ordered by `compareReviewersByName`, for the
-prepare-time drift gate (plan §3.4b).
+prepare-time drift gate (plan §3.4b). `REVIEW_FINGERPRINT_FIELDS` includes
+`lastName`/`keywords`/`areaOfExpertise` (the expertise composer's inputs) so
+the fingerprint moves when a reviewer's expertise data changes.
 
 ## Retry and partial-success behavior
 
