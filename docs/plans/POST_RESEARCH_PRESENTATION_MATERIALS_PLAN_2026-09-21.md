@@ -106,7 +106,7 @@ works.
 | An external request never chooses a request ID, SharePoint path, drive ID, item ID, or redirect target. | presentation external routes/service | Route accepts token plus bounded `member`; service re-resolves request membership before every redirect. |
 | Zoom URLs are not stored in `wmkf_sharepointweburl`. | Request Document schema/adapter, post-presentation service | Writer test proves `wmkf_externalurl` is used and SharePoint identity fields are empty. |
 | A Request Document material has exactly one backing mode: validated external Zoom URL, or stable SharePoint drive/item identity. | projector + writer/finalizer | Table tests cover external-only, file-only, both, and neither; both/neither fail closed. |
-| Recording, Transcript, and Transcript Summary have one deterministic visible winner per type. | post-presentation service/read model | Shared total order is `createdon DESC, wmkf_requestdocumentid DESC`; an equal-timestamp duplicate fixture yields the same winner internally and externally and emits a reconciliation warning. |
+| Recording, Transcript, and Transcript Summary have one deterministic visible winner per type. | post-presentation service/read model | New rows use a monotonic slot-fence version; shared order is `wmkf_slotversion DESC NULLS LAST, createdon DESC, wmkf_requestdocumentid DESC`. A stale lower-fence writer cannot become visible even if it commits later. |
 | Replacement becomes visible only after the new source is valid. | link writer, upload finalizer | Failure before new-row confirmation leaves the old material visible; retry converges on the same generation key. |
 | Superseded material is retained but cannot be served externally or shown as current internally. | registry writer + both readers | Positive fixture includes the superseded row and proves it is excluded. |
 | The app never buffers a complete uploaded or downloaded MP4. | Graph upload-session client, media resolver | Large synthetic/browser test proves chunked browser upload and Microsoft-served range/download bytes; the application resolution response contains no media bytes. |
@@ -115,7 +115,7 @@ works.
 | A completed SharePoint upload is recoverable if Dataverse registration fails. | upload-intent store/finalizer | Inject failure after candidate persistence; retry registers the exact same drive item and does not upload a second file. |
 | An incomplete or abandoned upload cannot become a Board-visible material. | upload-intent store/finalizer/reader | Only a Ready Request Document is externally eligible; expired intent cleanup never promotes an item. |
 | Cleanup never deletes SharePoint bytes referenced by any Request Document lifecycle state. | transcript staging reconciler, MP4 intent reconciler | Exact generation-key and drive/item match to one registry row means bound even when Superseded; zero matches may delete the exact candidate; ambiguous/mismatched/failed lookup retains and alerts. |
-| Zoom save, transcript finalize, and MP4 finalize cannot replace the same artifact type concurrently. | presentation-material slot-lease store + all three producers | A Zoom PATCH racing an MP4 finalize yields one lease holder; the loser remains retryable and no valid prior winner is superseded. |
+| Zoom save, transcript finalize, and MP4 finalize cannot replace the same artifact type concurrently. | presentation-material slot-lease store + all three producers | Lease acquisition increments a fencing version stored on the new registry row; the holder renews/revalidates before each Dataverse mutation, and a stale lower-fence row never wins or supersedes predecessors. |
 | Expired transcript staging cannot strand or destroy a registered SharePoint candidate. | portal-upload staging migration/reconciler | Positive fixtures prove: any exact registry binding clears cleanup authority without deleting bytes; a true zero-row orphan is discarded by exact identity; unknown/ambiguous/mismatched shapes remain retained. |
 | A stale Meeting Tracker request cannot update the newly selected request after an await. | new card/hooks | Request-generation or AbortController tests cover load, save, upload, finalize, copy, and error paths. |
 | Reissuing the presentation link revokes only the prior presentation link. | presentation-link store/service | Compare-and-swap tests; the deliberation briefing link is unchanged. |
@@ -134,7 +134,9 @@ The card contains:
 - **Recording source**
   - `Zoom link`: paste a bare Zoom share URL or Zoom's multiline “Copy link and passcode” result.
     The client extracts exactly one absolute HTTPS URL; zero or multiple URLs fail with actionable
-    copy. A `pwd` query parameter is allowed and retained.
+    copy. A `pwd` query parameter is allowed and retained. If the pasted text contains a separate
+    passcode line but the URL has no embedded `pwd`, reject it and tell staff to copy an
+    embedded-passcode share link; the first slice does not store a separate passcode.
   - `Upload video`: select one MP4 and upload it to SharePoint.
 - **Transcript**
   - upload VTT, TXT, PDF, or DOCX;
@@ -179,6 +181,22 @@ Add `/external/presentation/[token]` with minimal context:
 - no proposal document, reviews, review bundle, consultant feedback, staff brief, attendee list,
   meeting join link, or request number.
 
+The presentation audience has an exact material-membership model:
+
+- collection members are file-backed Applicant Slides or Other Applicant Materials produced by
+  `site-visit-materials-portal`, belonging to the token's request, Ready, non-Superseded, and not
+  a pre-site distribution snapshot; every eligible row is included, with no latest-only collapse;
+- singleton members are only the shared projector's current Recording, Transcript, and Transcript
+  Summary winners;
+- all other artifact types/producers are briefing-only or internal and return 404 before Graph;
+- opaque `material:<requestdocument-guid>` remains the only browser-supplied member identity.
+
+All SharePoint-backed members on the materials-only page use its non-buffering Microsoft URL
+resolver, with `open`, `watch`, or `download` allowed only where appropriate for that content type;
+the presentation token never calls the briefing audience's buffered document route. Tests serve a
+positive Applicant Slides member and prove a Ready non-allowlisted artifact returns 404 before any
+Graph call.
+
 For a Zoom-backed recording, `Watch on Zoom` calls a token-checked redirect route; the raw URL is
 not returned in context JSON. Zoom's own viewer/passcode/expiry policy applies after redirect.
 
@@ -218,11 +236,12 @@ The external page and every token-bearing response set `Referrer-Policy: no-refe
 
 ### 5.1 Request Document: support an external recording source
 
-Add one nullable URL field in the next available Dataverse schema wave:
+Add two nullable fields in the next available Dataverse schema wave:
 
 | Field | Shape | Purpose |
 |---|---|---|
 | `wmkf_ExternalUrl` (`wmkf_externalurl`) | URL string, max 2000 | Validated Zoom recording share URL for a link-backed Recording row. |
+| `wmkf_SlotVersion` (`wmkf_slotversion`) | Whole number, min 1 | Monotonic Postgres lease-fence version for Recording/Transcript/Summary winner ordering; null only for legacy rows. |
 
 Do not add a source-kind choice in the first slice. The server-owned backing-mode predicate is:
 
@@ -237,11 +256,12 @@ SharePoint-backed files. Existing rows remain compatible because the new field i
 
 Update the Request Document entity/operation descriptions so “Ready” means the row agrees with
 its validated backing source, not unconditionally with SharePoint bytes. Add
-`POST_PRESENTATION_SELECT_FIELDS = ['wmkf_externalurl']` to the Request Document adapter and append
-it only when the exact-on post-presentation schema-readiness helper returns true. Do not place the
-field in `BASE_REQUEST_DOCUMENT_SELECT` or the legacy `REQUEST_DOCUMENT_SELECT` constant. This lets
-deploy-safe code run while the Dataverse wave is still absent. The raw field-name and hardcoded
-select-list fan-out must be audited before release, with readiness-off and readiness-on tests.
+`POST_PRESENTATION_SELECT_FIELDS = ['wmkf_externalurl', 'wmkf_slotversion']` to the Request
+Document adapter and append it only when the exact-on post-presentation schema-readiness helper
+returns true. Do not place either field in `BASE_REQUEST_DOCUMENT_SELECT` or the legacy
+`REQUEST_DOCUMENT_SELECT` constant. This lets deploy-safe code run while the Dataverse wave is
+still absent. The raw field-name and hardcoded select-list fan-out must be audited before release,
+with readiness-off and readiness-on tests.
 
 ### 5.2 Link-backed Recording row
 
@@ -256,6 +276,7 @@ Saving a Zoom URL creates a normal Request Document row:
 - cycle code is server-derived from the request;
 - explicit initiated actor is required from the authenticated Meeting Tracker session;
 - `wmkf_externalurl` is populated and every SharePoint identity/content field is empty.
+- `wmkf_slotversion` is the fencing version returned by the acquired Recording slot lease.
 
 The route accepts a client operation UUID only for retry identity. It does not accept a generation
 key, request ID in the body, actor, producer, lifecycle, or artifact type.
@@ -266,7 +287,9 @@ zero or multiple URLs fail closed. The hostname must be exactly `zoom.us` or end
 (`zoom.com` is not accepted in the first slice), `username` and `password` URL components are
 forbidden, and the path must match a reviewed recording/share allowlist. The normal `pwd` query
 parameter is permitted and retained because Zoom uses it for embedded passcodes. Unknown hosts or
-URL shapes fail with actionable copy; broadening either allowlist is a reviewed code change.
+URL shapes fail with actionable copy; broadening either allowlist is a reviewed code change. If
+the surrounding paste contains a passcode line but the URL lacks `pwd`, reject it with instructions
+to obtain an embedded-passcode link rather than silently discarding the passcode.
 
 ### 5.3 SharePoint files
 
@@ -281,6 +304,14 @@ chooses a path. Each finalized file gets stable Graph site/drive/item/version/eT
 Request Document row. Recording and transcript files created by this feature use producer
 `meeting-tracker-post-presentation`, matching the Zoom-link row and making current-winner and
 briefing inclusion behavior consistent across both backing modes.
+
+All three producers create Ready + Draft rows, matching the existing applicant-material lifecycle
+that D19 currently serves; only Superseded is externally ineligible. File-backed post-presentation
+rows also carry the acquired slot-fence version. The Zoom URL, including an embedded `pwd`, is
+stored as governed plaintext in Dataverse so server-side resolvers can use it. It is never returned
+in external context JSON or application logs; the schema wave must evaluate Dataverse field-level
+security and document why the application identities and `meeting-tracker`/`reviewers` grants are
+the minimum readers if field-level security cannot be enabled.
 
 Accepted first-slice formats:
 
@@ -344,10 +375,28 @@ plaintext or in logs. An independently authenticated resume endpoint rechecks th
 request, active visit, intent state, and expiry before decrypting it into a no-store response and
 querying `nextExpectedRanges`. A browser reload requires staff to reselect the local file; the
 client recomputes the bounded resume fingerprint before continuing, because a browser cannot be
-assumed to retain a `File` handle. Clear the ciphertext on finalization, abandonment, or expiry.
+assumed to retain a `File` handle. The normal materials GET lists that actor's unfinished intents
+for the request using only upload ID, filename, size, state, timestamps, and `canResume`/
+`canFinalize`; it never returns the encrypted URL. Clear the ciphertext on finalization,
+abandonment, or expiry.
+
+`upload_session_expires_at` is copied from Graph and is the last instant at which byte resume may
+be offered. `intent_expires_at` is three days after that value, preserving a finalize-only grace
+period after the session closes. The existing daily maintenance cron calls a new
+`cleanupPresentationMaterialUploads` subtask. It claims an expired intent with the same lease
+discipline, first checks the exact server-owned path for a committed item, persists any candidate,
+and applies the registry-binding proof below. It never cleans an unexpired intent or an intent with
+a live operation lease.
 If an unfinished session expires, Graph discards its partial fragments. If the final byte commits
 but registration fails, the finalizer re-resolves the exact server-owned path, persists the
 candidate identity, and retries registration without creating another file.
+
+When Graph reports that the session is complete/closed, or the exact path already resolves to the
+declared-size item, resume returns `canFinalize: true` and no upload URL; the UI offers **Finish
+saving** without requiring file reselection. A slot conflict during finalization remains
+`uploaded`, is retried automatically with bounded backoff while the page is open, and remains
+manually finalizable throughout the three-day grace. It is not marked abandoned merely because a
+five-minute slot lease was busy.
 
 An abandoned intent may point to a fully committed file even when the browser never called
 finalize. Cleanup resolves only the exact persisted server-chosen path and persists the candidate
@@ -363,15 +412,30 @@ inferred name, or browser-supplied identity.
 Add `presentation_material_slot_leases` in the same numbered migration:
 
 - composite primary key `(request_id, artifact_type)`;
-- nullable lease token and lease expiry plus `updated_at`;
+- nullable lease token and lease expiry, a monotonically increasing positive integer
+  `fence_version` constrained at or below 2,147,483,647 for Dataverse whole-number parity, plus
+  `updated_at`;
 - artifact type is restricted to Recording, Transcript, and Transcript Summary;
 - acquisition is a conditional insert/update that succeeds only when the row is unleased, expired,
   or already held by the same retry token;
 - release/renewal requires the matching token.
 
-The lease TTL is five minutes. Recovery under a reacquired/renewed lease always re-runs the shared
-current-winner projection after reconciling the recovered generation; it never returns a recovered
-row directly because a later successful operation may already have superseded it.
+The lease TTL is five minutes. Every successful acquisition by a new retry token atomically
+increments and returns `fence_version`; idempotent reacquisition by the same token preserves it.
+Exhaustion of the Dataverse-representable range fails closed and alerts rather than wrapping.
+MP4 uses durable upload ID as its retry/lease token, transcript uses staging ID, and Zoom uses the
+client operation UUID. Finalize accepts no second client-chosen operation UUID. Recovery under a
+reacquired/renewed lease always re-runs the shared current-winner projection after reconciling the
+recovered generation; it never returns a recovered row directly because a later successful
+operation may already have superseded it.
+
+The holder atomically renews and revalidates matching token + fence immediately before Request
+Document create/recover and again before each predecessor update. It captures explicit predecessor
+IDs under that fence and supersedes only those IDs, never an open-ended “older rows” query. Every
+new row stores the fence in `wmkf_slotversion`. If a holder stalls after validation and commits
+after a newer holder, its lower-fence row cannot win; after create it must revalidate again, and a
+lost holder is forbidden from superseding anything. A reconciliation event records the stale
+lower-fence active row for later supersede repair.
 
 Zoom-link save, transcript finalize, and MP4 finalize all acquire this lease before creating or
 superseding a Request Document. Upload/staging rows keep their own operation lease for idempotent
@@ -405,16 +469,21 @@ Slides and Other Applicant Materials retain their existing collection semantics.
 For each post-presentation type:
 
 1. acquire the short `presentation_material_slot_leases` lease for request + artifact type using
-   the operation UUID as the retry token;
-2. create or recover the new Ready row by generation key;
-3. only after the new row is confirmed, mark older non-Superseded rows of that type Superseded;
+   the producer's durable retry identity and receive its monotonic fence version;
+2. capture the explicit current predecessor IDs, renew/revalidate the lease, and create or recover
+   the new Ready row by generation key with that fence version;
+3. after the new row is confirmed, renew/revalidate again and mark only the captured predecessors
+   whose fence is lower (or legacy-null) Superseded;
 4. project the newest Ready non-Superseded row by the total order
-   `createdon DESC, wmkf_requestdocumentid DESC` as the visible winner;
+   `wmkf_slotversion DESC NULLS LAST, createdon DESC, wmkf_requestdocumentid DESC` as the visible
+   winner;
 5. if more than one such row remains after a partial failure, still show only the deterministic
    newest winner, record an operational reconciliation event, and retry superseding the losers;
-6. on replay or lease recovery, reconcile the generation and then reproject the current winner;
+6. if the lease expires between writes, stop mutation; a lower-fence row is not visible over a
+   newer winner and the reconciliation event schedules safe loser supersede repair;
+7. on replay or lease recovery, reconcile the generation and then reproject the current winner;
    never return the recovered row directly;
-7. release the slot only with the matching lease token. Failure paths leave the producer operation
+8. release the slot only with the matching lease token. Failure paths leave the producer operation
    retryable and never release another operation's lease.
 
 The external and internal readers use the same pure winner predicate. The browser does not sort
@@ -449,6 +518,11 @@ resume route for the still-valid upload URL and current `nextExpectedRanges`. A 
 expired Graph session refuses continuation and offers a fresh upload; it never splices bytes from
 a different local file.
 
+After reload, the materials GET makes unfinished intents discoverable. An in-progress intent shows
+Resume; a committed candidate with no registry row shows Finish saving. Only the creating actor
+may resume/finalize. If the active Site Visit no longer matches the intent, both actions refuse;
+the exact candidate is retained until the expiry reconciler can prove it unbound and clean it.
+
 **[ASSUMED — Slice 0 browser decision]** direct browser PUTs to the tenant-issued upload URL work
 under the deployed Preview origin/CORS posture. Prove this with the Slice 0 disposable-file test
 before building durable schema or the full UI. If it fails, stop for a transport decision; do not
@@ -456,14 +530,16 @@ route the complete MP4 through a Function body as an unreviewed fallback.
 
 ### 7.3 Finalize
 
-1. Client POSTs only upload ID + operation UUID; it does not supply drive/item/path authority.
+1. Client POSTs no authority-bearing body; upload ID is in the path and is the stable retry/lease
+   identity. It does not supply a second operation UUID, drive/item, path, or actor.
 2. Service claims the intent lease and revalidates actor/request/visit binding.
 3. Service resolves the exact persisted path from Graph and persists candidate identity before
    any Dataverse write.
 4. Service verifies the exact size at or below 2,000,000,000 bytes, MP4 signature through a bounded
    range read, and rejects a non-null Graph malware facet.
-5. Service acquires the Recording slot lease, creates or recovers the Request Document row, then
-   supersedes predecessors.
+5. Service acquires the Recording slot lease/fence, captures predecessors, renews before create,
+   creates or recovers the fenced Request Document row, renews again, then supersedes only the
+   captured lower-fence predecessor IDs.
 6. Service releases the matching slot lease, clears upload-session ciphertext, marks the intent
    finalized, and returns the newly projected current material rather than assuming the recovered
    generation is still current.
@@ -501,15 +577,15 @@ exact body allowlist, and use the session's mapped Dynamics system-user actor.
 
 | Route | Method | Contract |
 |---|---|---|
-| `/api/meeting-tracker/visits/[requestId]/presentation-materials` | GET | Current Recording/Transcript/Summary winners, conflicts, and supported formats; no upload secret. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-materials` | GET | Current Recording/Transcript/Summary winners, conflicts, supported formats, and the authenticated actor's unfinished intent descriptors; no upload secret. |
 | same | PATCH | Exact action to save/replace a Zoom link; request and actor are server-owned. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | Begin MP4 or bounded transcript upload; returns the appropriate staging/upload contract. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | Independently reauthorize actor/request/visit, verify file resume fingerprint and live intent/session, then return the no-store upload URL plus `nextExpectedRanges`. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | Independently reauthorize creating actor/request/visit. For an open session, verify file resume fingerprint and return the no-store URL plus `nextExpectedRanges`; for an already committed item return finalize-only state and no URL. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | Lease-fenced, request-bound finalize/recovery. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | GET current link; POST exact `ensure` or compare-and-swap `reissue`. |
-| Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While post-presentation readiness is off, return the legacy payload with `presentationMaterials: []`; do not 503 the existing logistics read. |
+| Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection/status for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While readiness is off, return the legacy payload with `presentationMaterialsStatus: 'disabled'`, not a false empty collection; do not 503 the existing logistics read. |
 | `/api/external/presentation/[token]/context` | GET | Rate limit, verify presentation token, return minimal material descriptors. |
-| `/api/external/presentation/[token]/open` | GET | Reverify token and live membership; redirect Zoom. For SharePoint, use the Slice 0-selected no-store 302 or one-shot URL response. `mode=watch|download` is an allowlist. |
+| `/api/external/presentation/[token]/open` | GET | Reverify token and exact live audience membership; redirect Zoom. For eligible SharePoint members, use the Slice 0-selected no-store 302 or one-shot URL response. `mode=open|watch|download` is content-type constrained. |
 | `/api/external/briefing/[token]/open` | GET | Preserve D19/D28 full-briefing semantics while resolving eligible Zoom or large SharePoint-backed post-presentation winners through the briefing token's distinct verifier/audience. |
 
 Keep routes thin. Domain logic belongs under
@@ -557,9 +633,11 @@ For every initial Watch/Download resolution:
 1. apply a dedicated resolver limiter that fails closed when its Postgres state is unavailable,
    then verify the route's presentation or briefing token with the matching audience;
 2. parse the bounded member ID;
-3. re-read the Request and current material winners;
-4. require that the requested row is the current Ready non-Superseded winner and belongs to the
-   token's request;
+3. re-read the Request, eligible applicant-material collection, and current singleton winners;
+4. require token-request membership and then either (a) exact inclusion in the Ready,
+   non-Superseded, file-backed `site-visit-materials-portal` Applicant Slides/Other Applicant
+   Materials collection, or (b) identity as the current Recording/Transcript/Summary singleton
+   winner; every other type/producer returns 404 before Graph;
 5. require file backing for SharePoint media and reject a malware facet;
 6. request a fresh `@microsoft.graph.downloadUrl` for that exact drive/item;
 7. use the Slice 0-proved delivery shape:
@@ -583,6 +661,12 @@ gets a dedicated regression test and structured metric that contains no raw toke
 
 Do not create permanent SharePoint Anyone links. They are independent file permissions and could
 outlive revocation of the application token.
+
+All new presentation context/media routes and the new briefing media-open route check exact-on
+post-presentation readiness before touching new fields or tables. They fail closed with the
+route's non-disclosing unavailable/not-found response while readiness is off. The existing
+briefing context and bounded-document route continue their legacy behavior and omit unsupported
+post-presentation backing while readiness is off; staff routes expose `disabled` explicitly.
 
 ## 10. Async and stale-state contract
 
@@ -610,6 +694,9 @@ Upload-specific rules:
 - Zoom redirects accept only the current validated Zoom-backed Recording winner.
 - Graph upload URLs are encrypted at rest and returned only to the independently reauthenticated
   actor who created the request-bound, unexpired intent; every response is no-store.
+- Upload-session encryption derives a purpose-specific subkey from `EXTERNAL_LINK_SECRET` with a
+  fixed `presentation-upload-session-v1` context; raw link-token and upload-session encryption do
+  not reuse the same key material directly. Release checks secret presence, never value.
 - Upload finalization reauthorizes independently; possession of an upload ID or Graph result is
   insufficient.
 - Dataverse target/write interlock and DAL enforcement remain active on every Request Document
@@ -623,6 +710,8 @@ Upload-specific rules:
   headers.
 - Revocation prevents future application resolutions; already revealed Microsoft URLs may last
   until their short expiry and already revealed Zoom URLs remain subject to Zoom host controls.
+- Decline or withdrawal does not silently shorten the owner-approved fixed 60-day lifetime; staff
+  must reissue to revoke. This matches briefing D17 unless the owner later chooses a new policy.
 
 ## 12. Implementation slices
 
@@ -633,6 +722,10 @@ authenticated proof route and minimal harness, but it creates no durable applica
 removed or converted into production code after the decision. Use a sanctioned test request,
 SharePoint test folder, and a real Zoom-produced MP4 larger than 50 MB. Never log the token,
 upload URL, download URL, or passcode.
+
+The transport decision must pass in current stable desktop Chrome, desktop Edge, macOS Safari,
+and iPadOS Safari. These are the first-slice Board browser/device matrix; a resolver shape that
+passes only Chromium does not pass Slice 0.
 
 The proof harness fails closed unless `classifyDeployment() === 'preview'`, its mint route requires
 an authenticated Meeting Tracker user, and its short-lived JWT uses a distinct
@@ -663,7 +756,9 @@ production routes; a release gate asserts that the proof audience/routes cannot 
 2. Start with the no-store 302 resolver. Play at least two minutes; seek forward and backward to at
    least ten positions, including near the end; pause/resume; reload; then invoke Download.
 3. Record origins, status codes, `Range`/`Content-Range` behavior, application resolver hit count,
-   any 429s, and application response bytes. Evidence is redacted and contains no bearer URL.
+   any 429s, application response bytes, and the Microsoft `Content-Disposition` behavior used by
+   Download (do not rely on a cross-origin HTML `download` attribute). Evidence is redacted and
+   contains no bearer URL.
 4. Verify an expired proof token fails. Record that an already-issued Microsoft URL may remain
    valid only until its short expiry.
 5. If the browser re-enters the application resolver for range traffic, switch the spike to a
@@ -683,7 +778,8 @@ Pass only when all of the following are observed:
 - the selected resolver shape causes one bounded application resolution per user action and does
   not exhaust the dedicated fail-closed resolver limiter during the seek script;
 - no raw token or preauthenticated URL appears in application-emitted logs or persisted rows;
-  the accepted D18 limitation is that the hosting platform may retain the request-path token;
+  the accepted `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md` D18 limitation is that the hosting
+  platform may retain the request-path token;
 - exact-item cleanup succeeds for the disposable upload.
 
 If the 302 passes, keep it. If only the one-shot URL response passes, adopt that shape and state
@@ -697,13 +793,17 @@ may supply sanctioned evidence that the Graph malware facet becomes non-null for
 without that evidence, keep the facet check as defense in depth and do not claim it proves a
 synchronous scan. The first-slice size cap is resolved at 2,000,000,000 bytes.
 
+Also send a sanctioned 25 MB clean transcript through the configured scanner in Preview and
+record success; if the scanner cannot accept the proposed cap, reduce the cap before Slice 3.
+
 Run this proof only against the Preview deployment's sandbox Dataverse organization and Preview
 SharePoint test location. Production is a separate target/readiness wave and receives no disposable
 proof writes.
 
 ### Slice 1 — Additive schema and readiness
 
-- Dataverse wave adds `wmkf_ExternalUrl` to Request Document plus exact preflight.
+- Dataverse wave adds `wmkf_ExternalUrl` and `wmkf_SlotVersion` to Request Document plus exact
+  preflight.
 - Request Document adapter adds readiness-gated `POST_PRESENTATION_SELECT_FIELDS`; the base and
   legacy selects remain safe while the wave is absent.
 - One Postgres migration adds presentation links, upload intents, slot leases, and the
@@ -719,12 +819,16 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 
 - Add backing-mode validator and latest-only projector.
 - Add Meeting Tracker GET/PATCH service/routes and Zoom URL producer.
-- Acquire the named Recording slot lease in the Zoom PATCH before registry mutation.
+- Acquire the named Recording slot lease/fence in the Zoom PATCH, revalidate before each explicit
+  Dataverse mutation, and persist the fence version.
 - Add Request Document writer to the explicit writer census and required-actor tests.
 - Update logistics/Workbench read models to consume the shared projection.
 - Extend the existing full briefing in the same slice to include eligible Zoom/file-backed
   post-presentation winners through its own verifier and the non-buffering media resolver. D19/D28
   must hold before the first producer can create a row.
+- Deliver the non-buffering Graph download-URL helper, dedicated fail-closed resolver limiter,
+  Zoom redirect, and new briefing media-open route in this same slice; the current buffered
+  `/api/external/briefing/[token]/document` route remains for bounded files.
 
 ### Slice 3 — Transcript producer
 
@@ -744,6 +848,8 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 - Add exact orphan/expiry maintenance. Never delete by prefix or inferred path; cleanup uses only
   persisted exact candidate identity and deletes only after a zero-row registry proof, including
   an upload that completed before the browser abandoned finalize.
+- Wire the cleanup into the existing daily maintenance cron and expose unfinished/finish-saving
+  intent states in the staff GET/UI.
 
 ### Slice 5 — Internal and external consumers
 
@@ -769,8 +875,8 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 - external/file/both/neither backing modes;
 - Recording external allowed; Transcript external rejected;
 - Ready + non-Superseded filtering;
-- newest deterministic winner with two active rows, including equal `createdon` values resolved by
-  `wmkf_requestdocumentid DESC`;
+- newest deterministic winner with two active rows; higher slot fence wins even when it commits
+  earlier, while legacy-null/equal timestamp rows fall back to request-document ID;
 - positive exclusion fixtures for old/Superseded rows;
 - generation-key lost-response replay;
 - replacement failure before new row leaves old winner;
@@ -783,9 +889,11 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
   superseded recovered row;
 - cross-producer slot lease: Zoom PATCH racing MP4 finalize and transcript finalize racing a second
   transcript replacement; one winner, retryable loser, prior visible material preserved;
+- lease expiry between create and supersede: stale lower-fence row never wins, cannot supersede,
+  and reconciliation repairs only explicit predecessor IDs;
 - MP4 cap boundaries accept 2,000,000,000 and reject 2,000,000,001; persisted size equals Graph;
 - Request Document select excludes `wmkf_externalurl` while readiness is off and includes it only
-  when exact-on readiness is enabled;
+  when exact-on readiness is enabled; the same assertions cover `wmkf_slotversion`;
 - migration/fresh-install parity asserts all five staging scopes, including existing
   `consultant_feedback`;
 - full briefing positive-inclusion fixtures contain Ready Zoom and large SharePoint-backed
@@ -799,16 +907,23 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
   by their verifiers/routes;
 - unknown/foreign/Superseded/non-current material returns 404 with no Graph call;
 - Zoom Copy-link/passcode extraction accepts exactly one eligible URL, retains `pwd`, and rejects
-  multiple URLs, URL userinfo, non-HTTPS, `zoom.com`, and suffix-confusion hosts;
+  multiple URLs, URL userinfo, non-HTTPS, `zoom.com`, and suffix-confusion hosts; a separate
+  passcode line without embedded `pwd` is rejected with corrective copy;
+- materials-only audience serves eligible `site-visit-materials-portal` Slides/Other collection
+  rows plus current singleton winners, and rejects every non-allowlisted type/producer before
+  Graph;
 - selected resolver shape has no-store headers and no URL in context JSON, persistence, or logs;
 - `Referrer-Policy: no-referrer` on the token-bearing page and resolution responses;
 - rate-limit success/failure accounting for one user resolution action; media range traffic does
   not consume the application bucket; Postgres/limiter failure rejects mint/resolution.
+- external routes fail closed with readiness off; staff logistics returns disabled, not empty.
 
 ### Upload and recovery
 
 - client chunks are sequential 320 KiB multiples and resume from `nextExpectedRanges`, including
   reload/reselect with a matching fingerprint; mismatched file and expired session refuse;
+- unfinished intent rediscovery, complete-session Finish saving, creating-actor-only resume,
+  active-visit drift refusal, and automatic bounded retry after a slot conflict;
 - navigation/request change suppresses stale progress/success/error state;
 - incomplete Graph session never creates a Request Document;
 - completed Graph upload + Dataverse failure retries the same exact item;
@@ -829,10 +944,13 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 - external page contains presentation materials and explicitly does not contain proposal,
   reviews, staff brief, consultant feedback, or request number;
 - deployed-Preview real MP4 over 50 MB completes the Slice 0 play/seek/download script without
-  application buffering, repeated resolver throttling, or bearer values in logs;
+  application buffering, repeated resolver throttling, or bearer values in logs across desktop
+  Chrome, desktop Edge, macOS Safari, and iPadOS Safari;
 - expired/revoked tokens, Microsoft URL expiry recovery with playback-position restore, and fresh
   download action after URL expiry;
 - Preview proof harness rejects Production and is removed/disabled before release.
+- pre-compatibility runtime is rejected as a rollback target; compatibility-floor readers tolerate
+  external-backed, fenced, duplicate-active, and Superseded fixtures.
 
 ## 14. Durable surfaces and gates
 
@@ -847,6 +965,8 @@ Implementation must update, as applicable:
 - `docs/API_ROUTE_SECURITY_MATRIX.md` for every new route;
 - `docs/CREDENTIALS_RUNBOOK.md` for readiness and any code-owned caps surfaced there;
 - `docs/SERVICE_AND_UTILITY_CATALOG.md`;
+- `pages/api/cron/maintenance.js`, `lib/services/maintenance-service.js`, and maintenance tests for
+  the daily expired-intent reconciler and its retained/alerted outcomes;
 - `next.config.js` path-specific headers so presentation/briefing token pages and media resolver
   responses override the global policy with `Referrer-Policy: no-referrer`;
 - `docs/PC_MEETING_TRACKER_PLAN.md` to retire “recording/transcript producers” from out of scope;
@@ -885,25 +1005,31 @@ Release order:
 1. deploy only the fail-closed Slice 0 harness to Preview, verify it is connected to the sandbox
    Dataverse organization and Preview SharePoint test location, and record the transport/session
    expiry proof; select 302 or one-shot URL resolution from observed range behavior;
-2. remove/convert the proof harness and merge deploy-safe production code with readiness off and
-   `wmkf_externalurl` absent from all live selects. Confirm only the presence—not the value—of
+2. remove/convert the proof harness and merge the compatibility floor: deploy-safe readers,
+   backing validation, disabled-state payload, and external-route readiness guards with readiness
+   off and both new fields absent from live selects. Confirm only the presence—not the value—of
    `EXTERNAL_LINK_SECRET` separately in Preview and Production;
 3. for Preview, owner applies the Postgres migration to the Preview-connected database and the
    Dataverse wave to the sandbox organization, then runs exact schema/readback preflights while
    readiness remains off;
-4. deploy the compatible runtime to Preview, owner sets
+4. deploy the compatible producer runtime to Preview, run the prior-runtime-tolerance fixtures,
+   then owner sets
    `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` only in Preview, and run signed-in/private-window
    acceptance with a file over 50 MB, including reload/resume and URL-expiry recovery;
 5. for Production, separately confirm the target registry/interlock classifies the production
    Dataverse organization, owner applies the same Postgres migration to the Production-connected
    database and the Dataverse wave to the production organization, and runs exact preflights with
    Production readiness still off;
-6. deploy/promote the already-proven compatible runtime, owner sets readiness on only in
+6. deploy/promote the already-proven compatible runtime, rerun the tolerance fixtures, owner sets readiness on only in
    Production, and repeat a bounded smoke on a sanctioned request. Verify D19 full-briefing access
    and the materials-only link as separate audiences.
 
-Rollback is unsetting the readiness flag and redeploying the prior runtime. Additive schema and
-retained superseded rows remain. Do not delete uploaded files or link rows during rollback.
+Once any producer can write a post-presentation row, the compatibility-floor commit becomes the
+oldest permitted runtime. Rollback is unsetting readiness and keeping/redeploying that compatible
+runtime; never redeploy a pre-compatibility runtime unless its exact artifact passed tolerance
+tests against link-backed and Superseded fixtures. Additive schema and retained rows remain. Do not
+delete uploaded files or link rows during rollback. With readiness off, external routes fail
+closed and Staff Deliberations shows disabled rather than a false empty state.
 
 ## 16. Contract reconciliation
 
@@ -919,7 +1045,9 @@ validation → post-presentation service → SharePoint/Request Document/Postgre
 - Transcript: private staging records exact SharePoint candidate before Dataverse registration.
 - MP4: durable intent records exact path before upload and exact candidate before Dataverse.
 - All three producers acquire the named request/type slot lease immediately before registry
-  mutation; a collision is retryable and cannot supersede the prior visible winner.
+  mutation; its monotonic fence is stored on the row, renewed before each explicit write, and makes
+  a stale late commit non-winning. A collision is retryable and cannot supersede the prior visible
+  winner.
 - Transcript and MP4 cleanup first prove registry binding by exact generation plus drive/item.
   Any-lifecycle matches retain bytes; only a proven zero-row candidate may be deleted by exact
   persisted identity, while ambiguity/mismatch/lookup failure retains and alerts.
@@ -930,7 +1058,8 @@ validation → post-presentation service → SharePoint/Request Document/Postgre
 ### Async/stale state
 
 Every client post-await state write is request-generation guarded. Server retries are keyed by
-operation/upload ID, and every finalization independently reauthorizes.
+operation/staging/upload ID, unfinished uploads are rediscoverable after reload, and every resume
+or finalization independently reauthorizes the creating actor, request, and active visit.
 
 ### Helper extraction
 
@@ -940,10 +1069,10 @@ distribution-send lock and presentation reissue does not.
 
 ### Durable surfaces
 
-The single Postgres migration includes link rows, upload intents, slot leases, and the transcript
-scope constraint. Fresh-install parity, manifest, schema wave/preflight, readiness-gated select,
-Atlas, route matrix, service catalog, readiness runbook, writer census, cleanup policy, tests, and
-gates are all named.
+The single Postgres migration includes link rows, upload intents, fenced slot leases, and the
+transcript scope constraint. Fresh-install parity, manifest, two-field schema wave/preflight,
+readiness-gated selects/routes, Atlas, route matrix, service catalog, readiness runbook, writer
+census, daily cleanup policy, tests, and gates are all named.
 
 ### Symbol-consumer fan-out
 
@@ -976,6 +1105,18 @@ are resolved in this revision as follows:
 - Zoom Copy-link parsing, total winner ordering, resolver expiry recovery, fail-closed rate
   limiting, Preview-only proof isolation, per-environment schema waves, and Staff Deliberations
   loaded-empty/unavailable behavior are explicit and covered by tests.
+
+The subsequent document-only Opus pass identified six further blockers, now incorporated:
+
+- presentation-token membership explicitly separates the applicant-material collection from
+  latest-only singleton types and allowlists `site-visit-materials-portal`;
+- unfinished uploads are rediscoverable, complete sessions expose Finish saving, slot conflicts
+  retry, and daily cleanup waits through an explicit three-day finalize grace;
+- the compatibility floor, not a pre-feature runtime, is the rollback minimum once producers run;
+- separate Zoom passcodes without embedded `pwd` are rejected rather than silently discarded;
+- Slice 0 must pass desktop Chrome/Edge plus macOS/iPadOS Safari; and
+- monotonic slot fencing plus renew/revalidate-before-write prevents an expired lease holder from
+  becoming the visible winner or superseding an uncaptured row.
 
 No product value remains open in this plan. A failed Slice 0 proof is an evidence-based transport
 blocker that returns to the owner; it is not permission to introduce application byte proxying.
