@@ -1,4 +1,4 @@
-# Session 531 Prompt: Pre-Site / Pre-RP brief fixes released; snapshot writer still v1 (phase 2 open)
+# Session 531 Prompt: Pre-Site / Pre-RP brief fixes released, snapshot versioning complete
 
 ## Session 530 Summary
 
@@ -33,7 +33,17 @@ release before the owner said "merge".
    snapshot `schemaVersion`: readers accept 1 and 2, legacy rows verify and
    drift-compare under their own version, a reclaimed generation row renders
    from its verified stored snapshot (409 `pre_rp_brief_snapshot_invalid`
-   otherwise). **Writer still emits v1** (phase 1).
+   otherwise). Phase 1 wrote v1 snapshots.
+4. **Pre-RP snapshot versioning phase 2** (PR #324 → main `0f2f22c46`,
+   deployment `dpl_A6qv3LPwa1UNBsJdrft8bqiEB3bg`, Ready 2026-09-22 04:58Z; 307
+   on the four hosts; CI: Tests, E2E, Security, Dependency, Secret Scanning
+   green, CodeQL still running at handoff). Writer flipped to
+   `snapshotSchemaVersion: 2`; new briefs fingerprint over the 11-field list so
+   expertise-only changes register as drift. Rows written by phase 1 stay v1
+   until regenerated and do not flag expertise-only drift. Two fresh Agent
+   adversarial reviews (receipts for the 2026-09-16 plan) approved; the first
+   caught three stale phase-1 comments and forward-dated "2026-09-22" wording,
+   fixed in the amended commit.
 
 Owner completed the manual side: corrected Herwig Schüler's Main institution and
 expertise, regenerated, and confirmed the draft briefing looks good.
@@ -43,24 +53,17 @@ expertise, regenerated, and confirmed the draft briefing looks good.
 - `2937cdfa4`, `15128a2b5`, `54346b00b` — institution-name reduction, Codex rounds 2–3
 - `8ad57295a`, `0bdcc4ce6`, `fdbf8ca6f`, `1a2a3331a` — mainInstitution gating, structural tier rules, card date
 - `fc9a5ca48`, `3568e7e72`, `21410bf8e`, `90b6c6838` — Pre-RP expertise sentence, snapshot versioning phase 1, reclaimed-row provenance
+- `72f951b73` — Session 530 handoff (first pass)
+- `0f2f22c46` — snapshot versioning phase 2 (writer v2)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Pre-RP snapshot versioning phase 2.** Flip
-   `PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion` 1 → 2 in
-   `shared/config/requestDocument.js:163`, update the pinned test in
-   `tests/unit/pre-rp-brief-input-service.test.js`, and the two-phase wording in
-   `docs/agent-wiki/topics/external-reviewer-portal.md`,
-   `docs/atlas/dataverse-wmkf-requestdocument.md`, and
-   `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`.
-   Evidence: `grep -n snapshotSchemaVersion shared/config/requestDocument.js`
-   shows `1` with the phase comment. Until flipped, an expertise-only change
-   renders on regenerate but does not register as brief drift. Branch + PR +
-   Codex review, then merge; `90b6c6838` is the rollback target.
-2. **Delete the merged remote branch** `origin/feat/pre-rp-brief-expertise`
-   (fast-forward merge did not auto-delete it). Evidence: `git ls-remote --heads origin feat/pre-rp-brief-expertise`.
+- None carried from this session. Both feature branches
+  (`feat/pre-rp-brief-expertise`, `feat/pre-rp-snapshot-v2`) are merged and
+  deleted locally and on origin (`git ls-remote --heads origin 'feat/pre-rp-*'`
+  returns nothing).
 
 ### Owner Decision Needed
 
@@ -77,6 +80,8 @@ expertise, regenerated, and confirmed the draft briefing looks good.
 - Institution-name heuristic scope: owner closed further rounds 2026-09-21
   (Codex round 6). Trailing unlisted city stays verbatim by design.
 - Pre-RP brief carries the expertise sentence (owner decision 2026-09-21).
+- Snapshot versioning is complete (writer v2, readers v1+v2). Do not re-widen
+  `REVIEW_FINGERPRINT_FIELDS` without bumping the version and its field list.
 
 ## Gotchas
 
@@ -107,7 +112,7 @@ npx jest 'pre-rp|pre-site-visit|distribution|review-writeup|reviews-tab|external
 
 ## Stop-time notes
 
-No milestone entry: three incremental fixes to existing brief capabilities, no
+No milestone entry: four incremental releases to existing brief capabilities, no
 new architecture or cutover. Claim-evidence pilot report: zero advisory events
 and no eligible plan-doc edit recorded, so no observation row added. Memory:
 one mechanics line added to
