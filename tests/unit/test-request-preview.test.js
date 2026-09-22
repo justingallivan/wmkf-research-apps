@@ -27,49 +27,52 @@ function metadata() {
   };
 }
 
-function input() {
+function trusted(overrides = {}) {
   return {
-    draftInput: {
-      recipe: 'basic',
-      sourceRequest: {
-        akoya_requestid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        akoya_purpose: 'Synthetic purpose',
-        akoya_request: 1250,
-      },
-      testLabel: 'Clone preview',
-      fiscalYear: 'December 2026',
-      requestType: 100000000,
-      meetingDate: '2026-12-01',
-      metadata: metadata(),
-      ...ids,
+    filePolicy: {
+      allowedMimeTypes: ['application/pdf'],
+      maxFileBytes: 10_000,
+      maxFiles: 2,
+      maxTotalBytes: 20_000,
     },
-    fileInput: {
-      filePolicy: {
-        allowedMimeTypes: ['application/pdf'],
-        maxFileBytes: 10_000,
-        maxFiles: 2,
-        maxTotalBytes: 20_000,
-      },
-      selectedDocumentIds: ['project-description'],
-      sourceDocuments: [{
-        contentHash: 'a'.repeat(64),
-        folder: '1000123_GUID/Phase I',
-        id: 'project-description',
-        kind: 'projectDescription',
-        library: 'Documents',
-        mimeType: 'application/pdf',
-        name: 'ProjectDescription.pdf',
-        size: 1_000,
-        versionId: 'version-1',
-      }],
-      sourceRequestNumber: '1000123',
+    metadata: metadata(),
+    sourceDocuments: [{
+      contentHash: 'a'.repeat(64),
+      folder: '1000123_GUID/Phase I',
+      id: 'project-description',
+      kind: 'projectDescription',
+      library: 'Documents',
+      mimeType: 'application/pdf',
+      name: 'ProjectDescription.pdf',
+      size: 1_000,
+      versionId: 'version-1',
+    }],
+    sourceRequest: {
+      akoya_requestid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      akoya_purpose: 'Synthetic purpose',
+      akoya_request: 1250,
     },
+    sourceRequestNumber: '1000123',
+    ...ids,
+    ...overrides,
+  };
+}
+
+function requested(overrides = {}) {
+  return {
+    recipe: 'basic',
+    testLabel: 'Clone preview',
+    fiscalYear: 'December 2026',
+    requestType: 100000000,
+    meetingDate: '2026-12-01',
+    selectedDocumentIds: ['project-description'],
+    ...overrides,
   };
 }
 
 describe('compileBasicTestRequestPreview', () => {
   test('composes a valid request and file plan without becoming executable', () => {
-    const result = compileBasicTestRequestPreview(input());
+    const result = compileBasicTestRequestPreview(trusted(), requested());
     expect(result.blockers).toEqual([]);
     expect(result.planReady).toBe(true);
     expect(result.executionReady).toBe(false);
@@ -81,27 +84,73 @@ describe('compileBasicTestRequestPreview', () => {
     expect(result.filePlan.plannedFiles[0].destination).toEqual({
       folder: 'Phase I',
       filename: 'ProjectDescription.pdf',
+      filenameTemplate: null,
     });
   });
 
-  test('preserves scoped blockers from both compilers and unknown preview keys', () => {
-    const bad = input();
-    bad.draftInput.recipe = 'paid-workflow';
-    bad.fileInput.selectedDocumentIds = ['missing'];
-    bad.arbitraryPayload = { status: 'approved' };
-    const result = compileBasicTestRequestPreview(bad);
-
+  test('a request-only blocker strips both actionable sub-plans', () => {
+    const result = compileBasicTestRequestPreview(trusted(), requested({ recipe: 'paid-workflow' }));
+    expect(result.blockers).toContainEqual(expect.objectContaining({
+      code: 'RECIPE_UNSUPPORTED',
+      scope: 'request',
+    }));
     expect(result.planReady).toBe(false);
-    expect(result.executionReady).toBe(false);
-    expect(result.blockers).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'PREVIEW_INPUT_INVALID', scope: 'preview' }),
-      expect.objectContaining({ code: 'RECIPE_UNSUPPORTED', scope: 'request' }),
-      expect.objectContaining({ code: 'FILE_SELECTION_UNKNOWN', scope: 'files' }),
-    ]));
+    expect(result.requestPlan.createBody).toBeNull();
+    expect(result.filePlan.planReady).toBe(false);
+    expect(result.filePlan.plannedFiles).toEqual([]);
+    expect(result.preview.files).toHaveLength(1);
   });
 
-  test.each([null, [], false, 'bad'])('rejects non-object preview input %p without throwing', value => {
-    const result = compileBasicTestRequestPreview(value);
+  test('a file-only blocker strips the otherwise valid request body', () => {
+    const result = compileBasicTestRequestPreview(trusted(), requested({ selectedDocumentIds: ['missing'] }));
+    expect(result.blockers).toContainEqual(expect.objectContaining({
+      code: 'FILE_SELECTION_UNKNOWN',
+      scope: 'files',
+    }));
+    expect(result.planReady).toBe(false);
+    expect(result.requestPlan.createBody).toBeNull();
+    expect(result.filePlan.planReady).toBe(false);
+    expect(result.filePlan.plannedFiles).toEqual([]);
+    expect(result.preview.requestBody).toEqual(expect.objectContaining({ akoya_requestid: ids.requestId }));
+  });
+
+  test('a top-level trust-boundary blocker strips both actionable sub-plans', () => {
+    const result = compileBasicTestRequestPreview(
+      trusted({ arbitraryServerValue: true }),
+      requested(),
+    );
+    expect(result.blockers).toContainEqual(expect.objectContaining({
+      code: 'PREVIEW_INPUT_INVALID',
+      field: 'arbitraryServerValue',
+      scope: 'preview',
+    }));
+    expect(result.requestPlan.createBody).toBeNull();
+    expect(result.filePlan.planReady).toBe(false);
+    expect(result.filePlan.plannedFiles).toEqual([]);
+  });
+
+  test('rejects browser attempts to supply trusted inventory or policy', () => {
+    const result = compileBasicTestRequestPreview(trusted(), requested({
+      filePolicy: { maxFiles: 999 },
+      sourceDocuments: [],
+    }));
+    expect(result.blockers.filter(item => item.code === 'PREVIEW_INPUT_INVALID')).toEqual([
+      expect.objectContaining({ field: 'filePolicy', scope: 'preview' }),
+      expect.objectContaining({ field: 'sourceDocuments', scope: 'preview' }),
+    ]);
+    expect(result.requestPlan.createBody).toBeNull();
+    expect(result.filePlan.plannedFiles).toEqual([]);
+  });
+
+  test.each([null, [], false, 'bad'])('rejects non-object trusted preview input %p', value => {
+    const result = compileBasicTestRequestPreview(value, requested());
+    expect(result.planReady).toBe(false);
+    expect(result.executionReady).toBe(false);
+    expect(result.blockers[0]).toEqual(expect.objectContaining({ code: 'PREVIEW_INPUT_INVALID' }));
+  });
+
+  test.each([null, [], false, 'bad'])('rejects non-object browser preview input %p', value => {
+    const result = compileBasicTestRequestPreview(trusted(), value);
     expect(result.planReady).toBe(false);
     expect(result.executionReady).toBe(false);
     expect(result.blockers[0]).toEqual(expect.objectContaining({ code: 'PREVIEW_INPUT_INVALID' }));
