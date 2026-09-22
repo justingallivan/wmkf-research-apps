@@ -153,7 +153,10 @@ export const PRE_RP_BRIEF_CONTRACT = Object.freeze({
   // '5' (2026-09-21): expertise sentence added to the Referee Comments paragraph (owner decision).
   renderVersion: '5',
   snapshotArtifactType: 'pre-rp-brief',
-  snapshotSchemaVersion: 1,
+  // 2 (2026-09-21): review fingerprint fields gained lastName/keywords/
+  // areaOfExpertise (expertise sentence). v1 rows verify with the legacy
+  // field list.
+  snapshotSchemaVersion: 2,
   relativeFolder: 'Artifacts/Pre-Research Presentation Brief',
 });
 

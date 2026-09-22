@@ -11,6 +11,7 @@ import {
   renderBrief,
   REQUEST_FINGERPRINT_FIELDS,
   REVIEW_FINGERPRINT_FIELDS,
+  LEGACY_REVIEW_FINGERPRINT_FIELDS_V1,
 } from '../../lib/services/pre-rp-brief/docx-renderer';
 
 const DV_TOKENS = Object.freeze({
@@ -91,8 +92,11 @@ function reviewer(overrides = {}) {
   };
 }
 
-function envelope({ request = requestFixture(), reviews = [reviewer()] } = {}) {
-  return { schemaVersion: 1, artifactType: 'pre-rp-brief', request, reviews };
+// The CURRENT envelope shape (schemaVersion 2, 11-field review fingerprint
+// list). Legacy (v1) row tests build their own `schemaVersion: 1` envelope
+// explicitly instead of overriding this default.
+function envelope({ request = requestFixture(), reviews = [reviewer()], schemaVersion = 2 } = {}) {
+  return { schemaVersion, artifactType: 'pre-rp-brief', request, reviews };
 }
 
 async function wordText(docxBuffer) {
@@ -325,10 +329,27 @@ describe('renderBrief', () => {
   });
 
   it('fails closed on a malformed snapshot envelope', async () => {
-    await expect(renderBrief({ schemaVersion: 2, artifactType: 'pre-rp-brief', request: requestFixture(), reviews: [] }))
+    await expect(renderBrief({ schemaVersion: 3, artifactType: 'pre-rp-brief', request: requestFixture(), reviews: [] }))
       .rejects.toThrow(/unsupported schemaVersion/);
     await expect(renderBrief({ schemaVersion: 1, artifactType: 'something-else', request: requestFixture(), reviews: [] }))
       .rejects.toThrow(/unexpected artifactType/);
+  });
+
+  it('renders both supported schema versions (1 and 2), and rejects any other version', async () => {
+    await expect(renderBrief(envelope({ schemaVersion: 1 }))).resolves.toEqual(expect.objectContaining({ docx: expect.any(Buffer) }));
+    await expect(renderBrief(envelope({ schemaVersion: 2 }))).resolves.toEqual(expect.objectContaining({ docx: expect.any(Buffer) }));
+    await expect(renderBrief(envelope({ schemaVersion: 3 })))
+      .rejects.toThrow(/unsupported schemaVersion/);
+  });
+
+  it('renders a v1 envelope fine, without an expertise sentence, since v1 reviews carry no expertise fields', async () => {
+    const { docx } = await renderBrief(envelope({
+      schemaVersion: 1,
+      reviews: [reviewer({ name: 'Jeroen Roelofs', academicRank: 'professor', mainInstitution: 'University of Kansas Medical Center' })],
+    }));
+    const text = await wordText(docx);
+    expect(text).toContain('The reviewer was Jeroen Roelofs, a professor at University of Kansas Medical Center.');
+    expect(text).not.toContain('has expertise in');
   });
 
   it.each([
@@ -497,6 +518,69 @@ describe('briefInputFingerprint', () => {
       reviews: [reviewer({ [field]: REVIEW_FIELD_PERTURBATIONS[field] })],
     }));
     expect(changed).not.toBe(base);
+  });
+
+  it('pins the exact LEGACY_REVIEW_FINGERPRINT_FIELDS_V1 list', () => {
+    // Discriminating: same rationale as the two pins above — this is the
+    // exact 8-field list every v1 stored brief row was ever fingerprinted
+    // with, and it must never change under it.
+    expect([...LEGACY_REVIEW_FINGERPRINT_FIELDS_V1]).toEqual([
+      'suggestionId',
+      'reviewReceivedAt',
+      'name',
+      'academicRank',
+      'reviewerOverallAssessment',
+      'reviewerAffiliation',
+      'mainInstitution',
+      'affiliation',
+    ]);
+  });
+
+  it('does not move a v1 envelope\'s digest when lastName/keywords/areaOfExpertise change, but does move a v2 envelope\'s digest', () => {
+    const v1Base = briefInputFingerprint(envelope({ schemaVersion: 1, reviews: [reviewer()] }));
+    const v1WithExpertise = briefInputFingerprint(envelope({
+      schemaVersion: 1,
+      reviews: [reviewer({ lastName: 'Different', keywords: 'Some keyword', areaOfExpertise: 'Some area' })],
+    }));
+    expect(v1WithExpertise).toBe(v1Base);
+
+    const v2Base = briefInputFingerprint(envelope({ schemaVersion: 2, reviews: [reviewer()] }));
+    const v2WithExpertise = briefInputFingerprint(envelope({
+      schemaVersion: 2,
+      reviews: [reviewer({ lastName: 'Different', keywords: 'Some keyword', areaOfExpertise: 'Some area' })],
+    }));
+    expect(v2WithExpertise).not.toBe(v2Base);
+  });
+
+  it('briefInputFingerprint of a v1 envelope equals the digest of its 8-field legacy canonical form', () => {
+    const v1Envelope = envelope({ schemaVersion: 1, reviews: [reviewer()] });
+    const expectedCanonical = {
+      schemaVersion: 1,
+      artifactType: 'pre-rp-brief',
+      request: (() => {
+        const r = {};
+        for (const field of REQUEST_FINGERPRINT_FIELDS) r[field] = v1Envelope.request[field] ?? null;
+        return r;
+      })(),
+      reviews: [(() => {
+        const r = {};
+        for (const field of LEGACY_REVIEW_FINGERPRINT_FIELDS_V1) r[field] = v1Envelope.reviews[0][field] ?? null;
+        return r;
+      })()],
+    };
+    expect(canonicalBriefInputState(v1Envelope)).toEqual(expectedCanonical);
+  });
+
+  it('briefInputFingerprint(v2Envelope, { schemaVersion: 1 }) equals the v1 digest of the same 8 field values', () => {
+    const sharedReview = reviewer({ lastName: 'One', keywords: 'Microbial ecology', areaOfExpertise: 'Microbial ecology' });
+    const v1Envelope = envelope({ schemaVersion: 1, reviews: [sharedReview] });
+    const v2Envelope = envelope({ schemaVersion: 2, reviews: [sharedReview] });
+    const v1Digest = briefInputFingerprint(v1Envelope);
+    const v2DigestUnderV1Rules = briefInputFingerprint(v2Envelope, { schemaVersion: 1 });
+    expect(v2DigestUnderV1Rules).toBe(v1Digest);
+    // And, without the override, the v2 envelope's own digest differs (its
+    // expertise fields are populated and count under the current list).
+    expect(briefInputFingerprint(v2Envelope)).not.toBe(v1Digest);
   });
 
   it('does not move the digest when a non-received reviewer is added or renamed', () => {

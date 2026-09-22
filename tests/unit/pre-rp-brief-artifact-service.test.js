@@ -22,7 +22,7 @@ const NEWER_ARTIFACT_ID = '44444444-4444-4444-8444-444444444444';
 const CLAIM_ID = '55555555-5555-4555-8555-555555555555';
 
 const ENVELOPE = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   artifactType: 'pre-rp-brief',
   request: {
     institutionName: 'Applicant University',
@@ -1009,6 +1009,58 @@ describe('projectPreRpBriefArtifact', () => {
       wmkf_inputfingerprint: briefInputFingerprint(snapshot),
     }));
     expect(artifact.receivedReviewCount).toBe(2);
+  });
+
+  it('counts received reviews for a legacy v1 row whose fingerprint was computed with the 8-field list (FAILS on fc9a5ca48)', () => {
+    const legacyReview = {
+      suggestionId: 'g1',
+      reviewReceivedAt: '2026-09-01T00:00:00Z',
+      name: 'Dr. Submitted',
+      academicRank: 'professor',
+      reviewerOverallAssessment: 5,
+      reviewerAffiliation: null,
+      mainInstitution: 'University of Kansas Medical Center',
+      affiliation: null,
+      // A production v1 row never had these fields fingerprinted; a legacy
+      // row read today may still carry them (or not) on the review record
+      // itself, but they must not participate in the re-hash.
+    };
+    const v1Snapshot = {
+      ...ENVELOPE,
+      schemaVersion: 1,
+      reviews: [
+        legacyReview,
+        { ...legacyReview, suggestionId: 'pending-1', reviewReceivedAt: null },
+        { ...legacyReview, suggestionId: 'received-2', reviewReceivedAt: '2026-09-02T00:00:00Z' },
+      ],
+    };
+    const artifact = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify(v1Snapshot),
+      wmkf_inputfingerprint: briefInputFingerprint(v1Snapshot),
+    }));
+    expect(artifact.receivedReviewCount).toBe(2);
+  });
+
+  it('counts received reviews for a v2 row whose fingerprint was computed with the current 11-field list', () => {
+    const v2Review = {
+      suggestionId: 'g1',
+      reviewReceivedAt: '2026-09-01T00:00:00Z',
+      name: 'Dr. Submitted',
+      academicRank: 'professor',
+      reviewerOverallAssessment: 5,
+      reviewerAffiliation: null,
+      mainInstitution: 'University of Kansas Medical Center',
+      affiliation: null,
+      lastName: 'Submitted',
+      keywords: 'Some keyword',
+      areaOfExpertise: null,
+    };
+    const v2Snapshot = { ...ENVELOPE, schemaVersion: 2, reviews: [v2Review] };
+    const artifact = projectPreRpBriefArtifact(briefRow({
+      wmkf_presiteinputsnapshotjson: JSON.stringify(v2Snapshot),
+      wmkf_inputfingerprint: briefInputFingerprint(v2Snapshot),
+    }));
+    expect(artifact.receivedReviewCount).toBe(1);
   });
 
   it('reads null when the stored snapshot does not re-hash to the recorded fingerprint (server brief_snapshot_invalid mirror)', () => {

@@ -68,7 +68,7 @@ describe('loadPreRpBriefInputs', () => {
     expect(result.requestNumber).toBe('1002379');
     expect(result.cycleCode).toBeTruthy();
     expect(result.envelope).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       artifactType: 'pre-rp-brief',
       request: {
         institutionName: 'Applicant University',

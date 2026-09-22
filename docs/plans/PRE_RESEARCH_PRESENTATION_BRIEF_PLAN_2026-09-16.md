@@ -91,6 +91,10 @@ renders "We received three reviews with scores of one Excellent and two Very Goo
 The brief uses those two sentences only,
 not the expertise sentence, themes, or quotations.
 
+> **Superseded 2026-09-21 (owner decision):** the Referee Comments paragraph now also carries
+> the expertise sentence; renderVersion 5, snapshot schemaVersion 2 (legacy v1 rows verify with
+> the v1 field list). Current description: docs/agent-wiki/topics/external-reviewer-portal.md.
+
 Rendering is deterministic: no model call, no prompt registry entry. The renderer is a
 template-preserving OOXML placeholder fill in the same style as
 `lib/services/pre-site-visit/docx-renderer.js` (`[VERIFIED via lib/services/pre-site-visit/docx-renderer.js:362-371]` replacement-map pattern), against a tracked template
@@ -173,7 +177,13 @@ lib/services/pre-site-visit/artifact-service.js:365-389,782-807]` the only runti
 behind that path or the Pre-Site generator. Keep the reuse and give the brief snapshot its own
 envelope, for example `{ schemaVersion: 1, artifactType: 'pre-rp-brief', request, reviews }`, so
 its shape is self-describing; no neutral field is added
-in this pass, preserving the settled two-write Dataverse plumbing. The snapshot carries every
+in this pass, preserving the settled two-write Dataverse plumbing.
+
+> **Superseded 2026-09-21 (owner decision):** the Referee Comments paragraph now also carries
+> the expertise sentence; renderVersion 5, snapshot schemaVersion 2 (legacy v1 rows verify with
+> the v1 field list). Current description: docs/agent-wiki/topics/external-reviewer-portal.md.
+
+The snapshot carries every
 composer input (`[VERIFIED via lib/services/review-manager/reviewers-service.js:597-622;
 shared/utils/review-writeup-paragraphs.js:182-184,222-240,322-342]`): request header fields,
 abstract, and, for each received review, the suggestion id, received state, name, academic rank,
@@ -702,7 +712,11 @@ merge auto-deploys code naming the new columns.
 3. Items carried for slice 4 review / slice 5: (a) **resolved 2026-09-16** — keep raw
    `reviewReceivedAt` in `REVIEW_FINGERPRINT_FIELDS` and make the delta consume the same
    received-only canonical form and raw fields; a timestamp rewrite now appears in the
-   changed-reviewer delta, while non-received suggestions affect neither representation;
+   changed-reviewer delta, while non-received suggestions affect neither representation.
+   > **Superseded 2026-09-21 (owner decision):** `REVIEW_FINGERPRINT_FIELDS` gained
+   > lastName/keywords/areaOfExpertise; snapshot schemaVersion is now 2, with a
+   > `LEGACY_REVIEW_FINGERPRINT_FIELDS_V1` 8-field list for re-verifying/comparing v1 stored
+   > rows. Current description: docs/agent-wiki/topics/external-reviewer-portal.md.
    (b) no route test exists for
    `distribution/prepare.js`'s new `acknowledgeStaleInputs` validation; (c) slice-3 reviewer's
    queued fixture: claim-race guard should also prove the orphan IS deleted when the winner

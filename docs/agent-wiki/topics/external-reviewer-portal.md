@@ -518,6 +518,22 @@ the input fingerprint's `REVIEW_FINGERPRINT_FIELDS` now includes
 regenerates when a reviewer's expertise data changes, and
 `PRE_RP_BRIEF_CONTRACT.renderVersion` moved `'4'` → `'5'` alongside it, since
 the change binds both together (`lib/services/pre-rp-brief/artifact-service.js:746`).
+Widening that list would have invalidated every stored brief's fingerprint
+(re-hashing a v1 row's snapshot with the new 11-field list no longer equals
+the fingerprint that row was written with), so `PRE_RP_BRIEF_CONTRACT
+.snapshotSchemaVersion` moved `1` → `2` in the same change
+(`[RECHECKED after lib/services/pre-rp-brief/docx-renderer.js change:
+lib/services/pre-rp-brief/docx-renderer.js:92-135]`): a v1 stored row is
+re-verified and, when compared to a live envelope, diffed using the frozen
+8-field `LEGACY_REVIEW_FINGERPRINT_FIELDS_V1` list it was always
+fingerprinted with, never the current list; new snapshots get
+schemaVersion 2. Every reader that re-hashes a stored snapshot —
+`receivedReviewCountOf` (`lib/services/pre-rp-brief/artifact-service.js`)
+and `assertBriefInputsReady` (`lib/services/pre-site-visit/distribution/context.js`)
+— accepts both schema versions and picks the field list from the row's own
+`schemaVersion`, and the live fingerprint computed for the UI's
+`acknowledgeStaleInputs` echo-back is likewise computed under the stored
+row's schema version so the handshake stays consistent for legacy rows.
 Verifier
 `lib/external/verify-briefing-token.js` is the stored-digest pattern keyed on Postgres
 `deliberation_briefing_links` (`aud:'briefing'`, digest, revocation, row expiry, request

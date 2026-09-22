@@ -563,7 +563,18 @@ exports `briefInputFingerprint`, a pure sha256-over-stable-keys function of
 that same envelope with reviews ordered by `compareReviewersByName`, for the
 prepare-time drift gate (plan §3.4b). `REVIEW_FINGERPRINT_FIELDS` includes
 `lastName`/`keywords`/`areaOfExpertise` (the expertise composer's inputs) so
-the fingerprint moves when a reviewer's expertise data changes.
+the fingerprint moves when a reviewer's expertise data changes. Because that
+widened the field list every existing brief row's `wmkf_inputfingerprint` was
+computed under, `snapshotSchemaVersion` moved `1` → `2` in the same change:
+a v1 stored row is re-verified, and compared against a live envelope, with
+the frozen 8-field `LEGACY_REVIEW_FINGERPRINT_FIELDS_V1` list (the exact
+pre-2026-09-21 list) instead of the current 11-field list; new snapshots get
+schemaVersion 2. Every reader that re-hashes a stored snapshot
+(`receivedReviewCountOf` in `artifact-service.js`, `assertBriefInputsReady`
+in `lib/services/pre-site-visit/distribution/context.js`) picks the field
+list from the row's own `schemaVersion`, and the live fingerprint the UI
+echoes back as `acknowledgeStaleInputs` is likewise computed under the
+stored row's schema version.
 
 ## Retry and partial-success behavior
 

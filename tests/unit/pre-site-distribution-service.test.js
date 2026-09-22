@@ -749,6 +749,83 @@ describe('prepare-time review/drift gate (plan §3.4b)', () => {
     expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
   });
 
+  // Snapshot schemaVersion 2 (2026-09-21): REVIEW_FINGERPRINT_FIELDS gained
+  // lastName/keywords/areaOfExpertise. A v1 stored row's fingerprint was
+  // only ever computed from the legacy 8-field list, so it must be
+  // re-verified — and compared to the live envelope — with that same
+  // legacy list, never the current one (FAILS on fc9a5ca48, which always
+  // re-hashes with the current list).
+  test('a v1 stored snapshot with a legacy fingerprint passes when the live envelope only differs in fields the legacy list never covered (FAILS on fc9a5ca48)', async () => {
+    const legacyReview = { ...briefEnvelope().reviews[0] };
+    const generatedV1 = briefEnvelope({ schemaVersion: 1, reviews: [legacyReview] });
+    const liveV2 = briefEnvelope({
+      reviews: [{
+        ...legacyReview,
+        lastName: 'One',
+        keywords: 'microbial ecology',
+        areaOfExpertise: 'microbial ecology',
+      }],
+    });
+    const gate = briefGateFixture({ generated: generatedV1, live: liveV2 });
+    const harness = createPrepareHarness({ briefGate: gate });
+    await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+    const persisted = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
+    expect(persisted.inputFingerprintGenerated).toBe(gate.fingerprint);
+    expect(persisted.inputFingerprintLive).toBe(gate.fingerprint);
+    expect(persisted.staleInputsDelta).toBeNull();
+  });
+
+  test('a v1 stored snapshot still drifts when a legacy-visible field (name) changes, and the acknowledgement value is the live fingerprint computed under v1 (FAILS on fc9a5ca48)', async () => {
+    const legacyReview = { ...briefEnvelope().reviews[0] };
+    const generatedV1 = briefEnvelope({ schemaVersion: 1, reviews: [legacyReview] });
+    const liveV2 = briefEnvelope({
+      reviews: [{
+        ...legacyReview,
+        name: 'Reviewer One Renamed',
+        lastName: 'One Renamed',
+        keywords: 'microbial ecology',
+        areaOfExpertise: 'microbial ecology',
+      }],
+    });
+    const gate = briefGateFixture({ generated: generatedV1, live: liveV2 });
+    const harness = createPrepareHarness({ briefGate: gate });
+    const expectedLiveFingerprintUnderV1 = briefInputFingerprint(liveV2, { schemaVersion: 1 });
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({
+        code: 'brief_inputs_stale',
+        httpStatus: 409,
+        body: {
+          generatedFingerprint: gate.fingerprint,
+          liveFingerprint: expectedLiveFingerprintUnderV1,
+        },
+      });
+    expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+    // The retry that echoes exactly this live fingerprint succeeds.
+    const harnessRetry = createPrepareHarness({ briefGate: gate });
+    await preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: expectedLiveFingerprintUnderV1 }),
+      harnessRetry.dependencies,
+    );
+    const persisted = harnessRetry.dependencies.createOrGetAttempt.mock.calls[0][0];
+    expect(persisted.inputFingerprintLive).toBe(expectedLiveFingerprintUnderV1);
+  });
+
+  test('a v2 stored snapshot drifts when only keywords changes (a field the legacy list never covered)', async () => {
+    const generatedV2 = briefEnvelope();
+    const liveV2 = briefEnvelope({
+      reviews: [{ ...generatedV2.reviews[0], keywords: 'cryo-electron tomography' }],
+    });
+    const gate = briefGateFixture({ generated: generatedV2, live: liveV2 });
+    const harness = createPrepareHarness({ briefGate: gate });
+    const expectedLiveFingerprint = briefInputFingerprint(liveV2);
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({
+        code: 'brief_inputs_stale',
+        httpStatus: 409,
+        body: { generatedFingerprint: gate.fingerprint, liveFingerprint: expectedLiveFingerprint },
+      });
+  });
+
   test('at least one received review with no live drift succeeds and persists equal fingerprints with a null delta', async () => {
     const gate = briefGateFixture();
     const harness = createPrepareHarness({ briefGate: gate });
