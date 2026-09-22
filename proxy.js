@@ -25,6 +25,12 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from 'next-auth/middleware';
 import { isAuthRequired } from './lib/utils/auth-policy';
+import { SHAREPOINT_CANONICAL_SITE_URL } from './lib/services/graph/constants';
+
+const SHAREPOINT_CANONICAL_ORIGIN = new URL(SHAREPOINT_CANONICAL_SITE_URL).origin;
+const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
+const PRESENTATION_UPLOAD_PROOF_PATH = '/meeting-tracker/presentation-media-proof';
+const PRESENTATION_PLAYBACK_PROOF_PREFIX = '/external/presentation-media-proof/';
 
 export default withAuth(
   function proxy(req) {
@@ -34,8 +40,11 @@ export default withAuth(
     const nonce = btoa(String.fromCharCode(...nonceBytes));
     const isDev = process.env.NODE_ENV === 'development';
     const hostname = req.nextUrl?.hostname;
+    const pathname = req.nextUrl?.pathname || '';
     const isLoopbackHttp = req.nextUrl?.protocol === 'http:'
       && ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
+    const isPresentationUploadProof = pathname === PRESENTATION_UPLOAD_PROOF_PATH;
+    const isPresentationPlaybackProof = pathname.startsWith(PRESENTATION_PLAYBACK_PROOF_PREFIX);
 
     // Build CSP directives
     // Dev: Turbopack injects inline scripts without nonces, needs unsafe-inline + unsafe-eval.
@@ -53,9 +62,16 @@ export default withAuth(
     // avoids edge cases with framework-injected styles on SSG pages.
     const styleSrc = `'self' 'unsafe-inline'`;
 
-    const connectSrc = isDev
+    let connectSrc = isDev
       ? `'self' https://*.public.blob.vercel-storage.com https://vercel.com https://*.vercel-insights.com ws://localhost:3000 ws://127.0.0.1:3000`
       : `'self' https://vercel.com https://*.vercel-insights.com`;
+    if (isPresentationUploadProof) {
+      // Graph upload sessions currently resolve to signed *.up.1drv.com URLs;
+      // keep that egress capability confined to this authenticated proof page.
+      // The canonical tenant origin is included because Microsoft may issue a
+      // tenant-hosted session URL for the governed SharePoint drive.
+      connectSrc += ` ${GRAPH_UPLOAD_ORIGIN} ${SHAREPOINT_CANONICAL_ORIGIN}`;
+    }
 
     const directives = [
       `default-src 'self'`,
@@ -66,6 +82,12 @@ export default withAuth(
       `connect-src ${connectSrc}`,
       `frame-ancestors 'none'`,
     ];
+
+    if (isPresentationPlaybackProof) {
+      // Graph's short-lived download URL for this governed drive is hosted on
+      // the canonical tenant. Other pages retain default-src 'self'.
+      directives.push(`media-src 'self' ${SHAREPOINT_CANONICAL_ORIGIN}`);
+    }
 
     // Production deployments must upgrade insecure requests. A production build
     // exercised through `next start` on an HTTP loopback address is the sole

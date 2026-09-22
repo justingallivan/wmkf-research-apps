@@ -12,7 +12,17 @@ function abortError() {
   return error;
 }
 
-function uploadFragmentWithXhr({ uploadUrl, contentRange, body, signal, xhrFactory }) {
+const DEFAULT_FRAGMENT_TIMEOUT_MS = 60_000;
+
+function uploadFragmentWithXhr({
+  uploadUrl,
+  contentRange,
+  body,
+  signal,
+  xhrFactory,
+  timeoutMs,
+  onUploadProgress,
+}) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(abortError());
     const xhr = xhrFactory();
@@ -32,9 +42,15 @@ function uploadFragmentWithXhr({ uploadUrl, contentRange, body, signal, xhrFacto
     xhr.onerror = () => finish(reject, new Error('Microsoft upload connection failed before a response.'));
     xhr.onabort = () => finish(reject, abortError());
     xhr.ontimeout = () => finish(reject, new Error('Microsoft upload fragment timed out.'));
+    if (xhr.upload) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) onUploadProgress(event.loaded, event.total);
+      };
+    }
     signal?.addEventListener('abort', onSignalAbort, { once: true });
     try {
       xhr.open('PUT', uploadUrl, true);
+      xhr.timeout = timeoutMs;
       xhr.setRequestHeader('Content-Range', contentRange);
       xhr.send(body);
     } catch (error) {
@@ -53,6 +69,7 @@ export async function uploadPresentationMediaProofFile({
   onProgress = () => {},
   fetchImpl,
   xhrFactory = () => new XMLHttpRequest(),
+  fragmentTimeoutMs = DEFAULT_FRAGMENT_TIMEOUT_MS,
 }) {
   if (!file || !Number.isInteger(file.size) || file.size <= 0) throw new Error('A file is required.');
   if (!uploadUrl || !Number.isInteger(chunkBytes) || chunkBytes <= 0 || chunkBytes % (320 * 1024) !== 0) {
@@ -60,6 +77,9 @@ export async function uploadPresentationMediaProofFile({
   }
   if (!Number.isInteger(start) || start < 0 || start > file.size) {
     throw new Error('The upload resume position is invalid.');
+  }
+  if (!Number.isInteger(fragmentTimeoutMs) || fragmentTimeoutMs <= 0) {
+    throw new Error('The upload fragment timeout is invalid.');
   }
   let offset = start;
   while (offset < file.size) {
@@ -74,7 +94,18 @@ export async function uploadPresentationMediaProofFile({
         body: fragment,
         signal,
       })
-      : await uploadFragmentWithXhr({ uploadUrl, contentRange, body: fragment, signal, xhrFactory });
+      : await uploadFragmentWithXhr({
+        uploadUrl,
+        contentRange,
+        body: fragment,
+        signal,
+        xhrFactory,
+        timeoutMs: fragmentTimeoutMs,
+        onUploadProgress: (loaded) => onProgress({
+          uploaded: Math.min(offset + loaded, endExclusive),
+          total: file.size,
+        }),
+      });
     if (!response.ok) throw new Error(`Microsoft rejected upload fragment ${response.status}.`);
     if (response.status === 200 || response.status === 201) {
       onProgress({ uploaded: file.size, total: file.size });

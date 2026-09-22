@@ -67,10 +67,12 @@ test('uses XMLHttpRequest in the browser so the user agent supplies Content-Leng
       status: 0,
       responseText: '',
       headers: {},
+      upload: {},
       open: jest.fn((method, url, async) => { requests.push({ xhr, method, url, async }); }),
       setRequestHeader: jest.fn((name, value) => { xhr.headers[name] = value; }),
       send: jest.fn((body) => {
         xhr.body = body;
+        xhr.upload.onprogress({ lengthComputable: true, loaded: body.size / 2, total: body.size });
         xhr.status = responseValue.status;
         xhr.responseText = JSON.stringify(responseValue.body);
         queueMicrotask(() => xhr.onload());
@@ -100,6 +102,51 @@ test('uses XMLHttpRequest in the browser so the user agent supplies Content-Leng
     { start: 0, end: CHUNK, size: CHUNK },
     { start: CHUNK, end: file.size, size: 7 },
   ]);
+  expect(requests.every(({ xhr }) => xhr.timeout === 60_000)).toBe(true);
+});
+
+test('reports in-fragment XHR progress and rejects a timed-out fragment', async () => {
+  const file = fakeFile(CHUNK);
+  const progress = jest.fn();
+  const progressXhr = {
+    status: 202,
+    responseText: JSON.stringify({ nextExpectedRanges: [`${CHUNK}-`] }),
+    upload: {},
+    open: jest.fn(),
+    setRequestHeader: jest.fn(),
+    send: jest.fn(function send(body) {
+      this.upload.onprogress({ lengthComputable: true, loaded: body.size / 2, total: body.size });
+      this.status = 201;
+      this.responseText = '{}';
+      queueMicrotask(() => this.onload());
+    }),
+    abort: jest.fn(),
+  };
+  await uploadPresentationMediaProofFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    chunkBytes: CHUNK,
+    xhrFactory: () => progressXhr,
+    onProgress: progress,
+    fragmentTimeoutMs: 1234,
+  });
+  expect(progressXhr.timeout).toBe(1234);
+  expect(progress).toHaveBeenCalledWith({ uploaded: CHUNK / 2, total: CHUNK });
+  expect(progress).toHaveBeenLastCalledWith({ uploaded: CHUNK, total: CHUNK });
+
+  const timeoutXhr = {
+    upload: {},
+    open: jest.fn(),
+    setRequestHeader: jest.fn(),
+    send: jest.fn(function send() { queueMicrotask(() => this.ontimeout()); }),
+    abort: jest.fn(),
+  };
+  await expect(uploadPresentationMediaProofFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    chunkBytes: CHUNK,
+    xhrFactory: () => timeoutXhr,
+  })).rejects.toThrow('fragment timed out');
 });
 
 test('pauses only at a committed chunk boundary and rejects invalid progress', async () => {

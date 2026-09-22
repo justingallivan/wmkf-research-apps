@@ -154,6 +154,34 @@ describe('proxy CSP function', () => {
     expect(styleSrc).toContain("'unsafe-inline'");
   });
 
+  test('presentation upload proof alone can connect to Microsoft upload origins', () => {
+    process.env.NODE_ENV = 'production';
+    const proof = proxyFn(makeReq({}, 'https://preview.example/meeting-tracker/presentation-media-proof'));
+    const proofConnectSrc = proof.headers.get('Content-Security-Policy')
+      .split('; ').find(d => d.startsWith('connect-src'));
+
+    expect(proofConnectSrc).toContain('https://*.up.1drv.com');
+    expect(proofConnectSrc).toContain('https://appriver3651007194.sharepoint.com');
+
+    const ordinary = proxyFn(makeReq({}, 'https://preview.example/meeting-tracker'));
+    const ordinaryConnectSrc = ordinary.headers.get('Content-Security-Policy')
+      .split('; ').find(d => d.startsWith('connect-src'));
+    expect(ordinaryConnectSrc).not.toContain('up.1drv.com');
+    expect(ordinaryConnectSrc).not.toContain('sharepoint.com');
+  });
+
+  test('presentation playback proof alone can load media from the canonical SharePoint tenant', () => {
+    process.env.NODE_ENV = 'production';
+    const proof = proxyFn(makeReq({}, 'https://preview.example/external/presentation-media-proof/token'));
+    const mediaSrc = proof.headers.get('Content-Security-Policy')
+      .split('; ').find(d => d.startsWith('media-src'));
+
+    expect(mediaSrc).toBe("media-src 'self' https://appriver3651007194.sharepoint.com");
+
+    const sibling = proxyFn(makeReq({}, 'https://preview.example/external/presentation-media-proofish/token'));
+    expect(sibling.headers.get('Content-Security-Policy')).not.toContain('media-src');
+  });
+
   test('successive requests get distinct nonces', () => {
     process.env.NODE_ENV = 'production';
     proxyFn(makeReq());
