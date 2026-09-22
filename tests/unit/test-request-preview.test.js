@@ -36,6 +36,7 @@ function trusted(overrides = {}) {
       maxTotalBytes: 20_000,
     },
     metadata: metadata(),
+    requestType: 100000000,
     sourceDocuments: [{
       contentHash: 'a'.repeat(64),
       folder: '1000123_GUID/Phase I',
@@ -63,7 +64,6 @@ function requested(overrides = {}) {
     recipe: 'basic',
     testLabel: 'Clone preview',
     fiscalYear: 'December 2026',
-    requestType: 100000000,
     meetingDate: '2026-12-01',
     selectedDocumentIds: ['project-description'],
     ...overrides,
@@ -111,7 +111,11 @@ describe('compileBasicTestRequestPreview', () => {
     expect(result.requestPlan.createBody).toBeNull();
     expect(result.filePlan.planReady).toBe(false);
     expect(result.filePlan.plannedFiles).toEqual([]);
-    expect(result.preview.requestBody).toEqual(expect.objectContaining({ akoya_requestid: ids.requestId }));
+    expect(result.preview.request).toEqual({
+      authoritative: false,
+      body: expect.objectContaining({ akoya_requestid: ids.requestId }),
+    });
+    expect(result.preview.files).toEqual([]);
   });
 
   test('a top-level trust-boundary blocker strips both actionable sub-plans', () => {
@@ -140,6 +144,16 @@ describe('compileBasicTestRequestPreview', () => {
     ]);
     expect(result.requestPlan.createBody).toBeNull();
     expect(result.filePlan.plannedFiles).toEqual([]);
+  });
+
+  test('rejects browser control of the server-resolved request type', () => {
+    const result = compileBasicTestRequestPreview(trusted(), requested({ requestType: 999 }));
+    expect(result.blockers).toContainEqual(expect.objectContaining({
+      code: 'PREVIEW_INPUT_INVALID',
+      field: 'requestType',
+      scope: 'preview',
+    }));
+    expect(result.requestPlan.createBody).toBeNull();
   });
 
   test.each([null, [], false, 'bad'])('rejects non-object trusted preview input %p', value => {

@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import path from 'path';
 import {
   compileBasicCloneFilePlan,
   TEST_REQUEST_DOCUMENT_KINDS,
@@ -129,7 +130,7 @@ describe('compileBasicCloneFilePlan', () => {
     ['reviewerProposal', 'Reviewer Materials', 'Proposal_1000999.pdf'],
     ['proposalNarrative', 'AI Materials', 'ProposalNarrative_1000999.pdf'],
     ['proposalBibliography', 'AI Materials', 'ProposalBibliography_1000999.pdf'],
-  ])('materializes %s inside the primary plan from the trusted destination number', (kind, folder, filename) => {
+  ])('materializes %s in the generated preview from the trusted destination number', (kind, folder, filename) => {
     const sourceName = kind === 'reviewerProposal'
       ? 'Proposal_1000123.pdf'
       : kind === 'proposalNarrative'
@@ -151,10 +152,20 @@ describe('compileBasicCloneFilePlan', () => {
     expect(result.plannedFiles).toEqual([]);
   });
 
-  test('rejects unsafe destination request numbers before materializing a filename', () => {
-    const result = compile({ destinationRequestNumber: '../1000999' });
+  test('rejects unsafe destination request numbers on the generated-document path', () => {
+    const reviewer = document({
+      folder: '1000123_GUID/Reviewer Materials',
+      id: 'reviewer-proposal',
+      kind: TEST_REQUEST_DOCUMENT_KINDS.reviewerProposal,
+      name: 'Proposal_1000123.pdf',
+    });
+    const result = compile(
+      { destinationRequestNumber: '../1000999', sourceDocuments: [reviewer] },
+      { selectedDocumentIds: ['reviewer-proposal'] },
+    );
     expect(result.planReady).toBe(false);
     expect(result.plannedFiles).toEqual([]);
+    expect(result.previewFiles[0].destination).toBeNull();
     expect(result.blockers).toContainEqual(expect.objectContaining({
       code: 'DESTINATION_REQUEST_NUMBER_INVALID',
     }));
@@ -196,6 +207,14 @@ describe('compileBasicCloneFilePlan', () => {
     const result = compile({ sourceDocuments: [document({ mimeType: 'text/html', size: 20_000_001 })] });
     expect(result.previewFiles[0].operation).toBe('blocked');
     expect(result.plannedFiles).toEqual([]);
+  });
+
+  test('marks unevaluated and aggregate-blocked preview rows blocked', () => {
+    const missingPolicy = compile({ filePolicy: undefined });
+    expect(missingPolicy.previewFiles[0].operation).toBe('blocked');
+
+    const totalExceeded = compile({ filePolicy: policy({ maxTotalBytes: 999 }) });
+    expect(totalExceeded.previewFiles[0].operation).toBe('blocked');
   });
 
   test('rejects unknown file shapes, kinds, hashes, and source filename mismatches', () => {
@@ -250,9 +269,18 @@ describe('compileBasicCloneFilePlan', () => {
   });
 
   test('keeps the planner import graph pure and leaf-only', () => {
-    const source = readFileSync('lib/services/test-requests/file-plan.js', 'utf8');
+    const source = readFileSync(path.join(__dirname, '../../lib/services/test-requests/file-plan.js'), 'utf8');
     const imports = [...source.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(match => match[1]);
     expect(imports).toEqual(['../../utils/proposal-document-names.js']);
-    expect(source).not.toMatch(/GraphService|DynamicsService|fetch\s*\(|@vercel\/blob|database-service/);
+    expect(source).not.toMatch(/GraphService|DynamicsService|fetch\s*\(|@vercel\/blob|database-service|\brequire\s*\(|\bimport\s*\(/);
+  });
+
+  test('keeps the preview composer and policy import graph pure', () => {
+    const preview = readFileSync(path.join(__dirname, '../../lib/services/test-requests/preview.js'), 'utf8');
+    const policySource = readFileSync(path.join(__dirname, '../../lib/services/test-requests/policy.js'), 'utf8');
+    const imports = [...preview.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(match => match[1]);
+    expect(imports).toEqual(['./policy.js', './file-plan.js']);
+    expect(preview).not.toMatch(/GraphService|DynamicsService|fetch\s*\(|@vercel\/blob|database-service|\brequire\s*\(|\bimport\s*\(/);
+    expect(policySource).not.toMatch(/GraphService|DynamicsService|fetch\s*\(|@vercel\/blob|database-service|\brequire\s*\(|\bimport\s*\(/);
   });
 });
