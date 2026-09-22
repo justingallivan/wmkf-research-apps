@@ -1,4 +1,124 @@
-# Session 530 Prompt: Meeting Tracker released; session housekeeping complete
+# Session 531 Prompt: Pre-Site / Pre-RP brief fixes released; snapshot writer still v1 (phase 2 open)
+
+## Session 530 Summary
+
+[VERIFIED via Git, CI on main, `vercel inspect`, signed-in owner check] Three
+production releases fixed the reviewer paragraph in the Pre-Site Visit briefing
+and the Pre-Research Presentation (Pre-RP) Brief, diagnosed on request 1002852.
+Workflow: root planned, Sonnet built from scratchpad briefs, root reviewed,
+Codex (`gpt-5.6-sol`, adversarial-review, twelve rounds total) reviewed each
+release before the owner said "merge".
+
+1. **Applicant-recommended reviewer expertise** (PR #321 → main `54346b00b`,
+   deployment `dpl_B8H5CQ6efCEvrhBEFciGYUwRnMWs`). "Enrich recommended" now
+   writes OpenAlex author research topics to `wmkf_keywords` (fill-if-empty,
+   ETag-conditional PATCH with one re-read retry) for candidates with no claimed
+   expertise. `composeRefereeSection` emits `referee_expertise_missing`; the
+   Pre-Site artifact model and the Reviews tab surface it as a warning.
+2. **Byline affiliations reduced to institution names** (same PR + PR #322 →
+   main `1a2a3331a`, deployment `dpl_7jSwz134V1BXuzvduLpj3CrLwbF7`).
+   `institutionNameOf` / `looksLikeByline` in
+   `shared/utils/review-writeup-paragraphs.js`: two institutions joined with
+   "and"; a confirmed `mainInstitution` is reduced only when byline-shaped; the
+   accept-form Main-institution prefill seeds the reduced name; Pre-RP card shows
+   "Word draft · generated <date>". Owner decision: the heuristic stopped after
+   Codex round 6; remaining misses are corrected by staff in the Reviewer Finder
+   candidate edit modal.
+3. **Pre-RP Brief expertise sentence + snapshot versioning** (PR #323 → main
+   `90b6c6838`, deployment `dpl_Dj2Hjo2xMrpJnKu9yY2tCfFnZXv2`, Ready 2026-09-22
+   03:58Z; six CI workflows green; 307 on applications/grantees/reviews/
+   submissions). Referee Comments paragraph gains the expertise sentence
+   (`renderVersion` '5', reversing the 2026-09-16 plan's two-sentence rule).
+   Fingerprint fields widened (+lastName/keywords/areaOfExpertise) behind
+   snapshot `schemaVersion`: readers accept 1 and 2, legacy rows verify and
+   drift-compare under their own version, a reclaimed generation row renders
+   from its verified stored snapshot (409 `pre_rp_brief_snapshot_invalid`
+   otherwise). **Writer still emits v1** (phase 1).
+
+Owner completed the manual side: corrected Herwig Schüler's Main institution and
+expertise, regenerated, and confirmed the draft briefing looks good.
+
+### Commits (all on main)
+- `df313efd8`, `4365e02f5` — expertise fill + diagnostic, Codex fixes
+- `2937cdfa4`, `15128a2b5`, `54346b00b` — institution-name reduction, Codex rounds 2–3
+- `8ad57295a`, `0bdcc4ce6`, `fdbf8ca6f`, `1a2a3331a` — mainInstitution gating, structural tier rules, card date
+- `fc9a5ca48`, `3568e7e72`, `21410bf8e`, `90b6c6838` — Pre-RP expertise sentence, snapshot versioning phase 1, reclaimed-row provenance
+
+## Next Items
+
+### Verified Open
+
+1. **Pre-RP snapshot versioning phase 2.** Flip
+   `PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion` 1 → 2 in
+   `shared/config/requestDocument.js:163`, update the pinned test in
+   `tests/unit/pre-rp-brief-input-service.test.js`, and the two-phase wording in
+   `docs/agent-wiki/topics/external-reviewer-portal.md`,
+   `docs/atlas/dataverse-wmkf-requestdocument.md`, and
+   `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`.
+   Evidence: `grep -n snapshotSchemaVersion shared/config/requestDocument.js`
+   shows `1` with the phase comment. Until flipped, an expertise-only change
+   renders on regenerate but does not register as brief drift. Branch + PR +
+   Codex review, then merge; `90b6c6838` is the rollback target.
+2. **Delete the merged remote branch** `origin/feat/pre-rp-brief-expertise`
+   (fast-forward merge did not auto-delete it). Evidence: `git ls-remote --heads origin feat/pre-rp-brief-expertise`.
+
+### Owner Decision Needed
+
+- Suite-wide personal email defaults (carried from S529): unchanged, see
+  `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+
+### Verify Before Acting
+
+- Older carryovers (Connor/Test Request Factory, cache telemetry, reviewer
+  follow-ups) were not re-probed this session; use their plans and live checks.
+
+### Do Not Reopen Without New Decision
+
+- Institution-name heuristic scope: owner closed further rounds 2026-09-21
+  (Codex round 6). Trailing unlisted city stays verbatim by design.
+- Pre-RP brief carries the expertise sentence (owner decision 2026-09-21).
+
+## Gotchas
+
+- Codex runs in a separate checkout (`WMKF_Apps-codex`, branch
+  `codex/parallel-session`) plus other worktrees; pass `--base main` and a
+  committed diff, and don't read its branch state as this checkout's.
+- `codex-companion.mjs --help` starts a review; never pass it.
+- Mutation checks: commit or stash the fix before `git checkout <prev> -- file`;
+  `git checkout HEAD -- file` otherwise drops it (bit S530, caught by Codex).
+- `shared/utils/review-writeup-paragraphs.js` is Jest-only (extensionless
+  imports); probe with a throwaway Jest test, delete before commit.
+
+## Key Files
+
+- `shared/utils/review-writeup-paragraphs.js` — composer, `institutionNameOf`, `looksLikeByline`, diagnostics
+- `lib/services/pre-rp-brief/docx-renderer.js` — fingerprint field lists, versioned `briefInputFingerprint`
+- `lib/services/pre-rp-brief/artifact-service.js` — `storedBriefEnvelopeForRender`, reclaimed-row render
+- `lib/services/pre-site-visit/distribution/context.js` — `assertBriefInputsReady` under stored version
+- `lib/services/workbench/enrich-recommended-service.js` — `expertiseKeywordsFor`
+- `lib/dataverse/adapters/researcher.js` — `upsertByPotentialReviewer` ETag retry
+
+## Testing
+
+```bash
+npx jest 'pre-rp|pre-site-visit|distribution|review-writeup|reviews-tab|external-review|enrich-recommended'
+# full gate set: 67 PASS expected, gates sequential with their self-tests
+```
+
+## Stop-time notes
+
+No milestone entry: three incremental fixes to existing brief capabilities, no
+new architecture or cutover. Claim-evidence pilot report: zero advisory events
+and no eligible plan-doc edit recorded, so no observation row added. Memory:
+one mechanics line added to
+`feedback-mutation-test-with-the-discriminating-fixture.md`; router unchanged.
+
+## Historical handoffs — not current instructions
+
+All text below is historical context. Session 531 guidance above is authoritative;
+older completion, cleanup and authorization statements apply to their named runs.
+
+## Prior Session 530 Prompt: Meeting Tracker released; session housekeeping complete
 
 ## Session 529 Summary
 

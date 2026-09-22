@@ -24,6 +24,10 @@ Do not:
 - Trust a mutation check whose fixture satisfies both the correct and the buggy
   predicate.
 - Report "verified by mutation" without saying which test failed.
+- Run the mutation with `git checkout <prev> -- <file>` while the fix is still
+  uncommitted: the restoring `git checkout HEAD -- <file>` then silently drops the
+  fix (S530: commit `67ea2a57f` shipped without its implementation; Codex caught it).
+  Commit or `git stash` the fix first, so `HEAD` actually holds it.
 
 **Why:** S412, grantee staff replace-submission service. The portal writer confirms
 a commit with `imageRef === new && status === SUBMITTED`; the new staff path writes
