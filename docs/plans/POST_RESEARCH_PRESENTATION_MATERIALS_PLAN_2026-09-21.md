@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker to capture a Zoom recording link or SharePoint-hosted MP4 plus the latest transcript, surface them to program directors, and mint a 60-day materials-only Board link; deployed Chrome now proves direct Graph MP4 upload, playback, and download after a route-scoped CSP correction."
+summary: "Active plan for Meeting Tracker to capture a Zoom recording link or SharePoint-hosted MP4 plus the latest transcript, surface them to program directors, and mint a 60-day materials-only Board link; deployed Chrome now proves direct Graph MP4 upload, same-session pause/resume, playback, and download after route-scoped CSP and upload-placeholder corrections."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -40,7 +40,7 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
 | SharePoint video delivery | Offer Watch and Download without proxying the complete file through the application. |
 | First-slice MP4 cap | 2,000,000,000 bytes (about 1.86 GiB), so the exact byte count fits the existing Dataverse `wmkf_FileSize` integer. Raising the cap requires a reviewed larger-size schema field. |
 | Existing full briefing | Preserve D19/D28: the existing distributed briefing remains a superset and continues to include research-presentation materials. Add audience-specific non-buffering Watch/Download resolution for Zoom and large SharePoint recordings. The new copied link is an additional materials-only option. |
-| Transport proof | **CHROME CORE PATH PASSED 2026-09-22.** The original status-0 failure was the application CSP, not Graph transport. After adding route-scoped Microsoft upload/media origins, deployed Chrome uploaded a 96.0 MiB MP4 directly to Graph, finalized it, played it through both resolver shapes, and downloaded the complete bytes. Edge, macOS Safari, iPadOS Safari, reload/reselect resume, expiry recovery, and long-duration seeking remain required before Slice 0 is complete. |
+| Transport proof | **CHROME CORE PATH PASSED 2026-09-22.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. Edge, macOS Safari, iPadOS Safari, reload/reselect resume, expiry recovery, and long-duration seeking remain required before Slice 0 is complete. |
 | Distribution | No new email composer or automatic distribution for the materials-only link. Meeting Tracker provides Copy link for staff to share through their chosen channel; the existing deliberation email continues distributing the full briefing link. |
 
 ## 2. Verified current state
@@ -754,16 +754,19 @@ Upload-specific rules:
 
 ### Slice 0 — Deployed-Preview browser proof
 
-**Implementation status (2026-09-22): CHROME CORE PATH PASSED; SLICE REMAINS OPEN.** [VERIFIED via
-focused unit/contract tests] the isolated
+**Implementation status (2026-09-22): CURRENT-HARDENING CHROME CORE PATH PASSED; SLICE REMAINS
+OPEN.** [VERIFIED via focused unit/contract tests] the isolated
 feature branch contains the Preview-only staff harness, browser-direct Graph upload session,
 encrypted staff permit, five-minute encrypted-subject proof token, fail-closed resolver limiter,
 302/one-shot playback comparison, scoped CSP, and exact-item cleanup. [VERIFIED via signed-in
-Chrome] the deployed Preview completed the 96.0 MiB upload, bounded finalize, visible 302 playback,
-successful one-shot Watch resolution, complete download, and exact-item deletion. Resolver counts stayed bounded
-to explicit actions. The downloaded filename was the opaque physical MP4 name, not the display
-name. The required Edge/macOS Safari/iPadOS Safari, reload/reselect resume, expiry recovery,
-long-duration seek, and 2 GB throughput-cap evidence remain open, so Slice 0 is not yet complete.
+Chrome] the current-hardening Preview paused and resumed the 96.0 MiB upload in the same page,
+completed bounded finalize, visibly played and sought through the 302 resolver without extra
+application resolution, played through one-shot Watch resolution, downloaded byte- and
+SHA-256-identical content, and deleted the exact item to the recycle bin. Resolver counts stayed
+bounded to explicit actions. The downloaded filename was the opaque physical MP4 name, not the
+display name. The required Edge/macOS Safari/iPadOS Safari, reload/reselect resume, expiry
+recovery, long-duration seek, and 2 GB throughput-cap evidence remain open, so Slice 0 is not yet
+complete.
 
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
 authenticated proof route and minimal harness, but it creates no durable application schema and is
@@ -852,6 +855,30 @@ branch-scoped Preview settings were created. The request lookup was a read again
 Dataverse, while the disposable file write and deletion occurred in the canonical akoyaGO
 SharePoint site. The shared `Artifacts/Presentation Media Proof` folder remains as the reusable
 proof container, and the deleted item remains governed by the site's recycle-bin retention policy.
+
+**Current-hardening execution receipt (2026-09-22):** immutable Preview deployment
+`dpl_9jDj7Xu6euv9e1CH3FrBKtHbdrTu` at source commit `5d32dc682` paused after 10.9 MiB, but Resume
+failed because Graph exposed a smaller same-drive, same-name path item while the upload session was
+still live and status misclassified that placeholder as a committed-file mismatch. Confirmed
+cleanup cancelled that session and verified that no committed item existed. Commit `cdc7574e1`
+made status accept only that narrow placeholder case while a matching upload session remains live;
+stable identity drift, negative/oversized content, and full-size mismatch continue to fail closed,
+and finalize/cleanup still require the exact full-size committed item.
+
+The shared OAuth alias was then temporarily moved to immutable Preview deployment
+`dpl_2oyHRnNLwuXvuNPK3MLqcKnwNyop`. Signed-in Chrome paused the 100,665,703-byte upload at 0.6 MiB,
+resumed it in the same page, and reached 100%. Finalize succeeded. The 302 Watch path played and
+an End-key seek reached 67.3 seconds without increasing its single application resolver hit; the
+one-shot Watch path played from the canonical SharePoint tenant with exactly one additional
+resolver hit. Download returned exactly 100,665,703 bytes, and source/download SHA-256 both equaled
+`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`. With explicit user
+confirmation, cleanup deleted the exact stable DriveItem through Graph, moving it to the canonical
+site's recycle bin. The alias was restored and re-inspected at its prior exact target
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The run used one-off runtime settings; no
+`codex/feature-request` Preview environment settings were created. It read owner-authorized Request
+`1003222` from Production Dataverse and wrote only the disposable proof item to the canonical
+SharePoint site. This proves same-page pause/resume on current hardening; reload/reselect resume is
+a separate open requirement.
 
 Also verify tenant Safe Attachments and `DisallowInfectedFileDownload` posture. A security owner
 may supply sanctioned evidence that the Graph malware facet becomes non-null for a flagged item;
