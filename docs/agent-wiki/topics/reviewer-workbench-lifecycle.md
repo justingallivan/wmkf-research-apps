@@ -1024,37 +1024,63 @@ confirmed. A prior confirmed `wmkf_maininstitution` is still never re-reduced
 at pre-fill, unchanged from the paragraph above.
 
 **"…Medicine"/"…Laboratory" institutions are recognized structurally, not by
-bare word (Fix A, Codex round 5, 2026-09-21):** bare `medicine` and
-`laboratory` were removed from `INSTITUTION_TIER_ORG_TERM` — matching the bare
-word anywhere in a segment wrongly promoted structurally unrelated text like
-"Laboratory Medicine" and "Sports Medicine" to institution tier. Instead,
-`isInstitutionTierPart` recognizes a whole institution named this way only
-when the segment ENDS with "Medicine" or "Laboratory" and has at least two
-preceding, uppercase-initial (proper-noun-shaped) words directly before the
-tail (`NAMED_INSTITUTION_TAIL`) — "Weill Cornell Medicine" and "Cold Spring
-Harbor Laboratory" qualify, but "Sports Medicine"/"Laboratory Medicine"
-(one preceding word) do not — or when an all-caps acronym (2+ letters) leads
-straight into "Laboratory" (`ACRONYM_LABORATORY_LEAD`) — "MRC Laboratory of
-Molecular Biology" qualifies. Bare "Medicine" alone is still excluded via
-`BARE_INSTITUTION_TIER_LABEL`, and "Department/Faculty/School of Medicine"
-stay handled by the existing `SUBUNIT_SEGMENT`/`ORGANIZATION_TERM` rules,
-unchanged. `national laboratory` and `laboratories` (plural) remain in
-`INSTITUTION_TIER_ORG_TERM` since they are unambiguous without a proper-noun
-lead.
+bare word, and are specialty/generic-aware (Fix A, Codex round 5, 2026-09-21;
+made specialty/generic-aware, owner decision 2026-09-21, Codex round 6):**
+bare `medicine` and `laboratory` were removed from `INSTITUTION_TIER_ORG_TERM`
+— matching the bare word anywhere in a segment wrongly promoted structurally
+unrelated text like "Laboratory Medicine" and "Sports Medicine" to institution
+tier. Instead, `isInstitutionTierPart` recognizes a whole institution named
+this way only when the segment ENDS with "Medicine" or "Laboratory" AND the
+word immediately before the tail is not itself a generic descriptor:
+- `NAMED_MEDICINE_TAIL` (via `isNamedMedicineTail`): the segment ends with
+  "Medicine" after at least two preceding, uppercase-initial
+  (proper-noun-shaped) words, AND the word directly before "Medicine" is not
+  in a clinical-specialty list (`internal`, `emergency`, `pediatric`,
+  `regenerative`, `laboratory`, …; see `MEDICINE_SPECIALTY_WORD`) — "Weill
+  Cornell Medicine" qualifies, but "Harvard Internal Medicine" and "Pediatric
+  Emergency Medicine" do not, even though both have two preceding
+  proper-noun-shaped words, because the immediately preceding word names a
+  specialty. "Sports Medicine"/"Laboratory Medicine"/"Regenerative Medicine"
+  (one preceding word) still fail on shape alone. "Icahn School of Medicine at
+  Mount Sinai" isn't a "…Medicine" tail at all (it doesn't end in "Medicine");
+  it stays covered by `school\s+of\s+medicine` in `INSTITUTION_TIER_ORG_TERM`.
+- `NAMED_LABORATORY_TAIL` (via `isNamedLaboratoryTail`): the segment ends with
+  "Laboratory" after at least one preceding, uppercase-initial word, AND that
+  word is not generic (`research`, `clinical`, `national`, `university`,
+  `medical`, …; see `LABORATORY_GENERIC_WORD`) — "Jackson Laboratory" and
+  "Cold Spring Harbor Laboratory" qualify, but "Research Laboratory"/"Clinical
+  Laboratory" do not. "Lawrence Berkeley National Laboratory" is excluded here
+  (preceding word "National" is generic) but still reaches institution tier
+  via `national\s+laboratory` in `INSTITUTION_TIER_ORG_TERM`.
+- An all-caps acronym (2+ letters) leading straight into "Laboratory"
+  (`ACRONYM_LABORATORY_LEAD`) — "MRC Laboratory of Molecular Biology"
+  qualifies, independent of the two rules above.
 
-**`looksLikeByline` also fires on a trailing single-word location (Fix B,
-Codex round 5, 2026-09-21):** when there are at least two comma/semicolon
-segments and the LAST one is a single letters-only word that is not itself an
-institution-tier part, `looksLikeByline` returns true — this catches an
-unlisted trailing city ("Doha", "Ithaca", "Houston") that `isGeographicSegment`'s
-finite lists don't know, e.g. "Weill Cornell Medicine, Cornell University,
-Doha". Two documented limits: "University of California, Davis" is still safe
-even though "Davis" trips this marker, because `institutionNameOf`'s
-multi-campus re-attach restores the exact "University of California, Davis"
-string on either path; and a two-word trailing campus such as "New York
-University, Abu Dhabi" is deliberately NOT treated as a marker (it stays
-verbatim), so a multi-word unlisted city ("Yale University, New Haven") is a
-known miss.
+Bare "Medicine" alone is still excluded via `BARE_INSTITUTION_TIER_LABEL`, and
+"Department/Faculty/School of Medicine" stay handled by the existing
+`SUBUNIT_SEGMENT`/`ORGANIZATION_TERM` rules, unchanged. `national laboratory`
+and `laboratories` (plural) remain in `INSTITUTION_TIER_ORG_TERM` since they
+are unambiguous without a proper-noun lead.
+
+**The trailing-single-word byline marker is removed (owner decision
+2026-09-21, Codex round 6):** `looksLikeByline` no longer treats a trailing
+single letters-only comma/semicolon segment as a byline marker (the Fix B
+rule from Codex round 5 is deleted). That rule caught an unlisted trailing
+city ("Weill Cornell Medicine, Cornell University, Doha", "Cornell
+University, Ithaca") but also misfired on a confirmed value that legitimately
+ends in one unlisted word — a real co-affiliation ("Stanford University,
+Genentech") or a campus qualifier ("Weill Cornell Medicine, Qatar") — erasing
+confirmed content to fix a display artifact. `looksLikeByline` now returns
+true only for: an echoed email/"electronic address", any `isGeographicSegment`
+segment, or any `SUBUNIT_SEGMENT` segment. A trailing unlisted city is
+therefore a **documented miss**: it is shown verbatim rather than reduced.
+Staff correct such values directly in the Reviewer Finder candidate edit
+modal's Main institution field.
+
+Owner decision 2026-09-21 (Codex round 6): the heuristic stops here; remaining
+misclassifications are corrected by staff in the Reviewer Finder candidate
+edit modal (Main institution), and a corrected value with no byline markers is
+shown verbatim.
 
 `PRE_RP_BRIEF_CONTRACT.renderVersion` stays `'4'` — the gating and tier
 change are unreleased on this branch, so no version bump was needed.

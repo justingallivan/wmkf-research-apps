@@ -256,12 +256,28 @@ describe('composeReviewerSentence', () => {
     expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of University of California, San Francisco.');
   });
 
-  it('reduces a mainInstitution byline with a trailing unlisted-city marker (Fix B, Codex round 5, 2026-09-21)', () => {
-    const { runs } = composeReviewerSentence([
-      reviewer({ name: 'A', mainInstitution: 'Weill Cornell Medicine, Cornell University, Doha' }),
-    ]);
-    expect(runs.map((r) => r.text).join(''))
-      .toBe('The reviewer was A of Weill Cornell Medicine and Cornell University.');
+  it('shows a mainInstitution with a trailing unlisted word verbatim, not reduced (owner decision 2026-09-21, Codex round 6: the trailing-single-word marker is removed)', () => {
+    // A confirmed co-affiliation ending in one unlisted word must not be
+    // erased — "Genentech" is a real institution, not a city.
+    expect(
+      composeReviewerSentence([
+        reviewer({ name: 'A', mainInstitution: 'Stanford University, Genentech' }),
+      ]).runs.map((r) => r.text).join(''),
+    ).toBe('The reviewer was A of Stanford University, Genentech.');
+    // A confirmed campus qualifier ending in one unlisted word must also stay
+    // verbatim.
+    expect(
+      composeReviewerSentence([
+        reviewer({ name: 'A', mainInstitution: 'Weill Cornell Medicine, Qatar' }),
+      ]).runs.map((r) => r.text).join(''),
+    ).toBe('The reviewer was A of Weill Cornell Medicine, Qatar.');
+    // Documented miss: a trailing unlisted city is indistinguishable from the
+    // two cases above, so it is now also shown verbatim rather than reduced.
+    expect(
+      composeReviewerSentence([
+        reviewer({ name: 'A', mainInstitution: 'Weill Cornell Medicine, Cornell University, Doha' }),
+      ]).runs.map((r) => r.text).join(''),
+    ).toBe('The reviewer was A of Weill Cornell Medicine, Cornell University, Doha.');
   });
 
   it('keeps University of California, Davis exact despite the trailing-city marker (multi-campus re-attach restores it)', () => {
@@ -502,6 +518,36 @@ describe('institutionNameOf (byline → institution name for display)', () => {
     expect(institutionNameOf('MRC Laboratory of Molecular Biology, University of Cambridge, Cambridge, UK'))
       .toBe('MRC Laboratory of Molecular Biology and University of Cambridge');
   });
+
+  it('is specialty-aware for the "…Medicine" tail and generic-aware for the one-word "…Laboratory" tail (owner decision 2026-09-21, Codex round 6)', () => {
+    // A one-word "…Laboratory" tail is a whole institution unless the
+    // preceding word is generic (FAILS on fdbf8ca6f: "Jackson Laboratory"
+    // was not recognized without a second preceding word).
+    expect(institutionNameOf('Jackson Laboratory, University of Maine, Bar Harbor, ME'))
+      .toBe('Jackson Laboratory and University of Maine');
+    // A clinical specialty immediately before "Medicine" keeps the segment
+    // department-shaped even with two preceding words (FAILS on fdbf8ca6f:
+    // "Pediatric Emergency Medicine" had two proper-noun-shaped words before
+    // the old bare tail and was wrongly promoted).
+    expect(institutionNameOf('Pediatric Emergency Medicine, Harvard Medical School, Boston, MA'))
+      .toBe('Harvard Medical School');
+    expect(institutionNameOf('Harvard Internal Medicine, Harvard Medical School, Boston, MA'))
+      .toBe('Harvard Medical School');
+    // "Icahn School of Medicine at Mount Sinai" is not a "…Medicine" tail at
+    // all (it doesn't end in "Medicine"); it is still caught via
+    // `school\s+of\s+medicine` in INSTITUTION_TIER_ORG_TERM.
+    expect(institutionNameOf('Icahn School of Medicine at Mount Sinai, New York, NY'))
+      .toBe('Icahn School of Medicine at Mount Sinai');
+    // A generic word immediately before "Laboratory" ("National") still
+    // reaches institution tier via `national\s+laboratory` in
+    // INSTITUTION_TIER_ORG_TERM, not via the named-tail rule.
+    expect(institutionNameOf('Lawrence Berkeley National Laboratory, Berkeley, CA'))
+      .toBe('Lawrence Berkeley National Laboratory');
+    // "Research" immediately before "Laboratory" is generic — the university
+    // wins.
+    expect(institutionNameOf('Research Laboratory, University of Z, Austin, TX'))
+      .toBe('University of Z');
+  });
 });
 
 describe('looksLikeByline', () => {
@@ -521,9 +567,15 @@ describe('looksLikeByline', () => {
     expect(looksLikeByline('Cold Spring Harbor Laboratory, Stony Brook University')).toBe(false);
   });
 
-  it('is true when the last segment is a trailing single-word location (Fix B, Codex round 5, 2026-09-21)', () => {
-    expect(looksLikeByline('Weill Cornell Medicine, Cornell University, Doha')).toBe(true);
-    expect(looksLikeByline('Cornell University, Ithaca')).toBe(true);
+  it('is false for a trailing single-word segment — the marker is removed (owner decision 2026-09-21, Codex round 6)', () => {
+    // These would misfire as bylines under the removed Fix B marker; a
+    // confirmed value legitimately ending in one unlisted word (a
+    // co-affiliation, a campus qualifier, or a genuinely unlisted trailing
+    // city) is now always shown verbatim.
+    expect(looksLikeByline('Weill Cornell Medicine, Cornell University, Doha')).toBe(false);
+    expect(looksLikeByline('Stanford University, Genentech')).toBe(false);
+    expect(looksLikeByline('Weill Cornell Medicine, Qatar')).toBe(false);
+    expect(looksLikeByline('Cornell University, Ithaca')).toBe(false);
   });
 
   it('is false when the trailing segment is a two-word campus or the value has no comma (Fix B limits)', () => {

@@ -331,17 +331,17 @@ describe('buildReviewContext', () => {
     expect(payload.prefill.mainInstitution).toBe('University of X');
   });
 
-  it('seeds the Main institution prefill reduced when the enrichment affiliation has a trailing unlisted-city marker (Fix B, Codex round 5, 2026-09-21)', async () => {
+  it('seeds the Main institution prefill verbatim for an enrichment affiliation ending in one unlisted word — the trailing-single-word marker is removed (owner decision 2026-09-21, Codex round 6)', async () => {
     const payload = await buildReviewContext({
       suggestion: baseSuggestion(),
       request,
       reviewer: {
         ...reviewer,
-        wmkf_primaryaffiliation: 'Weill Cornell Medicine, Cornell University, Doha',
+        wmkf_primaryaffiliation: 'Stanford University, Genentech',
       },
     });
 
-    expect(payload.prefill.mainInstitution).toBe('Weill Cornell Medicine and Cornell University');
+    expect(payload.prefill.mainInstitution).toBe('Stanford University, Genentech');
   });
 });
 

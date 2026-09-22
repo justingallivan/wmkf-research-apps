@@ -146,23 +146,50 @@ const ORGANIZATION_TERM = /(?<![\p{L}\p{N}])(?:institut(?:e|o|ion)?|istituto|hos
 // institution tier just because they contained the word. Whole-institution
 // names built on those words ("Weill Cornell Medicine", "Cold Spring Harbor
 // Laboratory", "MRC Laboratory of Molecular Biology") are now recognized
-// structurally by NAMED_INSTITUTION_TAIL / ACRONYM_LABORATORY_LEAD below,
+// structurally by NAMED_MEDICINE_TAIL / NAMED_LABORATORY_TAIL /
+// ACRONYM_LABORATORY_LEAD below,
 // which require a proper-noun lead rather than matching the bare word
 // anywhere in the segment. `national\s+laboratory` and `laboratories` stay
 // here since they are unambiguous even without a proper-noun lead.
 const INSTITUTION_TIER_ORG_TERM = /(?<![\p{L}\p{N}])(?:hospital|clinic|klinik|medical\s+(?:center|centre)|medical\s+school|school\s+of\s+medicine|cancer\s+(?:center|centre)|national\s+laboratory|laboratories|foundation|CNRS|INSERM|Max\s+Planck|Howard\s+Hughes|Riken|CSIC)(?![\p{L}\p{N}])/iu;
-// Structural whole-institution names ending in "Medicine"/"Laboratory" (Fix
-// A, Codex round 5, 2026-09-21): the segment must END with the tail word and
-// have at least two preceding, uppercase-initial (proper-noun-shaped) words
-// directly before it — "Weill Cornell Medicine" ✓, "Cold Spring Harbor
-// Laboratory" ✓, but "Sports Medicine" ✗ (one preceding word), "Laboratory
-// Medicine" ✗ (one preceding word), "Department of Medicine" / "Faculty of
-// Medicine" ✗ ("of" is not uppercase-initial, so the repeated group cannot
-// reach the tail), "Regenerative Medicine" ✗ (one preceding word). Written
+// Structural whole-institution names ending in "Medicine" or "Laboratory"
+// (Fix A, Codex round 5, 2026-09-21; made specialty/generic-aware, owner
+// decision 2026-09-21, Codex round 6). The segment must END with the tail
+// word and have proper-noun-shaped (uppercase-initial) words directly before
+// it, AND the word immediately before the tail must not itself be a generic
+// descriptor — a clinical specialty before "Medicine" ("Harvard Internal
+// Medicine", "Pediatric Emergency Medicine", "Regenerative Medicine") or a
+// generic qualifier before "Laboratory" ("Research Laboratory", "Clinical
+// Laboratory") names a department/service, not a whole institution. Written
 // WITHOUT the `i` flag for the leading words so the uppercase-initial
-// requirement is not defeated; the tail is matched case-insensitively via an
-// explicit alternation instead.
-const NAMED_INSTITUTION_TAIL = /^(?:\p{Lu}[\p{L}\p{N}.&'’-]*\s+){2,}(?:Medicine|Laboratory|medicine|laboratory)$/u;
+// requirement is not defeated; the tail and the preceding-word check are
+// matched case-insensitively via explicit alternations instead.
+const NAMED_MEDICINE_TAIL_SHAPE = /^(?:\p{Lu}[\p{L}\p{N}.&'’-]*\s+){2,}(?:Medicine|medicine)$/u;
+const MEDICINE_SPECIALTY_WORD = /^(?:internal|emergency|family|sports|laboratory|nuclear|veterinary|regenerative|translational|preventive|preventative|occupational|molecular|precision|genomic|personalized|personalised|pediatric|paediatric|sleep|pain|palliative|geriatric|tropical|community|rural|social|behavioral|behavioural|integrative|complementary|alternative|physical|rehabilitation|pulmonary|respiratory|cardiovascular|hospital|academic|experimental|systems|computational|biomedical|clinical|general|oral|dental|maternal|fetal|reproductive|sexual|addiction|forensic|aerospace|military|wilderness|travel|transfusion|critical)$/iu;
+// "Weill Cornell Medicine" ✓ (preceding word "Cornell" is not a specialty);
+// "Harvard Internal Medicine" ✗, "Pediatric Emergency Medicine" ✗, "Sports
+// Medicine" ✗ (one preceding word, shape doesn't match), "Laboratory
+// Medicine" ✗ (one preceding word), "Regenerative Medicine" ✗ (one preceding
+// word).
+function isNamedMedicineTail(trimmed) {
+  if (!NAMED_MEDICINE_TAIL_SHAPE.test(trimmed)) return false;
+  const words = trimmed.split(/\s+/);
+  const precedingWord = words[words.length - 2];
+  return !MEDICINE_SPECIALTY_WORD.test(precedingWord);
+}
+const NAMED_LABORATORY_TAIL_SHAPE = /^(?:\p{Lu}[\p{L}\p{N}.&'’-]*\s+){1,}(?:Laboratory|laboratory)$/u;
+const LABORATORY_GENERIC_WORD = /^(?:research|clinical|core|central|teaching|analytical|diagnostic|testing|reference|regional|state|public|health|national|university|hospital|department|medical|molecular|cell|tissue|imaging|computing|computer|dry|wet)$/iu;
+// "Jackson Laboratory" ✓, "Cold Spring Harbor Laboratory" ✓; "Research
+// Laboratory" ✗, "Clinical Laboratory" ✗. "Lawrence Berkeley National
+// Laboratory" is excluded here (preceding word "National" is generic) but
+// still reaches institution tier via `national\s+laboratory` in
+// INSTITUTION_TIER_ORG_TERM above.
+function isNamedLaboratoryTail(trimmed) {
+  if (!NAMED_LABORATORY_TAIL_SHAPE.test(trimmed)) return false;
+  const words = trimmed.split(/\s+/);
+  const precedingWord = words[words.length - 2];
+  return !LABORATORY_GENERIC_WORD.test(precedingWord);
+}
 // An all-caps acronym (2+ letters) leading straight into "Laboratory" (Fix A):
 // "MRC Laboratory of Molecular Biology" ✓, "LMB Laboratory" ✓.
 const ACRONYM_LABORATORY_LEAD = /^[A-Z]{2,}\s+Laboratory(?![\p{L}\p{N}])/u;
@@ -193,7 +220,7 @@ function isInstitutionTierPart(part) {
   if (UNIVERSITY_TERM.test(part)) return true;
   if (INSTITUTION_TIER_ORG_TERM.test(part)) return true;
   if (INSTITUTE_WORD.test(part) && !INSTITUTE_SUBUNIT_LEAD.test(trimmed)) return true;
-  if (NAMED_INSTITUTION_TAIL.test(trimmed) || ACRONYM_LABORATORY_LEAD.test(trimmed)) return true;
+  if (isNamedMedicineTail(trimmed) || isNamedLaboratoryTail(trimmed) || ACRONYM_LABORATORY_LEAD.test(trimmed)) return true;
   return false;
 }
 // Geography that never names an institution on its own.
@@ -315,22 +342,21 @@ function pickInstitutionsFromRun(parts) {
 }
 
 /**
- * True when `text` carries a marker a reviewer- or staff-confirmed
- * institution name never has: an echoed email address, a geographic segment
- * (postal code, US state, listed country/state name, "City ST 12345", a
- * street address), a department/division-shaped sub-unit lead, or a trailing
- * single-word location (Fix B, Codex round 5, 2026-09-21) — e.g. "Weill
- * Cornell Medicine, Cornell University, Doha" or "Cornell University,
- * Ithaca", where the last segment is one letters-only word that is not
- * itself an institution-tier part. This catches an unlisted trailing city
- * that `isGeographicSegment`'s finite lists don't know. Two documented
- * limits: "University of California, Davis" stays safe even though "Davis"
- * trips this marker, because `institutionNameOf`'s multi-campus re-attach
- * restores the exact "University of California, Davis" string regardless of
- * which path is taken; and a two-word trailing campus such as "New York
- * University, Abu Dhabi" is deliberately NOT treated as a marker (it stays
- * verbatim), so a multi-word unlisted city ("Yale University, New Haven") is
- * a known miss.
+ * True when `text` carries a marker a confirmed institution name never has:
+ * an echoed email address, a geographic segment (postal code, US state,
+ * listed country/state name, "City ST 12345", a street address), or a
+ * department/division-shaped sub-unit lead.
+ *
+ * Owner decision 2026-09-21 (Codex round 6): the trailing-single-word marker
+ * (added Codex round 5, removed here) is gone. It caught an unlisted
+ * trailing city ("Cornell University, Ithaca") but also misfired on a
+ * confirmed value that legitimately ends in one unlisted word — a
+ * co-affiliation ("Stanford University, Genentech") or a campus qualifier
+ * ("Weill Cornell Medicine, Qatar") — erasing real content to fix a display
+ * artifact. A trailing unlisted city is therefore a documented miss: a
+ * value like "Weill Cornell Medicine, Cornell University, Doha" is shown
+ * verbatim rather than reduced. Staff correct such values directly in the
+ * Reviewer Finder candidate edit modal's Main institution field.
  *
  * A confirmed value may legitimately contain commas of its own ("Weill Cornell
  * Medicine, Cornell University", "University of California, San Francisco")
@@ -347,11 +373,6 @@ export function looksLikeByline(text) {
   if (/\S+@\S+/.test(trimmed) || /electronic\s+address/i.test(trimmed)) return true;
   const segments = trimmed.split(/[,;]/).map((part) => part.trim()).filter(Boolean);
   if (segments.some((segment) => isGeographicSegment(segment) || SUBUNIT_SEGMENT.test(segment))) return true;
-  const lastSegment = segments[segments.length - 1];
-  if (segments.length >= 2 && lastSegment && !/\s/.test(lastSegment)
-    && /^\p{L}[\p{L}'’.-]*$/u.test(lastSegment) && !isInstitutionTierPart(lastSegment)) {
-    return true;
-  }
   return false;
 }
 
