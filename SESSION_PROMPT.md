@@ -63,13 +63,14 @@ handoffs are not part of the current `main` checkout:
    **Parked by owner decision this session** while Test Request prerequisites
    receive read-only investigation.
 2. **Test Request read-only Admin preview:**
-   `codex/test-request-preview-integration` at `b334d8a59`. Its
-   [branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/b334d8a5976f6ec29de0a28a982a802cb112fdd0/SESSION_PROMPT.md)
-   records a signed-in sandbox Preview smoke. Create/copy remains blocked by
-   the not-yet-implemented ownership-field contract, execution file policy, Stage 1 isolation,
-   and a document-bearing sandbox fixture. The owner chose read-only blocker
-   investigation as the next scope; no additional sandbox create, schema
-   operation, document copy, or production integration is authorized by it.
+   `codex/test-request-preview-integration` at `cf886221b`. Its
+   [branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/cf886221b04a72ca838cdb76a3f2c2eb5afdfe73/SESSION_PROMPT.md)
+   records the signed-in sandbox Preview smoke and the later offline owner
+   contract change. Create/copy remains blocked by the execution file policy,
+   Stage 1 isolation, a document-bearing sandbox fixture, and unresolved
+   platform provisioning/automation behavior. The owner chose a software-only
+   ownership compiler change next; no additional sandbox create, schema
+   operation, document copy, or production integration was performed.
 
 Preserve both branches and worktrees. Review and integrate each independently
 from a fresh `main` baseline only after its release scope is decided. Recheck
@@ -87,8 +88,8 @@ its owner is a `systemuser`, equals `createdby` and `owninguser`, and that user
 has the authenticated application's ID. This proves the sandbox supplied an
 application-user owner for that exact create. This readback alone did not
 establish a Production default. The owner policy is now decided below, but the
-branch's pure compiler still reports both fields as unresolved;
-no feature-branch code changed in this investigation.
+branch's pure compiler reported both fields as unresolved at that time. The
+later branch change is recorded below.
 
 [VERIFIED via `scripts/probe-request-owner.js --request=1002852` production GET at
 2026-09-23 01:26 UTC] Existing Request 1002852 is owned and was created by
@@ -109,13 +110,24 @@ human who initiated the action through the app.
 [OWNER DECISION, 2026-09-22 PT] Request 1002852 is a real GOApply portal
 application, while 1003259 is an honorarium Request made by this app suite.
 After reviewing the recommendation, the owner settled that the app suite
-should be both creator and owner of future Test Requests. [DECIDED, NOT IMPLEMENTED]
+should be both creator and owner of future Test Requests. [DECIDED; COMPILER
+IMPLEMENTED, EXECUTOR NOT BUILT]
 Have the app suite create without staff impersonation; omit `createdby`,
 `ownerid`, and `owneridtype` from the POST, and require readback that creator
 and owner are the expected app user. Keep the initiating staff actor in the
 factory run ledger rather than substituting a staff record owner. The current
 branch preview remains read-only, and production staff visibility under this
 ownership still needs verification before enablement.
+
+[VERIFIED via `codex/test-request-preview-integration` commit `cf886221b`,
+source and focused tests] The pure compiler now accepts `ownerid` and
+`owneridtype` as the two documented Dataverse-managed system-required fields,
+never places them or `createdby` in the proposed POST body, and still blocks
+unrelated unknown system-required fields. The preview service remains read-only
+and strips executable payloads while file-policy approval is absent. Three
+focused suites passed (65 tests), as did scoped lint, types, and the relevant
+document/DAL gates. This change is pushed only on the feature branch; the
+external Preview still runs its older deployment and has not been re-smoked.
 
 [VERIFIED via the 2026-09-21 sandbox rehearsal receipt; current setting not
 re-probed] Background processing was disabled and Request async workflows
