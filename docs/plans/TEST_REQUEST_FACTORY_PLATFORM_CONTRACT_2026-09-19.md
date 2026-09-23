@@ -20,7 +20,7 @@ Status: **PARTIAL: sandbox Request creation, app-owned SharePoint folder/locatio
 | Preallocated identity | `akoya_requestid`: fresh server-owned GUID, never copied. |
 | Server readback | `akoya_requestnum`: never copied or included in POST. |
 | Creator and owner | Owner-decided app-suite application user; omit `createdby`, `ownerid`, and `owneridtype` from POST. The sandbox omission/default is verified for Request 1000338. A future executor must create without staff impersonation and verify the assigned creator and owner before accepting the result. |
-| Replaced identity | Applicant uses a configured test account. Source contacts/PI/payee/memberships are omitted; later presets require dedicated test personas. |
+| Replaced identity | Applicant uses a configured test account. Source contacts/PI/payee/memberships are omitted; later presets require dedicated test personas. Reviewers are the exception (owner amendment 2026-09-23 in the design doc): synthetic reviewers are seeded from the source's reviewers with per-run, staff-editable throwaway addresses. |
 | Potential copied content | Allowlisted title, purpose and requested amount only in the initial offline compiler; never paid/awarded totals. Types and metadata limits must validate. |
 | Basic clone cycle and recipe selection | Default fiscal year and meeting date from the server-resolved source Request; ask for either missing value and permit an explicit override. Validate both and read back the final meeting date because the sandbox rule may overwrite it. Program/type and status/triage require a supported policy; source lifecycle is not inherited. The initial compiler does not implement lookup/lifecycle recipes. |
 | Required test controls | Proposed marker/run fields and both reminder booleans explicitly false; missing metadata blocks creation. |
@@ -107,7 +107,7 @@ The [schema proposal](TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md) specif
 3. The sandbox meeting-date rewrite is traced to a hard-coded active business rule, and a guarded corrective PATCH is proven on one retained fixture. Verify the combined create-plus-correction path on a future bounded run; production behavior is not inferred from the sandbox rule.
 4. Verify marker list/filter/search support and every ordinary read/worker/transport consumer. Unknown marker state must fail closed without redefining eligibility.
 5. Obtain current platform-owner evidence for create/update flows, including narrative/package overwrites and status-driven automation. Repository docs alone cannot close this gate.
-6. Establish approved test organization/personas, content boundary, retention and file limits. No identity is silently inferred from source.
+6. Establish approved test organization/personas, content boundary, retention and file limits. No identity is silently inferred from source. (2026-09-23: reviewer personas are resolved by the design's owner amendment — per-run throwaway addresses, never a real reviewer's address as a default; the test organization, applicant contacts and consultants remain open.)
 
 ## Offline verification scope
 
