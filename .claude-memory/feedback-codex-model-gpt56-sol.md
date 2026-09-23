@@ -1,13 +1,15 @@
 ---
 name: feedback-codex-model-gpt56-sol
 description: "Owner directive 2026-09-08: Codex reviews use --model gpt-5.6-sol; never gpt-6-astra (config default); ChatGPT-auth account refuses bare gpt-5.6 and gpt-5.4; catalog lives in ~/.codex/models_cache.json"
-status: active
+status: superseded
 metadata:
   node_type: memory
   type: feedback
   originSessionId: 0c3accb8-eecf-472e-924c-e629a3a49c19
   modified: 2026-09-08T15:42:51.670Z
 ---
+
+**Superseded 2026-09-23 (Session 535) by [[feedback-codex-model-gpt6-sol-high]]: the owner switched Codex work to `gpt-6-sol` at high effort.** Historical record below.
 
 ## Recall Rule
 Read before composing any Codex companion invocation (`adversarial-review`, `review`, `task`) or writing a brief that names a Codex model.

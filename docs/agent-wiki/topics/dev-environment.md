@@ -56,7 +56,7 @@ Claude config sync, and environment-specific operating notes.
 - Returning-machine sync and install safety: `feedback-returning-machine-sync-before-install`.
 - Decision log: `decision-module-typeless-warning-accept`.
 - Vercel env and deploy verification (routed here from the memory router 2026-09-17): `feedback-verify-vercel-env-with-env-ls`, `feedback-deployment-monitoring-use-inspect`, `feedback-verify-deploy-is-the-merge-build`, `feedback-no-vercel-cli-update-reminders`, `reference-vercel-sensitive-env-unreadable`, `reference-vercel-logs-filtering`.
-- Delegated Codex work (routed here from the memory router 2026-09-17; contract in `docs/AGENT_COLLABORATION_PLAN.md`): `feedback-codex-worktree-owner-runs-it`, `feedback-codex-delegation-review-vs-rescue-routing`, `reference-codex-review-needs-a-committed-diff`, `feedback-codex-model-gpt56-sol`.
+- Delegated Codex work (routed here from the memory router 2026-09-17; contract in `docs/AGENT_COLLABORATION_PLAN.md`): `feedback-codex-worktree-owner-runs-it`, `feedback-codex-delegation-review-vs-rescue-routing`, `reference-codex-review-needs-a-committed-diff`, `feedback-codex-model-gpt6-sol-high`.
 - Vercel Node 22 runtime cannot `require(esm)`; sanitize-html/jsdom pins: `project-vercel-node22-no-require-esm`, `project-jsdom-serverless-esm-incompat`.
 
 ## Operating Notes
