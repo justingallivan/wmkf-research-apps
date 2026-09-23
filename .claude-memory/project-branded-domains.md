@@ -67,9 +67,12 @@ host-selection problem.
 
 The public portal variables are `REVIEWER_PORTAL_BASE_URL` and
 `GRANTEE_PORTAL_BASE_URL`; staff auth is governed by `NEXTAUTH_URL` plus the
-Azure redirect URI and Origin/Referer check in `lib/utils/auth.js`. Preview must
-remain host-derived rather than pointing its callback at the production staff
-host. For any future change: attach DNS/alias, update the matching environment,
-redeploy, then probe navigation, callback, and a state-changing request. Sensitive
+Azure redirect URI and Origin/Referer check in `lib/utils/auth.js`. Preview
+normally remains deployment-host-derived; an exact, temporary branch-scoped
+`NEXTAUTH_URL` may point to the registered stable Preview alias for a bounded
+signed-in POST smoke (see `docs/AUTHENTICATION_SETUP.md` Step 2.4). Never point
+a Preview callback at the Production staff host. For any future change: attach
+DNS/alias, update the matching environment, redeploy, then probe navigation,
+callback, and a state-changing request. Sensitive
 variables may read back empty through `vercel env pull`; see
 [[reference-vercel-sensitive-env-unreadable]] and `docs/CREDENTIALS_RUNBOOK.md`.

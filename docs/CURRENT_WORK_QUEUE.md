@@ -70,14 +70,17 @@ sequence.
   through a Vercel alias such as `wmkfresearchapps-preview.vercel.app` returns 403
   `Forbidden` while GETs pass. Seen on the Explorer chat POST during the
   `integration/2026-09-19` Preview smoke; worked around with a branch-scoped Preview
-  `NEXTAUTH_URL` set to the alias origin. Pre-existing, not a regression. Fix
-  options: (a) document the branch-scoped `NEXTAUTH_URL` as the required step in the
-  Preview smoke runbook (`project-vercel-cli-deploy-preview-auth` and
-  `docs/AUTHENTICATION_SETUP.md`); (b) accept `VERCEL_BRANCH_URL` and a fixed
+  `NEXTAUTH_URL` set to the alias origin. Pre-existing, not a regression.
+  **Runbook option (a) documented 2026-09-23:**
+  `docs/AUTHENTICATION_SETUP.md` Step 2.4 and
+  `.claude-memory/project-vercel-cli-deploy-preview-auth.md` specify the exact
+  branch scope, new deployment, validation-only POST, and alias/environment
+  rollback. No Vercel setting or runtime allowlist changed in that docs pass.
+  Option (b), if later needed, is to accept `VERCEL_BRANCH_URL` and a fixed
   allowlist of registered alias origins alongside `VERCEL_URL`, never a request
-  header. Prefer (a) first; (b) widens a CSRF allowlist and goes through
-  `/contract-reconcile` under `docs/API_ROUTE_SECURITY_MATRIX.md`. Also remove the two
-  temporary Entra callbacks for retired Codex branch aliases while there.
+  header; it widens a CSRF allowlist and requires `/contract-reconcile` under
+  `docs/API_ROUTE_SECURITY_MATRIX.md`. Separately remove the two temporary Entra
+  callbacks for retired Codex branch aliases after checking their current use.
 - **Dependabot triage 2026-09-12 (S509).** Patch bumps (Next 16.3.5, xmldom 0.8.15,
   sharp 0.35.4, qs 6.16.0, js-yaml 3.15.2/4.3.2) and csv-parse 7.0.2 (a mistaken major
   with no breaking changes; the IRS BMF importer's option set was smoke-tested but the
