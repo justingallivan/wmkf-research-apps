@@ -804,7 +804,21 @@ production routes; a release gate asserts that the proof audience/routes cannot 
 
 Each live run needs a fresh owner-approved request and SharePoint target, any Production Dataverse
 read, an immutable Preview deployment, and any change to the shared Preview alias. Request
-`1003222` was authorized only for the completed 2026-09-22 run. Re-inspect the alias target and
+`1003222` was authorized only for the completed 2026-09-22 run. The owner corrected the next
+candidate request to `1003222`; this selection does not yet authorize a new upload. [VERIFIED
+2026-09-23 via one approved, interlock-checked Production Dataverse lookup of three GETs]
+the request GUID is `e43ae6ea-698f-f111-8076-6045bd018a07`, and its resolved governed
+library/folder is `akoya_request/1003222_E43AE6EA698FF11180766045BD018A07`.
+The location rows did not include the SharePoint site URL. The owner supplied a SharePoint link
+whose URL identifies `https://appriver3651007194.sharepoint.com/sites/akoyaGO` and the same
+governed library/folder; the page contents were not read. For the next approved run, new uploads
+create/use `Post Site Visit Materials` directly under that request folder, with the disposable
+MP4 directly inside. Existing sealed permits retain their original paths for resume/cleanup.
+An earlier approved single GET for the mistakenly supplied `1003332` returned zero exact rows;
+no document-location reads followed that result. The owner will select the MP4 when the Preview
+run is ready. The Windows Edge colleague has Meeting Tracker access and the MP4 on that PC; give them
+the staff harness link after an approved deployment, since the playback proof link lasts only
+five minutes. Re-inspect the alias target and
 branch-scoped Preview variable names before an alias change, then restore and re-inspect the exact
 prior target. Do not clear a permit or delete an item on an uncertain cleanup response; ask the
 owner before deleting each exact disposable item.
@@ -812,17 +826,18 @@ owner before deleting each exact disposable item.
 | Browser | Scenario | Expected recorded evidence | Runner |
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. New recovery code remains untested live. | Agent (receipt already recorded) |
-| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | Redacted Network trace: direct Microsoft PUT 202 ranges, no MP4 application body, 302 then Microsoft 206 ranges, one resolver action per Watch/Download, source/download byte and SHA-256 match. | Owner on another Edge device, after owner live-run approval |
+| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | Redacted Network trace: direct Microsoft PUT 202 ranges, no MP4 application body, 302 then Microsoft 206 ranges, one resolver action per Watch/Download, source/download byte and SHA-256 match. | Owner's Windows Edge colleague, after owner live-run approval |
 | macOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts and source/download byte plus SHA-256 match; note any autoplay permission prompt or playback error. | Owner by hand |
 | iPadOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts where Web Inspector is available, plus Files-app downloaded byte count/hash compared on a trusted computer; note any mobile-specific failure. | Owner by hand |
-| Edge, then one Safari | Let a paused upload session expire; attempt Resume; cleanup only after owner confirmation; start a fresh proof | 410 `presentation_media_proof_session_expired`, retained permit, exact cleanup outcome (including `placeholder_deleted` only after confirmed terminal session), new session and successful finalize; no old partial item promoted. | Owner on Edge and Safari |
-| Edge, then one Safari | Let a five-minute proof token expire; reload old link; mint a new link with Finish saving from the committed item | Old context/open refuses (401); fresh link plays and seeks; exact item identity remains stable. | Owner on Edge and Safari |
-| Desktop Edge | Upload a real MP4 near 2,000,000,000 bytes (record exact size); run long-duration seeking and Download | Session expiry, elapsed upload time, measured bytes/second, projected 2,000,000,000-byte completion before expiry with margin, seek positions, direct Microsoft 206 ranges, and size/SHA-256 match. | Owner with sanctioned media and approval |
+| Edge, then one Safari | Let a paused upload session expire; attempt Resume; cleanup only after owner confirmation; start a fresh proof | 410 `presentation_media_proof_session_expired`, retained permit, exact cleanup outcome (including `placeholder_deleted` only after confirmed terminal session), new session and successful finalize; no old partial item promoted. | Owner's Edge colleague, then owner on Safari |
+| Edge, then one Safari | Let a five-minute proof token expire; reload old link; mint a new link with Finish saving from the committed item | Old context/open refuses (401); fresh link plays and seeks; exact item identity remains stable. | Owner's Edge colleague, then owner on Safari |
+| Desktop Edge | Upload a real MP4 near 2,000,000,000 bytes (record exact size); run long-duration seeking and Download | Session expiry, elapsed upload time, measured bytes/second, projected 2,000,000,000-byte completion before expiry with margin, seek positions, direct Microsoft 206 ranges, and size/SHA-256 match. | Owner's Edge colleague with sanctioned media and approval |
 
 **Owner click sequence for macOS Safari and iPadOS Safari.** Do this separately in each browser
 with a newly approved disposable item; Safari on iPad uses the Files app for selection/download.
 [VERIFIED via Applications and Spotlight, 2026-09-23] Edge is not installed on the agent's Mac.
-The owner chose a Windows Edge device; its live result remains open.
+The owner chose a colleague's Windows Edge device and approved one disposable Edge upload to
+the corrected Request `1003222` target; its live result remains open.
 
 **Owner Edge sequence (Windows).** In Edge, open **⋯ → Help and feedback → About Microsoft Edge**
 and record its version. Press **F12**, open **Network**, enable **Preserve log**, and follow steps

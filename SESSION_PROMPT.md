@@ -22,17 +22,30 @@ record. This branch merge and offline work do not authorize a Preview deployment
 Production Dataverse read, new SharePoint upload, or cleanup deletion. Obtain a separate owner
 approval for each live run and each exact cleanup.
 
-Next: obtain separate owner approval for a bounded live run with the exact request,
-SharePoint target, approved MP4, Production Dataverse-read decision, immutable Preview deployment,
+Next: the owner corrected the next candidate to Request `1003222` and will select the MP4 when
+ready. [VERIFIED via approved interlock-checked Production Dataverse reads, 2026-09-23]
+one GET for the mistakenly supplied `1003332` returned zero rows; a newly approved bounded
+three-GET lookup resolved `1003222` to GUID `e43ae6ea-698f-f111-8076-6045bd018a07` and
+governed library/folder `akoya_request/1003222_E43AE6EA698FF11180766045BD018A07`.
+The site URL was absent from those location rows. The owner supplied a SharePoint link whose
+URL identifies `https://appriver3651007194.sharepoint.com/sites/akoyaGO` and the same folder;
+the page contents were not read. The owner specified that the next proof upload create/use
+`Post Site Visit Materials` directly under the governed request folder and place its disposable
+MP4 directly there. One Edge upload by the owner's Windows colleague was approved. The owner enabled
+`DATAVERSE_ALLOW_PROD_READS=yes` locally for that lookup and then removed it, verified by a
+configuration check;
+the agent must not change it. The prior `1003222` upload authorization remains spent. Obtain
+separate owner approval for the bounded live upload, immutable Preview deployment,
 any runtime-target settings, and a temporary alias window. [VERIFIED via read-only Vercel
 inspection 2026-09-23] the shared alias still resolved to Ready
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the presentation branch had no scoped Preview variables,
 while the Test Request branch still had its four scoped names. [VERIFIED via Applications and
-Spotlight 2026-09-23] Edge is not installed on this Mac; the owner will run its matrix cell
-on Windows Edge. That live evidence is still open.
+Spotlight 2026-09-23] Edge is not installed on this Mac; the owner's colleague has Meeting
+Tracker access and the MP4 on Windows Edge and will run that matrix cell after a shareable
+staff harness link is available. That live evidence is still open.
 Re-inspect immediately before an
 alias change and after restoration. Never set `DATAVERSE_ALLOW_PROD_READS` as this agent. The
-owner runs Edge, macOS Safari, and iPadOS Safari by hand using the plan.
+owner runs macOS/iPadOS Safari by hand, and the owner's colleague runs Edge, using the plan.
 
 The current main-branch handoff follows. Its Test Request work is owned by another checkout;
 this presentation session does not edit or run that workstream.

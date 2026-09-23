@@ -76,11 +76,11 @@ test('begin derives an exact disposable server path and returns an opaque staff-
   const result = await begin(deps);
   expect(deps.ensureFolder).toHaveBeenCalledWith(
     'akoya_request',
-    'Requests/24-1000/Artifacts/Presentation Media Proof',
+    'Requests/24-1000/Post Site Visit Materials',
   );
   expect(deps.createSession).toHaveBeenCalledWith(
     'akoya_request',
-    'Requests/24-1000/Artifacts/Presentation Media Proof',
+    'Requests/24-1000/Post Site Visit Materials',
     `${PROOF_ID}.mp4`,
     { conflictBehavior: 'fail', siteId: 'site-1', driveId: 'drive-1' },
   );
