@@ -17,6 +17,7 @@ import {
   createMaterialsCollection,
   inviteMaterialsContributors,
   remindMaterialsContributors,
+  sendReminderEmail,
 } from '../../lib/services/site-visit-materials/collection-service.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -42,4 +43,17 @@ test.each([
   expect(deps.getRequest).not.toHaveBeenCalled();
   expect(deps.getOpenCollection).not.toHaveBeenCalled();
   expect(deps.findActiveSiteVisit).not.toHaveBeenCalled();
+});
+
+test('sendReminderEmail (used by the automatic sweep) refuses a test request before sending', async () => {
+  const deps = { sendEmail: jest.fn() };
+  await expect(sendReminderEmail({
+    row: { id: 7, request_id: REQUEST_ID, contacts: {} },
+    prepared: { subject: 's', bodyText: 'b' },
+    fromEmail: 'pd@example.org',
+    actorId: ACTOR_ID,
+    sequence: 1,
+  }, deps)).rejects.toBe(refusal);
+  expect(assertRequestEmailAllowed).toHaveBeenCalledWith(REQUEST_ID);
+  expect(deps.sendEmail).not.toHaveBeenCalled();
 });

@@ -389,3 +389,27 @@ test('reviewer VIP flag SQL keys on potential_reviewer_id, never contact_id', ()
   expect(section).toContain('potential_reviewer_id');
   expect(section).not.toContain('contact_id');
 });
+
+describe('Test Request isolation (Stage 1b)', () => {
+  test('a test request row is stopped after its claim, before any mint, recovery or send', async () => {
+    const deps = { ...dependencies(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'synthetic', reason: 'marker_and_run_valid' })) };
+    const result = await deliverScheduledEmail(message().id, {}, deps);
+    expect(result.stopped).toBe(true);
+    expect(deps.resolveTestState).toHaveBeenCalledWith(message().request_id);
+    expect(deps.cancelForSource).toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled();
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an unreadable marker takes the failure path (retried later), not a permanent stop', async () => {
+    const deps = { ...dependencies(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'unknown', reason: 'read_failed' })) };
+    await expect(deliverScheduledEmail(message().id, {}, deps)).rejects.toMatchObject({ code: 'test_request_state_unknown' });
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled();
+    expect(deps.recordFailure).toHaveBeenCalled();
+  });
+});

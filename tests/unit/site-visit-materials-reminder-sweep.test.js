@@ -181,3 +181,25 @@ test('a send failure after the claim is counted and logged, not retried, and oth
   expect(d.attachEmailId).toHaveBeenCalledWith('c2', 'email-2');
   log.mockRestore();
 });
+
+describe('Test Request isolation (Stage 1b)', () => {
+  test('skips a test request row before any read, preparation, claim or send', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'synthetic', reason: 'marker_and_run_valid' })) };
+    const result = await sweepMaterialsReminders({}, d);
+    expect(result.skippedTestRequest).toBeGreaterThan(0);
+    expect(d.getRequest).not.toHaveBeenCalled();
+    expect(d.claim).not.toHaveBeenCalled();
+    expect(d.sendReminder).not.toHaveBeenCalled();
+  });
+
+  test('an unreadable marker skips the row for this run and reports it', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'unknown', reason: 'read_failed' })) };
+    const result = await sweepMaterialsReminders({}, d);
+    expect(d.claim).not.toHaveBeenCalled();
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ error: 'request could not be confirmed as ordinary' }),
+    ]));
+  });
+});

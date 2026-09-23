@@ -7,6 +7,7 @@
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
 import { assertRequestEmailAllowed } from '../../lib/services/test-requests/request-test-state.js';
+import { processAnnotations } from '../../lib/services/dynamics/annotations.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RUN_ID = '22222222-2222-4222-8222-222222222222';
@@ -126,4 +127,60 @@ describe('assertRequestEmailAllowed', () => {
     await expect(assertRequestEmailAllowed(REQUEST_ID, { resolve, env: on }))
       .rejects.toMatchObject({ httpStatus: 409, code: 'test_request_email_denied', message });
   });
+});
+
+describe('sendEmail dispatch-time recheck', () => {
+  const EMAIL_ID = '55555555-5555-4555-8555-555555555555';
+
+  // Emails are returned as Dataverse sends them and run through the real
+  // processAnnotations, exactly as getRecord does.
+  function reads({ email, request }) {
+    getRecord.mockImplementation(async (entitySet) => {
+      if (entitySet === 'emails') {
+        if (email instanceof Error) throw email;
+        return processAnnotations(email);
+      }
+      if (request instanceof Error) throw request;
+      return request;
+    });
+  }
+
+  test('refuses to send an existing activity regarding a test request', ctx(async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    reads({
+      email: { _regardingobjectid_value: REQUEST_ID, '_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'akoya_request' },
+      request: { wmkf_istestrequest: true, wmkf_testcreationrunid: RUN_ID },
+    });
+    await expect(DynamicsService.sendEmail(EMAIL_ID)).rejects.toMatchObject({ code: 'test_request_email_denied' });
+    expect(writeFetch).not.toHaveBeenCalled();
+  }));
+
+  test.each([
+    ['the activity cannot be read', new Error('boom')],
+    ['the regarding type is unknown', { _regardingobjectid_value: REQUEST_ID }],
+  ])('fails closed when %s', (_label, email) => ctx(async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    reads({ email, request: { wmkf_istestrequest: null, wmkf_testcreationrunid: null } });
+    await expect(DynamicsService.sendEmail(EMAIL_ID)).rejects.toMatchObject({ code: 'test_request_email_denied' });
+    expect(writeFetch).not.toHaveBeenCalled();
+  })());
+
+  test.each([
+    ['an ordinary request', { _regardingobjectid_value: REQUEST_ID, '_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'akoya_request' }],
+    ['no regarding record', { _regardingobjectid_value: null }],
+    ['a non-request regarding record', { _regardingobjectid_value: RUN_ID, '_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'contact' }],
+  ])('sends an activity about %s', (_label, email) => ctx(async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    writeFetch.mockResolvedValue({ ok: true });
+    reads({ email, request: { wmkf_istestrequest: null, wmkf_testcreationrunid: null } });
+    await DynamicsService.sendEmail(EMAIL_ID);
+    expect(writeFetch).toHaveBeenCalledTimes(1);
+  })());
+
+  test('does not read the activity while the switch is off', ctx(async () => {
+    writeFetch.mockResolvedValue({ ok: true });
+    await DynamicsService.sendEmail(EMAIL_ID);
+    expect(getRecord).not.toHaveBeenCalled();
+    expect(writeFetch).toHaveBeenCalledTimes(1);
+  }));
 });
