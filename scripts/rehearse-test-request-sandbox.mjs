@@ -571,6 +571,51 @@ async function getRequestLibraryParent(client) {
   return body.value[0];
 }
 
+async function correctMeetingDate(client, manifest, request, receipt) {
+  if (!guidEqual(request.akoya_requestid, manifest.values.requestId) ||
+      !guidEqual(request.wmkf_testcreationrunid, manifest.values.runId) ||
+      !guidEqual(request._createdby_value, manifest.expectedAppUserId) ||
+      !guidEqual(request._ownerid_value, manifest.expectedAppUserId) ||
+      request.wmkf_istestrequest !== true || !request['@odata.etag']) {
+    throw new Error('Fresh synthetic Request readback failed the meeting-date correction precondition.');
+  }
+  const desired = manifest.values.meetingDate;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desired)) throw new Error('Manifest meeting date is invalid.');
+  const before = request.wmkf_meetingdate || null;
+  receipt.meetingDateCorrection = { desired, before, patchAttempted: false };
+  if (String(before).slice(0, 10) === desired) return request;
+
+  receipt.meetingDateCorrection.patchAttempted = true;
+  let patched = null;
+  let patchError = null;
+  try {
+    patched = await client.patch(
+      `/akoya_requests(${request.akoya_requestid})`,
+      { wmkf_meetingdate: desired },
+      { 'If-Match': request['@odata.etag'] },
+    );
+    receipt.meetingDateCorrection.patchResponseStatus = patched.status;
+  } catch (error) {
+    patchError = error;
+    receipt.meetingDateCorrection.patchResponseError = error.message;
+  }
+  // The one-field PATCH is never retried. A lost response is reconciled by
+  // rereading the same Request and exact date/marker/owner identities.
+  const after = await getRequest(client, request.akoya_requestid);
+  receipt.meetingDateCorrection.after = after.wmkf_meetingdate || null;
+  if (!guidEqual(after.akoya_requestid, manifest.values.requestId) ||
+      !guidEqual(after.wmkf_testcreationrunid, manifest.values.runId) ||
+      after.wmkf_istestrequest !== true ||
+      !guidEqual(after._createdby_value, manifest.expectedAppUserId) ||
+      !guidEqual(after._ownerid_value, manifest.expectedAppUserId) ||
+      String(after.wmkf_meetingdate || '').slice(0, 10) !== desired) {
+    if (patchError) throw new Error('Meeting-date PATCH outcome is ambiguous; no retry is allowed.', { cause: patchError });
+    bodyOrThrow('single meeting-date correction', patched);
+    throw new Error('Meeting-date correction readback did not match the planned Request state.');
+  }
+  return after;
+}
+
 async function provisionSharePointLocation(client, manifest, request, receipt) {
   if (!guidEqual(request.akoya_requestid, manifest.values.requestId) ||
       !guidEqual(request.wmkf_testcreationrunid, manifest.values.runId) ||
@@ -697,6 +742,7 @@ function verify(manifest, preflightBefore, observation, files, foundationAfter, 
   if (!request.akoya_requestnum) failures.push('server request number missing');
   if (request.akoya_title !== manifest.createBody.akoya_title) failures.push('title mismatch');
   if (request.akoya_requesttype !== manifest.createBody.akoya_requesttype) failures.push('request type mismatch');
+  if (String(request.wmkf_meetingdate || '').slice(0, 10) !== manifest.values.meetingDate) failures.push('meeting date mismatch');
   if (!guidEqual(request._akoya_applicantid_value, manifest.expectedOrganization.accountid)) failures.push('applicant mismatch');
   if (request.wmkf_istestrequest !== true) failures.push('test marker not true');
   if (!guidEqual(request.wmkf_testcreationrunid, manifest.values.runId)) failures.push('run ID mismatch');
@@ -810,7 +856,8 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
     if (!created?.ok) bodyOrThrow('single Request create', created);
 
     const createdRequest = await getRequest(client, manifest.values.requestId);
-    await provisionSharePointLocation(client, manifest, createdRequest, receipt);
+    const datedRequest = await correctMeetingDate(client, manifest, createdRequest, receipt);
+    await provisionSharePointLocation(client, manifest, datedRequest, receipt);
 
     const observation = await observe(client, manifest.values.requestId);
     let files = null;
