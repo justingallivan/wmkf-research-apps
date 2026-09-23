@@ -1,5 +1,18 @@
 # Session 532 Prompt: Test Request preview integrated; create/copy remains blocked
 
+## Current branch update — 2026-09-22 PT
+
+[OWNER DECISION] Test Requests created by this app suite should have
+`# WMK: Research Review App Suite` as Dataverse creator and owner. Sandbox
+Request 1000338 received the authenticated application user as both after a
+POST that omitted `ownerid` and `owneridtype`; Production honorarium Request
+1003259 has the same app-suite creator/owner pattern. [SOURCE VERIFIED]
+The pure compiler now treats only those two system-required fields as
+Dataverse-managed defaults and never sends them or `createdby` in its body.
+Its focused regression test passes. This does not add an executor or a
+post-create identity check. The external branch Preview still runs an older
+deployment and was not re-smoked for this change.
+
 ## Session 531 Summary
 
 [VERIFIED via Git, Vercel CLI, signed-in browser, source, tests and gates]
@@ -39,11 +52,11 @@ production deployment or production Dataverse/SharePoint write was performed.
      path exists in this UI.
 
 3. **Live-smoke findings made explicit.**
-   - The request policy currently blocks `ownerid` and `owneridtype`: sandbox
-     metadata marks them system-required/createable, but no documented contract
-     proves safe omission as Dataverse-managed defaults or specifies an owner.
-     The UI was fixed to show blocker field names rather than duplicate generic
-     messages.
+   - At that deployment, the request policy blocked `ownerid` and
+     `owneridtype`: sandbox metadata marked them system-required/createable,
+     while their default contract was unresolved. The UI was fixed to show
+     blocker field names rather than duplicate generic messages. The current
+     source change above resolves this compiler blocker only.
    - File execution remains blocked by `FILE_POLICY_APPROVAL_REQUIRED`; preview
      hash ceilings are technical safety limits, not approved copy limits.
    - Requests 1000338 and 996142 contained no allowlisted proposal files. A
@@ -71,12 +84,11 @@ production deployment or production Dataverse/SharePoint write was performed.
 
 ### Verified Open
 
-1. **Resolve the ownership-field create contract.**
-   Evidence: signed-in preview POST and read-only service probe returned
-   `SYSTEM_REQUIRED_UNRESOLVED` for `ownerid` and `owneridtype`.
-   Confirm from authoritative Dataverse behavior/config whether both are
-   server-managed when omitted, or define the exact server-resolved owner to
-   send. Do not simply whitelist them from memory.
+1. **Verify app-suite ownership when execution is eventually built.**
+   Evidence: bounded sandbox Request 1000338 omission/readback and owner
+   decision establish the compiler exception. The future executor must create
+   without staff impersonation and verify both assigned identities by readback;
+   production staff access under app-user ownership remains unverified.
 2. **Approve the execution file policy.**
    Evidence: `FILE_POLICY_APPROVAL_REQUIRED` is intentionally added by
    `lib/services/test-requests/admin-preview-service.js`. Decide maximum file
@@ -105,7 +117,7 @@ production deployment or production Dataverse/SharePoint write was performed.
 ### Parked
 
 1. Durable run ledger, create/copy executor, resume/retire surfaces and
-   IA/materials recipes. Re-open only after Stage 1 guards, ownership defaults,
+   IA/materials recipes. Re-open only after Stage 1 guards, post-create ownership readback,
    approved file limits and a working isolated location/folder contract.
 
 ### Verify Before Acting

@@ -146,6 +146,26 @@ describe('compileTestRequestDraft', () => {
     expect(requiredUnknown.blockers.some((item) => item.code === 'SYSTEM_REQUIRED_UNRESOLVED')).toBe(true);
   });
 
+  test('omits server-managed ownership and copied creator despite required metadata', () => {
+    const result = compileTestRequestDraft(input({
+      sourceRequest: {
+        ...input().sourceRequest,
+        ownerid: 'source-owner-must-not-win',
+        owneridtype: 'team',
+        createdby: 'source-creator-must-not-win',
+      },
+      metadata: metadata({
+        ownerid: { createable: true, requiredLevel: 'SystemRequired', type: 'Owner' },
+        owneridtype: { createable: true, requiredLevel: 'SystemRequired', type: 'EntityName' },
+      }),
+    }));
+    expect(result.blockers).toEqual([]);
+    expect(result.executionReady).toBe(false);
+    expect(result.createBody).not.toHaveProperty('ownerid');
+    expect(result.createBody).not.toHaveProperty('owneridtype');
+    expect(result.createBody).not.toHaveProperty('createdby');
+  });
+
   test('missing or false createable marker/reminder metadata blocks the draft', () => {
     const missing = compileTestRequestDraft(input({
       metadata: metadata({ [TEST_REQUEST_FIXED_FIELDS.marker]: undefined }),

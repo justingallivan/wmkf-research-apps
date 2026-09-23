@@ -42,13 +42,17 @@ function compilerMetadata() {
   };
   return {
     entity: 'akoya_request',
-    fields: Object.fromEntries(Object.entries(specs).map(([field, [type, extra = {}]]) => [field, {
-      createable: true,
-      requiredLevel: 'None',
-      type,
-      ...(field === 'akoya_applicantid' ? { lookupTarget: 'accounts' } : {}),
-      ...extra,
-    }])),
+    fields: {
+      ...Object.fromEntries(Object.entries(specs).map(([field, [type, extra = {}]]) => [field, {
+        createable: true,
+        requiredLevel: 'None',
+        type,
+        ...(field === 'akoya_applicantid' ? { lookupTarget: 'accounts' } : {}),
+        ...extra,
+      }])),
+      ownerid: { createable: true, requiredLevel: 'SystemRequired', type: 'Owner' },
+      owneridtype: { createable: true, requiredLevel: 'SystemRequired', type: 'EntityName' },
+    },
   };
 }
 
@@ -229,6 +233,9 @@ test('re-resolves and hashes the selected file, but strips every executable payl
   expect(result.preview.blockers).toContainEqual(expect.objectContaining({
     code: 'FILE_POLICY_APPROVAL_REQUIRED',
     scope: 'files',
+  }));
+  expect(result.preview.blockers).not.toContainEqual(expect.objectContaining({
+    code: 'SYSTEM_REQUIRED_UNRESOLVED',
   }));
   expect(result.preview.preview.request.authoritative).toBe(false);
   expect(result.preview.preview.request).not.toHaveProperty('body');
