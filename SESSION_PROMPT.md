@@ -29,7 +29,7 @@ inspection 2026-09-23] the shared alias still resolved to Ready
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the presentation branch had no scoped Preview variables,
 while the Test Request branch still had its four scoped names. [VERIFIED via Applications and
 Spotlight 2026-09-23] Edge is not installed on this Mac; the owner will run its matrix cell
-on another Edge device. That live evidence is still open.
+on Windows Edge. That live evidence is still open.
 Re-inspect immediately before an
 alias change and after restoration. Never set `DATAVERSE_ALLOW_PROD_READS` as this agent. The
 owner runs Edge, macOS Safari, and iPadOS Safari by hand using the plan.

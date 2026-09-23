@@ -822,14 +822,19 @@ owner before deleting each exact disposable item.
 **Owner click sequence for macOS Safari and iPadOS Safari.** Do this separately in each browser
 with a newly approved disposable item; Safari on iPad uses the Files app for selection/download.
 [VERIFIED via Applications and Spotlight, 2026-09-23] Edge is not installed on the agent's Mac.
-The owner chose another Edge device; its live result remains open.
+The owner chose a Windows Edge device; its live result remains open.
 
-**Owner Edge sequence.** On the separate Edge device, follow steps 1, 2, 4, 5, and 6 below
-with the same approved target and a fresh disposable item. For step 3, right-click
+**Owner Edge sequence (Windows).** In Edge, open **⋯ → Help and feedback → About Microsoft Edge**
+and record its version. Press **F12**, open **Network**, enable **Preserve log**, and follow steps
+1, 2, 4, 5, and 6 below with the same approved target and a fresh disposable item. For step 3,
+right-click
 **Open proof page** and select **Copy link**; open Edge's **⋯ → New InPrivate window**,
 paste the link, then perform both Watch modes and seeks as described. In Edge DevTools,
-open **Network**, enable **Preserve log**, and record only redacted method/status/origin/range/
-byte-count facts. Do not share a Network archive that contains bearer URLs.
+record only redacted method/status/origin/range/byte-count facts. Do not share a Network archive
+that contains bearer URLs. In PowerShell, run
+`(Get-Item -LiteralPath 'C:\path\to\source.mp4').Length` and
+`(Get-FileHash -Algorithm SHA256 -LiteralPath 'C:\path\to\source.mp4').Hash`, then repeat with
+the downloaded file's actual path; record both byte counts and hashes, not the file bytes.
 
 1. Open the owner-approved immutable Preview origin and sign in to Meeting Tracker. Open
    `/meeting-tracker/presentation-media-proof`. In macOS Safari Web Inspector (or paired iPad Web
