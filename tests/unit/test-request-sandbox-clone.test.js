@@ -173,6 +173,10 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain('receipt.observationStartedAt = new Date().toISOString()');
     expect(script).toContain('expectedSharePointFolder: expectedFolder');
     expect(script).toContain('postCreateStepsSkippedReason =');
+    expect(script).toContain('restoreManualRecheckRequired = true');
+    expect(script).toContain('Workflow ID: ${receipt.goverifyBypass.workflowId}.');
+    expect(script).toContain('isGoverifyDeactivationUncertain(receipt.goverifyBypass)');
+    expect(script).toContain('restoreVerified = true');
     expect(script).toContain('signalFence?.dispose()');
     expect(script).toContain('client.postWithOptions');
     const mainBody = script.slice(script.indexOf('async function main()'), script.indexOf('main().catch'));

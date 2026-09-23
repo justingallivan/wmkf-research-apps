@@ -24,7 +24,11 @@ import {
   reserveRehearsalReceipt,
   updateRehearsalReceipt,
 } from '../lib/services/test-requests/rehearsal-receipt.js';
-import { createBypassSignalFence, throwIfInterrupted } from '../lib/services/test-requests/bypass-signal-fence.js';
+import {
+  createBypassSignalFence,
+  isGoverifyDeactivationUncertain,
+  throwIfInterrupted,
+} from '../lib/services/test-requests/bypass-signal-fence.js';
 import {
   assertCopiedSourceValues,
   assertSourceUnchanged,
@@ -954,6 +958,7 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
           originalVersionNumber: workflowBefore.versionnumber,
           deactivationAttemptedAt: new Date().toISOString(),
           restored: false,
+          restoreVerified: false,
         };
         signalFence = createBypassSignalFence();
         // From this point forward a failed or ambiguous PATCH still requires
@@ -961,6 +966,8 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
         goverifyRestoreRequired = true;
         updateRehearsalReceipt(receiptPath, receipt);
         throwIfInterrupted(signalFence);
+        receipt.goverifyBypass.deactivationPatchAttemptedAt = new Date().toISOString();
+        updateRehearsalReceipt(receiptPath, receipt);
         const workflowDeactivated = await setGoverifyWorkflowState(
           client,
           workflowBefore,
@@ -1010,6 +1017,19 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
           }
           let workflowRestored;
           try {
+            if (isGoverifyDeactivationUncertain(receipt.goverifyBypass)) {
+              const reason = 'GoVerify deactivation PATCH was attempted but its inactive state was not verified; the server may still commit it. Manually recheck the workflow before resuming.';
+              receipt.goverifyBypass.restoreVerified = false;
+              receipt.goverifyBypass.restoreManualRecheckRequired = true;
+              receipt.goverifyBypass.restoreManualRecheckReason = reason;
+              receipt.goverifyBypass.restoreError = reason;
+              if (receipt.createAttempted) {
+                receipt.postCreateStepsSkipped = true;
+                receipt.postCreateStepsSkippedReason = reason;
+              }
+              updateRehearsalReceipt(receiptPath, receipt);
+              throw new Error(`${reason} Workflow ID: ${receipt.goverifyBypass.workflowId}.`);
+            }
             const restoreOptions = { timeoutMs: BYPASS_REQUEST_TIMEOUT_MS };
             const workflowCurrent = await getGoverifyWorkflow(client, restoreOptions);
             workflowRestored = workflowCurrent;
@@ -1028,14 +1048,16 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
           } catch (error) {
             receipt.goverifyBypass.restoreError = error.message;
             receipt.goverifyBypass.restored = false;
+            receipt.goverifyBypass.restoreVerified = false;
             if (receipt.createAttempted) {
               receipt.postCreateStepsSkipped = true;
-              receipt.postCreateStepsSkippedReason = 'GoVerify restoration failed; inspect the destination Request by its preallocated GUID.';
+              receipt.postCreateStepsSkippedReason ||= 'GoVerify restoration failed; inspect the destination Request by its preallocated GUID.';
             }
             updateRehearsalReceipt(receiptPath, receipt);
             throw error;
           }
           receipt.goverifyBypass.restored = true;
+          receipt.goverifyBypass.restoreVerified = true;
           receipt.goverifyBypass.restoredAt = new Date().toISOString();
           receipt.goverifyBypass.restoredVersionNumber = workflowRestored.versionnumber;
           updateRehearsalReceipt(receiptPath, receipt);
