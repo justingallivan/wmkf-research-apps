@@ -1,14 +1,14 @@
 /**
- * The Test Request marker and run ID are set only when the factory creates a
- * request. Every update path (updateRecord, and PATCH operations inside a
- * changeset) must refuse a body that names either field, before any network
- * write. Only `fetch` is mocked; the real write helpers run inside a trusted
+ * No deployed app path may write the Test Request marker or run ID. Every
+ * write path (createRecord, updateRecord, and POST/PATCH operations inside a
+ * changeset, in any URL form) must refuse a body that names either field,
+ * before any network write. Only `fetch` is mocked; the real write helpers run inside a trusted
  * DAL context, as in dynamics-service-write-core.test.js.
  */
 
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
-import { assertTestRequestMarkerNotUpdated } from '../../lib/services/test-requests/isolation.js';
+import { assertTestRequestMarkerNotWritten } from '../../lib/services/test-requests/isolation.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RUN_ID = '22222222-2222-4222-8222-222222222222';
@@ -45,7 +45,7 @@ beforeEach(() => {
   });
 });
 
-describe('assertTestRequestMarkerNotUpdated', () => {
+describe('assertTestRequestMarkerNotWritten', () => {
   test.each([
     ['clearing the marker', { wmkf_istestrequest: null }],
     ['setting the marker false', { wmkf_istestrequest: false }],
@@ -53,12 +53,12 @@ describe('assertTestRequestMarkerNotUpdated', () => {
     ['clearing the run ID', { wmkf_testcreationrunid: null }],
     ['a differently cased key', { WMKF_IsTestRequest: null }],
   ])('refuses %s on akoya_requests', (_label, data) => {
-    expect(() => assertTestRequestMarkerNotUpdated('akoya_requests', data))
+    expect(() => assertTestRequestMarkerNotWritten('akoya_requests', data))
       .toThrow(expect.objectContaining({ code: 'test_request_marker_immutable' }));
   });
 
   test('matches the entity set with a leading slash or different case', () => {
-    expect(() => assertTestRequestMarkerNotUpdated('/Akoya_Requests', { wmkf_istestrequest: null })).toThrow();
+    expect(() => assertTestRequestMarkerNotWritten('/Akoya_Requests', { wmkf_istestrequest: null })).toThrow();
   });
 
   test.each([
@@ -66,7 +66,7 @@ describe('assertTestRequestMarkerNotUpdated', () => {
     ['another entity that happens to use the name', 'contacts', { wmkf_istestrequest: true }],
     ['a missing body', 'akoya_requests', undefined],
   ])('allows %s', (_label, entitySet, data) => {
-    expect(() => assertTestRequestMarkerNotUpdated(entitySet, data)).not.toThrow();
+    expect(() => assertTestRequestMarkerNotWritten(entitySet, data)).not.toThrow();
   });
 });
 
@@ -87,7 +87,16 @@ describe('DynamicsService write paths', () => {
     expect(writes[0][1].method).toBe('PATCH');
   }));
 
-  test('createRecord may set the marker and run ID (factory create)', ctx(async () => {
+  test('createRecord refuses a request create that sets the marker (no forged test requests)', ctx(async () => {
+    await expect(DynamicsService.createRecord('akoya_requests', {
+      akoya_requestid: REQUEST_ID,
+      wmkf_istestrequest: true,
+      wmkf_testcreationrunid: RUN_ID,
+    })).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+    expect(dataverseWrites()).toHaveLength(0);
+  }));
+
+  test('createRecord still sends an ordinary request create', ctx(async () => {
     fetch.mockImplementation((url) => {
       if (typeof url === 'string' && url.includes('login.microsoftonline.com')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 'tok', expires_in: 3600 }) });
@@ -100,18 +109,22 @@ describe('DynamicsService write paths', () => {
         text: () => Promise.resolve(JSON.stringify({ akoya_requestid: REQUEST_ID })),
       });
     });
-    await DynamicsService.createRecord('akoya_requests', {
-      akoya_requestid: REQUEST_ID,
-      wmkf_istestrequest: true,
-      wmkf_testcreationrunid: RUN_ID,
-    });
+    await DynamicsService.createRecord('akoya_requests', { akoya_requestid: REQUEST_ID });
     expect(dataverseWrites()[0][1].method).toBe('POST');
   }));
 
-  test('a changeset PATCH that names the marker is refused before the batch is sent', ctx(async () => {
-    await expect(DynamicsService.executeChangeset([
-      { method: 'PATCH', url: `akoya_requests(${REQUEST_ID})`, body: { wmkf_testcreationrunid: null } },
-    ])).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
-    expect(dataverseWrites()).toHaveLength(0);
-  }));
+  test.each([
+    ['relative PATCH', 'PATCH', `akoya_requests(${REQUEST_ID})`],
+    ['absolute PATCH', 'PATCH', `https://example.crm.dynamics.com/api/data/v9.2/akoya_requests(${REQUEST_ID})`],
+    ['alternate-key upsert with a slash in the key', 'PATCH', "akoya_requests(akoya_requestnum='10/03')"],
+    ['relative POST create', 'POST', 'akoya_requests'],
+    ['absolute POST create', 'POST', 'https://example.crm.dynamics.com/api/data/v9.2/akoya_requests'],
+  ])('a changeset %s that names the marker is refused before the batch is sent', (_label, method, url) => (
+    bypassDynamicsRestrictions('test:test-request-marker-write-guard', async () => {
+      await expect(DynamicsService.executeChangeset([
+        { method, url, body: { wmkf_testcreationrunid: null } },
+      ])).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(dataverseWrites()).toHaveLength(0);
+    })
+  ));
 });

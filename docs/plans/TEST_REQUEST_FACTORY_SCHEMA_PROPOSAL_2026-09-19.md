@@ -18,7 +18,7 @@ The local implementation adds an isolated `extensions-on-existing` wave named `w
 | Createable | Preflight absence/spec first; verify `IsValidForCreate` in post-apply target metadata before enabling any factory write |
 | True/false labels | `Test request` / `Ordinary request` |
 | Initial create value | `true`, supplied by the server-side factory in the same request INSERT |
-| Update policy | Set only at create. Every app update path refuses a PATCH that names the field (`assertTestRequestMarkerNotUpdated`, wired into `DynamicsService.updateRecord` and changeset PATCHes, 2026-09-23) |
+| Update policy | Written only by the factory's creator (today the local operator CLI). Every deployed app write path refuses a create or update body that names the field (`assertTestRequestMarkerNotWritten`, wired into `DynamicsService.createRecord`, `updateRecord` and changeset POST/PATCH, 2026-09-23) |
 
 The default false is a compatibility proposal for ordinary rows, not proof that existing rows will return false. Schema preflight and post-apply readback must establish that behavior before guard rollout. Readers must distinguish an authoritative selected value from a missing projection, absent schema or failed query. Test-only operations require marker true plus valid matching run ownership; verified ordinary false rows do not require a run ID. The default does not suppress plugins or flows.
 
@@ -34,7 +34,7 @@ The default false is a compatibility proposal for ordinary rows, not proof that 
 | Default | none |
 | Createable | Preflight absence/spec first; verify `IsValidForCreate` in post-apply target metadata before enabling any factory write |
 | Initial create value | server-owned run UUID, same INSERT as the marker |
-| Update policy | Immutable after create: the same write guard refuses any PATCH that names it; never accepted from a browser payload |
+| Update policy | Same write guard: no deployed app create or update may name it; never accepted from a browser payload |
 
 The field is a correlation/ownership key, not an alternate request number or an authorization token. The operation ledger remains the durable authority for the run; this request field is only a bounded Dataverse-side join. No alternate key is proposed: uniqueness is per factory ledger/run and must not be inferred from a Dataverse field without an explicit concurrency design.
 
