@@ -708,3 +708,44 @@ describe('drainReviewerAcceptanceJobs', () => {
     expect(d.jobs.recordReviewerAcceptanceJobFailure).not.toHaveBeenCalled();
   });
 });
+
+describe('processReviewerAcceptanceJob — Test Request isolation (Stage 1b)', () => {
+  function followUps(d) {
+    return [d.ensureHonorarium, d.ensureAcceptedContact, d.captureOrcid, d.captureIdentity,
+      d.syncNameTitle, d.autoLinkAccount, d.sendAcceptanceEmail];
+  }
+
+  it('cancels every follow-up (Contact, identity, honorarium/BILL, email) for a test request', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'synthetic', reason: 'marker_and_run_valid' })) };
+    const result = await processReviewerAcceptanceJob(job(), d);
+    expect(result).toMatchObject({ status: 'cancelled', reason: 'test_request_followup_skipped' });
+    expect(d.jobs.cancelReviewerAcceptanceJob).toHaveBeenCalledWith(
+      expect.anything(), 'test_request_followup_skipped', expect.any(Object),
+    );
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+  });
+
+  it('retries, rather than cancels, when the request marker cannot be read', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'unknown', reason: 'read_failed' })) };
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({ retryable: true });
+    expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+  });
+
+  it('runs the normal follow-up for an ordinary request with the switch on', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'ordinary', reason: 'marker_null_and_run_null' })) };
+    await processReviewerAcceptanceJob(job(), d);
+    expect(d.ensureHonorarium).toHaveBeenCalled();
+    expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('does not read the marker while the switch is off', async () => {
+    const d = { ...deps(), isolationEnabled: () => false, resolveTestState: jest.fn() };
+    await processReviewerAcceptanceJob(job(), d);
+    expect(d.resolveTestState).not.toHaveBeenCalled();
+    expect(d.ensureHonorarium).toHaveBeenCalled();
+  });
+});
