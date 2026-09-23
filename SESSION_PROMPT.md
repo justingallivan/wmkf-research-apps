@@ -50,6 +50,33 @@ by hand. Event 834 is the same shape, tagged `preview`.
 
 ## Next Items
 
+### Preserved branch workstreams — 2026-09-22 coordination update
+
+[VERIFIED via Git and GitHub] Two clean, pushed Codex branches remain separate
+from `main`, with no open pull requests. Their implementation and branch-specific
+handoffs are not part of the current `main` checkout:
+
+1. **Presentation-media transport proof:** `codex/feature-request` at
+   `703b8e76c`. The [branch closeout](https://github.com/justingallivan/wmkf-research-apps/blob/703b8e76c31c26468cb2a76856f2d0d10ba61762/docs/plans/CODEX_WORKSTREAM_CLOSEOUT_2026-09-22.md)
+   records a successful Chrome proof and the remaining browser, reload, expiry,
+   and large-file checks. The Preview harness is not a production feature.
+   **Parked by owner decision this session** while Test Request prerequisites
+   receive read-only investigation.
+2. **Test Request read-only Admin preview:**
+   `codex/test-request-preview-integration` at `b334d8a59`. Its
+   [branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/b334d8a5976f6ec29de0a28a982a802cb112fdd0/SESSION_PROMPT.md)
+   records a signed-in sandbox Preview smoke. Create/copy remains blocked by
+   the ownership-field contract, execution file policy, Stage 1 isolation,
+   and a document-bearing sandbox fixture. The owner chose read-only blocker
+   investigation as the next scope; no additional sandbox create, schema
+   operation, document copy, or production integration is authorized by it.
+
+Preserve both branches and worktrees. Review and integrate each independently
+from a fresh `main` baseline only after its release scope is decided. Recheck
+the shared Preview alias and branch-scoped configuration before any change;
+the branch handoffs' external-state observations were not re-probed in this
+coordination update.
+
 ### Verified Open
 
 1. **First natural production proof of PR #325.**
@@ -74,9 +101,11 @@ by hand. Event 834 is the same shape, tagged `preview`.
 
 ### Verify Before Acting
 
-- Older carryovers (Connor/Test Request Factory, cache telemetry, reviewer
-  follow-ups) were not re-probed this session or last; use their plans and live
-  checks.
+- For the Test Request workstream above, verify current source and sandbox
+  behavior before resolving a blocker; its branch handoff is historical
+  evidence, not a live-state probe for this session.
+- Older unrelated carryovers (cache telemetry, reviewer follow-ups) were not
+  re-probed this session or last; use their plans and live checks.
 
 ### Do Not Reopen Without New Decision
 
