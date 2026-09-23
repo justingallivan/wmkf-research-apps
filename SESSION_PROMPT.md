@@ -1,4 +1,63 @@
-# Session 533 Prompt: Test Request app-owned folder and location proven in sandbox
+# Session 534 Prompt: Continue Test Request Factory from source-cycle policy
+
+## Session 533 Summary — 2026-09-23 PT
+
+[VERIFIED via branch source, focused tests, gates, build, Git and remote ref] The
+owner clarified that new Test Requests should use the current cycle so they
+remain visible. The Basic clone now defaults fiscal year and meeting date from
+the server-resolved source Request. The form asks for either missing value and
+allows an explicit edit; unchanged values are omitted from POST so the server
+re-reads the source rather than trusting a browser echo. Missing or invalid
+values block the compiler. Commit `efeef1234` is pushed on
+`codex/test-request-preview-integration`; the worktree is clean.
+
+The separate sandbox rehearsal script no longer defaults to artificial
+`December 2099` / `2099-12-01`. Preparing a new manifest requires an explicit
+fiscal year and meeting date. The historical 2099 receipts remain evidence of
+the earlier bounded experiment, not a product date requirement. The preview
+remains read-only; no new Request was created or production capability deployed
+in this session.
+
+### Commits
+
+- `efeef1234` — Use source cycle for Test Request previews (integration branch)
+
+### Next Items
+
+**Verified open:** Continue the Basic clone from the
+[branch design](https://github.com/justingallivan/wmkf-research-apps/blob/efeef1234a2b71b61d60b7d8d29262b8cb6eb48a/docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md)
+and [Stage 0 contract](https://github.com/justingallivan/wmkf-research-apps/blob/efeef1234a2b71b61d60b7d8d29262b8cb6eb48a/docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md).
+The app-owned sandbox folder/location path is proven. Stage 1 synthetic
+isolation, production automation suppression, duplicate-location policy,
+execution file limits, and a document-bearing source remain before production
+creation/copy can be enabled. The sandbox meeting-date correction is proven on
+one retained Request; a combined fresh create-plus-correction run has not been
+performed. Do not reopen the date-default choice or ask the owner to create
+folders manually.
+
+**Owner decision needed:** None for date selection. Ask for a source Request
+only when an actual creation run is ready and a source has not already been
+selected.
+
+**Verify before acting:** The branch Admin Preview deployed earlier still runs
+an older commit; do not describe `efeef1234` as live. Recheck target, source
+cycle, and platform state before any fresh create. This main-branch handoff is
+documentation only; runtime code remains on the integration branch.
+
+### Key Files and Testing
+
+The branch changed `lib/services/test-requests/preview.js`,
+`pages/api/admin/test-requests/preview.js`,
+`shared/components/admin/TestRequestPreviewSection.js`, and
+`scripts/rehearse-test-request-sandbox.mjs`, with focused tests and the two
+factory plan documents. Four focused suites passed (47 tests), scoped ESLint,
+the production build, API-route and route-service gates with self-tests,
+doc-currency and fact-consistency gates with self-tests, and docs catalog.
+The claim-evidence pilot report could not read its local state; no observation
+was inferred. No DEVELOPMENT_LOG milestone is required: this corrects branch
+policy and has not shipped a production capability.
+
+## Prior Session 533 Prompt: Test Request app-owned folder and location proven in sandbox
 
 ## Session 532 Test Request update — 2026-09-22/23 PT
 
