@@ -9,6 +9,8 @@ metadata:
   modified: 2026-09-08T15:42:51.670Z
 ---
 
+**2026-09-23 (Session 535):** the owner asked for `gpt-6-sol` (high). Codex refused it twice, on CLI 0.153.x and after the owner updated to 0.156.1: "The 'gpt-6-sol' model is not supported when using Codex with a ChatGPT account." Per the owner's instruction the rule stays `--model gpt-5.6-sol`. Review commands accept `--model` but not `--effort` (their effort comes from `~/.codex/config.toml`, which sets `model_reasoning_effort = "high"`); for `task`, pass `--effort high`. `~/.codex/config.toml` currently names `gpt-6-sol` as its default, so never rely on the default — always pass `--model`.
+
 ## Recall Rule
 Read before composing any Codex companion invocation (`adversarial-review`, `review`, `task`) or writing a brief that names a Codex model.
 
