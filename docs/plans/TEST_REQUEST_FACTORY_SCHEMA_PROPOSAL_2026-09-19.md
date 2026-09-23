@@ -93,7 +93,7 @@ The read-only process-definition census also found environment differences in ac
 
 ## Minimum Stage 1 ordinary consumer inventory
 
-Stage 1 must add marker-aware reads/guards at the following exact source surfaces. `shared/config/workbenchVisibility.js` remains the business eligibility contract and should not be changed to hide tests; marker exclusion is a separate filter/resolver layer.
+**Superseded in part by owner decisions 8–9 (design doc, 2026-09-23).** Test requests are shown in Workbench lists and search with a TEST badge, and ordinary actions (including Reviewer Finder and staff-clicked AI generation) work on them. Rows below that say to exclude marked rows from Workbench or Reviewer Finder lists, or to deny ordinary or provider actions, no longer apply; exclusion now covers only reports, exports and cycle totals, and denial covers payments/BILL, Contact promotion, email (see *Reviewer email confinement*) and scheduled jobs. The design doc's *Stage 1 decisions and plan* is the current Stage 1 scope. Stage 1 must add marker-aware reads/guards at the following exact source surfaces. `shared/config/workbenchVisibility.js` remains the business eligibility contract and should not be changed to hide tests; marker exclusion is a separate filter/resolver layer.
 
 ### Lists, search, aggregates and exports
 

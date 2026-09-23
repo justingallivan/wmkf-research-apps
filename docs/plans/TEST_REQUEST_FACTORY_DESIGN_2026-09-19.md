@@ -64,6 +64,26 @@ The original isolation section stands and gains these consumers. [VERIFIED via s
 
 Each stage is a separate commit with a Codex adversarial review before acceptance.
 
+### Stage 1 decisions and plan (2026-09-23, Session 535)
+
+8. **[OWNER DECISION] Visibility.** Test requests appear everywhere in the Workbench (dashboard, search, lists) with a clear TEST badge. Reports, exports and cycle totals exclude them. This supersedes the original "excluded from normal queues, dashboards … by default" rule in *Isolation before the first create*.
+9. **[OWNER DECISION] Actions.** Workflows behave normally on test requests, including Reviewer Finder and staff-clicked AI generation (which spends credits). Always blocked: payments/BILL onboarding, CRM Contact promotion, email other than to synthetic reviewers, and scheduled jobs. This supersedes the original denials of ordinary actions and provider generation on marked requests.
+
+**[VERIFIED via a read-only sandbox query, 2026-09-23] Existing requests read back `null`, not `false`.** In the sandbox, where `wmkf_istestrequest` is applied, 5,000+ `akoya_request` rows (the count caps at 5,000) have a null marker, zero are `false`, and two (the rehearsal requests) are `true`; the default did not populate existing rows. [ASSUMED] Production will behave the same once the field is added. Because only the factory ever writes the marker, and always `true` in the initial INSERT, a null or false marker with a null run ID is classified ordinary. `unknown` (fail closed) is reserved for a missing projection, a failed read or an invalid value. Production does not yet have the field and any query selecting it would fail, so the production schema apply (owner authorization required) must precede deploying code that selects it.
+
+**Stage 1 simplification.** No synthetic reviewer can exist before the synthetic-reviewer recipe, which follows the run ledger. Stage 1 therefore denies **all** email concerning a marked request at the delivery seam; the reviewer-engagement exception, synthetic-person marker and address matching ship with that recipe.
+
+Stage 1 slices, each a separate commit with tests, relevant gates and a Codex adversarial review:
+
+| Slice | Scope |
+|---|---|
+| 1a. Marker read contract | Classifier rule above; a server resolver that reads marker and run ID for a request ID and returns the classification; tests including null legacy rows, missing projection and failed read. No behavior change for callers yet. |
+| 1b. Hard blocks | Default-deny email at the shared delivery seam for marked requests, with early denial in direct and scheduled grantee paths and materials invite/remind; the mechanically derived sender-census gate; acceptance-drain Contact promotion and BILL onboarding skipped for marked requests; honorarium orchestrator refuses marked requests. |
+| 1c. Scheduled jobs | Census of every scheduled job that selects requests or reviewer suggestions (`vercel.json` crons); marked requests skipped at candidate selection, before claims, tokens, provider calls or sends. |
+| 1d. Visibility | TEST badge on the Workbench request header, dashboard rows and search results; marked requests excluded from reports, exports and cycle totals (for example awardees and cycle export). Lists and search show them. |
+
+Rollout: sandbox-backed Preview first; production schema apply (owner-authorized) before any production deploy that selects the marker; then production deploy.
+
 ## Outcome and user flow
 
 From an existing request, an administrator selects **Create test request**. A short wizard asks for a test label, starting point, selected documents, and staff-controlled test identities. It previews exactly what will be copied, reset, created, and omitted, including the destination environment. One **Create test request** action produces a new request and opens it in the Workbench with a persistent TEST banner and a link to its creation receipt.
@@ -140,9 +160,9 @@ Server enforcement:
 
 - `requireSuperuser(req, res)` plus normal source-request read authorization on preview, create, resume, inspect and retire. Creating a clone must not bypass source program/access restrictions.
 - Keep business eligibility functions `isVisibleRequestRow`, `buildVisibilityFilter`, and `assertSchedulableRequest` unchanged: eligible test fixtures must still pass their stage/date rules. Apply separate synthetic exclusion fragments at ordinary OData list and FetchXML aggregate callers, and a server-side request resolver for direct-ID access. Inventory Dataverse Search separately: server-side marker filtering requires verified field support/indexing; if unavailable, use a bounded supported query with correct paging/count semantics or keep that capability blocked—never fetch a page then silently filter it while claiming complete counts. The historical Quick Find change failure means indexing cannot be assumed.
-- Test requests excluded from normal queues, dashboards, aggregates and exports by default; admin Test Requests view and explicit admin test mode expose them. Direct-ID routes also enforce test visibility; hiding list rows alone is insufficient. Unknown marker state fails closed in the test tool.
+- (Superseded by owner decision 8, 2026-09-23: test requests are shown in lists and search with a TEST badge; only reports, exports and cycle totals exclude them.) Test requests excluded from normal queues, dashboards, aggregates and exports by default; admin Test Requests view and explicit admin test mode expose them. Direct-ID routes also enforce test visibility; hiding list rows alone is insufficient. Unknown marker state fails closed in the test tool.
 - Background workers skip test requests by default. Deliberate AI/payment testing is outside V1; no generic client `testMode` escape hatch. Test collection setup creates no send job or email activity. (Amended 2026-09-23: reviewer email to the run's recorded throwaway addresses is in scope; see *Isolation additions required by this amendment*.)
-- Ordinary synchronous calendar/payment/provider-generation actions on marked requests are denied in V1. Reviewer invite/remind actions are confined to synthetic reviewers' recorded throwaway addresses (amended 2026-09-23; see *Isolation additions required by this amendment*); other email on marked requests remains denied. Resolve marker state before dispatch; an unavailable required check fails closed. Deploy schema/readiness support before enabling these guards, preserving normal behavior for verified non-test requests. No client-controlled exemption.
+- (Amended by owner decision 9, 2026-09-23: ordinary actions and staff-clicked provider generation work on test requests; payments/BILL, Contact promotion, non-synthetic email and scheduled jobs stay blocked.) Ordinary synchronous calendar/payment/provider-generation actions on marked requests are denied in V1. Reviewer invite/remind actions are confined to synthetic reviewers' recorded throwaway addresses (amended 2026-09-23; see *Isolation additions required by this amendment*); other email on marked requests remains denied. Resolve marker state before dispatch; an unavailable required check fails closed. Deploy schema/readiness support before enabling these guards, preserving normal behavior for verified non-test requests. No client-controlled exemption.
 - Each supported synchronous test action verifies the request marker, operation ownership and allowed test identity/target again. Synthetic status does not weaken ordinary auth or target interlocks.
 - Retiring a fixture first blocks new activity and revokes its links, then reconciles exact owned resources. No delete-by-prefix, source traversal, or deletion of shared test personas.
 
