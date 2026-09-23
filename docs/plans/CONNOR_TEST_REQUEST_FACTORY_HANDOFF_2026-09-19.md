@@ -1,63 +1,22 @@
 # Connor handoff — Test Request Factory platform gates
 
-Status: **PLATFORM-OWNER EVIDENCE REQUESTED; PRODUCTION ENABLEMENT BLOCKED.** Connor was emailed by the owner; response is pending. This handoff records the bounded questions that must be answered before the separate `codex/test-request-design` branch can move beyond offline implementation. It authorizes no schema apply, request creation, file creation, email, deployment, or push.
+Status: **CONNOR ANSWERED 2026-09-21; ONE MARKED SANDBOX REQUEST CREATED; DOCUMENT-WORKFLOW REHEARSAL AND PRODUCTION ENABLEMENT REMAIN BLOCKED.** This main-branch page replaces the original pending-response question set. The [feature-branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/cf886221b04a72ca838cdb76a3f2c2eb5afdfe73/docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md) contains the full answer, manifests, receipts, and read-only Admin preview result. The original questions remain in this file's Git history; they are no longer a request to ask Connor again.
 
-## Current scope and evidence
+## Settled guidance and existing documentation
 
-The factory is an admin-only synthetic fixture tool, separate from the shipped GraphService release. The implementation branch is `codex/test-request-design` at `/Users/gallivan/.codex/worktrees/test-request-design/WMKF_Apps`; the active design and Stage 0 contract are:
+- [OWNER-REPORTED CONNOR RESPONSE, 2026-09-21] No automation sends email without user input; a payment is created when Phase II status changes to `Recommended`; organization contacts can be updated by automation. Connor recommended using the **W. M. Keck Foundation** account instead of a real grantee. He said app-principal Request creation is theoretically possible, a new Request should automatically receive a linked SharePoint folder, and Bill.com/other Akoya flows relevant to this rehearsal are manual or Request-value-only. These are platform-owner statements, not proof of behavior under every trigger or environment.
+- [OWNER DECISION] Each factory run must create a fresh Request GUID, number, document location, SharePoint folder, and file history. Existing Requests are source inputs, never reset-in-place destinations. The app suite should create and own synthetic Requests; omit staff impersonation and owner fields from the proposed create body, then verify creator and owner on readback. Keep the initiating staff actor in the proposed run ledger. The feature branch implements only the pure compiler part of this owner decision; it has no create executor.
+- [DOCUMENTED FILE MODEL] `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and `docs/atlas/dataverse-akoya-request.md` already identify the active `akoya_request` library, the `sharepointdocumentlocation` relationship, and folder pattern `{requestNumber}_{requestGuidNoHyphensUpper}`. The folder layout is known; the component and trigger that provision a **new** linked location remain unidentified.
+- [EXISTING FIXTURE] `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` records production Request **1002788** as a purpose-built, Connor-created test Request under W. M. Keck Foundation. It is a reference fixture for read-only comparison, not authorization to reset it or use it as a new factory destination.
 
-- `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`
-- `docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md`
+## What the controlled sandbox rehearsal established
 
-The accepted local slice is an inert policy/compiler and isolation work only. It has no runtime caller, route, UI, ledger, schema rollout, or live creation path. Stage 0 metadata and automation receipts are source/metadata evidence, not proof of tenant readiness.
+The owner authorized a sandbox-only schema apply and bounded create. Four isolation/reminder fields were applied in sandbox. The first POST rolled back after a GoVerify workflow failure. After an owner-authorized temporary GoVerify bypass, one POST created marked Request **1000338** under W. M. Keck Foundation. Readback proved server number allocation, marker/run/reminder persistence, and Foundation payee copying; bounded checks found no payment, regarding email, or Foundation account/child-Contact change. The POST omitted owner fields, and later readback showed the authenticated application user as both creator and owner. See the [feature-branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/cf886221b04a72ca838cdb76a3f2c2eb5afdfe73/docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md) for the exact scope and receipts.
 
-Verified Stage 0 facts include:
+Two results remain unexplained: the requested `2099-12-01` meeting date read back as `2024-12-13`, and no `sharepointdocumentlocation` appeared. The sandbox was in **Disable Background Processing** mode, with observed asynchronous Request workflows canceled. Thus this rehearsal cannot prove normal document provisioning or the complete automation side-effect boundary. The known folder convention does not identify its provisioner.
 
-- Both registered tenants lack the proposed `wmkf_istestrequest` and `wmkf_testcreationrunid` attributes.
-- Production and sandbox differ in createable/application-required fields; sandbox also lacks the reminder and triage controls needed by the proposed policy.
-- The verified applicant binding is `akoya_applicantid@odata.bind` to `accounts`; intake's `akoya_Account@odata.bind` precedent must not be copied.
-- Request-number auto-number configuration and document-management capability are visible in metadata, but effective create privileges, plugin defaults, number allocation, and successful end-to-end creation remain unverified.
-- No app-owned SharePoint document-location create seam was found in the inspected adapter. A resolved request bucket is required; the responsible provisioner is still unknown.
-- Production and sandbox visible automation/vendor registrations differ. Names and trigger flags do not establish behavior, and absence of a visible narrative/package flow does not prove absence.
+## Current next step and boundary
 
-Evidence paths in the branch include `evidence/test-request-factory/` and the Stage 0 contract receipt. The source census and platform census were bounded and did not query business records or execute flows.
+Use the existing docs and production fixture for read-only reference. For the next **controlled** creation rehearsal, obtain platform-owner evidence identifying the request-to-location provisioner and trigger, an isolated target where required background processing runs, and an explanation or configuration for the meeting-date rewrite. Verify the resulting location/folder and automation effects by readback. That is a focused follow-up on observed gaps; Connor's original broad questions should not be resent.
 
-## Evidence Connor should provide
-
-Please return authoritative owner/config evidence, or explicitly mark an item unknown. Do not run a production create to discover behavior.
-
-1. **Create/update suppression**
-   - For activated request Create workflows and enabled vendor Create/Update hooks, identify the owner, trigger/message, environment, and relevant branches.
-   - State how a marker and creation-run ID present in the initial INSERT, and every later pointer/status PATCH, are handled.
-   - Confirm that marked requests do not trigger narrative/package overwrite, status recomputation with external effects, email/calendar, payment/honorarium, provider generation, or other operational automation.
-   - Include an approved disconfirming test or owner-backed configuration evidence. Do not disable mandatory vendor hooks wholesale.
-
-2. **Narrative/package and status consumers**
-   - Identify the actual Power Automate/AkoyaGO definitions that write `AI Materials/ProposalNarrative_<number>.pdf`, `Reviewer Materials/Proposal_<number>.pdf`, or react to request status.
-   - Provide environment, trigger, marker exclusion, and subsequent PATCH behavior. If a documented flow is retired, provide authoritative retirement evidence.
-   - Repository source and visible-definition absence are insufficient to close this gate.
-
-3. **SharePoint location provisioner**
-   - Identify the component that creates or provisions the Dynamics-tracked request document location, its trigger, expected library/parents, maximum wait, retry/recovery behavior, and uniqueness contract.
-   - Confirm how a new request reaches exactly one resolved parent chain usable by `requireResolvedParents: true`.
-   - Clarify whether provisioning is Dataverse document management, AkoyaGO, Power Automate, UI-driven, or an approved app adapter. `IsDocumentManagementEnabled: true` alone is not proof.
-   - Explain whether suppressing request automation also suppresses folder provisioning; if so, identify the approved test-safe provisioning path rather than bypassing suppression.
-   - Do not create a location, accept duplicates, or relax the resolved-parent requirement during this handoff.
-
-4. **Create/number/default contract**
-   - Confirm effective create privileges and the smallest valid create body for each target environment.
-   - Confirm server number allocation and readback, createable required defaults, marker/run/reminder field behavior, and applicant lookup binding.
-   - Reconcile production/sandbox differences before claiming one recipe works in both.
-
-5. **Isolated rehearsal boundary**
-   - Name the approved isolated target, test organization/personas, content boundary, retention owner, and bounded file/count limits.
-   - Provide a readback plan proving fresh request GUID/number, marker/run values, independent folder/location, no source mutation, no real contacts/tokens, no unwanted automation, and exact owned-resource cleanup.
-   - This evidence must precede any schema rollout or controlled fixture creation.
-
-   - Confirm approved test PI/liaison identities and recipient behavior. A test persona or prior invitation does not authorize a new send; the preparation path must be no-send unless a separately approved recipient rehearsal is selected.
-
-## Enablement boundary
-
-Until the suppression owner evidence and location-provisioner contract are verified, production cloning remains disabled. The marker and run ID must be present in the initial request INSERT; a later patch cannot retroactively suppress create-triggered automation. Offline policy and tests may continue on the separate branch, but no clone control, schema apply, request create, folder/file create, invitation, or email is enabled. Unknown marker state must fail closed; folder naming or a Dataverse-only target does not establish SharePoint isolation. Metadata visibility, prior test fixtures, or an approved recipient identity do not imply permission to enable production cloning.
-
-Connor's response should be attached to this handoff and reconciled into the Stage 0 contract before any implementation stage is accepted. The user has emailed Connor; response status is pending at the time of this handoff.
+The feature branch's Admin preview remains read-only. Its selected-file copy policy and execution limits still require an owner decision. The four D26 Proposal-tab slots are a Workbench display convention, not approval to copy three PDFs and a budget XLSX into a Test Request. No new Request create, file copy, email, schema apply, or production integration is authorized by this handoff. Production creation remains blocked until marker-aware consumers, automation exclusions, and the independent folder contract are implemented and verified.

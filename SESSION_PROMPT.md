@@ -130,8 +130,13 @@ document/DAL gates. This change is pushed only on the feature branch; the
 external Preview still runs its older deployment and has not been re-smoked.
 
 [VERIFIED via the 2026-09-21 sandbox rehearsal receipt; current setting not
-re-probed] Background processing was disabled and Request async workflows
-were canceled. The actual request-to-SharePoint-location provisioner and the
+re-probed] Connor answered the original broad platform questions on 2026-09-21;
+do not ask them again. The documented SharePoint model already identifies the
+`akoya_request` library, Dynamics location relationship, and request folder
+pattern. Production Request 1002788 is an existing Connor-created test fixture
+for read-only reference, not a fresh factory destination. Background processing
+was disabled and Request async workflows were canceled for the marked sandbox
+Request 1000338. The actual new-request location provisioner/trigger and the
 meeting-date rewrite remain unidentified. [Microsoft's administration-mode
 guide](https://learn.microsoft.com/en-us/power-platform/admin/admin-mode)
 says disabled background operations stop Dataverse asynchronous workflows and

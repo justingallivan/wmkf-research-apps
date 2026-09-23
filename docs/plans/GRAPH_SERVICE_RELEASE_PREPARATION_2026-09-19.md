@@ -26,7 +26,8 @@ and local `/private/tmp/graph-production-release-receipt.json` (completed
 2026-09-20T04:54:26Z). Local receipts are supplementary and may not survive cleanup;
 this checked-in summary retains the outcome and identifiers for another computer.
 No Graph implementation or release blocker remains. The independent test-request
-factory awaits platform evidence; see `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`.
+factory has Connor's answer and a bounded sandbox create; its remaining platform
+gaps are tracked in `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`.
 
 ## Historical preparation and rehearsal record
 
