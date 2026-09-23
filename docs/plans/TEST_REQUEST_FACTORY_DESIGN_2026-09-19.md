@@ -73,6 +73,11 @@ Each stage is a separate commit with a Codex adversarial review before acceptanc
 
 **Stage 1 simplification.** No synthetic reviewer can exist before the synthetic-reviewer recipe, which follows the run ledger. Stage 1 therefore denies **all** email concerning a marked request at the delivery seam; the reviewer-engagement exception, synthetic-person marker and address matching ship with that recipe.
 
+10. **[OWNER DECISION] Never write to an existing request.** The factory only creates new requests and writes to those. No backfill, normalization or other change to existing request rows, under any circumstances.
+11. **[OWNER DECISION, platform owner Connor consulted 2026-09-23] Marker columns approved.** Adding `wmkf_istestrequest` and `wmkf_testcreationrunid` to the `akoya_request` table is acceptable: existing rows keep an empty value, only factory-created requests are written, and the values will only ever be empty or yes. Connor will not surface the fields anywhere ordinary staff work in AkoyaGO; staff reach Dataverse only through the WMKF apps or AkoyaGO, so Dataverse field-level security is not needed. The production schema apply remains a deliberate, owner-confirmed rollout step.
+
+**Marker write guard (Stage 1a follow-up, answering the Codex Stage 1a review).** The legacy-null rule is safe only if nothing clears the fields on a test request. `DynamicsService.updateRecord` and every PATCH inside `DynamicsService.executeChangeset` refuse a body for `akoya_requests` that names either field, whatever the value (`assertTestRequestMarkerNotUpdated` in `lib/services/test-requests/isolation.js`); only a create may set them. [VERIFIED via source search, 2026-09-23] Deployed request writes reach Dataverse only through those two functions; local operator scripts that use the raw `lib/dataverse/client.js` are outside this guard. Tampering outside the apps is not a modeled threat per decision 11; the run ledger becomes a second, Dataverse-independent signal when it exists.
+
 Stage 1 slices, each a separate commit with tests, relevant gates and a Codex adversarial review:
 
 | Slice | Scope |
