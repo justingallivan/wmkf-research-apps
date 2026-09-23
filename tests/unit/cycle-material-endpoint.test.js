@@ -145,7 +145,7 @@ it('serves the private template with attachment + nosniff + no-store headers', a
   expect(r.statusCode).toBe(200);
   expect(readUploadedBlobBuffer).toHaveBeenCalledWith({ access: 'private', pathname: TEMPLATE_PATH });
   expect(r.sent.toString()).toBe('PRIVATE-MATERIAL-BYTES');
-  expect(r.headers['Content-Disposition']).toBe('attachment; filename="Review Template.docx"');
+  expect(r.headers['Content-Disposition']).toBe(`attachment; filename="Review Template.docx"; filename*=UTF-8''Review%20Template.docx`);
   expect(r.headers['X-Content-Type-Options']).toBe('nosniff');
   expect(r.headers['Cache-Control']).toBe('private, no-store');
   expect(r.headers['Content-Type']).toBe(
@@ -170,7 +170,18 @@ it('serves a private additional attachment by pathname', async () => {
   await handler({ method: 'GET', query: { cycleId: CYCLE_ID, pathname: ATT_PATH } }, r);
   expect(r.statusCode).toBe(200);
   expect(r.headers['Content-Type']).toBe('application/pdf');
-  expect(r.headers['Content-Disposition']).toBe('attachment; filename="Guidelines.pdf"');
+  expect(r.headers['Content-Disposition']).toBe(`attachment; filename="Guidelines.pdf"; filename*=UTF-8''Guidelines.pdf`);
+});
+
+it('encodes quoted, Unicode, and CR/LF characters in the material filename', async () => {
+  findById.mockResolvedValue(makeCycle({ reviewTemplateFilename: 'bad"é\r\nInjected: yes.docx' }));
+  const r = res();
+  await handler({ method: 'GET', query: { cycleId: CYCLE_ID, pathname: TEMPLATE_PATH } }, r);
+  expect(r.headers['Content-Disposition']).toBe(
+    `attachment; filename="bad_Injected: yes.docx"; filename*=UTF-8''bad%22%C3%A9Injected%3A%20yes.docx`,
+  );
+  expect(r.headers['Content-Disposition']).not.toMatch(/[\r\n]/);
+  expect(r.sent).toEqual(Buffer.from('PRIVATE-MATERIAL-BYTES'));
 });
 
 it('fails closed with 503 when the private-store token is unset', async () => {

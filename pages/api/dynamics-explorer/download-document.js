@@ -22,6 +22,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { GraphService } from '../../../lib/services/graph-service';
+import { contentDisposition } from '../../../lib/utils/content-disposition';
 
 export const config = {
   api: {
@@ -79,7 +80,7 @@ export default async function handler(req, res) {
     );
 
     res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${resolvedName.replace(/"/g, '\\"')}"`);
+    res.setHeader('Content-Disposition', contentDisposition('attachment', resolvedName));
     res.setHeader('Content-Length', size);
     res.setHeader('Cache-Control', 'private, max-age=300');
     // Belt-and-suspenders with the attachment disposition: stop the browser

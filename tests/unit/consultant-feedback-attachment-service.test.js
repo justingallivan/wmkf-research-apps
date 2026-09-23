@@ -74,6 +74,16 @@ describe('finalizeAttachmentUpload — happy paths', () => {
     expect(deps.writeFeedbackEntry).toHaveBeenCalledWith(expect.objectContaining({ requestId: REQUEST_ID, requestdocumentId: REGISTRY_ID }));
   });
 
+  test('the registry create carries the uploading staff member as the attributed actor', async () => {
+    const deps = baseDeps();
+    const staffId = '55555555-5555-4555-8555-555555555555';
+    await finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, actingUserSystemId: staffId, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps);
+    expect(deps.createDocument.mock.calls[0][1]).toEqual(expect.objectContaining({
+      actorPolicy: 'allow-unattributed',
+      actingUserSystemId: staffId,
+    }));
+  });
+
   test('the registry payload carries wmkf_cyclecode derived from the request meeting date', async () => {
     const deps = baseDeps();
     await finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps);

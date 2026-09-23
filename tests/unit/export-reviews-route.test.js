@@ -65,7 +65,18 @@ test('returns a private no-store DOCX generated with session identity', async ()
   });
   expect(res.statusCode).toBe(200);
   expect(res.headers['Content-Type']).toContain('wordprocessingml.document');
-  expect(res.headers['Content-Disposition']).toBe('attachment; filename="reviews-R-1.docx"');
+  expect(res.headers['Content-Disposition']).toBe(`attachment; filename="reviews-R-1.docx"; filename*=UTF-8''reviews-R-1.docx`);
   expect(res.headers['Cache-Control']).toBe('private, no-store');
+  expect(res.body).toEqual(Buffer.from('docx'));
+});
+
+test('encodes quoted, Unicode, and CR/LF characters in the download filename', async () => {
+  exportCombinedReviews.mockResolvedValue({ content: Buffer.from('docx'), filename: 'bad"é\r\nInjected: yes.docx' });
+  const res = response();
+  await handler({ method: 'GET', query: { proposalId: REQUEST_ID } }, res);
+  expect(res.headers['Content-Disposition']).toBe(
+    `attachment; filename="bad_Injected: yes.docx"; filename*=UTF-8''bad%22%C3%A9Injected%3A%20yes.docx`,
+  );
+  expect(res.headers['Content-Disposition']).not.toMatch(/[\r\n]/);
   expect(res.body).toEqual(Buffer.from('docx'));
 });
