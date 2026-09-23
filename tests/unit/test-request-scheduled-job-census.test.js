@@ -6,6 +6,9 @@
  * test-request skip in the file that selects its candidates. Adding, removing
  * or rescheduling a cron fails this test until the record is updated
  * deliberately. The design doc's Stage 1c record explains each decision.
+ * This file pins that the skip exists; the ordering (no claim, mint, provider
+ * call, write or send before classification) is asserted by each job's own
+ * focused tests.
  */
 
 import fs from 'fs';
@@ -31,7 +34,7 @@ const RECORDED_CRONS = {
   'grantee-deliverable-reminders': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/cron/grantee-deliverable-reminders-service.js', 'lib/services/scheduled-email-service.js'] },
   'health-check': { scheduled: true, class: 'operational' },
   'log-analysis': { scheduled: true, class: 'operational' },
-  maintenance: { scheduled: true, class: 'operational', note: 'retention/GC sub-tasks; see the Stage 1c record for the request-linked ones' },
+  maintenance: { scheduled: true, class: 'operational', note: 'retention/GC sub-tasks; request-linked ones (expired materials close, BILL onboarding sweep, upload-staging GC, review-draft GC) are recorded decisions in the Stage 1c record' },
   'pricing-canary': { scheduled: true, class: 'operational' },
   'pricing-refresh': { scheduled: true, class: 'operational' },
   'reconcile-identities': { scheduled: true, class: 'operational' },

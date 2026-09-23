@@ -449,6 +449,8 @@ describe('Test Request isolation (Stage 1c)', () => {
     const r = await reconcileReviewerEmails({});
     expect(mockRequestTestState).toHaveBeenCalledWith(REQ);
     expect(r[counter]).toBe(1);
+    expect(r.scanned).toBe(0);
+    expect(rosterStore.findReconcilableCandidates).toHaveBeenLastCalledWith(expect.any(Number), { excludeRequestIds: [REQ] });
     expect(r.written).toEqual([]);
     expect(suggestionAdapter.getForEmailReconcile).not.toHaveBeenCalled();
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
@@ -456,5 +458,24 @@ describe('Test Request isolation (Stage 1c)', () => {
     expect(NotificationService.notify).not.toHaveBeenCalled();
     expect(AlertService.autoResolve).not.toHaveBeenCalled();
   });
+});
+
+test('Stage 1c: test-request rows never take up the batch; the next page of ordinary rows is processed', async () => {
+  const TEST_REQ = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  mockRequestTestState.mockImplementation(async (id) => (
+    id === TEST_REQ ? { kind: 'synthetic', reason: 'x' } : { kind: 'ordinary', reason: 'x' }
+  ));
+  // Newest-first page is all test-request rows until that request is excluded.
+  rosterStore.findReconcilableCandidates.mockImplementation(async (limit, { excludeRequestIds = [] } = {}) => (
+    excludeRequestIds.includes(TEST_REQ)
+      ? [{ requestId: REQ, candidate: vettedCandidate() }]
+      : Array.from({ length: limit }, () => ({ requestId: TEST_REQ, candidate: vettedCandidate() }))
+  ));
+  suggestionAdapter.getForEmailReconcile.mockResolvedValue({
+    _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: PERSON, wmkf_selected: true,
+  });
+  const r = await reconcileReviewerEmails({ maxBatch: 2 });
+  expect(r.skippedTestRequest).toBe(1);
+  expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'ava.mercer@example.org' }]);
 });
 

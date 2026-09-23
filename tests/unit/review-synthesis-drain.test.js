@@ -20,11 +20,13 @@ const enqueueAutomaticReviewSynthesisJob = jest.fn();
 const claimAutomaticReviewSynthesisJobs = jest.fn();
 const cancelReviewSynthesisJob = jest.fn();
 const recordReviewSynthesisJobFailure = jest.fn();
+const releaseReviewSynthesisJob = jest.fn();
 jest.mock('../../lib/services/review-synthesis-job-service', () => ({
   enqueueAutomaticReviewSynthesisJob: (...args) => enqueueAutomaticReviewSynthesisJob(...args),
   claimAutomaticReviewSynthesisJobs: (...args) => claimAutomaticReviewSynthesisJobs(...args),
   cancelReviewSynthesisJob: (...args) => cancelReviewSynthesisJob(...args),
   recordReviewSynthesisJobFailure: (...args) => recordReviewSynthesisJobFailure(...args),
+  releaseReviewSynthesisJob: (...args) => releaseReviewSynthesisJob(...args),
 }));
 
 // Stage 1c: the per-run test-state lookup is replaced so each test chooses a
@@ -176,15 +178,17 @@ describe('Test Request isolation (Stage 1c)', () => {
     expect(synthesizeReviews).not.toHaveBeenCalled();
   });
 
-  test('an unreadable marker on a claimed job takes the retryable failure path, not a cancel', async () => {
+  test('an unreadable marker requeues a claimed job without consuming an attempt', async () => {
     mockRequestTestState.mockImplementation(async () => ({ kind: 'unknown', reason: 'read_failed' }));
-    const job = { id: 9, request_id: REQUEST_ID, input_hash: INPUT_HASH, attempts: 1 };
+    const job = { id: 9, request_id: REQUEST_ID, input_hash: INPUT_HASH, attempts: 3 };
     claimAutomaticReviewSynthesisJobs.mockResolvedValue([job]);
     const result = await drainReviewSynthesisJobs();
+    expect(releaseReviewSynthesisJob).toHaveBeenCalledWith(job);
     expect(cancelReviewSynthesisJob).not.toHaveBeenCalled();
-    expect(recordReviewSynthesisJobFailure).toHaveBeenCalledWith(job, expect.any(Error), expect.objectContaining({ retryable: true }));
+    expect(recordReviewSynthesisJobFailure).not.toHaveBeenCalled();
     expect(synthesizeReviews).not.toHaveBeenCalled();
-    expect(result.failed).toBe(1);
+    // Counted once at enqueue (scan) and once for the claimed job.
+    expect(result).toMatchObject({ failed: 0, testStateUnknown: 2 });
   });
 });
 
