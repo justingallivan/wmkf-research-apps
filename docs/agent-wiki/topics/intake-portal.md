@@ -50,6 +50,11 @@ update_triggers:
 > routes and the submission-drain cron are implemented and deployment-configured;
 > that does **not** mean the parked applicant product is open or operational for
 > applicants.
+>
+> **Revival hazard (2026-09-23):** the drain copies applicant-supplied
+> `draftJson.dataverseFields` straight into the new `akoya_request`, so an applicant
+> could set arbitrary request fields. Resolve it before reopening the portal; see the
+> security-concern block at the top of `docs/INTAKE_PORTAL_DESIGN.md`.
 > `docs/INTAKE_PORTAL_DESIGN.md` is the historical cancelled-pilot design, not
 > an active plan.
 > The joint `proxy.js` applicant-surface + `/api/intake/*` Origin/CSRF correction
