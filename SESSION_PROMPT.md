@@ -63,8 +63,8 @@ handoffs are not part of the current `main` checkout:
    **Parked by owner decision this session** while Test Request prerequisites
    receive read-only investigation.
 2. **Test Request read-only Admin preview:**
-   `codex/test-request-preview-integration` at `cf886221b`. Its
-   [branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/cf886221b04a72ca838cdb76a3f2c2eb5afdfe73/SESSION_PROMPT.md)
+   `codex/test-request-preview-integration` at `b2c8e4088`. Its
+   [branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/b2c8e4088fc0256b4478897a2a3cfd2933d6e919/SESSION_PROMPT.md)
    records the signed-in sandbox Preview smoke and the later offline owner
    contract change. Create/copy remains blocked by the execution file policy,
    Stage 1 isolation, a document-bearing sandbox fixture, and unresolved
@@ -144,6 +144,19 @@ Dataverse-triggered flows, while some other processes may still run. Obtain
 platform-owner isolation and provisioner evidence before changing that setting or
 attempting another create. No platform setting or business record was changed
 by this read-only investigation.
+
+[VERIFIED via read-only Dataverse/Graph GETs and a refreshed complete plugin-step
+census, 2026-09-23 UTC] Request 1000338 now has one resolved `akoya_request`
+document location and an empty physical folder. The location was created about
+20 hours after the Request under Justin Gallivan's staff user; the original
+attempt-window absence remains accurate. Production reference Request 1002788's
+location appeared about 82 seconds after its Request under the GOApply
+integration user. An enabled production `AkoyaGo.AsyncEntityCreated` Request
+Create registration is absent from sandbox. The exact provisioner remains
+unknown; restoring sandbox background processing alone is not a proven parity
+fix. Request 1000338's meeting date remains `2024-12-13`. The branch's
+[sanitized receipt](https://github.com/justingallivan/wmkf-research-apps/blob/b2c8e4088fc0256b4478897a2a3cfd2933d6e919/docs/plans/evidence/test-request-factory/location-followup-2026-09-23.json)
+records the bounded checks. No remote write or setting change was made.
 
 ### Verified Open
 
