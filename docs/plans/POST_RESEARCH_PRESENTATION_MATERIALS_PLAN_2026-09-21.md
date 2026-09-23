@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker to capture a Zoom recording link or SharePoint-hosted MP4 plus the latest transcript, surface them to program directors, and mint a 60-day materials-only Board link; deployed Chrome now proves direct Graph MP4 upload, same-session pause/resume, playback, and download after route-scoped CSP and upload-placeholder corrections."
+summary: "Active plan for Meeting Tracker presentation materials; Chrome proved the Preview-only Graph transport core path, and offline reload/reselect, expiry, playback recovery, and bounded range-retry hardening awaits Edge/Safari and throughput evidence."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -536,8 +536,12 @@ The selected candidate has the browser PUT sequential chunks directly to the pre
 Graph upload URL and follow `nextExpectedRanges`. The deployed proof uses Graph's 320 KiB alignment
 unit and a 60-second XHR fragment timeout with byte-level progress. Chrome completed a 96.0 MiB
 upload after the proof route's CSP admitted only the Microsoft upload and canonical tenant origins.
-The reload/reselect/fingerprint-resume design remains to be exercised in the rest of the required
-browser matrix before production implementation.
+[VERIFIED via branch source and focused tests, 2026-09-23] The Preview harness now stores a
+SHA-256 fingerprint of file size plus the first and last 1 MiB alongside its encrypted browser
+permit. After reload it requires reselection and checks name, size, modification time, and that
+fingerprint before requesting Graph resume status. An old permit without a fingerprint remains
+available for exact Cleanup but cannot resume. [ASSUMED pending Preview browser runs] These checks
+work across the required Edge/Safari matrix; the production intent remains a separate build.
 
 After reload, the materials GET makes unfinished intents discoverable. An in-progress intent shows
 Resume; a committed candidate with no registry row shows Finish saving. Only the creating actor
@@ -754,8 +758,8 @@ Upload-specific rules:
 
 ### Slice 0 — Deployed-Preview browser proof
 
-**Implementation status (2026-09-22): CURRENT-HARDENING CHROME CORE PATH PASSED; SLICE REMAINS
-OPEN.** [VERIFIED via focused unit/contract tests] the isolated
+**Implementation status (2026-09-23): CHROME CORE PATH PASSED; OFFLINE RECOVERY HARDENING
+BUILT; SLICE REMAINS OPEN.** [VERIFIED via focused unit/contract tests] the isolated
 feature branch contains the Preview-only staff harness, browser-direct Graph upload session,
 encrypted staff permit, five-minute encrypted-subject proof token, fail-closed resolver limiter,
 302/one-shot playback comparison, scoped CSP, and exact-item cleanup. [VERIFIED via signed-in
@@ -764,9 +768,19 @@ completed bounded finalize, visibly played and sought through the 302 resolver w
 application resolution, played through one-shot Watch resolution, downloaded byte- and
 SHA-256-identical content, and deleted the exact item to the recycle bin. Resolver counts stayed
 bounded to explicit actions. The downloaded filename was the opaque physical MP4 name, not the
-display name. The required Edge/macOS Safari/iPadOS Safari, reload/reselect resume, expiry
-recovery, long-duration seek, and 2 GB throughput-cap evidence remain open, so Slice 0 is not yet
-complete.
+display name. [VERIFIED via branch source and focused tests, 2026-09-23] The Preview harness
+now checks a bounded same-file fingerprint before reload/reselect resume, retains cleanup authority
+on session expiry, can delete only the exact partial placeholder after a confirmed terminal
+session outcome, can mint a fresh five-minute token from the exact committed item, and performs
+one automatic playback re-resolution with position restore before offering manual Resume Watch.
+The bounded Graph signature-range policy makes at most three total attempts, refreshing the
+Microsoft URL for retryable network or 408/429/500/502/503/504 failures; a malformed/unbounded
+response and other statuses fail immediately. These additions have not been deployed or tested in
+Edge/Safari. [VERIFIED via local Jest/build/gates, 2026-09-23] 11 focused suites / 132 tests,
+scoped ESLint, the Next.js build, 66/67 startup gate/self-test commands initially, then 67/67 after repairing and rerunning
+the local Claude-memory symlink invariant, and 27/27 changed-surface gate commands passed.
+Edge/macOS Safari/iPadOS Safari, live reload/reselect and expiry recovery, long-duration seek, and
+near-cap throughput evidence remain open, so Slice 0 is not yet complete.
 
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
 authenticated proof route and minimal harness, but it creates no durable application schema and is
@@ -785,6 +799,57 @@ an authenticated Meeting Tracker user, and its short-lived JWT uses a distinct
 `presentation-media-proof` audience. Every proof route denies Production even if a configuration
 value is wrong. Remove the harness before Slice 2 or convert only reviewed pieces into the
 production routes; a release gate asserts that the proof audience/routes cannot ship enabled.
+
+#### Remaining Slice 0 browser matrix (2026-09-23)
+
+Each live run needs a fresh owner-approved request and SharePoint target, any Production Dataverse
+read, an immutable Preview deployment, and any change to the shared Preview alias. Request
+`1003222` was authorized only for the completed 2026-09-22 run. Re-inspect the alias target and
+branch-scoped Preview variable names before an alias change, then restore and re-inspect the exact
+prior target. Do not clear a permit or delete an item on an uncertain cleanup response; ask the
+owner before deleting each exact disposable item.
+
+| Browser | Scenario | Expected recorded evidence | Runner |
+|---|---|---|---|
+| Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. New recovery code remains untested live. | Agent (receipt already recorded) |
+| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | Redacted Network trace: direct Microsoft PUT 202 ranges, no MP4 application body, 302 then Microsoft 206 ranges, one resolver action per Watch/Download, source/download byte and SHA-256 match. | Agent after owner live-run approval |
+| macOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts and source/download byte plus SHA-256 match; note any autoplay permission prompt or playback error. | Owner by hand |
+| iPadOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts where Web Inspector is available, plus Files-app downloaded byte count/hash compared on a trusted computer; note any mobile-specific failure. | Owner by hand |
+| Edge, then one Safari | Let a paused upload session expire; attempt Resume; cleanup only after owner confirmation; start a fresh proof | 410 `presentation_media_proof_session_expired`, retained permit, exact cleanup outcome (including `placeholder_deleted` only after confirmed terminal session), new session and successful finalize; no old partial item promoted. | Agent for Edge; owner for Safari |
+| Edge, then one Safari | Let a five-minute proof token expire; reload old link; mint a new link with Finish saving from the committed item | Old context/open refuses (401); fresh link plays and seeks; exact item identity remains stable. | Agent for Edge; owner for Safari |
+| Desktop Edge | Upload a real MP4 near 2,000,000,000 bytes (record exact size); run long-duration seeking and Download | Session expiry, elapsed upload time, measured bytes/second, projected 2,000,000,000-byte completion before expiry with margin, seek positions, direct Microsoft 206 ranges, and size/SHA-256 match. | Agent with owner-supplied sanctioned media and approval |
+
+**Owner click sequence for macOS Safari and iPadOS Safari.** Do this separately in each browser
+with a newly approved disposable item; Safari on iPad uses the Files app for selection/download.
+
+1. Open the owner-approved immutable Preview origin and sign in to Meeting Tracker. Open
+   `/meeting-tracker/presentation-media-proof`. In macOS Safari Web Inspector (or paired iPad Web
+   Inspector), enable Preserve Log and record only redacted method/status/origin/range/byte-count
+   facts. Do not capture bearer tokens, upload URLs, or media bytes. Record browser version,
+   request GUID, approved SharePoint site, source MP4 byte size, duration, and source SHA-256.
+2. Enter that request GUID, choose the approved MP4 (>50 MiB), and click **Begin and upload**.
+   After progress advances, click **Pause after chunk**. Record the paused byte count and the
+   Microsoft `202`/`nextExpectedRanges` evidence. Reload the same tab, select the same file in
+   **Zoom MP4**, and click **Resume**. Record the resumed starting range and final byte count.
+   Record any file-mismatch refusal if encountered; the changed-edge-byte case is pinned by offline tests.
+3. Click **Finish saving**. Open **Open proof page** in a private window before its five-minute
+   expiry. With **302 redirect** selected, click **Watch**, play at least two minutes, seek to ten
+   positions including near the end, pause/resume, and record 302 → Microsoft 206 plus the page's
+   resolver count. Select **one-shot URL**, click **Watch** again, and repeat a forward/back seek.
+4. Click **Download** once for each delivery shape if the browser allows it. Record the final
+   downloaded size and SHA-256 (for iPad, move the Files-app download to a trusted computer for
+   hashing). They must equal the source. Record the filename Microsoft supplies and any 429 or
+   range-fetch error. If a media error occurs before token expiry, record whether the single
+   automatic re-resolution restores the position; after another failure use **Resume Watch** once.
+5. After five minutes, reload the old proof page and record its refusal. Return to the staff
+   harness and click **Finish saving** again, then open the fresh link and confirm Watch. For a
+   separate expiry run, pause upload and wait until the displayed Graph session expiry before
+   clicking **Resume**; record the refusal and retained permit. Do not click **Cleanup exact item**
+   until the owner has confirmed deletion of that exact disposable item/session. Then begin a new
+   upload and record its result.
+6. Send back a pass/fail row per scenario with browser/version, file size/duration, source and
+   downloaded SHA-256, upload start/end and Graph expiry times, ten seek timestamps, statuses and
+   resolver counts, any error wording, and exact cleanup outcome. Redact all secret URLs and tokens.
 
 #### Upload procedure
 
@@ -846,8 +911,9 @@ Function.
 moved to immutable Preview deployment `dpl_4zAYDFC4YDntkHFQsWBFxeTfTJD2`. Chrome uploaded the
 100,665,703-byte MP4, finalized it, visibly played it through the 302 resolver, resolved the
 one-shot Watch path, and downloaded a byte-complete local copy. Two transient Microsoft range-fetch failures occurred while refreshing the
-five-minute proof; a later retry succeeded, so production finalization needs a bounded transient
-retry decision. With explicit user confirmation, cleanup deleted the exact committed SharePoint
+five-minute proof; a later retry succeeded. The Preview Graph signature-range helper now has a three-attempt
+transient policy verified offline; its live behavior and the production finalization policy remain
+unverified. With explicit user confirmation, cleanup deleted the exact committed SharePoint
 item through Graph, moving it to the canonical site's recycle bin rather than permanently purging
 it. The alias was then restored and re-inspected at its prior exact target
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The proof deployment used one-off runtime settings; no

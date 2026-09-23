@@ -1,13 +1,29 @@
 # Presentation branch continuation — 2026-09-23
 
-[VERIFIED via Git] This checkout is `codex/feature-request`. The owner authorized merging
-`origin/main` into this branch before a new Preview proof deployment. The previous Chrome
-transport proof and the remaining Slice 0 matrix are recorded in
-`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`. The closeout and
-retained shared Preview state are recorded in
-`docs/plans/CODEX_WORKSTREAM_CLOSEOUT_2026-09-22.md`. This branch merge does not authorize a
-Preview deployment, shared alias change, Production Dataverse read, new disposable SharePoint
-write, or cleanup deletion. Obtain the owner's explicit approval for each live run and target.
+[VERIFIED via Git] This checkout is `codex/feature-request`. The owner approved merging current
+`origin/main` into this branch, committed as `1d455ba9a`; no main push, other checkout edit, or
+Preview deployment occurred. The four named overlap surfaces were checked against the merged
+source. The Preview-only proof now has offline-tested bounded edge-byte SHA-256 reselect checks,
+expired-session permit retention and exact terminal-placeholder cleanup, proof-token reissue guidance, one automatic
+playback re-resolution with position restore, and a three-attempt transient Microsoft signature-
+range retry policy. The branch plan has the remaining Edge/macOS Safari/iPadOS Safari and near-cap
+matrix with exact owner steps. [VERIFIED via local commands] 11 focused suites / 132 tests,
+scoped ESLint, Next.js build, 66/67 startup gate commands initially and 67/67 after repairing/rerunning the local memory-link invariant,
+and 27/27 changed-surface gate commands passed. No live browser cell has been closed by these
+offline tests.
+
+[VERIFIED via the 2026-09-22 execution receipt] Chrome previously passed same-page pause/resume,
+finalize, 302 and one-shot Watch, seek, byte/hash-identical Download, and exact cleanup. The
+prior Request `1003222` authorization was spent. The shared Preview alias was restored to the
+Test Request preview target at that time; its *current* target and branch-scoped variables must be
+re-inspected before any new alias change. The 2026-09-22 closeout remains a dated historical
+record. This branch merge and offline work do not authorize a Preview deployment, alias change,
+Production Dataverse read, new SharePoint upload, or cleanup deletion. Obtain a separate owner
+approval for each live run and each exact cleanup.
+
+Next: finish relevant gates and push only this branch; then seek owner authorization for one
+bounded live run with the exact request/SharePoint target, Production Dataverse-read decision,
+Preview deployment, and alias window. The owner runs macOS/iPadOS Safari by hand using the plan.
 
 The current main-branch handoff follows. Its Test Request work is owned by another checkout;
 this presentation session does not edit or run that workstream.

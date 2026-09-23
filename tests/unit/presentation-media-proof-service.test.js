@@ -191,6 +191,19 @@ test('finalize validates the committed item and MP4 signature, then mints an enc
   await expect(resolvePresentationMediaProof(verified, deps)).resolves.toMatchObject({ downloadUrl: 'https://media.example/one-shot' });
 });
 
+test('the same committed item can mint a new token after the first five-minute proof expires', async () => {
+  const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
+  const deps = dependencies({ getByPath: jest.fn(async () => item) });
+  const started = await begin(deps);
+  await finalizePresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps);
+  deps.now.mockReturnValue(new Date(NOW + 6 * 60 * 1000));
+  const renewed = await finalizePresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps);
+  expect(renewed.expiresAt).toBe(new Date(NOW + 11 * 60 * 1000).toISOString());
+  expect(deps.getByPath).toHaveBeenCalledTimes(2);
+  expect(deps.createSession).toHaveBeenCalledTimes(1);
+  expect(deps.mint).toHaveBeenCalledTimes(2);
+});
+
 test('finalize rejects a committed item without an MP4 ftyp signature before token minting', async () => {
   const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
   const deps = dependencies({
@@ -222,6 +235,31 @@ test.each([
   const started = await begin(deps);
   await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
     .rejects.toMatchObject({ httpStatus: 409, code: 'presentation_media_proof_identity_mismatch' });
+  expect(deps.deleteFile).not.toHaveBeenCalled();
+});
+
+test.each(['cancelled', 'gone', 'expired'])('cleanup deletes only an exact partial placeholder after a %s session outcome', async (outcome) => {
+  const partial = { driveId: 'drive-1', id: 'partial-item', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024 };
+  const deps = dependencies({
+    getByPath: jest.fn(async () => partial),
+    cancelSession: jest.fn(async () => ({ outcome })),
+  });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .resolves.toEqual({ cleaned: true, cleanupOutcome: 'placeholder_deleted', deletedItem: true });
+  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'partial-item');
+  expect(deps.deleteFile).toHaveBeenCalledTimes(1);
+});
+
+test('uncertain session cancellation retains an exact partial placeholder and retry permit', async () => {
+  const partial = { driveId: 'drive-1', id: 'partial-item', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024 };
+  const deps = dependencies({
+    getByPath: jest.fn(async () => partial),
+    cancelSession: jest.fn(async () => { throw new Error('no response'); }),
+  });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 502, code: 'presentation_media_proof_cleanup_uncertain' });
   expect(deps.deleteFile).not.toHaveBeenCalled();
 });
 

@@ -112,3 +112,43 @@ test('rejects unsafe preauthenticated URLs and any unbounded range response befo
     .rejects.toThrow('was not bounded');
   expect(unbounded.arrayBuffer).not.toHaveBeenCalled();
 });
+
+const mediaMetadata = {
+  id: 'item-1', name: 'proof.mp4', size: 80_000_000, file: { mimeType: 'video/mp4' },
+  '@microsoft.graph.downloadUrl': 'https://media.example/one-shot',
+};
+
+test.each([408, 429, 500, 502, 503, 504])('range read retries transient Microsoft %s with a fresh URL', async (status) => {
+  global.fetch
+    .mockResolvedValueOnce(response(200, mediaMetadata))
+    .mockResolvedValueOnce(response(status))
+    .mockResolvedValueOnce(response(200, mediaMetadata))
+    .mockResolvedValueOnce(response(206, Buffer.alloc(32), { 'content-range': 'bytes 0-31/80000000' }));
+  await expect(GraphService.readMediaRange('drive-1', 'item-1')).resolves.toMatchObject({ bytes: Buffer.alloc(32) });
+  expect(global.fetch).toHaveBeenCalledTimes(4);
+  expect(global.fetch.mock.calls[3][1].headers).toEqual({ Range: 'bytes=0-31' });
+});
+
+test('range read stops after three transient attempts and never consumes their bodies', async () => {
+  const failures = [response(503), response(503), response(503)];
+  for (const failure of failures) {
+    global.fetch.mockResolvedValueOnce(response(200, mediaMetadata)).mockResolvedValueOnce(failure);
+  }
+  await expect(GraphService.readMediaRange('drive-1', 'item-1'))
+    .rejects.toThrow('after 3 attempts');
+  expect(global.fetch).toHaveBeenCalledTimes(6);
+  expect(failures.every((failure) => !failure.arrayBuffer.mock.calls.length)).toBe(true);
+});
+
+test('range read never retries a non-transient status or unbounded success', async () => {
+  global.fetch.mockResolvedValueOnce(response(200, mediaMetadata)).mockResolvedValueOnce(response(404));
+  await expect(GraphService.readMediaRange('drive-1', 'item-1')).rejects.toThrow('not bounded (404)');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+
+  global.fetch.mockClear();
+  const unbounded = response(200, Buffer.alloc(32));
+  global.fetch.mockResolvedValueOnce(response(200, mediaMetadata)).mockResolvedValueOnce(unbounded);
+  await expect(GraphService.readMediaRange('drive-1', 'item-1')).rejects.toThrow('not bounded (200)');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+  expect(unbounded.arrayBuffer).not.toHaveBeenCalled();
+});

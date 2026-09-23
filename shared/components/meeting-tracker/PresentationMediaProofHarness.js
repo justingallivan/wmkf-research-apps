@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { uploadPresentationMediaProofFile, nextExpectedStart } from '../../utils/presentation-media-proof-upload';
+import { fingerprintPresentationMediaProofFile, uploadPresentationMediaProofFile, nextExpectedStart } from '../../utils/presentation-media-proof-upload';
 import { requestJson } from '../../utils/api-request';
 
 const STORAGE_KEY = 'wmkf:presentation-media-proof-upload';
@@ -47,19 +47,20 @@ export default function PresentationMediaProofHarness() {
     setSaved(value);
   };
 
-  const sameFile = () => Boolean(file && saved
-    && file.name === saved.file.name
-    && file.size === saved.file.size
-    && file.lastModified === saved.file.lastModified);
+  const sameFile = async (chosenFile, record) => Boolean(chosenFile && record?.fingerprint
+    && chosenFile.name === record.file.name
+    && chosenFile.size === record.file.size
+    && chosenFile.lastModified === record.file.lastModified
+    && await fingerprintPresentationMediaProofFile(chosenFile) === record.fingerprint);
 
-  const runUpload = async ({ uploadUrl, chunkBytes, start }) => {
+  const runUpload = async ({ chosenFile, uploadUrl, chunkBytes, start }) => {
     pauseRef.current = false;
     abortRef.current = new AbortController();
     setBusy(true);
     setStatus('Uploading directly from this browser to Microsoft…');
     try {
       const result = await uploadPresentationMediaProofFile({
-        file,
+        file: chosenFile,
         uploadUrl,
         chunkBytes,
         start,
@@ -80,22 +81,26 @@ export default function PresentationMediaProofHarness() {
 
   const begin = async () => {
     if (!file) return setStatus('Choose an MP4 first.');
+    const chosenFile = file;
     setBusy(true);
     setProof(null);
     try {
+      const fingerprint = await fingerprintPresentationMediaProofFile(chosenFile);
       const data = await proofAction({
-        action: 'begin', requestId, filename: file.name, mimeType: file.type,
-        size: file.size, lastModified: file.lastModified,
+        action: 'begin', requestId, filename: chosenFile.name, mimeType: chosenFile.type,
+        size: chosenFile.size, lastModified: chosenFile.lastModified,
       });
       const record = {
         permit: data.permit,
         requestId,
-        file: { name: file.name, size: file.size, lastModified: file.lastModified },
+        file: { name: chosenFile.name, size: chosenFile.size, lastModified: chosenFile.lastModified },
+        fingerprint,
         expiresAt: data.expiresAt,
       };
       persist(record);
       setProgress(0);
       await runUpload({
+        chosenFile,
         uploadUrl: data.uploadUrl,
         chunkBytes: data.chunkBytes,
         start: nextExpectedStart(data.nextExpectedRanges, 0),
@@ -108,23 +113,37 @@ export default function PresentationMediaProofHarness() {
 
   const resume = async () => {
     if (!saved?.permit) return setStatus('No unfinished proof upload was found.');
-    if (!sameFile()) return setStatus('Reselect the exact same local file before resuming.');
+    const chosenFile = file;
+    const record = saved;
     setBusy(true);
     try {
-      const data = await proofAction({ action: 'status', permit: saved.permit });
+      if (!record.fingerprint) {
+        setStatus('This older proof has no file fingerprint. Keep the permit for Cleanup, then begin a new proof.');
+        return;
+      }
+      if (!await sameFile(chosenFile, record)) {
+        setStatus('Reselect the exact same local file before resuming; its size, timestamp, and SHA-256 edge fingerprint must match.');
+        return;
+      }
+      const data = await proofAction({ action: 'status', permit: record.permit });
       if (data.complete) {
         setProgress(100);
         setStatus('Microsoft already committed the file. Use Finish saving.');
         setBusy(false);
         return;
       }
+      persist({ ...record, expiresAt: data.expiresAt || record.expiresAt });
       await runUpload({
+        chosenFile,
         uploadUrl: data.uploadUrl,
         chunkBytes: data.chunkBytes,
         start: nextExpectedStart(data.nextExpectedRanges, 0),
       });
     } catch (error) {
-      setStatus(error.message);
+      setStatus(error.payload?.code === 'presentation_media_proof_session_expired'
+        ? 'The Graph upload session expired. Keep this permit; after owner-approved Cleanup of its exact item or session, begin a new proof upload.'
+        : error.message);
+    } finally {
       setBusy(false);
     }
   };
@@ -150,6 +169,7 @@ export default function PresentationMediaProofHarness() {
       const data = await proofAction({ action: 'cleanup', permit: saved.permit });
       const outcomeCopy = {
         item_deleted: 'The exact disposable SharePoint item was moved to the site recycle bin.',
+        placeholder_deleted: 'The terminal upload session left an exact partial SharePoint placeholder; it was moved to the site recycle bin.',
         session_cancelled: 'Microsoft confirmed the upload session was cancelled; no committed item existed.',
         session_gone: 'Microsoft reports the upload session no longer exists; no committed item was found.',
         session_expired: 'Microsoft reports the upload session expired; no committed item was found.',
@@ -182,7 +202,7 @@ export default function PresentationMediaProofHarness() {
           <label className="block text-sm font-medium" htmlFor="proof-request">Sanctioned request GUID</label>
           <input id="proof-request" value={requestId} onChange={(event) => setRequestId(event.target.value)} disabled={Boolean(saved)} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm" />
           <label className="mt-4 block text-sm font-medium" htmlFor="proof-file">Zoom MP4 (over 50 MB)</label>
-          <input id="proof-file" type="file" accept="video/mp4,.mp4" onChange={(event) => setFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-sm" />
+          <input id="proof-file" type="file" accept="video/mp4,.mp4" disabled={busy} onChange={(event) => setFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-sm" />
           {file && <p className="mt-2 text-xs text-gray-600">{file.name} · {formatBytes(file.size)}</p>}
 
           <div className="mt-5 flex flex-wrap gap-3">

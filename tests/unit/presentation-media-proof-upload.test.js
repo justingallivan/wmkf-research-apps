@@ -1,6 +1,7 @@
 /** @jest-environment node */
 
 import {
+  fingerprintPresentationMediaProofFile,
   nextExpectedStart,
   uploadPresentationMediaProofFile,
 } from '../../shared/utils/presentation-media-proof-upload';
@@ -179,4 +180,26 @@ test('pauses only at a committed chunk boundary and rejects invalid progress', a
     chunkBytes: CHUNK,
     fetchImpl,
   })).rejects.toThrow('resume position is invalid');
+});
+
+test('resume fingerprint binds size and both file edges without reading middle bytes', async () => {
+  const { webcrypto } = await import('node:crypto');
+  const size = 3 * 1024 * 1024;
+  const bytes = new Uint8Array(size);
+  const fileOf = (value) => ({
+    size: value.length,
+    slice: (start, end) => ({ arrayBuffer: async () => value.slice(start, end).buffer }),
+  });
+  const original = await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle);
+  bytes[0] = 1;
+  const firstChanged = await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle);
+  expect(firstChanged).not.toBe(original);
+  bytes[0] = 0;
+  bytes[size - 1] = 1;
+  const lastChanged = await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle);
+  expect(lastChanged).not.toBe(original);
+  bytes[size - 1] = 0;
+  bytes[1_500_000] = 1;
+  expect(await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle)).toBe(original);
+  expect(await fingerprintPresentationMediaProofFile(fileOf(bytes.slice(1)), webcrypto.subtle)).not.toBe(original);
 });
