@@ -429,6 +429,14 @@ describe('Test Request isolation (Stage 1b)', () => {
     expect(deps.cancelForSource).not.toHaveBeenCalled();
   });
 
+  test('send-now by the owning PD matches the stored GUID case-insensitively', async () => {
+    const deps = isolated('ordinary');
+    const owner = message().pd_systemuser_id;
+    expect(owner).toMatch(/[a-f]/);
+    await deliverScheduledEmail(message().id, { force: true, pdSystemUserId: owner.toUpperCase() }, deps);
+    expect(deps.claimSend).toHaveBeenCalled();
+  });
+
   test('send-now by a PD who does not own the row does not stop it', async () => {
     const deps = isolated('synthetic');
     const result = await deliverScheduledEmail(message().id, { force: true, pdSystemUserId: 'someone-else' }, deps);
