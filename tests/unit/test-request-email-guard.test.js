@@ -156,14 +156,25 @@ describe('sendEmail dispatch-time recheck', () => {
   }));
 
   test.each([
-    ['the activity cannot be read', new Error('boom')],
-    ['the regarding type is unknown', { _regardingobjectid_value: REQUEST_ID }],
-  ])('fails closed when %s', (_label, email) => ctx(async () => {
+    ['the activity cannot be read', new Error('boom'), { wmkf_istestrequest: null, wmkf_testcreationrunid: null }],
+    ['the regarding type is unknown', { _regardingobjectid_value: REQUEST_ID }, { wmkf_istestrequest: null, wmkf_testcreationrunid: null }],
+    ['an ordinary request cannot be read', { _regardingobjectid_value: REQUEST_ID, '_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'akoya_request' }, new Error('timeout')],
+  ])('fails closed, as a definite non-send, when %s', (_label, email, request) => ctx(async () => {
     process.env.TEST_REQUEST_ISOLATION = 'on';
-    reads({ email, request: { wmkf_istestrequest: null, wmkf_testcreationrunid: null } });
-    await expect(DynamicsService.sendEmail(EMAIL_ID)).rejects.toMatchObject({ code: 'test_request_email_denied' });
+    reads({ email, request });
+    await expect(DynamicsService.sendEmail(EMAIL_ID))
+      .rejects.toMatchObject({ code: 'test_request_email_denied', dispatched: false });
     expect(writeFetch).not.toHaveBeenCalled();
   })());
+
+  test('createAndSendEmail keeps a dispatch-recheck refusal classified as not dispatched', ctx(async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    jest.spyOn(DynamicsService, 'createEmailActivity').mockResolvedValue(EMAIL_ID);
+    reads({ email: new Error('boom'), request: null });
+    await expect(DynamicsService.createAndSendEmail(EMAIL))
+      .rejects.toMatchObject({ code: 'test_request_email_denied', dispatched: false, emailId: EMAIL_ID });
+    expect(writeFetch).not.toHaveBeenCalled();
+  }));
 
   test.each([
     ['an ordinary request', { _regardingobjectid_value: REQUEST_ID, '_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'akoya_request' }],

@@ -2,6 +2,8 @@
 /**
  * Materials create/invite/remind each send email, so each must run the Test
  * Request early refusal before loading the request or touching the collection.
+ * The post-claim send helper does no fallible read (it would consume the
+ * at-most-once claim of an ordinary request).
  */
 
 const refusal = Object.assign(new Error('Email is disabled for test requests.'), {
@@ -45,15 +47,15 @@ test.each([
   expect(deps.findActiveSiteVisit).not.toHaveBeenCalled();
 });
 
-test('sendReminderEmail (used by the automatic sweep) refuses a test request before sending', async () => {
-  const deps = { sendEmail: jest.fn() };
+test('sendReminderEmail runs after the claim and does no test-request read of its own', async () => {
+  assertRequestEmailAllowed.mockClear();
+  const deps = { sendEmail: jest.fn(async () => 'email-1') };
   await expect(sendReminderEmail({
-    row: { id: 7, request_id: REQUEST_ID, contacts: {} },
+    row: { id: 7, request_id: REQUEST_ID, contacts: [] },
     prepared: { subject: 's', bodyText: 'b' },
     fromEmail: 'pd@example.org',
     actorId: ACTOR_ID,
     sequence: 1,
-  }, deps)).rejects.toBe(refusal);
-  expect(assertRequestEmailAllowed).toHaveBeenCalledWith(REQUEST_ID);
-  expect(deps.sendEmail).not.toHaveBeenCalled();
+  }, deps)).resolves.toBe('email-1');
+  expect(assertRequestEmailAllowed).not.toHaveBeenCalled();
 });

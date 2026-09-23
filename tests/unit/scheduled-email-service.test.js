@@ -391,25 +391,49 @@ test('reviewer VIP flag SQL keys on potential_reviewer_id, never contact_id', ()
 });
 
 describe('Test Request isolation (Stage 1b)', () => {
-  test('a test request row is stopped after its claim, before any mint, recovery or send', async () => {
-    const deps = { ...dependencies(), isolationEnabled: () => true,
-      resolveTestState: jest.fn(async () => ({ kind: 'synthetic', reason: 'marker_and_run_valid' })) };
+  function isolated(kind) {
+    return {
+      ...dependencies(),
+      isolationEnabled: () => true,
+      getMessage: jest.fn(async () => message()),
+      resolveTestState: jest.fn(async () => ({ kind, reason: 'x' })),
+    };
+  }
+
+  test('a test request row is stopped before any claim, mint, recovery or send', async () => {
+    const deps = isolated('synthetic');
     const result = await deliverScheduledEmail(message().id, {}, deps);
     expect(result.stopped).toBe(true);
     expect(deps.resolveTestState).toHaveBeenCalledWith(message().request_id);
-    expect(deps.cancelForSource).toHaveBeenCalled();
+    expect(deps.cancelForSource).toHaveBeenCalledWith(message().id, 'test_request');
+    expect(deps.claimSend).not.toHaveBeenCalled();
     expect(deps.mintForRequest).not.toHaveBeenCalled();
     expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
     expect(deps.createEmailActivity).not.toHaveBeenCalled();
     expect(deps.sendEmail).not.toHaveBeenCalled();
   });
 
-  test('an unreadable marker takes the failure path (retried later), not a permanent stop', async () => {
-    const deps = { ...dependencies(), isolationEnabled: () => true,
-      resolveTestState: jest.fn(async () => ({ kind: 'unknown', reason: 'read_failed' })) };
+  test('an unreadable marker throws with no durable write, so a later run retries', async () => {
+    const deps = isolated('unknown');
     await expect(deliverScheduledEmail(message().id, {}, deps)).rejects.toMatchObject({ code: 'test_request_state_unknown' });
+    expect(deps.claimSend).not.toHaveBeenCalled();
     expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.recordFailure).not.toHaveBeenCalled();
     expect(deps.mintForRequest).not.toHaveBeenCalled();
-    expect(deps.recordFailure).toHaveBeenCalled();
+  });
+
+  test('a verified ordinary row is claimed after the check', async () => {
+    const deps = isolated('ordinary');
+    await deliverScheduledEmail(message().id, {}, deps);
+    expect(deps.claimSend).toHaveBeenCalled();
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+  });
+
+  test('send-now by a PD who does not own the row does not stop it', async () => {
+    const deps = isolated('synthetic');
+    const result = await deliverScheduledEmail(message().id, { force: true, pdSystemUserId: 'someone-else' }, deps);
+    expect(result).toEqual({ skipped: true });
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
   });
 });

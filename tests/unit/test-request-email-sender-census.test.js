@@ -42,12 +42,12 @@ const RECORDED_SENDERS = {
   'lib/services/reviewer-engagement/terminal-transition.js': { audience: 'reviewer', early: [] },
   'lib/services/reviewer-reminder-sweep.js': { audience: 'reviewer', early: [] },
   'lib/services/reviewer-thankyou-sweep.js': { audience: 'reviewer', early: [] },
-  // deliverScheduledEmail checks the request right after its claim (injected
+  // deliverScheduledEmail checks the request before its claim (injected
   // resolveTestState); sendEmail's dispatch recheck is the backstop.
   'lib/services/scheduled-email-service.js': { audience: 'grantee', early: [] },
   'lib/services/site-visit-materials/collection-service.js': {
     audience: 'materials',
-    early: ['createMaterialsCollection', 'inviteMaterialsContributors', 'remindMaterialsContributors', 'sendReminderEmail'],
+    early: ['createMaterialsCollection', 'inviteMaterialsContributors', 'remindMaterialsContributors'],
   },
   'lib/services/workbench/grantee-deliverables/send-invite-service.js': { audience: 'grantee', early: ['sendGranteeInvite'] },
 };
@@ -55,9 +55,9 @@ const RECORDED_SENDERS = {
 // lib/ files that reach a sender through its exported send helpers rather than
 // the transport, with where their test-request refusal lives.
 const RECORDED_INDIRECT = {
-  'lib/services/cron/grantee-deliverable-reminders-service.js': 'deliverScheduledEmail checks after claim; scheduled-job skip lands in Stage 1c',
+  'lib/services/cron/grantee-deliverable-reminders-service.js': 'processRow skips test requests before recipient reads or ledger writes; deliverScheduledEmail checks before claim',
   'lib/services/reviewer-manual-reminder.js': 'sendOneReminder sends with the request as regarding; delivery seam and dispatch recheck',
-  'lib/services/site-visit-materials/reminder-sweep.js': 'per-row check before read, preparation or claim; sendReminderEmail refuses too',
+  'lib/services/site-visit-materials/reminder-sweep.js': 'per-row check before read, preparation or claim; sendReminderEmail (post-claim) does no read',
 };
 
 function walk(dir, out = []) {
