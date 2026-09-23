@@ -1,6 +1,6 @@
 # Test Request Factory — schema proposal
 
-Status: **SANDBOX SCHEMA APPLIED; ONE MARKED REQUEST CREATED; READ-ONLY PREVIEW DEPLOYED; no create/copy route, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields are createable and persist through create. Request 1000338 proves effective create permission and server numbering after a bounded GoVerify bypass; disabled sandbox background processing prevented folder/document verification, and the requested meeting date was rewritten. The deployed Admin preview is non-writing and does not change the schema rollout boundary below.
+Status: **SANDBOX SCHEMA APPLIED; ONE MARKED REQUEST CREATED; READ-ONLY PREVIEW DEPLOYED; no create/copy route, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields are createable and persist through create. Request 1000338 proves effective create permission and server numbering after a bounded GoVerify bypass; its meeting date was rewritten. The attempt-window readback found no folder while sandbox background processing was disabled. A later read-only check found one staff-created location and an empty folder, without establishing automatic provisioning (`evidence/test-request-factory/location-followup-2026-09-23.json`). The deployed Admin preview is non-writing and does not change the schema rollout boundary below.
 
 ## Proposed schema wave
 
@@ -85,7 +85,7 @@ Metadata GET proves logical names, types, createability flags, required-level de
 - that the target SharePoint location is provisioned;
 - that Dataverse Search, FetchXML, exports, workers and email/payment paths honor the marker.
 
-The first controlled rehearsal was owner-authorized and rejected by the sandbox synchronous workflow chain before persistence. The owner then classified GoVerify as irrelevant to the exercise and authorized a temporary sandbox bypass plus one fresh create. Request 1000338 persisted the marker, run ID and both reminder-false values and received a server number. The requested meeting date did not survive processing, and no SharePoint location appeared while sandbox background processing was disabled; see the dated handoff and receipts. A schema default of false is a compatibility default, not a security control.
+The first controlled rehearsal was owner-authorized and rejected by the sandbox synchronous workflow chain before persistence. The owner then classified GoVerify as irrelevant to the exercise and authorized a temporary sandbox bypass plus one fresh create. Request 1000338 persisted the marker, run ID and both reminder-false values and received a server number. The requested meeting date did not survive processing, and no SharePoint location appeared in the original attempt window while sandbox background processing was disabled. A location and empty folder appeared later under a staff user; see the dated handoff and both receipts. A schema default of false is a compatibility default, not a security control.
 
 The reproducible census receipt is `docs/plans/evidence/test-request-factory/platform-2026-09-20.json` (probe: `scripts/probe-test-request-platform.js`). Both targets report `{SEQNUM:7}` request-number metadata and document management enabled; neither proves a create or provisioning outcome.
 

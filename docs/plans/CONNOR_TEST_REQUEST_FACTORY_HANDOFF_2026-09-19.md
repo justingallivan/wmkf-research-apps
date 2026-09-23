@@ -1,6 +1,6 @@
 # Connor handoff — Test Request Factory platform gates
 
-Status: **CONNOR RESPONSE RECEIVED; ONE MARKED SANDBOX REQUEST CREATED; FULL DOCUMENT-WORKFLOW REHEARSAL BLOCKED BY DISABLED SANDBOX BACKGROUND PROCESSING; PRODUCTION ENABLEMENT BLOCKED.** This handoff records Connor's 2026-09-21 answers, the owner's fixture-isolation decision, and both controlled sandbox attempts. It does not authorize production schema/data writes, email, payment, file copying, another Request create, or cleanup.
+Status: **CONNOR RESPONSE RECEIVED; ONE MARKED SANDBOX REQUEST CREATED; ITS LOCATION/FOLDER LATER APPEARED UNDER A STAFF USER; AUTOMATIC PROVISIONING AND PRODUCTION ENABLEMENT REMAIN UNPROVED.** This handoff records Connor's 2026-09-21 answers, the owner's fixture-isolation decision, both controlled sandbox attempts, and a later read-only follow-up. It does not authorize production schema/data writes, email, payment, file copying, another Request create, or cleanup.
 
 ## Questions and Connor's answers
 
@@ -53,7 +53,13 @@ The operator's first post-restore assertion expected one total activation row an
 Two Stage 0 discrepancies remain:
 
 - The requested meeting date `2099-12-01` read back as `2024-12-13`; the responsible synchronous default/workflow is not yet identified.
-- No Dynamics SharePoint document location appeared. Bounded async-operation readback showed that the sandbox is in **Disable Background Processing** mode and canceled every observed asynchronous Request workflow in the attempt window. This prevents the sandbox from validating Connor's expected document/folder behavior, but does not by itself identify the location provisioner.
+- No Dynamics SharePoint document location appeared **during that attempt-window readback**. Bounded async-operation readback showed that the sandbox was in **Disable Background Processing** mode and canceled every observed asynchronous Request workflow in the attempt window. This could not validate Connor's expected automatic document/folder behavior or identify the location provisioner. A later location and folder observation is recorded below.
+
+## Later read-only location follow-up — 2026-09-23 UTC
+
+[VERIFIED via exact Dataverse Request/location/creator/parent GETs, Graph folder list, and refreshed complete plugin-step census; sanitized receipt: `evidence/test-request-factory/location-followup-2026-09-23.json`] Sandbox Request 1000338 now has exactly one resolved `sharepointdocumentlocation` under `akoya_request`, and its physical SharePoint folder exists with zero root items. The location was created at `2026-09-22T18:51:10Z`, about 20 hours after the Request, with **Justin Gallivan** as `createdby`. Production reference Request 1002788 has one location created about 82 seconds after its Request by **# BCO akoyaGO Integration**. The sandbox meeting date remains `2024-12-13`, and its marker/run still match.
+
+The refreshed metadata census found an enabled asynchronous `AkoyaGo.AsyncEntityCreated` registration on production Request Create and no matching sandbox registration; both step collections were complete HTTP 200. This is a concrete environment difference, not proof that the production step provisions folders. The late sandbox location under a staff user does not establish automatic provisioning or the action that created it. Enabling background processing alone is therefore not a proven sandbox-parity remedy.
 
 ## Read-only Admin preview integration — 2026-09-21/22
 
@@ -70,6 +76,6 @@ Neither Request exposed allowlisted proposal documents. A bounded read-only inve
 
 ## Remaining platform-owner action
 
-GoVerify is no longer the immediate create blocker for this exercise, and Copy Applicant to Payee is not independently broken. Before relying on this sandbox for document-generation tests, the platform owner must enable/restore the required sandbox background processing or provide another isolated environment where those async workflows run; identify the actual SharePoint location provisioner and its trigger; and explain or configure the meeting-date rewrite so a recipe can produce deterministic state. Do not treat background-disabled success as proof that normal create/update automations are safe.
+GoVerify is no longer the immediate create blocker for this exercise, and Copy Applicant to Payee is not independently broken. First identify the actual location provisioner and trigger, explain why production and sandbox Request Create registrations differ, and determine what action created the late staff-owned sandbox location. Then select an isolated target with the necessary plugin/flow registrations and background processing, and explain or configure the meeting-date rewrite so a recipe can produce deterministic state. Do not treat the current empty folder or background-disabled create as proof that normal create/update automations are safe.
 
 Production remains blocked until marker-aware ordinary consumer guards, automation exclusions, and the location/folder contract are implemented and independently verified. The successful sandbox Request proves effective create permission, server number allocation, marker/run/reminder persistence, and absence of the checked synchronous payment/email/account/Contact effects. It does not prove folder uniqueness, SharePoint file-history isolation, deterministic meeting-date handling, or behavior with normal background processing enabled. Before any executor is built or another create is attempted, approve concrete copy limits and supply a document-bearing sandbox source (or a separately approved isolated fixture) that can exercise the selected-file path. The app-suite creator/owner policy is decided and compiled offline, but its executor readback and staff access effects remain to be verified. A second create requires a new manifest and separate authorization; the prior bounded authorization is spent.

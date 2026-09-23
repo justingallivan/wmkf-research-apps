@@ -1,6 +1,6 @@
 # Session 532 Prompt: Test Request preview integrated; create/copy remains blocked
 
-## Current branch update — 2026-09-22 PT
+## Current branch update — 2026-09-22/23 PT
 
 [OWNER DECISION] Test Requests created by this app suite should have
 `# WMK: Research Review App Suite` as Dataverse creator and owner. Sandbox
@@ -12,6 +12,19 @@ Dataverse-managed defaults and never sends them or `createdby` in its body.
 Its focused regression test passes. This does not add an executor or a
 post-create identity check. The external branch Preview still runs an older
 deployment and was not re-smoked for this change.
+
+[VERIFIED via read-only Dataverse/Graph GETs and refreshed complete plugin-step
+census, 2026-09-23 UTC] The original Request 1000338 attempt-window receipt
+correctly found no document location then. The Request now has one resolved
+`akoya_request` location and an empty physical folder; the location was created
+about 20 hours after the Request under Justin Gallivan's staff user. Production
+reference Request 1002788's location was created about 82 seconds after its
+Request under the GOApply integration application user. Production registers an
+enabled `AkoyaGo.AsyncEntityCreated` Request Create step absent from sandbox.
+The actor/timing contrast and step difference do not identify the provisioner;
+enabling sandbox background processing alone is not a proven parity remedy.
+Request 1000338's meeting date remains `2024-12-13`. See
+`docs/plans/evidence/test-request-factory/location-followup-2026-09-23.json`.
 
 ## Session 531 Summary
 
@@ -68,9 +81,11 @@ production deployment or production Dataverse/SharePoint write was performed.
 4. **Durable Test Request records reconciled.**
    - Design, Stage 0 platform contract, schema proposal and Connor handoff now
      distinguish the deployed read-only preview from create/copy readiness.
-   - Request 1000338 remains a sandbox-only rehearsal record. Its missing folder
-     and rewritten meeting date remain evidence of incomplete sandbox parity,
-     not permission to test in production.
+   - Request 1000338 remains a sandbox-only rehearsal record. Its location/folder
+     was absent during the original readback but appeared later under a staff
+     user; automatic provisioning remains unproved. The rewritten meeting date
+     remains evidence of incomplete sandbox parity, not permission to test in
+     production.
 
 ### Commits
 
@@ -94,12 +109,14 @@ production deployment or production Dataverse/SharePoint write was performed.
    `lib/services/test-requests/admin-preview-service.js`. Decide maximum file
    count, per-file bytes, total bytes and supported MIME types independently of
    preview hash ceilings.
-3. **Provide one document-bearing sandbox source and restore the platform path
-   needed to create it.**
+3. **Provide one document-bearing sandbox source and identify a repeatable
+   isolated provisioning path.**
    Evidence: 150 linked sandbox Requests produced no canonical allowlisted set;
    sandbox background processing canceled Request async workflows during the
-   1000338 rehearsal. Connor/platform owner must identify and configure the
-   SharePoint location provisioner or provide another approved isolated target.
+   1000338 rehearsal. Its later empty folder does not supply documents or prove
+   the create trigger. Production and sandbox Request Create registrations
+   differ; the platform owner must identify the provisioner and supply a target
+   with the needed registration and background behavior.
 4. **Implement Stage 1 isolation before any create/copy executor.**
    Evidence: `TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md` inventories
    ordinary list/search/export/worker/transport consumers; those marker-aware
@@ -110,9 +127,10 @@ production deployment or production Dataverse/SharePoint write was performed.
 1. Keep or retire the branch-scoped Preview alias/config after the other Codex
    session decides whether to merge, continue or abandon this branch. Inspect
    current Vercel state first; another session may have changed the shared alias.
-2. Decide with Connor whether to re-enable required sandbox background
-   processing or use a different isolated environment. Do not use production as
-   the document-provisioning experiment.
+2. After the provisioner/registration difference is explained, decide with
+   Connor whether to restore required sandbox background processing and parity
+   or use a different isolated environment. Do not use production as the
+   document-provisioning experiment.
 
 ### Parked
 
