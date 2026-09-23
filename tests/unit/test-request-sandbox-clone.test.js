@@ -149,6 +149,15 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain('Preallocated request GUID is not absent');
     expect(script).toContain('READ_ONLY_PREFLIGHT');
     expect(script).toContain('writeNewJson(args.prepare, manifest)');
+    const bypassIntent = script.indexOf('updateReservedJson(receiptDescriptor, receipt);\n        const workflowDeactivated');
+    const bypassWrite = script.indexOf('await setGoverifyWorkflowState(' , bypassIntent);
+    expect(bypassIntent).toBeGreaterThan(-1);
+    expect(bypassWrite).toBeGreaterThan(bypassIntent);
+    const requestIntent = script.indexOf('receipt.createAttempted = true;');
+    const receiptPersist = script.indexOf('updateReservedJson(receiptDescriptor, receipt);', requestIntent);
+    const requestWrite = script.indexOf("client.post('/akoya_requests'", receiptPersist);
+    expect(receiptPersist).toBeGreaterThan(requestIntent);
+    expect(requestWrite).toBeGreaterThan(receiptPersist);
     const mainBody = script.slice(script.indexOf('async function main()'), script.indexOf('main().catch'));
     expect(mainBody).not.toMatch(/client\.(post|patch|delete)\s*\(/);
     expect(script).toContain('verifyCloneRequestReadback(manifest, request)');

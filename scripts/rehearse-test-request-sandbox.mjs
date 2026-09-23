@@ -8,7 +8,7 @@
  * unexpired manifest and a new receipt path:
  *
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs
- *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --prepare=/absolute/manifest.json --source-request-number=1000339
+ *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --prepare=/absolute/manifest.json --source-request-number=<actual-grant-request-number>
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --execute=/absolute/manifest.json --receipt=/absolute/receipt.json
  *
  * The script never deletes or resets the created Request. An ambiguous create
@@ -133,7 +133,8 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log('Read-only: node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs');
-  console.log('Prepare:  ... --prepare=/absolute/new-manifest.json --source-request-number=1000339 [--fiscal-year=...] [--meeting-date=...]');
+  console.log('Prepare:  ... --prepare=/absolute/new-manifest.json --source-request-number=<actual-grant-request-number> [--fiscal-year=...] [--meeting-date=...]');
+  console.log('Replace the source-number placeholder with an actual sandbox Grant Request number.');
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
   console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
@@ -928,6 +929,7 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
         // From this point forward a failed or ambiguous PATCH still requires
         // a readback and explicit restoration attempt in the finally block.
         goverifyRestoreRequired = true;
+        updateReservedJson(receiptDescriptor, receipt);
         const workflowDeactivated = await setGoverifyWorkflowState(
           client,
           workflowBefore,
@@ -947,6 +949,8 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       assertCopiedSourceValues(sourceBeforePost, manifest.createBody);
 
       receipt.createAttempted = true;
+      receipt.createAttemptedAt = new Date().toISOString();
+      updateReservedJson(receiptDescriptor, receipt);
       created = await client.post('/akoya_requests', manifest.createBody, {
         Prefer: 'return=representation',
       });
