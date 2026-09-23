@@ -163,6 +163,35 @@ describe('compileBasicCloneFilePlan', () => {
     })]);
   });
 
+  test.each([
+    ['before the destination number exists', {}, 'AI Materials/ProposalNarrative_{new-request-number}.pdf'],
+    ['after the destination number exists', { destinationRequestNumber: '1000999' }, 'AI Materials/ProposalNarrative_1000999.pdf'],
+  ])('blocks two sources of one numbered PDF %s', (_label, extraTrusted, pathname) => {
+    const current = document({
+      folder: '1000123_GUID/AI Materials',
+      id: 'narrative-current',
+      kind: TEST_REQUEST_DOCUMENT_KINDS.proposalNarrative,
+      name: 'ProposalNarrative_1000123.pdf',
+    });
+    const archived = document({
+      ...current,
+      contentHash: HASH_B,
+      folder: 'Archive/1000123/AI Materials',
+      id: 'narrative-archive',
+    });
+    const result = compile(
+      { ...extraTrusted, sourceDocuments: [current, archived] },
+      { selectedDocumentIds: ['narrative-current', 'narrative-archive'] },
+    );
+
+    expect(result.planReady).toBe(false);
+    expect(result.plannedFiles).toEqual([]);
+    expect(result.blockers).toContainEqual(expect.objectContaining({
+      code: 'DESTINATION_COLLISION',
+      detail: `Multiple selected documents resolve to ${pathname}.`,
+    }));
+  });
+
   test('rejects unsafe destination request numbers on the generated-document path', () => {
     const reviewer = document({
       folder: '1000123_GUID/Reviewer Materials',

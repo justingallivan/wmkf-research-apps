@@ -273,7 +273,7 @@ export default function TestRequestPreviewSection() {
               <div>
                 <h3 id="test-request-documents-heading" className="text-base font-semibold text-gray-950">Proposal documents</h3>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
-                  Phase I files are selected by default. Generated proposal files may contain the old Request identity and require a dedicated transformer.
+                  Phase I files and the numbered proposal PDFs are selected by default. Numbered PDFs are copied as-is and renamed to the new Request number.
                 </p>
               </div>
               <span className="text-sm tabular-nums text-gray-500">{selectedIds.length} selected</span>

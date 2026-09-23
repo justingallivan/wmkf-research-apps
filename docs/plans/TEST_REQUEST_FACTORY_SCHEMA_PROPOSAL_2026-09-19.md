@@ -119,12 +119,19 @@ Stage 1 must add marker-aware reads/guards at the following exact source surface
 | `pages/api/meeting-tracker/visits/[requestId]/materials.js` | Route dispatches invite/remind actions | Preserve route auth and map marked-request denial; service remains authoritative |
 | `lib/services/site-visit/logistics-service.js` | Site-visit scheduling eligibility | Do not alter ordinary eligibility; deny synthetic scheduling unless a later recipe explicitly permits it |
 | `lib/services/reviewer-reminder-sweep.js` | Scheduled reviewer reminder worker | Add marker to request projection and skip marked rows before claims/token mint/send |
-| `lib/services/reviewer-manual-reminder.js` | Staff-triggered reviewer reminders | Resolve marker and deny marked requests before claim/send |
-| `lib/services/review-manager/send-emails-service.js` | Reviewer invitation transport | Resolve parent request marker before any email activity; deny marked rows in V1 |
+| `lib/services/reviewer-manual-reminder.js` | Staff-triggered reviewer reminders | Resolve marker before claim/send; on marked requests allow only a confined synthetic recipient (see note below) and deny everything else |
+| `lib/services/review-manager/send-emails-service.js` | Reviewer invitation transport | Resolve parent request marker before any email activity; on marked requests allow only a confined synthetic recipient (see note below) and deny everything else |
+| `lib/services/reviewer-thankyou-sweep.js` (cron `send-review-thankyous`) | Scheduled thank-you email over all received, un-thanked suggestions | Skip marked requests before send (added 2026-09-23) |
+| `lib/services/review-synthesis-drain.js` (cron `drain-review-syntheses`) | Scheduled AI review synthesis | Skip marked requests before provider work (added 2026-09-23) |
+| `lib/services/review-documents/individual-file-service.js` (cron `file-review-docx`) | Scheduled review DOCX filing to SharePoint | Skip marked requests unless a later recipe explicitly files synthetic reviews (added 2026-09-23) |
+| `lib/services/reviewer-suggestion-sweep.js` (cron `sweep-stale-invites`) | Scheduled stale-invite status change | Skip marked requests (added 2026-09-23) |
+| `lib/services/external-review/respond-service.js` → `lib/services/reviewer-acceptance-drain.js` (cron `drain-reviewer-acceptances`) | Accept enqueues a job whose drain promotes the reviewer to a CRM Contact and runs honorarium/BILL onboarding | In production, marked requests must not promote a Contact or onboard for payment; the accept itself may record (added 2026-09-23) |
 | `lib/services/initial-assessment/artifact-service.js` | Provider-backed IA generation | Deny generic paid generation for marked rows; future IA preset uses a separate synthetic artifact path |
 | `pages/api/phase-i-dynamics/summarize-v2.js` | Phase-I provider route | Resolve marker before provider invocation; deny marked rows in V1 |
 | `lib/bill/honorarium-onboard-orchestrator.js` | Honorarium/request creation and reminder defaults | Reject marked source requests from ordinary honorarium flow; no payment fixture in V1 |
 | `lib/services/grantee-submit-notification.js` | Grantee email notification | Resolve marker before email dispatch; deny marked rows |
+
+**Reviewer email confinement (owner amendment 2026-09-23, design doc decision 4).** Synthetic reviewers use real staff-controlled throwaway inboxes so staff can exercise reviewer interactions, so staff-triggered reviewer email on a marked request is confined rather than denied. A send is allowed only when the request marker is true, the recipient's reviewer person row carries the synthetic-person marker, and the recipient address exactly equals the address recorded on that person for this run; every other case fails closed. Once the run ledger exists, the recorded run assignment becomes the authority for the address match. Materials-contributor and grantee email on marked requests remain denied in V1.
 
 This is the minimum Stage 1 inventory from current source fan-out. It is not a claim that off-platform flows, vendor plugins, Power Automate, or every report have been proven safe. Stage 1 must add a symbol/field census gate so newly found raw `akoya_request` readers cannot silently bypass the marker.
 
@@ -145,7 +152,7 @@ Rollback is additive and leaves fields in place. First disable new factory creat
 - Marker truth table: true/false/null/missing/invalid marker and valid/invalid/mismatched run ID.
 - Initial INSERT contract test: marker true, run ID present, both reminder flags false, applicant binding to accounts, no source number/contact/annotation/workflow fields.
 - Reader fan-out tests for every file in the Stage 1 inventory; direct-ID and aggregate totals must remain complete after exclusion.
-- Transport/provider negative tests proving marked rows cannot invite, remind, generate, pay, notify or mint links; ordinary unmarked regressions remain unchanged.
+- Transport/provider negative tests proving marked rows cannot generate, pay, notify or mint links, and cannot invite or remind any recipient other than a confined synthetic reviewer; positive tests proving a confined synthetic reviewer can be invited and reminded; ordinary unmarked regressions remain unchanged.
 - Trigger/flow disconfirming rehearsal owned by the platform owner; source tests cannot substitute for this evidence.
 - Run sequentially: focused policy/consumer Jest tests, relevant gate and its self-test, `check:api-routes` and self-test for new routes, `check:atlas` and self-test after Atlas updates, `check:fact-consistency` and self-test, `check:doc-currency` and self-test, scoped lint, then build. No schema apply or production promotion until all relevant gates and platform evidence pass.
 
