@@ -21,7 +21,7 @@ restored immediately after the Request POST. The raw receipt's sole failed
 assertion expected `akoya_submissionaccepted=null`; live Boolean metadata
 proved `DefaultValue=false` and the stored value was false, so source now checks
 false. No extra Request was created to retest that assertion. Both rehearsal
-Requests 1000338 and 1000339 still exhibit the meeting-date rewrite
+Requests 1000338 and 1000339 exhibited the meeting-date rewrite at create
 (`2099-12-01` requested, `2024-12-13` stored).
 
 Evidence and current contract: [branch receipt](https://github.com/justingallivan/wmkf-research-apps/blob/d99b4043b5cba48f633c32950830ade8bf18837a/docs/plans/evidence/test-request-factory/app-owned-location-rehearsal-2026-09-23.json),
@@ -29,9 +29,12 @@ Evidence and current contract: [branch receipt](https://github.com/justingalliva
 The branch's script syntax and lint, 72 focused tests, doc-currency and
 fact-consistency gates and their self-tests, docs catalog, and diff check passed.
 
+**2026-09-23 follow-up [VERIFIED via read-only sandbox/production workflow metadata and one guarded sandbox PATCH]:** Active sandbox business rule `WMKF_Set Meeting Date` has server-side XAML assigning `2024-12-13` for fiscal years containing `December` and `2024-06-07` for `June`. No workflow with that exact name was visible in Production. One ETag-guarded PATCH of `wmkf_meetingdate` on retained marked Request 1000339 returned 204 and read back `2099-12-01`; a later inspection found that date retained, one location, and no payment or regarding-email rows. The marker and app owner remained intact. The sandbox rehearsal script now corrects and verifies the date once after create, reconciles an ambiguous response by readback, and never retries the PATCH blindly. This is branch commit `523d705bd`, pushed with [sanitized evidence](https://github.com/justingallivan/wmkf-research-apps/blob/523d705bdaa8469fe4ff85e31a4c788c4d39b30a/docs/plans/evidence/test-request-factory/meeting-date-rule-and-patch-2026-09-23.json). The combined create-plus-correction path has not created a third Request.
+
 **Next:** Use the proven app-owned folder/location path for the eventual
-executor. Investigate the meeting-date rewrite and implement Stage 1 synthetic
-isolation before any production creation. Production also needs a policy for a
+executor. Implement Stage 1 synthetic isolation before any production creation.
+The sandbox meeting-date correction is now proven separately; verify the combined
+path on a future bounded run. Production also needs a policy for a
 possible vendor-created duplicate location; the production-only
 `AkoyaGo.AsyncEntityCreated` step is still a candidate, not a proven
 provisioner. The exact AkoyaGO automatic provisioner is no longer a prerequisite
