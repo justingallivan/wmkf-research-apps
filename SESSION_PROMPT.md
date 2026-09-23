@@ -66,7 +66,7 @@ handoffs are not part of the current `main` checkout:
    `codex/test-request-preview-integration` at `b334d8a59`. Its
    [branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/b334d8a5976f6ec29de0a28a982a802cb112fdd0/SESSION_PROMPT.md)
    records a signed-in sandbox Preview smoke. Create/copy remains blocked by
-   the ownership-field contract, execution file policy, Stage 1 isolation,
+   the not-yet-implemented ownership-field contract, execution file policy, Stage 1 isolation,
    and a document-bearing sandbox fixture. The owner chose read-only blocker
    investigation as the next scope; no additional sandbox create, schema
    operation, document copy, or production integration is authorized by it.
@@ -85,9 +85,9 @@ The one successful sandbox POST for retained Request 1000338 omitted both
 `ownerid` and `owneridtype`. The current row still matches the test marker/run;
 its owner is a `systemuser`, equals `createdby` and `owninguser`, and that user
 has the authenticated application's ID. This proves the sandbox supplied an
-application-user owner for that exact create. It does not decide whether
-application-user ownership is the desired factory policy or prove a Production
-default. The branch's pure compiler still reports both fields as unresolved;
+application-user owner for that exact create. This readback alone did not
+establish a Production default. The owner policy is now decided below, but the
+branch's pure compiler still reports both fields as unresolved;
 no feature-branch code changed in this investigation.
 
 [VERIFIED via `scripts/probe-request-owner.js --request=1002852` production GET at
@@ -106,10 +106,10 @@ by this repo. `ownerid`, `createdby`, and `owninguser` agree; `owningteam` is
 empty. Dataverse `createdby` names the writing principal, not necessarily the
 human who initiated the action through the app.
 
-[OWNER-PROVIDED CONTEXT, 2026-09-22 PT] Request 1002852 is a real GOApply
-portal application, while 1003259 is an honorarium Request made by this app
-suite. The owner favors the app suite as creator of future Test Requests and
-considers it a likely owner, pending advice. [RECOMMENDED, NOT IMPLEMENTED]
+[OWNER DECISION, 2026-09-22 PT] Request 1002852 is a real GOApply portal
+application, while 1003259 is an honorarium Request made by this app suite.
+After reviewing the recommendation, the owner settled that the app suite
+should be both creator and owner of future Test Requests. [DECIDED, NOT IMPLEMENTED]
 Have the app suite create without staff impersonation; omit `createdby`,
 `ownerid`, and `owneridtype` from the POST, and require readback that creator
 and owner are the expected app user. Keep the initiating staff actor in the
@@ -147,11 +147,6 @@ by this read-only investigation.
 
 ### Owner Decision Needed
 
-- Test Request creator/owner: the owner has supplied the GOApply versus app
-  suite distinction and asked for advice. The recommendation above is to use
-  the app suite principal for both and verify Dataverse-assigned owner and
-  creator after create. Treat this as a proposed policy until the owner accepts
-  it; do not change the compiler's blocker or enable creates on this note alone.
 - Suite-wide personal email defaults (carried from S529): unchanged, see
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
