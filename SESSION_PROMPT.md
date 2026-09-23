@@ -22,16 +22,17 @@ record. This branch merge and offline work do not authorize a Preview deployment
 Production Dataverse read, new SharePoint upload, or cleanup deletion. Obtain a separate owner
 approval for each live run and each exact cleanup.
 
-Next: resolve the Edge browser location, then obtain separate owner approval for a bounded live run with the exact request,
+Next: obtain separate owner approval for a bounded live run with the exact request,
 SharePoint target, approved MP4, Production Dataverse-read decision, immutable Preview deployment,
 any runtime-target settings, and a temporary alias window. [VERIFIED via read-only Vercel
 inspection 2026-09-23] the shared alias still resolved to Ready
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the presentation branch had no scoped Preview variables,
 while the Test Request branch still had its four scoped names. [VERIFIED via Applications and
-Spotlight 2026-09-23] Edge is not installed on this Mac, so its matrix cell is still open.
+Spotlight 2026-09-23] Edge is not installed on this Mac; the owner will run its matrix cell
+on another Edge device. That live evidence is still open.
 Re-inspect immediately before an
 alias change and after restoration. Never set `DATAVERSE_ALLOW_PROD_READS` as this agent. The
-owner runs macOS/iPadOS Safari by hand using the plan.
+owner runs Edge, macOS Safari, and iPadOS Safari by hand using the plan.
 
 The current main-branch handoff follows. Its Test Request work is owned by another checkout;
 this presentation session does not edit or run that workstream.

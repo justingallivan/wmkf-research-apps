@@ -812,17 +812,24 @@ owner before deleting each exact disposable item.
 | Browser | Scenario | Expected recorded evidence | Runner |
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. New recovery code remains untested live. | Agent (receipt already recorded) |
-| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | Redacted Network trace: direct Microsoft PUT 202 ranges, no MP4 application body, 302 then Microsoft 206 ranges, one resolver action per Watch/Download, source/download byte and SHA-256 match. | Agent if Edge is installed on this Mac, or owner on another Edge device, after owner live-run approval |
+| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | Redacted Network trace: direct Microsoft PUT 202 ranges, no MP4 application body, 302 then Microsoft 206 ranges, one resolver action per Watch/Download, source/download byte and SHA-256 match. | Owner on another Edge device, after owner live-run approval |
 | macOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts and source/download byte plus SHA-256 match; note any autoplay permission prompt or playback error. | Owner by hand |
 | iPadOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts where Web Inspector is available, plus Files-app downloaded byte count/hash compared on a trusted computer; note any mobile-specific failure. | Owner by hand |
-| Edge, then one Safari | Let a paused upload session expire; attempt Resume; cleanup only after owner confirmation; start a fresh proof | 410 `presentation_media_proof_session_expired`, retained permit, exact cleanup outcome (including `placeholder_deleted` only after confirmed terminal session), new session and successful finalize; no old partial item promoted. | Agent for Edge; owner for Safari |
-| Edge, then one Safari | Let a five-minute proof token expire; reload old link; mint a new link with Finish saving from the committed item | Old context/open refuses (401); fresh link plays and seeks; exact item identity remains stable. | Agent for Edge; owner for Safari |
-| Desktop Edge | Upload a real MP4 near 2,000,000,000 bytes (record exact size); run long-duration seeking and Download | Session expiry, elapsed upload time, measured bytes/second, projected 2,000,000,000-byte completion before expiry with margin, seek positions, direct Microsoft 206 ranges, and size/SHA-256 match. | Agent with owner-supplied sanctioned media and approval |
+| Edge, then one Safari | Let a paused upload session expire; attempt Resume; cleanup only after owner confirmation; start a fresh proof | 410 `presentation_media_proof_session_expired`, retained permit, exact cleanup outcome (including `placeholder_deleted` only after confirmed terminal session), new session and successful finalize; no old partial item promoted. | Owner on Edge and Safari |
+| Edge, then one Safari | Let a five-minute proof token expire; reload old link; mint a new link with Finish saving from the committed item | Old context/open refuses (401); fresh link plays and seeks; exact item identity remains stable. | Owner on Edge and Safari |
+| Desktop Edge | Upload a real MP4 near 2,000,000,000 bytes (record exact size); run long-duration seeking and Download | Session expiry, elapsed upload time, measured bytes/second, projected 2,000,000,000-byte completion before expiry with margin, seek positions, direct Microsoft 206 ranges, and size/SHA-256 match. | Owner with sanctioned media and approval |
 
 **Owner click sequence for macOS Safari and iPadOS Safari.** Do this separately in each browser
 with a newly approved disposable item; Safari on iPad uses the Files app for selection/download.
-[VERIFIED via Applications and Spotlight, 2026-09-23] Edge is not installed on the agent's Mac;
-its runner and live result remain open pending the owner's browser choice.
+[VERIFIED via Applications and Spotlight, 2026-09-23] Edge is not installed on the agent's Mac.
+The owner chose another Edge device; its live result remains open.
+
+**Owner Edge sequence.** On the separate Edge device, follow steps 1, 2, 4, 5, and 6 below
+with the same approved target and a fresh disposable item. For step 3, right-click
+**Open proof page** and select **Copy link**; open Edge's **⋯ → New InPrivate window**,
+paste the link, then perform both Watch modes and seeks as described. In Edge DevTools,
+open **Network**, enable **Preserve log**, and record only redacted method/status/origin/range/
+byte-count facts. Do not share a Network archive that contains bearer URLs.
 
 1. Open the owner-approved immutable Preview origin and sign in to Meeting Tracker. Open
    `/meeting-tracker/presentation-media-proof`. In macOS Safari Web Inspector (or paired iPad Web
