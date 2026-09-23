@@ -1,4 +1,45 @@
-# Session 532 Prompt: Request Document missing-actor warning noise fixed and released
+# Session 533 Prompt: Test Request app-owned folder and location proven in sandbox
+
+## Session 532 Test Request update — 2026-09-22/23 PT
+
+[VERIFIED via sandbox Dataverse and Graph writes/readbacks, 60-second observation,
+Git, focused tests and document gates] The owner directed us to create the
+synthetic Request folder and Dataverse location ourselves. On the isolated
+`codex/test-request-preview-integration` branch, commit `d99b4043b` adds that
+path to the bounded sandbox rehearsal script and is pushed. The branch remains
+separate from `main`; its deployed Admin preview remains read-only, and no
+production schema, Request, document, or runtime code was changed.
+
+The fresh marked sandbox Request **1000339** (`63dab4af-178f-4bbc-b24d-3ccbaf74cbfc`)
+and its `sharepointdocumentlocation` (`76e1d537-b0ad-4fa8-98d0-008dab6106e8`)
+were created and owned by `# WMK: Research Review App Suite`. Graph created the
+exact `akoya_request/1000339_63DAB4AF178F4BBCB24D3CCBAF74CBFC` folder; the
+Dataverse location binds to that Request and the one verified `akoya_request`
+parent. The folder read back empty. No payment, regarding email, or Foundation
+account/Contact change appeared in the 60-second window. GoVerify was
+restored immediately after the Request POST. The raw receipt's sole failed
+assertion expected `akoya_submissionaccepted=null`; live Boolean metadata
+proved `DefaultValue=false` and the stored value was false, so source now checks
+false. No extra Request was created to retest that assertion. Both rehearsal
+Requests 1000338 and 1000339 still exhibit the meeting-date rewrite
+(`2099-12-01` requested, `2024-12-13` stored).
+
+Evidence and current contract: [branch receipt](https://github.com/justingallivan/wmkf-research-apps/blob/d99b4043b5cba48f633c32950830ade8bf18837a/docs/plans/evidence/test-request-factory/app-owned-location-rehearsal-2026-09-23.json),
+[Stage 0 contract](https://github.com/justingallivan/wmkf-research-apps/blob/d99b4043b5cba48f633c32950830ade8bf18837a/docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md).
+The branch's script syntax and lint, 72 focused tests, doc-currency and
+fact-consistency gates and their self-tests, docs catalog, and diff check passed.
+
+**Next:** Use the proven app-owned folder/location path for the eventual
+executor. Investigate the meeting-date rewrite and implement Stage 1 synthetic
+isolation before any production creation. Production also needs a policy for a
+possible vendor-created duplicate location; the production-only
+`AkoyaGo.AsyncEntityCreated` step is still a candidate, not a proven
+provisioner. The exact AkoyaGO automatic provisioner is no longer a prerequisite
+for sandbox fixture creation. File-copy policy and a document-bearing source
+remain later Basic-clone work. Do not repeat the broad Connor questions or
+ask the owner to hand-create folders.
+
+## Prior Session 532 Prompt: Request Document missing-actor warning noise fixed and released
 
 ## Session 531 Summary
 
