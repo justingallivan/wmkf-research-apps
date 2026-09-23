@@ -77,6 +77,30 @@ the shared Preview alias and branch-scoped configuration before any change;
 the branch handoffs' external-state observations were not re-probed in this
 coordination update.
 
+### Test Request read-only blocker investigation — 2026-09-22 PT
+
+[VERIFIED via the checked-in sandbox create manifest and
+`scripts/probe-test-request-sandbox-owner.js` GET at 2026-09-23 01:21 UTC]
+The one successful sandbox POST for retained Request 1000338 omitted both
+`ownerid` and `owneridtype`. The current row still matches the test marker/run;
+its owner is a `systemuser`, equals `createdby` and `owninguser`, and that user
+has the authenticated application's ID. This proves the sandbox supplied an
+application-user owner for that exact create. It does not decide whether
+application-user ownership is the desired factory policy or prove a Production
+default. The branch's pure compiler still reports both fields as unresolved;
+no feature-branch code changed in this investigation.
+
+[VERIFIED via the 2026-09-21 sandbox rehearsal receipt; current setting not
+re-probed] Background processing was disabled and Request async workflows
+were canceled. The actual request-to-SharePoint-location provisioner and the
+meeting-date rewrite remain unidentified. [Microsoft's administration-mode
+guide](https://learn.microsoft.com/en-us/power-platform/admin/admin-mode)
+says disabled background operations stop Dataverse asynchronous workflows and
+Dataverse-triggered flows, while some other processes may still run. Obtain
+platform-owner isolation and provisioner evidence before changing that setting or
+attempting another create. No platform setting or business record was changed
+by this read-only investigation.
+
 ### Verified Open
 
 1. **First natural production proof of PR #325.**
@@ -96,6 +120,10 @@ coordination update.
 
 ### Owner Decision Needed
 
+- Decide whether future synthetic Requests should keep the Dataverse
+  application user as owner or use a named staff user/team. The sandbox
+  default is verified above; access and workflow expectations need a product
+  choice before changing the compiler's blocker.
 - Suite-wide personal email defaults (carried from S529): unchanged, see
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
@@ -125,6 +153,8 @@ coordination update.
 
 ## Key Files
 
+- `scripts/probe-test-request-sandbox-owner.js` — pinned sandbox ownership
+  readback for the retained Test Request fixture
 - `lib/services/request-document-actor-service.js` — policies, `isActorNotCaptured`
 - `lib/dataverse/adapters/request-document.js` — `create()` event sites
 - `lib/services/site-visit-materials/contributor-service.js` — applicant upload create
