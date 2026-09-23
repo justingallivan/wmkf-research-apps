@@ -71,8 +71,7 @@ sequence.
   `Forbidden` while GETs pass. Seen on the Explorer chat POST during the
   `integration/2026-09-19` Preview smoke; worked around with a branch-scoped Preview
   `NEXTAUTH_URL` set to the alias origin. Pre-existing, not a regression.
-  **Runbook option (a) documented 2026-09-23 on
-  `codex/preview-alias-csrf-runbook`, pending merge:**
+  **Runbook option (a) documented 2026-09-23:**
   `docs/AUTHENTICATION_SETUP.md` Step 2.4 and
   `.claude-memory/project-vercel-cli-deploy-preview-auth.md` specify the exact
   branch scope, new deployment, validation-only POST, and alias/environment
