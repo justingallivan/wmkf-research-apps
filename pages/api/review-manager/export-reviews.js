@@ -11,6 +11,7 @@ import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { exportCombinedReviews } from '../../../lib/services/review-manager/export-reviews-service';
 import { withRequestCorrelation, mintCorrelationId } from '../../../lib/observability/request-correlation';
+import { contentDisposition } from '../../../lib/utils/content-disposition';
 
 const DOCX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -42,7 +43,7 @@ async function handleWithCorrelation(req, res) {
       }),
     );
     res.setHeader('Content-Type', DOCX_CONTENT_TYPE);
-    res.setHeader('Content-Disposition', `attachment; filename="${exported.filename}"`);
+    res.setHeader('Content-Disposition', contentDisposition('attachment', exported.filename));
     res.setHeader('Cache-Control', 'private, no-store');
     return res.status(200).send(exported.content);
   } catch (error) {

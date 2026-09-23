@@ -17,10 +17,15 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/services/reviewer-candidate-export', () => ({
   buildReviewerCandidateWorkbook: jest.fn(),
 }));
+jest.mock('../../lib/services/workbench/export-candidates-service', () => ({
+  exportCandidates: jest.fn((...args) =>
+    jest.requireActual('../../lib/services/workbench/export-candidates-service').exportCandidates(...args)),
+}));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { buildReviewerCandidateWorkbook } from '../../lib/services/reviewer-candidate-export';
+import { exportCandidates } from '../../lib/services/workbench/export-candidates-service';
 import handler from '../../pages/api/workbench/export-candidates';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
@@ -120,8 +125,22 @@ test('golden path: builds the workbook from the authoritatively-fetched request 
     candidates: body().candidates,
   });
   expect(res.headers['Content-Type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  expect(res.headers['Content-Disposition']).toMatch(/^attachment; filename="reviewer-candidates-1002794-\d{4}-\d{2}-\d{2}\.xlsx"$/);
+  expect(res.headers['Content-Disposition']).toMatch(/^attachment; filename="(reviewer-candidates-1002794-\d{4}-\d{2}-\d{2}\.xlsx)"; filename\*=UTF-8''\1$/);
   expect(res.headers['Content-Length']).toBe(Buffer.from('xlsx-bytes').length);
+  expect(res.body).toEqual(Buffer.from('xlsx-bytes'));
+});
+
+test('encodes quoted, Unicode, and CR/LF characters in the service filename', async () => {
+  exportCandidates.mockResolvedValueOnce({
+    buffer: Buffer.from('xlsx-bytes'),
+    filename: 'bad"é\r\nInjected: yes.xlsx',
+  });
+  const res = mockRes();
+  await handler(reqOf(body()), res);
+  expect(res.headers['Content-Disposition']).toBe(
+    `attachment; filename="bad_Injected: yes.xlsx"; filename*=UTF-8''bad%22%C3%A9Injected%3A%20yes.xlsx`,
+  );
+  expect(res.headers['Content-Disposition']).not.toMatch(/[\r\n]/);
   expect(res.body).toEqual(Buffer.from('xlsx-bytes'));
 });
 

@@ -15,6 +15,7 @@ import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { exportCandidates } from '../../../lib/services/workbench/export-candidates-service';
+import { contentDisposition } from '../../../lib/utils/content-disposition';
 
 const MAX_CANDIDATES = 500;
 
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
     try {
       const { buffer, filename } = await exportCandidates({ requestId: requestGuid, candidates });
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Disposition', contentDisposition('attachment', filename));
       res.setHeader('Content-Length', buffer.length);
       return res.status(200).send(buffer);
     } catch (err) {

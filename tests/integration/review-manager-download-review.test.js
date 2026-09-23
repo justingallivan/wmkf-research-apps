@@ -103,7 +103,7 @@ describe('/api/review-manager/download-review', () => {
     expect(res.send).toHaveBeenCalledWith(Buffer.from('pdf-bytes'));
     expect(res._headers).toMatchObject({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': 'attachment; filename="review.pdf"',
+      'Content-Disposition': `attachment; filename="review.pdf"; filename*=UTF-8''review.pdf`,
       'Content-Length': 1234,
       'Cache-Control': 'private, no-store',
     });

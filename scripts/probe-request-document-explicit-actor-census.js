@@ -20,6 +20,7 @@
 const ALLOWED_UNATTRIBUTED_ORIGIN_STAGES = new Map([
   ['initial-assessment-generation', null],
   ['pre-site-generation', null],
+  ['pre-rp-brief-generation', 'request-workbench-pre-rp-brief'],
   ['consultant-feedback-attachment', 'consultant-feedback'],
 ]);
 
@@ -276,9 +277,11 @@ async function main() {
   if (counts.violation) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(`Census failed: ${error.message}`);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`Census failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
 
 module.exports = { classifyRows, parseSince };
