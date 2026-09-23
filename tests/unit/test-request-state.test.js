@@ -1,4 +1,8 @@
-import { resolveRequestTestState } from '../../lib/services/test-requests/request-test-state.js';
+import {
+  createRequestTestStateLookup,
+  recordTestRequestSkip,
+  resolveRequestTestState,
+} from '../../lib/services/test-requests/request-test-state.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RUN_ID = '22222222-2222-4222-8222-222222222222';
@@ -44,5 +48,30 @@ describe('resolveRequestTestState', () => {
     const state = await resolveRequestTestState(requestId, { getRequestById });
     expect(state).toEqual({ kind: 'unknown', reason });
     if (reason === 'request_id_invalid') expect(getRequestById).not.toHaveBeenCalled();
+  });
+});
+
+describe('createRequestTestStateLookup (scheduled-job skips)', () => {
+  test('reads nothing and reports ordinary while the switch is off', async () => {
+    const resolve = jest.fn();
+    const lookup = createRequestTestStateLookup({ resolve, env: {} });
+    await expect(lookup(REQUEST_ID)).resolves.toMatchObject({ kind: 'ordinary' });
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  test('resolves each request once per run, case-insensitively', async () => {
+    const resolve = jest.fn(async () => ({ kind: 'synthetic', reason: 'x' }));
+    const lookup = createRequestTestStateLookup({ resolve, env: { TEST_REQUEST_ISOLATION: 'on' } });
+    await lookup(REQUEST_ID);
+    await expect(lookup(REQUEST_ID.toUpperCase())).resolves.toMatchObject({ kind: 'synthetic' });
+    expect(resolve).toHaveBeenCalledTimes(1);
+  });
+
+  test('counts test and unreadable skips separately', () => {
+    const summary = {};
+    recordTestRequestSkip(summary, { kind: 'synthetic' });
+    recordTestRequestSkip(summary, { kind: 'anomaly' });
+    recordTestRequestSkip(summary, { kind: 'unknown' });
+    expect(summary).toEqual({ skippedTestRequest: 2, testStateUnknown: 1 });
   });
 });

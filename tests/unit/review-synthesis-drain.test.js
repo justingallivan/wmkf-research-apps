@@ -27,6 +27,14 @@ jest.mock('../../lib/services/review-synthesis-job-service', () => ({
   recordReviewSynthesisJobFailure: (...args) => recordReviewSynthesisJobFailure(...args),
 }));
 
+// Stage 1c: the per-run test-state lookup is replaced so each test chooses a
+// request's state; the lookup itself is covered in test-request-state.test.js.
+const mockRequestTestState = jest.fn(async () => ({ kind: 'ordinary', reason: 'test' }));
+jest.mock('../../lib/services/test-requests/request-test-state', () => ({
+  ...jest.requireActual('../../lib/services/test-requests/request-test-state'),
+  createRequestTestStateLookup: () => (requestId) => mockRequestTestState(requestId),
+}));
+
 const { drainReviewSynthesisJobs } = require('../../lib/services/review-synthesis-drain');
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -46,6 +54,7 @@ function submittedRow(overrides = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRequestTestState.mockImplementation(async () => ({ kind: 'ordinary', reason: 'test' }));
   findReviewSynthesisParticipants.mockResolvedValue({
     records: [submittedRow()],
     capped: false,
@@ -146,3 +155,36 @@ test('revalidates and runs a matching claimed job through automatic mode', async
     job,
   });
 });
+
+describe('Test Request isolation (Stage 1c)', () => {
+  test('a test request gets no automatic job and no context read', async () => {
+    mockRequestTestState.mockImplementation(async () => ({ kind: 'synthetic', reason: 'x' }));
+    const result = await drainReviewSynthesisJobs();
+    expect(result).toMatchObject({ enqueued: 0, skippedTestRequest: 1 });
+    expect(loadReviewSynthesisContext).not.toHaveBeenCalled();
+    expect(enqueueAutomaticReviewSynthesisJob).not.toHaveBeenCalled();
+  });
+
+  test('a job enqueued before the switch is cancelled before any provider call', async () => {
+    mockRequestTestState.mockImplementation(async () => ({ kind: 'synthetic', reason: 'x' }));
+    const job = { id: 9, request_id: REQUEST_ID, input_hash: INPUT_HASH, attempts: 1 };
+    claimAutomaticReviewSynthesisJobs.mockResolvedValue([job]);
+    const result = await drainReviewSynthesisJobs();
+    expect(cancelReviewSynthesisJob).toHaveBeenCalledWith(job, 'test_request');
+    expect(result.cancelled).toBe(1);
+    expect(findByRequest).not.toHaveBeenCalled();
+    expect(synthesizeReviews).not.toHaveBeenCalled();
+  });
+
+  test('an unreadable marker on a claimed job takes the retryable failure path, not a cancel', async () => {
+    mockRequestTestState.mockImplementation(async () => ({ kind: 'unknown', reason: 'read_failed' }));
+    const job = { id: 9, request_id: REQUEST_ID, input_hash: INPUT_HASH, attempts: 1 };
+    claimAutomaticReviewSynthesisJobs.mockResolvedValue([job]);
+    const result = await drainReviewSynthesisJobs();
+    expect(cancelReviewSynthesisJob).not.toHaveBeenCalled();
+    expect(recordReviewSynthesisJobFailure).toHaveBeenCalledWith(job, expect.any(Error), expect.objectContaining({ retryable: true }));
+    expect(synthesizeReviews).not.toHaveBeenCalled();
+    expect(result.failed).toBe(1);
+  });
+});
+
