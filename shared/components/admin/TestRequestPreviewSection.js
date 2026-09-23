@@ -18,14 +18,12 @@ function valueText(value) {
 const OPERATION_LABELS = Object.freeze({
   blocked: 'Blocked',
   omitted: 'Omitted',
-  'requires-transform': 'Needs transformer',
   'would-copy': 'Would copy',
 });
 
 const OPERATION_TONES = Object.freeze({
   blocked: 'red',
   omitted: 'gray',
-  'requires-transform': 'amber',
   'would-copy': 'green',
 });
 
@@ -90,7 +88,7 @@ export default function TestRequestPreviewSection() {
       if (controller.signal.aborted || contextVersion !== contextVersionRef.current) return;
       setSourceState(body);
       setSourceNumber(body.source.requestNumber);
-      setSelectedIds(body.documents.filter((document) => document.copyMode === 'copy').map((document) => document.id));
+      setSelectedIds(body.documents.filter((document) => document.copyMode === 'copy' || document.copyMode === 'copy-rename').map((document) => document.id));
       setForm({
         testLabel: body.defaults.testLabel,
         fiscalYear: body.defaults.fiscalYear,
@@ -310,8 +308,8 @@ export default function TestRequestPreviewSection() {
                       <td className="px-4 py-3 text-gray-600">{document.source === 'dynamics' ? 'Current Request folder' : 'Request archive'}</td>
                       <td className="px-4 py-3 tabular-nums text-gray-600">{formatBytes(document.size)}</td>
                       <td className="px-4 py-3">
-                        <StatusChip tone={document.copyMode === 'copy' ? 'green' : 'amber'}>
-                          {document.copyMode === 'copy' ? 'Direct copy candidate' : 'Transformer required'}
+                        <StatusChip tone="green">
+                          {document.copyMode === 'copy-rename' ? 'Copy, renamed to new number' : 'Direct copy candidate'}
                         </StatusChip>
                       </td>
                     </tr>

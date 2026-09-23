@@ -105,7 +105,7 @@ describe('compileBasicCloneFilePlan', () => {
     expect(result.plannedFiles[0].source).toMatchObject({ eTag: 'etag-only', versionId: null });
   });
 
-  test('shows a non-executable template and blocks generated artifacts without a transformer', () => {
+  test('plans numbered proposal PDFs as a byte copy renamed once the destination number exists', () => {
     const reviewer = document({
       folder: '1000123_GUID/Reviewer Materials',
       id: 'reviewer-proposal',
@@ -117,20 +117,20 @@ describe('compileBasicCloneFilePlan', () => {
       { selectedDocumentIds: ['reviewer-proposal'] },
     );
 
-    expect(result.planReady).toBe(false);
-    expect(result.plannedFiles).toEqual([]);
-    expect(result.blockers).toContainEqual(expect.objectContaining({
-      code: 'DOCUMENT_TRANSFORMER_REQUIRED',
-      field: 'reviewer-proposal',
-    }));
-    expect(result.previewFiles[0]).toEqual(expect.objectContaining({
-      destination: {
-        folder: 'Reviewer Materials',
-        filename: null,
-        filenameTemplate: 'Proposal_{new-request-number}.pdf',
-      },
-      operation: 'requires-transform',
-    }));
+    expect(result.blockers).toEqual([]);
+    expect(result.planReady).toBe(true);
+    expect(result.executionReady).toBe(false);
+    const destination = {
+      folder: 'Reviewer Materials',
+      filename: null,
+      filenameTemplate: 'Proposal_{new-request-number}.pdf',
+    };
+    expect(result.previewFiles[0]).toEqual(expect.objectContaining({ destination, operation: 'would-copy' }));
+    expect(result.plannedFiles).toEqual([expect.objectContaining({
+      destination,
+      operation: 'copy',
+      source: expect.objectContaining({ id: 'reviewer-proposal', name: 'Proposal_1000123.pdf', contentHash: reviewer.contentHash }),
+    })]);
   });
 
   test.each([
@@ -155,8 +155,12 @@ describe('compileBasicCloneFilePlan', () => {
       { selectedDocumentIds: [kind] },
     );
     expect(result.previewFiles[0].destination).toEqual({ folder, filename, filenameTemplate: null });
-    expect(result.previewFiles[0].operation).toBe('requires-transform');
-    expect(result.plannedFiles).toEqual([]);
+    expect(result.previewFiles[0].operation).toBe('would-copy');
+    expect(result.plannedFiles).toEqual([expect.objectContaining({
+      destination: { folder, filename, filenameTemplate: null },
+      operation: 'copy',
+      source: expect.objectContaining({ name: sourceName }),
+    })]);
   });
 
   test('rejects unsafe destination request numbers on the generated-document path', () => {

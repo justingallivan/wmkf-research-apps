@@ -128,6 +128,30 @@ test('loads server inventory and posts only source identity plus browser choices
   expect(postOptions.body).not.toContain('testOrganizationId');
 });
 
+test('preselects numbered proposal PDFs as copy-and-rename candidates', async () => {
+  const narrative = {
+    ...loadedSource.documents[0],
+    id: 'opaque-narrative-id',
+    kind: 'proposalNarrative',
+    label: 'Proposal narrative',
+    name: 'ProposalNarrative_1002001.pdf',
+    folder: 'AI Materials',
+    copyMode: 'copy-rename',
+  };
+  global.fetch.mockResolvedValueOnce(jsonResponse({
+    ...loadedSource,
+    documents: [...loadedSource.documents, narrative],
+  }));
+  render(<TestRequestPreviewSection />);
+
+  fireEvent.change(screen.getByLabelText('Source Request number'), { target: { value: '1002001' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Load source' }));
+
+  expect(await screen.findByLabelText('Include Proposal narrative')).toBeChecked();
+  expect(screen.getByText('Copy, renamed to new number')).toBeInTheDocument();
+  expect(screen.getByText('Direct copy candidate')).toBeInTheDocument();
+});
+
 test('sends only an explicitly changed meeting date as an override', async () => {
   global.fetch
     .mockResolvedValueOnce(jsonResponse(loadedSource))
