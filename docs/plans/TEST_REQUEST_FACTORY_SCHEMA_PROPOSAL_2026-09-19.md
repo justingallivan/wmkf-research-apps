@@ -68,10 +68,10 @@ The resolver must return an explicit classification; it must never interpret `un
 | Marker true, missing/invalid run | Synthetic anomaly: exclude and deny; never ordinary. |
 | Marker false, no run | Ordinary: preserve normal authorized behavior; no run ID required. |
 | Marker false or null with a run | Inconsistent: exclude/deny and report for investigation. |
-| Explicit null, no run, verified pre-factory legacy row | Compatibility classification for lists only, after schema and selected projection/read behavior are established. Do not infer legacy status from null alone. |
+| Explicit null, no run (selected projection) | Ordinary. [VERIFIED via read-only sandbox query, 2026-09-23] Existing rows read back null after the field is applied (0 false, 2 true among 5,000+); only the factory writes the marker, always `true` in the initial INSERT. See the design doc's *Stage 1 decisions and plan*. |
 | Missing property, missing schema, failed query, malformed value or unproven null | Unknown: fail closed. A projection omission must not expose a marked row or allow dispatch. |
 
-Transport/provider actions require a positively verified ordinary classification. Before guard rollout, prove existing rows yield literal false or establish a separately reviewed legacy normalization; do not blindly enable a guard that breaks every historical row. There is no client `testMode`, `verified` or bypass flag. Exclusion fragments must preserve this classification in OData, FetchXML, direct-ID and Search; a paged client filter is not a complete query.
+Transport/provider actions require a positively verified ordinary classification. The legacy-null normalization above is the reviewed rule (Stage 1a); a guard must never treat a selected null marker as unknown, or it would block every historical row. There is no client `testMode`, `verified` or bypass flag. Exclusion fragments must preserve this classification in OData, FetchXML, direct-ID and Search; a paged client filter is not a complete query.
 
 ## Metadata versus permission/default proof
 
@@ -172,7 +172,7 @@ This is the minimum Stage 1 inventory from current source fan-out. It is not a c
 
 1. **Preflight only:** validate both targets' metadata, relationship `akoya_applicantid@odata.bind` → `accounts`, create/update permissions, field defaults and trigger ownership. Keep production enablement disabled.
 2. **Expand schema:** apply the isolated marker/run wave only after preflight approval, first to the approved sandbox. Verify exact logical names and no Power Automate trigger. Provision the existing reminder controls separately where absent; do not proceed with factory creation until both false writes are supported.
-3. **Read compatibility:** deploy marker resolver and ordinary read exclusion code with no create UI. Verified false rows remain ordinary; any legacy-null compatibility must meet the resolver evidence rule; marked rows are excluded/denied according to the inventory above. Verify direct-ID, Search, FetchXML, exports and worker projections.
+3. **Read compatibility:** deploy marker resolver and ordinary read exclusion code with no create UI. False and selected-null rows with no run remain ordinary; marked rows are excluded/denied according to the inventory above. Verify direct-ID, Search, FetchXML, exports and worker projections.
 4. **Guard and rehearsal:** enable marked-request transport/provider denials, then run a bounded sandbox create only after suppression owner evidence and permission checks. Verify initial marker/run/reminder values, number readback, no trigger side effects, and exact downstream read behavior.
 5. **Production promotion:** promote schema and guards deliberately under the campaign release strategy, with a last-known-good deployment and platform-owner evidence. Production clone creation remains disabled until the isolation and possible duplicate-location gates close.
 
@@ -209,7 +209,7 @@ Previous proposal-only review (before the local isolation slice below): Sol **AC
 
 ## Local isolation implementation — 2026-09-20 UTC
 
-[VERIFIED via source and sandbox schema dry-run] `lib/dataverse/schema/wave29-test-request-isolation/akoya_request-test-request-isolation.json` contains only the two proposed attributes. `lib/services/test-requests/isolation.js` provides a pure classifier, ordinary assertion, and fixed parenthesized OData / AND FetchXML fragments. Only explicit false plus explicit null run is ordinary. Missing, malformed and unverified legacy-null values deny dispatch. Classification does not establish actor authorization or matching ledger ownership. No runtime consumer imports this module yet; the Stage 1 inventory above is still outstanding.
+[VERIFIED via source and sandbox schema dry-run] `lib/dataverse/schema/wave29-test-request-isolation/akoya_request-test-request-isolation.json` contains only the two proposed attributes. `lib/services/test-requests/isolation.js` provides a pure classifier, ordinary assertion, and fixed parenthesized OData / AND FetchXML fragments. A selected false or null marker with a null run is ordinary (Stage 1a, 2026-09-23; originally only explicit false was). Unselected, malformed and inconsistent values deny dispatch. Classification does not establish actor authorization or matching ledger ownership. No runtime consumer imports this module yet; the Stage 1 inventory above is still outstanding.
 
 The schema tests invoke the existing `ensureAttribute` engine with a mock client and verify emitted Dataverse payloads, rather than duplicating a schema builder. The existing engine is unchanged.
 

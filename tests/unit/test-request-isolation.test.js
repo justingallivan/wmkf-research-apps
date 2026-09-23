@@ -21,7 +21,9 @@ describe('test-request isolation classifier', () => {
     [{ [fields.marker]: false, [fields.runId]: null }, 'ordinary'],
     [{ [fields.marker]: false, [fields.runId]: '' }, 'anomaly'],
     [{ [fields.marker]: false, [fields.runId]: VALID_RUN }, 'anomaly'],
-    [{ [fields.marker]: null, [fields.runId]: null }, 'unknown'],
+    [{ [fields.marker]: null, [fields.runId]: null }, 'ordinary'],
+    [{ [fields.marker]: null }, 'unknown'],
+    [{ [fields.marker]: 'false', [fields.runId]: null }, 'unknown'],
     [{ [fields.marker]: null, [fields.runId]: VALID_RUN }, 'anomaly'],
     [{ [fields.marker]: false }, 'unknown'],
     [{ [fields.runId]: null }, 'unknown'],
@@ -40,9 +42,9 @@ describe('test-request isolation classifier', () => {
     expect(JSON.stringify(snapshot)).toBe(before);
   });
 
-  test('does not provide a legacy-null exemption or test-operation authorization', () => {
+  test('classifies selected legacy nulls as ordinary without granting test-operation authorization', () => {
     const result = classifyTestRequestSnapshot({ [fields.marker]: null, [fields.runId]: null });
-    expect(result.kind).toBe('unknown');
+    expect(result).toEqual({ kind: 'ordinary', reason: 'marker_null_and_run_null' });
     expect(result).not.toHaveProperty('authorized');
     expect(result).not.toHaveProperty('marker');
     expect(result).not.toHaveProperty('runId');
@@ -56,7 +58,8 @@ describe('test-request isolation classifier', () => {
     expect(assertOrdinaryRequestSnapshot({ [fields.marker]: true, [fields.runId]: VALID_RUN })).toEqual({
       ok: false, code: 'test_request_not_ordinary',
     });
-    expect(assertOrdinaryRequestSnapshot({ [fields.marker]: null, [fields.runId]: null })).toEqual({
+    expect(assertOrdinaryRequestSnapshot({ [fields.marker]: null, [fields.runId]: null })).toEqual({ ok: true });
+    expect(assertOrdinaryRequestSnapshot({ [fields.marker]: null })).toEqual({
       ok: false, code: 'test_request_not_ordinary',
     });
     expect(assertOrdinaryRequestSnapshot({ kind: 'ordinary' })).toEqual({
@@ -66,10 +69,10 @@ describe('test-request isolation classifier', () => {
 });
 
 describe('ordinary-only query fragments', () => {
-  test('uses the exact false + null contract', () => {
-    expect(buildOrdinaryTestRequestODataFilter()).toBe('(wmkf_istestrequest eq false and wmkf_testcreationrunid eq null)');
+  test('treats a false or legacy-null marker with no run as ordinary', () => {
+    expect(buildOrdinaryTestRequestODataFilter()).toBe('((wmkf_istestrequest eq false or wmkf_istestrequest eq null) and wmkf_testcreationrunid eq null)');
     expect(buildOrdinaryTestRequestFetchXmlFilter()).toBe(
-      '<filter type="and"><condition attribute="wmkf_istestrequest" operator="eq" value="0"/><condition attribute="wmkf_testcreationrunid" operator="null"/></filter>',
+      '<filter type="and"><filter type="or"><condition attribute="wmkf_istestrequest" operator="eq" value="0"/><condition attribute="wmkf_istestrequest" operator="null"/></filter><condition attribute="wmkf_testcreationrunid" operator="null"/></filter>',
     );
   });
 
