@@ -10,6 +10,7 @@ import { REVIEW_STATUS_MAP } from '../../shared/config/reviewerLifecycle';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+const LIVE_REQUEST_ID = '22222222-2222-4222-8222-222222222223';
 const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
 
 function acceptedSuggestion(overrides = {}) {
@@ -723,6 +724,38 @@ describe('processReviewerAcceptanceJob — Test Request isolation (Stage 1b)', (
     expect(d.jobs.cancelReviewerAcceptanceJob).toHaveBeenCalledWith(
       expect.anything(), 'test_request_followup_skipped', expect.any(Object),
     );
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+  });
+
+  it('uses the live suggestion request relationship instead of the stale job payload', async () => {
+    const d = {
+      ...deps(acceptedSuggestion({ _wmkf_request_value: LIVE_REQUEST_ID })),
+      isolationEnabled: () => true,
+      resolveTestState: jest.fn(async (requestId) => ({
+        kind: requestId === LIVE_REQUEST_ID ? 'synthetic' : 'ordinary',
+        reason: 'fixture',
+      })),
+    };
+
+    const result = await processReviewerAcceptanceJob(job(), d);
+
+    expect(d.resolveTestState).toHaveBeenCalledWith(LIVE_REQUEST_ID);
+    expect(result).toMatchObject({ status: 'cancelled', reason: 'test_request_followup_skipped' });
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+  });
+
+  it('reports lease loss when test-request cancellation no-ops under a stale token', async () => {
+    const d = {
+      ...deps(),
+      isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'synthetic', reason: 'marker_and_run_valid' })),
+    };
+    d.jobs.cancelReviewerAcceptanceJob.mockResolvedValueOnce(null);
+
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({
+      code: 'reviewer_acceptance_lease_lost',
+      retryable: true,
+    });
     for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
   });
 
