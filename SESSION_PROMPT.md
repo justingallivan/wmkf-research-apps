@@ -1,10 +1,10 @@
-# Session 535 Prompt: Sandbox Basic clone reviewed; branch publication pending
+# Session 535 Prompt: Sandbox Basic clone reviewed; select live source
 
 ## Session 534 Summary — 2026-09-22/23 PT
 
 [VERIFIED via local Git, source, focused tests, relevant gates, and three read-only Claude Opus review rounds] The isolated `codex/test-request-preview-integration` branch now has a sandbox-only Basic clone operator. It resolves exactly one Grant Request by number, defaults fiscal year and meeting date from that source, copies only purpose and requested amount, and prepares a private source-bound v3 manifest. Execute fences the source before its single Request POST, creates the marked Request under the app-suite Dataverse application user, provisions the exact SharePoint folder/location, and verifies content, ownership, location, and absence of payment/email effects. Receipt milestones support exact-ID recovery without blind retry. Opus found no remaining P1/P2 defect after three bounded rounds.
 
-This work was **source-built and tested offline only**. No new Dataverse Request, Graph folder, production capability, or deployment was created in Session 534. The combined fresh create, meeting-date correction, and folder run remains unproven. The previous Session 533 instruction to supply both cycle values to `--prepare` is historical: the new v3 operator reads them from the selected source unless one is missing or explicitly overridden. Request 1000339 is a retained synthetic rehearsal record, not the default clone source.
+This work was **source-built and tested offline only**. The operator created no new Dataverse Request or Graph folder, and no production capability was promoted. The combined fresh create, meeting-date correction, and folder run remains unproven. The previous Session 533 instruction to supply both cycle values to `--prepare` is historical: the new v3 operator reads them from the selected source unless one is missing or explicitly overridden. Request 1000339 is a retained synthetic rehearsal record, not the default clone source.
 
 ### Commits
 
@@ -13,13 +13,13 @@ This work was **source-built and tested offline only**. No new Dataverse Request
 - `0e3296296` — Harden sandbox clone receipt recovery
 - `a7def6a3` — Fail closed on uncertain GoVerify deactivation
 
-All four commits are **local only**, in the clean worktree `/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps`, four commits ahead of `origin/codex/test-request-preview-integration`. Automatic approval rejected a push of source to GitHub; `gh repo view` reports `justingallivan/wmkf-research-apps` as **PUBLIC**. An explicit owner decision on publishing to that destination is pending. Do not use an alternate route to bypass the rejection.
+[VERIFIED via successful `git push` and branch status] The owner explicitly authorized publishing to the existing public GitHub origin after automatic approval had rejected Luna's earlier attempt. All four commits are now pushed on `codex/test-request-preview-integration` at `a7def6a31`. The worktree `/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps` is clean and synchronized with origin. The public destination was verified with `gh repo view`; no alternate export path was used.
 
 ### Next Items
 
 **Verified open:** Select an actual sandbox Grant Request number before a bounded live Basic clone. Run read-only `--prepare`, inspect the private manifest and source cycle, then decide whether to run `--execute` with an unused receipt path. Recheck the registered sandbox target, GoVerify state, and source revision. The operator never retries an ambiguous create; use `--inspect` and the preallocated GUID. If deactivation was attempted without a verified inactive readback, the receipt marks `restoreVerified:false` and requires manual workflow verification before proceeding. Stage 1 isolation, production automation suppression, duplicate-location policy, file-copy limits, and a document-bearing source remain for the full product; this CLI slice does not enable production creation.
 
-**Owner decision needed:** Whether to publish these four feature commits to the existing public GitHub repository. The question was sent to the owner. No branch push, PR, merge, or production promotion is implied by local acceptance.
+**Owner input needed for a live sandbox run:** Select an actual Grant Request source number. Publication is done; no PR, merge, or production promotion was requested or performed.
 
 **Verify before acting:** The Admin Preview deployment is from an older branch commit and is still read-only. The new CLI's combined live create/correction/folder path has not been exercised. A client-side timeout or signal cancellation does not prove Dataverse canceled server-side work; exact-ID inspection is required after an ambiguous outcome.
 
