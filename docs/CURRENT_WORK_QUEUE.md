@@ -93,14 +93,17 @@ sequence.
   superscript applied and the toolbar pressed-state tracked each; Undo restored the
   original; no console errors; nothing was saved. The external reviewer portal itself and
   the Playwright authoring spec were not exercised.
-- **Unescaped `Content-Disposition` filenames on five download/export routes (found 2026-09-12, S509).**
-  `pages/api/cycle-dossier/download.js` now uses `lib/utils/content-disposition.js`
-  (ASCII quoted fallback plus RFC 5987 `filename*`). The same raw interpolation or a
-  partial local sanitiser remains in `review-manager/export-reviews.js`,
+- **Safe `Content-Disposition` filenames on five download/export routes (fixed 2026-09-23).**
+  Commit `6f89b1df` converted `review-manager/export-reviews.js`,
   `workbench/export-candidates.js`, `dynamics-explorer/download-document.js`,
-  `review-manager/download-review.js`, and `reviewer-finder/cycle-material.js`.
-  Convert each to the shared helper in one pass with a route test per file; left
-  untouched in S509 under rule 9.
+  `review-manager/download-review.js`, and `reviewer-finder/cycle-material.js` to
+  `lib/utils/content-disposition.js` (ASCII fallback plus UTF-8 `filename*`).
+  Route tests cover quotes, Unicode, and CR/LF in
+  `tests/unit/export-reviews-route.test.js`,
+  `tests/unit/workbench-export-candidates-route.test.js`,
+  `tests/unit/dynamics-explorer-download-document-route.test.js`,
+  `tests/unit/download-review-route.test.js`, and
+  `tests/unit/cycle-material-endpoint.test.js`.
 - **Single-page Request Workbench shell (owner direction 2026-09-08, Session 499).**
   The Workbench was conceived as one page a PD moves across left to right through
   a cycle; the Request list kept its content in place while Reviewer follow-up,

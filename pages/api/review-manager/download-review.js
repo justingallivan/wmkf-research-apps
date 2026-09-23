@@ -27,6 +27,7 @@ import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { downloadReview } from '../../../lib/services/review-manager/download-review-service';
+import { contentDisposition } from '../../../lib/utils/content-disposition';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -51,10 +52,7 @@ export default async function handler(req, res) {
     try {
       const file = await downloadReview({ suggestionId, requestedFilename });
       res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${encodeFilename(file.filename)}"`,
-      );
+      res.setHeader('Content-Disposition', contentDisposition('attachment', file.filename));
       res.setHeader('Content-Length', file.size);
       res.setHeader('Cache-Control', 'private, no-store');
       return res.status(200).send(file.buffer);
@@ -70,10 +68,6 @@ export default async function handler(req, res) {
       });
     }
   });
-}
-
-function encodeFilename(name) {
-  return String(name || 'review').replace(/["\r\n]/g, '');
 }
 
 export const config = {
