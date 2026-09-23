@@ -1,8 +1,9 @@
 # Presentation branch continuation — 2026-09-23
 
-[VERIFIED via Git] This checkout is `codex/feature-request`. The owner approved merging current
-`origin/main` into this branch, committed as `1d455ba9a`; no main push, other checkout edit, or
-Preview deployment occurred. The four named overlap surfaces were checked against the merged
+[VERIFIED via Git and branch-only push] This checkout is `codex/feature-request`, clean and
+equal to its upstream at `26b368604`. The owner-approved `origin/main` merge is `1d455ba9a`;
+the offline Slice 0 hardening is `26b368604`. Neither commit was pushed to main. No other checkout
+was edited and no Preview deployment occurred. The four named overlap surfaces were checked against the merged
 source. The Preview-only proof now has offline-tested bounded edge-byte SHA-256 reselect checks,
 expired-session permit retention and exact terminal-placeholder cleanup, proof-token reissue guidance, one automatic
 playback re-resolution with position restore, and a three-attempt transient Microsoft signature-
@@ -21,9 +22,14 @@ record. This branch merge and offline work do not authorize a Preview deployment
 Production Dataverse read, new SharePoint upload, or cleanup deletion. Obtain a separate owner
 approval for each live run and each exact cleanup.
 
-Next: finish relevant gates and push only this branch; then seek owner authorization for one
-bounded live run with the exact request/SharePoint target, Production Dataverse-read decision,
-Preview deployment, and alias window. The owner runs macOS/iPadOS Safari by hand using the plan.
+Next: obtain separate owner approval for one bounded Edge live run with the exact request,
+SharePoint target, approved MP4, Production Dataverse-read decision, immutable Preview deployment,
+any runtime-target settings, and a temporary alias window. [VERIFIED via read-only Vercel
+inspection 2026-09-23] the shared alias still resolved to Ready
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the presentation branch had no scoped Preview variables,
+while the Test Request branch still had its four scoped names. Re-inspect immediately before an
+alias change and after restoration. Never set `DATAVERSE_ALLOW_PROD_READS` as this agent. The
+owner runs macOS/iPadOS Safari by hand using the plan.
 
 The current main-branch handoff follows. Its Test Request work is owned by another checkout;
 this presentation session does not edit or run that workstream.

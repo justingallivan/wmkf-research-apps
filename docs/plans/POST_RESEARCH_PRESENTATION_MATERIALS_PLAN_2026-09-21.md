@@ -759,7 +759,7 @@ Upload-specific rules:
 ### Slice 0 — Deployed-Preview browser proof
 
 **Implementation status (2026-09-23): CHROME CORE PATH PASSED; OFFLINE RECOVERY HARDENING
-BUILT; SLICE REMAINS OPEN.** [VERIFIED via focused unit/contract tests] the isolated
+PUSHED AT `26b368604`; SLICE REMAINS OPEN.** [VERIFIED via focused unit/contract tests] the isolated
 feature branch contains the Preview-only staff harness, browser-direct Graph upload session,
 encrypted staff permit, five-minute encrypted-subject proof token, fail-closed resolver limiter,
 302/one-shot playback comparison, scoped CSP, and exact-item cleanup. [VERIFIED via signed-in
