@@ -24,6 +24,22 @@ does not make the product plan active. For current status use
 `docs/agent-wiki/topics/intake-portal.md`, `.claude-memory/project-intake-portal-parked.md`, the Atlas,
 and source. The body below is retained for design history and must not be read as a delivery queue.
 
+> **⚠️ Security concern to resolve before any revival (recorded 2026-09-23, Session 535).**
+> [VERIFIED via source] The deployed intake path lets an applicant set arbitrary `akoya_request` fields
+> on their own submission. `/api/intake/draft` accepts any `draftJson` object from an applicant session
+> and stores it without restricting its keys (`pages/api/intake/draft.js`, body validation and upsert);
+> `/api/intake/submit` freezes that `draft_json` into the job payload (`pages/api/intake/submit.js`,
+> "Frozen payload"); and the drain spreads `draftJson.dataverseFields` directly into the request create
+> body (`lib/services/cron/drain-submissions-service.js`, `handleScanning`). No portal UI sends
+> `dataverseFields`, but a signed-in applicant with a live membership could add it by replaying the
+> autosave call, setting status, amounts, payment flags, lookups or the Test Request Factory marker.
+> It is not exploitable in practice while the portal is parked (no applicant accounts are issued), but
+> the routes and the `drain-submissions` cron remain deployed. Before reopening the portal: allowlist the
+> fields `dataverseFields` may carry (or remove the key), validate server-side, add a negative test from
+> draft through drain creation, and review under `docs/API_ROUTE_SECURITY_MATRIX.md`. The Test Request
+> Factory (branch `codex/test-request-preview-integration`, not yet on `main`) is adding a create-time
+> guard for its own marker fields only; it does not close this wider hole.
+
 **Related:**
 - `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md` — reference implementation pattern for token-authenticated public surface
 - `docs/REVIEWER_MATERIALS_FOLDER_SPEC.md` — Connor-shareable folder convention
