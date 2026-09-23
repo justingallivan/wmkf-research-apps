@@ -190,5 +190,18 @@ describe('Test Request isolation (Stage 1c)', () => {
     // Counted once at enqueue (scan) and once for the claimed job.
     expect(result).toMatchObject({ failed: 0, testStateUnknown: 2 });
   });
+
+  test.each(['request_not_found', 'request_id_invalid'])(
+    'a job whose request is permanently unreadable (%s) is cancelled, never requeued',
+    async (reason) => {
+      mockRequestTestState.mockImplementation(async () => ({ kind: 'unknown', reason }));
+      const job = { id: 9, request_id: REQUEST_ID, input_hash: INPUT_HASH, attempts: 1 };
+      claimAutomaticReviewSynthesisJobs.mockResolvedValue([job]);
+      const result = await drainReviewSynthesisJobs();
+      expect(cancelReviewSynthesisJob).toHaveBeenCalledWith(job, reason);
+      expect(releaseReviewSynthesisJob).not.toHaveBeenCalled();
+      expect(result.cancelled).toBe(1);
+    },
+  );
 });
 
