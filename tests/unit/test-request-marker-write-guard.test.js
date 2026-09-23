@@ -52,21 +52,35 @@ describe('assertTestRequestMarkerNotWritten', () => {
     ['setting the marker true', { wmkf_istestrequest: true }],
     ['clearing the run ID', { wmkf_testcreationrunid: null }],
     ['a differently cased key', { WMKF_IsTestRequest: null }],
-  ])('refuses %s on akoya_requests', (_label, data) => {
-    expect(() => assertTestRequestMarkerNotWritten('akoya_requests', data))
+    ['an annotated key', { 'wmkf_istestrequest@OData.Community.Display.V1.FormattedValue': 'Yes' }],
+    ['a deep-insert request nested in another entity', { name: 'x', wmkf_Request: { akoya_title: 't', wmkf_istestrequest: true } }],
+    ['a marker inside an array of related rows', { related: [{ ok: 1 }, { wmkf_testcreationrunid: 'x' }] }],
+  ])('refuses %s', (_label, data) => {
+    expect(() => assertTestRequestMarkerNotWritten(data))
       .toThrow(expect.objectContaining({ code: 'test_request_marker_immutable' }));
   });
 
-  test('matches the entity set with a leading slash or different case', () => {
-    expect(() => assertTestRequestMarkerNotWritten('/Akoya_Requests', { wmkf_istestrequest: null })).toThrow();
+  test.each([
+    ['property-level PUT', `akoya_requests(${REQUEST_ID})/wmkf_istestrequest`],
+    ['property-level DELETE with $value', `akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid/$value`],
+    ['absolute property URL', `https://example.crm.dynamics.com/api/data/v9.2/akoya_requests(${REQUEST_ID})/wmkf_istestrequest`],
+  ])('refuses a %s that names the field in the URL', (_label, url) => {
+    expect(() => assertTestRequestMarkerNotWritten(undefined, url))
+      .toThrow(expect.objectContaining({ code: 'test_request_marker_immutable' }));
+  });
+
+  test('fails closed on a body nested too deeply to check', () => {
+    let body = { leaf: true };
+    for (let i = 0; i < 40; i += 1) body = { child: body };
+    expect(() => assertTestRequestMarkerNotWritten(body)).toThrow();
   });
 
   test.each([
-    ['an ordinary request update', 'akoya_requests', { akoya_title: 'New title' }],
-    ['another entity that happens to use the name', 'contacts', { wmkf_istestrequest: true }],
-    ['a missing body', 'akoya_requests', undefined],
-  ])('allows %s', (_label, entitySet, data) => {
-    expect(() => assertTestRequestMarkerNotWritten(entitySet, data)).not.toThrow();
+    ['an ordinary request body', { akoya_title: 'New title' }],
+    ['a missing body', undefined],
+    ['a field that merely contains the name', { wmkf_istestrequest_note: 'x' }],
+  ])('allows %s', (_label, data) => {
+    expect(() => assertTestRequestMarkerNotWritten(data)).not.toThrow();
   });
 });
 
@@ -77,6 +91,12 @@ describe('DynamicsService write paths', () => {
       wmkf_istestrequest: null,
       wmkf_testcreationrunid: null,
     })).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+    expect(dataverseWrites()).toHaveLength(0);
+  }));
+
+  test('deleteRecord refuses a marker property path before any Dataverse write', ctx(async () => {
+    await expect(DynamicsService.deleteRecord('akoya_requests', `${REQUEST_ID})/wmkf_istestrequest(`))
+      .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
     expect(dataverseWrites()).toHaveLength(0);
   }));
 
@@ -119,6 +139,7 @@ describe('DynamicsService write paths', () => {
     ['alternate-key upsert with a slash in the key', 'PATCH', "akoya_requests(akoya_requestnum='10/03')"],
     ['relative POST create', 'POST', 'akoya_requests'],
     ['absolute POST create', 'POST', 'https://example.crm.dynamics.com/api/data/v9.2/akoya_requests'],
+    ['write through a navigation path of another entity', 'PATCH', `accounts(${RUN_ID})/akoya_requests(${REQUEST_ID})`],
   ])('a changeset %s that names the marker is refused before the batch is sent', (_label, method, url) => (
     bypassDynamicsRestrictions('test:test-request-marker-write-guard', async () => {
       await expect(DynamicsService.executeChangeset([
@@ -127,4 +148,48 @@ describe('DynamicsService write paths', () => {
       expect(dataverseWrites()).toHaveLength(0);
     })
   ));
+
+  test('a changeset DELETE of the marker property is refused before the batch is sent', ctx(async () => {
+    await expect(DynamicsService.executeChangeset([
+      { method: 'DELETE', url: `akoya_requests(${REQUEST_ID})/wmkf_istestrequest` },
+    ])).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+    expect(dataverseWrites()).toHaveLength(0);
+  }));
+});
+
+describe('raw Dataverse client (lib/dataverse/client.js)', () => {
+  const { createClient, TEST_REQUEST_MARKER_FIELDS } = require('../../lib/dataverse/client.js');
+
+  beforeEach(() => {
+    delete process.env.DATAVERSE_TARGET_INTERLOCK;
+  });
+
+  test('keeps its marker field list identical to the service guard', () => {
+    expect([...TEST_REQUEST_MARKER_FIELDS].sort()).toEqual(['wmkf_istestrequest', 'wmkf_testcreationrunid']);
+  });
+
+  test.each([
+    ['post', (c) => c.post('/akoya_requests', { wmkf_istestrequest: true })],
+    ['patch', (c) => c.patch(`/akoya_requests(${REQUEST_ID})`, { wmkf_testcreationrunid: null })],
+    ['raw PUT', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})/wmkf_istestrequest`, { value: true })],
+    ['nested deep insert', (c) => c.post('/accounts', { name: 'x', akoya_request: { wmkf_istestrequest: true } })],
+    ['property-level DELETE', (c) => c.delete_(`/akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid`)],
+  ])('refuses a %s that names the marker before any fetch', async (_label, send) => {
+    const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't' });
+    await expect(send(client)).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test('lets the factory CLI write the marker when it opts in', async () => {
+    const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't', allowTestRequestMarkerWrites: true });
+    await client.post('/akoya_requests', { wmkf_istestrequest: true });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('leaves ordinary writes and reads unchanged', async () => {
+    const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't' });
+    await client.patch(`/akoya_requests(${REQUEST_ID})`, { akoya_title: 'x' });
+    await client.get('/akoya_requests?$select=wmkf_istestrequest');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
 });

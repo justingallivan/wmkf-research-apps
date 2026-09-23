@@ -18,7 +18,7 @@ The local implementation adds an isolated `extensions-on-existing` wave named `w
 | Createable | Preflight absence/spec first; verify `IsValidForCreate` in post-apply target metadata before enabling any factory write |
 | True/false labels | `Test request` / `Ordinary request` |
 | Initial create value | `true`, supplied by the server-side factory in the same request INSERT |
-| Update policy | Written only by the factory's creator (today the local operator CLI). Every deployed app write path refuses a create or update body that names the field (`assertTestRequestMarkerNotWritten`, wired into `DynamicsService.createRecord`, `updateRecord` and changeset POST/PATCH, 2026-09-23) |
+| Update policy | Written only by the factory's creator (today the local operator CLI). Every deployed app write path refuses a body or property URL that names the field, at any depth and on any entity (`assertTestRequestMarkerNotWritten` in `DynamicsService` writes and changesets; a parity copy in the raw client, which only the factory CLI opts out of, 2026-09-23) |
 
 The default false is a compatibility proposal for ordinary rows, not proof that existing rows will return false. Schema preflight and post-apply readback must establish that behavior before guard rollout. Readers must distinguish an authoritative selected value from a missing projection, absent schema or failed query. Test-only operations require marker true plus valid matching run ownership; verified ordinary false rows do not require a run ID. The default does not suppress plugins or flows.
 

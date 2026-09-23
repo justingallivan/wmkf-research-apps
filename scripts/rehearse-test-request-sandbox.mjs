@@ -1154,6 +1154,8 @@ async function main() {
   const client = createClient({
     resourceUrl: SANDBOX_URL,
     token: await getAccessToken(SANDBOX_URL),
+    // The factory CLI is the one sanctioned writer of the Test Request marker.
+    allowTestRequestMarkerWrites: true,
   });
 
   if (args.execute) {
