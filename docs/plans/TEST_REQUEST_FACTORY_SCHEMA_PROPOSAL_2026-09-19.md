@@ -1,6 +1,6 @@
 # Test Request Factory — schema proposal
 
-Status: **SANDBOX SCHEMA APPLIED; ONE MARKED REQUEST CREATED; READ-ONLY PREVIEW DEPLOYED; no create/copy route, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields are createable and persist through create. Request 1000338 proves effective create permission and server numbering after a bounded GoVerify bypass; its meeting date was rewritten. The attempt-window readback found no folder while sandbox background processing was disabled. A later read-only check found one staff-created location and an empty folder, without establishing automatic provisioning (`evidence/test-request-factory/location-followup-2026-09-23.json`). The deployed Admin preview is non-writing and does not change the schema rollout boundary below.
+Status: **SANDBOX SCHEMA APPLIED; TWO MARKED REQUESTS CREATED; APP-OWNED FOLDER/LOCATION PROVEN; READ-ONLY PREVIEW DEPLOYED; no create/copy route, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields persist through create. Request 1000339 additionally proves the app suite can create and own its exact SharePoint folder and Dataverse location (`evidence/test-request-factory/app-owned-location-rehearsal-2026-09-23.json`). Its meeting date was rewritten. The deployed Admin preview is non-writing and does not change the schema rollout boundary below.
 
 ## Proposed schema wave
 
@@ -134,7 +134,7 @@ This is the minimum Stage 1 inventory from current source fan-out. It is not a c
 2. **Expand schema:** apply the isolated marker/run wave only after preflight approval, first to the approved sandbox. Verify exact logical names and no Power Automate trigger. Provision the existing reminder controls separately where absent; do not proceed with factory creation until both false writes are supported.
 3. **Read compatibility:** deploy marker resolver and ordinary read exclusion code with no create UI. Verified false rows remain ordinary; any legacy-null compatibility must meet the resolver evidence rule; marked rows are excluded/denied according to the inventory above. Verify direct-ID, Search, FetchXML, exports and worker projections.
 4. **Guard and rehearsal:** enable marked-request transport/provider denials, then run a bounded sandbox create only after suppression owner evidence and permission checks. Verify initial marker/run/reminder values, number readback, no trigger side effects, and exact downstream read behavior.
-5. **Production promotion:** promote schema and guards deliberately under the campaign release strategy, with a last-known-good deployment and platform-owner evidence. Production clone creation remains disabled until the SharePoint provisioner and isolation gates close.
+5. **Production promotion:** promote schema and guards deliberately under the campaign release strategy, with a last-known-good deployment and platform-owner evidence. Production clone creation remains disabled until the isolation and possible duplicate-location gates close.
 
 Rollback is additive and leaves fields in place. First disable new factory creation and UI exposure. Keep marker-aware read exclusions and marked-request transport denials active so existing synthetic rows cannot leak or send while code is being reverted. Retire/reconcile owned synthetic rows through the future ledger before considering removal of guards. Never drop the fields, reset marker values globally, or remove the marker-aware reader before all marked rows are accounted for. A code rollback cannot undo Dataverse, SharePoint, email, or flow side effects.
 
@@ -154,10 +154,10 @@ Rollback is additive and leaves fields in place. First disable new factory creat
 - The initial sandbox dry-run verified publisher `WMKF_Publisher` with prefix `wmkf` and pre-apply absence of both proposed attributes. The subsequent controlled apply created them and metadata/readback verified them; explicit solution membership remains unverified because the dry-run check did not establish it.
 - The two reviewer-engagement reminder controls are now applied in sandbox through the isolated parity wave and survived false-value create readback. Production already had those controls; production marker/run schema remains unapplied.
 - Platform-owner suppression contract for initial create and every status/pointer update.
-- SharePoint request-location provisioner and uniqueness/recovery contract.
+- Production duplicate-location and recovery contract for the sandbox-proven app-owned path.
 - Deterministic meeting-date/default behavior: the manifest supplied `2099-12-01`, but create readback returned `2024-12-13`.
 
-Until these are resolved, sandbox schema stays additive and create/copy execution remains disabled. The compiler is used only by the read-only Admin preview, which strips actionable payloads and reports blockers. Production schema is unapplied. The successful sandbox Request is evidence for create permission and marker/run/reminder persistence only, not a claim that the Test Request Factory is production-ready.
+Until these are resolved, sandbox schema stays additive and runtime create/copy execution remains disabled. The compiler is used only by the read-only Admin preview, which strips actionable payloads and reports blockers. Production schema is unapplied. The sandbox rehearsal proves Request plus app-owned folder/location creation, not that the Test Request Factory is production-ready.
 
 ## Review disposition
 

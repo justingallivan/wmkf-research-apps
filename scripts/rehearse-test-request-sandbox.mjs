@@ -26,6 +26,7 @@ const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse
 
 const SANDBOX_URL = 'https://orgd9e66399.crm.dynamics.com';
 const FOUNDATION_NAME = 'W. M. Keck Foundation';
+const REQUEST_LIBRARY = 'akoya_request';
 const REHEARSAL_MEETING_DATE = '2099-12-01';
 const REHEARSAL_FISCAL_YEAR = 'December 2099';
 const MANIFEST_TTL_MS = 60 * 60 * 1000;
@@ -71,6 +72,8 @@ const READBACK_FIELDS = Object.freeze([
   '_akoya_primarycontactid_value',
   'createdon',
   'modifiedon',
+  '_createdby_value',
+  '_ownerid_value',
 ]);
 
 function parseArgs(argv) {
@@ -318,6 +321,22 @@ async function getFoundationSnapshot(client) {
   return rows[0];
 }
 
+async function getAppUser(client) {
+  const applicationId = process.env.DYNAMICS_CLIENT_ID;
+  if (!/^[0-9a-f-]{36}$/i.test(applicationId || '')) throw new Error('Configured Dataverse application ID is invalid.');
+  const response = await client.get(
+    '/systemusers?$select=systemuserid,fullname,applicationid,accessmode,isdisabled' +
+      `&$filter=${encodeURIComponent(`applicationid eq ${applicationId}`)}&$top=3`,
+  );
+  const body = bodyOrThrow('app-suite system user lookup', response);
+  if (body['@odata.nextLink'] || body.value?.length !== 1 ||
+      body.value[0].isdisabled !== false || body.value[0].accessmode !== 4 ||
+      body.value[0].fullname !== '# WMK: Research Review App Suite') {
+    throw new Error('Expected exactly one active app-suite Dataverse application user.');
+  }
+  return body.value[0];
+}
+
 async function getContactSnapshot(client, accountId) {
   const filter = `_parentcustomerid_value eq ${accountId}`;
   const response = await client.get(
@@ -343,14 +362,30 @@ async function getSharePointSites(client) {
 }
 
 async function runPreflight(client) {
-  const [metadata, grantOption, foundation, sharePointSites] = await Promise.all([
+  const [metadata, grantOption, foundation, sharePointSites, requestLibraryParent, appUser] = await Promise.all([
     buildCompilerMetadata(client),
     getGrantOption(client),
     getFoundationSnapshot(client),
     getSharePointSites(client),
+    getRequestLibraryParent(client),
+    getAppUser(client),
   ]);
+  const { configuredSharePointTargetInfo } = await import('../lib/services/sharepoint-target-registry.js');
+  const sharePoint = configuredSharePointTargetInfo();
+  if (!sharePoint.registered || sharePoint.key !== 'akoyago-shared' ||
+      !sharePointSites.some((site) => site.absoluteurl === sharePoint.siteUrl)) {
+    throw new Error('Sandbox Dataverse and Graph do not resolve to the registered akoyaGO site.');
+  }
+  const registeredDataverseSite = sharePointSites.find((site) => site.absoluteurl === sharePoint.siteUrl);
+  if (!guidEqual(requestLibraryParent._parentsiteorlocation_value, registeredDataverseSite.sharepointsiteid)) {
+    throw new Error('Request library parent is not under the registered Dataverse SharePoint site.');
+  }
+  const { GraphService } = await import('../lib/services/graph-service.js');
+  const siteId = await GraphService.getSiteId();
+  const driveId = await GraphService.getDriveId(REQUEST_LIBRARY, { siteId });
+  if (!siteId || !driveId) throw new Error('Request SharePoint library did not resolve.');
   const contacts = await getContactSnapshot(client, foundation.accountid);
-  return { metadata, grantOption, foundation, contacts, sharePointSites };
+  return { metadata, grantOption, foundation, contacts, sharePointSites, requestLibraryParent, appUser, siteId, driveId };
 }
 
 function compileBody(preflight, values) {
@@ -389,22 +424,28 @@ function preflightSummary(preflight) {
       type: preflight.metadata.fields[field].type,
     }])),
     sharePointSites: preflight.sharePointSites,
+    requestLibraryParent: preflight.requestLibraryParent,
+    appUser: { systemuserid: preflight.appUser.systemuserid, fullname: preflight.appUser.fullname },
+    graphSiteId: preflight.siteId,
+    graphDriveId: preflight.driveId,
   };
 }
 
 function buildManifest(preflight) {
   const requestId = crypto.randomUUID();
   const runId = crypto.randomUUID();
+  const locationId = crypto.randomUUID();
   const values = {
     requestId,
     runId,
+    locationId,
     testLabel: `Codex sandbox request factory rehearsal ${new Date().toISOString().slice(0, 10)} ${runId.slice(0, 8)}`,
     fiscalYear: REHEARSAL_FISCAL_YEAR,
     meetingDate: REHEARSAL_MEETING_DATE,
   };
   const createBody = compileBody(preflight, values);
   return {
-    kind: 'test-request-sandbox-rehearsal-manifest/v1',
+    kind: 'test-request-sandbox-rehearsal-manifest/v2',
     preparedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + MANIFEST_TTL_MS).toISOString(),
     target: SANDBOX_URL,
@@ -414,6 +455,7 @@ function buildManifest(preflight) {
       name: preflight.foundation.name,
     },
     expectedRequestType: preflight.grantOption,
+    expectedAppUserId: preflight.appUser.systemuserid,
     createBody,
     createBodySha256: sha256(createBody),
     invariants: {
@@ -428,11 +470,22 @@ function buildManifest(preflight) {
   };
 }
 
-function validateManifest(manifest, { allowExpired = false } = {}) {
-  if (manifest?.kind !== 'test-request-sandbox-rehearsal-manifest/v1') throw new Error('Unsupported manifest kind.');
+function validateManifest(manifest, { allowExpired = false, forExecute = false } = {}) {
+  if (!['test-request-sandbox-rehearsal-manifest/v1', 'test-request-sandbox-rehearsal-manifest/v2'].includes(manifest?.kind)) {
+    throw new Error('Unsupported manifest kind.');
+  }
+  if (forExecute && manifest.kind !== 'test-request-sandbox-rehearsal-manifest/v2') {
+    throw new Error('Only a v2 manifest can execute app-owned SharePoint provisioning.');
+  }
   if (manifest.target !== SANDBOX_URL) throw new Error('Manifest target is not the registered sandbox.');
   if (!manifest.expiresAt || (!allowExpired && Date.parse(manifest.expiresAt) <= Date.now())) throw new Error('Manifest is expired.');
   if (manifest.createBodySha256 !== sha256(manifest.createBody)) throw new Error('Manifest create body hash mismatch.');
+  if (!guidEqual(manifest.createBody.akoya_requestid, manifest.values?.requestId) ||
+      !guidEqual(manifest.createBody.wmkf_testcreationrunid, manifest.values?.runId) ||
+      (manifest.kind.endsWith('/v2') && (!/^[0-9a-f-]{36}$/i.test(manifest.values?.locationId || '') ||
+        !/^[0-9a-f-]{36}$/i.test(manifest.expectedAppUserId || '')))) {
+    throw new Error('Manifest identity mismatch.');
+  }
   if (manifest.invariants?.exactlyOneCreate !== true || manifest.invariants?.retryOnAmbiguousCreate !== false) {
     throw new Error('Manifest create invariants are invalid.');
   }
@@ -496,10 +549,79 @@ async function getLocations(client, requestId) {
   const filter = `_regardingobjectid_value eq ${requestId}`;
   const response = await client.get(
     '/sharepointdocumentlocations' +
-      '?$select=sharepointdocumentlocationid,name,relativeurl,absoluteurl,_parentsiteorlocation_value,createdon' +
+      '?$select=sharepointdocumentlocationid,name,relativeurl,absoluteurl,_parentsiteorlocation_value,_createdby_value,_ownerid_value,createdon' +
       `&$filter=${encodeURIComponent(filter)}&$top=20`,
   );
-  return bodyOrThrow('Request SharePoint locations', response).value || [];
+  const body = bodyOrThrow('Request SharePoint locations', response);
+  if (body['@odata.nextLink']) throw new Error('Request SharePoint locations exceeded 20 rows.');
+  return body.value || [];
+}
+
+async function getRequestLibraryParent(client) {
+  const filter = `relativeurl eq '${REQUEST_LIBRARY}'`;
+  const response = await client.get(
+    '/sharepointdocumentlocations' +
+      '?$select=sharepointdocumentlocationid,name,relativeurl,_parentsiteorlocation_value' +
+      `&$filter=${encodeURIComponent(filter)}&$top=10`,
+  );
+  const body = bodyOrThrow('Request library parent lookup', response);
+  if (body['@odata.nextLink'] || body.value?.length !== 1) {
+    throw new Error(`Expected exactly one ${REQUEST_LIBRARY} document-location parent.`);
+  }
+  return body.value[0];
+}
+
+async function provisionSharePointLocation(client, manifest, request, receipt) {
+  if (!guidEqual(request.akoya_requestid, manifest.values.requestId) ||
+      !guidEqual(request.wmkf_testcreationrunid, manifest.values.runId) ||
+      !guidEqual(request._createdby_value, manifest.expectedAppUserId) ||
+      !guidEqual(request._ownerid_value, manifest.expectedAppUserId) ||
+      request.wmkf_istestrequest !== true || !request.akoya_requestnum) {
+    throw new Error('Fresh synthetic Request readback failed the location-create precondition.');
+  }
+  const { configuredSharePointTargetInfo } = await import('../lib/services/sharepoint-target-registry.js');
+  const sharePoint = configuredSharePointTargetInfo();
+  if (!sharePoint.registered || sharePoint.key !== 'akoyago-shared') {
+    throw new Error('The configured SharePoint site is not the registered akoyaGO site.');
+  }
+  const parent = await getRequestLibraryParent(client);
+  const folder = `${request.akoya_requestnum}_${request.akoya_requestid.replace(/-/g, '').toUpperCase()}`;
+  const existing = await getLocations(client, request.akoya_requestid);
+  if (existing.length > 0) {
+    throw new Error(`Expected no preexisting Request location before app provisioning; found ${existing.length}.`);
+  }
+  const { GraphService } = await import('../lib/services/graph-service.js');
+  receipt.locationProvision = { parentId: parent.sharepointdocumentlocationid, folder, folderAttempted: true };
+  const graphFolder = await GraphService.ensureFolderPath(REQUEST_LIBRARY, folder);
+  receipt.locationProvision.graphFolder = graphFolder;
+
+  const body = {
+    sharepointdocumentlocationid: manifest.values.locationId,
+    name: 'Documents on Default Site 1',
+    relativeurl: folder,
+    servicetype: 0,
+    locationtype: 0,
+    'regardingobjectid_akoya_request@odata.bind': `/akoya_requests(${request.akoya_requestid})`,
+    'parentsiteorlocation_sharepointdocumentlocation@odata.bind':
+      `/sharepointdocumentlocations(${parent.sharepointdocumentlocationid})`,
+  };
+  receipt.locationProvision.createAttempted = true;
+  const created = await client.post('/sharepointdocumentlocations', body, { Prefer: 'return=representation' });
+  receipt.locationProvision.createResponseStatus = created.status;
+  // A dropped response is reconciled by the preallocated ID. Never issue a
+  // second POST: Dataverse and Graph cannot participate in one transaction.
+  const readback = await getLocations(client, request.akoya_requestid);
+  if (readback.length !== 1 ||
+      !guidEqual(readback[0].sharepointdocumentlocationid, manifest.values.locationId) ||
+      !guidEqual(readback[0]._parentsiteorlocation_value, parent.sharepointdocumentlocationid) ||
+      !guidEqual(readback[0]._createdby_value, manifest.expectedAppUserId) ||
+      !guidEqual(readback[0]._ownerid_value, manifest.expectedAppUserId) ||
+      readback[0].relativeurl !== folder) {
+    bodyOrThrow('single Request document-location create', created);
+    throw new Error('Request document-location readback did not match the planned identity and parent.');
+  }
+  receipt.locationProvision.locationId = readback[0].sharepointdocumentlocationid;
+  return { folder, parentId: parent.sharepointdocumentlocationid, graphFolder };
 }
 
 async function resolveLocationParents(client, locations) {
@@ -583,7 +705,7 @@ function verify(manifest, preflightBefore, observation, files, foundationAfter, 
   if (request.wmkf_phaseiistatus != null) failures.push('Phase II status unexpectedly populated');
   if (request.akoya_recommendedamount != null) failures.push('recommended amount unexpectedly populated');
   if (request.akoya_originalgrantamount != null) failures.push('original grant amount unexpectedly populated');
-  if (request.akoya_submissionaccepted != null) failures.push('submission accepted unexpectedly populated');
+  if (request.akoya_submissionaccepted !== false) failures.push('submission accepted is not the verified false default');
   if (observation.payments.length !== 0) failures.push(`created ${observation.payments.length} payment row(s)`);
   if (observation.emails.length !== 0) failures.push(`created ${observation.emails.length} regarding email row(s)`);
   if (observation.locations.length !== 1) failures.push(`expected one Dynamics SharePoint location, found ${observation.locations.length}`);
@@ -604,7 +726,7 @@ function verify(manifest, preflightBefore, observation, files, foundationAfter, 
 }
 
 async function executeManifest(client, manifest, receiptPath, { bypassGoverify = false } = {}) {
-  validateManifest(manifest);
+  validateManifest(manifest, { forExecute: true });
   const receipt = {
     kind: 'test-request-sandbox-rehearsal-receipt/v1',
     startedAt: new Date().toISOString(),
@@ -622,6 +744,9 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
     }
     if (preflightBefore.grantOption.value !== manifest.expectedRequestType.value) {
       throw new Error('Grant request-type option changed since prepare.');
+    }
+    if (!guidEqual(preflightBefore.appUser.systemuserid, manifest.expectedAppUserId)) {
+      throw new Error('App-suite application user changed since prepare.');
     }
     const rebuiltBody = compileBody(preflightBefore, manifest.values);
     if (sha256(rebuiltBody) !== manifest.createBodySha256) throw new Error('Fresh preflight does not reproduce manifest body.');
@@ -683,6 +808,9 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       }
     }
     if (!created?.ok) bodyOrThrow('single Request create', created);
+
+    const createdRequest = await getRequest(client, manifest.values.requestId);
+    await provisionSharePointLocation(client, manifest, createdRequest, receipt);
 
     const observation = await observe(client, manifest.values.requestId);
     let files = null;

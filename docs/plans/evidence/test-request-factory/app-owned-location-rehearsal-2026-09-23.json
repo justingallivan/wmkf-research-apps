@@ -1,0 +1,49 @@
+{
+  "mode": "BOUNDED_SANDBOX_WRITE_AND_READBACK",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "requestNumber": "1000339",
+  "requestId": "63dab4af-178f-4bbc-b24d-3ccbaf74cbfc",
+  "runId": "06dadd69-c5d7-4159-b690-2cc8e5a61af9",
+  "requestCreate": {
+    "httpStatus": 201,
+    "marker": true,
+    "respondReminderEnabled": false,
+    "reviewDueReminderEnabled": false,
+    "serverNumberAllocated": true,
+    "creatorAndOwner": "# WMK: Research Review App Suite",
+    "meetingDateRequested": "2099-12-01",
+    "meetingDateReadback": "2024-12-13T00:00:00Z",
+    "submissionAcceptedReadback": false,
+    "submissionAcceptedMetadataDefault": false
+  },
+  "appOwnedSharePointProvision": {
+    "parentLibrary": "akoya_request",
+    "parentLocationId": "c8117abb-dab0-ee11-a569-000d3a341e8f",
+    "folder": "1000339_63DAB4AF178F4BBCB24D3CCBAF74CBFC",
+    "graphFolderId": "01G4GVMS3HFBVEVRBNIRDJIO5RKNUEUNBQ",
+    "graphFolderCreate": "succeeded; exact folder readback and empty recursive file list succeeded",
+    "locationCreateHttpStatus": 201,
+    "locationId": "76e1d537-b0ad-4fa8-98d0-008dab6106e8",
+    "locationCountAfter60Seconds": 1,
+    "locationCreatorAndOwner": "# WMK: Research Review App Suite",
+    "requestAndParentBindsReadBack": true
+  },
+  "sideEffectsAt60Seconds": {
+    "paymentRows": 0,
+    "regardingEmailRows": 0,
+    "foundationAccountChanges": 0,
+    "foundationContactChanges": 0,
+    "sharePointFiles": 0
+  },
+  "goVerifySandboxBypass": "definition and activation restored immediately after Request POST; receipt confirms restored=true",
+  "originalReceiptVerification": {
+    "ok": false,
+    "soleFailure": "The then-current script expected akoya_submissionaccepted to be null; live BooleanAttributeMetadata verified DefaultValue=false and readback was false. The assertion has been corrected in source. No second Request was created."
+  },
+  "limits": [
+    "This is sandbox proof of app-owned folder and document-location creation, not production enablement.",
+    "The shared akoyaGO SharePoint site serves both Dataverse environments; this rehearsal created only the exact new Request folder and no files.",
+    "The meeting-date rewrite remains unresolved, so a deterministic cycle recipe is not yet ready.",
+    "A production vendor provisioner might race an app-owned create; production reconciliation and synthetic isolation still require proof."
+  ]
+}
