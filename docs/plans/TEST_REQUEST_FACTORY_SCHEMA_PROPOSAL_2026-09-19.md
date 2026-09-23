@@ -1,6 +1,6 @@
 # Test Request Factory — schema proposal
 
-Status: **SANDBOX SCHEMA APPLIED; ONE MARKED REQUEST CREATED; no route wiring, deployment, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields are createable and persist through create. Request 1000338 proves effective create permission and server numbering after a bounded GoVerify bypass; disabled sandbox background processing prevented folder/document verification, and the requested meeting date was rewritten.
+Status: **SANDBOX SCHEMA APPLIED; ONE MARKED REQUEST CREATED; READ-ONLY PREVIEW DEPLOYED; no create/copy route, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields are createable and persist through create. Request 1000338 proves effective create permission and server numbering after a bounded GoVerify bypass; disabled sandbox background processing prevented folder/document verification, and the requested meeting date was rewritten. The deployed Admin preview is non-writing and does not change the schema rollout boundary below.
 
 ## Proposed schema wave
 
@@ -157,7 +157,7 @@ Rollback is additive and leaves fields in place. First disable new factory creat
 - SharePoint request-location provisioner and uniqueness/recovery contract.
 - Deterministic meeting-date/default behavior: the manifest supplied `2099-12-01`, but create readback returned `2024-12-13`.
 
-Until these are resolved, sandbox schema stays additive and the offline compiler remains disabled for runtime use. Production schema is unapplied. The successful sandbox Request is evidence for create permission and marker/run/reminder persistence only, not a claim that the Test Request Factory is production-ready.
+Until these are resolved, sandbox schema stays additive and create/copy execution remains disabled. The compiler is used only by the read-only Admin preview, which strips actionable payloads and reports blockers. Production schema is unapplied. The successful sandbox Request is evidence for create permission and marker/run/reminder persistence only, not a claim that the Test Request Factory is production-ready.
 
 ## Review disposition
 

@@ -1,4 +1,181 @@
-# Session 531 Prompt: Pre-Site / Pre-RP brief fixes released; snapshot writer still v1 (phase 2 open)
+# Session 532 Prompt: Test Request preview integrated; create/copy remains blocked
+
+## Session 531 Summary
+
+[VERIFIED via Git, Vercel CLI, signed-in browser, source, tests and gates]
+Codex worked in the isolated worktree
+`/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps`
+on branch `codex/test-request-preview-integration`; Claude's/shared checkout was
+not edited. The Test Request Factory design/rehearsal branch was integrated onto
+a fresh `origin/main` baseline, reviewed fixes were retained, and the read-only
+Admin preview was deployed to a branch-scoped non-production environment. No
+production deployment or production Dataverse/SharePoint write was performed.
+
+### What Was Completed
+
+1. **Read-only Admin preview integrated and pushed.**
+   - Administration **Test Requests → Preview** and
+     `GET`/`POST /api/admin/test-requests/preview` are present on the branch.
+   - The surface is superuser-only, uses trusted DAL context, refuses
+     Production/unknown Dataverse targets and unregistered SharePoint sites,
+     re-resolves all trusted values server-side, and exposes no create/copy
+     control.
+   - Graph pagination/target validation, sanitized preview responses, shared
+     `requestJson`, current API-route count, Atlas, service catalog and security
+     matrix changes are integrated.
+
+2. **Branch-scoped Vercel Preview deployed and signed-in smoke completed.**
+   - Stable URL:
+     `https://wmkfresearchapps-preview.vercel.app/admin?workspace=test-requests&view=preview`.
+   - Verified deployment: `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, immutable URL
+     `https://wmkfresearchapps-cuuzzf2jk-justin-gallivans-projects.vercel.app`.
+   - Branch-scoped Preview variables are present for `DYNAMICS_URL`,
+     `SHAREPOINT_SITE_URL`, `DATAVERSE_DAL_ENFORCEMENT`, and `NEXTAUTH_URL`.
+     Do not remove or change them without first deciding whether this preview is
+     still needed; do not infer their values from the general Preview scope.
+   - Signed-in GETs loaded sandbox Requests 1000338 and 996142 and displayed the
+     registered sandbox Dataverse and shared akoyaGO SharePoint targets. A POST
+     for 996142 returned a deliberately blocked, non-authoritative plan. No write
+     path exists in this UI.
+
+3. **Live-smoke findings made explicit.**
+   - The request policy currently blocks `ownerid` and `owneridtype`: sandbox
+     metadata marks them system-required/createable, but no documented contract
+     proves safe omission as Dataverse-managed defaults or specifies an owner.
+     The UI was fixed to show blocker field names rather than duplicate generic
+     messages.
+   - File execution remains blocked by `FILE_POLICY_APPROVAL_REQUIRED`; preview
+     hash ceilings are technical safety limits, not approved copy limits.
+   - Requests 1000338 and 996142 contained no allowlisted proposal files. A
+     bounded read-only inventory of 150 sandbox Requests with linked folders
+     found no canonical allowlisted proposal-document set. The zero-document
+     POST path is live-verified; selected-file download/version/hash and filename
+     transformation are not.
+
+4. **Durable Test Request records reconciled.**
+   - Design, Stage 0 platform contract, schema proposal and Connor handoff now
+     distinguish the deployed read-only preview from create/copy readiness.
+   - Request 1000338 remains a sandbox-only rehearsal record. Its missing folder
+     and rewritten meeting date remain evidence of incomplete sandbox parity,
+     not permission to test in production.
+
+### Commits
+
+- `0dadd3619` — integrate the sandbox Test Request preview branch and fixes
+- `b22b122ba` — trigger the branch-scoped sandbox Preview deployment
+- `8f552da6c` — show preview blocker field names
+- `ac85b3d8a`, `95aadf01d`, `b9ae82225` — retained adversarial-review,
+  hardening and preview implementation commits from the integrated workstream
+
+## Next Items
+
+### Verified Open
+
+1. **Resolve the ownership-field create contract.**
+   Evidence: signed-in preview POST and read-only service probe returned
+   `SYSTEM_REQUIRED_UNRESOLVED` for `ownerid` and `owneridtype`.
+   Confirm from authoritative Dataverse behavior/config whether both are
+   server-managed when omitted, or define the exact server-resolved owner to
+   send. Do not simply whitelist them from memory.
+2. **Approve the execution file policy.**
+   Evidence: `FILE_POLICY_APPROVAL_REQUIRED` is intentionally added by
+   `lib/services/test-requests/admin-preview-service.js`. Decide maximum file
+   count, per-file bytes, total bytes and supported MIME types independently of
+   preview hash ceilings.
+3. **Provide one document-bearing sandbox source and restore the platform path
+   needed to create it.**
+   Evidence: 150 linked sandbox Requests produced no canonical allowlisted set;
+   sandbox background processing canceled Request async workflows during the
+   1000338 rehearsal. Connor/platform owner must identify and configure the
+   SharePoint location provisioner or provide another approved isolated target.
+4. **Implement Stage 1 isolation before any create/copy executor.**
+   Evidence: `TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md` inventories
+   ordinary list/search/export/worker/transport consumers; those marker-aware
+   guards and production marker schema are not implemented.
+
+### Owner Decision Needed
+
+1. Keep or retire the branch-scoped Preview alias/config after the other Codex
+   session decides whether to merge, continue or abandon this branch. Inspect
+   current Vercel state first; another session may have changed the shared alias.
+2. Decide with Connor whether to re-enable required sandbox background
+   processing or use a different isolated environment. Do not use production as
+   the document-provisioning experiment.
+
+### Parked
+
+1. Durable run ledger, create/copy executor, resume/retire surfaces and
+   IA/materials recipes. Re-open only after Stage 1 guards, ownership defaults,
+   approved file limits and a working isolated location/folder contract.
+
+### Verify Before Acting
+
+1. Fetch and inspect `origin/main` plus the other Codex branch before integration;
+   concurrent work continued after this branch's baseline. Do not merge or
+   cherry-pick blindly.
+2. Re-inspect the stable Preview alias and branch-scoped environment-variable
+   names before cleanup or further smoke. The alias was manually pointed to the
+   verified deployment above.
+3. Re-read the exact sandbox source and folder inventory before claiming a new
+   document-bearing fixture exists; the 150-request census is bounded evidence,
+   not a permanent tenant fact.
+
+### Do Not Reopen Without New Decision
+
+1. The prior authorization covered one fresh sandbox create with a temporary
+   GoVerify bypass and is spent. Another create requires a new manifest and
+   separate authorization. GoVerify was restored.
+2. Do not reset/recycle an existing Request as the default fixture strategy;
+   the owner chose fresh Requests because SharePoint artifacts and version
+   history survive Dataverse resets.
+3. Do not apply marker schema, create a Request, or test provisioning in
+   production. Production enablement remains blocked.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `shared/components/admin/TestRequestPreviewSection.js` | Read-only Admin preview UI; no create/copy action |
+| `pages/api/admin/test-requests/preview.js` | Superuser GET/POST preview route |
+| `lib/services/test-requests/admin-preview-service.js` | Target gating, source/document resolution and sanitized preview assembly |
+| `lib/services/test-requests/policy.js` | Pure request-field compiler and metadata blockers |
+| `lib/services/test-requests/file-plan.js` | Pure selected-file/filename plan |
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Current design and implementation boundary |
+| `docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md` | Stage 0 tenant/platform evidence and unresolved gates |
+| `docs/plans/TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md` | Marker schema, consumer inventory and rollout order |
+| `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md` | Connor answers, rehearsals, preview evidence and remaining owner actions |
+
+## Testing
+
+```bash
+# Integrated preview verification already passed:
+# 46 focused tests; 35 suites / 475 regression tests; scoped ESLint;
+# canonical build; Vercel build; signed-in read-only smoke.
+npx jest tests/unit/test-request-preview-section.test.js --runInBand
+npx eslint shared/components/admin/TestRequestPreviewSection.js tests/unit/test-request-preview-section.test.js
+npm run check:api-routes && npm run check:api-routes:self-test
+npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test
+npm run check:atlas && npm run check:atlas:self-test
+npm run check:fact-consistency && npm run check:fact-consistency:self-test
+npm run check:doc-currency && npm run check:doc-currency:self-test
+```
+
+## Stop-time notes
+
+No DEVELOPMENT_LOG entry is required: this is a non-production, read-only
+preview of an incomplete capability, not a production cutover or completed new
+architecture. `report:claim-evidence-pilot -- --current` could not read local
+state, so no observation row was inferred. Root instructions and memory were not
+changed. The documentation closeout is committed and pushed on the feature
+branch; the other Codex session should use `/start`, inspect both branches and
+own any merge/cleanup decision.
+
+## Historical handoffs — not current instructions
+
+The Test Request handoff above is authoritative for this branch. Older prompts
+below are retained as historical evidence and are not an automatic worklist.
+
+## Prior Session 531 Prompt: Pre-Site / Pre-RP brief fixes released; snapshot writer still v1 (phase 2 open)
 
 ## Session 530 Summary
 

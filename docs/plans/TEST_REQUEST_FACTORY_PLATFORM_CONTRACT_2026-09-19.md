@@ -1,6 +1,6 @@
 # Test Request Factory — Stage 0 platform contract
 
-Status: **PARTIAL: source census, tenant schema metadata, visible automation registrations, sandbox schema apply, and one successful marked sandbox Request create are verified; deterministic meeting-date handling, async document provisioning, and production suppression remain unresolved.** Request 1000338 proved effective create permission and number/marker/reminder readback after a bounded GoVerify bypass. No production write or deployment was performed. The offline census is reproducible with `node scripts/probe-test-request-factory-preflight.js --json`; it does not verify tenant state.
+Status: **PARTIAL: source census, tenant schema metadata, visible automation registrations, sandbox schema apply, one successful marked sandbox Request create, and a read-only sandbox Admin preview are verified; deterministic meeting-date handling, async document provisioning, and production suppression remain unresolved.** Request 1000338 proved effective create permission and number/marker/reminder readback after a bounded GoVerify bypass. A branch-scoped Vercel Preview now exercises read-only sandbox/SharePoint resolution and fails closed on unresolved policy; no production write or production deployment was performed. The offline census is reproducible with `node scripts/probe-test-request-factory-preflight.js --json`; it does not verify tenant state.
 
 ## Source contract
 
@@ -102,4 +102,4 @@ The [schema proposal](TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md) specif
 
 The preflight checks required source anchors and negative fixtures for lost evidence, unexpected location creation and incorrect field roles. Read-only behavior is established by source review, not by the script's static safety declarations. Tests do not prove remote suppression or runtime readiness.
 
-Stage 0 remains partial pending a background-enabled isolated document/folder rehearsal, identification of the location provisioner, deterministic meeting-date behavior, and the external production-suppression evidence above. Offline policy development may continue under the accepted design; no create route or retry is enabled by this receipt.
+Stage 0 remains partial pending a background-enabled isolated document/folder rehearsal, identification of the location provisioner, deterministic meeting-date behavior, and the external production-suppression evidence above. The read-only Admin preview may continue under the accepted design; no create route or retry is enabled by this receipt. Its live blocked result currently identifies `ownerid` and `owneridtype` as system-required fields without a documented omission/default contract, and file execution remains blocked until concrete count/size limits are approved.
