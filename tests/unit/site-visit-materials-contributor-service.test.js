@@ -131,7 +131,7 @@ test('finalize validates, scans, uploads under the canonical name with replace, 
   expect(payload.wmkf_generationkey).toMatch(/^[0-9a-f]{64}$/);
   expect(d.findDocumentByGenerationKey).toHaveBeenCalledWith(payload.wmkf_generationkey);
   expect(payload.wmkf_contenthash).toBe(payload.wmkf_inputfingerprint);
-  expect(options.actorPolicy).toBe('allow-unattributed');
+  expect(options.actorPolicy).toBe('external-contributor');
   expect(d.supersedeDocument).toHaveBeenCalledWith(ROW_PDF.wmkf_requestdocumentid);
   expect(d.recordPortalUploadCandidate).toHaveBeenCalledWith({
     stagingId: STAGING_ID,

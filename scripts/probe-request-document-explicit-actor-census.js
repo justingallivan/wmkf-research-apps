@@ -15,9 +15,26 @@
  * incomplete Dataverse export and exits non-zero on any unattributed gap.
  */
 
-const ALLOWED_UNATTRIBUTED_ORIGIN_STAGES = new Set([
-  'initial-assessment-generation',
-  'pre-site-generation',
+// Availability-first origin stages → required producer (null: stage-only match).
+// A producer-bound stage needs the row and the event to name that producer.
+const ALLOWED_UNATTRIBUTED_ORIGIN_STAGES = new Map([
+  ['initial-assessment-generation', null],
+  ['pre-site-generation', null],
+  ['consultant-feedback-attachment', 'consultant-feedback'],
+]);
+
+function isAllowedOriginEvent(event, row) {
+  if (!ALLOWED_UNATTRIBUTED_ORIGIN_STAGES.has(event?.stage)) return false;
+  if (event?.metadata?.operation !== event.stage) return false;
+  const producer = ALLOWED_UNATTRIBUTED_ORIGIN_STAGES.get(event.stage);
+  return producer === null
+    || (row.wmkf_producer === producer && event?.metadata?.producer === producer);
+}
+
+// Applicant-side producers write under the EXTERNAL_CONTRIBUTOR actor policy:
+// no staff actor exists and no missing-actor event is recorded by design.
+const EXTERNAL_CONTRIBUTOR_PRODUCERS = new Set([
+  'site-visit-materials-portal',
 ]);
 
 function normalizedId(value) {
@@ -44,13 +61,17 @@ function classifyRows(rows, events, since) {
     if (isAtOrAfter(row.createdon, since)) {
       const actor = normalizedId(row._wmkf_initiatedby_value);
       const at = row.wmkf_initiatedat || null;
-      const allowedEvent = matchingEvents.find((event) => (
-        ALLOWED_UNATTRIBUTED_ORIGIN_STAGES.has(event.stage)
-        && event?.metadata?.operation === event.stage
-      ));
+      const allowedEvent = matchingEvents.find((event) => isAllowedOriginEvent(event, row));
       let status = 'attributed';
       let reason = null;
-      if (Boolean(actor) !== Boolean(at)) {
+      if (EXTERNAL_CONTRIBUTOR_PRODUCERS.has(row.wmkf_producer)) {
+        if (actor || at) {
+          status = 'violation';
+          reason = 'external-contributor row carries a staff origin actor/time';
+        } else {
+          status = 'external-contributor';
+        }
+      } else if (Boolean(actor) !== Boolean(at)) {
         status = 'violation';
         reason = 'origin actor/time is a partial pair';
       } else if (!actor && !at && allowedEvent) {
@@ -109,6 +130,39 @@ function runSelfTest() {
       wmkf_milestonecreatedat: '2026-09-01T00:01:00.000Z',
       _wmkf_milestonecreatedby_value: null,
     },
+    {
+      ...base,
+      wmkf_requestdocumentid: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      wmkf_producer: 'site-visit-materials-portal',
+      wmkf_initiatedat: null,
+      _wmkf_initiatedby_value: null,
+    },
+    {
+      ...base,
+      wmkf_requestdocumentid: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      wmkf_producer: 'site-visit-materials-portal',
+    },
+    {
+      ...base,
+      wmkf_requestdocumentid: '12121212-1212-4121-8121-121212121212',
+      wmkf_producer: 'consultant-feedback',
+      wmkf_initiatedat: null,
+      _wmkf_initiatedby_value: null,
+    },
+    {
+      ...base,
+      wmkf_requestdocumentid: '13131313-1313-4131-8131-131313131313',
+      wmkf_producer: 'pre-rp-brief',
+      wmkf_initiatedat: null,
+      _wmkf_initiatedby_value: null,
+    },
+    {
+      ...base,
+      wmkf_requestdocumentid: '14141414-1414-4141-8141-141414141414',
+      wmkf_producer: 'consultant-feedback',
+      wmkf_initiatedat: null,
+      _wmkf_initiatedby_value: null,
+    },
   ];
   const events = [
     {
@@ -121,16 +175,39 @@ function runSelfTest() {
       entity_refs: { requestDocumentId: rows[3].wmkf_requestdocumentid },
       metadata: { operation: 'site-visit-handoff' },
     },
+    {
+      stage: 'consultant-feedback-attachment',
+      entity_refs: { requestDocumentId: rows[6].wmkf_requestdocumentid },
+      metadata: { operation: 'consultant-feedback-attachment', producer: 'consultant-feedback' },
+    },
+    {
+      // Consultant stage on a row from another producer: not allowed evidence.
+      stage: 'consultant-feedback-attachment',
+      entity_refs: { requestDocumentId: rows[7].wmkf_requestdocumentid },
+      metadata: { operation: 'consultant-feedback-attachment', producer: 'consultant-feedback' },
+    },
+    {
+      // Consultant row whose event names another producer: not allowed evidence.
+      stage: 'consultant-feedback-attachment',
+      entity_refs: { requestDocumentId: rows[8].wmkf_requestdocumentid },
+      metadata: { operation: 'consultant-feedback-attachment', producer: 'pre-rp-brief' },
+    },
   ];
   const results = classifyRows(rows, events, since);
   const counts = results.reduce((out, result) => {
     out[result.status] = (out[result.status] || 0) + 1;
     return out;
   }, {});
-  if (counts.attributed !== 2 || counts['event-backed-unattributed'] !== 2 || counts.violation !== 1) {
+  const status = (id) => results.find((result) => result.documentId === id && result.kind === 'origin')?.status;
+  if (counts.attributed !== 2 || counts['event-backed-unattributed'] !== 3 || counts.violation !== 4
+    || counts['external-contributor'] !== 1
+    || status(rows[5].wmkf_requestdocumentid) !== 'violation'
+    || status(rows[6].wmkf_requestdocumentid) !== 'event-backed-unattributed'
+    || status(rows[7].wmkf_requestdocumentid) !== 'violation'
+    || status(rows[8].wmkf_requestdocumentid) !== 'violation') {
     throw new Error(`Unexpected self-test classification: ${JSON.stringify(counts)}`);
   }
-  console.log('PASS: Wave 24 attribution census classifier distinguishes attributed, event-backed, and missing evidence.');
+  console.log('PASS: Wave 24 attribution census classifier distinguishes attributed, event-backed, external-contributor, and missing evidence.');
 }
 
 function parseSince(argv) {
@@ -161,6 +238,7 @@ async function main() {
     () => DynamicsService.queryAllRecords('wmkf_requestdocuments', {
       select: [
         'wmkf_requestdocumentid',
+        'wmkf_producer',
         'createdon',
         'wmkf_initiatedat',
         '_wmkf_initiatedby_value',
@@ -190,6 +268,7 @@ async function main() {
   console.log(`Wave 24 Request Document attribution census since ${since.toISOString()}`);
   console.log(`  attributed: ${counts.attributed || 0}`);
   console.log(`  event-backed unattributed: ${counts['event-backed-unattributed'] || 0}`);
+  console.log(`  external contributor: ${counts['external-contributor'] || 0}`);
   console.log(`  violations: ${counts.violation || 0}`);
   for (const result of results.filter((entry) => entry.status === 'violation')) {
     console.log(`  VIOLATION ${result.documentId} ${result.kind}: ${result.reason}`);

@@ -1,211 +1,374 @@
-# Session 532 Prompt: Test Request preview integrated; create/copy remains blocked
+# Session 535 Prompt: Sandbox Basic clone reviewed; select live source
 
-## Current branch update — 2026-09-22/23 PT
+## Session 534 Summary — 2026-09-22/23 PT
 
-[OWNER DECISION] Test Requests created by this app suite should have
-`# WMK: Research Review App Suite` as Dataverse creator and owner. Sandbox
-Request 1000338 received the authenticated application user as both after a
-POST that omitted `ownerid` and `owneridtype`; Production honorarium Request
-1003259 has the same app-suite creator/owner pattern. [SOURCE VERIFIED]
-The pure compiler now treats only those two system-required fields as
-Dataverse-managed defaults and never sends them or `createdby` in its body.
-Its focused regression test passes. This does not add an executor or a
-post-create identity check. The external branch Preview still runs an older
-deployment and was not re-smoked for this change.
+[VERIFIED via local Git, source, focused tests, relevant gates, and three read-only Claude Opus review rounds] The isolated `codex/test-request-preview-integration` branch now has a sandbox-only Basic clone operator. It resolves exactly one Grant Request by number, defaults fiscal year and meeting date from that source, copies only purpose and requested amount, and prepares a private source-bound v3 manifest. Execute fences the source before its single Request POST, creates the marked Request under the app-suite Dataverse application user, provisions the exact SharePoint folder/location, and verifies content, ownership, location, and absence of payment/email effects. Receipt milestones support exact-ID recovery without blind retry. Opus found no remaining P1/P2 defect after three bounded rounds.
 
-[VERIFIED via read-only Dataverse/Graph GETs and refreshed complete plugin-step
-census, 2026-09-23 UTC] The original Request 1000338 attempt-window receipt
-correctly found no document location then. The Request now has one resolved
-`akoya_request` location and an empty physical folder; the location was created
-about 20 hours after the Request under Justin Gallivan's staff user. Production
-reference Request 1002788's location was created about 82 seconds after its
-Request under the GOApply integration application user. Production registers an
-enabled `AkoyaGo.AsyncEntityCreated` Request Create step absent from sandbox.
-The actor/timing contrast and step difference do not identify the provisioner;
-enabling sandbox background processing alone is not a proven parity remedy.
-Request 1000338's meeting date remains `2024-12-13`. See
-`docs/plans/evidence/test-request-factory/location-followup-2026-09-23.json`.
-
-## Session 531 Summary
-
-[VERIFIED via Git, Vercel CLI, signed-in browser, source, tests and gates]
-Codex worked in the isolated worktree
-`/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps`
-on branch `codex/test-request-preview-integration`; Claude's/shared checkout was
-not edited. The Test Request Factory design/rehearsal branch was integrated onto
-a fresh `origin/main` baseline, reviewed fixes were retained, and the read-only
-Admin preview was deployed to a branch-scoped non-production environment. No
-production deployment or production Dataverse/SharePoint write was performed.
-
-### What Was Completed
-
-1. **Read-only Admin preview integrated and pushed.**
-   - Administration **Test Requests → Preview** and
-     `GET`/`POST /api/admin/test-requests/preview` are present on the branch.
-   - The surface is superuser-only, uses trusted DAL context, refuses
-     Production/unknown Dataverse targets and unregistered SharePoint sites,
-     re-resolves all trusted values server-side, and exposes no create/copy
-     control.
-   - Graph pagination/target validation, sanitized preview responses, shared
-     `requestJson`, current API-route count, Atlas, service catalog and security
-     matrix changes are integrated.
-
-2. **Branch-scoped Vercel Preview deployed and signed-in smoke completed.**
-   - Stable URL:
-     `https://wmkfresearchapps-preview.vercel.app/admin?workspace=test-requests&view=preview`.
-   - Verified deployment: `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, immutable URL
-     `https://wmkfresearchapps-cuuzzf2jk-justin-gallivans-projects.vercel.app`.
-   - Branch-scoped Preview variables are present for `DYNAMICS_URL`,
-     `SHAREPOINT_SITE_URL`, `DATAVERSE_DAL_ENFORCEMENT`, and `NEXTAUTH_URL`.
-     Do not remove or change them without first deciding whether this preview is
-     still needed; do not infer their values from the general Preview scope.
-   - Signed-in GETs loaded sandbox Requests 1000338 and 996142 and displayed the
-     registered sandbox Dataverse and shared akoyaGO SharePoint targets. A POST
-     for 996142 returned a deliberately blocked, non-authoritative plan. No write
-     path exists in this UI.
-
-3. **Live-smoke findings made explicit.**
-   - At that deployment, the request policy blocked `ownerid` and
-     `owneridtype`: sandbox metadata marked them system-required/createable,
-     while their default contract was unresolved. The UI was fixed to show
-     blocker field names rather than duplicate generic messages. The current
-     source change above resolves this compiler blocker only.
-   - File execution remains blocked by `FILE_POLICY_APPROVAL_REQUIRED`; preview
-     hash ceilings are technical safety limits, not approved copy limits.
-   - Requests 1000338 and 996142 contained no allowlisted proposal files. A
-     bounded read-only inventory of 150 sandbox Requests with linked folders
-     found no canonical allowlisted proposal-document set. The zero-document
-     POST path is live-verified; selected-file download/version/hash and filename
-     transformation are not.
-
-4. **Durable Test Request records reconciled.**
-   - Design, Stage 0 platform contract, schema proposal and Connor handoff now
-     distinguish the deployed read-only preview from create/copy readiness.
-   - Request 1000338 remains a sandbox-only rehearsal record. Its location/folder
-     was absent during the original readback but appeared later under a staff
-     user; automatic provisioning remains unproved. The rewritten meeting date
-     remains evidence of incomplete sandbox parity, not permission to test in
-     production.
+This work was **source-built and tested offline only**. The operator created no new Dataverse Request or Graph folder, and no production capability was promoted. The combined fresh create, meeting-date correction, and folder run remains unproven. The previous Session 533 instruction to supply both cycle values to `--prepare` is historical: the new v3 operator reads them from the selected source unless one is missing or explicitly overridden. Request 1000339 is a retained synthetic rehearsal record, not the default clone source.
 
 ### Commits
 
-- `0dadd3619` — integrate the sandbox Test Request preview branch and fixes
-- `b22b122ba` — trigger the branch-scoped sandbox Preview deployment
-- `8f552da6c` — show preview blocker field names
-- `ac85b3d8a`, `95aadf01d`, `b9ae82225` — retained adversarial-review,
-  hardening and preview implementation commits from the integrated workstream
+- `654e01ac8` — Add source-bound sandbox Request clone operator
+- `3b6903ba0` — Persist sandbox clone write intents
+- `0e3296296` — Harden sandbox clone receipt recovery
+- `a7def6a3` — Fail closed on uncertain GoVerify deactivation
+
+[VERIFIED via successful `git push` and branch status] The owner explicitly authorized publishing to the existing public GitHub origin after automatic approval had rejected Luna's earlier attempt. All four commits are now pushed on `codex/test-request-preview-integration` at `a7def6a31`. The worktree `/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps` is clean and synchronized with origin. The public destination was verified with `gh repo view`; no alternate export path was used.
+
+### Next Items
+
+**Verified open:** Select an actual sandbox Grant Request number before a bounded live Basic clone. Run read-only `--prepare`, inspect the private manifest and source cycle, then decide whether to run `--execute` with an unused receipt path. Recheck the registered sandbox target, GoVerify state, and source revision. The operator never retries an ambiguous create; use `--inspect` and the preallocated GUID. If deactivation was attempted without a verified inactive readback, the receipt marks `restoreVerified:false` and requires manual workflow verification before proceeding. Stage 1 isolation, production automation suppression, duplicate-location policy, file-copy limits, and a document-bearing source remain for the full product; this CLI slice does not enable production creation.
+
+**Owner input needed for a live sandbox run:** Select an actual Grant Request source number. Publication is done; no PR, merge, or production promotion was requested or performed.
+
+**Verify before acting:** The Admin Preview deployment is from an older branch commit and is still read-only. The new CLI's combined live create/correction/folder path has not been exercised. A client-side timeout or signal cancellation does not prove Dataverse canceled server-side work; exact-ID inspection is required after an ambiguous outcome.
+
+### Key Files and Testing
+
+Feature worktree: `scripts/rehearse-test-request-sandbox.mjs`, `lib/services/test-requests/sandbox-clone.js`, `lib/services/test-requests/rehearsal-receipt.js`, `lib/services/test-requests/bypass-signal-fence.js`, and `lib/dataverse/client.js`; the branch design and Stage 0 contract carry the detailed boundary. Luna's final safety run passed 69 focused tests; root independently passed 57 focused tests plus the final 25-test delta, and Atlas and Dataverse access-layer gates with self-tests. Doc-currency and fact-consistency gates with self-tests passed. Opus round 3 accepted with no remaining P1/P2 finding. No `DEVELOPMENT_LOG.md` milestone entry is required because no production capability shipped. The optional claim-evidence pilot report could not read local state; no observation was inferred.
+
+## Prior Session 534 Prompt: Continue Test Request Factory from source-cycle policy
+
+## Session 533 Summary — 2026-09-23 PT
+
+[VERIFIED via branch source, focused tests, gates, build, Git and remote ref] The
+owner clarified that new Test Requests should use the current cycle so they
+remain visible. The Basic clone now defaults fiscal year and meeting date from
+the server-resolved source Request. The form asks for either missing value and
+allows an explicit edit; unchanged values are omitted from POST so the server
+re-reads the source rather than trusting a browser echo. Missing or invalid
+values block the compiler. Commit `efeef1234` is pushed on
+`codex/test-request-preview-integration`; the worktree is clean.
+
+The separate sandbox rehearsal script no longer defaults to artificial
+`December 2099` / `2099-12-01`. Preparing a new manifest requires an explicit
+fiscal year and meeting date. The historical 2099 receipts remain evidence of
+the earlier bounded experiment, not a product date requirement. The preview
+remains read-only; no new Request was created or production capability deployed
+in this session.
+
+### Commits
+
+- `efeef1234` — Use source cycle for Test Request previews (integration branch)
+
+### Next Items
+
+**Verified open:** Continue the Basic clone from the
+[branch design](https://github.com/justingallivan/wmkf-research-apps/blob/efeef1234a2b71b61d60b7d8d29262b8cb6eb48a/docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md)
+and [Stage 0 contract](https://github.com/justingallivan/wmkf-research-apps/blob/efeef1234a2b71b61d60b7d8d29262b8cb6eb48a/docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md).
+The app-owned sandbox folder/location path is proven. Stage 1 synthetic
+isolation, production automation suppression, duplicate-location policy,
+execution file limits, and a document-bearing source remain before production
+creation/copy can be enabled. The sandbox meeting-date correction is proven on
+one retained Request; a combined fresh create-plus-correction run has not been
+performed. Do not reopen the date-default choice or ask the owner to create
+folders manually.
+
+**Owner decision needed:** None for date selection. Ask for a source Request
+only when an actual creation run is ready and a source has not already been
+selected.
+
+**Verify before acting:** The branch Admin Preview deployed earlier still runs
+an older commit; do not describe `efeef1234` as live. Recheck target, source
+cycle, and platform state before any fresh create. This main-branch handoff is
+documentation only; runtime code remains on the integration branch.
+
+### Key Files and Testing
+
+The branch changed `lib/services/test-requests/preview.js`,
+`pages/api/admin/test-requests/preview.js`,
+`shared/components/admin/TestRequestPreviewSection.js`, and
+`scripts/rehearse-test-request-sandbox.mjs`, with focused tests and the two
+factory plan documents. Four focused suites passed (47 tests), scoped ESLint,
+the production build, API-route and route-service gates with self-tests,
+doc-currency and fact-consistency gates with self-tests, and docs catalog.
+The claim-evidence pilot report could not read its local state; no observation
+was inferred. No DEVELOPMENT_LOG milestone is required: this corrects branch
+policy and has not shipped a production capability.
+
+## Prior Session 533 Prompt: Test Request app-owned folder and location proven in sandbox
+
+## Session 532 Test Request update — 2026-09-22/23 PT
+
+[VERIFIED via sandbox Dataverse and Graph writes/readbacks, 60-second observation,
+Git, focused tests and document gates] The owner directed us to create the
+synthetic Request folder and Dataverse location ourselves. On the isolated
+`codex/test-request-preview-integration` branch, commit `d99b4043b` adds that
+path to the bounded sandbox rehearsal script and is pushed. The branch remains
+separate from `main`; its deployed Admin preview remains read-only, and no
+production schema, Request, document, or runtime code was changed.
+
+The fresh marked sandbox Request **1000339** (`63dab4af-178f-4bbc-b24d-3ccbaf74cbfc`)
+and its `sharepointdocumentlocation` (`76e1d537-b0ad-4fa8-98d0-008dab6106e8`)
+were created and owned by `# WMK: Research Review App Suite`. Graph created the
+exact `akoya_request/1000339_63DAB4AF178F4BBCB24D3CCBAF74CBFC` folder; the
+Dataverse location binds to that Request and the one verified `akoya_request`
+parent. The folder read back empty. No payment, regarding email, or Foundation
+account/Contact change appeared in the 60-second window. GoVerify was
+restored immediately after the Request POST. The raw receipt's sole failed
+assertion expected `akoya_submissionaccepted=null`; live Boolean metadata
+proved `DefaultValue=false` and the stored value was false, so source now checks
+false. No extra Request was created to retest that assertion. Both rehearsal
+Requests 1000338 and 1000339 exhibited the meeting-date rewrite at create
+(`2099-12-01` requested, `2024-12-13` stored).
+
+Evidence and current contract: [branch receipt](https://github.com/justingallivan/wmkf-research-apps/blob/d99b4043b5cba48f633c32950830ade8bf18837a/docs/plans/evidence/test-request-factory/app-owned-location-rehearsal-2026-09-23.json),
+[Stage 0 contract](https://github.com/justingallivan/wmkf-research-apps/blob/d99b4043b5cba48f633c32950830ade8bf18837a/docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md).
+The branch's script syntax and lint, 72 focused tests, doc-currency and
+fact-consistency gates and their self-tests, docs catalog, and diff check passed.
+
+**2026-09-23 follow-up [VERIFIED via read-only sandbox/production workflow metadata and one guarded sandbox PATCH]:** Active sandbox business rule `WMKF_Set Meeting Date` has server-side XAML assigning `2024-12-13` for fiscal years containing `December` and `2024-06-07` for `June`. No workflow with that exact name was visible in Production. One ETag-guarded PATCH of `wmkf_meetingdate` on retained marked Request 1000339 returned 204 and read back `2099-12-01`; a later inspection found that date retained, one location, and no payment or regarding-email rows. The marker and app owner remained intact. The sandbox rehearsal script now corrects and verifies the date once after create, reconciles an ambiguous response by readback, and never retries the PATCH blindly. This is branch commit `523d705bd`, pushed with [sanitized evidence](https://github.com/justingallivan/wmkf-research-apps/blob/523d705bdaa8469fe4ff85e31a4c788c4d39b30a/docs/plans/evidence/test-request-factory/meeting-date-rule-and-patch-2026-09-23.json). The combined create-plus-correction path has not created a third Request.
+
+**Next:** Use the proven app-owned folder/location path for the eventual
+executor. Implement Stage 1 synthetic isolation before any production creation.
+The sandbox meeting-date correction is now proven separately; verify the combined
+path on a future bounded run. Production also needs a policy for a
+possible vendor-created duplicate location; the production-only
+`AkoyaGo.AsyncEntityCreated` step is still a candidate, not a proven
+provisioner. The exact AkoyaGO automatic provisioner is no longer a prerequisite
+for sandbox fixture creation. File-copy policy and a document-bearing source
+remain later Basic-clone work. Do not repeat the broad Connor questions or
+ask the owner to hand-create folders.
+
+## Prior Session 532 Prompt: Request Document missing-actor warning noise fixed and released
+
+## Session 531 Summary
+
+[VERIFIED via Git, PR #325 CI, `vercel inspect`, read-only Postgres query]
+The owner asked about an admin-panel warning, "A Request Document business
+action completed without a verified staff actor" (×2, 9/19 7:59–8:08 PM PT).
+A read-only query of `operational_events` showed that events 832 and 833 were
+`site-visit-materials-upload`, reason `missing`, from an applicant uploading via
+the materials contributor link. Every `request_document_actor_not_captured`
+event on record came from that path or from consultant feedback attachments.
+None came from a real staff identity gap, and five had already been dismissed
+by hand. Event 834 is the same shape, tagged `preview`.
+
+### What Was Completed
+
+1. **Applicant uploads stop warning.** New
+   `REQUEST_DOCUMENT_ACTOR_POLICY.EXTERNAL_CONTRIBUTOR` in
+   `lib/services/request-document-actor-service.js`: no systemuser read, no
+   bind, resolution reason `external-contributor`. `isActorNotCaptured()` gates
+   both event sites in `lib/dataverse/adapters/request-document.js` `create()`
+   (normal and lost-response recovery). `contributor-service.js` uses it, and
+   the writer gate pins it.
+2. **Consultant feedback attachments attribute the staff uploader.** Correction
+   made mid-session: these are staff uploads, not consultant uploads. Owner
+   chose "record the staff actor". The finalize route passes
+   `access.session?.user?.dynamicsSystemuserId` through
+   `finalizeAttachmentUpload` to the registry create, still under
+   `ALLOW_UNATTRIBUTED`. The warning now means a genuinely unlinked staff
+   identity.
+3. **Census probe** (`scripts/probe-request-document-explicit-actor-census.js`).
+   External-contributor rows are classified first, and any staff actor/time on
+   one is a violation. `consultant-feedback-attachment` events are allowed only
+   when both the row and the event name producer `consultant-feedback`.
+   Self-test fixtures cover each guard independently (mutation-checked).
+4. **Release.** Codex adversarial review (`gpt-5.6-sol`) took three rounds. Two
+   census findings were fixed; round 3 approved. PR #325 CI was all green. The
+   owner merged it as main `da401efa7`; production deployment
+   `dpl_ASNEuUWoqqg2ns7jbtEW92dnF5uZ` is Ready. Docs updated: actor plan,
+   applicant materials plan, service catalog.
+5. **Housekeeping.** `3cc311830` removed the impeccable plugin enablement from
+   `.claude/settings.json` (owner-intentional edit).
+
+### Commits
+- `3cc311830` — remove impeccable plugin enablement from project settings
+- `c101ae7d1` — external-contributor policy; consultant session actor
+- `12e1be098` — docs for the external-contributor policy
+- `c0a022efb`, `fa5671f4e` — census contract enforcement + discriminating fixtures (Codex rounds 1–2)
+- `da401efa7` — merge PR #325
 
 ## Next Items
 
+### Preserved branch workstreams — 2026-09-22 coordination update
+
+[VERIFIED via Git and GitHub] Two clean, pushed Codex branches remain separate
+from `main`, with no open pull requests. Their implementation and branch-specific
+handoffs are not part of the current `main` checkout:
+
+1. **Presentation-media transport proof:** `codex/feature-request` at
+   `703b8e76c`. The [branch closeout](https://github.com/justingallivan/wmkf-research-apps/blob/703b8e76c31c26468cb2a76856f2d0d10ba61762/docs/plans/CODEX_WORKSTREAM_CLOSEOUT_2026-09-22.md)
+   records a successful Chrome proof and the remaining browser, reload, expiry,
+   and large-file checks. The Preview harness is not a production feature.
+   **Parked by owner decision this session** while Test Request prerequisites
+   receive read-only investigation.
+2. **Test Request read-only Admin preview:**
+   `codex/test-request-preview-integration` at `b2c8e4088`. Its
+   [branch handoff](https://github.com/justingallivan/wmkf-research-apps/blob/b2c8e4088fc0256b4478897a2a3cfd2933d6e919/SESSION_PROMPT.md)
+   records the signed-in sandbox Preview smoke and the later offline owner
+   contract change. Create/copy remains blocked by the execution file policy,
+   Stage 1 isolation, a document-bearing sandbox fixture, and unresolved
+   platform provisioning/automation behavior. The owner chose a software-only
+   ownership compiler change next; no additional sandbox create, schema
+   operation, document copy, or production integration was performed.
+
+Preserve both branches and worktrees. Review and integrate each independently
+from a fresh `main` baseline only after its release scope is decided. Recheck
+the shared Preview alias and branch-scoped configuration before any change;
+the branch handoffs' external-state observations were not re-probed in this
+coordination update.
+
+### Test Request read-only blocker investigation — 2026-09-22 PT
+
+[VERIFIED via the checked-in sandbox create manifest and
+`scripts/probe-test-request-sandbox-owner.js` GET at 2026-09-23 01:21 UTC]
+The one successful sandbox POST for retained Request 1000338 omitted both
+`ownerid` and `owneridtype`. The current row still matches the test marker/run;
+its owner is a `systemuser`, equals `createdby` and `owninguser`, and that user
+has the authenticated application's ID. This proves the sandbox supplied an
+application-user owner for that exact create. This readback alone did not
+establish a Production default. The owner policy is now decided below, but the
+branch's pure compiler reported both fields as unresolved at that time. The
+later branch change is recorded below.
+
+[VERIFIED via `scripts/probe-request-owner.js --request=1002852` production GET at
+2026-09-23 01:26 UTC] Existing Request 1002852 is owned and was created by
+`# BCO akoyaGO Integration`, a Dataverse application user. Its `ownerid`,
+`createdby`, and `owninguser` all point to that same user; `owningteam` is
+empty. That is a different application identity from the one used by this
+repo's authenticated probe. This single Request supports application-user
+ownership as an existing pattern, but does not establish the owner policy for
+every Request or the intended owner for future synthetic records.
+
+[VERIFIED via `scripts/probe-request-owner.js --request=1003259` production GET at
+2026-09-23 01:31 UTC] Request 1003259 is owned and was created by
+`# WMK: Research Review App Suite`, the authenticated application user used
+by this repo. `ownerid`, `createdby`, and `owninguser` agree; `owningteam` is
+empty. Dataverse `createdby` names the writing principal, not necessarily the
+human who initiated the action through the app.
+
+[OWNER DECISION, 2026-09-22 PT] Request 1002852 is a real GOApply portal
+application, while 1003259 is an honorarium Request made by this app suite.
+After reviewing the recommendation, the owner settled that the app suite
+should be both creator and owner of future Test Requests. [DECIDED; COMPILER
+IMPLEMENTED, EXECUTOR NOT BUILT]
+Have the app suite create without staff impersonation; omit `createdby`,
+`ownerid`, and `owneridtype` from the POST, and require readback that creator
+and owner are the expected app user. Keep the initiating staff actor in the
+factory run ledger rather than substituting a staff record owner. The current
+branch preview remains read-only, and production staff visibility under this
+ownership still needs verification before enablement.
+
+[VERIFIED via `codex/test-request-preview-integration` commit `cf886221b`,
+source and focused tests] The pure compiler now accepts `ownerid` and
+`owneridtype` as the two documented Dataverse-managed system-required fields,
+never places them or `createdby` in the proposed POST body, and still blocks
+unrelated unknown system-required fields. The preview service remains read-only
+and strips executable payloads while file-policy approval is absent. Three
+focused suites passed (65 tests), as did scoped lint, types, and the relevant
+document/DAL gates. This change is pushed only on the feature branch; the
+external Preview still runs its older deployment and has not been re-smoked.
+
+[VERIFIED via the 2026-09-21 sandbox rehearsal receipt; current setting not
+re-probed] Connor answered the original broad platform questions on 2026-09-21;
+do not ask them again. The documented SharePoint model already identifies the
+`akoya_request` library, Dynamics location relationship, and request folder
+pattern. Production Request 1002788 is an existing Connor-created test fixture
+for read-only reference, not a fresh factory destination. Background processing
+was disabled and Request async workflows were canceled for the marked sandbox
+Request 1000338. The actual new-request location provisioner/trigger and the
+meeting-date rewrite remain unidentified. [Microsoft's administration-mode
+guide](https://learn.microsoft.com/en-us/power-platform/admin/admin-mode)
+says disabled background operations stop Dataverse asynchronous workflows and
+Dataverse-triggered flows, while some other processes may still run. Obtain
+platform-owner isolation and provisioner evidence before changing that setting or
+attempting another create. No platform setting or business record was changed
+by this read-only investigation.
+
+[VERIFIED via read-only Dataverse/Graph GETs and a refreshed complete plugin-step
+census, 2026-09-23 UTC] Request 1000338 now has one resolved `akoya_request`
+document location and an empty physical folder. The location was created about
+20 hours after the Request under Justin Gallivan's staff user; the original
+attempt-window absence remains accurate. Production reference Request 1002788's
+location appeared about 82 seconds after its Request under the GOApply
+integration user. An enabled production `AkoyaGo.AsyncEntityCreated` Request
+Create registration is absent from sandbox. The exact provisioner remains
+unknown; restoring sandbox background processing alone is not a proven parity
+fix. Request 1000338's meeting date remains `2024-12-13`. The branch's
+[sanitized receipt](https://github.com/justingallivan/wmkf-research-apps/blob/b2c8e4088fc0256b4478897a2a3cfd2933d6e919/docs/plans/evidence/test-request-factory/location-followup-2026-09-23.json)
+records the bounded checks. No remote write or setting change was made.
+
 ### Verified Open
 
-1. **Verify app-suite ownership when execution is eventually built.**
-   Evidence: bounded sandbox Request 1000338 omission/readback and owner
-   decision establish the compiler exception. The future executor must create
-   without staff impersonation and verify both assigned identities by readback;
-   production staff access under app-user ownership remains unverified.
-2. **Approve the execution file policy.**
-   Evidence: `FILE_POLICY_APPROVAL_REQUIRED` is intentionally added by
-   `lib/services/test-requests/admin-preview-service.js`. Decide maximum file
-   count, per-file bytes, total bytes and supported MIME types independently of
-   preview hash ceilings.
-3. **Provide one document-bearing sandbox source and identify a repeatable
-   isolated provisioning path.**
-   Evidence: 150 linked sandbox Requests produced no canonical allowlisted set;
-   sandbox background processing canceled Request async workflows during the
-   1000338 rehearsal. Its later empty folder does not supply documents or prove
-   the create trigger. Production and sandbox Request Create registrations
-   differ; the platform owner must identify the provisioner and supply a target
-   with the needed registration and background behavior.
-4. **Implement Stage 1 isolation before any create/copy executor.**
-   Evidence: `TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md` inventories
-   ordinary list/search/export/worker/transport consumers; those marker-aware
-   guards and production marker schema are not implemented.
+1. **First natural production proof of PR #325.**
+   Evidence: `dpl_ASNEuUWoqqg2ns7jbtEW92dnF5uZ` Ready; no upload since release.
+   On the next real applicant materials upload, confirm no new
+   `request_document_actor_not_captured` event. On the next staff consultant
+   attachment, confirm `_wmkf_initiatedby_value` is set. Don't manufacture
+   records.
+2. **Census still treats Pre-RP brief fallback events as violations.**
+   Evidence: `ALLOWED_UNATTRIBUTED_ORIGIN_STAGES` lacks
+   `pre-rp-brief-generation` (a pre-existing gap). This matters only when the
+   manual census is rerun. Add it with its producer before the next census run.
+
+### Owner Action
+
+- Dismiss events 832/833 (production) and 834 (preview) in the admin panel.
 
 ### Owner Decision Needed
 
-1. Keep or retire the branch-scoped Preview alias/config after the other Codex
-   session decides whether to merge, continue or abandon this branch. Inspect
-   current Vercel state first; another session may have changed the shared alias.
-2. After the provisioner/registration difference is explained, decide with
-   Connor whether to restore required sandbox background processing and parity
-   or use a different isolated environment. Do not use production as the
-   document-provisioning experiment.
-
-### Parked
-
-1. Durable run ledger, create/copy executor, resume/retire surfaces and
-   IA/materials recipes. Re-open only after Stage 1 guards, post-create ownership readback,
-   approved file limits and a working isolated location/folder contract.
+- Suite-wide personal email defaults (carried from S529): unchanged, see
+  `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
 ### Verify Before Acting
 
-1. Fetch and inspect `origin/main` plus the other Codex branch before integration;
-   concurrent work continued after this branch's baseline. Do not merge or
-   cherry-pick blindly.
-2. Re-inspect the stable Preview alias and branch-scoped environment-variable
-   names before cleanup or further smoke. The alias was manually pointed to the
-   verified deployment above.
-3. Re-read the exact sandbox source and folder inventory before claiming a new
-   document-bearing fixture exists; the 150-request census is bounded evidence,
-   not a permanent tenant fact.
+- For the Test Request workstream above, verify current source and sandbox
+  behavior before resolving a blocker; its branch handoff is historical
+  evidence, not a live-state probe for this session.
+- Older unrelated carryovers (cache telemetry, reviewer follow-ups) were not
+  re-probed this session or last; use their plans and live checks.
 
 ### Do Not Reopen Without New Decision
 
-1. The prior authorization covered one fresh sandbox create with a temporary
-   GoVerify bypass and is spent. Another create requires a new manifest and
-   separate authorization. GoVerify was restored.
-2. Do not reset/recycle an existing Request as the default fixture strategy;
-   the owner chose fresh Requests because SharePoint artifacts and version
-   history survive Dataverse resets.
-3. Do not apply marker schema, create a Request, or test provisioning in
-   production. Production enablement remains blocked.
+- Consultant attachments record the staff actor (owner decision 2026-09-22);
+  applicant uploads use `EXTERNAL_CONTRIBUTOR` with no event.
+- S531 closures still stand: the scope of the institution-name heuristic, the
+  Pre-RP expertise sentence, and snapshot versioning complete.
 
-## Key Files Reference
+## Gotchas
 
-| File | Purpose |
-|------|---------|
-| `shared/components/admin/TestRequestPreviewSection.js` | Read-only Admin preview UI; no create/copy action |
-| `pages/api/admin/test-requests/preview.js` | Superuser GET/POST preview route |
-| `lib/services/test-requests/admin-preview-service.js` | Target gating, source/document resolution and sanitized preview assembly |
-| `lib/services/test-requests/policy.js` | Pure request-field compiler and metadata blockers |
-| `lib/services/test-requests/file-plan.js` | Pure selected-file/filename plan |
-| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Current design and implementation boundary |
-| `docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md` | Stage 0 tenant/platform evidence and unresolved gates |
-| `docs/plans/TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md` | Marker schema, consumer inventory and rollout order |
-| `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md` | Connor answers, rehearsals, preview evidence and remaining owner actions |
+- The auto-mode classifier blocked `gh pr merge` even after the owner said
+  "merge". The owner ran it via `! gh pr merge ...`. Expect the same unless a
+  permission rule is added.
+- The Codex sandbox cannot run Jest (EPERM on the haste map); run suites locally.
+- Local `.env.local` `POSTGRES_URL` reaches the shared `operational_events`
+  table (production and preview rows, `environment` column).
+
+## Key Files
+
+- `scripts/probe-test-request-sandbox-owner.js` — pinned sandbox ownership
+  readback for the retained Test Request fixture
+- `scripts/probe-request-owner.js` — read-only Production ownership and
+  creator readback for a specified Request number
+- `lib/services/request-document-actor-service.js` — policies, `isActorNotCaptured`
+- `lib/dataverse/adapters/request-document.js` — `create()` event sites
+- `lib/services/site-visit-materials/contributor-service.js` — applicant upload create
+- `lib/services/consultant-feedback-attachment-service.js`, `pages/api/workbench/consultant-feedback/finalize.js` — staff actor wiring
+- `scripts/probe-request-document-explicit-actor-census.js` — census classifier
 
 ## Testing
 
 ```bash
-# Integrated preview verification already passed:
-# 46 focused tests; 35 suites / 475 regression tests; scoped ESLint;
-# canonical build; Vercel build; signed-in read-only smoke.
-npx jest tests/unit/test-request-preview-section.test.js --runInBand
-npx eslint shared/components/admin/TestRequestPreviewSection.js tests/unit/test-request-preview-section.test.js
-npm run check:api-routes && npm run check:api-routes:self-test
-npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test
-npm run check:atlas && npm run check:atlas:self-test
-npm run check:fact-consistency && npm run check:fact-consistency:self-test
-npm run check:doc-currency && npm run check:doc-currency:self-test
+npx jest request-document consultant-feedback site-visit-materials   # 308 pass
+node scripts/probe-request-document-explicit-actor-census.js --self-test
+npm run check:request-document-writers && npm run check:request-document-writers:self-test
 ```
 
 ## Stop-time notes
 
-No DEVELOPMENT_LOG entry is required: this is a non-production, read-only
-preview of an incomplete capability, not a production cutover or completed new
-architecture. `report:claim-evidence-pilot -- --current` could not read local
-state, so no observation row was inferred. Root instructions and memory were not
-changed. The documentation closeout is committed and pushed on the feature
-branch; the other Codex session should use `/start`, inspect both branches and
-own any merge/cleanup decision.
+No milestone entry: a noise-reduction fix to an existing observability event,
+with no new capability or architecture. Claim-evidence pilot: no eligible
+plan/design edit was recorded, so no observation row was added. No memory
+changes.
 
 ## Historical handoffs — not current instructions
 
-The Test Request handoff above is authoritative for this branch. Older prompts
-below are retained as historical evidence and are not an automatic worklist.
+All text below is historical context. Session 532 guidance above is authoritative;
+older completion, cleanup and authorization statements apply to their named runs.
 
-## Prior Session 531 Prompt: Pre-Site / Pre-RP brief fixes released; snapshot writer still v1 (phase 2 open)
+## Prior Session 531 Prompt: Pre-Site / Pre-RP brief fixes released, snapshot versioning complete
 
 ## Session 530 Summary
 
@@ -240,7 +403,17 @@ release before the owner said "merge".
    snapshot `schemaVersion`: readers accept 1 and 2, legacy rows verify and
    drift-compare under their own version, a reclaimed generation row renders
    from its verified stored snapshot (409 `pre_rp_brief_snapshot_invalid`
-   otherwise). **Writer still emits v1** (phase 1).
+   otherwise). Phase 1 wrote v1 snapshots.
+4. **Pre-RP snapshot versioning phase 2** (PR #324 → main `0f2f22c46`,
+   deployment `dpl_A6qv3LPwa1UNBsJdrft8bqiEB3bg`, Ready 2026-09-22 04:58Z; 307
+   on the four hosts; CI: Tests, E2E, Security, Dependency, Secret Scanning
+   green, CodeQL still running at handoff). Writer flipped to
+   `snapshotSchemaVersion: 2`; new briefs fingerprint over the 11-field list so
+   expertise-only changes register as drift. Rows written by phase 1 stay v1
+   until regenerated and do not flag expertise-only drift. Two fresh Agent
+   adversarial reviews (receipts for the 2026-09-16 plan) approved; the first
+   caught three stale phase-1 comments and forward-dated "2026-09-22" wording,
+   fixed in the amended commit.
 
 Owner completed the manual side: corrected Herwig Schüler's Main institution and
 expertise, regenerated, and confirmed the draft briefing looks good.
@@ -250,24 +423,17 @@ expertise, regenerated, and confirmed the draft briefing looks good.
 - `2937cdfa4`, `15128a2b5`, `54346b00b` — institution-name reduction, Codex rounds 2–3
 - `8ad57295a`, `0bdcc4ce6`, `fdbf8ca6f`, `1a2a3331a` — mainInstitution gating, structural tier rules, card date
 - `fc9a5ca48`, `3568e7e72`, `21410bf8e`, `90b6c6838` — Pre-RP expertise sentence, snapshot versioning phase 1, reclaimed-row provenance
+- `72f951b73` — Session 530 handoff (first pass)
+- `0f2f22c46` — snapshot versioning phase 2 (writer v2)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Pre-RP snapshot versioning phase 2.** Flip
-   `PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion` 1 → 2 in
-   `shared/config/requestDocument.js:163`, update the pinned test in
-   `tests/unit/pre-rp-brief-input-service.test.js`, and the two-phase wording in
-   `docs/agent-wiki/topics/external-reviewer-portal.md`,
-   `docs/atlas/dataverse-wmkf-requestdocument.md`, and
-   `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`.
-   Evidence: `grep -n snapshotSchemaVersion shared/config/requestDocument.js`
-   shows `1` with the phase comment. Until flipped, an expertise-only change
-   renders on regenerate but does not register as brief drift. Branch + PR +
-   Codex review, then merge; `90b6c6838` is the rollback target.
-2. **Delete the merged remote branch** `origin/feat/pre-rp-brief-expertise`
-   (fast-forward merge did not auto-delete it). Evidence: `git ls-remote --heads origin feat/pre-rp-brief-expertise`.
+- None carried from this session. Both feature branches
+  (`feat/pre-rp-brief-expertise`, `feat/pre-rp-snapshot-v2`) are merged and
+  deleted locally and on origin (`git ls-remote --heads origin 'feat/pre-rp-*'`
+  returns nothing).
 
 ### Owner Decision Needed
 
@@ -284,6 +450,8 @@ expertise, regenerated, and confirmed the draft briefing looks good.
 - Institution-name heuristic scope: owner closed further rounds 2026-09-21
   (Codex round 6). Trailing unlisted city stays verbatim by design.
 - Pre-RP brief carries the expertise sentence (owner decision 2026-09-21).
+- Snapshot versioning is complete (writer v2, readers v1+v2). Do not re-widen
+  `REVIEW_FINGERPRINT_FIELDS` without bumping the version and its field list.
 
 ## Gotchas
 
@@ -314,7 +482,7 @@ npx jest 'pre-rp|pre-site-visit|distribution|review-writeup|reviews-tab|external
 
 ## Stop-time notes
 
-No milestone entry: three incremental fixes to existing brief capabilities, no
+No milestone entry: four incremental releases to existing brief capabilities, no
 new architecture or cutover. Claim-evidence pilot report: zero advisory events
 and no eligible plan-doc edit recorded, so no observation row added. Memory:
 one mechanics line added to

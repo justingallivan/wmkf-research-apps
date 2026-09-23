@@ -73,9 +73,6 @@ the tracked seeds. No email was sent.
 - [ ] Inventory suite-wide email flows and record each gap against this requirement.
 - [ ] Extend the capability consistently in bounded, reviewed follow-ups.
 
-Connor has responded about the separate Test Request Factory, and its read-only
-sandbox Admin preview is deployed on the feature branch. Create/copy execution
-and production enablement remain blocked; see
-`docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`. That dependency
-does not prevent these email controls; this note authorizes no production
-test-request creation or real email send.
+The separate Test Request Factory platform status is tracked in
+`docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`; it does not
+block the personal-email-defaults work described here.
