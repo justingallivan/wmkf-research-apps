@@ -47,6 +47,17 @@ Re-inspect immediately before an
 alias change and after restoration. Never set `DATAVERSE_ALLOW_PROD_READS` as this agent. The
 owner runs macOS/iPadOS Safari by hand, and the owner's colleague runs Edge, using the plan.
 
+[VERIFIED via `docs/AUTHENTICATION_SETUP.md` Step 2.4 and `lib/utils/auth.js`]
+Alias-hosted signed-in POSTs need a branch-scoped Preview `NEXTAUTH_URL` equal to
+`https://wmkfresearchapps-preview.vercel.app`, followed by a new deployment; a one-off runtime
+proposal was insufficient for the documented workaround. [VERIFIED via read-only Entra app
+query 2026-09-23] that alias's exact Azure callback is already registered, so no URI registration
+change is needed. [VERIFIED via read-only Vercel inspection 2026-09-23] the alias still resolves to
+Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and this presentation branch has no
+scoped Preview variables. The owner has not yet approved this branch's Vercel env changes,
+Preview deploy, Preview Production Dataverse reads, or an alias move. Obtain each approval before
+acting; the owner alone sets `DATAVERSE_ALLOW_PROD_READS`.
+
 The current main-branch handoff follows. Its Test Request work is owned by another checkout;
 this presentation session does not edit or run that workstream.
 

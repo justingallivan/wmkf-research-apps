@@ -823,6 +823,26 @@ branch-scoped Preview variable names before an alias change, then restore and re
 prior target. Do not clear a permit or delete an item on an uncertain cleanup response; ask the
 owner before deleting each exact disposable item.
 
+**Authenticated Preview URI preflight (2026-09-23).** [VERIFIED via read-only Entra app query]
+`https://wmkfresearchapps-preview.vercel.app/api/auth/callback/azure-ad` is already a registered
+Web redirect URI; no Entra URI edit is needed for this alias. [VERIFIED via read-only Vercel
+inspection] the shared alias currently resolves to Ready Test Request Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and `codex/feature-request` has no branch-scoped Preview
+variables. Follow `docs/AUTHENTICATION_SETUP.md` Step 2.4 before a signed-in proof: with separate
+owner approval, set **Preview scoped only to `codex/feature-request`** `NEXTAUTH_URL` to the exact
+origin `https://wmkfresearchapps-preview.vercel.app` (no trailing slash), and set the approved
+SharePoint site target for this branch. The owner alone sets any branch-scoped
+`DATAVERSE_ALLOW_PROD_READS=yes`; a fresh authorization is required for those Production reads.
+Create a new immutable Preview deployment after those settings exist, attest its branch, commit,
+ID, and Preview class, and ask separately before temporarily moving the shared alias. Use the
+alias for browser traffic; an immutable-host signed-in POST has a different Origin while the
+override is active. Prove a protected GET and an approved validation-only POST through the alias
+before the upload: send `{}` to the staff proof POST route and expect its exact-body `400`
+after the auth check, before any proof service action. After the run, restore and re-inspect the
+exact prior alias target, remove only
+the approved presentation-branch settings, and redeploy the active branch if needed so future
+deployments use normal Preview `VERCEL_URL` derivation. Do not edit the Factory branch settings.
+
 | Browser | Scenario | Expected recorded evidence | Runner |
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. New recovery code remains untested live. | Agent (receipt already recorded) |
@@ -851,7 +871,8 @@ that contains bearer URLs. In PowerShell, run
 `(Get-FileHash -Algorithm SHA256 -LiteralPath 'C:\path\to\source.mp4').Hash`, then repeat with
 the downloaded file's actual path; record both byte counts and hashes, not the file bytes.
 
-1. Open the owner-approved immutable Preview origin and sign in to Meeting Tracker. Open
+1. Open the owner-approved stable Preview alias after its exact target has been attested and sign
+   in to Meeting Tracker. Open
    `/meeting-tracker/presentation-media-proof`. In macOS Safari Web Inspector (or paired iPad Web
    Inspector), enable Preserve Log and record only redacted method/status/origin/range/byte-count
    facts. Do not capture bearer tokens, upload URLs, or media bytes. Record browser version,
