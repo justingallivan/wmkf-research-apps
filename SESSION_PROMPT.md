@@ -1,4 +1,33 @@
-# Session 534 Prompt: Continue Test Request Factory from source-cycle policy
+# Session 535 Prompt: Sandbox Basic clone reviewed; branch publication pending
+
+## Session 534 Summary — 2026-09-22/23 PT
+
+[VERIFIED via local Git, source, focused tests, relevant gates, and three read-only Claude Opus review rounds] The isolated `codex/test-request-preview-integration` branch now has a sandbox-only Basic clone operator. It resolves exactly one Grant Request by number, defaults fiscal year and meeting date from that source, copies only purpose and requested amount, and prepares a private source-bound v3 manifest. Execute fences the source before its single Request POST, creates the marked Request under the app-suite Dataverse application user, provisions the exact SharePoint folder/location, and verifies content, ownership, location, and absence of payment/email effects. Receipt milestones support exact-ID recovery without blind retry. Opus found no remaining P1/P2 defect after three bounded rounds.
+
+This work was **source-built and tested offline only**. No new Dataverse Request, Graph folder, production capability, or deployment was created in Session 534. The combined fresh create, meeting-date correction, and folder run remains unproven. The previous Session 533 instruction to supply both cycle values to `--prepare` is historical: the new v3 operator reads them from the selected source unless one is missing or explicitly overridden. Request 1000339 is a retained synthetic rehearsal record, not the default clone source.
+
+### Commits
+
+- `654e01ac8` — Add source-bound sandbox Request clone operator
+- `3b6903ba0` — Persist sandbox clone write intents
+- `0e3296296` — Harden sandbox clone receipt recovery
+- `a7def6a3` — Fail closed on uncertain GoVerify deactivation
+
+All four commits are **local only**, in the clean worktree `/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps`, four commits ahead of `origin/codex/test-request-preview-integration`. Automatic approval rejected a push of source to GitHub; `gh repo view` reports `justingallivan/wmkf-research-apps` as **PUBLIC**. An explicit owner decision on publishing to that destination is pending. Do not use an alternate route to bypass the rejection.
+
+### Next Items
+
+**Verified open:** Select an actual sandbox Grant Request number before a bounded live Basic clone. Run read-only `--prepare`, inspect the private manifest and source cycle, then decide whether to run `--execute` with an unused receipt path. Recheck the registered sandbox target, GoVerify state, and source revision. The operator never retries an ambiguous create; use `--inspect` and the preallocated GUID. If deactivation was attempted without a verified inactive readback, the receipt marks `restoreVerified:false` and requires manual workflow verification before proceeding. Stage 1 isolation, production automation suppression, duplicate-location policy, file-copy limits, and a document-bearing source remain for the full product; this CLI slice does not enable production creation.
+
+**Owner decision needed:** Whether to publish these four feature commits to the existing public GitHub repository. The question was sent to the owner. No branch push, PR, merge, or production promotion is implied by local acceptance.
+
+**Verify before acting:** The Admin Preview deployment is from an older branch commit and is still read-only. The new CLI's combined live create/correction/folder path has not been exercised. A client-side timeout or signal cancellation does not prove Dataverse canceled server-side work; exact-ID inspection is required after an ambiguous outcome.
+
+### Key Files and Testing
+
+Feature worktree: `scripts/rehearse-test-request-sandbox.mjs`, `lib/services/test-requests/sandbox-clone.js`, `lib/services/test-requests/rehearsal-receipt.js`, `lib/services/test-requests/bypass-signal-fence.js`, and `lib/dataverse/client.js`; the branch design and Stage 0 contract carry the detailed boundary. Luna's final safety run passed 69 focused tests; root independently passed 57 focused tests plus the final 25-test delta, and Atlas and Dataverse access-layer gates with self-tests. Doc-currency and fact-consistency gates with self-tests passed. Opus round 3 accepted with no remaining P1/P2 finding. No `DEVELOPMENT_LOG.md` milestone entry is required because no production capability shipped. The optional claim-evidence pilot report could not read local state; no observation was inferred.
+
+## Prior Session 534 Prompt: Continue Test Request Factory from source-cycle policy
 
 ## Session 533 Summary — 2026-09-23 PT
 
