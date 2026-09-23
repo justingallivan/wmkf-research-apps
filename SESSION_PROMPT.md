@@ -106,6 +106,17 @@ by this repo. `ownerid`, `createdby`, and `owninguser` agree; `owningteam` is
 empty. Dataverse `createdby` names the writing principal, not necessarily the
 human who initiated the action through the app.
 
+[OWNER-PROVIDED CONTEXT, 2026-09-22 PT] Request 1002852 is a real GOApply
+portal application, while 1003259 is an honorarium Request made by this app
+suite. The owner favors the app suite as creator of future Test Requests and
+considers it a likely owner, pending advice. [RECOMMENDED, NOT IMPLEMENTED]
+Have the app suite create without staff impersonation; omit `createdby`,
+`ownerid`, and `owneridtype` from the POST, and require readback that creator
+and owner are the expected app user. Keep the initiating staff actor in the
+factory run ledger rather than substituting a staff record owner. The current
+branch preview remains read-only, and production staff visibility under this
+ownership still needs verification before enablement.
+
 [VERIFIED via the 2026-09-21 sandbox rehearsal receipt; current setting not
 re-probed] Background processing was disabled and Request async workflows
 were canceled. The actual request-to-SharePoint-location provisioner and the
@@ -136,14 +147,11 @@ by this read-only investigation.
 
 ### Owner Decision Needed
 
-- For future synthetic Requests, the observed sandbox default and existing
-  Production Requests 1002852 and 1003259 all use application-user owners;
-  the two Production records have different application identities. Recommend
-  retaining application-user ownership for the next sandbox rehearsal. Before
-  a Production create policy, confirm which application identity should own
-  synthetic records and its access/workflow effects; these examples cannot
-  settle that policy. Do not change the compiler's blocker on this evidence
-  alone.
+- Test Request creator/owner: the owner has supplied the GOApply versus app
+  suite distinction and asked for advice. The recommendation above is to use
+  the app suite principal for both and verify Dataverse-assigned owner and
+  creator after create. Treat this as a proposed policy until the owner accepts
+  it; do not change the compiler's blocker or enable creates on this note alone.
 - Suite-wide personal email defaults (carried from S529): unchanged, see
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
