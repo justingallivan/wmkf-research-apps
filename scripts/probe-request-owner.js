@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * Read-only ownership and creation attribution for production Request 1002852.
- * Pins the production target and request number; prints no GUIDs or credentials.
- * Usage: DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-request-1002852-owner.js
+ * Read-only ownership and creation attribution for one production Request.
+ * Pins the production target; prints no GUIDs or credentials.
+ * Usage: DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-request-owner.js --request=1002852
  */
 
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
 
 const PRODUCTION_URL = 'https://wmkf.crm.dynamics.com';
-const REQUEST_NUMBER = '1002852';
+const requestArg = process.argv.find((arg) => arg.startsWith('--request='));
+const REQUEST_NUMBER = requestArg?.slice('--request='.length);
+if (!/^\d{7}$/.test(REQUEST_NUMBER ?? '') || process.argv.length !== 3) {
+  throw new Error('Pass exactly one seven-digit --request=NUMBER argument.');
+}
 
 async function readUser(client, id) {
   if (!id) return null;
