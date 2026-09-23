@@ -23,6 +23,8 @@ No environment, deployment, schema, Dataverse or Vercel operation ran. Nothing w
 
 ### Verified Open
 
+0. **Fix the three Stage 1d root-review defects before accepting 1d** (spend-check alarm must count all spend; admin dashboard shows test spend as one separate line per owner decision; Dynamics Explorer Search must not throw on an unclassified hit; Workbench cycle discovery must include test requests). Details: the "Stage 1d root review" paragraph in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`. Then rerun the Codex adversarial review from base `a69545697` if its first run's findings were not recorded there.
+
 1. **Stage 1 rollout remains owner-gated.** Evidence: `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` Stage 1d record and `lib/services/test-requests/isolation.js`. Apply the marker schema to an environment before setting `TEST_REQUEST_ISOLATION=on`; production apply/enablement is a separate explicit authorization.
 2. **Creation still requires the durable ledger/resumable runner.** Evidence: the design's build-order amendment and current implementation boundary. Do not expose a deployed Create route before the run ledger, reservation, recovery and ownership contracts exist.
 
@@ -37,7 +39,7 @@ No environment, deployment, schema, Dataverse or Vercel operation ran. Nothing w
 ### Verify Before Acting
 
 1. The external Admin Preview remains an older read-only deployment; re-verify branch head, target schema, switch state and preview alias before any future smoke or rollout.
-2. This session's commits are local only because the owner prohibited pushing. Check the remote branch before any later publication or integration.
+2. The branch is pushed to origin (Claude, 2026-09-23). Codex's run was told not to push; the owner had authorized pushes to this branch.
 
 ### Do Not Reopen Without New Decision
 
@@ -62,7 +64,7 @@ No environment, deployment, schema, Dataverse or Vercel operation ran. Nothing w
 
 ## Stop-time notes
 
-No `DEVELOPMENT_LOG.md` milestone entry: this is branch-local capability with no production release or cutover. Claim-evidence pilot reported no eligible plan/design edit for its current-session key, so no observation row was added. `CLAUDE.md` and memory were unchanged. Push was intentionally skipped under the owner's explicit no-push instruction.
+No `DEVELOPMENT_LOG.md` milestone entry: this is branch-local capability with no production release or cutover. Claim-evidence pilot reported no eligible plan/design edit for its current-session key, so no observation row was added. `CLAUDE.md` and memory were unchanged. Codex skipped the push per its brief; Claude pushed the branch afterwards.
 
 ## Prior Session 534 Prompt: Continue Test Request Factory from source-cycle policy
 
