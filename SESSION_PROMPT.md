@@ -1,5 +1,26 @@
 # Presentation branch continuation — 2026-09-23
 
+**Latest Slice 0 state (2026-09-23):** [VERIFIED via Git] `codex/feature-request` includes
+the owner-approved `origin/main` merge, offline recovery hardening, and the documented
+Preview authentication URI workaround. [VERIFIED via Vercel] the
+owner-triggered immutable Preview deployment `dpl_4R14xsX2jYHHgHYSzvuRjUDQUhM1` was Ready
+from that commit. The owner approved one Windows Edge upload to Request `1003222` in the
+governed `akoya_request/1003222_E43AE6EA698FF11180766045BD018A07/Post Site Visit Materials/`
+folder. [REPORTED by owner from colleague] the 93.2 MB MP4 uploaded, played, and downloaded;
+pause/reload/reselect, expiry, resolver/seek trace, source/download size and SHA-256 match,
+macOS/iPadOS Safari, and near-cap throughput remain open. [VERIFIED via Microsoft Graph]
+the one exact 97,777,999-byte proof item was deleted with an ETag guard after the owner's
+cleanup request; exact GET returned 404 and the folder listing was empty. [VERIFIED via
+Vercel alias and environment APIs] the proof-window user access grant was removed, the shared
+alias was restored and re-inspected at prior Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, all three temporary presentation branch Preview
+variables were removed, and the Factory branch's four scoped settings remain. [VERIFIED via
+Vercel deployment inspection] the immutable proof deployment remains Ready as a historical
+Preview artifact. Fresh approvals are needed
+for any further live run, Production Dataverse read, Preview deployment, or alias change.
+The detailed matrix, click steps, and receipt are in
+`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`.
+
 [VERIFIED via Git and branch-only push] This checkout is `codex/feature-request`.
 The owner-approved `origin/main` merge is `1d455ba9a`; the offline Slice 0 hardening is
 `26b368604`, followed by the handoff commit `d459b96f0`. None was pushed to main. No other checkout
@@ -52,11 +73,13 @@ Alias-hosted signed-in POSTs need a branch-scoped Preview `NEXTAUTH_URL` equal t
 `https://wmkfresearchapps-preview.vercel.app`, followed by a new deployment; a one-off runtime
 proposal was insufficient for the documented workaround. [VERIFIED via read-only Entra app
 query 2026-09-23] that alias's exact Azure callback is already registered, so no URI registration
-change is needed. [VERIFIED via read-only Vercel inspection 2026-09-23] the alias still resolves to
-Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and this presentation branch has no
-scoped Preview variables. The owner has not yet approved this branch's Vercel env changes,
-Preview deploy, Preview Production Dataverse reads, or an alias move. Obtain each approval before
-acting; the owner alone sets `DATAVERSE_ALLOW_PROD_READS`.
+change is needed. [VERIFIED via read-only Vercel inspection before the Edge run] the alias then
+resolved to Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and this presentation
+branch then had no scoped Preview variables. The owner subsequently approved this run's Vercel
+env changes, Preview deployment, Production Dataverse reads, and temporary alias move. Those
+approvals were spent by the run and do not apply to another run. The owner alone sets
+`DATAVERSE_ALLOW_PROD_READS`; the agent removed the exact temporary branch-scoped record during
+the owner-requested cleanup.
 
 The current main-branch handoff follows. Its Test Request work is owned by another checkout;
 this presentation session does not edit or run that workstream.

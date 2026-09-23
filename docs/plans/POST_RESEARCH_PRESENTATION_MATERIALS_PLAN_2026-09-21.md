@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; Chrome proved the Preview-only Graph transport core path, and offline reload/reselect, expiry, playback recovery, and bounded range-retry hardening awaits Edge/Safari and throughput evidence."
+summary: "Active plan for Meeting Tracker presentation materials; Chrome proved the Preview-only Graph transport core path, Edge reported upload/playback/download, and recovery, Safari, integrity, and throughput evidence remain open."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -40,7 +40,7 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
 | SharePoint video delivery | Offer Watch and Download without proxying the complete file through the application. |
 | First-slice MP4 cap | 2,000,000,000 bytes (about 1.86 GiB), so the exact byte count fits the existing Dataverse `wmkf_FileSize` integer. Raising the cap requires a reviewed larger-size schema field. |
 | Existing full briefing | Preserve D19/D28: the existing distributed briefing remains a superset and continues to include research-presentation materials. Add audience-specific non-buffering Watch/Download resolution for Zoom and large SharePoint recordings. The new copied link is an additional materials-only option. |
-| Transport proof | **CHROME CORE PATH PASSED 2026-09-22.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. Edge, macOS Safari, iPadOS Safari, reload/reselect resume, expiry recovery, and long-duration seeking remain required before Slice 0 is complete. |
+| Transport proof | **CHROME CORE PATH PASSED 2026-09-22; EDGE PARTIAL PATH REPORTED 2026-09-23.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. The Windows Edge colleague reported upload, playback, and Download for a 97,777,999-byte MP4; the exact item was deleted after owner approval. Edge's remaining actions, macOS Safari, iPadOS Safari, reload/reselect resume, expiry recovery, and long-duration/near-cap evidence remain required before Slice 0 is complete. |
 | Distribution | No new email composer or automatic distribution for the materials-only link. Meeting Tracker provides Copy link for staff to share through their chosen channel; the existing deliberation email continues distributing the full briefing link. |
 
 ## 2. Verified current state
@@ -758,8 +758,8 @@ Upload-specific rules:
 
 ### Slice 0 — Deployed-Preview browser proof
 
-**Implementation status (2026-09-23): CHROME CORE PATH PASSED; OFFLINE RECOVERY HARDENING
-PUSHED AT `26b368604`; SLICE REMAINS OPEN.** [VERIFIED via focused unit/contract tests] the isolated
+**Implementation status (2026-09-23): CHROME CORE PATH PASSED; EDGE UPLOAD/PLAYBACK/DOWNLOAD
+REPORTED; OFFLINE RECOVERY HARDENING PUSHED AT `26b368604`; SLICE REMAINS OPEN.** [VERIFIED via focused unit/contract tests] the isolated
 feature branch contains the Preview-only staff harness, browser-direct Graph upload session,
 encrypted staff permit, five-minute encrypted-subject proof token, fail-closed resolver limiter,
 302/one-shot playback comparison, scoped CSP, and exact-item cleanup. [VERIFIED via signed-in
@@ -775,11 +775,15 @@ session outcome, can mint a fresh five-minute token from the exact committed ite
 one automatic playback re-resolution with position restore before offering manual Resume Watch.
 The bounded Graph signature-range policy makes at most three total attempts, refreshing the
 Microsoft URL for retryable network or 408/429/500/502/503/504 failures; a malformed/unbounded
-response and other statuses fail immediately. These additions have not been deployed or tested in
-Edge/Safari. [VERIFIED via local Jest/build/gates, 2026-09-23] 11 focused suites / 132 tests,
+response and other statuses fail immediately. These additions were deployed at `209cf18c3` but
+their reload, expiry, and retry behavior has not been tested live in Edge/Safari. [VERIFIED via
+local Jest/build/gates, 2026-09-23] 11 focused suites / 132 tests,
 scoped ESLint, the Next.js build, 66/67 startup gate/self-test commands initially, then 67/67 after repairing and rerunning
 the local Claude-memory symlink invariant, and 27/27 changed-surface gate commands passed.
-Edge/macOS Safari/iPadOS Safari, live reload/reselect and expiry recovery, long-duration seek, and
+The owner's Windows Edge colleague reported a 93.2 MiB upload, playback, and completed Download;
+[VERIFIED via Microsoft Graph] its exact committed item was 97,777,999 bytes before deletion. No
+Edge byte/hash comparison or detailed pause, resolver, seek, or range evidence was recorded.
+macOS Safari/iPadOS Safari, live reload/reselect and expiry recovery, long-duration seek, and
 near-cap throughput evidence remain open, so Slice 0 is not yet complete.
 
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
@@ -804,8 +808,9 @@ production routes; a release gate asserts that the proof audience/routes cannot 
 
 Each live run needs a fresh owner-approved request and SharePoint target, any Production Dataverse
 read, an immutable Preview deployment, and any change to the shared Preview alias. Request
-`1003222` was authorized only for the completed 2026-09-22 run. The owner corrected the next
-candidate request to `1003222`; this selection does not yet authorize a new upload. [VERIFIED
+`1003222` was authorized for the completed 2026-09-22 run and separately for one Edge upload on
+2026-09-23; both authorizations are spent. The owner corrected that second candidate request to
+`1003222`. [VERIFIED
 2026-09-23 via one approved, interlock-checked Production Dataverse lookup of three GETs]
 the request GUID is `e43ae6ea-698f-f111-8076-6045bd018a07`, and its resolved governed
 library/folder is `akoya_request/1003222_E43AE6EA698FF11180766045BD018A07`.
@@ -815,20 +820,23 @@ governed library/folder; the page contents were not read. For the next approved 
 create/use `Post Site Visit Materials` directly under that request folder, with the disposable
 MP4 directly inside. Existing sealed permits retain their original paths for resume/cleanup.
 An earlier approved single GET for the mistakenly supplied `1003332` returned zero exact rows;
-no document-location reads followed that result. The owner will select the MP4 when the Preview
-run is ready. The Windows Edge colleague has Meeting Tracker access and the MP4 on that PC; give them
-the staff harness link after an approved deployment, since the playback proof link lasts only
-five minutes. Re-inspect the alias target and
+no document-location reads followed that result. The owner selected the MP4 for the completed
+Edge run; any later file and upload need fresh approval. The Windows Edge colleague has Meeting
+Tracker access and had the MP4 on that PC; give them the staff harness link after any newly
+approved deployment, since the playback proof link lasts only five minutes. Re-inspect the alias target and
 branch-scoped Preview variable names before an alias change, then restore and re-inspect the exact
 prior target. Do not clear a permit or delete an item on an uncertain cleanup response; ask the
 owner before deleting each exact disposable item.
 
-**Authenticated Preview URI preflight (2026-09-23).** [VERIFIED via read-only Entra app query]
+**Authenticated Preview URI preflight and rollback (2026-09-23).** [VERIFIED via read-only Entra app query]
 `https://wmkfresearchapps-preview.vercel.app/api/auth/callback/azure-ad` is already a registered
 Web redirect URI; no Entra URI edit is needed for this alias. [VERIFIED via read-only Vercel
 inspection] the shared alias currently resolves to Ready Test Request Factory deployment
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and `codex/feature-request` has no branch-scoped Preview
-variables. Follow `docs/AUTHENTICATION_SETUP.md` Step 2.4 before a signed-in proof: with separate
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and `codex/feature-request` then had no branch-scoped Preview
+variables. [VERIFIED via Vercel alias and env APIs after the Edge run] that exact Factory target is
+restored, the proof-window user access grant is absent, the three temporary presentation branch
+variables are removed, and the Factory branch's four scoped variable names remain. Follow
+`docs/AUTHENTICATION_SETUP.md` Step 2.4 before another signed-in proof: with separate
 owner approval, set **Preview scoped only to `codex/feature-request`** `NEXTAUTH_URL` to the exact
 origin `https://wmkfresearchapps-preview.vercel.app` (no trailing slash), and set the approved
 SharePoint site target for this branch. The owner alone sets any branch-scoped
@@ -846,7 +854,7 @@ deployments use normal Preview `VERCEL_URL` derivation. Do not edit the Factory 
 | Browser | Scenario | Expected recorded evidence | Runner |
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. New recovery code remains untested live. | Agent (receipt already recorded) |
-| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | Redacted Network trace: direct Microsoft PUT 202 ranges, no MP4 application body, 302 then Microsoft 206 ranges, one resolver action per Watch/Download, source/download byte and SHA-256 match. | Owner's Windows Edge colleague, after owner live-run approval |
+| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | **Partial 2026-09-23:** colleague reported 93.2 MiB upload, playback, and completed Download; Graph confirmed the 97,777,999-byte committed item. Direct PUT/range trace, pause/reload/reselect, both Watch shapes, ten seeks, and source/download size plus SHA-256 match remain unrecorded. | Owner's Windows Edge colleague, after new owner live-run approval |
 | macOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts and source/download byte plus SHA-256 match; note any autoplay permission prompt or playback error. | Owner by hand |
 | iPadOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts where Web Inspector is available, plus Files-app downloaded byte count/hash compared on a trusted computer; note any mobile-specific failure. | Owner by hand |
 | Edge, then one Safari | Let a paused upload session expire; attempt Resume; cleanup only after owner confirmation; start a fresh proof | 410 `presentation_media_proof_session_expired`, retained permit, exact cleanup outcome (including `placeholder_deleted` only after confirmed terminal session), new session and successful finalize; no old partial item promoted. | Owner's Edge colleague, then owner on Safari |
@@ -1000,6 +1008,34 @@ site's recycle bin. The alias was restored and re-inspected at its prior exact t
 `1003222` from Production Dataverse and wrote only the disposable proof item to the canonical
 SharePoint site. This proves same-page pause/resume on current hardening; reload/reselect resume is
 a separate open requirement.
+
+**Windows Edge partial execution and cleanup receipt (2026-09-23):** [VERIFIED via Vercel deployment
+inspection] the owner-triggered immutable Preview deployment
+`dpl_4R14xsX2jYHHgHYSzvuRjUDQUhM1` was Ready from `codex/feature-request` commit `209cf18c3`.
+The owner approved the one disposable upload to Request `1003222` in the governed
+`akoya_request/1003222_E43AE6EA698FF11180766045BD018A07/Post Site Visit Materials/`
+folder on the akoyaGO site, the Production Dataverse reads for this run, the branch-scoped
+Preview settings, and the temporary alias move. [VERIFIED via Vercel inspection] the three
+presentation-only Preview variables were scoped to `codex/feature-request` before deployment;
+the owner set `DATAVERSE_ALLOW_PROD_READS` and the agent did not set it. [REPORTED by owner from
+the Windows Edge colleague] the page showed 93.2 MB, the file uploaded, played, and Download
+completed. The colleague did not record pause/reload/reselect, expiry, both Watch shapes, seek
+positions, direct network statuses, or a downloaded byte/SHA-256 comparison; those cells remain
+open. [VERIFIED via Microsoft Graph metadata] the child folder contained exactly one disposable
+proof MP4, `b5c53a06-52e3-447e-a0df-38c45c8e7e05.mp4`, DriveItem
+`01G4GVMS622FX7MM5RIRGYL4EXWARAED2P`, 97,777,999 bytes. After the owner's cleanup request,
+the agent matched its exact drive, parent, item ID, name, size, creation time, and ETag, then
+deleted it with `If-Match`: Graph returned 204, exact item GET returned 404, and the child-folder
+listing contained zero items. The disposable MP4 is in SharePoint's recycle bin; the governed
+request and child folders were retained. [VERIFIED via Vercel alias API] the proof-window access
+record was a single user-scoped grant, not a shareable link; denial by its exact user ID removed
+the grant. The shared alias was then restored and re-inspected at its exact prior Factory
+deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, with zero protection-bypass records.
+[VERIFIED via Vercel branch environment listing] the three temporary presentation-scoped
+`DATAVERSE_ALLOW_PROD_READS`, `SHAREPOINT_SITE_URL`, and `NEXTAUTH_URL` records were removed;
+the Factory branch's four scoped variables remain. The immutable proof deployment remains a
+historical Preview artifact with its deployment-time environment snapshot; another live run
+requires fresh, separate authorization and configuration.
 
 Also verify tenant Safe Attachments and `DisallowInfectedFileDownload` posture. A security owner
 may supply sanctioned evidence that the Graph malware facet becomes non-null for a flagged item;
