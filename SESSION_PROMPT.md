@@ -90,6 +90,15 @@ application-user ownership is the desired factory policy or prove a Production
 default. The branch's pure compiler still reports both fields as unresolved;
 no feature-branch code changed in this investigation.
 
+[VERIFIED via `scripts/probe-request-1002852-owner.js` production GET at
+2026-09-23 01:26 UTC] Existing Request 1002852 is owned and was created by
+`# BCO akoyaGO Integration`, a Dataverse application user. Its `ownerid`,
+`createdby`, and `owninguser` all point to that same user; `owningteam` is
+empty. That is a different application identity from the one used by this
+repo's authenticated probe. This single Request supports application-user
+ownership as an existing pattern, but does not establish the owner policy for
+every Request or the intended owner for future synthetic records.
+
 [VERIFIED via the 2026-09-21 sandbox rehearsal receipt; current setting not
 re-probed] Background processing was disabled and Request async workflows
 were canceled. The actual request-to-SharePoint-location provisioner and the
@@ -120,10 +129,13 @@ by this read-only investigation.
 
 ### Owner Decision Needed
 
-- Decide whether future synthetic Requests should keep the Dataverse
-  application user as owner or use a named staff user/team. The sandbox
-  default is verified above; access and workflow expectations need a product
-  choice before changing the compiler's blocker.
+- For future synthetic Requests, the observed sandbox default and existing
+  Production Request 1002852 both use application-user owners. Recommend
+  retaining application-user ownership for the next sandbox rehearsal. Before
+  a Production create policy, confirm which application identity should own
+  synthetic records and its access/workflow effects; 1002852 alone cannot
+  settle that policy. Do not change the compiler's blocker on this evidence
+  alone.
 - Suite-wide personal email defaults (carried from S529): unchanged, see
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
@@ -155,6 +167,8 @@ by this read-only investigation.
 
 - `scripts/probe-test-request-sandbox-owner.js` — pinned sandbox ownership
   readback for the retained Test Request fixture
+- `scripts/probe-request-1002852-owner.js` — pinned, read-only Production
+  ownership and creator readback for the owner's comparison Request
 - `lib/services/request-document-actor-service.js` — policies, `isActorNotCaptured`
 - `lib/dataverse/adapters/request-document.js` — `create()` event sites
 - `lib/services/site-visit-materials/contributor-service.js` — applicant upload create
