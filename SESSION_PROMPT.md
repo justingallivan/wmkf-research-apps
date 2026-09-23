@@ -1,4 +1,138 @@
-# Session 531 Prompt: Pre-Site / Pre-RP brief fixes released; snapshot writer still v1 (phase 2 open)
+# Session 532 Prompt: Two Codex workstreams preserved; owner integration decisions remain
+
+## Session 531 Summary
+
+[VERIFIED via Git, source, the full 67-command gate census, Vercel CLI, and the completed signed-in
+Chrome proof] Two concurrent Codex workstreams are now consolidated into one closeout record while
+remaining separate branches. No merge, cherry-pick, `main` push, Production deployment, schema
+operation, Request create, document copy, or Vercel cleanup was performed.
+
+### What Was Completed
+
+1. **Presentation-materials transport proof completed its current Chrome boundary.**
+   - Branch: `codex/feature-request`; implementation receipt `0be2ffdb3`; live-discovered Graph
+     placeholder fix `cdc7574e1`.
+   - Chrome paused and resumed the 100,665,703-byte upload in the same page, finalized it, played
+     and sought through the 302 resolver without extra resolution, played through one-shot Watch,
+     and downloaded byte- and SHA-256-identical content.
+   - The exact disposable SharePoint item was moved to the recycle bin. The stable Preview alias
+     was restored to its prior target. No branch-scoped Preview settings were left for this branch.
+   - Slice 0 remains incomplete: Edge, macOS Safari, iPadOS Safari, reload/reselect resume, expiry
+     recovery, and long-duration/2 GB throughput evidence remain open. The Preview harness is not a
+     finished production feature.
+
+2. **Test Request preview handoff independently verified read-only.**
+   - Branch: `codex/test-request-preview-integration`; clean and equal to upstream at `b334d8a59`.
+   - Source trace confirms superuser + trusted DAL guards, exact input allowlists, sandbox and
+     registered-SharePoint target checks, server-side trusted-value resolution, stripped executable
+     plans, `executionEnabled: false`, stale-request UI guards and no create/copy control.
+   - Create/copy remains blocked by the unresolved `ownerid`/`owneridtype` contract, unapproved
+     execution file limits, unimplemented Stage 1 isolation, and the lack of a document-bearing
+     sandbox fixture. The prior one-create authorization is spent.
+
+3. **Cross-branch integration decision recorded.**
+   - Both branches are eight commits behind `origin/main` from merge base
+     `0f2f22c469cb0b050a32abc2ef6f8d0a139f44d0`.
+   - They overlap in `docs/API_ROUTE_SECURITY_MATRIX.md`, `docs/CANONICAL_COUNTS.md`,
+     `docs/SERVICE_AND_UTILITY_CATALOG.md`, and `lib/services/graph-service.js`.
+   - Do not merge the branches together. Review and integrate each separately from a fresh main
+     baseline only after an explicit owner release decision.
+
+4. **External Preview state inspected and retained.**
+   - `wmkfresearchapps-preview.vercel.app` points to Ready deployment
+     `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` for the Test Request preview.
+   - Branch-scoped `DYNAMICS_URL`, `SHAREPOINT_SITE_URL`, `DATAVERSE_DAL_ENFORCEMENT`, and
+     `NEXTAUTH_URL` names remain present for `codex/test-request-preview-integration`.
+   - No alias, environment variable, deployment, branch, or worktree was removed.
+
+### Commits
+
+- Presentation branch: `4afb68ca6` through `0be2ffdb3`; current-hardening fix `cdc7574e1`.
+- Test Request branch: current pushed head `b334d8a59` (authoritative branch handoff).
+- Closeout plan and this prompt: current `codex/feature-request` branch head after the stop commit.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Presentation-materials next boundary.** Choose whether to complete the remaining browser/
+   expiry/throughput proof matrix or revise the production design first. Before any main merge,
+   remove the disposable harness or convert only reviewed pieces.
+2. **Test Request Preview retention.** Decide whether to retain the stable read-only Preview alias
+   and its branch-scoped configuration. Re-inspect Vercel immediately before any change.
+3. **Branch integration.** If either workstream should proceed toward `main`, authorize a separate
+   fresh-main integration/review for that branch. Do not combine both branches into one merge.
+
+### Verified Open
+
+1. Presentation Slice 0: Edge, macOS Safari, iPadOS Safari, reload/reselect resume, expiry recovery,
+   and long-duration/2 GB throughput evidence.
+2. Test Request operational prerequisites: ownership-field default contract, approved execution
+   file policy, Stage 1 isolation, platform suppression/provisioning evidence, deterministic date
+   behavior, and one document-bearing isolated fixture.
+
+### Parked
+
+1. Test Request ledger, create/copy executor, resume/retire UI, and IA/materials recipes. Reopen
+   only after the prerequisites above are satisfied.
+2. Presentation production slices after Slice 0. Reopen from the accepted plan after deciding how
+   much additional transport evidence is required.
+
+### Verify Before Acting
+
+1. Refresh both branches against current `origin/main`; each was eight commits behind at closeout.
+2. Re-inspect the stable Preview alias and branch-scoped variable names before cleanup or smoke.
+3. Re-read the exact sandbox source/folder inventory before claiming a document-bearing fixture
+   exists. The prior 150-request census is bounded evidence, not a permanent tenant fact.
+4. Re-probe any old carryover below before treating it as current work; the historical sections are
+   retained evidence, not an automatic queue.
+
+### Do Not Reopen Without New Decision
+
+1. No additional sandbox Request create: the earlier authorization is spent; a new manifest and
+   separate authorization are mandatory.
+2. No Test Request schema, provisioning, create, or document-copy experiment in Production.
+3. No deletion of either feature branch/worktree or removal of Preview state as routine cleanup.
+4. No merge, cherry-pick, or push to `main` without explicit owner authorization.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/CODEX_WORKSTREAM_CLOSEOUT_2026-09-22.md` | Cross-branch state, integration order, external Preview state and archive criteria |
+| `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md` | Presentation product plan and current-hardening browser-proof receipts |
+| `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md` on `codex/test-request-preview-integration` | Authoritative Test Request platform/rehearsal handoff |
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` on `codex/test-request-preview-integration` | Current design and implementation boundary |
+| `docs/plans/TEST_REQUEST_FACTORY_PLATFORM_CONTRACT_2026-09-19.md` on `codex/test-request-preview-integration` | Stage 0 tenant/platform evidence and unresolved gates |
+| `docs/plans/TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md` on `codex/test-request-preview-integration` | Marker semantics, Stage 1 inventory and rollout boundary |
+
+## Testing
+
+```bash
+# Start-of-closeout census on codex/feature-request
+# 67/67 currently defined check:* scripts passed sequentially.
+
+# Presentation implementation verification already recorded on the branch
+# 76 focused tests, scoped ESLint, types, remote Vercel build, and relevant route/doc gates passed.
+
+# Test Request branch verification recorded at b334d8a59
+# 46 focused tests; 35 suites / 475 regressions; scoped ESLint; canonical/Vercel builds;
+# signed-in read-only smoke; route/DAL/Atlas/docs/fact gates.
+```
+
+## Stop-time notes
+
+The claim-evidence pilot report could not read local state, so no observation row was inferred.
+No `DEVELOPMENT_LOG.md` entry is required: neither branch shipped a Production capability or
+cutover. Once this closeout commit is pushed and both worktrees again match their upstreams, it is
+safe to archive both Codex tasks. Archiving tasks does not delete or retire their branches,
+worktrees, deployments, aliases, configuration, SharePoint folder, or recycle-bin evidence.
+
+## Historical handoffs — not current instructions
+
+Everything below preserves earlier evidence. The Session 532 guidance above is authoritative.
+
+## Prior Session 531 Prompt: Pre-Site / Pre-RP brief fixes released; snapshot writer still v1 (phase 2 open)
 
 ## Session 530 Summary
 
