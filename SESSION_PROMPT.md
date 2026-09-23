@@ -1,31 +1,68 @@
-# Session 535 Prompt: Sandbox Basic clone reviewed; select live source
+# Session 536 Prompt: Continue Test Request Factory after Stage 1d visibility
 
-## Session 534 Summary — 2026-09-22/23 PT
+## Session 535 Summary — 2026-09-23 PT
 
-[VERIFIED via local Git, source, focused tests, relevant gates, and three read-only Claude Opus review rounds] The isolated `codex/test-request-preview-integration` branch now has a sandbox-only Basic clone operator. It resolves exactly one Grant Request by number, defaults fiscal year and meeting date from that source, copies only purpose and requested amount, and prepares a private source-bound v3 manifest. Execute fences the source before its single Request POST, creates the marked Request under the app-suite Dataverse application user, provisions the exact SharePoint folder/location, and verifies content, ownership, location, and absence of payment/email effects. Receipt milestones support exact-ID recovery without blind retry. Opus found no remaining P1/P2 defect after three bounded rounds.
+[VERIFIED via local Git, source reconciliation, mutation checks, full Jest, TypeScript, ESLint and all required gate/self-test pairs] Test Request Factory Stage 1d is source-built on `codex/test-request-preview-integration` in `/Users/gallivan/Code/WMKF_Apps-factory`. Staff request lists retain test requests and display only a derived TEST signal; reports, exports and cycle totals exclude them in server queries; request-attributable review-panel spend is excluded while existing unattributable `api_usage_log` spend is explicitly labeled. Every read-side change is gated by literal `TEST_REQUEST_ISOLATION=on`; off mode keeps the historical selects, filters and DTO shapes and never names the production-missing marker columns.
 
-This work was **source-built and tested offline only**. The operator created no new Dataverse Request or Graph folder, and no production capability was promoted. The combined fresh create, meeting-date correction, and folder run remains unproven. The previous Session 533 instruction to supply both cycle values to `--prepare` is historical: the new v3 operator reads them from the selected source unless one is missing or explicitly overridden. Request 1000339 is a retained synthetic rehearsal record, not the default clone source.
+No environment, deployment, schema, Dataverse or Vercel operation ran. Nothing was pushed, merged or deployed, per the owner request. Production still lacks the marker columns until a separately authorized schema apply; the switch must remain off there until that apply succeeds.
+
+### What Was Completed
+
+1. **Census and durable record.** The Stage 1d design record classifies Workbench, Review Manager, Meeting Tracker, Dynamics Explorer, Administration, Grant Reporting, grantee exports, Dataverse export, cycle dossiers, cycle/count aggregates and spend. Generic Dataverse Search is inventoried without claiming a server-side marker-filter contract.
+2. **Visibility.** Shared `isTestRequest` DTO projection and `TestRequestBadge` cover the Workbench dashboard/search/header/follow-up, Initial Assessments, Staff Deliberations, Final Writeups, Expertise Finder, Review Panel, Meeting Tracker, Admin preview and Dynamics Explorer request/query/search/relationship results. Raw marker/run fields are stripped from staff DTOs.
+3. **Exclusions.** The canonical OData/FetchXML ordinary-only fragments are composed before report/export paging or counts for awardees, grantee cycle export, candidate/review downloads, Grant Reporting, Dataverse bulk export, Dynamics Explorer reports/exports/counts and Workbench cycle/status aggregates. The Dynamics page-only CSV control is suppressed for request-result tables so staff use the guarded server export.
+4. **Spend.** Admin cost stats and the spend-check cron group review-panel usage by trusted `review_panel_entries.request_id`, exclude non-ordinary/unknown request state, and report excluded/unknown attribution. `api_usage_log.request_id` remains an Explorer correlation ID and is labeled unattributable rather than misclassified.
+5. **Mechanized census and mutation proof.** `test-request-visibility-census.test.js` derives report/export routes and aggregate callers and pins each shared badge surface. Mutations produced 2 badge failures, 5 report/count failures, 1 spend failure and 1 census failure; the first census attempt exposed and fixed a filename-only assertion weakness.
 
 ### Commits
 
-- `654e01ac8` — Add source-bound sandbox Request clone operator
-- `3b6903ba0` — Persist sandbox clone write intents
-- `0e3296296` — Harden sandbox clone receipt recovery
-- `a7def6a3` — Fail closed on uncertain GoVerify deactivation
+- `4c0a9e86f` — docs: census test request visibility surfaces
+- `ca0e0142a` — Build Test Request Factory Stage 1d visibility
 
-[VERIFIED via successful `git push` and branch status] The owner explicitly authorized publishing to the existing public GitHub origin after automatic approval had rejected Luna's earlier attempt. All four commits are now pushed on `codex/test-request-preview-integration` at `a7def6a31`. The worktree `/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps` is clean and synchronized with origin. The public destination was verified with `gh repo view`; no alternate export path was used.
+## Next Items
 
-### Next Items
+### Verified Open
 
-**Verified open:** Select an actual sandbox Grant Request number before a bounded live Basic clone. Run read-only `--prepare`, inspect the private manifest and source cycle, then decide whether to run `--execute` with an unused receipt path. Recheck the registered sandbox target, GoVerify state, and source revision. The operator never retries an ambiguous create; use `--inspect` and the preallocated GUID. If deactivation was attempted without a verified inactive readback, the receipt marks `restoreVerified:false` and requires manual workflow verification before proceeding. Stage 1 isolation, production automation suppression, duplicate-location policy, file-copy limits, and a document-bearing source remain for the full product; this CLI slice does not enable production creation.
+1. **Stage 1 rollout remains owner-gated.** Evidence: `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` Stage 1d record and `lib/services/test-requests/isolation.js`. Apply the marker schema to an environment before setting `TEST_REQUEST_ISOLATION=on`; production apply/enablement is a separate explicit authorization.
+2. **Creation still requires the durable ledger/resumable runner.** Evidence: the design's build-order amendment and current implementation boundary. Do not expose a deployed Create route before the run ledger, reservation, recovery and ownership contracts exist.
 
-**Owner input needed for a live sandbox run:** Select an actual Grant Request source number. Publication is done; no PR, merge, or production promotion was requested or performed.
+### Owner Decision Needed
 
-**Verify before acting:** The Admin Preview deployment is from an older branch commit and is still read-only. The new CLI's combined live create/correction/folder path has not been exercised. A client-side timeout or signal cancellation does not prove Dataverse canceled server-side work; exact-ID inspection is required after an ambiguous outcome.
+1. **Single-request artifact boundary.** Stage 1d conservatively treats one deliberately selected request's proposal/material/IA/brief/review-panel/final-writeup artifacts as normal workflow actions, while population files and named exports exclude tests. Reclassifying every single-request Word/PDF artifact as a report would conflict with the existing normal-actions decision and needs an explicit owner change.
 
-### Key Files and Testing
+### Parked
 
-Feature worktree: `scripts/rehearse-test-request-sandbox.mjs`, `lib/services/test-requests/sandbox-clone.js`, `lib/services/test-requests/rehearsal-receipt.js`, `lib/services/test-requests/bypass-signal-fence.js`, and `lib/dataverse/client.js`; the branch design and Stage 0 contract carry the detailed boundary. Luna's final safety run passed 69 focused tests; root independently passed 57 focused tests plus the final 25-test delta, and Atlas and Dataverse access-layer gates with self-tests. Doc-currency and fact-consistency gates with self-tests passed. Opus round 3 accepted with no remaining P1/P2 finding. No `DEVELOPMENT_LOG.md` milestone entry is required because no production capability shipped. The optional claim-evidence pilot report could not read local state; no observation was inferred.
+1. **Unattributable provider spend.** Existing `api_usage_log` rows and Grant Reporting calls without `requestGuid` cannot be assigned safely to a Grant Request. Add trusted request attribution in a separately designed schema/contract before attempting exclusion; do not infer it from filenames or correlation IDs.
+
+### Verify Before Acting
+
+1. The external Admin Preview remains an older read-only deployment; re-verify branch head, target schema, switch state and preview alias before any future smoke or rollout.
+2. This session's commits are local only because the owner prohibited pushing. Check the remote branch before any later publication or integration.
+
+### Do Not Reopen Without New Decision
+
+1. Test requests remain visible in staff lists with a TEST badge; reports/exports/cycle totals exclude them; ordinary/null-marker equivalence and the literal-on rollout switch are fixed owner decisions.
+2. Never write or normalize the marker on existing requests. The application write guard remains authoritative.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Stage 1d census, gaps and verification record |
+| `lib/services/test-requests/isolation.js` | Gated select/filter/DTO policy |
+| `lib/services/test-requests/spend-isolation.js` | Request-attributable cost exclusion |
+| `shared/components/TestRequestBadge.js` | Shared staff TEST badge |
+| `tests/unit/test-request-visibility-census.test.js` | Mechanized surface census |
+
+## Testing
+
+- Final full Jest: 1,078 suites / 16,011 tests / one snapshot passed.
+- `npm run check:types` passed; changed-file ESLint: 0 errors, 15 pre-existing hook warnings.
+- Required gates and self-tests passed sequentially: API routes (226), route/service boundary, Dataverse access layer, OData escape (1,097 files), Atlas (58 Postgres / 38 Dataverse), doc currency, fact consistency (808 files), trust-boundary GUID (226 routes).
+
+## Stop-time notes
+
+No `DEVELOPMENT_LOG.md` milestone entry: this is branch-local capability with no production release or cutover. Claim-evidence pilot reported no eligible plan/design edit for its current-session key, so no observation row was added. `CLAUDE.md` and memory were unchanged. Push was intentionally skipped under the owner's explicit no-push instruction.
 
 ## Prior Session 534 Prompt: Continue Test Request Factory from source-cycle policy
 
