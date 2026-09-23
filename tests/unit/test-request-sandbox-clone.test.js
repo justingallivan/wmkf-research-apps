@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
   assertCopiedSourceValues,
   assertSourceUnchanged,
+  expectedRequestFolder,
   projectCloneSource,
   requireUniqueSourceRequest,
   resolveCloneCycle,
@@ -40,6 +41,9 @@ describe('sandbox clone source fence', () => {
     expect(projected).not.toHaveProperty('akoya_requeststatus');
     expect(projected).not.toHaveProperty('_akoya_primarycontactid_value');
     expect(projected).not.toHaveProperty('akoya_paid');
+    expect(projectCloneSource(source({ akoya_purpose: '' })).akoya_purpose).toBeNull();
+    expect(expectedRequestFolder('1000001', projected.akoya_requestid))
+      .toBe('1000001_AAAAAAAAAAAA4AAA8AAAAAAAAAAAAAAA');
     expect(resolveCloneCycle(projected)).toEqual({ fiscalYear: 'December 2026', meetingDate: '2026-12-04' });
   });
 
@@ -139,25 +143,38 @@ describe('sandbox operator write boundary', () => {
   const script = fs.readFileSync(scriptPath, 'utf8');
 
   test('keeps one Request create and routes it through execute only', () => {
-    expect(script.match(/client\.post\('\/akoya_requests'/g)).toHaveLength(1);
+    expect(script.match(/client\.postWithOptions\('\/akoya_requests'/g)).toHaveLength(1);
     expect(script).toContain('Only a source-bound v3 manifest can execute a sandbox clone.');
     expect(script).toContain('assertSourceUnchanged(manifest.source, sourceRow, preflightBefore.grantOption.value)');
-    expect(script).toContain('const receiptDescriptor = reserveJsonReceipt(receiptPath, receipt)');
+    expect(script).toContain('reserveRehearsalReceipt(receiptPath, receipt)');
     expect(script).toContain('manifest.values.locationId');
     expect(script).toContain('expectedFolder');
     expect(script).toContain('SharePoint location parent identity mismatch');
     expect(script).toContain('Preallocated request GUID is not absent');
     expect(script).toContain('READ_ONLY_PREFLIGHT');
     expect(script).toContain('writeNewJson(args.prepare, manifest)');
-    const bypassIntent = script.indexOf('updateReservedJson(receiptDescriptor, receipt);\n        const workflowDeactivated');
-    const bypassWrite = script.indexOf('await setGoverifyWorkflowState(' , bypassIntent);
+    const bypassIntent = script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', script.indexOf('signalFence = createBypassSignalFence()'));
+    const bypassWrite = script.indexOf('const workflowDeactivated = await setGoverifyWorkflowState(', bypassIntent);
     expect(bypassIntent).toBeGreaterThan(-1);
     expect(bypassWrite).toBeGreaterThan(bypassIntent);
     const requestIntent = script.indexOf('receipt.createAttempted = true;');
-    const receiptPersist = script.indexOf('updateReservedJson(receiptDescriptor, receipt);', requestIntent);
-    const requestWrite = script.indexOf("client.post('/akoya_requests'", receiptPersist);
+    const receiptPersist = script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', requestIntent);
+    const requestWrite = script.indexOf("client.postWithOptions('/akoya_requests'", receiptPersist);
     expect(receiptPersist).toBeGreaterThan(requestIntent);
     expect(requestWrite).toBeGreaterThan(receiptPersist);
+    expect(script).toContain('receipt.createResponseReceivedAt = new Date().toISOString()');
+    const datePatchIntent = script.indexOf('receipt.meetingDateCorrection.patchAttempted = true;');
+    expect(script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', datePatchIntent))
+      .toBeLessThan(script.indexOf('patched = await client.patch(', datePatchIntent));
+    const graphFolderIntent = script.indexOf('graphFolderAttempted: true');
+    expect(script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', graphFolderIntent))
+      .toBeLessThan(script.indexOf('GraphService.ensureFolderPath', graphFolderIntent));
+    expect(script).toContain('locationCreateAttempted = true');
+    expect(script).toContain('receipt.observationStartedAt = new Date().toISOString()');
+    expect(script).toContain('expectedSharePointFolder: expectedFolder');
+    expect(script).toContain('postCreateStepsSkippedReason =');
+    expect(script).toContain('signalFence?.dispose()');
+    expect(script).toContain('client.postWithOptions');
     const mainBody = script.slice(script.indexOf('async function main()'), script.indexOf('main().catch'));
     expect(mainBody).not.toMatch(/client\.(post|patch|delete)\s*\(/);
     expect(script).toContain('verifyCloneRequestReadback(manifest, request)');

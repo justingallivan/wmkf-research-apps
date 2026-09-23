@@ -21,9 +21,15 @@ import path from 'path';
 import { createRequire } from 'module';
 import { compileTestRequestDraft } from '../lib/services/test-requests/policy.js';
 import {
+  reserveRehearsalReceipt,
+  updateRehearsalReceipt,
+} from '../lib/services/test-requests/rehearsal-receipt.js';
+import { createBypassSignalFence, throwIfInterrupted } from '../lib/services/test-requests/bypass-signal-fence.js';
+import {
   assertCopiedSourceValues,
   assertSourceUnchanged,
   projectCloneSource,
+  expectedRequestFolder,
   requireUniqueSourceRequest,
   resolveCloneCycle,
   verifyCloneRequestReadback,
@@ -38,6 +44,8 @@ const REQUEST_LIBRARY = 'akoya_request';
 const MANIFEST_TTL_MS = 60 * 60 * 1000;
 const POLL_MS = 5_000;
 const OBSERVATION_MS = 60_000;
+const BYPASS_REQUEST_TIMEOUT_MS = 15_000;
+const CREATE_REQUEST_TIMEOUT_MS = 30_000;
 const GOVERIFY_WORKFLOW = Object.freeze({
   definitionId: 'a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb',
   name: 'GOverify- check Publication 78 on create of a request record',
@@ -140,7 +148,7 @@ function printHelp() {
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
 }
 
-async function getGoverifyWorkflow(client) {
+async function getGoverifyWorkflow(client, requestOptions = null) {
   const fields = [
     'workflowid',
     'workflowidunique',
@@ -157,25 +165,27 @@ async function getGoverifyWorkflow(client) {
     'modifiedon',
     'versionnumber',
   ];
-  const response = await client.get(
-    `/workflows(${GOVERIFY_WORKFLOW.definitionId})?$select=${fields.join(',')}`,
-  );
+  const requestPath = `/workflows(${GOVERIFY_WORKFLOW.definitionId})?$select=${fields.join(',')}`;
+  const response = requestOptions
+    ? await client.getWithOptions(requestPath, undefined, requestOptions)
+    : await client.get(requestPath);
   return bodyOrThrow('GoVerify workflow readback', response);
 }
 
-async function getGoverifyActivations(client) {
+async function getGoverifyActivations(client, requestOptions = null) {
   const filter = `_parentworkflowid_value eq ${GOVERIFY_WORKFLOW.definitionId} and type eq 2`;
-  const response = await client.get(
-    '/workflows?$select=workflowid,name,type,primaryentity,statecode,statuscode,_parentworkflowid_value' +
-      `&$filter=${encodeURIComponent(filter)}&$top=5`,
-  );
+  const requestPath = '/workflows?$select=workflowid,name,type,primaryentity,statecode,statuscode,_parentworkflowid_value' +
+    `&$filter=${encodeURIComponent(filter)}&$top=5`;
+  const response = requestOptions
+    ? await client.getWithOptions(requestPath, undefined, requestOptions)
+    : await client.get(requestPath);
   const body = bodyOrThrow('GoVerify activation readback', response);
   if (body['@odata.nextLink']) throw new Error('GoVerify activation readback exceeded five rows.');
   return body.value || [];
 }
 
-async function assertGoverifyActivationState(client, expectedActive) {
-  const activations = await getGoverifyActivations(client);
+async function assertGoverifyActivationState(client, expectedActive, requestOptions = null) {
+  const activations = await getGoverifyActivations(client, requestOptions);
   const unexpectedIdentity = activations.find((workflow) =>
     workflow.name !== GOVERIFY_WORKFLOW.name ||
     workflow.primaryentity !== GOVERIFY_WORKFLOW.primaryEntity ||
@@ -214,16 +224,16 @@ function assertExpectedGoverifyWorkflow(workflow, expectedState) {
   }
 }
 
-async function setGoverifyWorkflowState(client, before, nextState) {
-  const response = await client.patch(
-    `/workflows(${GOVERIFY_WORKFLOW.definitionId})`,
-    nextState,
-    { 'If-Match': before['@odata.etag'] },
-  );
+async function setGoverifyWorkflowState(client, before, nextState, requestOptions = null) {
+  const patchPath = `/workflows(${GOVERIFY_WORKFLOW.definitionId})`;
+  const headers = { 'If-Match': before['@odata.etag'] };
+  const response = requestOptions
+    ? await client.patchWithOptions(patchPath, nextState, headers, requestOptions)
+    : await client.patch(patchPath, nextState, headers);
   bodyOrThrow('GoVerify workflow state change', response);
-  const after = await getGoverifyWorkflow(client);
+  const after = await getGoverifyWorkflow(client, requestOptions);
   assertExpectedGoverifyWorkflow(after, nextState);
-  await assertGoverifyActivationState(client, nextState.statecode === 1);
+  await assertGoverifyActivationState(client, nextState.statecode === 1, requestOptions);
   return after;
 }
 
@@ -238,19 +248,6 @@ function bodyOrThrow(label, response) {
 function writeNewJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
-}
-
-function reserveJsonReceipt(filePath, value) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const descriptor = fs.openSync(filePath, 'wx', 0o600);
-  fs.writeSync(descriptor, `${JSON.stringify(value, null, 2)}\n`);
-  return descriptor;
-}
-
-function updateReservedJson(descriptor, value) {
-  fs.ftruncateSync(descriptor, 0);
-  fs.writeSync(descriptor, `${JSON.stringify(value, null, 2)}\n`, 0);
-  fs.fsyncSync(descriptor);
 }
 
 function readJson(filePath) {
@@ -386,8 +383,11 @@ async function getSourceRequestByNumber(client, requestNumber) {
   }
 }
 
-async function getSourceRequestById(client, requestId) {
-  const response = await client.get(`/akoya_requests(${requestId})?$select=${SOURCE_SELECT}`);
+async function getSourceRequestById(client, requestId, requestOptions = null) {
+  const requestPath = `/akoya_requests(${requestId})?$select=${SOURCE_SELECT}`;
+  const response = requestOptions
+    ? await client.getWithOptions(requestPath, undefined, requestOptions)
+    : await client.get(requestPath);
   if (response.status === 404) throw new Error('Source Request no longer exists.');
   return bodyOrThrow('source Request revalidation', response);
 }
@@ -602,12 +602,20 @@ async function inspectManifest(client, manifest) {
     getContactSnapshot(client, manifest.expectedOrganization.accountid),
   ]);
   const locationParents = await resolveLocationParents(client, locations);
+  const expectedFolder = request?.akoya_requestnum
+    ? expectedRequestFolder(request.akoya_requestnum, request.akoya_requestid)
+    : null;
   console.log(JSON.stringify({
     mode: 'READ_ONLY_RECOVERY_INSPECTION',
     target: SANDBOX_URL,
     requestId: manifest.values.requestId,
     requestExists: Boolean(request),
     request: sanitizedRequestIdentity(request),
+    expectedSharePointFolder: expectedFolder,
+    expectedLocationId: manifest.values.locationId || null,
+    folderRecoveryHint: expectedFolder && locations.length === 0
+      ? 'If the location is absent, inspect this deterministic folder path before creating anything.'
+      : null,
     dynamicsLocations: locations,
     locationParents,
     paymentRows: payments,
@@ -668,7 +676,7 @@ async function getRequestLibraryParent(client) {
   return body.value[0];
 }
 
-async function correctMeetingDate(client, manifest, request, receipt) {
+async function correctMeetingDate(client, manifest, request, receipt, receiptPath) {
   if (!guidEqual(request.akoya_requestid, manifest.values.requestId) ||
       !guidEqual(request.wmkf_testcreationrunid, manifest.values.runId) ||
       !guidEqual(request._createdby_value, manifest.expectedAppUserId) ||
@@ -683,6 +691,8 @@ async function correctMeetingDate(client, manifest, request, receipt) {
   if (String(before).slice(0, 10) === desired) return request;
 
   receipt.meetingDateCorrection.patchAttempted = true;
+  receipt.meetingDateCorrection.patchAttemptedAt = new Date().toISOString();
+  updateRehearsalReceipt(receiptPath, receipt);
   let patched = null;
   let patchError = null;
   try {
@@ -692,14 +702,20 @@ async function correctMeetingDate(client, manifest, request, receipt) {
       { 'If-Match': request['@odata.etag'] },
     );
     receipt.meetingDateCorrection.patchResponseStatus = patched.status;
+    receipt.meetingDateCorrection.patchResponseReceivedAt = new Date().toISOString();
+    updateRehearsalReceipt(receiptPath, receipt);
   } catch (error) {
     patchError = error;
     receipt.meetingDateCorrection.patchResponseError = error.message;
+    receipt.meetingDateCorrection.patchResponseReceivedAt = new Date().toISOString();
+    updateRehearsalReceipt(receiptPath, receipt);
   }
   // The one-field PATCH is never retried. A lost response is reconciled by
   // rereading the same Request and exact date/marker/owner identities.
   const after = await getRequest(client, request.akoya_requestid);
   receipt.meetingDateCorrection.after = after.wmkf_meetingdate || null;
+  receipt.meetingDateCorrection.readbackAt = new Date().toISOString();
+  updateRehearsalReceipt(receiptPath, receipt);
   if (!guidEqual(after.akoya_requestid, manifest.values.requestId) ||
       !guidEqual(after.wmkf_testcreationrunid, manifest.values.runId) ||
       after.wmkf_istestrequest !== true ||
@@ -713,7 +729,7 @@ async function correctMeetingDate(client, manifest, request, receipt) {
   return after;
 }
 
-async function provisionSharePointLocation(client, manifest, request, receipt) {
+async function provisionSharePointLocation(client, manifest, request, receipt, receiptPath) {
   if (!guidEqual(request.akoya_requestid, manifest.values.requestId) ||
       !guidEqual(request.wmkf_testcreationrunid, manifest.values.runId) ||
       !guidEqual(request._createdby_value, manifest.expectedAppUserId) ||
@@ -727,15 +743,23 @@ async function provisionSharePointLocation(client, manifest, request, receipt) {
     throw new Error('The configured SharePoint site is not the registered akoyaGO site.');
   }
   const parent = await getRequestLibraryParent(client);
-  const folder = `${request.akoya_requestnum}_${request.akoya_requestid.replace(/-/g, '').toUpperCase()}`;
+  const folder = expectedRequestFolder(request.akoya_requestnum, request.akoya_requestid);
   const existing = await getLocations(client, request.akoya_requestid);
   if (existing.length > 0) {
     throw new Error(`Expected no preexisting Request location before app provisioning; found ${existing.length}.`);
   }
   const { GraphService } = await import('../lib/services/graph-service.js');
-  receipt.locationProvision = { parentId: parent.sharepointdocumentlocationid, folder, folderAttempted: true };
+  receipt.locationProvision = {
+    parentId: parent.sharepointdocumentlocationid,
+    folder,
+    graphFolderAttempted: true,
+    graphFolderAttemptedAt: new Date().toISOString(),
+  };
+  updateRehearsalReceipt(receiptPath, receipt);
   const graphFolder = await GraphService.ensureFolderPath(REQUEST_LIBRARY, folder);
   receipt.locationProvision.graphFolder = graphFolder;
+  receipt.locationProvision.graphFolderReadyAt = new Date().toISOString();
+  updateRehearsalReceipt(receiptPath, receipt);
 
   const body = {
     sharepointdocumentlocationid: manifest.values.locationId,
@@ -747,9 +771,13 @@ async function provisionSharePointLocation(client, manifest, request, receipt) {
     'parentsiteorlocation_sharepointdocumentlocation@odata.bind':
       `/sharepointdocumentlocations(${parent.sharepointdocumentlocationid})`,
   };
-  receipt.locationProvision.createAttempted = true;
+  receipt.locationProvision.locationCreateAttempted = true;
+  receipt.locationProvision.locationCreateAttemptedAt = new Date().toISOString();
+  updateRehearsalReceipt(receiptPath, receipt);
   const created = await client.post('/sharepointdocumentlocations', body, { Prefer: 'return=representation' });
   receipt.locationProvision.createResponseStatus = created.status;
+  receipt.locationProvision.createResponseReceivedAt = new Date().toISOString();
+  updateRehearsalReceipt(receiptPath, receipt);
   // A dropped response is reconciled by the preallocated ID. Never issue a
   // second POST: Dataverse and Graph cannot participate in one transaction.
   const readback = await getLocations(client, request.akoya_requestid);
@@ -847,7 +875,7 @@ function verify(manifest, preflightBefore, observation, files, foundationAfter, 
   if (observation.locationParents.length !== 1 || !observation.locationParents[0]?.relativeurl) failures.push('SharePoint parent did not resolve');
   if (observation.locations.length === 1) {
     const location = observation.locations[0];
-    const expectedFolder = `${request.akoya_requestnum}_${manifest.values.requestId.replace(/-/g, '').toUpperCase()}`;
+    const expectedFolder = expectedRequestFolder(request.akoya_requestnum, manifest.values.requestId);
     if (!guidEqual(location.sharepointdocumentlocationid, manifest.values.locationId)) failures.push('SharePoint location ID mismatch');
     if (location.relativeurl !== expectedFolder) failures.push('SharePoint folder path mismatch');
     if (!guidEqual(location._createdby_value, manifest.expectedAppUserId)) failures.push('SharePoint location creator mismatch');
@@ -888,7 +916,8 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
   };
   // Reserve the private receipt path before any request-side write. The open
   // descriptor also lets every later success/failure outcome retain exact IDs.
-  const receiptDescriptor = reserveJsonReceipt(receiptPath, receipt);
+  reserveRehearsalReceipt(receiptPath, receipt);
+  let signalFence = null;
 
   try {
     const preflightBefore = await runPreflight(client);
@@ -926,61 +955,104 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
           deactivationAttemptedAt: new Date().toISOString(),
           restored: false,
         };
+        signalFence = createBypassSignalFence();
         // From this point forward a failed or ambiguous PATCH still requires
         // a readback and explicit restoration attempt in the finally block.
         goverifyRestoreRequired = true;
-        updateReservedJson(receiptDescriptor, receipt);
+        updateRehearsalReceipt(receiptPath, receipt);
+        throwIfInterrupted(signalFence);
         const workflowDeactivated = await setGoverifyWorkflowState(
           client,
           workflowBefore,
           { statecode: 0, statuscode: 1 },
+          { signal: signalFence.signal, timeoutMs: BYPASS_REQUEST_TIMEOUT_MS },
         );
         receipt.goverifyBypass.deactivatedAt = new Date().toISOString();
         receipt.goverifyBypass.deactivatedVersionNumber = workflowDeactivated.versionnumber;
+        updateRehearsalReceipt(receiptPath, receipt);
+        throwIfInterrupted(signalFence);
       }
 
       // Fence the source again after any optional automation change and just
       // before the sole Request POST.
       const sourceBeforePost = assertSourceUnchanged(
         manifest.source,
-        await getSourceRequestById(client, manifest.source.requestId),
+        await getSourceRequestById(
+          client,
+          manifest.source.requestId,
+          signalFence ? { signal: signalFence.signal, timeoutMs: BYPASS_REQUEST_TIMEOUT_MS } : null,
+        ),
         preflightBefore.grantOption.value,
       );
       assertCopiedSourceValues(sourceBeforePost, manifest.createBody);
+      throwIfInterrupted(signalFence);
 
       receipt.createAttempted = true;
       receipt.createAttemptedAt = new Date().toISOString();
-      updateReservedJson(receiptDescriptor, receipt);
-      created = await client.post('/akoya_requests', manifest.createBody, {
+      updateRehearsalReceipt(receiptPath, receipt);
+      const createRequestOptions = { timeoutMs: CREATE_REQUEST_TIMEOUT_MS };
+      if (signalFence) createRequestOptions.signal = signalFence.signal;
+      created = await client.postWithOptions('/akoya_requests', manifest.createBody, {
         Prefer: 'return=representation',
-      });
+      }, createRequestOptions);
       receipt.createResponseStatus = created.status;
+      receipt.createResponseReceivedAt = new Date().toISOString();
+      updateRehearsalReceipt(receiptPath, receipt);
     } finally {
-      if (goverifyRestoreRequired) {
-        const workflowCurrent = await getGoverifyWorkflow(client);
-        let workflowRestored = workflowCurrent;
-        if (workflowCurrent.statecode === 0 && workflowCurrent.statuscode === 1) {
-          assertExpectedGoverifyWorkflow(workflowCurrent, { statecode: 0, statuscode: 1 });
-          workflowRestored = await setGoverifyWorkflowState(
-            client,
-            workflowCurrent,
-            { statecode: 1, statuscode: 2 },
-          );
-        } else {
-          assertExpectedGoverifyWorkflow(workflowCurrent, { statecode: 1, statuscode: 2 });
-          receipt.goverifyBypass.restoreWasAlreadyActive = true;
+      try {
+        if (goverifyRestoreRequired) {
+          receipt.goverifyBypass.restoreAttemptedAt = new Date().toISOString();
+          try {
+            updateRehearsalReceipt(receiptPath, receipt);
+          } catch (error) {
+            // A receipt I/O failure must not prevent the safety restoration.
+            receipt.goverifyBypass.restoreIntentPersistError = error.message;
+          }
+          let workflowRestored;
+          try {
+            const restoreOptions = { timeoutMs: BYPASS_REQUEST_TIMEOUT_MS };
+            const workflowCurrent = await getGoverifyWorkflow(client, restoreOptions);
+            workflowRestored = workflowCurrent;
+            if (workflowCurrent.statecode === 0 && workflowCurrent.statuscode === 1) {
+              assertExpectedGoverifyWorkflow(workflowCurrent, { statecode: 0, statuscode: 1 });
+              workflowRestored = await setGoverifyWorkflowState(
+                client,
+                workflowCurrent,
+                { statecode: 1, statuscode: 2 },
+                restoreOptions,
+              );
+            } else {
+              assertExpectedGoverifyWorkflow(workflowCurrent, { statecode: 1, statuscode: 2 });
+              receipt.goverifyBypass.restoreWasAlreadyActive = true;
+            }
+          } catch (error) {
+            receipt.goverifyBypass.restoreError = error.message;
+            receipt.goverifyBypass.restored = false;
+            if (receipt.createAttempted) {
+              receipt.postCreateStepsSkipped = true;
+              receipt.postCreateStepsSkippedReason = 'GoVerify restoration failed; inspect the destination Request by its preallocated GUID.';
+            }
+            updateRehearsalReceipt(receiptPath, receipt);
+            throw error;
+          }
+          receipt.goverifyBypass.restored = true;
+          receipt.goverifyBypass.restoredAt = new Date().toISOString();
+          receipt.goverifyBypass.restoredVersionNumber = workflowRestored.versionnumber;
+          updateRehearsalReceipt(receiptPath, receipt);
         }
-        receipt.goverifyBypass.restored = true;
-        receipt.goverifyBypass.restoredAt = new Date().toISOString();
-        receipt.goverifyBypass.restoredVersionNumber = workflowRestored.versionnumber;
+      } finally {
+        signalFence?.dispose();
       }
     }
+    throwIfInterrupted(signalFence);
     if (!created?.ok) bodyOrThrow('single Request create', created);
 
     const createdRequest = await getRequest(client, manifest.values.requestId);
-    const datedRequest = await correctMeetingDate(client, manifest, createdRequest, receipt);
-    await provisionSharePointLocation(client, manifest, datedRequest, receipt);
+    const datedRequest = await correctMeetingDate(client, manifest, createdRequest, receipt, receiptPath);
+    await provisionSharePointLocation(client, manifest, datedRequest, receipt, receiptPath);
 
+    receipt.observationStartedAt = new Date().toISOString();
+    updateRehearsalReceipt(receiptPath, receipt);
     const observation = await observe(client, manifest.values.requestId);
     let files = null;
     let graphError = null;
@@ -1027,16 +1099,22 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       regardingEmails: observation.emails,
       verification,
     });
-    updateReservedJson(receiptDescriptor, receipt);
+    updateRehearsalReceipt(receiptPath, receipt);
     console.log(JSON.stringify({ receiptPath, requestNumber: observation.request.akoya_requestnum, verification }, null, 2));
     if (!verification.ok) process.exitCode = 1;
   } catch (error) {
     receipt.completedAt = new Date().toISOString();
     receipt.error = error.message;
-    updateReservedJson(receiptDescriptor, receipt);
+    if (receipt.createAttempted && !receipt.postCreateStepsSkipped) {
+      receipt.postCreateStepsSkipped = true;
+      receipt.postCreateStepsSkippedReason = signalFence?.interruptedBy
+        ? `Interrupted by ${signalFence.interruptedBy}; restore was awaited before stopping.`
+        : receipt.createResponseReceivedAt
+          ? 'A post-create step failed; inspect the exact destination IDs before continuing.'
+          : 'The Request create outcome is ambiguous; inspect the preallocated Request GUID before continuing.';
+    }
+    updateRehearsalReceipt(receiptPath, receipt);
     throw error;
-  } finally {
-    fs.closeSync(receiptDescriptor);
   }
 }
 
