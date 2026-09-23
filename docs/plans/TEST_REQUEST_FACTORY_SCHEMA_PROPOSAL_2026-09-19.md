@@ -119,8 +119,8 @@ Stage 1 must add marker-aware reads/guards at the following exact source surface
 | `pages/api/meeting-tracker/visits/[requestId]/materials.js` | Route dispatches invite/remind actions | Preserve route auth and map marked-request denial; service remains authoritative |
 | `lib/services/site-visit/logistics-service.js` | Site-visit scheduling eligibility | Do not alter ordinary eligibility; deny synthetic scheduling unless a later recipe explicitly permits it |
 | `lib/services/reviewer-reminder-sweep.js` | Scheduled reviewer reminder worker | Add marker to request projection and skip marked rows before claims/token mint/send |
-| `lib/services/reviewer-manual-reminder.js` | Staff-triggered reviewer reminders | Resolve marker before claim/send; on marked requests allow only a confined synthetic recipient (see note below) and deny everything else |
-| `lib/services/review-manager/send-emails-service.js` | Reviewer invitation transport | Resolve parent request marker before any email activity; on marked requests allow only a confined synthetic recipient (see note below) and deny everything else |
+| `lib/services/reviewer-manual-reminder.js` | Staff-triggered reviewer reminders | Resolve marker before claim/send; confined at the shared delivery seam (see *Reviewer email confinement* below) |
+| `lib/services/review-manager/send-emails-service.js` | Reviewer invitation transport | Resolve parent request marker before any email activity; confined at the shared delivery seam (see *Reviewer email confinement* below) |
 | `lib/services/reviewer-thankyou-sweep.js` (cron `send-review-thankyous`) | Scheduled thank-you email over all received, un-thanked suggestions | Skip marked requests before send (added 2026-09-23) |
 | `lib/services/review-synthesis-drain.js` (cron `drain-review-syntheses`) | Scheduled AI review synthesis | Skip marked requests before provider work (added 2026-09-23) |
 | `lib/services/review-documents/individual-file-service.js` (cron `file-review-docx`) | Scheduled review DOCX filing to SharePoint | Skip marked requests unless a later recipe explicitly files synthetic reviews (added 2026-09-23) |
@@ -131,7 +131,30 @@ Stage 1 must add marker-aware reads/guards at the following exact source surface
 | `lib/bill/honorarium-onboard-orchestrator.js` | Honorarium/request creation and reminder defaults | Reject marked source requests from ordinary honorarium flow; no payment fixture in V1 |
 | `lib/services/grantee-submit-notification.js` | Grantee email notification | Resolve marker before email dispatch; deny marked rows |
 
-**Reviewer email confinement (owner amendment 2026-09-23, design doc decision 4).** Synthetic reviewers use real staff-controlled throwaway inboxes so staff can exercise reviewer interactions, so staff-triggered reviewer email on a marked request is confined rather than denied. A send is allowed only when the request marker is true, the recipient's reviewer person row carries the synthetic-person marker, and the recipient address exactly equals the address recorded on that person for this run; every other case fails closed. Once the run ledger exists, the recorded run assignment becomes the authority for the address match. Materials-contributor and grantee email on marked requests remain denied in V1.
+**Reviewer email confinement (owner amendment 2026-09-23, design doc decision 4).** Synthetic reviewers use real staff-controlled throwaway inboxes so staff can exercise reviewer interactions, so reviewer email on a marked request is confined rather than denied. Confinement is enforced **once, at the shared delivery seam**, not re-implemented per sender, because per-sender inventories have repeatedly missed send paths.
+
+[VERIFIED via source, 2026-09-23] Every reviewer-email sender found reaches `lib/services/dynamics/email.js` (`createAndSendEmail`, or `createEmailActivity` then `sendEmail`) through `DynamicsService`, and `lib/services/scheduled-email-service.js` uses the same seam. Several senders pass the regarding request as optional (for example `regardingId: regardingId || undefined` in `review-manager/send-emails-service.js`, and `request?.akoya_requestid || undefined` in `reviewer-acceptance-email.js`), so a guard keyed only on the regarding record would miss them.
+
+Required Stage 1 contract:
+
+1. **Seam guard.** Before an email activity is created, when the regarding record is an `akoya_request`, resolve its marker. If the request is marked, every recipient (to and cc) must be the recorded address of a person row carrying the synthetic-person marker for that request's synthetic reviewers; otherwise refuse the send. Unknown or unreadable marker state fails closed. Once the run ledger exists, the run's recorded assignment is the authority for the address match. The exact layering (inside `dynamics/email.js`, or a wrapper every caller must use) is a Stage 1 design decision; the guard must not be bypassable by calling the lower function directly.
+2. **Regarding is mandatory for reviewer sends.** Every reviewer-engagement sender below must pass the request as the regarding record; a reviewer send without one is refused rather than treated as unmarked. A structural test enumerates the senders and fails if one omits the regarding request.
+3. **Address source.** The guard compares against the recorded synthetic address, never a reviewer-editable field. The acceptance confirmation currently prefers `suggestion.wmkf_revieweremail` (`reviewer-acceptance-email.js`), which the reviewer can change during acceptance (`contactEdits.email`, `reviewer-acceptance-drain.js`); on a marked request an edited address must not become a recipient.
+
+Per-route checklist (each needs a positive synthetic-recipient test plus negative mismatched-address, edited-address and missing-regarding tests):
+
+| Sender | Send path | Marked-request behavior |
+|---|---|---|
+| `lib/services/review-manager/send-emails-service.js` | Invitations and staff-sent reviewer email | Confined |
+| `lib/services/reviewer-manual-reminder.js` → `sendOneReminder` in `reviewer-reminder-sweep.js` | Staff-triggered respond/review-due reminder | Confined |
+| `lib/services/reviewer-acceptance-email.js` via `reviewer-acceptance-drain.js` | Acceptance confirmation | Confined; recipient is the recorded synthetic address, never an edited one |
+| `lib/services/reviewer-due-extension.js` | Due-date extension notice | Confined |
+| `lib/services/reviewer-engagement/terminal-transition.js` (reached from `review-manager/withdraw-sufficient-service.js`) | Release/withdraw email | Confined |
+| `lib/services/reviewer-reminder-sweep.js` (sweep candidate selection) | Scheduled reminder | Skipped at candidate selection, not inside the shared `sendOneReminder`, which manual reminders also use |
+| `lib/services/reviewer-thankyou-sweep.js` | Scheduled thank-you | Skipped (scheduled worker) |
+| `lib/services/scheduled-email-service.js` | Staff-scheduled request email | Confined by the seam guard |
+
+`NotificationService` (`reviewer-quota.js`, `alert-reviewer-email-mismatch.js`) sends staff alerts, not reviewer email. The seam guard applies to it only when it names a marked request as the regarding record. Materials-contributor and grantee email on marked requests remain denied in V1.
 
 This is the minimum Stage 1 inventory from current source fan-out. It is not a claim that off-platform flows, vendor plugins, Power Automate, or every report have been proven safe. Stage 1 must add a symbol/field census gate so newly found raw `akoya_request` readers cannot silently bypass the marker.
 
