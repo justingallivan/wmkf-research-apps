@@ -23,8 +23,8 @@ Codex delegation routing has two enforced paths (discovered S401, 2026-08-05):
   command runs — `node <plugin>/scripts/codex-companion.mjs adversarial-review
   "<args>"` (or `review`) — through Bash, so long runs do not wait on the
   owner. Resolve the versioned plugin path under
-  `~/.claude/plugins/cache/openai-codex/codex/` at run time. Pass `--model
-  gpt-6-sol` ([[feedback-codex-model-gpt6-sol-high]]), `-C <worktree>` and a
+  `~/.claude/plugins/cache/openai-codex/codex/` at run time. Pass the model from
+  [[feedback-codex-model-gpt56-sol]] (`--model gpt-5.6-sol`), `-C <worktree>` and a
   `--base <ref>` that scopes the diff; run larger reviews with
   `run_in_background` and wait for completion; show the output verbatim
   ([[feedback-share-codex-verbatim]]). The owner may still run the slash

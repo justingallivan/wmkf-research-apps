@@ -1,7 +1,7 @@
 ---
 name: feedback-codex-model-gpt56-sol
 description: "Owner directive 2026-09-08: Codex reviews use --model gpt-5.6-sol; never gpt-6-astra (config default); ChatGPT-auth account refuses bare gpt-5.6 and gpt-5.4; catalog lives in ~/.codex/models_cache.json"
-status: superseded
+status: active
 metadata:
   node_type: memory
   type: feedback
@@ -9,7 +9,7 @@ metadata:
   modified: 2026-09-08T15:42:51.670Z
 ---
 
-**Superseded 2026-09-23 (Session 535) by [[feedback-codex-model-gpt6-sol-high]]: the owner switched Codex work to `gpt-6-sol` at high effort.** Historical record below.
+**2026-09-23 (Session 535):** the owner asked for `gpt-6-sol` (high). Codex refused it twice, on CLI 0.153.x and after the owner updated to 0.156.1: "The 'gpt-6-sol' model is not supported when using Codex with a ChatGPT account." Per the owner's instruction the rule stays `--model gpt-5.6-sol`. Review commands accept `--model` but not `--effort` (their effort comes from `~/.codex/config.toml`, which sets `model_reasoning_effort = "high"`); for `task`, pass `--effort high`. `~/.codex/config.toml` currently names `gpt-6-sol` as its default, so never rely on the default — always pass `--model`.
 
 ## Recall Rule
 Read before composing any Codex companion invocation (`adversarial-review`, `review`, `task`) or writing a brief that names a Codex model.
