@@ -76,6 +76,22 @@ test('POST forwards only bounded browser choices to the service', async () => {
   expect(buildTestRequestAdminPreview).toHaveBeenCalledWith(body);
 });
 
+test('POST accepts omitted date and fiscal year so the service can use source values', async () => {
+  const body = {
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [],
+    testLabel: 'Fixture preview',
+  };
+  const res = mockRes();
+  await handler({ method: 'POST', query: {}, body }, res);
+  expect(res.statusCode).toBe(200);
+  expect(buildTestRequestAdminPreview).toHaveBeenCalledWith({
+    ...body,
+    fiscalYear: undefined,
+    meetingDate: undefined,
+  });
+});
+
 test('POST rejects extra trusted-state fields and invalid source IDs', async () => {
   const validBody = {
     sourceRequestId: SOURCE_ID,

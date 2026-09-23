@@ -17,12 +17,14 @@ import { requireSuperuser } from '../../../../lib/utils/auth';
 import { isGuid } from '../../../../lib/utils/guid';
 
 const REQUEST_NUMBER = /^[A-Za-z0-9-]{1,80}$/;
-const POST_KEYS = Object.freeze([
-  'fiscalYear',
-  'meetingDate',
+const REQUIRED_POST_KEYS = Object.freeze([
   'selectedDocumentIds',
   'sourceRequestId',
   'testLabel',
+]);
+const OPTIONAL_POST_KEYS = Object.freeze([
+  'fiscalYear',
+  'meetingDate',
 ]);
 
 export const config = { api: { bodyParser: { sizeLimit: '32kb' } } };
@@ -35,11 +37,12 @@ function sendError(res, error) {
   return res.status(500).json({ error: 'The Test Request preview could not be prepared.' });
 }
 
-function hasExactKeys(value, keys) {
+function hasAllowedKeys(value, requiredKeys, optionalKeys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
-  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+  const actual = Object.keys(value);
+  const allowed = new Set([...requiredKeys, ...optionalKeys]);
+  return requiredKeys.every((key) => Object.hasOwn(value, key))
+    && actual.every((key) => allowed.has(key));
 }
 
 export default async function handler(req, res) {
@@ -77,15 +80,15 @@ export default async function handler(req, res) {
     });
   }
 
-  if (!hasExactKeys(req.body, POST_KEYS)
+  if (!hasAllowedKeys(req.body, REQUIRED_POST_KEYS, OPTIONAL_POST_KEYS)
       || !isGuid(req.body.sourceRequestId)
       || !Array.isArray(req.body.selectedDocumentIds)
       || req.body.selectedDocumentIds.some((id) => typeof id !== 'string' || !id || id.length > 200)
       || typeof req.body.testLabel !== 'string'
-      || typeof req.body.fiscalYear !== 'string'
-      || typeof req.body.meetingDate !== 'string') {
+      || (req.body.fiscalYear !== undefined && typeof req.body.fiscalYear !== 'string')
+      || (req.body.meetingDate !== undefined && typeof req.body.meetingDate !== 'string')) {
     return res.status(400).json({
-      error: 'The preview body must contain only sourceRequestId, selectedDocumentIds, testLabel, fiscalYear, and meetingDate with valid types.',
+      error: 'The preview body must contain sourceRequestId, selectedDocumentIds, and testLabel; fiscalYear and meetingDate are optional string overrides.',
     });
   }
 

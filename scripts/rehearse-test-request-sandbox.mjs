@@ -8,7 +8,7 @@
  * unexpired manifest and a new receipt path:
  *
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs
- *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --prepare=/absolute/manifest.json
+ *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --prepare=/absolute/manifest.json --fiscal-year='December 2026' --meeting-date=2026-12-04
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --execute=/absolute/manifest.json --receipt=/absolute/receipt.json
  *
  * The script never deletes or resets the created Request. An ambiguous create
@@ -27,8 +27,6 @@ const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse
 const SANDBOX_URL = 'https://orgd9e66399.crm.dynamics.com';
 const FOUNDATION_NAME = 'W. M. Keck Foundation';
 const REQUEST_LIBRARY = 'akoya_request';
-const REHEARSAL_MEETING_DATE = '2099-12-01';
-const REHEARSAL_FISCAL_YEAR = 'December 2099';
 const MANIFEST_TTL_MS = 60 * 60 * 1000;
 const POLL_MS = 5_000;
 const OBSERVATION_MS = 60_000;
@@ -83,12 +81,16 @@ function parseArgs(argv) {
     inspect: null,
     receipt: null,
     bypassGoverify: false,
+    fiscalYear: null,
+    meetingDate: null,
   };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
     else if (arg.startsWith('--execute=')) parsed.execute = arg.slice('--execute='.length);
     else if (arg.startsWith('--inspect=')) parsed.inspect = arg.slice('--inspect='.length);
     else if (arg.startsWith('--receipt=')) parsed.receipt = arg.slice('--receipt='.length);
+    else if (arg.startsWith('--fiscal-year=')) parsed.fiscalYear = arg.slice('--fiscal-year='.length);
+    else if (arg.startsWith('--meeting-date=')) parsed.meetingDate = arg.slice('--meeting-date='.length);
     else if (arg === '--bypass-goverify') parsed.bypassGoverify = true;
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
@@ -101,6 +103,12 @@ function parseArgs(argv) {
   if (parsed.bypassGoverify && !parsed.execute) {
     throw new Error('--bypass-goverify is valid only with --execute.');
   }
+  if (parsed.prepare && (!parsed.fiscalYear || !parsed.meetingDate)) {
+    throw new Error('--prepare requires --fiscal-year and --meeting-date from the intended source Request or operator.');
+  }
+  if (!parsed.prepare && (parsed.fiscalYear !== null || parsed.meetingDate !== null)) {
+    throw new Error('--fiscal-year and --meeting-date are valid only with --prepare.');
+  }
   for (const value of [parsed.prepare, parsed.execute, parsed.inspect, parsed.receipt].filter(Boolean)) {
     if (!path.isAbsolute(value)) throw new Error('Manifest and receipt paths must be absolute.');
   }
@@ -109,7 +117,7 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log('Read-only: node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs');
-  console.log('Prepare:  ... --prepare=/absolute/new-manifest.json');
+  console.log("Prepare:  ... --prepare=/absolute/new-manifest.json --fiscal-year='December 2026' --meeting-date=2026-12-04");
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
   console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
@@ -431,7 +439,7 @@ function preflightSummary(preflight) {
   };
 }
 
-function buildManifest(preflight) {
+function buildManifest(preflight, { fiscalYear, meetingDate }) {
   const requestId = crypto.randomUUID();
   const runId = crypto.randomUUID();
   const locationId = crypto.randomUUID();
@@ -440,8 +448,8 @@ function buildManifest(preflight) {
     runId,
     locationId,
     testLabel: `Codex sandbox request factory rehearsal ${new Date().toISOString().slice(0, 10)} ${runId.slice(0, 8)}`,
-    fiscalYear: REHEARSAL_FISCAL_YEAR,
-    meetingDate: REHEARSAL_MEETING_DATE,
+    fiscalYear,
+    meetingDate,
   };
   const createBody = compileBody(preflight, values);
   return {
@@ -934,7 +942,7 @@ async function main() {
 
   const preflight = await runPreflight(client);
   if (args.prepare) {
-    const manifest = buildManifest(preflight);
+    const manifest = buildManifest(preflight, args);
     writeNewJson(args.prepare, manifest);
     console.log(JSON.stringify({
       manifestPath: args.prepare,

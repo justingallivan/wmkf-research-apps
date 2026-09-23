@@ -89,6 +89,31 @@ describe('compileBasicTestRequestPreview', () => {
     });
   });
 
+  test('copies the server-resolved source cycle when the browser supplies no overrides', () => {
+    const sourceRequest = {
+      ...trusted().sourceRequest,
+      akoya_fiscalyear: 'December 2026',
+      wmkf_meetingdate: '2026-12-04T00:00:00Z',
+    };
+    const { fiscalYear, meetingDate, ...browserChoices } = requested();
+    const result = compileBasicTestRequestPreview(trusted({ sourceRequest }), browserChoices);
+    expect(result.blockers).toEqual([]);
+    expect(result.requestPlan.createBody).toEqual(expect.objectContaining({
+      akoya_fiscalyear: 'December 2026',
+      wmkf_meetingdate: '2026-12-04',
+    }));
+  });
+
+  test('requires an entered date or fiscal year when the source has no value', () => {
+    const { fiscalYear, meetingDate, ...browserChoices } = requested();
+    const result = compileBasicTestRequestPreview(trusted(), browserChoices);
+    expect(result.requestPlan.createBody).toBeNull();
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'INPUT_INVALID', field: 'fiscalYear' }),
+      expect.objectContaining({ code: 'INPUT_INVALID', field: 'meetingDate' }),
+    ]));
+  });
+
   test('a request-only blocker strips both actionable sub-plans', () => {
     const result = compileBasicTestRequestPreview(trusted(), requested({ recipe: 'paid-workflow' }));
     expect(result.blockers).toContainEqual(expect.objectContaining({

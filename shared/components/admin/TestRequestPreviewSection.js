@@ -140,8 +140,8 @@ export default function TestRequestPreviewSection() {
           sourceRequestId: sourceState.source.requestId,
           selectedDocumentIds: selectedIds,
           testLabel: form.testLabel,
-          fiscalYear: form.fiscalYear,
-          meetingDate: form.meetingDate,
+          ...(form.fiscalYear !== sourceState.source.fiscalYear ? { fiscalYear: form.fiscalYear } : {}),
+          ...(form.meetingDate !== sourceState.source.meetingDate ? { meetingDate: form.meetingDate } : {}),
         },
       });
       if (controller.signal.aborted
@@ -235,7 +235,7 @@ export default function TestRequestPreviewSection() {
           <section aria-labelledby="test-request-values-heading">
             <h3 id="test-request-values-heading" className="text-base font-semibold text-gray-950">Requested test values</h3>
             <p className="mt-1 text-sm leading-6 text-gray-600">
-              Organization, Request type, marker, run ID, and reminder controls are resolved by the server and cannot be supplied here.
+              Fiscal year and meeting date come from the source Request. Enter either value if it is missing, or change it here when needed. Organization, Request type, marker, run ID, and reminder controls are resolved by the server.
             </p>
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
               <label className="block text-sm font-semibold text-gray-800">

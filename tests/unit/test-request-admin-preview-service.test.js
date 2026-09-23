@@ -260,6 +260,19 @@ test('re-resolves and hashes the selected file, but strips every executable payl
   expect(publicResult).not.toContain('1002001_GUID/Phase I');
 });
 
+test('uses the re-resolved source cycle when the browser omits date overrides', async () => {
+  const result = await buildTestRequestAdminPreview({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [],
+    testLabel: 'Preview fixture',
+  }, dependencies());
+  expect(result.preview.preview.request.fields).toEqual(expect.arrayContaining([
+    { field: 'akoya_fiscalyear', value: 'December 2026' },
+    { field: 'wmkf_meetingdate', value: '2026-12-04' },
+  ]));
+  expect(result.preview.blockers).not.toContainEqual(expect.objectContaining({ code: 'INPUT_INVALID' }));
+});
+
 test('turns a truncated SharePoint inventory into an explicit blocker', async () => {
   const error = Object.assign(new Error('bounded inventory'), { code: 'graph_file_list_truncated' });
   const deps = dependencies({ listFiles: jest.fn(async () => { throw error; }) });

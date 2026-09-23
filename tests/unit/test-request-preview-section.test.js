@@ -31,6 +31,8 @@ const loadedSource = {
     requestNumber: '1002001',
     title: 'Source title',
     applicant: 'Live University',
+    fiscalYear: 'December 2026',
+    meetingDate: '2026-12-04',
   },
   documents: [{
     id: DOCUMENT_ID,
@@ -120,12 +122,32 @@ test('loads server inventory and posts only source identity plus browser choices
     sourceRequestId: SOURCE_ID,
     selectedDocumentIds: [DOCUMENT_ID],
     testLabel: 'Basic clone of Request 1002001',
-    fiscalYear: 'December 2026',
-    meetingDate: '2026-12-04',
   });
   expect(postOptions.body).not.toContain('library');
   expect(postOptions.body).not.toContain('metadata');
   expect(postOptions.body).not.toContain('testOrganizationId');
+});
+
+test('sends only an explicitly changed meeting date as an override', async () => {
+  global.fetch
+    .mockResolvedValueOnce(jsonResponse(loadedSource))
+    .mockResolvedValueOnce(jsonResponse(previewResult));
+  render(<TestRequestPreviewSection />);
+
+  fireEvent.change(screen.getByLabelText('Source Request number'), { target: { value: '1002001' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Load source' }));
+  await screen.findByRole('heading', { name: 'Request 1002001' });
+  fireEvent.change(screen.getByLabelText('Meeting date'), { target: { value: '2026-12-11' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Build read-only preview' }));
+  await screen.findByRole('heading', { name: 'Preview result' });
+
+  const [, postOptions] = global.fetch.mock.calls[1];
+  expect(JSON.parse(postOptions.body)).toEqual({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [DOCUMENT_ID],
+    testLabel: 'Basic clone of Request 1002001',
+    meetingDate: '2026-12-11',
+  });
 });
 
 test('changing the source invalidates an already rendered preview', async () => {
