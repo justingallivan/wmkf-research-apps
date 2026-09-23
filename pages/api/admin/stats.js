@@ -11,6 +11,9 @@
 import { requireSuperuser } from '../../../lib/utils/auth';
 import { sql } from '@vercel/postgres';
 import { ATTEMPT_COST_UNKNOWN_SQL } from '../../../lib/services/review-panel-store';
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { testRequestIsolationEnabled } from '../../../lib/services/test-requests/isolation.js';
+import { excludeTestRequestSpendRows } from '../../../lib/services/test-requests/spend-isolation.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -27,21 +30,26 @@ export default async function handler(req, res) {
     period === '90d' ? 90 :
     30;
 
-  try {
-    const [summary, byUser, byApp, byDay, today, reviewPanel] = await Promise.all([
-      getSummary(days),
-      getByUser(days),
-      getByApp(days),
-      getByDay(days),
-      getToday(),
-      getReviewPanel(days),
-    ]);
+  return withDalContext('admin-stats', async () => {
+    try {
+      const [summary, byUser, byApp, byDay, today, reviewPanel] = await Promise.all([
+        getSummary(days),
+        getByUser(days),
+        getByApp(days),
+        getByDay(days),
+        getToday(),
+        getReviewPanel(days),
+      ]);
 
-    return res.json({ period, days, summary, byUser, byApp, byDay, today, reviewPanel });
-  } catch (error) {
-    console.error('Admin stats error:', error);
-    return res.status(500).json({ error: 'Failed to fetch usage stats' });
-  }
+      return res.json({
+        period, days, summary, byUser, byApp, byDay, today, reviewPanel,
+        ...(testRequestIsolationEnabled() ? { usageAttribution: { apiUsageLog: 'unattributable' } } : {}),
+      });
+    } catch (error) {
+      console.error('Admin stats error:', error);
+      return res.status(500).json({ error: 'Failed to fetch usage stats' });
+    }
+  });
 }
 
 async function getSummary(days) {
@@ -185,6 +193,39 @@ async function getByDay(days) {
 // false.
 async function getReviewPanel(days) {
   try {
+    if (testRequestIsolationEnabled()) {
+      const grouped = await sql.query(
+        `SELECT
+           a.state AS state,
+           e.request_id AS request_id,
+           COUNT(*)::int AS attempt_count,
+           COALESCE(SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL}), 0)::numeric AS known_cost_cents,
+           COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})::int AS unknown_count
+         FROM review_panel_seat_attempts a
+         JOIN review_panel_entries e ON e.id = a.entry_id
+         WHERE a.created_at >= NOW() - MAKE_INTERVAL(days => $1)
+         GROUP BY a.state, e.request_id`,
+        [days]);
+      const filtered = await excludeTestRequestSpendRows(grouped.rows);
+      const byStateMap = new Map();
+      for (const row of filtered.rows) {
+        const current = byStateMap.get(row.state) || {
+          state: row.state, attemptCount: 0, knownCostCents: 0, unknownCount: 0,
+        };
+        current.attemptCount += Number(row.attempt_count);
+        current.knownCostCents += Number(row.known_cost_cents);
+        current.unknownCount += Number(row.unknown_count);
+        byStateMap.set(row.state, current);
+      }
+      const byState = [...byStateMap.values()];
+      return {
+        knownCostCents: byState.reduce((sum, row) => sum + row.knownCostCents, 0),
+        unknownCount: byState.reduce((sum, row) => sum + row.unknownCount, 0),
+        byState,
+        available: true,
+        isolation: filtered.isolation,
+      };
+    }
     const result = await sql.query(
       `SELECT
          a.state AS state,
@@ -210,4 +251,3 @@ async function getReviewPanel(days) {
     throw error;
   }
 }
-

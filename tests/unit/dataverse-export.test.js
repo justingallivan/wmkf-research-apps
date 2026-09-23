@@ -148,6 +148,18 @@ describe('compile() — every §3b invariant, bound not re-derived', () => {
     expect(appliedRules.join(' ')).toMatch(/Option B/);
   });
 
+  test('Stage 1d marker exclusion is opt-in and identical in data/count FetchXML', () => {
+    const off = compile(validSpec());
+    expect(off.fetchXml).not.toContain('wmkf_istestrequest');
+    expect(off.countFetchXml).not.toContain('wmkf_testcreationrunid');
+
+    const on = compile(validSpec(), { excludeMarkedTestRequests: true });
+    for (const xml of [on.fetchXml, on.countFetchXml]) {
+      expect(xml).toContain('attribute="wmkf_istestrequest"');
+      expect(xml).toContain('attribute="wmkf_testcreationrunid"');
+    }
+  });
+
   test('amount fan-out maps `which` → the explicit field (no bare "$")', () => {
     const mk = (which) => {
       const s = validSpec();

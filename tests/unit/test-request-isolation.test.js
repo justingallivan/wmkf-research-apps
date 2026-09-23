@@ -5,7 +5,12 @@ import {
   buildOrdinaryTestRequestODataFilter,
   assertOrdinaryRequestSnapshot,
   classifyTestRequestSnapshot,
+  projectTestRequestVisibilityRecord,
+  ordinaryTestRequestODataFilterForNavigation,
+  testRequestVisibilityDto,
   TEST_REQUEST_ISOLATION_FIELDS,
+  withOrdinaryTestRequestODataFilter,
+  withTestRequestIsolationSelect,
 } from '../../lib/services/test-requests/isolation';
 import { ensureAttribute } from '../../lib/dataverse/schema-apply';
 
@@ -79,6 +84,38 @@ describe('ordinary-only query fragments', () => {
   test('fragments accept no caller inputs', () => {
     expect(buildOrdinaryTestRequestODataFilter.length).toBe(0);
     expect(buildOrdinaryTestRequestFetchXmlFilter.length).toBe(0);
+  });
+});
+
+describe('Stage 1d gated visibility helpers', () => {
+  const on = { TEST_REQUEST_ISOLATION: 'on' };
+  const off = { TEST_REQUEST_ISOLATION: 'off' };
+  const synthetic = { id: 'r1', [fields.marker]: true, [fields.runId]: VALID_RUN };
+
+  test('switch off preserves selects, filters and DTOs without naming marker fields', () => {
+    expect(withTestRequestIsolationSelect('id,name', off)).toBe('id,name');
+    expect(withOrdinaryTestRequestODataFilter('statecode eq 0', off)).toBe('statecode eq 0');
+    expect(testRequestVisibilityDto(synthetic, off)).toEqual({});
+    expect(projectTestRequestVisibilityRecord(synthetic, off)).toBe(synthetic);
+  });
+
+  test('switch on adds trusted projection, ordinary filter and badge-only DTO', () => {
+    expect(withTestRequestIsolationSelect('id,name', on)).toBe(
+      'id,name,wmkf_istestrequest,wmkf_testcreationrunid',
+    );
+    expect(withOrdinaryTestRequestODataFilter('statecode eq 0', on)).toBe(
+      '(statecode eq 0) and ((wmkf_istestrequest eq false or wmkf_istestrequest eq null) and wmkf_testcreationrunid eq null)',
+    );
+    expect(ordinaryTestRequestODataFilterForNavigation('akoya_requestlookup')).toBe(
+      '((akoya_requestlookup/wmkf_istestrequest eq false or akoya_requestlookup/wmkf_istestrequest eq null) and akoya_requestlookup/wmkf_testcreationrunid eq null)',
+    );
+    expect(testRequestVisibilityDto(synthetic, on)).toEqual({ isTestRequest: true });
+    expect(projectTestRequestVisibilityRecord(synthetic, on)).toEqual({ id: 'r1', isTestRequest: true });
+  });
+
+  test('legacy null and false rows both project as ordinary', () => {
+    expect(testRequestVisibilityDto({ [fields.marker]: null, [fields.runId]: null }, on)).toEqual({ isTestRequest: false });
+    expect(testRequestVisibilityDto({ [fields.marker]: false, [fields.runId]: null }, on)).toEqual({ isTestRequest: false });
   });
 });
 

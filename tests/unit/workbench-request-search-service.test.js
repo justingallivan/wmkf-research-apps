@@ -64,6 +64,7 @@ const requestRow = (id, over = {}) => ({
 });
 
 beforeEach(() => {
+  delete process.env.TEST_REQUEST_ISOLATION;
   jest.clearAllMocks();
   aggregateRequests.mockResolvedValue({ results: [] });
   aggregateMeetingDateCycles.mockResolvedValue([]);
@@ -74,6 +75,8 @@ beforeEach(() => {
   queryRequests.mockResolvedValue({ records: [], totalCount: 0, hasMore: false });
   findByRequestNumber.mockResolvedValue({ records: [], totalCount: 0, hasMore: false });
 });
+
+afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
 
 test('loads grouped live cycles/statuses and sorts them for the filters', async () => {
   aggregateMeetingDateCycles.mockResolvedValueOnce([
@@ -106,6 +109,22 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
   });
   expect(aggregateMeetingDateCycles).toHaveBeenCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
   expect(aggregateStatusesByGrantProgram).toHaveBeenCalledWith(PROGRAM_IDS[1]);
+});
+
+test('Stage 1d: search option aggregates use ordinary-only server filters only when on', async () => {
+  await loadRequestSearchOptions();
+  expect(aggregateMeetingDateCycles).toHaveBeenLastCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
+  expect(aggregateStatusesByGrantProgram).toHaveBeenLastCalledWith(PROGRAM_IDS[1]);
+
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  await loadRequestSearchOptions();
+  expect(aggregateMeetingDateCycles).toHaveBeenLastCalledWith(expect.objectContaining({
+    extraFetchXmlFilter: expect.stringContaining('wmkf_istestrequest'),
+    extraRestrictionFields: ['wmkf_istestrequest', 'wmkf_testcreationrunid'],
+  }));
+  expect(aggregateStatusesByGrantProgram).toHaveBeenLastCalledWith(PROGRAM_IDS[1], {
+    filter: expect.stringContaining('wmkf_testcreationrunid'),
+  });
 });
 
 test('propagates a rejected guarded aggregate without returning partial options', async () => {

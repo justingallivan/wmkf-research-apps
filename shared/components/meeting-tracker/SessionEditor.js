@@ -6,6 +6,7 @@ import { formatZonedLocalInput, resolveZonedDateTime } from '../../../lib/utils/
 import SessionAgendaPanel from './SessionAgendaPanel';
 import OverflowMenu from '../workbench/OverflowMenu';
 import { requestEnvelope } from '../../utils/api-request';
+import TestRequestBadge from '../TestRequestBadge';
 
 const FIELD_CLASS = 'mt-1 rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300';
 
@@ -114,7 +115,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
       </div>
       <div className="min-w-0 flex-1 p-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <p className="min-w-0 font-semibold leading-9 text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}</p>
+          <p className="flex min-w-0 items-center gap-2 font-semibold leading-9 text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}<TestRequestBadge isTestRequest={proposal?.isTestRequest} /></p>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
               Minutes
@@ -496,7 +497,7 @@ export default function SessionEditor() {
         <section className="mt-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><h2 className="text-xl font-semibold text-gray-900">Proposal order</h2><p className="mt-1 text-sm text-gray-600">{slotMinutes} discussion minutes across {slots.length} proposal{slots.length === 1 ? '' : 's'}.</p></div>
-            <div className="flex min-w-[18rem] gap-2"><select aria-label="Proposal to add" value={selectedRequestId} onChange={(event) => setSelectedRequestId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="">Choose a proposal</option>{proposals.filter((proposal) => !slots.some((slot) => String(slot._wmkf_request_value).toLowerCase() === String(proposal.requestId).toLowerCase())).map((proposal) => <option key={proposal.requestId} value={proposal.requestId}>#{proposal.requestNumber} · {proposal.title}</option>)}</select><Button type="button" size="sm" disabled={!selectedRequestId || busy} onClick={addSlot}>Add</Button></div>
+            <div className="flex min-w-[18rem] gap-2"><select aria-label="Proposal to add" value={selectedRequestId} onChange={(event) => setSelectedRequestId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="">Choose a proposal</option>{proposals.filter((proposal) => !slots.some((slot) => String(slot._wmkf_request_value).toLowerCase() === String(proposal.requestId).toLowerCase())).map((proposal) => <option key={proposal.requestId} value={proposal.requestId}>{proposal.isTestRequest ? 'TEST · ' : ''}#{proposal.requestNumber} · {proposal.title}</option>)}</select><Button type="button" size="sm" disabled={!selectedRequestId || busy} onClick={addSlot}>Add</Button></div>
           </div>
           {slots.length ? (
             <ProposalOrderList

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
+import TestRequestBadge from '../TestRequestBadge';
 import { StatusChip } from './AdminWorkspaceNavigation';
 
 function formatBytes(value) {
@@ -217,6 +218,7 @@ export default function TestRequestPreviewSection() {
                 <h3 id="test-request-source-heading" className="text-base font-semibold text-gray-950">
                   Request {sourceState.source.requestNumber}
                 </h3>
+                <TestRequestBadge isTestRequest={sourceState.source.isTestRequest} className="mt-1" />
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
                   {sourceState.source.title || 'Untitled Request'} · {sourceState.source.applicant || 'Applicant unavailable'}
                 </p>

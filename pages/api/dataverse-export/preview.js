@@ -17,6 +17,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { compile, validateQuerySpec } from '../../../lib/services/dataverse-export/compiler';
 import { fetchXmlAggregateCount } from '../../../lib/services/dataverse-export/fetch-client';
+import { testRequestIsolationEnabled } from '../../../lib/services/test-requests/isolation.js';
 import { mintResultToken } from '../../../lib/services/dataverse-export/result-token';
 import { fetchLiveTaxonomy, buildResolver } from '../../../lib/services/dataverse-export/live-taxonomy';
 
@@ -79,7 +80,8 @@ export default async function handler(req, res) {
     const tax = await fetchLiveTaxonomy();
     const resolver = buildResolver(tax);
 
-    const compiled = compile(spec, { resolver });
+    const compileOptions = { resolver, excludeMarkedTestRequests: testRequestIsolationEnabled() };
+    const compiled = compile(spec, compileOptions);
 
     // FAIL-LOUD: excludeOperational requested but a label did not resolve ⇒
     // refuse (never mint a token that /run would execute with operational
@@ -115,9 +117,9 @@ export default async function handler(req, res) {
     // counted at the operational step (removed first), never doubled.
     const matchedCompiled = compile(
       { ...spec, excludeOperational: false, excludeTestRecords: false },
-      { resolver });
+      compileOptions);
     const afterOpCompiled = compile(
-      { ...spec, excludeTestRecords: false }, { resolver });
+      { ...spec, excludeTestRecords: false }, compileOptions);
 
     let trueTotal, matched, afterOperational, eraSplit;
     if (eraScoped) {
@@ -129,8 +131,8 @@ export default async function handler(req, res) {
       let migrated, native;
       [trueTotal, matched, afterOperational, migrated, native] = await Promise.all([
         countOf(compiled), countOf(matchedCompiled), countOf(afterOpCompiled),
-        countOf(compile({ ...spec, eraScope: 'migrated' }, { resolver })),
-        countOf(compile({ ...spec, eraScope: 'native' }, { resolver })),
+        countOf(compile({ ...spec, eraScope: 'migrated' }, compileOptions)),
+        countOf(compile({ ...spec, eraScope: 'native' }, compileOptions)),
       ]);
       eraSplit = { migrated, native, reconciles: migrated + native === trueTotal };
     }

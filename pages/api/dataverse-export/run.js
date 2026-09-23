@@ -20,6 +20,7 @@ import { compile, validateQuerySpec } from '../../../lib/services/dataverse-expo
 import {
   fetchXmlAll, fetchXmlAggregateCount, FetchXmlError,
 } from '../../../lib/services/dataverse-export/fetch-client';
+import { testRequestIsolationEnabled } from '../../../lib/services/test-requests/isolation.js';
 import { annotate } from '../../../lib/services/dataverse-export/disclosure';
 import { buildWorkbook, WorkbookError } from '../../../lib/services/dataverse-export/workbook';
 import { verifyResultToken, mintDownloadToken } from '../../../lib/services/dataverse-export/result-token';
@@ -71,7 +72,10 @@ export default async function handler(req, res) {
   let compiled;
   try {
     const resolver = buildResolver(await fetchLiveTaxonomy());
-    compiled = compile(spec, { resolver });
+    compiled = compile(spec, {
+      resolver,
+      excludeMarkedTestRequests: testRequestIsolationEnabled(),
+    });
   } catch (err) {
     console.error('[dataverse-export/run] taxonomy/compile failed:', err);
     return res.status(502).json({

@@ -6,6 +6,7 @@ import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import Link from 'next/link';
 import { requestEnvelope } from '../shared/utils/api-request';
+import TestRequestBadge from '../shared/components/TestRequestBadge';
 
 // ─── Markdown table parser ───
 
@@ -913,6 +914,10 @@ function DocumentLinks({ data }) {
 // ─── Data Table ───
 
 function DataTable({ headers, rows }) {
+  const markerColumn = headers.findIndex((header) => {
+    const normalized = String(header).replace(/[^a-z]/gi, '').toLowerCase();
+    return normalized === 'istestrequest' || normalized === 'testrequest';
+  });
   return (
     <div className="my-3 -mx-2">
       <div className="overflow-x-auto">
@@ -921,7 +926,7 @@ function DataTable({ headers, rows }) {
             <tr>
               {headers.map((h, i) => (
                 <th key={i} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 bg-gray-200 border-b border-gray-300 whitespace-nowrap">
-                  {h}
+                  {i === markerColumn ? 'Type' : h}
                 </th>
               ))}
             </tr>
@@ -931,7 +936,9 @@ function DataTable({ headers, rows }) {
               <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                 {row.map((cell, ci) => (
                   <td key={ci} className="px-3 py-2 text-gray-700 border-b border-gray-200 whitespace-nowrap max-w-xs truncate" title={cell}>
-                    {cell}
+                    {ci === markerColumn
+                      ? <TestRequestBadge isTestRequest={['true', 'test', 'yes'].includes(String(cell).trim().toLowerCase())} />
+                      : cell}
                   </td>
                 ))}
               </tr>
@@ -939,14 +946,14 @@ function DataTable({ headers, rows }) {
           </tbody>
         </table>
       </div>
-      <div className="flex justify-end mt-1">
+      {markerColumn < 0 && <div className="flex justify-end mt-1">
         <button
           onClick={() => downloadCsv(headers, rows, `dynamics-export-${Date.now()}.csv`)}
           className="text-xs text-blue-600 hover:text-blue-800"
         >
           Export CSV
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
