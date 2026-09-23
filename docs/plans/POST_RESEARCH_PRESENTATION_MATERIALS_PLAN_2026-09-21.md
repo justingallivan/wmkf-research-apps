@@ -812,7 +812,7 @@ owner before deleting each exact disposable item.
 | Browser | Scenario | Expected recorded evidence | Runner |
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. New recovery code remains untested live. | Agent (receipt already recorded) |
-| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | Redacted Network trace: direct Microsoft PUT 202 ranges, no MP4 application body, 302 then Microsoft 206 ranges, one resolver action per Watch/Download, source/download byte and SHA-256 match. | Agent after owner live-run approval |
+| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | Redacted Network trace: direct Microsoft PUT 202 ranges, no MP4 application body, 302 then Microsoft 206 ranges, one resolver action per Watch/Download, source/download byte and SHA-256 match. | Agent if Edge is installed on this Mac, or owner on another Edge device, after owner live-run approval |
 | macOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts and source/download byte plus SHA-256 match; note any autoplay permission prompt or playback error. | Owner by hand |
 | iPadOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts where Web Inspector is available, plus Files-app downloaded byte count/hash compared on a trusted computer; note any mobile-specific failure. | Owner by hand |
 | Edge, then one Safari | Let a paused upload session expire; attempt Resume; cleanup only after owner confirmation; start a fresh proof | 410 `presentation_media_proof_session_expired`, retained permit, exact cleanup outcome (including `placeholder_deleted` only after confirmed terminal session), new session and successful finalize; no old partial item promoted. | Agent for Edge; owner for Safari |
@@ -821,6 +821,8 @@ owner before deleting each exact disposable item.
 
 **Owner click sequence for macOS Safari and iPadOS Safari.** Do this separately in each browser
 with a newly approved disposable item; Safari on iPad uses the Files app for selection/download.
+[VERIFIED via Applications and Spotlight, 2026-09-23] Edge is not installed on the agent's Mac;
+its runner and live result remain open pending the owner's browser choice.
 
 1. Open the owner-approved immutable Preview origin and sign in to Meeting Tracker. Open
    `/meeting-tracker/presentation-media-proof`. In macOS Safari Web Inspector (or paired iPad Web
@@ -832,10 +834,15 @@ with a newly approved disposable item; Safari on iPad uses the Files app for sel
    Microsoft `202`/`nextExpectedRanges` evidence. Reload the same tab, select the same file in
    **Zoom MP4**, and click **Resume**. Record the resumed starting range and final byte count.
    Record any file-mismatch refusal if encountered; the changed-edge-byte case is pinned by offline tests.
-3. Click **Finish saving**. Open **Open proof page** in a private window before its five-minute
-   expiry. With **302 redirect** selected, click **Watch**, play at least two minutes, seek to ten
+3. Click **Finish saving**. On macOS, control-click **Open proof page**, choose **Copy Link**, open
+   **File → New Private Window**, and paste the link. On iPad, touch and hold **Open proof page**,
+   choose **Copy Link**, open Safari's tab overview, switch to **Private**, add a tab, and paste
+   the link. Do this before the five-minute token expiry. With **302 redirect** selected, click
+   **Watch**, play at least two minutes, seek to ten
    positions including near the end, pause/resume, and record 302 → Microsoft 206 plus the page's
    resolver count. Select **one-shot URL**, click **Watch** again, and repeat a forward/back seek.
+   If the proof token expires between modes, return to the staff harness, click **Finish saving**
+   to mint a fresh link for the same committed item, and copy that link into a new Private tab.
 4. Click **Download** once for each delivery shape if the browser allows it. Record the final
    downloaded size and SHA-256 (for iPad, move the Files-app download to a trusted computer for
    hashing). They must equal the source. Record the filename Microsoft supplies and any 429 or

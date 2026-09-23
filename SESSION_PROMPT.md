@@ -1,8 +1,8 @@
 # Presentation branch continuation — 2026-09-23
 
-[VERIFIED via Git and branch-only push] This checkout is `codex/feature-request`, clean and
-equal to its upstream at `26b368604`. The owner-approved `origin/main` merge is `1d455ba9a`;
-the offline Slice 0 hardening is `26b368604`. Neither commit was pushed to main. No other checkout
+[VERIFIED via Git and branch-only push] This checkout is `codex/feature-request`.
+The owner-approved `origin/main` merge is `1d455ba9a`; the offline Slice 0 hardening is
+`26b368604`, followed by the handoff commit `d459b96f0`. None was pushed to main. No other checkout
 was edited and no Preview deployment occurred. The four named overlap surfaces were checked against the merged
 source. The Preview-only proof now has offline-tested bounded edge-byte SHA-256 reselect checks,
 expired-session permit retention and exact terminal-placeholder cleanup, proof-token reissue guidance, one automatic
@@ -22,12 +22,14 @@ record. This branch merge and offline work do not authorize a Preview deployment
 Production Dataverse read, new SharePoint upload, or cleanup deletion. Obtain a separate owner
 approval for each live run and each exact cleanup.
 
-Next: obtain separate owner approval for one bounded Edge live run with the exact request,
+Next: resolve the Edge browser location, then obtain separate owner approval for a bounded live run with the exact request,
 SharePoint target, approved MP4, Production Dataverse-read decision, immutable Preview deployment,
 any runtime-target settings, and a temporary alias window. [VERIFIED via read-only Vercel
 inspection 2026-09-23] the shared alias still resolved to Ready
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the presentation branch had no scoped Preview variables,
-while the Test Request branch still had its four scoped names. Re-inspect immediately before an
+while the Test Request branch still had its four scoped names. [VERIFIED via Applications and
+Spotlight 2026-09-23] Edge is not installed on this Mac, so its matrix cell is still open.
+Re-inspect immediately before an
 alias change and after restoration. Never set `DATAVERSE_ALLOW_PROD_READS` as this agent. The
 owner runs macOS/iPadOS Safari by hand using the plan.
 
