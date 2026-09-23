@@ -8,7 +8,7 @@
  * unexpired manifest and a new receipt path:
  *
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs
- *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --prepare=/absolute/manifest.json --fiscal-year='December 2026' --meeting-date=2026-12-04
+ *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --prepare=/absolute/manifest.json --source-request-number=1000339
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --execute=/absolute/manifest.json --receipt=/absolute/receipt.json
  *
  * The script never deletes or resets the created Request. An ambiguous create
@@ -20,6 +20,14 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import { compileTestRequestDraft } from '../lib/services/test-requests/policy.js';
+import {
+  assertCopiedSourceValues,
+  assertSourceUnchanged,
+  projectCloneSource,
+  requireUniqueSourceRequest,
+  resolveCloneCycle,
+  verifyCloneRequestReadback,
+} from '../lib/services/test-requests/sandbox-clone.js';
 
 const require = createRequire(import.meta.url);
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
@@ -40,6 +48,8 @@ const CREATE_FIELDS = Object.freeze([
   'akoya_requestid',
   'akoya_applicantid',
   'akoya_title',
+  'akoya_purpose',
+  'akoya_request',
   'akoya_fiscalyear',
   'akoya_requesttype',
   'wmkf_meetingdate',
@@ -53,6 +63,8 @@ const READBACK_FIELDS = Object.freeze([
   'akoya_requestid',
   'akoya_requestnum',
   'akoya_title',
+  'akoya_purpose',
+  'akoya_request',
   'akoya_fiscalyear',
   'akoya_requesttype',
   'wmkf_meetingdate',
@@ -83,6 +95,8 @@ function parseArgs(argv) {
     bypassGoverify: false,
     fiscalYear: null,
     meetingDate: null,
+    sourceRequestNumber: null,
+    testLabel: null,
   };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
@@ -91,6 +105,8 @@ function parseArgs(argv) {
     else if (arg.startsWith('--receipt=')) parsed.receipt = arg.slice('--receipt='.length);
     else if (arg.startsWith('--fiscal-year=')) parsed.fiscalYear = arg.slice('--fiscal-year='.length);
     else if (arg.startsWith('--meeting-date=')) parsed.meetingDate = arg.slice('--meeting-date='.length);
+    else if (arg.startsWith('--source-request-number=')) parsed.sourceRequestNumber = arg.slice('--source-request-number='.length);
+    else if (arg.startsWith('--test-label=')) parsed.testLabel = arg.slice('--test-label='.length);
     else if (arg === '--bypass-goverify') parsed.bypassGoverify = true;
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
@@ -103,11 +119,11 @@ function parseArgs(argv) {
   if (parsed.bypassGoverify && !parsed.execute) {
     throw new Error('--bypass-goverify is valid only with --execute.');
   }
-  if (parsed.prepare && (!parsed.fiscalYear || !parsed.meetingDate)) {
-    throw new Error('--prepare requires --fiscal-year and --meeting-date from the intended source Request or operator.');
+  if (parsed.prepare && (!parsed.sourceRequestNumber || !/^\d{1,10}$/.test(parsed.sourceRequestNumber))) {
+    throw new Error('--prepare requires a bounded numeric --source-request-number.');
   }
-  if (!parsed.prepare && (parsed.fiscalYear !== null || parsed.meetingDate !== null)) {
-    throw new Error('--fiscal-year and --meeting-date are valid only with --prepare.');
+  if (!parsed.prepare && (parsed.fiscalYear !== null || parsed.meetingDate !== null || parsed.sourceRequestNumber !== null || parsed.testLabel !== null)) {
+    throw new Error('--source-request-number, --fiscal-year, --meeting-date, and --test-label are valid only with --prepare.');
   }
   for (const value of [parsed.prepare, parsed.execute, parsed.inspect, parsed.receipt].filter(Boolean)) {
     if (!path.isAbsolute(value)) throw new Error('Manifest and receipt paths must be absolute.');
@@ -117,7 +133,7 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log('Read-only: node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs');
-  console.log("Prepare:  ... --prepare=/absolute/new-manifest.json --fiscal-year='December 2026' --meeting-date=2026-12-04");
+  console.log('Prepare:  ... --prepare=/absolute/new-manifest.json --source-request-number=1000339 [--fiscal-year=...] [--meeting-date=...]');
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
   console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
@@ -223,6 +239,19 @@ function writeNewJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
 }
 
+function reserveJsonReceipt(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const descriptor = fs.openSync(filePath, 'wx', 0o600);
+  fs.writeSync(descriptor, `${JSON.stringify(value, null, 2)}\n`);
+  return descriptor;
+}
+
+function updateReservedJson(descriptor, value) {
+  fs.ftruncateSync(descriptor, 0);
+  fs.writeSync(descriptor, `${JSON.stringify(value, null, 2)}\n`, 0);
+  fs.fsyncSync(descriptor);
+}
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
@@ -312,6 +341,14 @@ async function buildCompilerMetadata(client) {
   for (const field of ['akoya_title', 'akoya_fiscalyear', 'wmkf_testcreationrunid']) {
     fields[field].maxLength = await getMaxLength(client, field, 'String');
   }
+  fields.akoya_purpose.maxLength = await getMaxLength(client, 'akoya_purpose', 'Memo');
+  const amountMeta = await client.get(
+    "/EntityDefinitions(LogicalName='akoya_request')/Attributes(LogicalName='akoya_request')" +
+      '/Microsoft.Dynamics.CRM.MoneyAttributeMetadata?$select=MinValue,MaxValue',
+  );
+  const amountRange = bodyOrThrow('requested amount metadata', amountMeta);
+  fields.akoya_request.minValue = amountRange.MinValue;
+  fields.akoya_request.maxValue = amountRange.MaxValue;
   fields.akoya_applicantid.lookupTarget = await getApplicantTarget(client);
   return { entity: 'akoya_request', fields };
 }
@@ -327,6 +364,31 @@ async function getFoundationSnapshot(client) {
     throw new Error(`Expected exactly one active exact-name ${FOUNDATION_NAME} account; found ${rows.length}.`);
   }
   return rows[0];
+}
+
+const SOURCE_SELECT = [
+  'akoya_requestid', 'akoya_requestnum', 'akoya_requesttype', 'akoya_purpose',
+  'akoya_request', 'akoya_fiscalyear', 'wmkf_meetingdate', 'versionnumber',
+].join(',');
+
+async function getSourceRequestByNumber(client, requestNumber) {
+  if (!/^\d{1,10}$/.test(String(requestNumber))) throw new Error('Source Request number must be bounded digits.');
+  const filter = `akoya_requestnum eq '${odataString(requestNumber)}'`;
+  const response = await client.get(
+    `/akoya_requests?$select=${SOURCE_SELECT}&$filter=${encodeURIComponent(filter)}&$top=2`,
+  );
+  const body = bodyOrThrow('source Request lookup', response);
+  try {
+    return requireUniqueSourceRequest(body.value || [], Boolean(body['@odata.nextLink']));
+  } catch (error) {
+    throw new Error(`Source Request ${requestNumber}: ${error.message}`);
+  }
+}
+
+async function getSourceRequestById(client, requestId) {
+  const response = await client.get(`/akoya_requests(${requestId})?$select=${SOURCE_SELECT}`);
+  if (response.status === 404) throw new Error('Source Request no longer exists.');
+  return bodyOrThrow('source Request revalidation', response);
 }
 
 async function getAppUser(client) {
@@ -396,10 +458,10 @@ async function runPreflight(client) {
   return { metadata, grantOption, foundation, contacts, sharePointSites, requestLibraryParent, appUser, siteId, driveId };
 }
 
-function compileBody(preflight, values) {
+function compileBody(preflight, values, sourceRequest) {
   const compiled = compileTestRequestDraft({
     recipe: 'basic',
-    sourceRequest: { akoya_requestid: '00000000-0000-4000-8000-000000000001' },
+    sourceRequest,
     testLabel: values.testLabel,
     fiscalYear: values.fiscalYear,
     meetingDate: values.meetingDate,
@@ -439,7 +501,7 @@ function preflightSummary(preflight) {
   };
 }
 
-function buildManifest(preflight, { fiscalYear, meetingDate }) {
+function buildManifest(preflight, { source, fiscalYear, meetingDate, testLabel }) {
   const requestId = crypto.randomUUID();
   const runId = crypto.randomUUID();
   const locationId = crypto.randomUUID();
@@ -447,13 +509,13 @@ function buildManifest(preflight, { fiscalYear, meetingDate }) {
     requestId,
     runId,
     locationId,
-    testLabel: `Codex sandbox request factory rehearsal ${new Date().toISOString().slice(0, 10)} ${runId.slice(0, 8)}`,
+    testLabel: testLabel || `Codex sandbox request factory rehearsal ${new Date().toISOString().slice(0, 10)} ${runId.slice(0, 8)}`,
     fiscalYear,
     meetingDate,
   };
-  const createBody = compileBody(preflight, values);
+  const createBody = compileBody(preflight, values, source);
   return {
-    kind: 'test-request-sandbox-rehearsal-manifest/v2',
+    kind: 'test-request-sandbox-rehearsal-manifest/v3',
     preparedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + MANIFEST_TTL_MS).toISOString(),
     target: SANDBOX_URL,
@@ -464,6 +526,12 @@ function buildManifest(preflight, { fiscalYear, meetingDate }) {
     },
     expectedRequestType: preflight.grantOption,
     expectedAppUserId: preflight.appUser.systemuserid,
+    source: {
+      requestId: source.akoya_requestid,
+      requestNumber: source.akoya_requestnum,
+      requestType: source.akoya_requesttype,
+      revision: source.revision,
+    },
     createBody,
     createBodySha256: sha256(createBody),
     invariants: {
@@ -479,24 +547,44 @@ function buildManifest(preflight, { fiscalYear, meetingDate }) {
 }
 
 function validateManifest(manifest, { allowExpired = false, forExecute = false } = {}) {
-  if (!['test-request-sandbox-rehearsal-manifest/v1', 'test-request-sandbox-rehearsal-manifest/v2'].includes(manifest?.kind)) {
+  if (!['test-request-sandbox-rehearsal-manifest/v1', 'test-request-sandbox-rehearsal-manifest/v2', 'test-request-sandbox-rehearsal-manifest/v3'].includes(manifest?.kind)) {
     throw new Error('Unsupported manifest kind.');
   }
-  if (forExecute && manifest.kind !== 'test-request-sandbox-rehearsal-manifest/v2') {
-    throw new Error('Only a v2 manifest can execute app-owned SharePoint provisioning.');
+  if (forExecute && manifest.kind !== 'test-request-sandbox-rehearsal-manifest/v3') {
+    throw new Error('Only a source-bound v3 manifest can execute a sandbox clone.');
   }
   if (manifest.target !== SANDBOX_URL) throw new Error('Manifest target is not the registered sandbox.');
+  if (manifest.kind.endsWith('/v3') && (!/^[0-9a-f-]{36}$/i.test(manifest.source?.requestId || '') ||
+      !manifest.source?.revision || !Number.isInteger(manifest.source?.requestType) ||
+      !String(manifest.createBody?.akoya_title || '').startsWith('TEST: '))) {
+    throw new Error('Source-bound v3 manifest provenance is invalid.');
+  }
   if (!manifest.expiresAt || (!allowExpired && Date.parse(manifest.expiresAt) <= Date.now())) throw new Error('Manifest is expired.');
   if (manifest.createBodySha256 !== sha256(manifest.createBody)) throw new Error('Manifest create body hash mismatch.');
   if (!guidEqual(manifest.createBody.akoya_requestid, manifest.values?.requestId) ||
       !guidEqual(manifest.createBody.wmkf_testcreationrunid, manifest.values?.runId) ||
-      (manifest.kind.endsWith('/v2') && (!/^[0-9a-f-]{36}$/i.test(manifest.values?.locationId || '') ||
+      ((manifest.kind.endsWith('/v2') || manifest.kind.endsWith('/v3')) && (!/^[0-9a-f-]{36}$/i.test(manifest.values?.locationId || '') ||
         !/^[0-9a-f-]{36}$/i.test(manifest.expectedAppUserId || '')))) {
     throw new Error('Manifest identity mismatch.');
   }
   if (manifest.invariants?.exactlyOneCreate !== true || manifest.invariants?.retryOnAmbiguousCreate !== false) {
     throw new Error('Manifest create invariants are invalid.');
   }
+}
+
+function sanitizedRequestIdentity(request) {
+  if (!request) return null;
+  return {
+    akoya_requestid: request.akoya_requestid,
+    akoya_requestnum: request.akoya_requestnum,
+    akoya_title: request.akoya_title,
+    akoya_requesttype: request.akoya_requesttype,
+    _akoya_applicantid_value: request._akoya_applicantid_value,
+    _createdby_value: request._createdby_value,
+    _ownerid_value: request._ownerid_value,
+    wmkf_istestrequest: request.wmkf_istestrequest,
+    wmkf_testcreationrunid: request.wmkf_testcreationrunid,
+  };
 }
 
 async function inspectManifest(client, manifest) {
@@ -518,7 +606,7 @@ async function inspectManifest(client, manifest) {
     target: SANDBOX_URL,
     requestId: manifest.values.requestId,
     requestExists: Boolean(request),
-    request,
+    request: sanitizedRequestIdentity(request),
     dynamicsLocations: locations,
     locationParents,
     paymentRows: payments,
@@ -746,16 +834,8 @@ async function listSharePointFiles(observation) {
 function verify(manifest, preflightBefore, observation, files, foundationAfter, contactsAfter) {
   const failures = [];
   const request = observation.request;
-  if (!guidEqual(request.akoya_requestid, manifest.values.requestId)) failures.push('request GUID mismatch');
+  failures.push(...verifyCloneRequestReadback(manifest, request));
   if (!request.akoya_requestnum) failures.push('server request number missing');
-  if (request.akoya_title !== manifest.createBody.akoya_title) failures.push('title mismatch');
-  if (request.akoya_requesttype !== manifest.createBody.akoya_requesttype) failures.push('request type mismatch');
-  if (String(request.wmkf_meetingdate || '').slice(0, 10) !== manifest.values.meetingDate) failures.push('meeting date mismatch');
-  if (!guidEqual(request._akoya_applicantid_value, manifest.expectedOrganization.accountid)) failures.push('applicant mismatch');
-  if (request.wmkf_istestrequest !== true) failures.push('test marker not true');
-  if (!guidEqual(request.wmkf_testcreationrunid, manifest.values.runId)) failures.push('run ID mismatch');
-  if (request.wmkf_respondreminderenabled !== false) failures.push('respond reminder not false');
-  if (request.wmkf_reviewduereminderenabled !== false) failures.push('review-due reminder not false');
   if (request.wmkf_phaseiistatus != null) failures.push('Phase II status unexpectedly populated');
   if (request.akoya_recommendedamount != null) failures.push('recommended amount unexpectedly populated');
   if (request.akoya_originalgrantamount != null) failures.push('original grant amount unexpectedly populated');
@@ -764,6 +844,18 @@ function verify(manifest, preflightBefore, observation, files, foundationAfter, 
   if (observation.emails.length !== 0) failures.push(`created ${observation.emails.length} regarding email row(s)`);
   if (observation.locations.length !== 1) failures.push(`expected one Dynamics SharePoint location, found ${observation.locations.length}`);
   if (observation.locationParents.length !== 1 || !observation.locationParents[0]?.relativeurl) failures.push('SharePoint parent did not resolve');
+  if (observation.locations.length === 1) {
+    const location = observation.locations[0];
+    const expectedFolder = `${request.akoya_requestnum}_${manifest.values.requestId.replace(/-/g, '').toUpperCase()}`;
+    if (!guidEqual(location.sharepointdocumentlocationid, manifest.values.locationId)) failures.push('SharePoint location ID mismatch');
+    if (location.relativeurl !== expectedFolder) failures.push('SharePoint folder path mismatch');
+    if (!guidEqual(location._createdby_value, manifest.expectedAppUserId)) failures.push('SharePoint location creator mismatch');
+    if (!guidEqual(location._ownerid_value, manifest.expectedAppUserId)) failures.push('SharePoint location owner mismatch');
+    if (observation.locationParents.length === 1 &&
+        !guidEqual(observation.locationParents[0]?.sharepointdocumentlocationid, preflightBefore.requestLibraryParent.sharepointdocumentlocationid)) {
+      failures.push('SharePoint location parent identity mismatch');
+    }
+  }
   if (!Array.isArray(files)) failures.push('SharePoint folder could not be inspected');
   else if (files.length !== 0) failures.push(`SharePoint folder contains ${files.length} file(s)`);
 
@@ -786,10 +878,16 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
     startedAt: new Date().toISOString(),
     target: SANDBOX_URL,
     requestId: manifest.values.requestId,
+    locationId: manifest.values.locationId,
     runId: manifest.values.runId,
+    sourceRequestId: manifest.source?.requestId || null,
+    sourceRevision: manifest.source?.revision || null,
     createAttempted: false,
     createResponseStatus: null,
   };
+  // Reserve the private receipt path before any request-side write. The open
+  // descriptor also lets every later success/failure outcome retain exact IDs.
+  const receiptDescriptor = reserveJsonReceipt(receiptPath, receipt);
 
   try {
     const preflightBefore = await runPreflight(client);
@@ -802,7 +900,10 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
     if (!guidEqual(preflightBefore.appUser.systemuserid, manifest.expectedAppUserId)) {
       throw new Error('App-suite application user changed since prepare.');
     }
-    const rebuiltBody = compileBody(preflightBefore, manifest.values);
+    const sourceRow = await getSourceRequestById(client, manifest.source?.requestId);
+    const source = assertSourceUnchanged(manifest.source, sourceRow, preflightBefore.grantOption.value);
+    assertCopiedSourceValues(source, manifest.createBody);
+    const rebuiltBody = compileBody(preflightBefore, manifest.values, source);
     if (sha256(rebuiltBody) !== manifest.createBodySha256) throw new Error('Fresh preflight does not reproduce manifest body.');
 
     const existing = await client.get(`/akoya_requests(${manifest.values.requestId})?$select=akoya_requestid`);
@@ -835,6 +936,15 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
         receipt.goverifyBypass.deactivatedAt = new Date().toISOString();
         receipt.goverifyBypass.deactivatedVersionNumber = workflowDeactivated.versionnumber;
       }
+
+      // Fence the source again after any optional automation change and just
+      // before the sole Request POST.
+      const sourceBeforePost = assertSourceUnchanged(
+        manifest.source,
+        await getSourceRequestById(client, manifest.source.requestId),
+        preflightBefore.grantOption.value,
+      );
+      assertCopiedSourceValues(sourceBeforePost, manifest.createBody);
 
       receipt.createAttempted = true;
       created = await client.post('/akoya_requests', manifest.createBody, {
@@ -887,6 +997,17 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       foundationAfter,
       contactsAfter,
     );
+    try {
+      const finalSource = assertSourceUnchanged(
+        manifest.source,
+        await getSourceRequestById(client, manifest.source.requestId),
+        preflightBefore.grantOption.value,
+      );
+      assertCopiedSourceValues(finalSource, manifest.createBody);
+    } catch {
+      verification.ok = false;
+      verification.failures.push('source changed during clone rehearsal');
+    }
     if (graphError) {
       verification.ok = false;
       verification.failures.push(`Graph folder inspection failed: ${graphError}`);
@@ -894,7 +1015,7 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
 
     Object.assign(receipt, {
       completedAt: new Date().toISOString(),
-      request: observation.request,
+      request: sanitizedRequestIdentity(observation.request),
       dynamicsLocations: observation.locations,
       locationParents: observation.locationParents,
       sharePointFiles: files,
@@ -902,14 +1023,16 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       regardingEmails: observation.emails,
       verification,
     });
-    writeNewJson(receiptPath, receipt);
+    updateReservedJson(receiptDescriptor, receipt);
     console.log(JSON.stringify({ receiptPath, requestNumber: observation.request.akoya_requestnum, verification }, null, 2));
     if (!verification.ok) process.exitCode = 1;
   } catch (error) {
     receipt.completedAt = new Date().toISOString();
     receipt.error = error.message;
-    if (!fs.existsSync(receiptPath)) writeNewJson(receiptPath, receipt);
+    updateReservedJson(receiptDescriptor, receipt);
     throw error;
+  } finally {
+    fs.closeSync(receiptDescriptor);
   }
 }
 
@@ -942,7 +1065,12 @@ async function main() {
 
   const preflight = await runPreflight(client);
   if (args.prepare) {
-    const manifest = buildManifest(preflight, args);
+    const source = await getSourceRequestByNumber(client, args.sourceRequestNumber);
+    if (source.akoya_requesttype !== preflight.grantOption.value) {
+      throw new Error('Source Request must be a Grant Request matching the live Grant option.');
+    }
+    const cycle = resolveCloneCycle(source, args);
+    const manifest = buildManifest(preflight, { ...cycle, source, testLabel: args.testLabel });
     writeNewJson(args.prepare, manifest);
     console.log(JSON.stringify({
       manifestPath: args.prepare,
