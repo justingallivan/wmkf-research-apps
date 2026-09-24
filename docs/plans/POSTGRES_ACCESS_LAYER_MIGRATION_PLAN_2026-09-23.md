@@ -521,6 +521,28 @@ is therefore CommonJS (Stage 2 decision, 2026-09-24): CJS files
   the contract test must cover every statement that binds a parameter into
   a function call, `CASE`, or `VALUES`.
 
+**How to copy the template (`tests/pg-contract/explorer-store.test.js`,
+from the Opus and Codex reviews of `cee855990`):**
+1. Read the DDL in `scripts/setup-database.js`, not the brief, for FK seeds
+   (`user_profiles` only where the DDL has that FK), nullable columns and
+   whether a flag like `is_active` exists at all.
+2. Make every fixture column sort differently from the column under test,
+   so a wrong `ORDER BY` or `WHERE` column fails a test.
+3. Assert every bound column of each INSERT/UPDATE, including one real
+   (non-null) foreign-key value.
+4. Pick guard fixtures where the guard and its likely mutant disagree (a
+   numeric string like `'3'`, not garbage) and name the mutant each
+   assertion kills; reach real error paths through the planner where the
+   schema allows (a non-integer id → 22P02 → the catch branch).
+5. Track keys before the write; `afterAll` sets bounded `lock_timeout` /
+   `statement_timeout`, deletes child-first inside try/finally, and ALWAYS
+   closes the direct client and `getShimPool()` even if a DELETE throws;
+   only fire-and-forget stores need the bounded poll; the
+   idle-in-transaction check counts every connection (fine for one
+   `--runInBand` lane). Existing unit tests that `jest.mock('@vercel/postgres')`
+   keep working through the CJS seam; files moving onto `withClient` /
+   `withTransaction` need `db.connect` added to that mock.
+
 **Order (lowest statement count and fan-in first; one file per commit):**
 1. `lib/services/dynamics-explorer/explorer-store.js` (4 stmts, 40 lines) —
    also the template commit others copy.
@@ -1247,6 +1269,51 @@ Open: none new; Stage 1's Stage 7 wording question stands.
   contract DB; discriminating fixture: a non-integer `requestRound` stored
   as NULL). Every Stage 3 table exists in the contract DB except
   `irs_exempt_orgs_new`, which `irs-bmf-service` creates at runtime.
+
+### Stage 3 — IN PROGRESS — 2026-09-24 — `claude/postgres-access-layer`
+Preamble: `[VERIFIED via --report in a fresh Haiku agent]` 61 driver-import
+files, 349 tags in 52, 68 with any record, unresolved-import 9,
+driver-export 1 (the CJS seam's `module.exports`), both gates 0, the 36
+`lib/services` importers = 30 Stage 3 + 2 Stage 5 + 4 Stage 6 exactly.
+Drift: none.
+Working rules for this stage (orchestrator): builders never touch the
+allowlist — the orchestrator deletes the file's vanished keys in the same
+commit as its swap (one file per commit, rule 3); per-commit proof is the
+file's `--json` record (no `driver-import`), its unit tests, its contract
+test in the lane; gate exit 0, full suite, gates and build at each wave
+boundary; at most two builders on disjoint slices, one file per hand-back;
+push and update this entry at every boundary.
+- **Item 1 — template — DONE `cee855990`** (`explorer-store.js`). Contract
+  test written first and green against the unconverted file; discriminating
+  fixture: a non-integer `requestRound` is stored as NULL. Template finding
+  (blocking, fixed in `9a5afcc33` before the template landed): the seam's
+  top-level `require('pg')` made every jsdom-environment suite that
+  transitively imports a converted store throw `TextEncoder is not defined`
+  (pg reads it at load; jsdom lacks it) — 3 suites / 86 tests red. `pg` is
+  now required lazily inside `getPool()`; the ratchet still sees the
+  literal. Copier notes: read the DDL, not the brief (`dynamics_restrictions`
+  has no active flag); end the shim pool in `afterAll`; FK seeds
+  (`user_profiles`) with child-first cleanup; `Number.isInteger` guards are
+  natural discriminating targets; `jest.mock('@vercel/postgres')` in
+  existing unit tests still intercepts through the CJS seam. Reviews: Opus — no P1, three P2 in the test only
+  (non-discriminating guard fixture, correlated ordering fixture, 5 of 11
+  logQuery columns asserted) with a 16-mutant table; Codex — the same
+  ordering gap plus a planner-error role test and cleanup hardening; all
+  folded into the test in the follow-up commit and into the "How to copy
+  the template" note above the Order list. Wave-1
+  boundary at `cee855990`: gates 69/69, `test:ci` 1059 suites / 15,667
+  tests, canonical build passes (first proof that Turbopack bundles an ESM
+  `import { sql } from '../../postgres/client'` against the CJS seam on a
+  route path, `pages/api/dynamics-explorer/chat.js`). Reviews: Opus PENDING; Codex
+  PENDING.
+- Item 2 (10 small swaps): not started.
+- Item 3 (11 larger swaps): not started.
+- Item 4 (6 connect/transaction users): not started. `irs-bmf-service`'s
+  `refresh()` fetches the four IRS CSV URLs through global `fetch` with no
+  injection point (`:40-43`, `:323`); its contract test stubs `fetch` with a
+  tiny CSV per region so every statement, including the COPY, runs against
+  the real planner.
+- Item 5 (the two largest stores): not started.
 
 ## Appendix A — Census (2026-09-23, commit `1046c1033`)
 
