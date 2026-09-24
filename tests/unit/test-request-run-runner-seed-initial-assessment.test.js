@@ -33,9 +33,12 @@ import {
   buildInitialAssessmentIdentity,
 } from '../../lib/services/initial-assessment/artifact-model.js';
 import {
+  SYNTHETIC_GENERATED,
   SYNTHETIC_PROPOSAL_FILENAME,
   SYNTHETIC_PROPOSAL_TEXT,
 } from '../../lib/services/test-requests/fixtures/initial-assessment-synthetic.js';
+import { hashGovernedDocxContent, GOVERNED_DOCX_HASH_PREFIX } from '../../lib/services/documents/governed-docx-hash.js';
+import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -355,7 +358,8 @@ describe('stepSeedInitialAssessment — happy path', () => {
       throw new Error(`unexpected fetch to ${href}`);
     });
 
-    const { result, calls } = await run({});
+    const fakeGraphInstance = fakeGraph();
+    const { result, calls } = await run({ graph: fakeGraphInstance });
 
     expect(result.outcome).toBe('advanced');
     expect(result.run.currentStep).toBe('seed_initial_assessment_snapshot');
@@ -373,6 +377,17 @@ describe('stepSeedInitialAssessment — happy path', () => {
       generationKey,
     });
     expect(last.readback.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    // P2-E: the journaled ledger contentHash ties to BOTH the exact buffer
+    // uploadFile received AND the wmkf_contenthash value the PATCH sent --
+    // all three are the same governed digest, just encoded two ways.
+    const uploadedBuffer = fakeGraphInstance.uploadFile.mock.calls[0][3];
+    const rehashedFromUpload = await hashGovernedDocxContent(uploadedBuffer);
+    const patchCall = fetch.mock.calls.find(([u, i]) => i?.method === 'PATCH' && String(u).includes('wmkf_requestdocuments('));
+    const patchedContentHash = JSON.parse(patchCall[1].body).wmkf_contenthash;
+    expect(patchedContentHash).toBe(rehashedFromUpload);
+    expect(last.readback.contentHash).toBe(
+      Buffer.from(rehashedFromUpload.slice(GOVERNED_DOCX_HASH_PREFIX.length), 'base64url').toString('hex'),
+    );
     // Attempt markers were journaled in order before each mutation -- each
     // merge() call resends the FULL current receipt (the copy_file
     // convention above), so the marker introduced by a given call is the
@@ -385,6 +400,25 @@ describe('stepSeedInitialAssessment — happy path', () => {
       seenKeys = new Set(Object.keys(r.readback));
     }
     expect(markerOrder).toEqual(['registryCreateAttemptedAt', 'registryPatchAttemptedAt', 'graphFolderAttemptedAt', 'uploadAttemptedAt', 'changesetAttemptedAt']);
+  });
+});
+
+describe('governed content hash stability across independent renders (P2-E)', () => {
+  it('the same generated content renders to a stable governed hash even though the docx Packer stamps a fresh docProps timestamp each time', async () => {
+    const args = { requestNumber: '9009009', title: 'Synthetic Fixture Rehearsal', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED };
+    const first = await renderInitialAssessmentDocx(args);
+    // A real millisecond apart, so a raw whole-file hash covering docProps'
+    // stamped created/modified timestamps would very likely differ.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const second = await renderInitialAssessmentDocx(args);
+
+    const firstGoverned = await hashGovernedDocxContent(first);
+    const secondGoverned = await hashGovernedDocxContent(second);
+    expect(firstGoverned).toBe(secondGoverned);
+
+    const toHex = (governed) => Buffer.from(governed.slice(GOVERNED_DOCX_HASH_PREFIX.length), 'base64url').toString('hex');
+    expect(toHex(firstGoverned)).toBe(toHex(secondGoverned));
+    expect(toHex(firstGoverned)).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 
@@ -595,6 +629,13 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
     expect(graph.getFileMetadataById).toHaveBeenCalledWith('b!driveIdSample1234567890', '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', { siteId: EXPECTED_SITE_ID });
     const iaResource = getResources().find((r) => r.resourceKind === 'dataverse_request_document');
     expect(iaResource.readback.sourceVersionId).toBe('2.0');
+    // P2-E: once an item id is already journaled (upload already committed),
+    // the PATCH's own contentHash merge is skipped -- only the terminal
+    // merge after commitReadyLineage carries contentHash. (Both would be the
+    // same stable value anyway, but this proves the resume branch doesn't
+    // redundantly re-journal it.)
+    const contentHashReadbacks = calls.filter((c) => c.op === 'recordResourceReadback' && c.readback?.contentHash);
+    expect(contentHashReadbacks).toHaveLength(1);
   });
 
   it('a journaled item that is no longer readable (404) stops with ia_upload_ambiguous, never re-PUTs', async () => {
