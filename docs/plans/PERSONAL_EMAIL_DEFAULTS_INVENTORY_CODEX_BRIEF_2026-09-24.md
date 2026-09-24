@@ -1,9 +1,9 @@
 ---
-title: Personal email defaults inventory — Codex Brief (2026-09-24)
+title: Personal email defaults inventory — historical Codex brief (2026-09-24)
 domain: platform
 kind: plan
-status: active
-summary: "Codex brief: read-only inventory of every email the app suite sends, recording for each whether the sender gets a shared default, a personal default and an editable preview, and the gap against the owner's personal-defaults requirement."
+status: complete
+summary: "Historical assignment and handoff for the completed source inventory. Current owner decisions, slice order and PR status live in PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md."
 cataloged: 2026-09-24
 last_verified: 2026-09-24
 owner: product-engineering
@@ -14,9 +14,14 @@ related:
   - shared/config/editableTextDefaults.js
 ---
 
-# Personal email defaults inventory — Codex Brief (2026-09-24)
+# Personal email defaults inventory — historical Codex brief (2026-09-24)
 
-## Where you are
+This file preserves the original read-only inventory assignment and its handoff.
+It is historical, not the current work order. The
+[`PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`](PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md)
+records resolved owner decisions, bounded follow-up slices, and current PR status.
+
+## Original checkout and constraints (historical)
 
 You are in `/Users/gallivan/Code/WMKF_Apps-codex` on branch
 `codex/personal-email-inventory`, cut from `origin/main` at `f1178bfda`. Run
@@ -30,7 +35,7 @@ this brief.
 
 Use `--model gpt-5.6-sol` if you are asked to choose a model.
 
-## Why (owner, 2026-09-20)
+## Original purpose (owner, 2026-09-20; historical)
 
 Read `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md` first; its owner
 requirements and interaction contract are settled and not yours to reopen. In
@@ -43,7 +48,7 @@ point. Meeting Tracker's materials invitation and reminder already do this
 gap against this requirement." That inventory is this task. **It is read-only:
 no code, config, template or test changes.**
 
-## Deliverable
+## Original deliverable (historical)
 
 One new document, `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`
 (same frontmatter shape as this brief), plus, in the TODO doc, ticking the
@@ -88,7 +93,7 @@ After the table, add:
 - **Residuals**: things you could not determine from source alone, stated as
   open questions, never guessed.
 
-## How to find every email
+## Original search method (historical)
 
 Start from `docs/EMAIL_SEND_FEEDBACK_AUDIT_2026-09-15.md`, which already holds a
 complete send-path inventory as of 2026-09-15; treat it as the seed list, then
@@ -100,7 +105,7 @@ drain-triggered emails, marking them "system job". Print the denominators:
 how many send call sites you found, how many distinct emails they map to, and
 how many rows meet, partly meet, or miss the requirement.
 
-## Guardrails
+## Original guardrails (historical)
 
 - Derive every identifier (route, key, table, field, app key) from real source
   or the Atlas; never invent one. If something is ambiguous, say so in
@@ -114,15 +119,19 @@ how many rows meet, partly meet, or miss the requirement.
   `npm run check:harness-framing` (each sequentially), and fix any failure your
   document causes.
 
-## Handoff
+## Inventory handoff and subsequent status
 
 Codex delivered `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`
 and ticked the inventory item in
 `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`. Source-only inventory:
-17 transport send expressions map to 56 distinct email cases (22
+17 source-level send expressions map to 56 distinct email cases (22
 workflow/diagnostic and 34 conditionally emailed operational notifications).
-Four meet the owner contract, nine partly meet it, three miss it, and forty
-are not applicable because they have no human sender. No runtime, template,
+Four meet the owner contract, nine partly meet it, three miss it, thirty-six
+are not applicable, and four automated reviewer cases that can send from a PD mailbox have an
+open personal-default policy decision. They have no staff compose action.
+The syntax count includes the default
+site-visit materials send dependency and two of its callers, rather than 17
+independent transports. No runtime, template,
 configuration, test, schema, or production state changed. No email was read
 or sent; no Dataverse/Vercel/production command ran.
 
@@ -133,13 +142,17 @@ gates passed sequentially:
 `check:scaffolding-tokens`, and `check:harness-framing`. Citation path/line
 validation found 222 valid `path:line` references and 56 numbered rows;
 `check:doc-currency` and its self-test also passed sequentially, as did
-`git diff --check`. Residual product decisions and source-only limits are
-recorded in the inventory's Residual questions section. No follow-up
-implementation was started.
+`git diff --check`. Source-only limits, the original questions, and the newly
+identified automated-reviewer policy question are recorded in the inventory's
+“Questions raised by source-only inspection” section. The owner's answers to
+the original questions are in its “Owner decisions” section. No follow-up
+implementation had started at this historical handoff.
 
 Justin explicitly authorized the feature-branch push in this session.
 Commit `dcbbda8bc` was pushed to `origin/codex/personal-email-inventory`,
 and docs-only Tier 0 PR #329, **Personal email defaults inventory**, was
-opened against `main`. The owner will decide whether to merge it. The three
-residual product questions were sent to the owner before any follow-up slice;
-their answers and the slice order are pending. No slice has started.
+opened against `main` and remains unmerged. Justin then answered the three
+product questions and selected the follow-up order recorded in the inventory.
+Slice 4, the grantee invitation, was built separately in unmerged PR #330 and
+is awaiting owner review; later slices have not started. These later changes
+do not alter this brief's original read-only assignment.
