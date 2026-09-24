@@ -112,12 +112,18 @@ function multipartResponse(ops) {
   };
 }
 
+// A real Dataverse response carries the RAW annotation key, not the
+// already-processed `_akoya_applicantid_value_formatted` shape -- the step
+// must call processAnnotations itself (getIaSeedRequest). Using the raw key
+// here is what would have caught the institution-always-empty bug (P1-A):
+// with only the processed key, every test still passed even though the real
+// step body never invoked processAnnotations.
 const DESTINATION_REQUEST = {
   akoya_requestid: REQUEST_ID,
   akoya_requestnum: '9009009',
   akoya_title: 'Synthetic Fixture Rehearsal',
   wmkf_meetingdate: '2026-06-15',
-  '_akoya_applicantid_value_formatted': 'Synthetic University',
+  '_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue': 'Synthetic University',
 };
 
 function fakeClient() {
@@ -322,6 +328,109 @@ describe('stepSeedInitialAssessment — happy path', () => {
       seenKeys = new Set(Object.keys(r.readback));
     }
     expect(markerOrder).toEqual(['registryCreateAttemptedAt', 'registryPatchAttemptedAt', 'graphFolderAttemptedAt', 'uploadAttemptedAt', 'changesetAttemptedAt']);
+  });
+});
+
+describe('stepSeedInitialAssessment — registry create dispatch-marker rule', () => {
+  it('a create marker with no readable row stops with ambiguous_create_outcome and issues zero POSTs', async () => {
+    const { generationKey } = identityFor();
+    const run0 = baseRun();
+    const { ledger } = createFakeLedger(run0);
+    await ledger.journalPlannedResource({
+      runId: RUN_ID, leaseToken: null, leaseGeneration: 0, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey },
+    });
+    const claimed = await ledger.claimLease({ runId: RUN_ID, expectedVersion: 1, leaseSeconds: 300 });
+    await ledger.recordResourceReadback({
+      resourceId: 1, runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      readback: { generationKey, filename: '9009009 Initial Assessment aaaaaaaa-bbbbbbbb.docx', claimTokenSha256: 'a'.repeat(64), registryCreateAttemptedAt: new Date().toISOString() },
+      outcome: 'dispatched',
+    });
+    await ledger.releaseLease({ runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration });
+
+    let postCount = 0;
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method === 'POST' && href.includes('wmkf_requestdocuments')) { postCount += 1; return jsonResponse({}); }
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [] }); // no row exists
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+    const graph = fakeGraph();
+    const manifest = baseManifest();
+    const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle: null,
+      deps: { client: fakeClient(), graph, sharePointTarget: () => ({}) },
+    }));
+
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ambiguous_create_outcome');
+    expect(postCount).toBe(0);
+    expect(graph.ensureFolderPath).not.toHaveBeenCalled();
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('a create response that is lost (an unrelated-looking error) recovers ONLY by finding the row on reread, and never re-POSTs', async () => {
+    const { generationKey } = identityFor();
+    const state = { row: null, request: { akoya_requestid: REQUEST_ID, _wmkf_currentinitialassessment_value: null, '@odata.etag': 'W/"request-1"' } };
+    let postCount = 0;
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method === 'POST' && href.includes('wmkf_requestdocuments')) {
+        postCount += 1;
+        // The write actually committed server-side (a subsequent GET will
+        // find it), but the client-visible response is a generic 500 with
+        // wording that does NOT match /duplicate|alternate key/i and a
+        // status that is NOT 409/412 -- proving recovery is not gated on
+        // guessing the error's shape.
+        state.row = {
+          wmkf_requestdocumentid: REQUEST_DOCUMENT_ID, wmkf_artifacttype: 100000000, wmkf_operationstatus: 100000000, wmkf_lifecyclestate: 100000000,
+          wmkf_generationkey: generationKey, wmkf_claimtoken: JSON.parse(init.body).wmkf_claimtoken,
+          wmkf_sharepointfolderpath: JSON.parse(init.body).wmkf_sharepointfolderpath, wmkf_filename: JSON.parse(init.body).wmkf_filename,
+          _wmkf_request_value: REQUEST_ID, '@odata.etag': 'W/"row-1"', modifiedon: new Date().toISOString(),
+        };
+        return Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('Something unexpected happened'), json: () => Promise.resolve({}) });
+      }
+      if (init?.method === 'PATCH' && href.includes('wmkf_requestdocuments(')) {
+        state.row = { ...state.row, ...JSON.parse(init.body), '@odata.etag': 'W/"row-2"' };
+        return Promise.resolve({ ok: true, status: 204, text: () => Promise.resolve('') });
+      }
+      if (href.includes('/$batch')) {
+        const opCount = (String(init.body).match(/Content-ID: \d+/g) || []).length;
+        state.row = { ...state.row, wmkf_operationstatus: 100000001, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', '@odata.etag': 'W/"row-3"' };
+        state.request = { ...state.request, _wmkf_currentinitialassessment_value: REQUEST_DOCUMENT_ID, '@odata.etag': 'W/"request-2"' };
+        return Promise.resolve(multipartResponse(Array.from({ length: opCount }, (_, i) => ({ contentId: i + 1, status: 204 }))));
+      }
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: state.row ? [state.row] : [] });
+      if (href.includes('akoya_requests(')) return jsonResponse(state.request);
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+
+    const { result } = await run({});
+
+    expect(result.outcome).toBe('advanced');
+    expect(postCount).toBe(1);
+  });
+
+  it('a create response that is lost, with NO row ever committed, stops with ambiguous_create_outcome (not ia_claim_lost) and never re-POSTs', async () => {
+    let postCount = 0;
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method === 'POST' && href.includes('wmkf_requestdocuments')) {
+        postCount += 1;
+        return Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('Something unexpected happened'), json: () => Promise.resolve({}) });
+      }
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [] });
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+
+    const { result } = await run({});
+
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ambiguous_create_outcome');
+    expect(postCount).toBe(1);
   });
 });
 
