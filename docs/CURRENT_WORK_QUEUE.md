@@ -87,8 +87,11 @@ sequence.
   were not part of that directive.
 - **Dependabot triage 2026-09-12 (S509).** Patch bumps (Next 16.3.5, xmldom 0.8.15,
   sharp 0.35.4, qs 6.16.0, js-yaml 3.15.2/4.3.2) and csv-parse 7.0.2 (a mistaken major
-  with no breaking changes; the IRS BMF importer's option set was smoke-tested but the
-  importer has no unit test and was not re-run against a live IRS file) shipped in S509.
+  with no breaking changes) shipped in S509. At that time, the IRS BMF importer's
+  option set was smoke-tested, but it had no unit test and was not re-run against
+  a live IRS file. **[VERIFIED via PR #333, merge `374a2e51e`, 2026-09-24]** The
+  importer now has a fixture-driven CSV/COPY stream test; a live-file re-run
+  remains unverified.
   The `@tiptap/core` prototype-pollution alert (GHSA-cp6q-959q-f8rh) was closed by the
   tiptap 2 → 3.31 editor migration (same day): StarterKit's new bundled link/underline/
   trailingNode/listKeymap are disabled to hold each editor's allowlist, `setContent` uses
