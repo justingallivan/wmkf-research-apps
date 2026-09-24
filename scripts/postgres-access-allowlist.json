@@ -394,11 +394,6 @@
   },
   {
     "file": "lib/services/review-draft-service.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/review-draft-service.js",
     "kind": "sql-tag",
     "count": 4
   },
