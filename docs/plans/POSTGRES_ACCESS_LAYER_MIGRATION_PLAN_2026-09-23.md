@@ -210,7 +210,9 @@ The layer is three things, each already present somewhere in the tree:
 1. **One driver seam** — `lib/postgres/client.js` (Q2). The only runtime
    module allowed to `import` `@vercel/postgres` or `pg`. Exports exactly:
    - `sql` — the tagged template, re-exported unchanged so every existing
-     statement compiles without edit.
+     statement compiles without edit. (`db` is NOT exported: the seam
+     consumes `db.connect()` inside `withClient`, and every live `db` use is
+     a `connect()` call that `withClient` replaces — Stage 2 review.)
    - `withClient(fn)` — replaces the `db.connect()` / `client.release()`
      pairs in 6 files (all six take `db` from `@vercel/postgres`); releases
      in `finally`, passing the thrown error to `release(err)` when `fn`
@@ -230,14 +232,17 @@ The layer is three things, each already present somewhere in the tree:
      in by the caller) keep their own statements on a `withClient` client —
      rule 6 forbids reshaping them.
    - `getPool()` — the single lazily created `pg` Pool for the three Pool
-     users. Today all three build a Pool from `POSTGRES_URL || DATABASE_URL`;
+     users, handed out as a frozen `{ query, connect }` facade (Codex Stage
+     2 finding: the raw Pool exposes `end()`, and two of the three live
+     users call `pool.end()` per request — a singleton must not be endable
+     by an importer; a non-enumerable test-only hook closes it in Jest). Today all three build a Pool from `POSTGRES_URL || DATABASE_URL`;
      two (`irs-bmf-service`, `intake/submit`) build one per call and
      `pool.end()` it, one (`cron/drain-submissions`) caches it. `getPool()`
      keeps the same `POSTGRES_URL || DATABASE_URL` resolution (behaviour
      freeze) and its missing-variable error names both; it is the only place
      OUR code reads those variables — `@vercel/postgres` reads
-     `POSTGRES_URL` internally behind the re-exported `sql`/`db`, which the
-     seam cannot and need not change. The per-call `pool.end()` callers are
+     `POSTGRES_URL` internally behind the re-exported `sql` and the internal
+     `db`, which the seam cannot and need not change. The per-call `pool.end()` callers are
      converted in their own stages (3 and 4) with the lifecycle change
      stated in that stage's report.
    No query helpers, no naming conventions, no result mapping. Rule 8.
@@ -477,12 +482,34 @@ seam's own records — that is expected, and nothing pins the 60); full suite
 code moves onto `withClient`/`withTransaction`. SQL text unchanged (rule 6).
 
 **Preconditions:** Stage 2 green; the Stage 3 file list in Appendix A
-matches `--report` (30 files on 2026-09-23).
+matches `--report` (30 files on 2026-09-23; re-verified 2026-09-24 by the
+fresh-context review — exactly the 30, all still `driver-import`, no
+unassigned `lib/services` importer). Module format: 12 of the 30 are
+CommonJS (`require('@vercel/postgres'|'pg')`) — alert-service,
+dynamics-explorer-request-telemetry, feedback-service, intake-audit-service,
+intake-draft-service, integrity-service, irs-bmf-service,
+operational-event-service, review-draft-service,
+reviewer-identity-shadow-log, reviewer-institution-measurement,
+reviewer-roster-store — and two plain-node scripts `require` three of them
+(`scripts/smoke-intake-draft.js`, `scripts/test-retractions.js`). The seam
+is therefore CommonJS (Stage 2 decision, 2026-09-24): CJS files
+`require('../postgres/client')` and ESM files `import { sql } from
+'../postgres/client'`; no file changes module format in this stage (rule 6).
 
 **Tests before (per file, before its commit):**
-- The file's existing unit tests green.
+- The file's existing unit tests green. Fresh-context review 2026-09-24:
+  four files have NO test of the module at all (`irs-bmf-service`,
+  `panel-review-service`, `integrity-service`, `intake-audit-service` — the
+  last two exist only as `jest.mock` targets); four more have only
+  source-text or indirect coverage (`explorer-store`, `agenda-store`,
+  `scheduled-email-store`, `briefing-link-store`). For those eight the
+  contract test IS the tests-before; no characterization unit test is
+  required in addition (rule 9 — a real planner counts, a mock does not).
 - One contract test in `tests/pg-contract/<store>.test.js` exercising each
-  exported function once against the real database with the discriminating
+  exported function once against the real database (the existing
+  `site-visit-collection-store.test.js` covers only the two lease functions
+  of `collection-store.js`'s 16 exports — it is extended, not counted as
+  done) with the discriminating
   fixture (memory: `feedback-mutation-test-with-the-discriminating-fixture`).
   For files with >10 statements (`scheduled-email-store` 32,
   `reviewer-roster-store` 24, `intake-draft-service` 20,
@@ -514,20 +541,46 @@ matches `--report` (30 files on 2026-09-23).
    `lib/services/site-visit-materials/collection-store.js`,
    `lib/services/pre-site-visit/distribution-store.js`,
    `lib/services/intake-draft-service.js`.
-4. Connect/transaction users (need `withClient`/`withTransaction`; these are
-   the files with `db.connect()` / `BEGIN` / `client.query`):
-   `lib/services/deliberation-briefing/briefing-link-store.js`,
-   `lib/services/consultant-feedback-service.js`,
-   `lib/services/cycle-dossier-store.js`, `lib/services/review-panel-store.js`,
-   `lib/services/alert-service.js`, `lib/services/irs-bmf-service.js` (also
-   retire its private `newPool()` at `:148` onto `getPool()`).
+4. Connect/transaction users (these are the files with `db.connect()` /
+   `BEGIN` / `client.query`), per-file shape from the 2026-09-24 review:
+   - `lib/services/cycle-dossier-store.js` and
+     `lib/services/review-panel-store.js`: the exact model shape; their
+     exported wrappers (`withDossierTransaction`, called from
+     `cycle-dossier-service.js:153,177` and mocked in its unit test;
+     `withReviewPanelTransaction`) MUST keep their names and become
+     `return withTransaction(fn)`. Two recorded behaviour differences:
+     ROLLBACK failure no longer masks the original error; the client is
+     destroyed on error.
+   - `lib/services/alert-service.js`: two `COMMIT`s but both on success
+     return paths (dedup → null, insert → row), so it fits `withTransaction`
+     with `fn` returning either; the transaction covers only the
+     `autoResolveKey` branch. Same two recorded differences.
+   - `lib/services/deliberation-briefing/briefing-link-store.js` and
+     `lib/services/consultant-feedback-service.js`: excluded shapes (early
+     ROLLBACK-then-throw; two COMMITs on one path and query-after-ROLLBACK)
+     — keep their statements verbatim on a `withClient` client (replacing
+     only `db.connect()`/`release`).
+   - `lib/services/irs-bmf-service.js`: pool path only (`newPool()` at
+     `:148`, per-call pools in `verifyEin` and `refresh`, `pg-copy-streams`
+     COPY on one held client, BEGIN mid-session). `withClient` does NOT fit
+     (it hands out the Neon client, not a raw `pg` client for COPY): use
+     `getPool().connect()` / `getPool().query()` directly, delete BOTH
+     `pool.end()` calls (the singleton lives for the warm instance — the
+     recorded lifecycle change), keep the statements verbatim. Its
+     `'POSTGRES_URL (or DATABASE_URL) is not configured'` message becomes
+     `getPool()`'s (no test asserts it).
 5. Largest last: `lib/services/scheduled-email-store.js`,
    `lib/services/reviewer-roster-store.js`.
 
-**Verify (per commit):** the file's tests + its contract test green; ratchet
-count for that file drops to 0 and the allowlist entry is removed in the
-same commit; full suite + build green at each wave boundary (after items 1,
-2, 3, 4, 5).
+**Verify (per commit):** the file's tests + its contract test green; the
+file's `driver-import` key (and its `db.connect` / `pool.connect` /
+`new-Pool` / `begin-literal` / `client.query` keys where the conversion
+moved that code onto `withClient`/`withTransaction`) vanishes from the
+census, and the matching allowlist entries are deleted in the same commit
+(the gate's stale-entry check forces this); the file's `sql-tag` and any
+remaining `sql.query` keys stay frozen at their counts because tags count
+wherever they appear (Stage 1 decision) — a conversion never changes them;
+full suite + build green at each wave boundary (after items 1, 2, 3, 4, 5).
 
 **Rollback:** `git revert` the single commit.
 
@@ -1010,13 +1063,30 @@ form and a CommonJS internal-use green control; the orchestrator re-ran its
 own seven-file fixture (three CJS accessors, aliased literal load, aliased
 computed load, `module.require`, CJS green control) against the committed
 gate before (all green — the evasion) and after (all red except the
-control). No Codex round 3: two rounds is the working model's cap for a
-build whose remaining surface is local AST shapes, and the orchestrator's
+control). Codex round 3 (narrow, on `633104aad`): both round-2 fixtures
+confirmed red; one more same-file shape — a two-hop alias (`const load =
+require; const load2 = load; load2('pg')`) — still produced no record.
+Fixed as a Stage 1 follow-up commit (alias resolution to a same-file
+fixpoint; see the commit after Stage 2's first commits, sequenced behind
+the Stage 2 builder's docblock edit to the same file). The orchestrator's
 own review (fixtures above, the plan's Verify mutations, allowlist ==
-census, mutant kill) is the last review. Route-gate side of both rounds:
+census, mutant kill) is the last review; further alias depth is covered
+by the fixpoint, and cross-file provenance stays out of scope. Route-gate side of both rounds:
 no change needed — a new file or route using either shape is red at the
 ratchet, and the 17 carry-over routes cannot add one without their counts
 rising.
+CI proof for the push (`d1800bedc`, PR #328 still draft): E2E green;
+**Tests FAILED at `check:doc-symbol-refs`** on the pull_request MERGE
+commit, not on branch content — `main` gained
+`.claude-memory/project-sandbox-rehearsal-bypass-allow-rule.md`
+(`85f51a17b`, the root session, after this branch last merged `main`) and
+it cites two Factory-branch paths that do not exist on `main`. Locally the
+gate is green here (297 files / 1,783 refs) because the file is not on
+this branch. Every later CI step was skipped, so **CI has not yet proved
+the two Stage 1 gates, `test:ci`, or the pg-contract lane for this push**;
+local runs did. The fix belongs on `main` (shared-file fence; the other
+session's surface) — flagged to the owner in the handoff. Re-push or
+re-run after `main` is green to get the CI proof.
 Fresh-context review of Stage 2: run (next log entry); 6 discrepancies,
 all fixed in §4 and Stage 2 before Stage 2 starts.
 Open:
@@ -1070,6 +1140,110 @@ Open:
   up. No drift: `lib/postgres/` absent; both Stage 1 gates green; the Atlas
   page `docs/atlas/postgres-infra-tables.md` has no "Access layer" section
   yet and `check:atlas` adds no requirement for one without new table names.
+
+### Stage 2 report — 2026-09-24 — `claude/postgres-access-layer@89ad9d446`
+Preconditions: `[VERIFIED via --report in a fresh Haiku agent]` 60
+driver-import files, 349 `sql` tags in 52 files, 67 files with any record,
+unresolved-import 9, driver-export 0, both gates exit 0, carry-over 17/0,
+`lib/postgres/` absent, both named tests absent, container up. Drift: none.
+Tests before: written this stage first, failed for want of the module,
+then green — `tests/unit/postgres-client.test.js` (20 tests after the
+Codex round: release on
+success/throw/falsy throw, ROLLBACK on throw with ROLLBACK-failure not
+masking, COMMIT failure path, singleton + laziness, `POSTGRES_URL ||
+DATABASE_URL` and the both-absent error naming both, exact export set via
+both `require` and ESM interop, frozen facade without `end`, release
+throwing on either path for both helpers) and
+`tests/pg-contract/postgres-client.test.js` (5 tests against the real
+container: commit, rollback, nested-throw leaves the probe table unchanged,
+`withClient` releases, `getPool` singleton runs `SELECT 1`; after every
+transaction test it asserts `pg_current_xact_id_if_assigned()` is null on a
+fresh pooled connection and no session is `idle in transaction`).
+Commits: `90b5768bc` probe docblock notes · `edb69241c` Stage 1 follow-up
+(alias fixpoint, Codex round 3) · `7fa6ff430` `lib/postgres/client.js` +
+both tests · `71e51c6d9` catalog + Atlas entries · `bf63c1213` kind-specific
+`lib/postgres/**` exemption (Codex) · `89ad9d446` CommonJS seam, frozen
+pool facade, release guard (Codex + Stage 3 fresh-context review).
+Ratchet: allowlist byte-identical (156 keys); `--report` driver-import
+files 60 → 61 (the seam, in the allowed-importer set); the seam's own
+records (driver-import 2, driver-export 2, db.connect 1, client.query 3,
+begin-literal 1, new-Pool 1) are reported, never ratcheted.
+Decisions taken in-stage:
+- `db` is NOT exported (plan §4 "exports exactly"; every live `db` use is
+  `db.connect()`, which `withClient` replaces). §4 reconciled.
+- `withClient` destroys the connection on error (`release(err ?? true)`),
+  the strictly safer superset of the two live forms — a behaviour change
+  for the four callers that release plainly on error today; recorded here
+  and in §4 for the owner.
+- `COMMIT` sits outside `withTransaction`'s try: a COMMIT failure surfaces
+  the COMMIT error and destroys the connection; Postgres has already
+  rolled back, so the DB end-state equals the model's (Opus verified with
+  a deferred-unique probe). The model helpers' unguarded `ROLLBACK` can
+  mask the original error; the seam swallows ROLLBACK failure.
+- `getPool()` keeps `POSTGRES_URL || DATABASE_URL` (behaviour freeze for
+  the three live Pool users) and is a singleton without `end()` on the
+  public surface; `drain-submissions`' `max: 5` and the two per-call
+  `pool.end()` lifecycles are recorded for Stages 3/4 to state when they
+  convert. Nested `withTransaction` takes a second connection, never a
+  second `BEGIN` on one client — noted for converters.
+Reviews: Sonnet built (tests first); Opus reviewed read-only with scratch
+mutants — no P1; four P2 closed (contract test now discriminates a
+poisoned-client mutant by the open-transaction assertion rather than a
+hook timeout; COMMIT-failure unit case; `db` export removed; docs state
+built state, not planned). Orchestrator re-ran the poisoned-client mutant
+(2 failures on the xact assertion in 0.1 s) and the export list.
+Verify (at `71e51c6d9`): every `check:*` gate in `/start` with its
+self-test, sequential: 69/69 green; `test:ci` 1059 suites / 15,659 tests
+pass; canonical `npm run build` passes. Re-run at `89ad9d446`: gates
+69/69 green; `test:ci` 1059 suites / 15666 tests pass; build passes. Contract lane 4
+suites / 13 tests locally, `--detectOpenHandles` clean, skip line without
+a URL; `check:atlas` 58 tables / `check:doc-currency` / `check:docs-catalog`
+green with self-tests. Codex adversarial review: PENDING.
+Codex adversarial review (`--scope branch --base d1800bedc`):
+**needs-attention**, three findings, all accepted and fixed before the
+stage closed: (P1) `getPool()` returned the raw Pool, so any importer could
+`end()` the process-wide singleton — now a frozen `{ query, connect }`
+facade with a non-enumerable test-only hook to close the handle; (P2) an
+unguarded `release()` on the failure path could replace the original
+error — release failure is swallowed there; (P2) the ratchet exempted all
+of `lib/postgres/**` from the driver-import law — now only `client.js` is
+fully exempt and other `lib/postgres/**` files are exempt for statement
+kinds only. Module format: the seam became CommonJS after the Stage 3
+fresh-context review (below) found 12 CJS consumers and two plain-node
+scripts. Codex round 2 (narrow, on `89ad9d446`): **approve** — all three
+fixtures closed, CJS and native-ESM probes pass, no new P1/P2 (its sandbox
+could not run Jest or reach loopback; the orchestrator ran both).
+Fresh-context review of Stage 3: run (next log entry); 6 items, all
+reconciled in §4/Stage 3/Appendix note before Stage 3 starts.
+Open: none new; Stage 1's Stage 7 wording question stands.
+
+- **2026-09-24 — Fresh-context review of Stage 3 preconditions (§6).** A
+  fresh Opus agent at `71e51c6d9` reconciled the 30-file list (exact match,
+  every Tests-before statement count exact) and found six items, all fixed
+  above: (1) 12 of 30 files are CommonJS and two plain-node scripts require
+  three of them — the seam is now CommonJS rather than converting any
+  consumer's module format; (2) `irs-bmf-service` cannot use `withClient`
+  (COPY on a held raw `pg` client; BEGIN mid-session; two per-call pools
+  with `pool.end()`) — Stage 3 item 4 now says `getPool().connect()`
+  directly and deletes both `end()` calls; (3) `alert-service`'s two
+  COMMITs are both success paths, so it fits `withTransaction` after all;
+  (4) `cycle-dossier-store`/`review-panel-store`'s exported wrapper names
+  must survive as `return withTransaction(fn)`; (5) the existing
+  `site-visit-collection-store.test.js` covers 2 of 16 exports — extended,
+  not counted as done; (6) §4's "12 BEGIN in 10 files" is now 13 in 10
+  with the seam (12 in 9 without), Appendix A's 60 driver files are 61 and
+  its 62 census rows are 68 — expected Stage 2 drift; Appendix A stays the
+  frozen 2026-09-23 snapshot and `--report` is the live source. Named tests
+  that do not exist: all 30 `tests/pg-contract/<store>.test.js` (expected;
+  each is written before its file's commit); eight files lack any direct
+  unit test (listed in Tests-before). Template facts recorded for item 1:
+  `explorer-store.js` (40 lines, 4 tags; `getUserRole`,
+  `getActiveRestrictions`, fire-and-forget `logQuery` with a 42703 fallback
+  unreachable on the fresh schema; importers `chat-session.js:30`,
+  `pages/api/dynamics-explorer/chat.js:33`; all three tables present in the
+  contract DB; discriminating fixture: a non-integer `requestRound` stored
+  as NULL). Every Stage 3 table exists in the contract DB except
+  `irs_exempt_orgs_new`, which `irs-bmf-service` creates at runtime.
 
 ## Appendix A — Census (2026-09-23, commit `1046c1033`)
 
