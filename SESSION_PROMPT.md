@@ -21,6 +21,26 @@ for any further live run, Production Dataverse read, Preview deployment, or alia
 The detailed matrix, click steps, and receipt are in
 `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`.
 
+**Slice 0 handoff cells:** no current unresolved FAIL is recorded. The earlier Chrome CSP and
+live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
+
+| Browser or scenario | Status | Evidence or limit |
+|---|---|---|
+| Chrome core upload, same-page pause/resume, finalize, both Watch modes, seek, Download | PASS | [VERIFIED via signed-in 2026-09-22 Chrome receipt] 100,665,703 bytes, 67.3-second seek, equal source/download SHA-256, exact cleanup; placeholder fix `cdc7574e1`. |
+| Windows Edge upload, playback, Download | PASS for reported actions; full Edge row NOT RUN | [VERIFIED via owner report] those three actions worked. [VERIFIED via Graph] committed item was 97,777,999 bytes. Pause/reload, resolver trace, seek, and download integrity were not recorded. |
+| macOS Safari full path | NOT RUN | [ASSUMED from no owner execution receipt] owner manual run remains. |
+| iPadOS Safari full path | NOT RUN | [ASSUMED from no owner execution receipt] owner manual run remains. |
+| Reload/same-file reselect resume | NOT RUN live | [VERIFIED via tests at `26b368604`] offline handling exists; [ASSUMED from no browser receipt] live result unknown. |
+| Upload-session and proof-token expiry recovery | NOT RUN live | [VERIFIED via tests at `26b368604`] offline handling exists; [ASSUMED from no browser receipt] live result unknown. |
+| Long-duration seek | NOT RUN | [VERIFIED via Chrome receipt] 67.3 seconds is the only recorded seek. |
+| Near-2,000,000,000-byte upload and throughput | NOT RUN | [ASSUMED from no near-cap receipt] no measured live run. |
+
+**Owner actions:** choose and approve each new disposable request, SharePoint target, and MP4;
+approve each Production Dataverse read, Preview deployment, and temporary shared-alias move
+separately. Run macOS and iPadOS Safari by hand; arrange the Windows Edge follow-up. Re-inspect
+the alias target and branch-scoped Preview variable names before any move, then restore and
+re-inspect. The prior Edge upload and cleanup approvals are spent.
+
 [VERIFIED via Git and branch-only push] This checkout is `codex/feature-request`.
 The owner-approved `origin/main` merge is `1d455ba9a`; the offline Slice 0 hardening is
 `26b368604`, followed by the handoff commit `d459b96f0`. None was pushed to main. No other checkout

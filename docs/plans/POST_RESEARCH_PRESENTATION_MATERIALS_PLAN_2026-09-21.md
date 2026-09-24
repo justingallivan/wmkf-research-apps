@@ -861,6 +861,29 @@ deployments use normal Preview `VERCEL_URL` derivation. Do not edit the Factory 
 | Edge, then one Safari | Let a five-minute proof token expire; reload old link; mint a new link with Finish saving from the committed item | Old context/open refuses (401); fresh link plays and seeks; exact item identity remains stable. | Owner's Edge colleague, then owner on Safari |
 | Desktop Edge | Upload a real MP4 near 2,000,000,000 bytes (record exact size); run long-duration seeking and Download | Session expiry, elapsed upload time, measured bytes/second, projected 2,000,000,000-byte completion before expiry with margin, seek positions, direct Microsoft 206 ranges, and size/SHA-256 match. | Owner's Edge colleague with sanctioned media and approval |
 
+**Slice 0 cell status at handoff (2026-09-23).** PASS means the stated evidence was recorded;
+it does not close a broader browser row. No current cell has a recorded unresolved FAIL.
+The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990bf` and
+`cdc7574e1`, respectively.
+
+| Browser or scenario | Status | Evidence and limit |
+|---|---|---|
+| Chrome core upload, same-page pause/resume, finalize, both Watch modes, seek, Download | PASS | [VERIFIED via signed-in 2026-09-22 Chrome receipt] 100,665,703-byte MP4, 302 and one-shot Watch, 67.3-second seek, equal source/download SHA-256, exact cleanup; current-hardening fix `cdc7574e1`. |
+| Windows Edge upload, playback, Download | PASS for these reported actions; full Edge row NOT RUN | [VERIFIED via owner report] colleague reported 93.2 MB upload, playback, and Download. [VERIFIED via Graph] committed item was 97,777,999 bytes. No pause/reload, resolver trace, seek, or download hash/size comparison was recorded. |
+| macOS Safari full path | NOT RUN | [ASSUMED from no owner execution receipt] owner performs this by hand after a new approved target, Preview deploy, and any alias change. |
+| iPadOS Safari full path | NOT RUN | [ASSUMED from no owner execution receipt] owner performs this by hand after separate live-run approval. |
+| Reload and same-file reselect resume | NOT RUN live | [VERIFIED via source/tests at `26b368604`] fingerprint and resume handling passed offline; [ASSUMED from no browser receipt] live Edge/Safari behavior remains unproved. |
+| Upload-session and five-minute proof-token expiry recovery | NOT RUN live | [VERIFIED via source/tests at `26b368604`] recovery handling passed offline; [ASSUMED from no browser receipt] both live expiry cases remain unproved. |
+| Long-duration seeking | NOT RUN | [VERIFIED via Chrome receipt] only a 67.3-second seek is recorded; [ASSUMED from no long-recording receipt] the required long-duration case remains open. |
+| Upload and throughput near 2,000,000,000 bytes | NOT RUN | [ASSUMED from no near-cap receipt] no sanctioned near-cap MP4 or measured throughput was recorded. |
+
+**Owner actions:** approve each new disposable request and governed SharePoint target, each
+Production Dataverse read, each Preview deployment, and each temporary shared-alias change
+separately. The owner runs macOS/iPadOS Safari by hand and arranges the Windows Edge follow-up.
+Before any alias move, re-inspect its current target and presentation/Factory branch-scoped
+Preview variable names; restore and re-inspect afterward. The 2026-09-23 Edge upload approval
+and cleanup authorization are spent.
+
 **Owner click sequence for macOS Safari and iPadOS Safari.** Do this separately in each browser
 with a newly approved disposable item; Safari on iPad uses the Files app for selection/download.
 [VERIFIED via Applications and Spotlight, 2026-09-23] Edge is not installed on the agent's Mac.
@@ -1036,6 +1059,18 @@ deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, with zero protection-bypass recor
 the Factory branch's four scoped variables remain. The immutable proof deployment remains a
 historical Preview artifact with its deployment-time environment snapshot; another live run
 requires fresh, separate authorization and configuration.
+
+**Final live-state re-inspection for handoff:** [VERIFIED via Graph on 2026-09-23] the
+`Post Site Visit Materials` and retained `Artifacts/Presentation Media Proof` folders each
+have zero children, and the exact Edge DriveItem returns 404. [VERIFIED via the 2026-09-22
+cleanup receipts] the first Chrome and current-hardening Chrome committed items were deleted
+to SharePoint's recycle bin; the intervening 10.9 MiB hardening session was cancelled with no
+committed item. [ASSUMED] their short-lived upload-session URLs are no longer usable; no URL
+was retained for a fresh session-status GET, so current session state was not re-probed.
+[VERIFIED via Vercel alias and environment APIs] the shared alias remains on its pre-run
+Factory target `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` with zero protection-bypass records;
+`NEXTAUTH_URL`, `SHAREPOINT_SITE_URL`, and `DATAVERSE_ALLOW_PROD_READS` are absent from the
+presentation branch's Preview scope, and the Factory branch's four scoped records remain.
 
 Also verify tenant Safe Attachments and `DisallowInfectedFileDownload` posture. A security owner
 may supply sanctioned evidence that the Graph malware facet becomes non-null for a flagged item;
