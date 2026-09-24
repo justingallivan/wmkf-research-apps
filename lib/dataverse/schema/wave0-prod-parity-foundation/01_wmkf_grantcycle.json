@@ -1,0 +1,48 @@
+{
+  "name": "wmkf_grantcycle",
+  "kind": "new-entity",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "schemaName": "wmkf_GrantCycle",
+  "displayName": "Grant Cycle",
+  "displayCollectionName": "Grant Cycles",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "maxLength": 850,
+    "requiredLevel": "None"
+  },
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_CycleCode",
+      "displayName": "Cycle Code",
+      "requiredLevel": "ApplicationRequired",
+      "maxLength": 100
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_CycleName",
+      "displayName": "Cycle Name",
+      "description": "Formal name of cycle",
+      "maxLength": 100
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_MeetingDate",
+      "displayName": "Meeting Date",
+      "requiredLevel": "ApplicationRequired",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    }
+  ],
+  "alternateKeys": [
+    {
+      "schemaName": "wmkf_CycleCode",
+      "displayName": "Cycle Code",
+      "keyAttributes": [
+        "wmkf_cyclecode"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "name": "wmkf_ai_run",
+  "kind": "new-entity",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "schemaName": "wmkf_ai_run",
+  "displayName": "AI Run",
+  "displayCollectionName": "AI Runs",
+  "ownershipType": "UserOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_ai_RunNum",
+    "displayName": "Run Number",
+    "maxLength": 850,
+    "requiredLevel": "Recommended"
+  },
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_ai_Model",
+      "displayName": "AI Model",
+      "requiredLevel": "ApplicationRequired",
+      "maxLength": 100
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_Notes",
+      "displayName": "Notes",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_ai_PromptOverridden",
+      "displayName": "Prompt Overridden",
+      "trueLabel": "Yes",
+      "falseLabel": "No"
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_PromptOverride",
+      "displayName": "Prompt Override",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_ai_PromptVersion",
+      "displayName": "Prompt Version",
+      "minValue": -2147483648,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_RawOutput",
+      "displayName": "Raw Output",
+      "maxLength": 1000000
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ai_RunDateTime",
+      "displayName": "Run Date/Time",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ai_RunSource",
+      "displayName": "Run Source",
+      "globalOptionSet": {
+        "name": "wmkf_wmkf_airunsource",
+        "displayName": "wmkf_AI Run Source"
+      },
+      "options": [
+        {
+          "value": 682090001,
+          "label": "Vercel User"
+        },
+        {
+          "value": 682090002,
+          "label": "Vercel Test"
+        },
+        {
+          "value": 682090003,
+          "label": "Vercel Interactive"
+        },
+        {
+          "value": 682090000,
+          "label": "PowerAutomate Auto"
+        },
+        {
+          "value": 682090005,
+          "label": "PowerAutomate Manual"
+        },
+        {
+          "value": 682090004,
+          "label": "PowerAutomate Test"
+        }
+      ]
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ai_Status",
+      "displayName": "AI Task Status",
+      "requiredLevel": "ApplicationRequired",
+      "globalOptionSet": {
+        "name": "wmkf_wmkf_aistatus",
+        "displayName": "wmkf_AI Status"
+      },
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Completed"
+        },
+        {
+          "value": 682090001,
+          "label": "Failed"
+        },
+        {
+          "value": 682090002,
+          "label": "Needs Review"
+        }
+      ]
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ai_TaskType",
+      "displayName": "Task Type",
+      "requiredLevel": "ApplicationRequired",
+      "globalOptionSet": {
+        "name": "wmkf_aitasktype",
+        "displayName": "wmkf_AI Task Type"
+      },
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Summary"
+        },
+        {
+          "value": 682090001,
+          "label": "Report"
+        },
+        {
+          "value": 682090002,
+          "label": "Check-in"
+        },
+        {
+          "value": 682090003,
+          "label": "PD Assignment"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_ai_run_ai_prompt",
+      "referencedEntity": "wmkf_ai_prompt",
+      "lookupSchemaName": "wmkf_ai_Prompt",
+      "lookupDisplayName": "Prompt",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "RemoveLink",
+        "Merge": "NoCascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_ai_run_akoya_request",
+      "referencedEntity": "akoya_request",
+      "lookupSchemaName": "wmkf_ai_Request",
+      "lookupDisplayName": "Request",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "RemoveLink",
+        "Merge": "NoCascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    }
+  ]
+}

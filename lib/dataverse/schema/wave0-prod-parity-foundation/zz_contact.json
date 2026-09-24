@@ -1,0 +1,20 @@
+{
+  "name": "contact-prod-parity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "contact",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_BillcomID",
+      "displayName": "Bill.com ID #",
+      "maxLength": 100
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_VendorID",
+      "displayName": "Vendor ID",
+      "maxLength": 100
+    }
+  ]
+}
