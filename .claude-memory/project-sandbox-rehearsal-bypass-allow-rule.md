@@ -16,9 +16,7 @@ permission rule so the Test Request Factory sandbox rehearsal can run
 gitignored `.claude/settings.local.json` at the repo root, under
 `permissions.allow`, and does NOT travel with git:
 
-```
-"Bash(DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com node --env-file=/Users/gallivan/Code/WMKF_Apps/.env.local scripts/rehearse-test-request-sandbox.mjs:*)"
-```
+`"Bash(DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com node --env-file=/Users/gallivan/Code/WMKF_Apps/.env.local scripts/rehearse-test-request-sandbox.mjs:*)"` <!-- doc-symbol-refs:ignore reason=factory-branch-only -->
 
 The prefix pins the sandbox URL and the env file, so it cannot match a
 production target. Adjust the `--env-file` path if the repo lives elsewhere on
@@ -37,4 +35,4 @@ owner must run each execute by hand.
 **How to apply:** on a new machine, add the rule to
 `.claude/settings.local.json` (create the file if missing; it is gitignored).
 Never widen it beyond this script. See [[project-test-request-factory]] and
-`docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` on the Factory branch.
+`docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` on the Factory branch. <!-- doc-symbol-refs:ignore reason=factory-branch-only -->
