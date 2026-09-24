@@ -785,5 +785,5 @@ reached Ready and was assigned `applications.wmkeck.org` at release time. Staff
 Preview rehearsal on Request 1003222 showed a rendered invitation addressed to
 Franklin Cat with the liaison name resolved and Send enabled. No email was sent
 in that rehearsal or during release verification. Production auth-provider and
-unauthenticated route checks passed; a signed-in production smoke check remains
-pending staff confirmation.
+unauthenticated route checks passed. Staff confirmed on 2026-09-24 that the
+production Meeting Tracker opens. No production email send was tested.
