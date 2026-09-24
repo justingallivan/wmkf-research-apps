@@ -222,7 +222,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     });
     const stuck = await ledger.markNeedsAttention({
       runId: run.runId, leaseToken: first.leaseToken, leaseGeneration: first.leaseGeneration,
-      expectedVersion: creating.version, reason: 'ambiguous create outcome',
+      expectedVersion: creating.version, reason: 'ambiguous_create_outcome',
     });
     expect(stuck.status).toBe('needs_attention');
     await ledger.releaseLease({ runId: run.runId, leaseToken: first.leaseToken, leaseGeneration: first.leaseGeneration });
@@ -240,7 +240,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     // A needs_attention run can also be verified straight to ready after resume.
     const stuckAgain = await ledger.markNeedsAttention({
       runId: run.runId, leaseToken: resumed.leaseToken, leaseGeneration: resumed.leaseGeneration,
-      expectedVersion: advanced.version, reason: 'second stall',
+      expectedVersion: advanced.version, reason: 'second_stall',
     });
     // markNeedsAttention releases the lease so Resume is not held to expiry;
     // the old token is now a fence miss and a new claim is required.

@@ -46,11 +46,13 @@ not perform.
   site/drive GUIDs; the run's own `run_id`), hashes/digests (`bundle_sha256`,
   `copy_policy_digest`, `plan_digest`, `create_body_sha256`, and per-resource
   provenance hashes inside `source_provenance`/`readback` JSONB), sizes,
-  timestamps, and sanitized error strings are stored.
-  `run-ledger.js#sanitizeErrorMessage` strips bearer tokens, `Authorization`
-  header values, SAS/`tempauth`/`sig=` query credentials and SharePoint
-  download links, and caps length at 500 chars; `last_error` and
-  `needs_attention_reason` pass through it. Every JSONB write
+  timestamps, and structured error codes are stored. `last_error`,
+  `needs_attention_reason` and resource `error` never hold upstream message
+  text: `ledgerReasonOrThrow` accepts only an allowlisted code token (or an
+  Error, which `describeLedgerError` reduces to an internal code or a
+  classification such as `upstream_http (http 401)`, `timeout`, `network`,
+  `unknown_error`) and rejects prose. Full messages belong in the operator's
+  private receipt or log, never in Postgres. Every JSONB write
   (`planned_identity`, `source_provenance`, `readback`) is validated by
   `assertLedgerReceipt` BEFORE any SQL: an allowlist of receipt keys
   (`LEDGER_RECEIPT_KEYS`: identities, hashes, sizes, statuses, timestamps),

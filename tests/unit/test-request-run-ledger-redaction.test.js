@@ -4,6 +4,8 @@ import {
   LEDGER_RECEIPT_KEYS,
   assertLedgerReceipt,
   createRunLedger,
+  describeLedgerError,
+  ledgerReasonOrThrow,
   requestNumberOrThrow,
   sanitizeErrorMessage,
 } from '../../lib/services/test-requests/run-ledger.js';
@@ -143,10 +145,36 @@ describe('ledger redaction', () => {
 });
 
 describe('ledger lifecycle additions', () => {
+  test('error columns hold an allowlisted code and status only, never upstream text', async () => {
+    const leaky = Object.assign(new Error('Authentication failed: Basic dXNlcjpwYXNz at https://x.sharepoint.com/sites/akoyaGO/_layouts/download.aspx?id=1; purpose: confidential proposal purpose'), { status: 401 });
+    expect(describeLedgerError(leaky)).toBe('upstream_http (http 401)');
+    expect(describeLedgerError(Object.assign(new Error('x'), { code: 'test_request_run_fenced', httpStatus: 409 }))).toBe('test_request_run_fenced (http 409)');
+    expect(describeLedgerError(Object.assign(new Error('x'), { name: 'AbortError' }))).toBe('timeout');
+    expect(describeLedgerError(Object.assign(new Error('x'), { code: 'ECONNRESET' }))).toBe('network');
+    expect(describeLedgerError(new Error('purpose text'))).toBe('unknown_error');
+    expect(ledgerReasonOrThrow('ambiguous_create_outcome')).toBe('ambiguous_create_outcome');
+    for (const prose of ['second stall', 'Bearer secret stalled', 'https://leak', 'Confidential proposal purpose', '']) {
+      expect(thrownCode(() => ledgerReasonOrThrow(prose))).toBe('test_request_ledger_unsafe_value');
+    }
+    const fenceRow = { run_id: RUN_ID, lease_token: TOKEN, lease_generation: 1, lease_live: true, version: 4 };
+    const db = recordingDb([[{ run_id: RUN_ID }], [{ run_id: RUN_ID }], [fenceRow], [{ resource_id: 1 }]]);
+    const ledger = createRunLedger(db);
+    await ledger.recordError({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 2, error: leaky });
+    await ledger.markNeedsAttention({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 3, reason: leaky });
+    await ledger.recordResourceFailure({ resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, outcome: 'failed', error: leaky });
+    const bound = JSON.stringify(db.calls.map((c) => c.params));
+    for (const fragment of ['dXNlcjpwYXNz', 'sharepoint.com', 'download.aspx', 'confidential', 'Authentication failed']) {
+      expect(bound).not.toContain(fragment);
+    }
+    expect(db.calls[0].params[4]).toBe('upstream_http (http 401)');
+    await expect(ledger.markNeedsAttention({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 4, reason: 'ambiguous create outcome' }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
   test('markNeedsAttention releases the lease in the same statement', async () => {
     const db = recordingDb([[{ run_id: RUN_ID, status: 'needs_attention' }]]);
     await createRunLedger(db).markNeedsAttention({
-      runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 3, reason: 'Bearer secret stalled',
+      runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 3, reason: 'ambiguous_create_outcome',
     });
     const { text, params } = db.calls[0];
     expect(text).toMatch(/lease_token = NULL/);
@@ -154,7 +182,7 @@ describe('ledger lifecycle additions', () => {
     expect(text).toMatch(/lease_token = \$2::uuid/);
     expect(text).toMatch(/lease_generation = \$3::integer/);
     expect(text).toMatch(/version = \$4::integer/);
-    expect(params[4]).toBe('Bearer [redacted] stalled');
+    expect(params[4]).toBe('ambiguous_create_outcome');
   });
 
   test('advanceStep records the server-assigned request number with COALESCE and validates its shape', async () => {
