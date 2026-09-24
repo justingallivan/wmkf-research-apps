@@ -120,6 +120,57 @@ test('round-trips through JSON and readSourceBundle unchanged', () => {
   expect(readSourceBundle(JSON.parse(JSON.stringify(bundle)))).toEqual(bundle);
 });
 
+test.each([
+  ['buildSourceBundle', () => build({ dataverseHost: 'foreign.crm.dynamics.com' })],
+  ['readSourceBundle', () => {
+    const bundle = build();
+    bundle.source.dataverseHost = 'foreign.crm.dynamics.com';
+    return readSourceBundle(bundle);
+  }],
+])('%s rejects a foreign Dataverse host', (_label, action) => {
+  expect(action).toThrow(/registered production host/);
+});
+
+test.each([
+  ['buildSourceBundle', () => build({
+    documents: [document({
+      sharePointSite: {
+        key: 'unregistered',
+        hostname: 'foreign.sharepoint.com',
+        pathname: '/sites/unregistered',
+      },
+    })],
+  })],
+  ['readSourceBundle', () => {
+    const bundle = build();
+    bundle.documents[0].sharePointSite = {
+      key: 'unregistered',
+      hostname: 'foreign.sharepoint.com',
+      pathname: '/sites/unregistered',
+    };
+    return readSourceBundle(bundle);
+  }],
+])('%s rejects an unregistered SharePoint site', (_label, action) => {
+  expect(action).toThrow(/registered SharePoint site/);
+});
+
+test('rejects documents from mixed SharePoint sites', () => {
+  expect(() => build({
+    documents: [
+      document(),
+      document({
+        id: 'inv-2',
+        kind: 'proposalNarrative',
+        sharePointSite: {
+          key: 'other-site',
+          hostname: 'appriver3651007194.sharepoint.com',
+          pathname: '/sites/other',
+        },
+      }),
+    ],
+  })).toThrow(/mixed SharePoint sites/);
+});
+
 test('exports after an unchanged strict discovery and metadata pass', async () => {
   const dependencies = exportDependencies();
 
@@ -127,6 +178,20 @@ test('exports after an unchanged strict discovery and metadata pass', async () =
   expect(dependencies.discoverDocuments).toHaveBeenCalledTimes(2);
   expect(dependencies.assertReadLimits).toHaveBeenCalledTimes(2);
   expect(dependencies.readSourceRevision).toHaveBeenCalledWith(REQUEST_ID.toLowerCase());
+});
+
+test('rejects an unavailable archive bucket before hydrating source documents', async () => {
+  const dependencies = exportDependencies();
+  dependencies.discoverDocuments.mockReset().mockResolvedValue({
+    documents: [],
+    errors: [{ source: 'archive', code: 'SOURCE_BUCKET_UNAVAILABLE' }],
+  });
+
+  await expect(exportBundle(dependencies)).rejects.toThrow(
+    /Source document inventory is incomplete: archive:SOURCE_BUCKET_UNAVAILABLE/,
+  );
+  expect(dependencies.hydrateDocument).not.toHaveBeenCalled();
+  expect(dependencies.readSourceRevision).not.toHaveBeenCalled();
 });
 
 test.each([
