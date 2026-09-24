@@ -15,6 +15,7 @@ const customJestConfig = {
     '<rootDir>/node_modules/',
     '<rootDir>/node_modules.nosync/',
     '<rootDir>/tests/e2e/', // E2E tests handled separately
+    '<rootDir>/tests/pg-contract/', // real-Postgres lane: jest.pg-contract.config.js only (npm run test:pg-contract)
     '<rootDir>/.claude/worktrees/' // agent worktrees (full repo copies)
   ],
   // iCloud-exclusion artifacts (*.nosync). Without this, Jest's haste map
