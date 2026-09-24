@@ -456,8 +456,11 @@ describe('slice 6a: manifest/run recipe binding', () => {
 });
 
 describe('slice 6a: IA-only steps stop cleanly instead of running unbuilt bodies', () => {
-  test('reaching seed_initial_assessment, seed_initial_assessment_snapshot or verify_initial_assessment marks needs_attention with recipe_step_not_built, never markReady, never an unhandled throw', async () => {
-    for (const step of ['seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment']) {
+  // seed_initial_assessment was built in Stage B (slice 6b) and has its own
+  // dedicated coverage (test-request-run-runner-seed-initial-assessment.test.js);
+  // it is deliberately excluded from this "still not built" loop.
+  test('reaching seed_initial_assessment_snapshot or verify_initial_assessment marks needs_attention with recipe_step_not_built, never markReady, never an unhandled throw', async () => {
+    for (const step of ['seed_initial_assessment_snapshot', 'verify_initial_assessment']) {
       const run = baseRun({ recipe: 'initial_assessment', currentStep: step, stepIndex: 7 });
       const { ledger, calls } = createFakeLedger(run);
       const manifest = baseManifest({ recipe: 'initial_assessment' });
