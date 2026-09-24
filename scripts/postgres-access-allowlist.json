@@ -329,23 +329,8 @@
   },
   {
     "file": "lib/services/review-panel-store.js",
-    "kind": "begin-literal",
-    "count": 1
-  },
-  {
-    "file": "lib/services/review-panel-store.js",
     "kind": "client.query",
-    "count": 51
-  },
-  {
-    "file": "lib/services/review-panel-store.js",
-    "kind": "db.connect",
-    "count": 1
-  },
-  {
-    "file": "lib/services/review-panel-store.js",
-    "kind": "driver-import",
-    "count": 1
+    "count": 48
   },
   {
     "file": "lib/services/review-panel-store.js",
