@@ -322,6 +322,9 @@ function DynamicsExplorer() {
                 const documentLinks = pendingDocumentLinks.length > 0
                   ? [...pendingDocumentLinks]
                   : undefined;
+                const testRequestIsolation = typeof parsed.testRequestIsolation === 'boolean'
+                  ? parsed.testRequestIsolation
+                  : null;
                 clearPendingArtifacts();
 
                 let finalMsgId;
@@ -330,7 +333,16 @@ function DynamicsExplorer() {
                   // Finalize streaming message
                   setMessages(prev => prev.map(m =>
                     m.id === streamingMsgId
-                      ? { ...m, content: assistantContent, isStreaming: false, rounds: parsed.rounds, requestId: parsed.requestId || null, fileExports, documentLinks }
+                      ? {
+                        ...m,
+                        content: assistantContent,
+                        isStreaming: false,
+                        rounds: parsed.rounds,
+                        requestId: parsed.requestId || null,
+                        fileExports,
+                        documentLinks,
+                        testRequestIsolation,
+                      }
                       : m
                   ));
                 } else {
@@ -345,6 +357,7 @@ function DynamicsExplorer() {
                     requestId: parsed.requestId || null,
                     fileExports,
                     documentLinks,
+                    testRequestIsolation,
                   }]);
                 }
                 // If server suggests feedback, mark this message
@@ -743,7 +756,12 @@ const MessageBubble = React.memo(function MessageBubble({ message, onCopy, onFee
         }`}>
           {segments.map((seg, i) => (
             seg.type === 'table' ? (
-              <DataTable key={i} headers={seg.headers} rows={seg.rows} />
+              <DataTable
+                key={i}
+                headers={seg.headers}
+                rows={seg.rows}
+                testRequestIsolation={message.testRequestIsolation}
+              />
             ) : (
               <div
                 key={i}
@@ -913,7 +931,7 @@ function DocumentLinks({ data }) {
 
 // ─── Data Table ───
 
-function DataTable({ headers, rows }) {
+function DataTable({ headers, rows, testRequestIsolation }) {
   const markerColumn = headers.findIndex((header) => {
     const normalized = String(header).replace(/[^a-z]/gi, '').toLowerCase();
     return normalized === 'istestrequest' || normalized === 'testrequest';
@@ -946,7 +964,7 @@ function DataTable({ headers, rows }) {
           </tbody>
         </table>
       </div>
-      {markerColumn < 0 && <div className="flex justify-end mt-1">
+      {testRequestIsolation === false && markerColumn < 0 && <div className="flex justify-end mt-1">
         <button
           onClick={() => downloadCsv(headers, rows, `dynamics-export-${Date.now()}.csv`)}
           className="text-xs text-blue-600 hover:text-blue-800"

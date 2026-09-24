@@ -32,7 +32,7 @@ event: response
 data: {"content":"All done."}
 
 event: complete
-data: {"requestId":"<REQUEST_ID>","rounds":5,"outcome":"completed","suggestFeedback":false}
+data: {"requestId":"<REQUEST_ID>","rounds":5,"outcome":"completed","suggestFeedback":false,"testRequestIsolation":false}
 
 "
 `;

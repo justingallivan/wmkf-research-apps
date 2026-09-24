@@ -102,9 +102,10 @@ test.each(BADGE_COMPONENTS)('%s uses the shared TEST badge', (file) => {
   expect(contents).toMatch(/<TestRequestBadge\b/);
 });
 
-test('Dynamics Explorer request tables suppress the local page-only CSV in favor of the guarded export tool', () => {
+test('Dynamics Explorer uses server isolation state to suppress every local page-only CSV', () => {
   const contents = source('pages/dynamics-explorer.js');
-  expect(contents).toContain('markerColumn < 0');
+  expect(contents).toContain('testRequestIsolation={message.testRequestIsolation}');
+  expect(contents).toContain('testRequestIsolation === false');
   expect(contents).toContain('downloadCsv(headers, rows');
-  expect(source('shared/config/prompts/dynamics-explorer.js')).toContain('always preserve it as an "Is Test Request" column');
+  expect(source('lib/services/dynamics-explorer/chat-session.js')).toContain('testRequestIsolationEnabled()');
 });
