@@ -29,7 +29,10 @@ import {
   discoverTestRequestSourceDocuments,
   hydrateTestRequestSourceDocument,
 } from '../lib/services/test-requests/admin-preview-service.js';
-import { buildSourceBundle, summarizeSourceBundle } from '../lib/services/test-requests/source-bundle.js';
+import {
+  exportTestRequestSourceBundle,
+  summarizeSourceBundle,
+} from '../lib/services/test-requests/source-bundle.js';
 
 const require = createRequire(import.meta.url);
 const { getAccessToken, createClient } = require('../lib/dataverse/client.js');
@@ -116,31 +119,21 @@ async function main() {
   const resourceUrl = `https://${hostname}`;
   const client = createClient({ resourceUrl, token: await getAccessToken(resourceUrl) });
 
-  const sourceRow = await readSourceRow(client, args.sourceRequestNumber);
-  const requestId = sourceRow.akoya_requestid.toLowerCase();
-  const documents = await withDalContext('export-test-request-source-bundle', async () => {
-    const inventory = await discoverTestRequestSourceDocuments(
-      { akoya_requestid: requestId, akoya_requestnum: String(sourceRow.akoya_requestnum) },
-      SOURCE_BUNDLE_DEPENDENCIES,
-    );
-    if (inventory.errors.length) {
-      throw new Error(`Source document inventory is incomplete: ${inventory.errors.map((e) => `${e.source}:${e.code}`).join(', ')}.`);
-    }
-    assertTestRequestSourceReadLimits(inventory.documents);
-    const hydrated = [];
-    for (const document of inventory.documents) {
-      const version = await hydrateTestRequestSourceDocument(document, SOURCE_BUNDLE_DEPENDENCIES);
-      hydrated.push({ ...version, graphItemId: document.graphItemId });
-    }
-    return hydrated;
-  });
-
-  const revisionAfter = await readSourceRevision(client, requestId);
-  if (revisionAfter !== String(sourceRow.versionnumber)) {
-    throw new Error('Source Request changed during export; rerun to capture a consistent bundle.');
-  }
-
-  const bundle = buildSourceBundle({ sourceRow, documents, dataverseHost: hostname, exportedAt: new Date() });
+  const bundle = await withDalContext('export-test-request-source-bundle', () => (
+    exportTestRequestSourceBundle({
+      sourceRequestNumber: args.sourceRequestNumber,
+      dataverseHost: hostname,
+      exportedAt: new Date(),
+    }, {
+      readSourceRow: (requestNumber) => readSourceRow(client, requestNumber),
+      discoverDocuments: (source) => discoverTestRequestSourceDocuments(source, SOURCE_BUNDLE_DEPENDENCIES),
+      assertReadLimits: assertTestRequestSourceReadLimits,
+      hydrateDocument: (document) => hydrateTestRequestSourceDocument(document, SOURCE_BUNDLE_DEPENDENCIES),
+      getDriveId: SOURCE_BUNDLE_DEPENDENCIES.getDriveId,
+      getFileMetadataById: SOURCE_BUNDLE_DEPENDENCIES.getFileMetadataById,
+      readSourceRevision: (requestId) => readSourceRevision(client, requestId),
+    })
+  ));
   fs.mkdirSync(path.dirname(args.out), { recursive: true });
   fs.writeFileSync(args.out, `${JSON.stringify(bundle, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify({ written: args.out, ...summarizeSourceBundle(bundle) }, null, 2));
