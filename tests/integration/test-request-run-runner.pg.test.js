@@ -44,9 +44,13 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
-  const fn = await db.query(`SELECT to_regproc('test_request_receipt_ok') AS fn`);
-  if (missing.length || !fn.rows[0]?.fn) {
-    throw new Error(`Throwaway ledger schema is stale (missing: ${[...missing, ...(fn.rows[0]?.fn ? [] : ['test_request_receipt_ok()'])].join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
+  const fn = await db.query(`SELECT prosrc FROM pg_proc WHERE proname = 'test_request_receipt_ok'`);
+  const normalize = (text) => String(text || '').replace(/\s+/g, ' ').trim();
+  const expectedBody = normalize(migrationSql.slice(migrationSql.indexOf('$receipt$') + 9, migrationSql.indexOf('$receipt$;')));
+  const liveBody = normalize(fn.rows[0]?.prosrc);
+  if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
+  if (missing.length) {
+    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
   }
 }
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -176,6 +180,7 @@ function makeWorld(log) {
     if (requestPath !== '/akoya_requests') throw new Error(`fake Dataverse: unexpected POST ${requestPath}`);
     event('dispatch:request_post');
     state.counts.requestPost += 1;
+    if (state.hooks.requestPostRejects) return { ok: false, status: 500, text: 'plugin failure' };
     const id = body.akoya_requestid.toLowerCase();
     if (state.requests.has(id)) return { ok: false, status: 412, text: 'duplicate key' };
     const row = {
@@ -613,6 +618,27 @@ describeIf('slice 5b runner against the live run ledger', () => {
       expect(stopped.lastError).toBe('ambiguous_create_outcome'); // recorded in the same fenced UPDATE
       expect(world.state.counts.requestPost).toBe(0);
       expect(world.state.counts.workflowPatch ?? 0).toBe(0);
+    }
+
+    // create_request: the POST itself returned a definitive error in an earlier
+    // invocation (marker + response recorded, GUID still absent). Resume must not POST.
+    {
+      const { world, run, advance } = await setup();
+      await runUntil(advance, 'create_request');
+      world.state.hooks.requestPostRejects = true;
+      const failed = await advance({ bypassGoverify: true });
+      expect(failed).toMatchObject({ step: 'create_request', outcome: 'needs_attention' });
+      world.state.hooks.requestPostRejects = false;
+      expect(world.state.counts.requestPost).toBe(1);
+      const rows = await ledger.listRunResources(run.runId);
+      const createRow = rows.find((row) => row.resourceKind === 'dataverse_request');
+      expect(createRow.readback.createAttemptedAt).toBeTruthy(); // survived the response write
+      await ledger.claimLease({ runId: run.runId, expectedVersion: (await ledger.getRun(run.runId)).version });
+      await expireLease(run.runId);
+      const resumed = await advance({ bypassGoverify: true });
+      expect(resumed).toMatchObject({ step: 'create_request', outcome: 'needs_attention' });
+      expect((await ledger.getRun(run.runId)).needsAttentionReason).toBe('ambiguous_create_outcome');
+      expect(world.state.counts.requestPost).toBe(1);
     }
 
     // provision_location: locationCreateAttemptedAt journaled, no location readable.

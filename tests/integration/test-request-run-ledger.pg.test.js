@@ -33,9 +33,13 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
-  const fn = await db.query(`SELECT to_regproc('test_request_receipt_ok') AS fn`);
-  if (missing.length || !fn.rows[0]?.fn) {
-    throw new Error(`Throwaway ledger schema is stale (missing: ${[...missing, ...(fn.rows[0]?.fn ? [] : ['test_request_receipt_ok()'])].join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
+  const fn = await db.query(`SELECT prosrc FROM pg_proc WHERE proname = 'test_request_receipt_ok'`);
+  const normalize = (text) => String(text || '').replace(/\s+/g, ' ').trim();
+  const expectedBody = normalize(migrationSql.slice(migrationSql.indexOf('$receipt$') + 9, migrationSql.indexOf('$receipt$;')));
+  const liveBody = normalize(fn.rows[0]?.prosrc);
+  if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
+  if (missing.length) {
+    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
   }
 }
 
@@ -409,6 +413,9 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       { filename: 'Confidential proposal.pdf' },
       { size: '12' },
       { restored: 'yes' },
+      { eTag: '"glpat-ABCDEFGHIJKLMNOPQRST"' },
+      { eTag: 'W/"ghp_0123456789abcdefghijklmnop"' },
+      { driveId: 'b!AAAAAAAAAAAAAAAA-ghp_0123456789abcdefghij' },
     ];
     for (const receipt of rejected) {
       expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
@@ -425,6 +432,29 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
        VALUES ($1, 998, 'copy_file', 'sharepoint_file', 'sharepoint', $2::jsonb)`,
       [plan.runId, JSON.stringify({ downloadUrl: 'https://graph.microsoft.com/x?tempauth=abc' })],
     )).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('a later readback merges into the earlier one, so a dispatch marker is never erased', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan();
+    createdRunIds.push(plan.runId);
+    const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-readback-merge', plan });
+    const claimed = await ledger.claimLease({ runId: run.runId, expectedVersion: run.version, leaseSeconds: 60 });
+    const resource = await ledger.journalPlannedResource({
+      runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      step: 'create_request', resourceKind: 'dataverse_request', system: 'dataverse', plannedIdentity: { requestId: plan.destinationRequestId },
+    });
+    const attemptedAt = '2026-09-24T07:54:00.000Z';
+    await ledger.recordResourceReadback({
+      resourceId: resource.resourceId, runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      responseStatus: null, readback: { createAttemptedAt: attemptedAt }, outcome: 'planned',
+    });
+    const after = await ledger.recordResourceReadback({
+      resourceId: resource.resourceId, runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      responseStatus: 500, readback: { createResponseReceivedAt: '2026-09-24T07:54:01.000Z' }, outcome: 'dispatched',
+    });
+    expect(after.readback).toMatchObject({ createAttemptedAt: attemptedAt, createResponseReceivedAt: '2026-09-24T07:54:01.000Z' });
+    expect(after.responseStatus).toBe(500);
   });
 
   it('needs_attention requires a reason: the DB constraint rejects a missing one', async () => {

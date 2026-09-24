@@ -1243,7 +1243,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
            s.t = 'string'
            AND length(s.v) BETWEEN 1 AND 200
            AND s.v !~ '(://|[[:cntrl:]])'
-           AND s.v !~ '^(b!)?(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
+           AND s.v !~ '(^|[^A-Za-z0-9])(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
            AND CASE
              WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
@@ -1333,8 +1333,8 @@ $receipt$`,
     CONSTRAINT test_request_runs_graph_identity_shapes CHECK (
       expected_graph_site_id ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       AND expected_graph_drive_id ~ '^b![A-Za-z0-9_-]{16,120}$'
-      AND expected_graph_drive_id !~ '^(b!)?(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
-      AND expected_graph_site_id !~ '^(b!)?(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
+      AND expected_graph_drive_id !~ '(^|[^A-Za-z0-9])(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
+      AND expected_graph_site_id !~ '(^|[^A-Za-z0-9])(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
     ),
     CONSTRAINT test_request_runs_fiscal_year_shape CHECK (
       fiscal_year ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
