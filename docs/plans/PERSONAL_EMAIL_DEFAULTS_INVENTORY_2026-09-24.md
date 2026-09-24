@@ -101,7 +101,17 @@ The owner contract is shared Admin default → sender's explicitly saved default
 
 ## Proposed bounded follow-up slices
 
-These are proposals, not implementation status. Each slice is one email family; the owner decides order and scope before build.
+These are proposals, not implementation status. Each slice is one email family. The owner accepted the default build order **4 → 1 → 3 → 2 → 6 → 7 → 5** and review after each PR. Track progress here:
+
+| Slice | Status | PR | Merged |
+| --- | --- | --- | --- |
+| 4. Grantee abstract invitation | Not started | — | No |
+| 1. Manual reviewer reminders | Not started | — | No |
+| 3. Reviewer release courtesies | Not started | — | No |
+| 2. Reviewer due-date extension | Not started | — | No |
+| 6. Meeting agenda | Not started | — | No |
+| 7. Deliberation distribution | Not started | — | No |
+| 5. Scheduled grantee reminder | Not started | — | No |
 
 1. **Manual reviewer reminders** (`RespondReminderModal.js`, `ReviewReminderAction.js`, `reviewer-manual-reminder.js`, `send-review-reminder.js`, `reviewerFinderPreferences.js`): separate respond/review-due personal keys and an editable review-due preview. A dedicated app-gated preference API route is **plan-first**; no schema indicated. Met when both kinds load/save their own defaults and one send's edits remain one-off. [VERIFIED prerequisite via `docs/API_ROUTE_SECURITY_MATRIX.md:255` and `shared/config/reviewerFinderPreferences.js:22`.]
 2. **Reviewer due-date extension** (`ReviewerDueDateEditor.js`, `reviewer-due-extension.js`, `review-due-extension.js`, `editableTextDefaults.js`): add personal subject/body layer and a pre-send copy review while preserving the date-write/notification partial result. A new preference API route is **plan-first**; no schema indicated. Met when the sender can save wording independently of the deadline action and inspect the exact notice. [VERIFIED prerequisite via `docs/API_ROUTE_SECURITY_MATRIX.md:250`.]
@@ -110,11 +120,9 @@ These are proposals, not implementation status. Each slice is one email family; 
 5. **Scheduled grantee reminder** (`grantee-deliverable-reminders-service.js`, `scheduled-email-service.js`, `scheduled-emails.js`, `scheduled-emails/[id].js`): plan how the PD's reusable default enters newly created rows while retaining immutable ownership/recipient/token rules. A new preference API route is **plan-first**; no schema indicated. Met when future rows start from that PD's saved wording and row edits remain local to the row. [VERIFIED prerequisite via `lib/services/cron/grantee-deliverable-reminders-service.js:298` and `pages/api/scheduled-emails/[id].js:54`.]
 6. **Meeting agenda** (`SessionAgendaPanel.js`, `agenda-service.js`, `sessions/[id]/agenda.js`): layer a personal default before the existing exact preview. A new `meeting-tracker` preference API route is **plan-first**; no schema indicated. Met when a save changes only future drafts for that sender. [VERIFIED prerequisite via `docs/API_ROUTE_SECURITY_MATRIX.md:216`.]
 7. **Deliberation distribution** (`PreSiteDistributionPanel.js`, `distribution/prepare.js`, `distribution/send.js`): layer personal subject/body defaults before the existing bound preview, with server-owned briefing and attachment material unchanged. A new `reviewers` preference API route is **plan-first**; no schema indicated. Met when a sender's next compose loads their own wording and send still requires a fresh bound preview. [VERIFIED prerequisite via `docs/API_ROUTE_SECURITY_MATRIX.md:309` and `docs/API_ROUTE_SECURITY_MATRIX.md:310`.]
-8. **Admin test email** (`pages/test-email.js`, `pages/api/test-email.js`): decide whether a diagnostic test message belongs in the owner-facing defaults capability, then use the existing own-profile preference store if it does. Any new preference route is **plan-first**; no schema indicated. Met when superusers can explicitly save their diagnostic copy without changing a sent draft. [VERIFIED prerequisite via `pages/test-email.js:13` and `docs/API_ROUTE_SECURITY_MATRIX.md:277`.]
+The owner excluded the Admin diagnostic test email and the two generic reviewer `followup`/`thankyou` compatibility sends from this build. The compatibility routes, Admin defaults, and saved personal template data remain in place. The current staff reminder and reviewer release actions in slices 1 and 3 are separate and remain in scope. The automatic reviewer thank-you continues to read its Admin default. The personal template editor currently exposes the two compatibility templates even though no current first-party send action selects them; clarify that copy when the profile settings surface is touched in slice 4. [VERIFIED via `shared/components/reviewers/ReleaseMaterialsModal.js:43`, `shared/components/reviewers/InviteEmailModal.js:396`, `shared/components/reviewers/EmailTemplatesModal.js:77`, `lib/services/reviewer-thankyou-sweep.js:134`, and `lib/services/review-manager/send-emails-service.js:202`; PLANNED owner scope decision.]
 
-The two reviewer compatibility sends are omitted from this implementation order until the owner decides whether to restore a user-facing panel or retire their callable compatibility route; they remain inventoried above. [VERIFIED via `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md:114` and `lib/services/review-manager/send-emails-service.js:202`.]
-
-## Residual questions from source-only inspection
+## Questions raised by source-only inspection (resolved below)
 
 - Whether the owner wants the superuser diagnostic email and callable-but-hidden reviewer `followup`/`thankyou` compatibility actions covered by personal defaults before any UI is restored. Source establishes current behavior; it does not establish product priority. [VERIFIED via `pages/test-email.js:13` and `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md:114`.]
 - Whether a scheduled reminder that is sent automatically should inherit the owning PD's personal default at row creation, and what should happen to already-created rows when the default changes. The current row freezes subject/body on creation, while its editor changes only that row. [VERIFIED via `lib/services/cron/grantee-deliverable-reminders-service.js:298`, `lib/services/scheduled-email-store.js:22`, `pages/api/scheduled-emails/[id].js:54`.]
@@ -124,7 +132,7 @@ The two reviewer compatibility sends are omitted from this implementation order 
 
 - [PLANNED; explicit owner direction] Newly created scheduled grantee reminder rows should use the owning Program Director's saved personal default. A later default change leaves already-created rows unchanged; their own row edits and approval state remain independent. This applies to proposed slice 5 and does not describe current behavior.
 - [PLANNED; explicit owner direction] Operational notification emails remain system-controlled and receive no personal-default capability. Their rows above remain not applicable.
-- The scope of hidden reviewer follow-up/thank-you compatibility sends and the Admin test email is still awaiting the owner's answer. The earlier recommendation to leave them out was based on their lack of a current panel action and the test email's diagnostic role; it was not a settled exclusion from the owner's suite-wide requirement.
+- [PLANNED; explicit owner direction] Do not add personal-default capability or restore a composer for the generic reviewer `followup`/`thankyou` compatibility sends, and do not personalize the superuser diagnostic test email. Preserve their existing routes, Admin defaults, and saved personal reviewer-template data. The Admin `email.reviewer_thankyou.*` default remains in use by the automatic thank-you sweep. Clarify the Profile Settings copy so staff know the personal compatibility templates are not used by current staff send actions. This is a scope decision, not a claim that Production traffic to the callable routes is zero.
 
 ## Scan record
 
