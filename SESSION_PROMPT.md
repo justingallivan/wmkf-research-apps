@@ -1,5 +1,79 @@
 # Session 537 Prompt: Sandbox Basic clone from the source bundle
 
+> **Two handoffs live in this file.** The section immediately below is the
+> parallel-branch handoff for `claude/postgres-access-layer` (worktree
+> `/Users/gallivan/Code/WMKF_Apps-investigate`); a fresh session in THAT
+> worktree continues from it. Everything from "## Session 536 Summary" down
+> is the root (`main`) handoff written by the other Claude session.
+
+## Parallel branch handoff — Postgres access layer, Stage 0 complete (Session 537-PG prompt)
+
+### Session 536-PG Summary — 2026-09-23 PT (Fable orchestrating; Sonnet builds; Opus reviews; Codex adversarial reviews)
+
+[VERIFIED via branch commits, full Jest run, canonical build, all touched-surface gates, local and CI pg-contract runs] Scoped the largest unplanned refactor — **Postgres has no access layer** (60 files import the driver directly, 17 of them API routes; the route→service law only recognises Dataverse sources; zero tests reached a real planner) — wrote the staged plan, and **executed Stage 0** on `claude/postgres-access-layer` (pushed; draft PR #328 for CI only, do not merge). Owner decided Q1–Q7, chose the Sonnet/Opus/Codex working model, and authorised autonomous continuation through the stages with a hard stop before Stage 6's Verify.
+
+#### What Was Completed
+
+1. **Plan**: `docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md` (status `active`). Stages 0–7, ground rules copied from the Dataverse DAL plan plus four of its own, §6 self-check protocol (fresh-context review between stages), owner decisions Q1–Q7 recorded, Appendix A census generated from the AST probe, Appendix B reproduction commands, Stage log with the Stage 0 report and both fresh-context reviews.
+2. **Stage 0 items 1–2**: `scripts/check-postgres-access-layer.js` (AST census, report-only; `check:postgres-access-layer` + `:self-test`). Baseline: 60 driver-import files (36 lib/services, 17 pages/api, 4 lib/utils, 3 other lib), 349 `sql` tags in 52 files, 62 files with any record.
+3. **Stage 0 items 3–4**: real-Postgres contract lane `tests/pg-contract/**` + `jest.pg-contract.config.js` (`npm run test:pg-contract`): pg shim replaces `@vercel/postgres`; loopback-only, **no override**; S504 regression against the real planner; pg_catalog parity of the five new fresh-install tables. CI service container in `test.yml`; proven in CI (PR #328 run 35955014525: 3 suites / 8 tests).
+4. **Stage 0 item 5**: fresh-install parity defect fixed — `scripts/setup-database.js` V55–V59 add `bill_webhook_events`, `bill_onboarding_state`, `reviewer_find_roster` (020+023+025+027+029 folded), `review_drafts`, `review_question_audit`; `tests/unit/postgres-schema-parity.test.js` pins it (KNOWN_GAPS = []).
+5. **Review yield**: Opus found a P1 the harness would have shipped with (shim preferred `POSTGRES_URL`; decoy-database proof); the parity test found a fifth gap table nobody knew about; the AST probe corrected three hand-grep miscounts and comment-only table names throughout Appendix A; Codex (3 rounds) forced the catalog-level comparison, sequence/collation projection, base-table filter, and override removal — round 3 fixed by the orchestrator with mutation proofs, not re-reviewed by Codex.
+6. **Environment**: owner installed Colima; container `wmkf-pg-contract` (postgres:16, port 55432) stays running for Stage 1. Codex config re-pinned to `gpt-5.6-sol` by the owner (`gpt-6-sol` is refused on ChatGPT auth). This worktree's `node_modules` symlink was replaced by a real `npm ci` (Turbopack rejects symlinks out of the project root). Memory router routes "Postgres access layer" to the plan.
+
+#### Commits (branch `claude/postgres-access-layer`, all pushed)
+- `6ddc622e0` Plan Postgres access layer migration · `c46ac3ceb`/`c6774396b` owner decisions · `9a7797667` local lane · `45d8fd5f5` router pointer
+- `e0c83f0b1` census probe · `0b7b81256` parity fix + unit test · `2910c06f3` pg-contract lane · `0cb78ddaf` registrations
+- `10cdab01a`/`d0269a710`/`bfb6aa360`/`855eaaf17`/`eb222bcdc`/`dc3ba840b` plan reconciliation, wiki, regroup, CI proof · `8fe646f0d` merge of `origin/main` (docs only)
+
+### Next Items (branch)
+
+#### Verified Open — the owner's standing instruction for the next session
+
+**Continue the plan from Stage 1, autonomously, one stage at a time, as far as possible.** Evidence: owner instruction 2026-09-23 ("work autonomously and get as far as you can through the stages tonight"); plan §5 Stage 1 Preconditions verified by the post-Stage-0 fresh-context review (Stage log).
+- Working model (owner-chosen): Fable orchestrates; Sonnet builds; Opus reviews read-only until satisfied, cap three rounds per build (P1/P2 only justify a round); orchestrator takes over when findings turn cosmetic; Codex adversarial review (`codex-companion.mjs adversarial-review --wait --scope working-tree --base origin/main "<focus>"`, model from `~/.codex/config.toml`) on each stage's final diff; orchestrator's own review last. Parallel builder streams only on disjoint files; builders never run git.
+- Every stage: ground rule 1 fresh-context preamble (`node scripts/check-postgres-access-layer.js --report`), tests-before, one file per commit in waves, full `test:ci` + canonical `npm run build` + touched-surface gates (sequential with self-tests) before the stage closes, then the §6 fresh-context review of the NEXT stage's preconditions logged before it starts.
+- **Hard stops**: (a) do not run Stage 6's Verify — it needs an owner-run signed-in Preview smoke and ships as one release; stop after Stage 5 (or at Stage 6's Tests-before at most) and report. (b) Everything stays on `claude/postgres-access-layer`; PR #328 stays draft; never merge to `main`. (c) `pages/api/cron/spend-check.js` (Stage 4 item 3) waits for the Factory branch to merge (Q7) — check `git log origin/main -- pages/api/cron/spend-check.js` first. (d) `maintenance-service.js` deletes rows: its survivor-asserting contract test is a Tests-before, not a follow-up.
+- Stage 1 specifics added by the fresh-context review: item 0 closes the probe's recorded recognition gaps (renamed/member `sql` tags, `new pg.Pool()`, nested member `.query`/`.connect`) before the baseline freezes; item 2 defines the Postgres carry-over inside the law-mode route gate (hook `isBoundarySource`, `scripts/check-route-service-boundary.js:81-83`) with a recorded-set test.
+
+#### Owner Decision Needed
+1. **Proposed Q3 follow-up**: make `scripts/setup-database.js` stamp every manifest file into `schema_migrations` after a fresh install (today a fresh install has an empty tracker; `apply-migrations.js` would re-apply 007 and `migration-drift.js` would alarm). Evidence: plan §3 Q3 row. Not started.
+2. **Q4 relocation** confirmed at Stage 7, not before (plan §3).
+
+#### Verify Before Acting
+1. **Merging `main` into the branch** is deliberate (plan §7 rule; the DAL precedent): fetch first, dry-run `git merge --no-commit`, re-run suite + build if code moved. As of `8fe646f0d` the branch contains `origin/main`.
+2. **Another Claude session may be active on `main`** in `/Users/gallivan/Code/WMKF_Apps` — check `git -C /Users/gallivan/Code/WMKF_Apps status --short` before any commit that touches `package.json`, `test.yml`, `CI_GATES_REFERENCE.md`, the `/start` skill or `setup-database.js` (the shared-file fence).
+3. **Stale paths in earlier handoffs**: `/Users/gallivan/Code/WMKF_Apps-factory` and `-presentation` do not exist; on 2026-09-23 the Factory branch (`codex/test-request-preview-integration`) lived in `/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps` and `codex/feature-request` in `/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` [VERIFIED via `git worktree list` at session start; re-check].
+4. **Container state**: `docker ps --filter name=wmkf-pg-contract`; if stopped, `colima start && docker start wmkf-pg-contract`. `PG_CONTRACT_URL=postgresql://postgres:contract@127.0.0.1:55432/wmkf_contract`.
+
+#### Do Not Reopen Without New Decision
+- Q1–Q7 (plan §3, decided 2026-09-23): CI container + pg shim, `lib/postgres/`, five-table parity fix, relocate at Stage 7, three exemption classes, cast-lint warn→red at Stage 7, spend-check waits for the Factory merge. No remote-host override in the lane.
+- Stop-at-Stage-0 regroup: held 2026-09-23; owner then authorised continuation (above).
+
+### Key Files (branch)
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md` | The plan; Stage log is the state of record |
+| `scripts/check-postgres-access-layer.js` | Stage 0 census probe (report-only; Stage 1 turns it into the ratchet) |
+| `tests/pg-contract/`, `jest.pg-contract.config.js` | Real-Postgres contract lane; `support/` holds the shim, preload, global setup |
+| `tests/unit/postgres-schema-parity.test.js` | Fresh-install ↔ migrations name-level tripwire (KNOWN_GAPS = []) |
+| `scripts/setup-database.js` V55–V59 | The five previously missing tables |
+| `docs/agent-wiki/topics/dev-environment.md` | Lane commands, Colima, worktree build hazard |
+
+### Testing (branch)
+
+```bash
+node scripts/check-postgres-access-layer.js --report            # census baseline (60 / 349 in 52 / 62)
+npm run check:postgres-access-layer && npm run check:postgres-access-layer:self-test
+PG_CONTRACT_URL=postgresql://postgres:contract@127.0.0.1:55432/wmkf_contract npm run test:pg-contract   # 3 suites / 8 tests
+npm run test:pg-contract                                        # prints the skip line, exit 0
+npx jest tests/unit/postgres-schema-parity.test.js
+npm run test:ci && npm run build
+```
+
+---
+
 ## Session 536 Summary — 2026-09-23 PT (Claude root; Codex rescue builds, Claude reviews)
 
 [VERIFIED via pushed branch commits, full Jest runs, gates, mutation checks, Codex adversarial reviews and owner-authorized production reads] Test Request Factory Stage 1d was fixed and **accepted by the owner**; the read-only production source-bundle exporter (build-order item 4, first half) was built, hardened through three Codex review rounds, run live on Request 1003222, and **accepted by the owner**. No commit landed on `main` this session except this handoff; all product work is on `codex/test-request-preview-integration` (now `57d823b14`, 26 commits this session, 19 behind / 89 ahead of main). Nothing was deployed and no production write occurred.
