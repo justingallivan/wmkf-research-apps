@@ -177,6 +177,16 @@
  * (`load(getModuleName())`) is caught as `unresolved-import`, same as a
  * direct `require(getModuleName())` would be.
  *
+ * Multi-hop aliasing (Codex round 3, narrow follow-up): `buildRequireAliasNames`
+ * and the driver-scoped/sql-tag binding map in `buildBindings` are BOTH a
+ * same-file fixpoint over plain identifier-to-identifier declarations AND
+ * assignments (`const load2 = load;`, `let l; l = require;`), not a single
+ * hop -- an alias can be re-aliased any number of times before use
+ * (`load -> load2 -> load3`, `vp -> vp2`) and every hop resolves. Each loop
+ * re-walks the file and stops once a pass adds nothing new; this is a
+ * fixpoint, not a fixed hop count, so it is not itself re-evadable by
+ * adding one more hop.
+ *
  * Self-test fixtures (--self-test) are built under a fresh os.tmpdir()
  * mkdtemp() directory, never under a tracked repo path, so a fixture can
  * never be picked up by another gate's scan (which walks lib/, pages/,
@@ -306,28 +316,58 @@ function resolveSourceValue(argNode, constMap) {
 // require: r } = module;` -- so a call through one of them is recognized
 // exactly like a literal `require(...)` call (Codex round 3: an aliased
 // loader was previously invisible to every check below).
+// True if `expr` is, or (once already discovered) resolves through the
+// alias set to, `require` itself or `module.require`.
+function isRequireLikeExpr(expr, names) {
+  if (!expr) return false;
+  if (expr.type === 'Identifier') return expr.name === 'require' || names.has(expr.name);
+  if ((expr.type === 'MemberExpression' || expr.type === 'OptionalMemberExpression') && !expr.computed
+    && expr.object.type === 'Identifier' && expr.object.name === 'module'
+    && propName(expr.property) === 'require') {
+    return true;
+  }
+  return false;
+}
+
+// Same-file, scope-insensitive FIXPOINT over declarations AND plain
+// assignments: `const load = require;`, `let l; l = require;`, `const load2
+// = load;` (any alias depth), `const { require: r } = module; const r2 =
+// r;`, or `module.require` reached the same ways. Iterates to a fixpoint
+// (not just one hop) because an alias can itself be re-aliased any number
+// of times before use -- round 2 only resolved one hop, which a two-hop
+// chain (`load2 = load`) evaded entirely (Codex round 3, narrow follow-up).
 function buildRequireAliasNames(ast) {
   const names = new Set();
-  walkAst(ast, (node) => {
-    if (node.type !== 'VariableDeclarator' || !node.init) return;
-    const init = node.init;
-    if (node.id.type === 'Identifier') {
-      if (init.type === 'Identifier' && init.name === 'require') {
-        names.add(node.id.name);
-      } else if ((init.type === 'MemberExpression' || init.type === 'OptionalMemberExpression') && !init.computed
-        && init.object.type === 'Identifier' && init.object.name === 'module'
-        && propName(init.property) === 'require') {
-        names.add(node.id.name);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    walkAst(ast, (node) => {
+      if (node.type === 'VariableDeclarator' && node.init && node.id.type === 'Identifier') {
+        if (!names.has(node.id.name) && isRequireLikeExpr(node.init, names)) {
+          names.add(node.id.name);
+          changed = true;
+        }
+        return;
       }
-      return;
-    }
-    if (node.id.type === 'ObjectPattern' && init.type === 'Identifier' && init.name === 'module') {
-      for (const prop of node.id.properties || []) {
-        if (prop.type !== 'ObjectProperty' || prop.computed || prop.value.type !== 'Identifier') continue;
-        if (propName(prop.key) === 'require') names.add(prop.value.name);
+      if (node.type === 'AssignmentExpression' && node.operator === '=' && node.left.type === 'Identifier') {
+        if (!names.has(node.left.name) && isRequireLikeExpr(node.right, names)) {
+          names.add(node.left.name);
+          changed = true;
+        }
+        return;
       }
-    }
-  });
+      if (node.type === 'VariableDeclarator' && node.id.type === 'ObjectPattern' && node.init
+        && node.init.type === 'Identifier' && node.init.name === 'module') {
+        for (const prop of node.id.properties || []) {
+          if (prop.type !== 'ObjectProperty' || prop.computed || prop.value.type !== 'Identifier') continue;
+          if (propName(prop.key) === 'require' && !names.has(prop.value.name)) {
+            names.add(prop.value.name);
+            changed = true;
+          }
+        }
+      }
+    });
+  }
   return names;
 }
 
@@ -550,6 +590,37 @@ function buildBindings(ast, constMap, requireAliasNames) {
       bindings.set(node.id.name, 'pool');
     }
   });
+
+  // Alias-of-an-alias fixpoint (Codex round 3, narrow follow-up): a plain
+  // identifier-to-identifier declaration or assignment (`const vp2 = vp;`,
+  // `const p2 = pool;`, `p3 = p2;`) copies the source's role to the target,
+  // repeated until nothing new is found so any alias depth resolves. This
+  // was previously single-hop-only (in effect, not at all -- there was no
+  // such pass) for namespace/db/pool/pool-ctor/sql-tag bindings, the same
+  // gap `buildRequireAliasNames` had for `require` itself.
+  let aliasChanged = true;
+  while (aliasChanged) {
+    aliasChanged = false;
+    walkAst(ast, (node) => {
+      let targetName = null;
+      let sourceName = null;
+      if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier'
+        && node.init && node.init.type === 'Identifier') {
+        targetName = node.id.name;
+        sourceName = node.init.name;
+      } else if (node.type === 'AssignmentExpression' && node.operator === '='
+        && node.left.type === 'Identifier' && node.right.type === 'Identifier') {
+        targetName = node.left.name;
+        sourceName = node.right.name;
+      } else {
+        return;
+      }
+      if (!bindings.has(targetName) && bindings.has(sourceName)) {
+        bindings.set(targetName, bindings.get(sourceName));
+        aliasChanged = true;
+      }
+    });
+  }
 
   return bindings;
 }
@@ -1683,6 +1754,37 @@ function runClassificationSelfTest() {
       module.exports.run = () => sql\`SELECT 1\`;
     `);
 
+    // Codex round 3 (narrow follow-up): a TWO-HOP require alias
+    // (load -> load2) with a literal source. `Client` is not a recognized
+    // role today (only `Pool` is), so `new driver.Client()` produces no
+    // kind of its own -- only driver-import is expected here.
+    write(tempRoot, 'lib/services/two-hop-require-literal.js', `
+      const load = require;
+      const load2 = load;
+      const driver = load2('pg');
+      module.exports.run = () => new driver.Client();
+    `);
+
+    // Three-hop alias with a COMPUTED source -- must be unresolved-import,
+    // not driver-import.
+    write(tempRoot, 'lib/services/three-hop-require-computed.js', `
+      function getName() { return '@vercel/postgres'; }
+      const load = require;
+      const load2 = load;
+      const load3 = load2;
+      const packageName = getName();
+      const driver = load3(packageName);
+      module.exports.run = () => driver;
+    `);
+
+    // Two-hop NAMESPACE alias member tag: vp bound via the import, vp2
+    // aliased to vp, then tagged as `vp2.sql\`...\``.
+    write(tempRoot, 'lib/services/two-hop-namespace-alias.js', `
+      import * as vp from '@vercel/postgres';
+      const vp2 = vp;
+      export const run = () => vp2.sql\`SELECT 1 FROM two_hop_table\`;
+    `);
+
     // Build the census in-process (this file's own analyzeRoot/buildJson)
     // and a permissive allowlist derived from it, so the CLI sanity checks
     // below (--report/default mode) exit 0 without duplicating the exact
@@ -1710,7 +1812,7 @@ function runClassificationSelfTest() {
       'resolved-non-driver-require.js resolves to fs, not a driver -- must not be driver-import');
     expect(!driverImportFiles.includes('lib/services/unresolved-dynamic-import.js'),
       'unresolved-dynamic-import.js must not be driver-import (fails open, per P2-3)');
-    const expectedDriverImportFiles = [
+        const expectedDriverImportFiles = [
       'lib/services/alias-import.js',
       'lib/services/alias-require.js',
       'lib/services/aliased-require-literal.js',
@@ -1744,6 +1846,8 @@ function runClassificationSelfTest() {
       'lib/services/resolved-const-require.js',
       'lib/services/sql-query-call.js',
       'lib/services/table-edge-cases.js',
+      'lib/services/two-hop-namespace-alias.js',
+      'lib/services/two-hop-require-literal.js',
       'lib/services/uses-sql-internally.js',
       'lib/services/vercel-postgres-subpath.js',
       'pages/api/health.js',
@@ -1755,7 +1859,7 @@ function runClassificationSelfTest() {
 
     // sql-tag: P1 -- source-agnostic. Now includes the barrel consumer.
     const sqlTagFiles = json.files.filter((f) => f.kinds['sql-tag']).map((f) => f.file).sort();
-    const expectedSqlTagFiles = [
+        const expectedSqlTagFiles = [
       'lib/services/alias-import.js',
       'lib/services/alias-require.js',
       'lib/services/bare-sql-from-call.js',
@@ -1772,6 +1876,7 @@ function runClassificationSelfTest() {
       'lib/services/plain-import.js',
       'lib/services/resolved-const-require.js',
       'lib/services/table-edge-cases.js',
+      'lib/services/two-hop-namespace-alias.js',
       'lib/services/uses-sql-internally.js',
       'lib/services/vercel-postgres-subpath.js',
       'pages/api/health.js',
@@ -1848,6 +1953,18 @@ function runClassificationSelfTest() {
     const moduleDotRequire = findRecord(json, 'lib/services/module-dot-require.js');
     expect(moduleDotRequire && moduleDotRequire.kinds['driver-import'] === 1,
       `module-dot-require.js (module.require('@vercel/postgres')) should record driver-import:1, got ${JSON.stringify(moduleDotRequire && moduleDotRequire.kinds)}`);
+
+    // Codex round 3 (narrow): multi-hop require aliases and a two-hop
+    // namespace alias tag.
+    const twoHopLiteral = findRecord(json, 'lib/services/two-hop-require-literal.js');
+    expect(twoHopLiteral && twoHopLiteral.kinds['driver-import'] === 1,
+      `two-hop-require-literal.js (load -> load2 -> load2('pg')) should record driver-import:1, got ${JSON.stringify(twoHopLiteral && twoHopLiteral.kinds)}`);
+    const threeHopComputed = findRecord(json, 'lib/services/three-hop-require-computed.js');
+    expect(threeHopComputed && threeHopComputed.kinds['unresolved-import'] === 1 && !threeHopComputed.kinds['driver-import'],
+      `three-hop-require-computed.js (load -> load2 -> load3, computed source) should record unresolved-import:1 and NOT driver-import, got ${JSON.stringify(threeHopComputed && threeHopComputed.kinds)}`);
+    const twoHopNamespace = findRecord(json, 'lib/services/two-hop-namespace-alias.js');
+    expect(twoHopNamespace && twoHopNamespace.kinds['sql-tag'] === 1,
+      `two-hop-namespace-alias.js (vp -> vp2; vp2.sql\`...\`) should record sql-tag:1, got ${JSON.stringify(twoHopNamespace && twoHopNamespace.kinds)}`);
 
     // P2-3: unresolved module sources are audited (and, per Codex round 2,
     // ratcheted as the unresolved-import kind above).
@@ -2393,7 +2510,71 @@ function runRatchetSelfTest() {
     }
   }
 
-  console.log('postgres-access-layer ratchet self-test OK -- green exact-match, red (a)/(a-count)/(b)/(b-vanished)/(b-exempt)/(c)/(c-index-form), green (c) no-op, Q5 exemptions, malformed-allowlist exit-2, legitimate-shrink green, unresolved-import/driver-export red+green, CJS-accessor-export red, and aliased-require red cases verified.');
+  // ---- red: driver-import (Codex round 3 narrow) -- two-hop require alias, no allowlist entry ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/two-hop-require-literal.js', `
+        const load = require;
+        const load2 = load;
+        const driver = load2('pg');
+        module.exports.run = () => new driver.Client();
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (two-hop require alias, unratcheted), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/two-hop-require-literal.js') && result.stderr.includes('driver-import'),
+        `expected violation naming the file and driver-import, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red: unresolved-import (Codex round 3 narrow) -- three-hop require alias, computed source ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/three-hop-require-computed.js', `
+        function getName() { return '@vercel/postgres'; }
+        const load = require;
+        const load2 = load;
+        const load3 = load2;
+        const packageName = getName();
+        const driver = load3(packageName);
+        module.exports.run = () => driver;
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (three-hop require alias, computed source), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/three-hop-require-computed.js') && result.stderr.includes('unresolved-import'),
+        `expected violation naming the file and unresolved-import, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red: sql-tag (Codex round 3 narrow) -- two-hop namespace alias tag ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/two-hop-namespace-alias.js', `
+        import * as vp from '@vercel/postgres';
+        const vp2 = vp;
+        export const run = () => vp2.sql\`SELECT 1\`;
+      `);
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'lib/services/two-hop-namespace-alias.js', kind: 'driver-import', count: 1 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (two-hop namespace alias tag, unratcheted sql-tag), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/two-hop-namespace-alias.js') && result.stderr.includes('sql-tag'),
+        `expected violation naming the file and sql-tag, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  console.log('postgres-access-layer ratchet self-test OK -- green exact-match, red (a)/(a-count)/(b)/(b-vanished)/(b-exempt)/(c)/(c-index-form), green (c) no-op, Q5 exemptions, malformed-allowlist exit-2, legitimate-shrink green, unresolved-import/driver-export red+green, CJS-accessor-export red, aliased-require red, and multi-hop-alias (require + namespace) red cases verified.');
 }
 
 // P2-A: a `--json` payload over ~64 KiB used to be truncated by
