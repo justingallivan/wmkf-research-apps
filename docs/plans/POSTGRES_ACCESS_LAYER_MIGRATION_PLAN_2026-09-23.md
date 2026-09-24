@@ -1325,8 +1325,34 @@ push and update this entry at every boundary.
   unit test needed a mock change: `jest.mock('@vercel/postgres')` still
   intercepts through the CJS seam. Wave-2 boundary at `8f6dab54d`: gates
   69/69, `test:ci` 1059 suites / 15667 tests, build passes.
-- Item 3 tests-before in progress (contract tests committed before any
-  swap): `bf743430d` panel-review-service.
+- Item 3 in progress. Tests-before committed ahead of their swaps:
+  `bf743430d` panel-review-service · `5e1ef9d49` integrity-service. Swaps
+  landed (each with its contract test, one file per commit, allowlist key
+  removed): `b119b09d8` agenda-store · `0c5452a64` operational-event-
+  service (its forced-failure test ends the shim pool for a real driver
+  rejection) · `510ec91ba` panel-review-service · `5fb493531`
+  portal-upload-staging (Blob client mocked; Postgres only) · `7f09be981`
+  review-synthesis-job-service · `5f331d591` collection-store (existing
+  S504 test extended to all 16 exports, control intact) · `33e49563a`
+  reviewer-acceptance-job-service · `47807ef77` feedback-service ·
+  `640a69cb5` distribution-store · `f3496d903` intake-draft-service.
+  **Item 3 complete: 10 of 11 converted; integrity-service deferred
+  (below).** Driver-import files 50 → 40. Wave-3 boundary at `f3496d903`: gates
+  69/69, `test:ci` 1059 suites / 15,667 tests, build passes. Opus
+  batch review of the 20 wave-2/3 conversions: PENDING.
+- Item 4 tests-before in progress on both builders (contract tests against
+  the unconverted files, with commit/rollback end-state and the
+  open-transaction assertion, before any conversion).
+  **Owner decision needed — `lib/services/integrity-service.js` swap
+  deferred:** the builder's one-line `require('@vercel/postgres')` →
+  `require('../postgres/client')` edit was denied twice by the session's
+  permission classifier ("Modify Shared Resources"), unlike the same edit
+  on every other file so far. Per the harness rule the orchestrator did
+  NOT perform the edit itself (that would launder a denied action). The
+  contract test (11 statements, all cast-lint rows) is committed and green
+  against the unconverted file, so the swap is a one-line change the
+  owner can make or authorise; until then the file keeps its
+  `driver-import` allowlist key and Stage 3 closes with 29 of 30 files.
 - Item 3 (11 larger swaps): not started.
 - Item 4 (6 connect/transaction users): not started. `irs-bmf-service`'s
   `refresh()` fetches the four IRS CSV URLs through global `fetch` with no
