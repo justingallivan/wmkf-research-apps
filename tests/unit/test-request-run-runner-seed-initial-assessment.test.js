@@ -60,7 +60,10 @@ beforeEach(() => {
   // to the environment (matches ia-sandbox-deps.test.js's convention).
   process.env.DYNAMICS_URL = `https://${PROD_HOST}`;
   process.env.DYNAMICS_TENANT_ID = 't';
-  process.env.DYNAMICS_CLIENT_ID = 'c';
+  // Also the app-suite application id runPreflight's getAppUser reads
+  // (must be GUID-shaped): must match APP_USER_ID's systemuserid below only
+  // in shape, not value -- the fake client ignores the actual filter.
+  process.env.DYNAMICS_CLIENT_ID = '88888888-8888-4888-8888-888888888888';
   process.env.DYNAMICS_CLIENT_SECRET = 's';
   _resetInterlockStateForTests();
   fetch.mockReset();
@@ -126,16 +129,68 @@ const DESTINATION_REQUEST = {
   '_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue': 'Synthetic University',
 };
 
+const ORG_ID = '77777777-7777-4777-8777-777777777777';
+const APP_USER_ID = '88888888-8888-4888-8888-888888888888';
+// Real Graph identifier shapes (ledger KEY_RULES: GRAPH_SITE_ID/GRAPH_DRIVE_ID
+// in run-ledger.js) -- a bare "site-1"/"drive-1" fails ledger receipt
+// validation once these flow into a journaled readback (P1-B).
+const EXPECTED_SITE_ID = 'contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222';
+const EXPECTED_DRIVE_ID = 'b!driveIdSample1234567890';
+const SHARE_POINT_TARGET = () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' });
+
+/**
+ * `stepSeedInitialAssessment` now calls runPreflight (P1-B: bind the step's
+ * Graph writes to the run's own verified site/drive, matching every Basic
+ * step). This `client` answers both the preflight's org-level reads
+ * (mirrors tests/unit/test-request-run-runner.test.js's own
+ * `preflightClient()` fixture) and the step's own `/akoya_requests(id)` read.
+ */
 function fakeClient() {
-  return { baseUrl: SANDBOX_BASE_URL, get: jest.fn(async () => ({ ok: true, status: 200, body: DESTINATION_REQUEST })) };
+  return {
+    baseUrl: SANDBOX_BASE_URL,
+    get: jest.fn(async (requestPath) => {
+      if (requestPath.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: true, status: 200, body: DESTINATION_REQUEST };
+      if (requestPath.includes('EntityDefinitions')) {
+        if (requestPath.includes('ManyToOneRelationships')) return { ok: true, status: 200, body: { value: [{ ReferencedEntity: 'account' }] } };
+        if (requestPath.includes('PicklistAttributeMetadata')) {
+          return { ok: true, status: 200, body: { OptionSet: { Options: [{ Value: 100000000, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } } };
+        }
+        if (requestPath.includes('MoneyAttributeMetadata')) return { ok: true, status: 200, body: { MinValue: 0, MaxValue: 1 } };
+        if (requestPath.includes('StringAttributeMetadata') || requestPath.includes('MemoAttributeMetadata')) return { ok: true, status: 200, body: { MaxLength: 100 } };
+        return {
+          ok: true, status: 200,
+          body: {
+            value: [
+              'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'akoya_request',
+              'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_istestrequest',
+              'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
+            ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
+          },
+        };
+      }
+      if (requestPath.startsWith('/accounts')) return { ok: true, status: 200, body: { value: [{ accountid: ORG_ID, name: 'W. M. Keck Foundation', statecode: 0 }] } };
+      if (requestPath.startsWith('/sharepointsites')) return { ok: true, status: 200, body: { value: [{ sharepointsiteid: 'site-x', absoluteurl: 'https://example.sharepoint.com/sites/akoyago' }] } };
+      if (requestPath.startsWith('/sharepointdocumentlocations')) return { ok: true, status: 200, body: { value: [{ sharepointdocumentlocationid: 'parent-1', _parentsiteorlocation_value: 'site-x' }] } };
+      if (requestPath.startsWith('/systemusers')) return { ok: true, status: 200, body: { value: [{ systemuserid: APP_USER_ID, fullname: '# WMK: Research Review App Suite', accessmode: 4, isdisabled: false }] } };
+      if (requestPath.startsWith('/contacts')) return { ok: true, status: 200, body: { value: [] } };
+      throw new Error(`unexpected preflight/client path: ${requestPath}`);
+    }),
+  };
 }
 
 function fakeGraph(overrides = {}) {
   return {
+    getSiteId: jest.fn(async () => EXPECTED_SITE_ID),
+    getDriveId: jest.fn(async () => EXPECTED_DRIVE_ID),
     ensureFolderPath: jest.fn(async () => ({ id: 'folder-1' })),
     uploadFile: jest.fn(async (library, folder, filename, content, contentType, { onItemCreated } = {}) => {
-      if (onItemCreated) await onItemCreated({ id: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', name: filename, size: content.length, eTag: '"1"' });
-      return { siteId: 'site', driveId: 'drive', id: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', versionId: '1.0', eTag: '"1"' };
+      if (onItemCreated) {
+        await onItemCreated({
+          id: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', name: filename, size: content.length, eTag: '"1"',
+          siteId: EXPECTED_SITE_ID, driveId: EXPECTED_DRIVE_ID,
+        });
+      }
+      return { siteId: EXPECTED_SITE_ID, driveId: EXPECTED_DRIVE_ID, id: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', versionId: '1.0', eTag: '"1"' };
     }),
     ...overrides,
   };
@@ -223,6 +278,8 @@ function baseRun(overrides = {}) {
     sourceRequestId: '55555555-5555-4555-8555-555555555555', sourceRevision: 'rev-1',
     destinationRequestId: REQUEST_ID, destinationLocationId: '66666666-6666-4666-8666-666666666666',
     destinationRequestNumber: '9009009',
+    expectedOrganizationId: ORG_ID, expectedAppUserId: APP_USER_ID,
+    expectedGraphSiteId: EXPECTED_SITE_ID, expectedGraphDriveId: EXPECTED_DRIVE_ID,
     ...overrides,
   };
 }
@@ -254,7 +311,7 @@ async function run(deps) {
   const manifest = baseManifest();
   const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
     runId: RUN_ID, ledger, manifest, bundle: null,
-    deps: { client: fakeClient(), graph: fakeGraph(), sharePointTarget: () => ({}), ...deps },
+    deps: { client: fakeClient(), graph: fakeGraph(), sharePointTarget: SHARE_POINT_TARGET, ...deps },
   }));
   return { result, calls, getResources };
 }
@@ -360,7 +417,7 @@ describe('stepSeedInitialAssessment — registry create dispatch-marker rule', (
     const manifest = baseManifest();
     const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
       runId: RUN_ID, ledger, manifest, bundle: null,
-      deps: { client: fakeClient(), graph, sharePointTarget: () => ({}) },
+      deps: { client: fakeClient(), graph, sharePointTarget: SHARE_POINT_TARGET },
     }));
 
     expect(result.outcome).toBe('needs_attention');
@@ -462,7 +519,7 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
     const manifest = baseManifest();
     const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
       runId: RUN_ID, ledger, manifest, bundle: null,
-      deps: { client: fakeClient(), graph, sharePointTarget: () => ({}) },
+      deps: { client: fakeClient(), graph, sharePointTarget: SHARE_POINT_TARGET },
     }));
 
     expect(result.outcome).toBe('needs_attention');
@@ -530,12 +587,12 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
     const manifest = baseManifest();
     const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
       runId: RUN_ID, ledger, manifest, bundle: null,
-      deps: { client: fakeClient(), graph, sharePointTarget: () => ({}) },
+      deps: { client: fakeClient(), graph, sharePointTarget: SHARE_POINT_TARGET },
     }));
 
     expect(result.outcome).toBe('advanced');
     expect(graph.uploadFile).not.toHaveBeenCalled();
-    expect(graph.getFileMetadataById).toHaveBeenCalledWith('b!driveIdSample1234567890', '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567');
+    expect(graph.getFileMetadataById).toHaveBeenCalledWith('b!driveIdSample1234567890', '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', { siteId: EXPECTED_SITE_ID });
     const iaResource = getResources().find((r) => r.resourceKind === 'dataverse_request_document');
     expect(iaResource.readback.sourceVersionId).toBe('2.0');
   });
@@ -582,7 +639,7 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
     const manifest = baseManifest();
     const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
       runId: RUN_ID, ledger, manifest, bundle: null,
-      deps: { client: fakeClient(), graph, sharePointTarget: () => ({}) },
+      deps: { client: fakeClient(), graph, sharePointTarget: SHARE_POINT_TARGET },
     }));
 
     expect(result.outcome).toBe('needs_attention');
@@ -630,6 +687,69 @@ describe('stepSeedInitialAssessment — upload durability', () => {
     const iaResource = capturedResources.find((r) => r.resourceKind === 'dataverse_request_document');
     expect(iaResource.readback.itemId).toBe('01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567');
     expect(iaResource.readback.uploadAttemptedAt).toBeTruthy();
+  });
+});
+
+describe('stepSeedInitialAssessment — SharePoint site/drive binding (P1-B)', () => {
+  it('a drifted Graph site/drive (preflight != run.expectedGraphSiteId/DriveId) stops with preflight_identity_changed before any Graph write', async () => {
+    fetch.mockImplementation((url) => {
+      if (String(url).includes('login.microsoftonline.com')) return tokenResponse();
+      throw new Error(`unexpected fetch to ${url} -- the step must stop at preflight, before any Dataverse write`);
+    });
+    // Preflight resolves a DIFFERENT site/drive than this run's own
+    // expectedGraphSiteId/expectedGraphDriveId (baseRun() above) -- drift.
+    const graph = fakeGraph({
+      getSiteId: jest.fn(async () => 'contoso.sharepoint.com,99999999-9999-9999-9999-999999999999,88888888-8888-8888-8888-888888888888'),
+      getDriveId: jest.fn(async () => 'b!driveIdDrifted0000000000'),
+    });
+    const { result } = await run({ graph });
+
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('preflight_identity_changed');
+    expect(graph.ensureFolderPath).not.toHaveBeenCalled();
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('a matching Graph site/drive carries the preflight-verified ids into ensureFolderPath and the upload PUT', async () => {
+    const { generationKey } = identityFor();
+    const state = { row: null, request: { akoya_requestid: REQUEST_ID, _wmkf_currentinitialassessment_value: null, '@odata.etag': 'W/"request-1"' } };
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method === 'POST' && href.includes('wmkf_requestdocuments')) {
+        state.row = {
+          wmkf_requestdocumentid: REQUEST_DOCUMENT_ID, wmkf_artifacttype: 100000000, wmkf_operationstatus: 100000000, wmkf_lifecyclestate: 100000000,
+          wmkf_generationkey: generationKey, wmkf_claimtoken: JSON.parse(init.body).wmkf_claimtoken,
+          wmkf_sharepointfolderpath: JSON.parse(init.body).wmkf_sharepointfolderpath, wmkf_filename: JSON.parse(init.body).wmkf_filename,
+          _wmkf_request_value: REQUEST_ID, '@odata.etag': 'W/"row-1"', modifiedon: new Date().toISOString(),
+        };
+        return jsonResponse(state.row);
+      }
+      if (init?.method === 'PATCH' && href.includes('wmkf_requestdocuments(')) {
+        state.row = { ...state.row, ...JSON.parse(init.body), '@odata.etag': 'W/"row-2"' };
+        return Promise.resolve({ ok: true, status: 204, text: () => Promise.resolve('') });
+      }
+      if (href.includes('/$batch')) {
+        const opCount = (String(init.body).match(/Content-ID: \d+/g) || []).length;
+        state.row = { ...state.row, wmkf_operationstatus: 100000001, wmkf_sharepointdriveid: EXPECTED_DRIVE_ID, wmkf_sharepointitemid: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', '@odata.etag': 'W/"row-3"' };
+        state.request = { ...state.request, _wmkf_currentinitialassessment_value: REQUEST_DOCUMENT_ID, '@odata.etag': 'W/"request-2"' };
+        return Promise.resolve(multipartResponse(Array.from({ length: opCount }, (_, i) => ({ contentId: i + 1, status: 204 }))));
+      }
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: state.row ? [state.row] : [] });
+      if (href.includes('akoya_requests(')) return jsonResponse(state.request);
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+    const graph = fakeGraph();
+    const { result } = await run({ graph });
+
+    expect(result.outcome).toBe('advanced');
+    expect(graph.ensureFolderPath).toHaveBeenCalledWith(
+      'akoya_request', expect.any(String), { siteId: EXPECTED_SITE_ID, driveId: EXPECTED_DRIVE_ID },
+    );
+    expect(graph.uploadFile).toHaveBeenCalledWith(
+      'akoya_request', expect.any(String), expect.any(String), expect.any(Buffer), expect.any(String),
+      expect.objectContaining({ siteId: EXPECTED_SITE_ID, driveId: EXPECTED_DRIVE_ID, conflictBehavior: 'fail' }),
+    );
   });
 });
 

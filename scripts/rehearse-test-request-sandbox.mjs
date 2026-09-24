@@ -266,7 +266,11 @@ async function buildGraphContext() {
     getDriveId: (library, options) => GraphService.getDriveId(library, options),
     ensureFolderPath: (library, folder, options) => GraphService.ensureFolderPath(library, folder, options),
     listFiles: (parentRelativeUrl, locationRelativeUrl, options) => GraphService.listFiles(parentRelativeUrl, locationRelativeUrl, options),
-    getFileMetadataById: (driveId, itemId) => GraphService.getFileMetadataById(driveId, itemId),
+    // options forwarded (Stage B round 2, P1-B): the seed_initial_assessment
+    // step's upload-resume path passes { siteId } through this wrapper so
+    // the re-read of a journaled item stays bound to the preflight-verified
+    // site, matching ensureFolderPath/uploadFile's existing options passthrough.
+    getFileMetadataById: (driveId, itemId, options) => GraphService.getFileMetadataById(driveId, itemId, options),
     downloadFile: (driveId, itemId) => GraphService.downloadFile(driveId, itemId),
     getFileMetadataByPath: (library, folder, filename, options) => GraphService.getFileMetadataByPath(library, folder, filename, options),
     uploadFile: (library, folder, filename, content, contentType, options) => (
