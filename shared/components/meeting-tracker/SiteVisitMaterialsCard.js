@@ -148,7 +148,13 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
 
   if (unavailable) return null;
 
-  const contacts = collection ? ['pi', 'liaison'].map((role) => collection.contacts?.[role]).filter((person) => person?.email) : [];
+  const seenEmails = new Set();
+  const contacts = collection ? ['pi', 'liaison'].map((role) => collection.contacts?.[role]).filter((person) => {
+    const email = String(person?.email || '').trim().toLowerCase();
+    if (!email || seenEmails.has(email)) return false;
+    seenEmails.add(email);
+    return true;
+  }) : [];
   const missingSavedLiaison = Boolean(collection && !collection.contacts?.liaison?.email);
 
   return (

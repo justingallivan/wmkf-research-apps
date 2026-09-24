@@ -19,6 +19,7 @@ import { requireAppAccess } from '../../lib/utils/auth';
 import { DatabaseService } from '../../lib/services/database-service';
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
 import { renderMaterialsEmailHtml } from '../../lib/external/site-visit-materials-email';
+import { resolveSiteVisitApplicantContacts } from '../../lib/services/site-visit/applicant-contacts';
 
 const REQUEST = '11111111-1111-4111-8111-111111111111';
 const ACTOR = '22222222-2222-4222-8222-222222222222';
@@ -316,6 +317,20 @@ test.each(['piLastName', 'liaisonFullName', 'programCoordinatorName'])('missing 
   expect(mockDeps.sendEmail).not.toHaveBeenCalled();
 });
 
+test('an unnamed organization fallback liaison reports a missing name rather than a stale preview', async () => {
+  const template = namedFixture('create');
+  mockDeps.resolveRecipients.mockResolvedValue({
+    pi: { name: 'Pat de la Cruz', email: 'pat@example.edu' },
+    liaison: { name: null, email: 'org@example.edu' },
+  });
+  mockDeps.resolveMaterialNames.mockResolvedValue({ ...namedValues, liaisonFullName: '', liaisonEmail: '' });
+  const result = await post({ action: 'preview', sendAction: 'create', emailTemplate: template });
+  expect(result.statusCode).toBe(409);
+  expect(result.body).toMatchObject({ code: 'site_visit_materials_email_name_unavailable', token: 'liaisonFullName' });
+  expect(result.body.error).toMatch(/primary contact name is unavailable/i);
+  expect(mockDeps.insertCollection).not.toHaveBeenCalled();
+});
+
 test.each(['create', 'invite', 'remind'])('changed names invalidate %s preview before side effects', async (action) => {
   const template = namedFixture(action);
   const draft = await preview(action, template);
@@ -345,6 +360,27 @@ test('same-address PI and liaison produce one To recipient and no duplicate Cc',
   const result = await post({ action: 'create', emailTemplate: template, proof: draft.proof });
   expect(result.statusCode).toBe(200);
   expect(mockDeps.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: ['pat@example.edu'], cc: [] }));
+});
+
+test('blank Request contact uses the organization liaison for named preview and one-address send', async () => {
+  const template = namedFixture('create');
+  const accountId = '66666666-6666-4666-8666-666666666666';
+  const contactId = '77777777-7777-4777-8777-777777777777';
+  mockDeps.getRequest.mockResolvedValue({ ...await mockDeps.getRequest(), _akoya_applicantid_value: accountId, _akoya_primarycontactid_value: null });
+  mockDeps.resolveRecipients.mockImplementation((requestId, request) => resolveSiteVisitApplicantContacts({ requestId, request }, {
+    resolveRequestRecipients: async () => ({
+      pi: { contactId, name: 'Pat de la Cruz', email: 'pat@example.edu' },
+      liaison: { contactId: null, name: null, email: null },
+    }),
+    getAccount: async () => ({ _primarycontactid_value: contactId }),
+    getContact: async () => ({ contactid: contactId, fullname: 'Pat de la Cruz', emailaddress1: 'pat@example.edu' }),
+  }));
+  mockDeps.resolveMaterialNames.mockResolvedValue({ ...namedValues, liaisonFullName: '', liaisonEmail: '' });
+  const draft = await preview('create', template);
+  expect(draft.bodyText).toContain('Liaison: Pat de la Cruz');
+  const result = await post({ action: 'create', emailTemplate: template, proof: draft.proof });
+  expect(result.statusCode).toBe(200);
+  expect(mockDeps.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: ['pat@example.edu'], cc: [], bodyText: expect.stringContaining('Liaison: Pat de la Cruz') }));
 });
 
 test.each(['pi', 'liaison'])('a named %s who is not a recipient cannot be implied by the email', async (role) => {

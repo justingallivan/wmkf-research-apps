@@ -51,3 +51,11 @@ test('an email-less organization contact remains missing rather than falling bac
   expect(contacts.liaison.email).toBeNull();
   expect(applicantAttendeeSuggestions(contacts)).toHaveLength(1);
 });
+
+test.each(['getAccount', 'getContact'])('a failed %s read reports an unavailable contact', async (method) => {
+  const d = deps({ [method]: jest.fn(async () => { throw new Error('Dataverse read failed'); }) });
+  await expect(resolveSiteVisitApplicantContacts({ requestId: REQUEST }, d)).rejects.toMatchObject({
+    httpStatus: 503,
+    code: 'site_visit_primary_contact_unavailable',
+  });
+});
