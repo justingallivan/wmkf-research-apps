@@ -455,22 +455,9 @@ describe('slice 6a: manifest/run recipe binding', () => {
   });
 });
 
-describe('slice 6a: IA-only steps stop cleanly instead of running unbuilt bodies', () => {
-  // seed_initial_assessment was built in Stage B (slice 6b) and has its own
-  // dedicated coverage (test-request-run-runner-seed-initial-assessment.test.js);
-  // it is deliberately excluded from this "still not built" loop.
-  test('reaching seed_initial_assessment_snapshot or verify_initial_assessment marks needs_attention with recipe_step_not_built, never markReady, never an unhandled throw', async () => {
-    for (const step of ['seed_initial_assessment_snapshot', 'verify_initial_assessment']) {
-      const run = baseRun({ recipe: 'initial_assessment', currentStep: step, stepIndex: 7 });
-      const { ledger, calls } = createFakeLedger(run);
-      const manifest = baseManifest({ recipe: 'initial_assessment' });
-      const result = await advanceRun({
-        runId: RUN_ID, ledger, manifest, bundle: null,
-        deps: { client: {}, graph: {}, sharePointTarget: () => ({}) },
-      });
-      expect(result.outcome).toBe('needs_attention');
-      expect(result.run.needsAttentionReason).toBe('recipe_step_not_built');
-      expect(calls.filter((call) => call.op === 'markReady')).toHaveLength(0);
-    }
-  });
-});
+// The `recipe_step_not_built` stub this suite previously pinned for
+// seed_initial_assessment_snapshot/verify_initial_assessment was slice 6a/
+// Stage A-B scaffolding; both step bodies were built in Stage C (slice 6b) and
+// now have their own dedicated coverage:
+// test-request-run-runner-seed-initial-assessment-snapshot.test.js and
+// test-request-run-runner-verify-initial-assessment.test.js.
