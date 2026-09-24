@@ -153,6 +153,8 @@ calls the same service.
   recorded attendees and show missing applicants as one-click Add suggestions, so removing a
   person stays removed across reloads. The Activity changes only when the PC reviews and saves.
   Failed contact lookup leaves the visit usable and displays an unavailable-suggestions note.
+  Only the Tracker GET requests these contact suggestions; the Workbench logistics GET keeps its
+  existing visit-and-materials response without the extra Dataverse reads.
 
 ### 5.2 Schema (new wave, `kind: new-entity`)
 

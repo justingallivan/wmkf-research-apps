@@ -66,7 +66,8 @@ fallback.
   liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
   `SiteVisitEditor` fills distinct missing attendees on new-visit forms; saved visits instead show
   missing applicants as one-click Add suggestions and preserve recorded attendees. The Activity
-  and its parties change only when staff click Save.
+  and its parties change only when staff click Save. The Tracker GET explicitly opts into these
+  contact reads; the Workbench logistics GET continues to return only visit and materials data.
 - **[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]** The Meeting
   Tracker cycle list is a read-only consumer. Its dashboard service calls
   `site-visit.js::findActiveByRequests(requestIds)` for the bounded cycle join,

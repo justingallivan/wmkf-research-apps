@@ -43,7 +43,7 @@ test('GET requires the tracker grant, validates the id before auth, and returns 
   const res = mockRes();
   await handler(req('GET'), res);
   expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'meeting-tracker');
-  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID });
+  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID, includeApplicantAttendees: true });
   expect(res.statusCode).toBe(200);
   expect(res.body).toEqual({ success: true, siteVisit: { activityId: 'a1', etag: 'W/"1"' }, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }], applicantAttendeesUnavailable: false });
 });
