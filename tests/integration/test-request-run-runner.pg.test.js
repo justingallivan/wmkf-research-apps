@@ -450,6 +450,8 @@ describeIf('slice 5b runner against the live run ledger', () => {
     const baseline = resources.find((row) => row.step === 'verify' && row.resourceKind === 'foundation_baseline');
     expect(baseline).toMatchObject({ outcome: 'verified' });
     expect(baseline.readback.foundationBaselineSha256).toMatch(/^[0-9a-f]{64}$/);
+    // Written in the same insert that created the row, not only in the readback.
+    expect(baseline.plannedIdentity.foundationBaselineSha256).toBe(baseline.readback.foundationBaselineSha256);
 
     // Nothing source-derived or message-shaped reached Postgres.
     const { rows } = await db.query(
@@ -466,16 +468,20 @@ describeIf('slice 5b runner against the live run ledger', () => {
   // A verify attempt that recorded the baseline but lost its lease before
   // advancing: the retry must compare against that baseline, never record a
   // second one (which would accept a between-attempts change).
-  async function recordPriorBaseline(run, digest) {
+  async function recordPriorBaseline(run, digest, { withReadback = true } = {}) {
     const claimed = await ledger.claimLease({ runId: run.runId, expectedVersion: (await ledger.getRun(run.runId)).version });
     const row = await ledger.journalPlannedResource({
       runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
-      step: 'verify', resourceKind: 'foundation_baseline', system: 'dataverse', plannedIdentity: {},
+      step: 'verify', resourceKind: 'foundation_baseline', system: 'dataverse',
+      plannedIdentity: { foundationBaselineSha256: digest },
     });
-    await ledger.recordResourceReadback({
-      resourceId: row.resourceId, runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
-      responseStatus: null, readback: { foundationBaselineSha256: digest }, outcome: 'verified',
-    });
+    // withReadback false = the insert committed but its response was lost.
+    if (withReadback) {
+      await ledger.recordResourceReadback({
+        resourceId: row.resourceId, runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+        responseStatus: null, readback: { foundationBaselineSha256: digest }, outcome: 'verified',
+      });
+    }
     await expireLease(run.runId);
   }
 
@@ -503,6 +509,30 @@ describeIf('slice 5b runner against the live run ledger', () => {
     });
     const baselines = (await ledger.listRunResources(run.runId)).filter((row) => row.resourceKind === 'foundation_baseline');
     expect(baselines).toHaveLength(1);
+  });
+
+  it('slice 6a: a baseline insert whose response was lost still anchors the retry (changed Foundation stops the run)', async () => {
+    const { run, advance } = await setup({ recipe: 'initial_assessment' });
+    await runUntil(advance, 'verify', { bypassGoverify: true });
+    await recordPriorBaseline(run, foundationBaselineDigest({ accountid: ORG_ID, versionnumber: 0 }, []), { withReadback: false });
+
+    expect(await advance()).toMatchObject({ step: 'verify', outcome: 'needs_attention' });
+    expect(await ledger.getRun(run.runId)).toMatchObject({ needsAttentionReason: 'ia_verification_failed' });
+    const baselines = (await ledger.listRunResources(run.runId)).filter((row) => row.resourceKind === 'foundation_baseline');
+    expect(baselines).toHaveLength(1);
+  });
+
+  it('slice 6a: the database refuses a second foundation_baseline row for one run', async () => {
+    const { run, advance } = await setup({ recipe: 'initial_assessment' });
+    await runUntil(advance, 'verify', { bypassGoverify: true });
+    await recordPriorBaseline(run, foundationBaselineDigest({ accountid: ORG_ID, versionnumber: 1 }, []));
+    const claimed = await ledger.claimLease({ runId: run.runId, expectedVersion: (await ledger.getRun(run.runId)).version });
+    await expect(ledger.journalPlannedResource({
+      runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      step: 'verify', resourceKind: 'foundation_baseline', system: 'dataverse',
+      plannedIdentity: { foundationBaselineSha256: foundationBaselineDigest({ accountid: ORG_ID, versionnumber: 2 }, []) },
+    })).rejects.toThrow();
+    await expireLease(run.runId);
   });
 
   it('resumes a create whose response was lost: exact GUID recovered, never a second POST', async () => {

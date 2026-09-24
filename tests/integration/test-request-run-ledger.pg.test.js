@@ -428,6 +428,36 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     )).rejects.toMatchObject({ code: '23514' });
   });
 
+  it('slice 6a: the IA folder and DOCX filename families are accepted, and look-alikes rejected, identically by JS and SQL', async () => {
+    const accepted = [
+      { folder: '1000400_5D54ABC57F744D23B4BE39599147E674/Artifacts/Initial Assessment' },
+      { folder: '1000400_5D54ABC57F744D23B4BE39599147E674/Artifacts/Initial Assessment/Board Milestones' },
+      { folder: 'Artifacts/Initial Assessment' },
+      { filename: '1000400 Initial Assessment 0a1b2c3d-9f8e7d6c.docx' },
+      { filename: '1000400 Initial Assessment Board v1.0 0a1b2c3d.docx' },
+      { name: '1000400 Initial Assessment Board v3 0a1b2c3d.docx' },
+    ];
+    for (const receipt of accepted) {
+      expect(assertLedgerReceipt(receipt, 'fixture')).toBe(receipt);
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(true);
+    }
+    const rejected = [
+      { folder: '1000400_5D54ABC57F744D23B4BE39599147E674/Artifacts/Initial Assessment/Extra' },
+      { folder: '1000400_5D54ABC57F744D23B4BE39599147E674/Artifacts/Pre-Site Visit' },
+      { filename: '1000400 Initial Assessment Secret Notes.docx' },
+      { filename: '1000400 Initial Assessment 0A1B2C3D-9f8e7d6c.docx' },
+      { filename: '1000400 Initial Assessment 0a1b2c3d-9f8e7d6c.pdf' },
+      { filename: `1000400 Initial Assessment Board v${FAKE_GITHUB_TOKEN.slice(0, 20)} 0a1b2c3d.docx` },
+      { filename: 'Confidential Initial Assessment 0a1b2c3d-9f8e7d6c.docx' },
+    ];
+    for (const receipt of rejected) {
+      expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(false);
+    }
+  });
+
   it('the PostgreSQL receipt function accepts every receipt the live run 1000341 stored and rejects what the JS validator rejects', async () => {
     const evidence = JSON.parse(fs.readFileSync(
       path.join(process.cwd(), 'docs/plans/evidence/test-request-factory/ledger-run-1000341-2026-09-24.json'), 'utf8',

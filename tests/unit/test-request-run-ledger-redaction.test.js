@@ -330,3 +330,28 @@ describe('ledger lifecycle additions', () => {
     expect(db.calls).toHaveLength(2);
   });
 });
+
+describe('slice 6a: Initial Assessment folder and DOCX filename grammar', () => {
+  it.each([
+      { folder: '1000400_5D54ABC57F744D23B4BE39599147E674/Artifacts/Initial Assessment' },
+      { folder: '1000400_5D54ABC57F744D23B4BE39599147E674/Artifacts/Initial Assessment/Board Milestones' },
+      { folder: 'Artifacts/Initial Assessment' },
+      { filename: '1000400 Initial Assessment 0a1b2c3d-9f8e7d6c.docx' },
+      { filename: '1000400 Initial Assessment Board v1.0 0a1b2c3d.docx' },
+      { name: '1000400 Initial Assessment Board v3 0a1b2c3d.docx' },
+  ])('accepts %j', (receipt) => {
+    expect(assertLedgerReceipt(receipt, 'fixture')).toBe(receipt);
+  });
+
+  it.each([
+      { folder: '1000400_5D54ABC57F744D23B4BE39599147E674/Artifacts/Initial Assessment/Extra' },
+      { folder: '1000400_5D54ABC57F744D23B4BE39599147E674/Artifacts/Pre-Site Visit' },
+      { filename: '1000400 Initial Assessment Secret Notes.docx' },
+      { filename: '1000400 Initial Assessment 0A1B2C3D-9f8e7d6c.docx' },
+      { filename: '1000400 Initial Assessment 0a1b2c3d-9f8e7d6c.pdf' },
+      { filename: `1000400 Initial Assessment Board v${FAKE_GITHUB_TOKEN.slice(0, 20)} 0a1b2c3d.docx` },
+      { filename: 'Confidential Initial Assessment 0a1b2c3d-9f8e7d6c.docx' },
+  ])('rejects %j', (receipt) => {
+    expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
+  });
+});
