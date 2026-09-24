@@ -61,7 +61,7 @@ fallback.
 
 ## Consumers
 
-- **[SOURCE-BUILT ON `codex/bugfix-session-2026-09-24`; not deployed:]** Meeting Tracker's
+- **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** Meeting Tracker's
   visit GET offers read-only applicant attendee suggestions from the Request Project Leader and
   liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
   `SiteVisitEditor` fills distinct missing attendees on new-visit forms; saved visits instead show

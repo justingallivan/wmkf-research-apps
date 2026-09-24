@@ -146,7 +146,7 @@ calls the same service.
   cycle dashboard's `institution` is the fallback). The agenda email carries the same name
   after each proposal's title (owner request, 2026-09-11).
 - One visit editor per request: the fields the Activity already has, written through the existing
-  logistics service. **[SOURCE-BUILT ON `codex/bugfix-session-2026-09-24`; not deployed:]** the
+  logistics service. **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** the
   tracker GET also suggests applicant-side calendar attendees from the Request Project Leader
   and liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
   New-visit forms prefill distinct email addresses as required attendees. Saved visits keep their

@@ -668,7 +668,7 @@ and the PC's ready confirmation. One non-closed row per request (partial unique 
 never here: accepted uploads are SharePoint items registered in `wmkf_requestdocument`, which the
 service reads back by artifact type and canonical filename. Migration 044 adds `slot_leases JSONB
 NOT NULL DEFAULT '{}'::jsonb`: one server-owned token/expiry object per canonical checklist slot.
-**[SOURCE-BUILT ON `codex/bugfix-session-2026-09-24`; not deployed:]** manual email previews
+**[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** manual email previews
 read the current Project Leader and liaison emails without writing this row. A blank Request
 Primary Contact uses the applicant Account's Org Primary Contact for the liaison. Send requires both roles,
 revalidates the reviewed To/Cc recipients, and refreshes `contacts` from the Request: an existing

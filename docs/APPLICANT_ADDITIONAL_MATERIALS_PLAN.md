@@ -22,7 +22,8 @@ related:
 
 ## 1. Status and recommendation
 
-**Planning only. No implementation is authorized by this document.**
+This section preserves the 2026-09-08 planning snapshot; §16 records subsequent
+build and release status. This document does not itself authorize new work.
 
 Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
 Coordinator (PC) verify that the required files are present and render, and publishes selected
@@ -503,7 +504,7 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 
 - PI and liaison: `resolveGranteeInviteRecipients({ requestId })` in
   `lib/services/workbench/grantee-deliverables/recipients-service.js` (PI = `wmkf_projectleader`,
-  liaison = `akoya_primarycontactid`, both → contact email). The branch-only
+  liaison = `akoya_primarycontactid`, both → contact email). The production-live
   `site-visit/applicant-contacts.js` wrapper uses applicant Account `primarycontactid`
   only when the Request liaison lookup is blank (§16.12).
 - Contributor link: stored-digest token like the briefing link (`mintScopedToken` with audience
@@ -760,7 +761,7 @@ four shared invitation/reminder subject/body values were saved through Admin.
 Independent Dataverse readback at `2026-09-21T04:29:49.271420Z` matched all
 four tracked seed values exactly. No email was sent during release verification.
 
-### 16.12 2026-09-24: required PI and liaison recipients [SOURCE-BUILT ON BRANCH; NOT DEPLOYED]
+### 16.12 2026-09-24: required PI and liaison recipients [PRODUCTION-LIVE via PR #335]
 
 Request 1003222 exposed an existing collection whose saved liaison contact could not be
 verified for the named email copy. The owner chose to require the liaison recipient rather than
@@ -777,3 +778,11 @@ If the contact changed, staff must refresh the preview. The unscheduled automati
 using the saved collection contacts and skips a row missing either role. When every required file
 is received, the separate “nothing to remind about” guard still applies.
 The materials card names a missing saved liaison email instead of displaying literal `null`.
+
+PR #335 merged as `407ca908d48d050d9607aee8d111bc49c02ecbb8` on
+2026-09-24. Production deployment `dpl_J7dPgJRrUmMMfYodC689fnye8QQY`
+reached Ready and serves `applications.wmkeck.org`. Staff Preview rehearsal on
+Request 1003222 showed a rendered invitation addressed to Franklin Cat with the
+liaison name resolved and Send enabled. No email was sent in that rehearsal or
+during release verification. Production auth-provider and unauthenticated route
+checks passed; a signed-in production smoke check remains pending staff confirmation.
