@@ -239,21 +239,6 @@
   },
   {
     "file": "lib/services/irs-bmf-service.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/irs-bmf-service.js",
-    "kind": "new-Pool",
-    "count": 1
-  },
-  {
-    "file": "lib/services/irs-bmf-service.js",
-    "kind": "pool.connect",
-    "count": 1
-  },
-  {
-    "file": "lib/services/irs-bmf-service.js",
     "kind": "pool.query",
     "count": 1
   },
