@@ -332,6 +332,19 @@ describe('lib/postgres/client', () => {
       });
     });
 
+    test('does not load pg until getPool() is first called (jsdom suites import stores without pg)', () => {
+      jest.isolateModules(() => {
+        mockVercelPostgres();
+        const factory = jest.fn(() => ({ Pool: jest.fn(() => ({})) }));
+        jest.doMock('pg', factory);
+        process.env.POSTGRES_URL = 'postgres://lazy/db';
+        const { getPool } = require('../../lib/postgres/client');
+        expect(factory).not.toHaveBeenCalled();
+        getPool();
+        expect(factory).toHaveBeenCalledTimes(1);
+      });
+    });
+
     test('throws a clear error naming both variables when neither is set', () => {
       jest.isolateModules(() => {
         mockVercelPostgres();
