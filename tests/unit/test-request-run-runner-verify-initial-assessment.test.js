@@ -348,7 +348,7 @@ function baselineResource(digest) {
 function seedResourceRow(overrides = {}) {
   return {
     resourceId: 2, sequence: 2, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
-    readback: { requestDocumentId: SEED_DOCUMENT_ID },
+    readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId },
     outcome: 'advanced',
     ...overrides,
   };
@@ -356,7 +356,7 @@ function seedResourceRow(overrides = {}) {
 function snapshotResourceRow(overrides = {}) {
   return {
     resourceId: 3, sequence: 3, step: 'seed_initial_assessment_snapshot', resourceKind: 'dataverse_request_document', system: 'dataverse',
-    readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID },
+    readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId },
     outcome: 'advanced',
     ...overrides,
   };
@@ -382,7 +382,7 @@ describe('stepVerifyInitialAssessment', () => {
     iaHash = await hashGovernedDocxContent(iaBuffer);
   });
 
-  function iaRow() {
+  function iaRow(overrides = {}) {
     return {
       wmkf_requestdocumentid: SEED_DOCUMENT_ID,
       wmkf_artifacttype: 100000000,
@@ -397,6 +397,7 @@ describe('stepVerifyInitialAssessment', () => {
       wmkf_sharepointversionid: '1.0',
       wmkf_sharepointfolderpath: `${REQUEST_FOLDER}/Artifacts/Initial Assessment`,
       wmkf_contenthash: iaHash,
+      ...overrides,
     };
   }
   function snapshotRow(overrides = {}) {
@@ -726,6 +727,43 @@ describe('stepVerifyInitialAssessment', () => {
       request: requestReadback({ _wmkf_currentinitialassessment_value: OTHER_READY_ID }),
     });
     const graph = baseGraph();
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+  });
+
+  it('a canonical Initial Assessment SharePoint item that differs from the seed step\'s journaled item stops with ia_pointer_mismatch (Stage C round 2, P3-3)', async () => {
+    mockDataverse({ ia: iaRow({ wmkf_sharepointitemid: '01DIFFERENTITEMABCDEFGHIJKLMNOPQ' }) });
+    const graph = baseGraph({
+      getFileMetadataById: jest.fn(async (driveId, itemId) => {
+        if (itemId === '01DIFFERENTITEMABCDEFGHIJKLMNOPQ') return { ...iaMetadata(), id: itemId };
+        if (itemId === BASIC_ITEM_ID) return basicMetadata();
+        return null;
+      }),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+  });
+
+  it('a canonical Board snapshot SharePoint item that differs from the snapshot step\'s journaled item stops with ia_pointer_mismatch (Stage C round 2, P3-3)', async () => {
+    mockDataverse({ snapshot: snapshotRow({ wmkf_sharepointitemid: '01DIFFERENTSNAPABCDEFGHIJKLMNOPQ' }) });
+    const graph = baseGraph({
+      getFileMetadataById: jest.fn(async (driveId, itemId) => {
+        if (itemId === iaId) return iaMetadata();
+        if (itemId === BASIC_ITEM_ID) return basicMetadata();
+        if (itemId === '01DIFFERENTSNAPABCDEFGHIJKLMNOPQ') return { ...snapshotMetadata(), id: itemId };
+        return null;
+      }),
+    });
     const { result } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),

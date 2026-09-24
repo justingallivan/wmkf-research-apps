@@ -469,6 +469,50 @@ describe('stepSeedInitialAssessmentSnapshot', () => {
     expect(graph2.uploadFile).not.toHaveBeenCalled();
   });
 
+  it('a pre-existing (staff-made) GENERATING snapshot row at the same source identity, with no prior ledger resource for this step, is claimed and journaled rather than crashing on a null resource (Stage C round 2, P3-1)', async () => {
+    // Discover the real generation key the same way the "already Ready" test
+    // above does, then feed a STALE (>15 minute-old) GENERATING row at that
+    // key -- as if a staff member (or the app's own admin snapshot flow)
+    // started, but never finished, a Board snapshot of this exact source
+    // version, entirely outside this run. No ledger resource for this step
+    // exists yet, so the first call this run makes against the sandbox deps
+    // is `claimSnapshot`'s own updateDocument PATCH (wrappedUpdateDocument),
+    // never `wrappedCreateDocument` -- before the P3-1 fix, `merge()` there
+    // threw on a null `resource.resourceId`.
+    const identityRow = seedRow(governedHash);
+    const discoverState = { seed: identityRow, request: requestRow() };
+    mockDataverse(discoverState);
+    const discover = await runStep({ deps: { graph: fakeGraph() }, resources: [seedResourceRow()] });
+    expect(discover.result.outcome).toBe('advanced');
+    const generationKey = discoverState.snapshot.wmkf_generationkey;
+
+    const staleClaimToken = 'staff-claim-11111111';
+    const state = {
+      seed: identityRow,
+      snapshot: {
+        ...discoverState.snapshot,
+        wmkf_operationstatus: 100000000, // force back to GENERATING (the discover run left it READY)
+        wmkf_claimtoken: staleClaimToken,
+        modifiedon: new Date(Date.now() - 20 * 60 * 1000).toISOString(), // stale: claim lease (15 min) has expired
+      },
+      request: requestRow(),
+    };
+    fetch.mockClear();
+    mockDataverse(state);
+    const graph = fakeGraph();
+    const { result, getResources } = await runStep({ deps: { graph }, resources: [seedResourceRow()] });
+
+    // Never an unhandled/generic crash: either it adopts the stale claim and
+    // advances, or it stops with a properly coded reason -- never `unknown_error`.
+    expect(['advanced', 'needs_attention']).toContain(result.outcome);
+    if (result.outcome === 'needs_attention') {
+      expect(result.run.needsAttentionReason).not.toBe('unknown_error');
+    }
+    const snapshotResource = getResources().find((r) => r.step === 'seed_initial_assessment_snapshot');
+    expect(snapshotResource).toBeTruthy();
+    expect(snapshotResource.readback).toMatchObject({ generationKey });
+  });
+
   it('missing seed step journal (no requestDocumentId/sourceVersionId) stops with ia_pointer_mismatch before any Dataverse call', async () => {
     fetch.mockImplementation((url) => {
       if (String(url).includes('login.microsoftonline.com')) return tokenResponse();
@@ -534,5 +578,50 @@ describe('stepSeedInitialAssessmentSnapshot', () => {
       expect(result.outcome).toBe('advanced');
       expect(postCount).toBe(1);
     });
+  });
+
+  it('resuming with a journaled item id stops with ia_upload_ambiguous if the function\'s own path-based recovery resolves to a DIFFERENT item (Stage C round 2, P3-2)', async () => {
+    // Discover the real generation key first (same pattern as the other
+    // resume tests above).
+    const identityRow = seedRow(governedHash);
+    const discoverState = { seed: identityRow, request: requestRow() };
+    mockDataverse(discoverState);
+    const discover = await runStep({ deps: { graph: fakeGraph() }, resources: [seedResourceRow()] });
+    expect(discover.result.outcome).toBe('advanced');
+    const generationKey = discoverState.snapshot.wmkf_generationkey;
+    const claimToken = discoverState.snapshot.wmkf_claimtoken;
+    const journaledItemId = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    const wrongItemId = '01WRONGITEMSAMPLEIDXXXXXXXXXXXXXX';
+
+    // Resume state: the row is still GENERATING (crashed before the Ready
+    // PATCH), and THIS run already journaled itemId=journaledItemId from a
+    // prior invocation's onItemCreated callback.
+    const state = {
+      seed: identityRow,
+      snapshot: { ...discoverState.snapshot, wmkf_operationstatus: 100000000, wmkf_claimtoken: claimToken, modifiedon: new Date(Date.now() - 20 * 60 * 1000).toISOString() },
+      request: requestRow(),
+    };
+    fetch.mockClear();
+    mockDataverse(state);
+    // getFileMetadataByPath resolves to a DIFFERENT item than the one this
+    // run journaled -- simulating the path now pointing somewhere else.
+    const graph = fakeGraph({
+      getFileMetadataByPath: jest.fn(async () => ({ id: wrongItemId, name: 'unexpected.docx' })),
+    });
+    const { result, getResources } = await runStep({
+      deps: { graph },
+      resources: [seedResourceRow(), {
+        resourceId: 2, sequence: 2, step: 'seed_initial_assessment_snapshot', resourceKind: 'dataverse_request_document', system: 'dataverse',
+        plannedIdentity: { generationKey, folder: 'Artifacts/Initial Assessment/Board Milestones' },
+        readback: { generationKey, uploadAttemptedAt: new Date().toISOString(), itemId: journaledItemId, driveId: EXPECTED_DRIVE_ID, siteId: EXPECTED_SITE_ID },
+        outcome: 'dispatched',
+      }],
+    });
+
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_upload_ambiguous');
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+    const snapshotResource = getResources().find((r) => r.step === 'seed_initial_assessment_snapshot');
+    expect(snapshotResource.readback.itemId).toBe(journaledItemId); // never overwritten by the wrong id
   });
 });
