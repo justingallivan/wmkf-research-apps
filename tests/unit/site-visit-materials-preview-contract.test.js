@@ -35,13 +35,14 @@ function fixture() {
     schemaReady: () => true,
     getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST, akoya_requestnum: '1003222', akoya_title: 'Study A', wmkf_meetingdate: '2030-12-11', akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000 })),
     findActiveSiteVisit: jest.fn(async () => ({ activityid: VISIT, scheduledstart: '2030-10-07T16:00:00Z', scheduledend: '2030-10-07T19:00:00Z', wmkf_ianatimezone: 'America/Los_Angeles' })),
-    resolveRecipients: jest.fn(async () => ({ pi: { name: 'Pat', email: 'pat@example.edu' }, liaison: null })),
+    resolveRecipients: jest.fn(async () => ({ pi: { name: 'Pat', email: 'pat@example.edu' }, liaison: { name: 'Lee', email: 'lee@example.edu' } })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getOpenCollection: jest.fn(async () => row),
     getLatestCollection: jest.fn(async () => row),
     insertCollection: jest.fn(async (x) => { row = { id: x.id, request_id: x.requestId, status: 'open', site_visit_activity_id: x.siteVisitActivityId, due_at: x.dueAt, closes_at: x.closesAt, checklist: x.checklist, contacts: x.contacts, token_ciphertext: x.tokenCiphertext, created_at: new Date(), reminder_count: 0 }; return row; }),
     recordInvitation: jest.fn(async (_id, emailId) => { row = { ...row, invited_at: new Date(), invitation_email_id: emailId }; return row; }),
-    claimManualReminder: jest.fn(async () => { row = { ...row, reminder_count: row.reminder_count + 1 }; return row; }),
+    updateContacts: jest.fn(async (_id, expected, contacts) => { if (JSON.stringify(row.contacts) !== JSON.stringify(expected)) return null; row = { ...row, contacts }; return row; }),
+    claimManualReminder: jest.fn(async (_id, _at, expected, contacts) => { if (JSON.stringify(row.contacts) !== JSON.stringify(expected)) return null; row = { ...row, contacts, reminder_count: row.reminder_count + 1 }; return row; }),
     attachReminderEmailId: jest.fn(async () => row),
     mint: jest.fn(async () => ({ jwt: 'server-upload-token', jti: 'jti', hash: 'a'.repeat(64) })),
     seal: (token) => token,
@@ -72,7 +73,7 @@ async function preview(action = 'create', emailTemplate = invitation) {
   return result.body;
 }
 function existingRow() {
-  return { id: COLLECTION, request_id: REQUEST, status: 'open', site_visit_activity_id: VISIT, due_at: '2030-10-03T16:00:00Z', closes_at: '2030-10-14T19:00:00Z', checklist: SITE_VISIT_MATERIALS_CHECKLIST.map((x) => ({ ...x, waived: false })), contacts: { pi: { name: 'Pat', email: 'pat@example.edu' } }, token_ciphertext: 'existing-upload-token', created_at: new Date(), reminder_count: 0 };
+  return { id: COLLECTION, request_id: REQUEST, status: 'open', site_visit_activity_id: VISIT, due_at: '2030-10-03T16:00:00Z', closes_at: '2030-10-14T19:00:00Z', checklist: SITE_VISIT_MATERIALS_CHECKLIST.map((x) => ({ ...x, waived: false })), contacts: { pi: { name: 'Pat', email: 'pat@example.edu' }, liaison: { name: 'Lee', email: 'lee@example.edu' } }, token_ciphertext: 'existing-upload-token', created_at: new Date(), reminder_count: 0 };
 }
 beforeEach(() => {
   jest.clearAllMocks();
@@ -126,6 +127,23 @@ test('reminder carries the reviewed body and valid server-owned CTA URL', async 
   expect(renderMaterialsEmailHtml(email)).toContain(`href="${email.url}"`);
 });
 
+test('a missing liaison blocks preview; after the request contact is fixed, preview is read-only and reminder saves that recipient at claim', async () => {
+  mockDeps.setRow({ ...existingRow(), contacts: { pi: { name: 'Pat', email: 'pat@example.edu' }, liaison: null } });
+  mockDeps.resolveRecipients.mockResolvedValueOnce({ pi: { name: 'Pat', email: 'pat@example.edu' }, liaison: { name: 'Lee', email: null } });
+  const blocked = await post({ action: 'preview', sendAction: 'remind', emailTemplate: reminder });
+  expect(blocked.statusCode).toBe(409);
+  expect(blocked.body).toMatchObject({ code: 'site_visit_materials_recipients_required', missingRoles: ['liaison'] });
+  expect(mockDeps.claimManualReminder).not.toHaveBeenCalled();
+  expect(mockDeps.sendEmail).not.toHaveBeenCalled();
+
+  const draft = await preview('remind', reminder);
+  expect(mockDeps.getRow().contacts.liaison).toBeNull();
+  const sent = await post({ action: 'remind', emailTemplate: reminder, proof: draft.proof });
+  expect(sent.statusCode).toBe(200);
+  expect(mockDeps.getRow().contacts.liaison.email).toBe('lee@example.edu');
+  expect(mockDeps.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: ['pat@example.edu'], cc: ['lee@example.edu'] }));
+});
+
 test('an item waived after reminder preview invalidates the proof before claim', async () => {
   mockDeps.setRow(existingRow());
   const draft = await preview('remind', reminder);
@@ -139,8 +157,8 @@ test('an item waived after reminder preview invalidates the proof before claim',
 
 test('recipient drift between revalidation and create is refused before collection/token creation', async () => {
   const draft = await preview();
-  mockDeps.resolveRecipients.mockResolvedValueOnce({ pi: { name: 'Pat', email: 'pat@example.edu' } })
-    .mockResolvedValue({ pi: { name: 'Other', email: 'other@example.edu' } });
+  mockDeps.resolveRecipients.mockResolvedValueOnce({ pi: { name: 'Pat', email: 'pat@example.edu' }, liaison: { name: 'Lee', email: 'lee@example.edu' } })
+    .mockResolvedValue({ pi: { name: 'Other', email: 'other@example.edu' }, liaison: { name: 'Lee', email: 'lee@example.edu' } });
   const result = await post({ action: 'create', emailTemplate: invitation, proof: draft.proof });
   // A single checked snapshot is also valid; the sent/inserted recipients must
   // then be the reviewed recipients. A second read must fail before insertion.
@@ -240,7 +258,7 @@ test('visit date drift during create preparation cannot persist a window differe
 test('reminder recipient drift is rejected before consuming the reminder claim', async () => {
   mockDeps.setRow(existingRow());
   const draft = await preview('remind', reminder);
-  mockDeps.getOpenCollection.mockResolvedValueOnce(existingRow()).mockResolvedValue({ ...existingRow(), contacts: { pi: { email: 'other@example.edu' } } });
+  mockDeps.resolveRecipients.mockResolvedValue({ pi: { name: 'Other', email: 'other@example.edu' }, liaison: { name: 'Lee', email: 'lee@example.edu' } });
   const result = await post({ action: 'remind', emailTemplate: reminder, proof: draft.proof });
   expect(result.statusCode).toBe(409);
   expect(mockDeps.claimManualReminder).not.toHaveBeenCalled();
