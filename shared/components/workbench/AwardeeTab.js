@@ -836,7 +836,11 @@ export default function AwardeeTab({ requestId, context }) {
     && !Number.isNaN(status)
     && status >= GRANTEE_DELIVERABLE_STATUS.SUBMITTED;
   const ccAddresses = ccEmail.trim() ? ccEmail.split(',').map((email) => email.trim()) : [];
-  const ccAddressesValid = ccAddresses.length <= 10 && ccAddresses.every(isEmail);
+  const ccAddressKeys = ccAddresses.map((email) => email.toLowerCase());
+  const ccAddressesValid = ccAddresses.length <= 10
+    && ccAddresses.every(isEmail)
+    && new Set(ccAddressKeys).size === ccAddresses.length
+    && !ccAddressKeys.includes(toEmail.trim().toLowerCase());
   const canSend = invitableStatus
     && hasAbstract
     && isEmail(toEmail)
@@ -1215,7 +1219,7 @@ export default function AwardeeTab({ requestId, context }) {
           {recipients?.liaison?.name && <span className="text-xs text-gray-500"> {recipients.liaison.name}</span>}
         </label>
         <p className="text-xs text-gray-500">To copy an assistant as well as the liaison, add their email after a comma (up to 10 Cc addresses).</p>
-        {!ccAddressesValid && <p className="text-xs text-red-700">Enter up to 10 valid Cc addresses, separated by commas.</p>}
+        {!ccAddressesValid && <p className="text-xs text-red-700">Enter up to 10 distinct Cc addresses, different from To, separated by commas.</p>}
         {vipContactIds !== null && recipients?.liaison?.contactId && (
           <label className="flex items-center gap-2 text-xs text-gray-600">
             <input

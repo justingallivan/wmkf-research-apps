@@ -19,8 +19,15 @@ import { fillInviteBody, fillInviteSubject } from '../../shared/config/granteeIn
 // jest.mock factory reference them) so profile-switch behavior is testable.
 let mockPreferences = {};
 let mockProfileId = 'p1';
+const mockSetPreference = jest.fn();
+const mockDeletePreference = jest.fn();
 jest.mock('../../shared/context/ProfileContext', () => ({
-  useProfile: () => ({ preferences: mockPreferences, currentProfile: { id: mockProfileId } }),
+  useProfile: () => ({
+    preferences: mockPreferences,
+    currentProfile: { id: mockProfileId },
+    setPreference: mockSetPreference,
+    deletePreference: mockDeletePreference,
+  }),
 }));
 jest.mock('@vercel/blob/client', () => ({ put: jest.fn() }));
 jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
@@ -42,6 +49,8 @@ jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
 beforeEach(() => {
   mockPreferences = {};
   mockProfileId = 'p1';
+  mockSetPreference.mockReset();
+  mockDeletePreference.mockReset();
   put.mockReset().mockResolvedValue({ pathname: 'portal-staging/staff/x' });
 });
 
@@ -298,10 +307,12 @@ test('keeps the liaison copied when staff add an assistant for this invitation',
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
   confirmSendInModal();
 
-  await waitFor(() => expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(true));
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
   expect(JSON.parse(sendCall[1].body).ccEmail).toBe('lorena.mclaren@emory.edu, assistant@emory.edu');
   expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/api/user-preferences'))).toBe(false);
+  expect(mockSetPreference).not.toHaveBeenCalled();
+  expect(mockDeletePreference).not.toHaveBeenCalled();
 });
 
 test('disables sending if an additional Cc address is invalid', async () => {
@@ -311,7 +322,27 @@ test('disables sending if an additional Cc address is invalid', async () => {
   fireEvent.change(screen.getByLabelText('Cc email'), {
     target: { value: 'lorena.mclaren@emory.edu, not-an-email' },
   });
-  expect(screen.getByText(/enter up to 10 valid Cc addresses/i)).toBeInTheDocument();
+  expect(screen.getByText(/enter up to 10 distinct Cc addresses/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+});
+
+test('allows ten distinct Cc addresses but blocks eleven or duplicates', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Cc email')).toHaveValue('lorena.mclaren@emory.edu'));
+  const ten = ['lorena.mclaren@emory.edu', ...Array.from({ length: 9 }, (_, i) => `assistant${i}@emory.edu`)];
+  fireEvent.change(screen.getByLabelText('Cc email'), { target: { value: ten.join(', ') } });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeEnabled();
+
+  fireEvent.change(screen.getByLabelText('Cc email'), { target: { value: [...ten, 'another@emory.edu'].join(', ') } });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText('Cc email'), {
+    target: { value: 'lorena.mclaren@emory.edu, LORENA.MCLAREN@emory.edu' },
+  });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText('Cc email'), { target: { value: 'monika.raj@emory.edu' } });
   expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
 });
 
@@ -711,6 +742,8 @@ test('seeds the subject independently from the PD saved subject, filling the req
   fireEvent.click(screen.getByRole('button', { name: /use shared subject for this email/i }));
   expect(screen.getByLabelText('Subject')).toHaveValue(GRANTEE_INVITE_SEED_SUBJECT);
   expect(mockPreferences.grantee_invite_subject).toBe('Review {{proposalTitle}} soon');
+  expect(mockSetPreference).not.toHaveBeenCalled();
+  expect(mockDeletePreference).not.toHaveBeenCalled();
 });
 
 test('a blank personal subject falls back to Admin; a saved subject can supply a blank Admin subject', async () => {
@@ -816,10 +849,12 @@ test('one-send subject and body edits send once without changing saved defaults'
   fireEvent.change(screen.getByLabelText('Email body'), { target: { value: 'One-time message' } });
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
   confirmSendInModal();
-  await waitFor(() => expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(true));
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
   expect(JSON.parse(sendCall[1].body)).toMatchObject({ subject: 'Only this email', bodyText: 'One-time message' });
   expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/api/user-preferences'))).toBe(false);
+  expect(mockSetPreference).not.toHaveBeenCalled();
+  expect(mockDeletePreference).not.toHaveBeenCalled();
 
   unmount();
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);

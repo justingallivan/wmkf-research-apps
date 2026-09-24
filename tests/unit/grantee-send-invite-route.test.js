@@ -174,9 +174,19 @@ test('liaison and added assistant are both sent as Cc addresses', async () => {
   ]);
 });
 
+test('exactly ten distinct Cc addresses are accepted', async () => {
+  const ccAddresses = Array.from({ length: 10 }, (_, i) => `assistant${i}@emory.edu`);
+  const res = mockRes();
+  await handler(reqOf(body({ ccEmail: ccAddresses.join(', ') })), res);
+  expect(res.statusCode).toBe(200);
+  expect(DynamicsService.createAndSendEmail.mock.calls[0][0].cc).toEqual(ccAddresses);
+});
+
 test.each([
   'lorena.mclaren@emory.edu, bad',
   'lorena.mclaren@emory.edu,',
+  'lorena.mclaren@emory.edu, LORENA.MCLAREN@emory.edu',
+  'monika.raj@emory.edu',
   Array.from({ length: 11 }, (_, i) => `assistant${i}@emory.edu`).join(', '),
   ['lorena.mclaren@emory.edu', 'assistant@emory.edu'],
 ])('invalid Cc list is rejected before the link is minted or mail is sent: %p', async (ccEmail) => {

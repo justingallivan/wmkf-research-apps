@@ -64,6 +64,10 @@ export default async function handler(req, res) {
   if (ccAddresses.length > 10 || ccAddresses.some((email) => !isEmail(email))) {
     return res.status(400).json({ error: 'Cc must contain up to 10 valid email addresses separated by commas.' });
   }
+  const ccAddressKeys = ccAddresses.map((email) => email.toLowerCase());
+  if (new Set(ccAddressKeys).size !== ccAddresses.length || ccAddressKeys.includes(toEmail.toLowerCase())) {
+    return res.status(400).json({ error: 'Cc addresses must be distinct and different from To.' });
+  }
   if (!subject) {
     return res.status(400).json({ error: 'A subject is required.' });
   }
