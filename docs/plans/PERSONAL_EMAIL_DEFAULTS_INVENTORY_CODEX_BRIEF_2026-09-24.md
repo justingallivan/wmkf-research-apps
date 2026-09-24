@@ -126,9 +126,10 @@ and ticked the inventory item in
 `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`. Source-only inventory:
 17 source-level send expressions map to 56 distinct email cases (22
 workflow/diagnostic and 34 conditionally emailed operational notifications).
-Four meet the owner contract, nine partly meet it, three miss it, thirty-six
-are not applicable, and four automated reviewer cases that can send from a PD mailbox have an
-open personal-default policy decision. They have no staff compose action.
+After the owner's automated-reviewer decision, four meet the contract, nine
+partly meet it, seven miss it, and thirty-six are not applicable. The four
+additional misses can send from a PD mailbox but currently use Admin wording;
+they have no staff compose action.
 The syntax count includes the default
 site-visit materials send dependency and two of its callers, rather than 17
 independent transports. No runtime, template,
@@ -142,17 +143,20 @@ gates passed sequentially:
 `check:scaffolding-tokens`, and `check:harness-framing`. Citation path/line
 validation found 222 valid `path:line` references and 56 numbered rows;
 `check:doc-currency` and its self-test also passed sequentially, as did
-`git diff --check`. Source-only limits, the original questions, and the newly
-identified automated-reviewer policy question are recorded in the inventory's
-“Questions raised by source-only inspection” section. The owner's answers to
-the original questions are in its “Owner decisions” section. No follow-up
+`git diff --check`. Source-only limits and the questions raised by inspection
+are recorded in the inventory's “Questions raised by source-only inspection”
+section. The owner's answers, including the automated-reviewer decision, are
+in its “Owner decisions” section. No follow-up
 implementation had started at this historical handoff.
 
 Justin explicitly authorized the feature-branch push in this session.
 Commit `dcbbda8bc` was pushed to `origin/codex/personal-email-inventory`,
 and docs-only Tier 0 PR #329, **Personal email defaults inventory**, was
 opened against `main` and remains unmerged. Justin then answered the three
-product questions and selected the follow-up order recorded in the inventory.
+product questions and selected the original follow-up order recorded in the
+inventory. The owner then directed automated reviewer mail sent from a PD
+mailbox to use that PD's saved default; the inventory records the affected
+paths and proposed bounded follow-ups.
 Slice 4, the grantee invitation, was built separately in unmerged PR #330 and
 is awaiting owner review; later slices have not started. These later changes
 do not alter this brief's original read-only assignment.
