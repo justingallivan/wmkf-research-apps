@@ -125,12 +125,6 @@ const NON_ENTITY_TRANSPORT_METHODS = new Set([
   'addEmailAttachment',
   'createEmailActivity',
   'logAiRun',
-  // Pure data transform (lib/services/dynamics/annotations.js) -- touches no
-  // entity, just reshapes an already-fetched record's OData annotation keys.
-  // A caller with its own non-facade Dataverse read path (e.g. the Test
-  // Request Factory's sandbox-bound client, run-runner.js) still needs it to
-  // match production's own read shape.
-  'processAnnotations',
 ]);
 
 const LOGICAL_TO_ENTITY_SET = {

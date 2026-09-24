@@ -522,6 +522,11 @@ describe('stepSeedInitialAssessment — registry create dispatch-marker rule', (
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ambiguous_create_outcome');
     expect(postCount).toBe(1);
+    // The stop is fail-closed but not diagnostics-free: the reason stays the
+    // bare code (as the Basic create stop) while the POST's HTTP status reaches
+    // the operator through the returned message, which never enters the ledger.
+    expect(result.run.lastError).toBe('ambiguous_create_outcome');
+    expect(result.errorMessage).toContain('(http 500)');
   });
 });
 
@@ -636,6 +641,55 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
     // redundantly re-journal it.)
     const contentHashReadbacks = calls.filter((c) => c.op === 'recordResourceReadback' && c.readback?.contentHash);
     expect(contentHashReadbacks).toHaveLength(1);
+  });
+
+  it('a journaled item on a drive other than the preflight-verified drive stops with preflight_identity_changed before any Graph read', async () => {
+    const { generationKey } = identityFor();
+    const run0 = baseRun();
+    const { ledger } = createFakeLedger(run0);
+    await ledger.journalPlannedResource({
+      runId: RUN_ID, leaseToken: null, leaseGeneration: 0, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey },
+    });
+    const claimed = await ledger.claimLease({ runId: RUN_ID, expectedVersion: 1, leaseSeconds: 300 });
+    await ledger.recordResourceReadback({
+      resourceId: 1, runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      readback: {
+        generationKey, requestDocumentId: REQUEST_DOCUMENT_ID,
+        uploadAttemptedAt: new Date().toISOString(),
+        itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', driveId: 'b!driveIdOther9876543210', siteId: 'contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222',
+      },
+      outcome: 'dispatched',
+    });
+    await ledger.releaseLease({ runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration });
+
+    const row = {
+      wmkf_requestdocumentid: REQUEST_DOCUMENT_ID, wmkf_artifacttype: 100000000, wmkf_operationstatus: 100000000, wmkf_lifecyclestate: 100000000,
+      wmkf_generationkey: generationKey, wmkf_claimtoken: 'claim-11111111',
+      wmkf_sharepointfolderpath: `9009009_${REQUEST_ID.replace(/-/g, '').toUpperCase()}/Artifacts/Initial Assessment`,
+      wmkf_filename: '9009009 Initial Assessment aaaaaaaa-bbbbbbbb.docx', wmkf_contenthash: null,
+      _wmkf_request_value: REQUEST_ID, '@odata.etag': 'W/"row-1"', modifiedon: new Date().toISOString(),
+    };
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method === 'PATCH' && href.includes('wmkf_requestdocuments(')) {
+        return Promise.resolve({ ok: true, status: 204, text: () => Promise.resolve('') });
+      }
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [row] });
+      if (href.includes('akoya_requests(')) return jsonResponse({ akoya_requestid: REQUEST_ID, _wmkf_currentinitialassessment_value: null, '@odata.etag': 'W/"request-1"' });
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+    const graph = fakeGraph({ getFileMetadataById: jest.fn() });
+    const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
+      runId: RUN_ID, ledger, manifest: baseManifest(), bundle: null,
+      deps: { client: fakeClient(), graph, sharePointTarget: SHARE_POINT_TARGET },
+    }));
+
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('preflight_identity_changed');
+    expect(graph.getFileMetadataById).not.toHaveBeenCalled();
+    expect(graph.uploadFile).not.toHaveBeenCalled();
   });
 
   it('a journaled item that is no longer readable (404) stops with ia_upload_ambiguous, never re-PUTs', async () => {

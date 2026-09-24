@@ -3,7 +3,7 @@
 /**
  * Guard the Wave 24 Request Document explicit-actor write contract.
  *
- * - exactly nine runtime create seams are registered;
+ * - exactly ten runtime create seams are registered (the WRITERS table is the count);
  * - each create declares its approved actor policy beside the call;
  * - raw Request Document createRecord calls remain centralized in the adapter;
  * - immutable origin fields are not written by arbitrary services/changesets.
