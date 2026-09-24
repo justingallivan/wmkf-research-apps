@@ -529,11 +529,6 @@
   },
   {
     "file": "lib/services/site-visit/recipient-directory-service.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/site-visit/recipient-directory-service.js",
     "kind": "sql-tag",
     "count": 2
   },
