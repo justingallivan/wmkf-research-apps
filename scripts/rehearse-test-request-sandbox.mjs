@@ -273,6 +273,12 @@ async function buildGraphContext() {
     getFileMetadataById: (driveId, itemId, options) => GraphService.getFileMetadataById(driveId, itemId, options),
     downloadFile: (driveId, itemId) => GraphService.downloadFile(driveId, itemId),
     getFileMetadataByPath: (library, folder, filename, options) => GraphService.getFileMetadataByPath(library, folder, filename, options),
+    // Stage C: forwarded so the sandbox-bound Initial Assessment Board
+    // snapshot step (ia-sandbox-deps.js createIaSandboxDeps) can be driven
+    // through this CLI, matching every other read/write above. Never used by
+    // stepSeedInitialAssessment.
+    getFileVersionMetadata: (driveId, itemId, versionId) => GraphService.getFileVersionMetadata(driveId, itemId, versionId),
+    downloadFileVersion: (driveId, itemId, versionId) => GraphService.downloadFileVersion(driveId, itemId, versionId),
     uploadFile: (library, folder, filename, content, contentType, options) => (
       GraphService.uploadFile(library, folder, filename, content, contentType, options)
     ),
