@@ -4,6 +4,8 @@
 
 import {
   buildTestRequestAdminPreview,
+  createStrictTestRequestSourceDependencies,
+  discoverTestRequestSourceDocuments,
   loadTestRequestPreviewSource,
 } from '../../lib/services/test-requests/admin-preview-service';
 
@@ -204,6 +206,24 @@ test('loads a server-derived source summary and opaque allowlisted inventory', a
   expect(result.documents[0]).not.toHaveProperty('graphItemId');
   expect(deps.getFileMetadataById).not.toHaveBeenCalled();
   expect(deps.downloadFile).not.toHaveBeenCalled();
+  expect(deps.getRequestSharePointBuckets).toHaveBeenCalledWith(SOURCE_ID, '1002001');
+});
+
+test('strict source export discovery aborts when parent resolution fails', async () => {
+  const parentFailure = new Error('parent lookup failed');
+  const deps = dependencies({
+    getRequestSharePointBuckets: jest.fn(async (_requestId, _requestNumber, options) => {
+      if (options?.requireResolvedParents) throw parentFailure;
+      return [];
+    }),
+  });
+  const strictDependencies = createStrictTestRequestSourceDependencies(deps);
+
+  await expect(discoverTestRequestSourceDocuments(source, strictDependencies)).rejects.toBe(parentFailure);
+  expect(deps.getRequestSharePointBuckets).toHaveBeenCalledWith(SOURCE_ID, '1002001', {
+    requireResolvedParents: true,
+    requireCompleteResults: true,
+  });
 });
 
 test('re-resolves and hashes the selected file, but strips every executable payload while policy is unapproved', async () => {

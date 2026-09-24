@@ -24,8 +24,8 @@ import { withDalContext } from '../lib/dataverse/core/context.js';
 import { PRODUCTION_HOSTS } from '../lib/dataverse/core/target-registry.js';
 import { requireUniqueSourceRequest } from '../lib/services/test-requests/sandbox-clone.js';
 import {
-  TEST_REQUEST_ADMIN_PREVIEW_DEPENDENCIES,
   assertTestRequestSourceReadLimits,
+  createStrictTestRequestSourceDependencies,
   discoverTestRequestSourceDocuments,
   hydrateTestRequestSourceDocument,
 } from '../lib/services/test-requests/admin-preview-service.js';
@@ -33,6 +33,7 @@ import { buildSourceBundle, summarizeSourceBundle } from '../lib/services/test-r
 
 const require = createRequire(import.meta.url);
 const { getAccessToken, createClient } = require('../lib/dataverse/client.js');
+const SOURCE_BUNDLE_DEPENDENCIES = createStrictTestRequestSourceDependencies();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_SELECT = [
@@ -120,7 +121,7 @@ async function main() {
   const documents = await withDalContext('export-test-request-source-bundle', async () => {
     const inventory = await discoverTestRequestSourceDocuments(
       { akoya_requestid: requestId, akoya_requestnum: String(sourceRow.akoya_requestnum) },
-      TEST_REQUEST_ADMIN_PREVIEW_DEPENDENCIES,
+      SOURCE_BUNDLE_DEPENDENCIES,
     );
     if (inventory.errors.length) {
       throw new Error(`Source document inventory is incomplete: ${inventory.errors.map((e) => `${e.source}:${e.code}`).join(', ')}.`);
@@ -128,7 +129,7 @@ async function main() {
     assertTestRequestSourceReadLimits(inventory.documents);
     const hydrated = [];
     for (const document of inventory.documents) {
-      const version = await hydrateTestRequestSourceDocument(document, TEST_REQUEST_ADMIN_PREVIEW_DEPENDENCIES);
+      const version = await hydrateTestRequestSourceDocument(document, SOURCE_BUNDLE_DEPENDENCIES);
       hydrated.push({ ...version, graphItemId: document.graphItemId });
     }
     return hydrated;
