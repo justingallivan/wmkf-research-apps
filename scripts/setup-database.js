@@ -1265,6 +1265,113 @@ const v54Statements = [
      )`,
 ];
 
+// V55: BILL.com webhook event dedup. Mirrors migration 015
+// (015_bill_webhook_events.sql). Postgres access layer plan
+// (docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md) Stage 0
+// item 5 / owner decision Q3 — fresh-install/migration parity fix.
+const v55Statements = [
+  `CREATE TABLE IF NOT EXISTS bill_webhook_events (
+    id SERIAL PRIMARY KEY,
+    subscription_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (subscription_id, event_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_webhook_events_received_at
+     ON bill_webhook_events (received_at)`,
+];
+
+// V56: BILL onboarding durable state (chunk-4 hardening). Mirrors migration
+// 017 (017_bill_onboarding_state.sql). Postgres access layer plan Stage 0
+// item 5 / owner decision Q3.
+const v56Statements = [
+  `CREATE TABLE IF NOT EXISTS bill_onboarding_state (
+    honorarium_request_id  UUID PRIMARY KEY,
+    reviewer_contact_id    UUID NOT NULL,
+    vendor_id              TEXT,
+    bill_status            TEXT NOT NULL DEFAULT 'pending',
+    dynamics_pending       BOOLEAN NOT NULL DEFAULT FALSE,
+    pending_pni            TEXT,
+    pending_match          BOOLEAN,
+    attempts               INTEGER NOT NULL DEFAULT 0,
+    last_error             TEXT,
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_onboarding_pending
+     ON bill_onboarding_state (dynamics_pending)
+     WHERE dynamics_pending = TRUE`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_onboarding_updated_at
+     ON bill_onboarding_state (updated_at)`,
+];
+
+// V57: per-request reviewer-search candidate roster (Find-tab dedup +
+// exclude/promote). Folds migration 020 (020_reviewer_find_roster.sql) plus
+// the four follow-on ALTERs (023 coi_dropped, 025 candidate_key, 027
+// ineligible, 029 blocked) into the single post-029 end-state shape.
+// See docs/atlas/postgres-reviewer-find-roster.md. Postgres access layer
+// plan Stage 0 item 5 / owner decision Q3.
+const v57Statements = [
+  `CREATE TABLE IF NOT EXISTS reviewer_find_roster (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    request_id      UUID NOT NULL,
+    normalized_name TEXT NOT NULL,
+    display_name    TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    candidate       JSONB NOT NULL,
+    source_kind     TEXT,
+    candidate_key   TEXT NOT NULL,
+    first_seen_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT reviewer_find_roster_status_chk
+      CHECK (status IN ('active','excluded','saved','coi_dropped','ineligible','blocked'))
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_reviewer_find_roster_req_candidate
+     ON reviewer_find_roster (request_id, candidate_key)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_find_roster_req_status
+     ON reviewer_find_roster (request_id, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_find_roster_req_name
+     ON reviewer_find_roster (request_id, normalized_name)`,
+];
+
+// V58: external reviewer review-form autosave drafts. Mirrors migration 021
+// (021_review_drafts.sql). See docs/atlas/postgres-review-drafts.md.
+// Postgres access layer plan Stage 0 item 5 / owner decision Q3.
+const v58Statements = [
+  `CREATE TABLE IF NOT EXISTS review_drafts (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    suggestion_id UUID NOT NULL UNIQUE,
+    draft_json    JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+];
+
+// V59: append-only audit trail for staff edits to the review question set.
+// Mirrors migration 022 (022_review_question_audit.sql). See
+// docs/atlas/dataverse-wmkf-reviewquestion.md. NOT one of the plan's
+// originally-named four Q3 gaps — this table was found missing from this
+// script by the Stage 0 item 5 parity probe (tests/unit/postgres-schema-
+// parity.test.js) and is included here so the fix closes the actual gap
+// rather than four of its five members.
+const v59Statements = [
+  `CREATE TABLE IF NOT EXISTS review_question_audit (
+    id              SERIAL PRIMARY KEY,
+    request_id      TEXT NOT NULL,
+    profile_id      INT REFERENCES user_profiles(id),
+    phase           TEXT NOT NULL CHECK (phase IN ('pending', 'final')),
+    status          TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'set_changed', 'invalid', 'audit_unavailable', 'failed')),
+    base_version    TEXT,
+    result_version  TEXT,
+    summary_json    JSONB,
+    before_json     JSONB,
+    after_json      JSONB,
+    warnings_json   JSONB,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_review_question_audit_request ON review_question_audit (request_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_review_question_audit_created ON review_question_audit (created_at DESC)`,
+];
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -2388,6 +2495,97 @@ async function runMigration() {
       }
     }
 
+    // Run V55 table creation (BILL.com webhook event dedup; mirrors migration 015)
+    console.log(`\nApplying v55 schema updates - BILL webhook event dedup (${v55Statements.length} statements)...`);
+    for (let i = 0; i < v55Statements.length; i++) {
+      const statement = v55Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v55-${i + 1}/${v55Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v55-${i + 1}/${v55Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v55-${i + 1}/${v55Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V56 table creation (BILL onboarding durable state; mirrors migration 017)
+    console.log(`\nApplying v56 schema updates - BILL onboarding durable state (${v56Statements.length} statements)...`);
+    for (let i = 0; i < v56Statements.length; i++) {
+      const statement = v56Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v56-${i + 1}/${v56Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v56-${i + 1}/${v56Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v56-${i + 1}/${v56Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V57 table creation (reviewer-find roster, folded post-029 end state;
+    // mirrors migrations 020/023/025/027/029)
+    console.log(`\nApplying v57 schema updates - Reviewer find roster (${v57Statements.length} statements)...`);
+    for (let i = 0; i < v57Statements.length; i++) {
+      const statement = v57Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v57-${i + 1}/${v57Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v57-${i + 1}/${v57Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v57-${i + 1}/${v57Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V58 table creation (review-form autosave drafts; mirrors migration 021)
+    console.log(`\nApplying v58 schema updates - Review drafts (${v58Statements.length} statements)...`);
+    for (let i = 0; i < v58Statements.length; i++) {
+      const statement = v58Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v58-${i + 1}/${v58Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v58-${i + 1}/${v58Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v58-${i + 1}/${v58Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V59 table creation (review question audit trail; mirrors migration 022)
+    console.log(`\nApplying v59 schema updates - Review question audit (${v59Statements.length} statements)...`);
+    for (let i = 0; i < v59Statements.length; i++) {
+      const statement = v59Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v59-${i + 1}/${v59Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v59-${i + 1}/${v59Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v59-${i + 1}/${v59Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -2456,6 +2654,12 @@ async function runMigration() {
     console.log('\nV47 new tables (Cycle Dossier pilot):');
     console.log('  • cycle_dossiers, cycle_dossier_previews, cycle_dossier_entries,');
     console.log('    cycle_dossier_runs, cycle_dossier_control, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
+    console.log('\nV55-V59 new tables (Postgres access layer plan Stage 0 item 5 — fresh-install/migration parity fix):');
+    console.log('  • bill_webhook_events (mirrors migration 015)');
+    console.log('  • bill_onboarding_state (mirrors migration 017)');
+    console.log('  • reviewer_find_roster (folded post-029 end state; mirrors migrations 020/023/025/027/029)');
+    console.log('  • review_drafts (mirrors migration 021)');
+    console.log('  • review_question_audit (mirrors migration 022)');
     console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40, 2 added in V44, 2 added in V47)');
 
   } catch (error) {
