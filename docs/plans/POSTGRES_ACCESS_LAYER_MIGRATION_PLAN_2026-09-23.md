@@ -1306,7 +1306,27 @@ push and update this entry at every boundary.
   `import { sql } from '../../postgres/client'` against the CJS seam on a
   route path, `pages/api/dynamics-explorer/chat.js`). Reviews: Opus PENDING; Codex
   PENDING.
-- Item 2 (10 small swaps): not started.
+- **Item 2 (10 small swaps) — DONE**, two Sonnet builders on disjoint
+  slices, one file per hand-back, each committed by the orchestrator with
+  the file's `driver-import` key removed and its `sql-tag` key frozen
+  (verified per commit: contract test green before and after the swap,
+  the file's `--json` record without `driver-import`, one-line store
+  diff): `e6bdd4650` reviewer-identity-shadow-log · `4ae89e43b`
+  recipient-directory-service · `12d428b6d` reviewer-institution-
+  measurement · `1558eb09a` policies-service · `b9f6ba139`
+  intake-audit-service · `d3092daa6` review-questions-service ·
+  `51e02207a` dynamics-explorer-request-telemetry · `f5770b9d6`
+  prompts-publish-service · `645ec144d` batch-match-service · `8f6dab54d`
+  review-draft-service. Driver-import files 61 → 50. Every contract test
+  reads back every bound column and names the mutant its discriminating
+  fixture kills (real planner errors used where the schema allows: 23514
+  check violation, 22P02 on INET, 22003 on SMALLINT; the fail-open
+  writers prove a forced failure resolves without throwing). No existing
+  unit test needed a mock change: `jest.mock('@vercel/postgres')` still
+  intercepts through the CJS seam. Wave-2 boundary at `8f6dab54d`: gates
+  69/69, `test:ci` 1059 suites / 15667 tests, build passes.
+- Item 3 tests-before in progress (contract tests committed before any
+  swap): `bf743430d` panel-review-service.
 - Item 3 (11 larger swaps): not started.
 - Item 4 (6 connect/transaction users): not started. `irs-bmf-service`'s
   `refresh()` fetches the four IRS CSV URLs through global `fetch` with no
