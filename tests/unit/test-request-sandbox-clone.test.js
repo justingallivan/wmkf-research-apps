@@ -213,5 +213,12 @@ describe('sandbox operator write boundary', () => {
     // Receipt-bound inspection reconciles journaled stable IDs read-only.
     expect(script).toContain('reconcileJournaledCopies(receipt.fileCopies');
     expect(script).toContain("Receipt does not belong to this manifest.");
+    // Final manifest-authoritative byte check by stable ID runs after observation and gates verification.ok.
+    const observation = script.indexOf('const observation = await observe(client, manifest.values.requestId);');
+    const reverify = script.indexOf('reverifyCopiedItems(receipt.fileCopies || []');
+    const persisted = script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', reverify);
+    expect(reverify).toBeGreaterThan(observation);
+    expect(persisted).toBeGreaterThan(reverify);
+    expect(script).toContain("verification.failures.push(...reverifyFailures.map((failure) => `final file check: ${failure}`))");
   });
 });

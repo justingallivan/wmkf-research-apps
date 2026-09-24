@@ -10,6 +10,7 @@ import {
   copyPolicyDigest,
   planBundleFileCopies,
   reconcileJournaledCopies,
+  reverifyCopiedItems,
   verifyCopiedFiles,
 } from '../../lib/services/test-requests/bundle-file-copy.js';
 import { TEST_REQUEST_PREVIEW_READ_LIMITS } from '../../lib/services/test-requests/admin-preview-service.js';
@@ -76,11 +77,17 @@ function fakeDependencies(overrides = {}) {
     }),
     getFileMetadataByPath: jest.fn(async (library, folder, filename) => destination.get(`${folder}/${filename}`) ?? null),
     ensureFolderPath: jest.fn(async (library, folder) => { calls.push(`folder:${folder}`); return { id: `folder:${folder}` }; }),
+    // Production-shaped: the PUT commits, the created identity is handed to
+    // onItemCreated, then the Graph layer performs its own metadata read-back
+    // (which `readbackFailure` can make throw after the create committed).
     uploadFile: jest.fn(async (library, folder, filename, buffer, mimeType, options) => {
       calls.push(`upload:${folder}/${filename}`);
       const item = { id: `new-${filename}`, name: filename, size: buffer.length, mimeType, eTag: '"new"', versionId: '1.0', buffer };
       destination.set(`${folder}/${filename}`, item);
-      return { id: item.id, name: filename, size: buffer.length };
+      if (options?.onItemCreated) await options.onItemCreated({ id: item.id, name: filename, size: buffer.length, eTag: item.eTag });
+      calls.push(`upload-readback:${filename}`);
+      if (deps.readbackFailure) throw deps.readbackFailure;
+      return { id: item.id, name: filename, size: buffer.length, eTag: item.eTag, versionId: '1.0' };
     }),
     ...overrides,
   };
@@ -174,7 +181,9 @@ describe('copyBundleFiles', () => {
     expect(calls[firstUpload - 1]).toMatch(/^journal:planned:-:u,/);
     expect(deps.uploadFile).toHaveBeenCalledTimes(2);
     for (const call of deps.uploadFile.mock.calls) {
-      expect(call[5]).toEqual({ conflictBehavior: 'fail', siteId: SITE_ID, driveId: REQUEST_DRIVE });
+      expect(call[5]).toEqual({
+        conflictBehavior: 'fail', siteId: SITE_ID, driveId: REQUEST_DRIVE, onItemCreated: expect.any(Function),
+      });
     }
     expect(deps.clearGraphCaches).toHaveBeenCalledTimes(2);
     expect(deps.getDriveId).toHaveBeenCalledWith('wmkf_archive', { siteId: SITE_ID });
@@ -313,6 +322,26 @@ describe('copyBundleFiles', () => {
     expect(verifyCopiedFiles([last], [])).toEqual(['1 planned file(s) not verified']);
   });
 
+  test('journals the identity inside the PUT, before the Graph read-back; a read-back failure verifies by exact ID with no second PUT', async () => {
+    const { deps, calls } = fakeDependencies();
+    deps.readbackFailure = Object.assign(new Error('read-back timed out'), { name: 'AbortError' });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async (copies) => { if (copies[0].item?.id) calls.push('journal-with-item'); });
+    const copies = await copyBundleFiles(params(plan), deps, journal);
+    expect(copies[0]).toMatchObject({
+      status: 'verified',
+      outcome: 'created',
+      uploadReadbackError: 'read-back timed out',
+      item: { id: 'new-ProposalNarrative_1000400.pdf', versionId: '1.0' },
+    });
+    expect(copies[0].itemJournaledAt).toBeTruthy();
+    // The receipt held the stable ID before the upload's internal read-back ran.
+    expect(calls.indexOf('journal-with-item')).toBeGreaterThan(-1);
+    expect(calls.indexOf('journal-with-item')).toBeLessThan(calls.indexOf('upload-readback:ProposalNarrative_1000400.pdf'));
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+    expect(deps.getFileMetadataByPath).toHaveBeenCalledTimes(1); // only the pre-upload absence check, no path recovery
+  });
+
   test('reconcileJournaledCopies verifies journaled stable IDs read-only', async () => {
     const { deps, destination } = fakeDependencies();
     destination.set('x', { id: 'new-1', name: 'ProposalNarrative_1000400.pdf', size: NARRATIVE.length, buffer: NARRATIVE });
@@ -341,6 +370,37 @@ describe('copyBundleFiles', () => {
     const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
     await expect(copyBundleFiles({ ...params(plan), requestFolder: '../etc' }, deps, jest.fn())).rejects.toThrow(/request folder is invalid/);
     expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('reverifyCopiedItems', () => {
+  const entry = (over = {}) => ({
+    index: 0, status: 'verified', destinationDriveId: REQUEST_DRIVE,
+    item: { id: 'new-1', eTag: '"v1"', versionId: '1.0' },
+    destination: { folder: 'f', filename: 'ProposalNarrative_1000400.pdf' },
+    source: { size: NARRATIVE.length, contentHash: hash(NARRATIVE) },
+    ...over,
+  });
+  const metadata = (over = {}) => ({ id: 'new-1', name: 'ProposalNarrative_1000400.pdf', size: NARRATIVE.length, eTag: '"v1"', versionId: '1.0', ...over });
+
+  test('passes when metadata is unchanged around a download that hashes to the bundle', async () => {
+    const deps = { getFileMetadataById: jest.fn(async () => metadata()), downloadFile: jest.fn(async () => ({ buffer: NARRATIVE })) };
+    expect(await reverifyCopiedItems([entry()], deps)).toEqual([]);
+    expect(deps.getFileMetadataById).toHaveBeenCalledTimes(2);
+  });
+
+  test('fails on same-size different bytes, on eTag drift, on disappearance, and on unverified entries', async () => {
+    const sameSize = Buffer.from('narrative bytez');
+    expect(await reverifyCopiedItems([entry()], { getFileMetadataById: async () => metadata(), downloadFile: async () => ({ buffer: sameSize }) }))
+      .toEqual(['ProposalNarrative_1000400.pdf bytes no longer match the bundle SHA-256']);
+    expect(await reverifyCopiedItems([entry()], { getFileMetadataById: async () => metadata({ eTag: '"v2"' }), downloadFile: async () => ({ buffer: NARRATIVE }) }))
+      .toEqual(['ProposalNarrative_1000400.pdf metadata changed after verification']);
+    let reads = 0;
+    expect(await reverifyCopiedItems([entry()], { getFileMetadataById: async () => (reads++ === 0 ? metadata() : metadata({ versionId: '2.0' })), downloadFile: async () => ({ buffer: NARRATIVE }) }))
+      .toEqual(['ProposalNarrative_1000400.pdf changed during final verification']);
+    expect(await reverifyCopiedItems([entry()], { getFileMetadataById: async () => null, downloadFile: async () => ({ buffer: NARRATIVE }) }))
+      .toEqual(['ProposalNarrative_1000400.pdf no longer exists']);
+    expect(await reverifyCopiedItems([entry({ status: 'created-unverified' })], {})).toEqual(['ProposalNarrative_1000400.pdf was not verified during copy']);
   });
 });
 

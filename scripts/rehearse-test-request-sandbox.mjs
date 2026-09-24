@@ -56,6 +56,7 @@ import {
   copyPolicyDigest,
   planBundleFileCopies,
   reconcileJournaledCopies,
+  reverifyCopiedItems,
   verifyCopiedFiles,
 } from '../lib/services/test-requests/bundle-file-copy.js';
 
@@ -1286,6 +1287,20 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
     if (graphError) {
       verification.ok = false;
       verification.failures.push(`Graph folder inspection failed: ${graphError}`);
+    }
+    if (isBundleManifest(manifest)) {
+      // Final manifest-authoritative byte check by stable ID, after the
+      // observation window, so a later same-size overwrite cannot pass.
+      const { GraphService } = await import('../lib/services/graph-service.js');
+      const reverifyFailures = await reverifyCopiedItems(receipt.fileCopies || [], {
+        getFileMetadataById: (driveId, itemId) => GraphService.getFileMetadataById(driveId, itemId),
+        downloadFile: (driveId, itemId) => GraphService.downloadFile(driveId, itemId),
+      });
+      receipt.fileCopyFinalVerification = { checkedAt: new Date().toISOString(), failures: reverifyFailures };
+      if (reverifyFailures.length) {
+        verification.ok = false;
+        verification.failures.push(...reverifyFailures.map((failure) => `final file check: ${failure}`));
+      }
     }
 
     Object.assign(receipt, {
