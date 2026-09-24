@@ -342,6 +342,24 @@ describe('copyBundleFiles', () => {
     expect(deps.getFileMetadataByPath).toHaveBeenCalledTimes(1); // only the pre-upload absence check, no path recovery
   });
 
+  test('a failed receipt write after the PUT makes no network call and retries persisting the captured ID', async () => {
+    const { deps } = fakeDependencies();
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    let failedOnce = false;
+    const journal = jest.fn(async (copies) => {
+      if (copies[0].item?.id && !failedOnce) { failedOnce = true; throw new Error('receipt disk full'); }
+    });
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/Receipt write failed after .* was created \(item new-ProposalNarrative_1000400.pdf\)/);
+    // No metadata read or download of the created item happened while its ID was not durable.
+    expect(deps.getFileMetadataById.mock.calls.filter(([, id]) => id.startsWith('new-'))).toHaveLength(0);
+    expect(deps.downloadFile.mock.calls.filter(([, id]) => id.startsWith('new-'))).toHaveLength(0);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+    // The failure path persisted the captured identity.
+    const last = journal.mock.calls.at(-1)[0][0];
+    expect(last).toMatchObject({ status: 'failed', outcome: 'created-unjournaled', item: { id: 'new-ProposalNarrative_1000400.pdf' } });
+    expect(last.itemJournaledAt).toBeUndefined();
+  });
+
   test('reconcileJournaledCopies verifies journaled stable IDs read-only', async () => {
     const { deps, destination } = fakeDependencies();
     destination.set('x', { id: 'new-1', name: 'ProposalNarrative_1000400.pdf', size: NARRATIVE.length, buffer: NARRATIVE });
