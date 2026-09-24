@@ -429,20 +429,33 @@ describeIf('slice 5b runner against the live run ledger', () => {
     expect(stored).not.toMatch(/https?:\/\//);
   });
 
-  it('slice 6a: an initial_assessment run advances past verify (recording the Foundation/Contact baseline digest) to seed_initial_assessment, then stops needs_attention there since 6a registers no IA step bodies', async () => {
+  // Stage C (slice 6b) built real bodies for seed_initial_assessment,
+  // seed_initial_assessment_snapshot and verify_initial_assessment
+  // (lib/services/test-requests/run-runner.js); they reach Dataverse through
+  // a sandbox-bound client (ia-sandbox-deps.js) that this file's in-memory
+  // "world" fake does not simulate (it fakes only the `client`/`graph`
+  // objects the Basic steps use, never global `fetch`). Their dedicated
+  // coverage lives in
+  // tests/unit/test-request-run-runner-seed-initial-assessment.test.js,
+  // tests/unit/test-request-run-runner-seed-initial-assessment-snapshot.test.js
+  // and tests/unit/test-request-run-runner-verify-initial-assessment.test.js.
+  // This test therefore stops at the boundary slice 6a already proved: the
+  // Basic steps plus the `verify` step's Foundation/Contact baseline journal,
+  // for an `initial_assessment` run driven by the REAL live-Postgres ledger.
+  it('an initial_assessment run advances through the Basic steps and verify (recording the Foundation/Contact baseline digest), then reaches seed_initial_assessment', async () => {
     const { world, run, advance } = await setup({ recipe: 'initial_assessment' });
-    const results = await runUntil(advance, null, { bypassGoverify: true });
+    const results = await runUntil(advance, 'seed_initial_assessment', { bypassGoverify: true });
     const summary = results.map((result) => `${result.step}:${result.outcome}`);
     expect(summary).toEqual([
       'fence_source:advanced', 'create_request:advanced', 'correct_meeting_date:advanced', 'provision_location:advanced',
-      'copy_file:advanced', 'copy_file:advanced', 'observe:advanced', 'verify:advanced', 'seed_initial_assessment:needs_attention',
+      'copy_file:advanced', 'copy_file:advanced', 'observe:advanced', 'verify:advanced',
     ]);
-    expect(results.at(-1)).toMatchObject({ outcome: 'needs_attention' });
+    expect(results.at(-1)).toMatchObject({ outcome: 'advanced' });
 
     const final = await ledger.getRun(run.runId);
     expect(final).toMatchObject({
-      recipe: 'initial_assessment', status: 'needs_attention', currentStep: 'seed_initial_assessment',
-      needsAttentionReason: 'recipe_step_not_built', destinationRequestNumber: '1000400',
+      recipe: 'initial_assessment', status: 'creating', currentStep: 'seed_initial_assessment',
+      destinationRequestNumber: '1000400',
     });
     expect(world.state.counts.requestPost).toBe(1); // never markReady, never a second create
 
