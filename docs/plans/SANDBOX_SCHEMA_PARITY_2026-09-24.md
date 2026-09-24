@@ -12,6 +12,8 @@ related:
   - lib/dataverse/schema-apply.js
   - lib/dataverse/schema/wave0-prod-parity-foundation/01_wmkf_grantcycle.json
   - lib/dataverse/schema/wave29-prod-parity-tail/zz_akoya_request.json
+  - scripts/compare-sandbox-schema-parity.js
+  - scripts/apply-sandbox-choice-parity.js
 ---
 
 # Sandbox schema parity with production (2026-09-24)
@@ -49,7 +51,10 @@ writes]
    multiselect choice columns and file columns.
    `scripts/apply-dataverse-schema.js` gained `--new-first` (see recipe).
 4. Every wave was applied to the sandbox, then 54 choice values production has
-   and the sandbox lacked were inserted into the sandbox and published.
+   and the sandbox lacked were inserted into the sandbox and published. The
+   session used scratch versions of the two scripts in the recipe below;
+   `scripts/compare-sandbox-schema-parity.js` and
+   `scripts/apply-sandbox-choice-parity.js` are their committed form.
 
 ## Result
 
@@ -93,7 +98,15 @@ through `28-meeting-tracker` in numeric order, then `29-prod-parity-tail`.
 Do not pass `--wave` for a `-existing` directory; it loads with its parent.
 The engine is creation-only, so rerunning after a failure is safe.
 
+Then bring choice values across and check the result:
+
+1. `DATAVERSE_ALLOW_PROD_READS=yes node scripts/compare-sandbox-schema-parity.js --out=<report.json>`
+   (read-only, both environments; the production read needs owner authorization).
+2. `node scripts/apply-sandbox-choice-parity.js --report=<report.json>` (dry run),
+   then the same with `--execute` (sandbox only; inserts values and publishes).
+3. Re-run step 1 and confirm 0 missing values and only the deviations above.
+
 Do not run the `scripts/extend-*` / `scripts/add-*` one-off scripts against the
 sandbox: they read `DYNAMICS_URL` (production) and several write without a dry
-run. Choice values they added are covered by the choice-value comparison
-above; `wmkf_heldat` is in the tail wave.
+run. Choice values they added are covered by step 2; `wmkf_heldat` is in the
+tail wave.
