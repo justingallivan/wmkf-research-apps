@@ -2,7 +2,7 @@
 title: Postgres Access Layer Migration Plan
 domain: platform
 kind: plan
-status: draft
+status: active
 summary: Staged introduction of one Postgres client seam and per-domain stores, a ratchet-then-law gate mirroring the Dataverse DAL campaign, closure of the route→service law's SQL blind spot, and a real-planner contract-test harness; plan only, nothing executed.
 canonical: false
 owner: product-engineering

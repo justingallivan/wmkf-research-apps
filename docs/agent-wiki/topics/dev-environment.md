@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-20
+last_verified: 2026-09-23
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -18,6 +18,8 @@ source_files:
   - .claude/hooks/trust-boundary-guid-commit-guard.js
   - eslint.config.mjs
   - shared/utils/api-request.js
+  - jest.pg-contract.config.js
+  - tests/pg-contract/support/
 canonical_docs:
   - docs/CREDENTIALS_RUNBOOK.md
   - docs/CI_GATES_REFERENCE.md
@@ -35,6 +37,8 @@ watch_paths:
   - docs/CREDENTIALS_RUNBOOK.md
   - eslint.config.mjs
   - shared/utils/api-request.js
+  - jest.pg-contract.config.js
+  - tests/pg-contract/**
 update_triggers:
   - root instruction, hook, rule, or skill wiring changes
   - local build/test/deploy command changes
@@ -94,6 +98,26 @@ Claude config sync, and environment-specific operating notes.
   `docs/CREDENTIALS_RUNBOOK.md`). `--worktree NAME` also sets up a sibling Codex
   worktree. Run the `parallel-agent-worktree` skill for the guided procedure;
   `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` is the full command-level detail.
+- **Real-Postgres contract lane (S536).** `npm run test:pg-contract` runs
+  `tests/pg-contract/**` under `jest.pg-contract.config.js` against a disposable
+  Postgres named by `PG_CONTRACT_URL`; without the variable it prints
+  `pg-contract: skipped (no PG_CONTRACT_URL)` and exits 0. Loopback hosts only, no
+  override — `globalSetup` runs `DROP SCHEMA public CASCADE`. Locally: Colima
+  provides Docker (`colima start`); `docker run -d --name wmkf-pg-contract
+  -e POSTGRES_PASSWORD=contract -e POSTGRES_DB=wmkf_contract -p 55432:5432 postgres:16`
+  then `PG_CONTRACT_URL=postgresql://postgres:contract@127.0.0.1:55432/wmkf_contract`.
+  CI uses a `services: postgres:16` container in `.github/workflows/test.yml`. The
+  lane swaps `@vercel/postgres` for a `pg` shim via `moduleNameMapper` (Neon's
+  WebSocket driver cannot reach a plain container). Owning plan:
+  `docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md` (Stage 0 item 3,
+  Q1/Q1b). Hazard this guards: every prior unit test mocked the driver, so the S504
+  parameter-typing failure reached production (`feedback-mocked-sql-hides-parameter-typing`).
+- **Worktree `node_modules` symlinks break the canonical build (S536).** A
+  worktree whose `node_modules` is a symlink into a sibling checkout fails
+  `npm run build` under Turbopack with "Symlink [project]/node_modules is invalid,
+  it points out of the filesystem root"; a webpack build passes but is only a
+  fallback signal. Fix: `rm node_modules && npm ci` in the worktree. Distinct from
+  the S272 sandbox signature in `feedback-codex-build-gate-turbopack-sandbox`.
 - **Returning-machine setup starts with `/start`, then install.** Sync and inspect the
   handoff before `npm ci`/`npm install`, because installing first can rewrite a lockfile
   against a stale checkout. Never use `npm audit fix --force` as routine cleanup, and
