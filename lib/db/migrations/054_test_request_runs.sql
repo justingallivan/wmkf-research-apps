@@ -86,8 +86,11 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
     OR (status IN ('prepared', 'creating', 'needs_attention') AND completed_at IS NULL)
     OR status IN ('retiring', 'retired')
   ),
+  CONSTRAINT test_request_runs_request_number_shape CHECK (
+    destination_request_number IS NULL OR destination_request_number ~ '^[0-9]{1,10}$'
+  ),
   CONSTRAINT test_request_runs_ready_request_number CHECK (
-    status <> 'ready' OR destination_request_number IS NOT NULL
+    status <> 'ready' OR (destination_request_number IS NOT NULL AND destination_request_number ~ '^[0-9]{1,10}$')
   )
 );
 

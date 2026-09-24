@@ -34,6 +34,11 @@ describe('ledger redaction', () => {
     for (const secret of ['abc.def', 'dXNlcjpwYXNz', 'SECRET123', 'download.aspx']) {
       expect(cleaned).not.toContain(secret);
     }
+    for (const quoted of [
+      'Authorization: "Basic QUOTED1"', "Authorization='Basic QUOTED2'", '{"Authorization":"Bearer QUOTED3"}', 'Authorization=Basic QUOTED4,next',
+    ]) {
+      expect(sanitizeErrorMessage(quoted)).not.toMatch(/QUOTED/);
+    }
     expect(cleaned.length).toBeLessThanOrEqual(500);
   });
 
@@ -49,23 +54,36 @@ describe('ledger redaction', () => {
       { createBody: { akoya_title: 'x' } },
       { '@microsoft.graph.downloadUrl': 'https://x' },
       { body: 'x' }, { bytes: 'x' }, { narrative: 'x' }, { token: 'x' }, { bodyId: 'x' },
-      { reason: 'Bearer abc' },
-      { reason: 'Authorization: Basic zzz' },
+      { reason: 'anything' },
+      { workflowName: 'GOverify' },
+      { eTag: 'Authorization: Basic zzz' },
       { name: 'https://sharepoint.com/file' },
       { filename: 'x'.repeat(201) },
-      { reason: 'x'.repeat(81) },
+      { filename: 'Report with a very long name that exceeds the sixty character cap.pdf' },
+      { filename: 'The confidential purpose of this proposal' },
       { contentHash: 'not-hex' },
       { requestNumber: 'DROP TABLE' },
       { verifiedAt: 'yesterday' },
       { nested: { a: 1 } },
       { requestIds: [{ id: 1 }] },
-      { reason: 'line\nbreak' },
+      { folder: 'line\nbreak' },
+      { workflowName: 'The confidential purpose of this proposal is to study' },
+      { expectedValue: 'confidential narrative text here' },
+      { relativeUrl: '//attacker/share' },
+      { relativeUrl: '../escape' },
+      { folder: 'a//b' },
+      { itemIds: ['QmFzZSBzaXh0eS1mb3VyIGVuY29kZWQgdGV4dCB0aGF0IGlzIGxvbmcgZW5vdWdoIHRvIGNhcnJ5IGNvbnRlbnQ='] },
+      { status: 'x'.repeat(41) },
+      { size: -1 }, { size: 'twelve' }, { restored: 'yes' },
+      { eTag: 'W/"1" Bearer x' },
+      { createdAt: 'Bearer x' },
+      { bodyAt: '2026-01-01T00:00:00Z' },
     ];
     for (const bad of rejects) {
       expect([JSON.stringify(bad).slice(0, 40), thrownCode(() => assertLedgerReceipt(bad))])
         .toEqual([JSON.stringify(bad).slice(0, 40), 'test_request_ledger_unsafe_value']);
     }
-    expect(LEDGER_RECEIPT_KEYS).not.toEqual(expect.arrayContaining(['purpose', 'body', 'content', 'token', 'downloadUrl']));
+    expect(LEDGER_RECEIPT_KEYS).not.toEqual(expect.arrayContaining(['purpose', 'body', 'content', 'token', 'downloadUrl', 'reason', 'workflowName', 'title']));
   });
 
   test('every JSONB write is validated before binding, so an unsafe receipt never reaches SQL', async () => {
@@ -106,7 +124,7 @@ describe('ledger redaction', () => {
       .rejects.toMatchObject({ code: 'test_request_run_invalid_request_number' });
     expect(db.calls).toHaveLength(0);
     await ledger.markReady({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 2, destinationRequestNumber: '1000340' });
-    expect(db.calls[0].text).toMatch(/AND COALESCE\(\$5::text, destination_request_number\) IS NOT NULL/);
+    expect(db.calls[0].text).toContain("AND COALESCE($5::text, destination_request_number) ~ '^[0-9]{1,10}$'");
     expect(db.calls[0].params[4]).toBe('1000340');
   });
 });

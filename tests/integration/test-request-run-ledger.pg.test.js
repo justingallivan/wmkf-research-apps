@@ -324,7 +324,11 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     const { run: readyRun } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-retire-ready', plan: readyPlan });
     const { run: stuckRun } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-retire-stuck', plan: stuckPlan });
 
-    await db.query(`UPDATE test_request_runs SET status = 'ready', completed_at = NOW() WHERE run_id = $1::uuid`, [readyRun.runId]);
+    // ready requires a well-formed destination number (CHECKs test_request_runs_ready_request_number / _request_number_shape).
+    await expect(db.query(`UPDATE test_request_runs SET status = 'ready', completed_at = NOW() WHERE run_id = $1::uuid`, [readyRun.runId])).rejects.toThrow();
+    await expect(db.query(`UPDATE test_request_runs SET destination_request_number = 'abc' WHERE run_id = $1::uuid`, [readyRun.runId])).rejects.toThrow();
+    await expect(db.query(`UPDATE test_request_runs SET destination_request_number = '' WHERE run_id = $1::uuid`, [readyRun.runId])).rejects.toThrow();
+    await db.query(`UPDATE test_request_runs SET status = 'ready', completed_at = NOW(), destination_request_number = '1000999' WHERE run_id = $1::uuid`, [readyRun.runId]);
     await db.query(`UPDATE test_request_runs SET status = 'retiring' WHERE run_id = $1::uuid`, [readyRun.runId]);
     await db.query(`UPDATE test_request_runs SET status = 'retired' WHERE run_id = $1::uuid`, [readyRun.runId]);
 

@@ -29,8 +29,13 @@ function satisfiesNeedsAttentionCoherence({ status, needsAttentionReason = null 
 }
 
 /** Mirrors test_request_runs_ready_request_number. */
+const REQUEST_NUMBER_SHAPE = /^[0-9]{1,10}$/;
+/** Mirrors test_request_runs_request_number_shape. */
+function satisfiesRequestNumberShape({ destinationRequestNumber = null }) {
+  return destinationRequestNumber === null || REQUEST_NUMBER_SHAPE.test(destinationRequestNumber);
+}
 function satisfiesReadyRequestNumber({ status, destinationRequestNumber = null }) {
-  return status !== 'ready' || destinationRequestNumber !== null;
+  return status !== 'ready' || (destinationRequestNumber !== null && REQUEST_NUMBER_SHAPE.test(destinationRequestNumber));
 }
 
 /** Mirrors test_request_runs_completed_at_coherence. */
@@ -116,6 +121,12 @@ describe('migration 054 CHECK constraints (pure-JS mirror)', () => {
     it('ready requires a destination request number; other states do not', () => {
       expect(satisfiesReadyRequestNumber({ status: 'ready', destinationRequestNumber: '1000340' })).toBe(true);
       expect(satisfiesReadyRequestNumber({ status: 'ready' })).toBe(false);
+      expect(satisfiesReadyRequestNumber({ status: 'ready', destinationRequestNumber: '' })).toBe(false);
+      expect(satisfiesReadyRequestNumber({ status: 'ready', destinationRequestNumber: 'abc' })).toBe(false);
+      expect(satisfiesRequestNumberShape({ destinationRequestNumber: 'abc' })).toBe(false);
+      expect(satisfiesRequestNumberShape({ destinationRequestNumber: '' })).toBe(false);
+      expect(satisfiesRequestNumberShape({ destinationRequestNumber: null })).toBe(true);
+      expect(satisfiesRequestNumberShape({ destinationRequestNumber: '1000340' })).toBe(true);
       for (const status of ['prepared', 'creating', 'needs_attention', 'retiring', 'retired']) {
         expect(satisfiesReadyRequestNumber({ status })).toBe(true);
       }
@@ -188,7 +199,10 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
 
   it('defines the ready-requires-request-number constraint', () => {
     expect(migration).toContain('test_request_runs_ready_request_number');
-    expect(migration).toContain("status <> 'ready' OR destination_request_number IS NOT NULL");
+    // NULL ~ regex is NULL and a NULL CHECK passes, so the non-null test is explicit.
+    expect(migration).toContain("status <> 'ready' OR (destination_request_number IS NOT NULL AND destination_request_number ~ '^[0-9]{1,10}$')");
+    expect(migration).toContain('test_request_runs_request_number_shape');
+    expect(migration).toContain("destination_request_number IS NULL OR destination_request_number ~ '^[0-9]{1,10}$'");
   });
 
   it('defines the completed_at coherence constraint', () => {
