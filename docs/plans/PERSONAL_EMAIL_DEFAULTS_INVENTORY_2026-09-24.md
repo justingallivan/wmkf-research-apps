@@ -105,7 +105,7 @@ These are proposals, not implementation status. Each slice is one email family. 
 
 | Slice | Status | PR | Merged |
 | --- | --- | --- | --- |
-| 4. Grantee abstract invitation | Not started | — | No |
+| 4. Grantee abstract invitation | Built; draft pending recipient decision | [#330](https://github.com/justingallivan/wmkf-research-apps/pull/330) | No |
 | 1. Manual reviewer reminders | Not started | — | No |
 | 3. Reviewer release courtesies | Not started | — | No |
 | 2. Reviewer due-date extension | Not started | — | No |
