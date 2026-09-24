@@ -98,6 +98,11 @@ test('happy path: server-minted link + signature injected; Drafted → Invited w
   expect(opts).toEqual({ ifMatch: 'W/"2"', actingUserSystemId: 'sys-1' });
 });
 
+test('forwards multiple route-validated Cc addresses to the mail transport', async () => {
+  await sendGranteeInvite(args({ ccEmail: ['li@x.edu', 'assistant@x.edu'] }));
+  expect(createAndSendEmail.mock.calls[0][0].cc).toEqual(['li@x.edu', 'assistant@x.edu']);
+});
+
 test('send failure → 502 typed, no status flip', async () => {
   createAndSendEmail.mockRejectedValue(Object.assign(new Error('graph 500'), { dispatched: false }));
   const err = await sendGranteeInvite(args()).catch((e) => e);

@@ -50,6 +50,9 @@ export const PREFERENCE_KEYS = {
   // the generic /api/user-preferences endpoint (not reserved); "Reset to default"
   // DELETEs the key.
   GRANTEE_INVITE_BODY: 'grantee_invite_body',
+  // Sibling of the existing plain-string body preference. Subject placeholders
+  // are filled for the current request only after this reusable template loads.
+  GRANTEE_INVITE_SUBJECT: 'grantee_invite_subject',
   SITE_VISIT_MATERIALS_INVITATION_TEMPLATE: 'site_visit_materials_invitation_template',
   SITE_VISIT_MATERIALS_REMINDER_TEMPLATE: 'site_visit_materials_reminder_template',
   REVIEWER_RESPOND_REMINDER_TEMPLATE: 'reviewer_respond_reminder_template',

@@ -1,0 +1,568 @@
+{
+  "name": "akoya_request-prod-parity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf__ai_Summary",
+      "displayName": "TRASH",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ai_ComplianceCheck",
+      "displayName": "AI Compliance Check",
+      "globalOptionSet": {
+        "name": "wmkf_wmkf_ai_compliance",
+        "displayName": "wmkf_AI_Compliance"
+      },
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Compliant"
+        },
+        {
+          "value": 682090001,
+          "label": "Non-Compliant"
+        },
+        {
+          "value": 682090002,
+          "label": "Human Review"
+        },
+        {
+          "value": 682090003,
+          "label": "Reviewed"
+        }
+      ]
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_ComplianceIssues",
+      "displayName": "AI Check-in Issues",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_ComplianceSummary",
+      "displayName": "AI Check-in Summary",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_DataExtract",
+      "displayName": "AI Extracted Data",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ai_FitAssessment",
+      "displayName": "AI Fit",
+      "globalOptionSet": {
+        "name": "wmkf_wmkf_aifitassessment",
+        "displayName": "wmkf_AI Fit Assessment"
+      },
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Fit"
+        },
+        {
+          "value": 682090001,
+          "label": "Not a Fit"
+        },
+        {
+          "value": 682090002,
+          "label": "Unclear"
+        }
+      ]
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_FitRationale",
+      "displayName": "AI Fit Rationale",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_Summary",
+      "displayName": "AI Summary",
+      "maxLength": 1000000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_BBStatus2",
+      "displayName": "BB Status 2",
+      "maxLength": 100
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_BBTitle",
+      "displayName": "BB Title",
+      "maxLength": 2000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_BillcomCountry",
+      "displayName": "Bill.com Country",
+      "maxLength": 100
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_CalculatedTime",
+      "displayName": "Calculated Time",
+      "_comment": "Production defines this as a formula column (SourceType 3); the schema engine creates it as a plain column, so it holds no computed value outside production.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ConceptCallDate",
+      "displayName": "Concept Call Date",
+      "description": "Date and Time of Concept Call",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ContingencyStatus",
+      "displayName": "Contingency Status",
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Not Met"
+        },
+        {
+          "value": 682090001,
+          "label": "Met"
+        },
+        {
+          "value": 682090002,
+          "label": "Paid"
+        }
+      ]
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_DatePhaseIIProposalReceived",
+      "displayName": "Date Phase II Proposal Received",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_GALReadyforReview",
+      "displayName": "GAL Ready for Review",
+      "description": "Grant Award Letter or Email ready for final ED review",
+      "trueLabel": "Yes",
+      "falseLabel": "No"
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ImpactRating",
+      "displayName": "Impact Rating",
+      "globalOptionSet": {
+        "name": "wmkf_impactrating",
+        "displayName": "Impact Rating"
+      },
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Exceeded Goals"
+        },
+        {
+          "value": 682090001,
+          "label": "Met Goals"
+        },
+        {
+          "value": 682090002,
+          "label": "Partially Met Goals"
+        },
+        {
+          "value": 682090003,
+          "label": "Unsuccessful"
+        }
+      ]
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_NumberofConcepts",
+      "displayName": "Number of Concepts",
+      "minValue": 0,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_NumberofPayments",
+      "displayName": "Number of Payments",
+      "_comment": "Production defines this as a rollup column (SourceType 2); the schema engine creates it as a plain column, so it holds no computed value outside production.",
+      "minValue": -2147483648,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "MultiSelectPicklist",
+      "schemaName": "wmkf_PopulationServed2",
+      "displayName": "Population Served 2",
+      "options": [
+        {
+          "value": 707510000,
+          "label": "Adults"
+        },
+        {
+          "value": 707510001,
+          "label": "Children/Youth"
+        },
+        {
+          "value": 707510002,
+          "label": "Community-at-Large"
+        },
+        {
+          "value": 707510003,
+          "label": "Families"
+        },
+        {
+          "value": 707510004,
+          "label": "Homeless"
+        },
+        {
+          "value": 707510005,
+          "label": "Low Income"
+        },
+        {
+          "value": 707510006,
+          "label": "Seniors"
+        },
+        {
+          "value": 707510007,
+          "label": "Special Needs"
+        },
+        {
+          "value": 707510008,
+          "label": "Young Adults"
+        },
+        {
+          "value": 707510009,
+          "label": "Young Children (0-5)"
+        }
+      ]
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ProjectTitle1",
+      "displayName": "Project Title 1",
+      "maxLength": 500
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_ReadyforReview",
+      "displayName": "Ready for Review",
+      "trueLabel": "Yes",
+      "falseLabel": "No"
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_SoCalConceptStatus",
+      "displayName": "SoCal Concept Status",
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Pending"
+        },
+        {
+          "value": 682090006,
+          "label": "Scheduled Call"
+        },
+        {
+          "value": 682090002,
+          "label": "Phone Call"
+        },
+        {
+          "value": 682090003,
+          "label": "Competitive, Apply"
+        },
+        {
+          "value": 682090004,
+          "label": "Fit, but Wait"
+        },
+        {
+          "value": 682090005,
+          "label": "Unlikely to be Competitive"
+        },
+        {
+          "value": 682090001,
+          "label": "Ineligible"
+        },
+        {
+          "value": 707510001,
+          "label": "Completed"
+        }
+      ]
+    },
+    {
+      "type": "MultiSelectPicklist",
+      "schemaName": "wmkf_SupportType2",
+      "displayName": "Support Type2",
+      "globalOptionSet": {
+        "name": "wmkf_supporttype",
+        "displayName": "Support Type"
+      },
+      "options": [
+        {
+          "value": 100000000,
+          "label": "AWD - Award"
+        },
+        {
+          "value": 100000001,
+          "label": "Building/Renovation"
+        },
+        {
+          "value": 100000002,
+          "label": "Capacity Building"
+        },
+        {
+          "value": 100000003,
+          "label": "Chair's Discretionary Fund"
+        },
+        {
+          "value": 100000004,
+          "label": "Clinical development"
+        },
+        {
+          "value": 100000005,
+          "label": "Computational Modeling/Simulation"
+        },
+        {
+          "value": 100000006,
+          "label": "Curriculum Development"
+        },
+        {
+          "value": 100000007,
+          "label": "Data Sharing Platform"
+        },
+        {
+          "value": 100000008,
+          "label": "Databases & Model Systems/Resources"
+        },
+        {
+          "value": 100000009,
+          "label": "Directed Grant Program"
+        },
+        {
+          "value": 100000010,
+          "label": "Disaster Relief"
+        },
+        {
+          "value": 100000011,
+          "label": "Discovery science"
+        },
+        {
+          "value": 100000012,
+          "label": "Emeritus Gift Program"
+        },
+        {
+          "value": 100000013,
+          "label": "Employee Matching Grant Program"
+        },
+        {
+          "value": 100000014,
+          "label": "Endowed Chair"
+        },
+        {
+          "value": 100000015,
+          "label": "Endowment"
+        },
+        {
+          "value": 100000016,
+          "label": "Equipment Purchase"
+        },
+        {
+          "value": 100000017,
+          "label": "Experimental Research"
+        },
+        {
+          "value": 100000018,
+          "label": "Faculty Development"
+        },
+        {
+          "value": 100000019,
+          "label": "Field Building"
+        },
+        {
+          "value": 100000020,
+          "label": "General Support"
+        },
+        {
+          "value": 100000021,
+          "label": "Hypothesis Driven Research"
+        },
+        {
+          "value": 100000022,
+          "label": "Instrument Development"
+        },
+        {
+          "value": 100000023,
+          "label": "Major Initiative"
+        },
+        {
+          "value": 100000024,
+          "label": "Matching Grant Program"
+        },
+        {
+          "value": 100000025,
+          "label": "Memorial Gift Program"
+        },
+        {
+          "value": 100000026,
+          "label": "Methodology Development"
+        },
+        {
+          "value": 100000027,
+          "label": "Molecular Tools"
+        },
+        {
+          "value": 100000028,
+          "label": "Multiple projects"
+        },
+        {
+          "value": 100000029,
+          "label": "New Model"
+        },
+        {
+          "value": 100000030,
+          "label": "Planning"
+        },
+        {
+          "value": 100000031,
+          "label": "Program Expansion"
+        },
+        {
+          "value": 100000032,
+          "label": "Program Support"
+        },
+        {
+          "value": 100000033,
+          "label": "Research"
+        },
+        {
+          "value": 100000034,
+          "label": "Scholarship/Fellowship"
+        },
+        {
+          "value": 100000035,
+          "label": "Senior Staff Directed Grant Program"
+        },
+        {
+          "value": 100000036,
+          "label": "Staff Directed Grant Program"
+        },
+        {
+          "value": 100000037,
+          "label": "Technology Development"
+        },
+        {
+          "value": 100000038,
+          "label": "Theoretical Research"
+        },
+        {
+          "value": 100000039,
+          "label": "Tissue Bank"
+        },
+        {
+          "value": 100000040,
+          "label": "Training"
+        }
+      ]
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_UsingPayee",
+      "displayName": "Using Payee",
+      "trueLabel": "Yes",
+      "falseLabel": "No"
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_akoya_request_BillcomContact_contact",
+      "referencedEntity": "contact",
+      "lookupSchemaName": "wmkf_BillcomContact",
+      "lookupDisplayName": "Bill.com Contact",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "RemoveLink",
+        "Merge": "Cascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_grantcycle_akoya_request",
+      "referencedEntity": "wmkf_grantcycle",
+      "lookupSchemaName": "wmkf_GrantCycle",
+      "lookupDisplayName": "Grant Cycle",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "Restrict",
+        "Merge": "NoCascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_akoya_request_GrantWriter_contact",
+      "referencedEntity": "contact",
+      "lookupSchemaName": "wmkf_GrantWriter",
+      "lookupDisplayName": "Grant Writer",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "RemoveLink",
+        "Merge": "Cascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_akoya_request_ResearchLeader_contact",
+      "referencedEntity": "contact",
+      "lookupSchemaName": "wmkf_ResearchLeader",
+      "lookupDisplayName": "Research Leader",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "RemoveLink",
+        "Merge": "Cascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_akoya_request_reviewedproposal",
+      "referencedEntity": "akoya_request",
+      "lookupSchemaName": "wmkf_ReviewedProposal",
+      "lookupDisplayName": "Reviewed Proposal",
+      "lookupDescription": "For a reviewer honorarium, the proposal (akoya_request) being reviewed. Set by the reviewer portal on honorarium create.",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "RemoveLink",
+        "Merge": "NoCascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    }
+  ]
+}

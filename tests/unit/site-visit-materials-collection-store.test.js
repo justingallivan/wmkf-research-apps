@@ -8,6 +8,7 @@ import {
   attachReminderEmailId,
   claimAutomaticReminder,
   claimManualReminder,
+  updateContacts,
   closeExpiredCollections,
   listCollectionsDueForAutomaticReminder,
   listLatestCollectionsForRequests,
@@ -100,20 +101,33 @@ test('automatic reminder: the candidate read and the claim share one predicate (
 
 test('manual reminder claim (S507): a single conditional UPDATE, open + a 60s window since the last reminder; null when claimed recently or not open', async () => {
   const at = new Date('2026-10-06T15:00:00Z');
+  const before = { pi: { email: 'pi@example.edu' }, liaison: null };
+  const after = { pi: { email: 'pi@example.edu' }, liaison: { email: 'lee@example.edu' } };
 
   sql.mockResolvedValueOnce({ rows: [{ id: 'c1', reminder_count: 2 }] });
-  expect(await claimManualReminder('c1', at)).toEqual({ id: 'c1', reminder_count: 2 });
+  expect(await claimManualReminder('c1', at, before, after)).toEqual({ id: 'c1', reminder_count: 2 });
   expect(queryText(0)).toContain('UPDATE site_visit_material_collections SET last_reminder_at = NOW(), updated_at = NOW(), reminder_count = reminder_count + 1');
-  expect(queryText(0)).toContain("WHERE id = ? AND status = 'open' AND (last_reminder_at IS NULL OR last_reminder_at < ?::timestamptz - interval '60 seconds')");
-  expect(sql.mock.calls[0].slice(1)).toEqual(['c1', at.toISOString()]);
+  expect(queryText(0)).toContain("WHERE id = ? AND status = 'open' AND contacts = ?::jsonb AND (last_reminder_at IS NULL OR last_reminder_at < ?::timestamptz - interval '60 seconds')");
+  expect(sql.mock.calls[0].slice(1)).toEqual([JSON.stringify(after), 'c1', JSON.stringify(before), at.toISOString()]);
 
   // A reminder (manual or automatic) was stamped within the last 60 seconds: claim lost.
   sql.mockResolvedValueOnce({ rows: [] });
-  expect(await claimManualReminder('c1', at)).toBeNull();
+  expect(await claimManualReminder('c1', at, before, after)).toBeNull();
 
   // Not open (e.g. closed or ready): the WHERE clause excludes it, claim lost.
   sql.mockResolvedValueOnce({ rows: [] });
-  expect(await claimManualReminder('c2', at)).toBeNull();
+  expect(await claimManualReminder('c2', at, before, after)).toBeNull();
+});
+
+test('invitation contact refresh updates only a non-closed row with the expected saved snapshot', async () => {
+  const before = { pi: { email: 'pi@example.edu' }, liaison: null };
+  const after = { pi: { email: 'pi@example.edu' }, liaison: { email: 'lee@example.edu' } };
+  sql.mockResolvedValueOnce({ rows: [{ id: 'c1', contacts: after }] });
+  expect(await updateContacts('c1', before, after)).toEqual({ id: 'c1', contacts: after });
+  expect(queryText()).toContain("SET contacts = ?::jsonb, updated_at = NOW() WHERE id = ? AND status <> 'closed' AND contacts = ?::jsonb");
+  expect(sql.mock.calls[0].slice(1)).toEqual([JSON.stringify(after), 'c1', JSON.stringify(before)]);
+  sql.mockResolvedValueOnce({ rows: [] });
+  expect(await updateContacts('c1', before, after)).toBeNull();
 });
 
 test('auto-close sweeps every non-closed row past closes_at (ready included) and returns the count', async () => {

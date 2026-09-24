@@ -39,13 +39,13 @@ test('GET requires the tracker grant, validates the id before auth, and returns 
   expect(bad.statusCode).toBe(400);
   expect(requireAppAccess).not.toHaveBeenCalled();
 
-  getSiteVisitLogistics.mockResolvedValueOnce({ siteVisit: { activityId: 'a1', etag: 'W/"1"' }, materials: [{ artifactId: 'm' }] });
+  getSiteVisitLogistics.mockResolvedValueOnce({ siteVisit: { activityId: 'a1', etag: 'W/"1"' }, materials: [{ artifactId: 'm' }], applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }], applicantAttendeesUnavailable: false });
   const res = mockRes();
   await handler(req('GET'), res);
   expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'meeting-tracker');
-  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID });
+  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID, includeApplicantAttendees: true });
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({ success: true, siteVisit: { activityId: 'a1', etag: 'W/"1"' } });
+  expect(res.body).toEqual({ success: true, siteVisit: { activityId: 'a1', etag: 'W/"1"' }, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }], applicantAttendeesUnavailable: false });
 });
 
 test('PATCH takes the request id from the path only, passes the session actor, and refuses unsupported fields', async () => {
