@@ -18,8 +18,6 @@ const output = path.join(os.tmpdir(), 'wmkf-reviewer-reminder-rehearsal');
 const port = Number(process.env.REHEARSAL_PORT || 3132);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid REHEARSAL_PORT');
 fs.mkdirSync(output, { recursive: true });
-fs.writeFileSync(path.join(output, 'jsx-loader.cjs'),
-  `module.exports=function(source){return require(${JSON.stringify(fromRoot.resolve('@babel/core'))}).transformSync(source,{babelrc:false,configFile:false,presets:[[${JSON.stringify(fromRoot.resolve('next/dist/compiled/babel/preset-react'))},{runtime:'automatic'}]],filename:this.resourcePath}).code}`);
 
 webpack({
   mode: 'development',
@@ -28,7 +26,7 @@ webpack({
   output: { path: output, filename: 'bundle.js' },
   devtool: false,
   resolve: { modules: [path.join(root, 'node_modules'), 'node_modules'] },
-  module: { rules: [{ test: /\.jsx?$/, exclude: /node_modules/, use: path.join(output, 'jsx-loader.cjs') }] },
+  module: { rules: [{ test: /\.jsx?$/, exclude: /node_modules/, use: path.join(root, 'scripts/rehearsal/jsx-loader.js') }] },
 }, async (error, stats) => {
   if (error || stats.hasErrors()) {
     console.error(error || stats.toString({ all: false, errors: true }));
