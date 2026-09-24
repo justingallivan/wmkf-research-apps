@@ -1,4 +1,4 @@
-import { createRunLedger, sanitizeErrorMessage } from '../../lib/services/test-requests/run-ledger.js';
+import { cliActorId, createRunLedger, sanitizeErrorMessage } from '../../lib/services/test-requests/run-ledger.js';
 
 /**
  * Recording fake db: satisfies the `{ query, transaction }` interface
@@ -97,7 +97,7 @@ describe('reserveRun', () => {
     queueRows([runRow()]); // SELECT
     const ledger = createRunLedger(db);
 
-    const { run, created } = await ledger.reserveRun({ actorId: 'cli:actor-1', idempotencyKey: 'key-1', plan: BASE_PLAN });
+    const { run, created } = await ledger.reserveRun({ actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: BASE_PLAN });
 
     expect(created).toBe(true);
     expect(run.runId).toBe(BASE_PLAN.runId);
@@ -129,7 +129,7 @@ describe('reserveRun', () => {
       destinationRequestId: '00000000-0000-0000-0000-000000000001',
       destinationLocationId: '00000000-0000-0000-0000-000000000002',
     };
-    const { run, created } = await ledger.reserveRun({ actorId: 'cli:actor-1', idempotencyKey: 'key-1', plan: retryPlan });
+    const { run, created } = await ledger.reserveRun({ actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: retryPlan });
 
     expect(created).toBe(false);
     expect(run.destinationRequestId).toBe(firstAttemptDestinationRequestId);
@@ -143,7 +143,7 @@ describe('reserveRun', () => {
     const ledger = createRunLedger(db);
 
     await expect(ledger.reserveRun({
-      actorId: 'cli:actor-1',
+      actorId: cliActorId('actor-1'),
       idempotencyKey: 'key-1',
       plan: { ...BASE_PLAN, planDigest: 'd921855e42ae1f28d6a612394ac4cf6902fde039bb6714ff3ea34e09a5ee84ce' },
     })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });

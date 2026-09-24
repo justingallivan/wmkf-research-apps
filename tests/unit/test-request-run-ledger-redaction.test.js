@@ -6,6 +6,8 @@ import {
   LEDGER_STEPS,
   assertLedgerReceipt,
   assertReservePlan,
+  cliActorId,
+  idempotencyKeyDigest,
   createRunLedger,
   describeLedgerError,
   ledgerReasonOrThrow,
@@ -177,42 +179,43 @@ describe('remaining text columns are finite or grammar-bound', () => {
   });
 
   test('reserveRun validates every text column before SQL', async () => {
-    expect(assertReservePlan({ actorId: 'cli:gallivan', idempotencyKey: 'run-2026-09-24-a', plan: validPlan() })).toBeTruthy();
-    expect(assertReservePlan({ actorId: 'user:jane-doe@example.org', idempotencyKey: 'clone-1003222-20260924-a1b2c3d4', plan: validPlan() })).toBeTruthy();
+    expect(assertReservePlan({ actorId: cliActorId('gallivan'), idempotencyKey: 'run-2026-09-24-a', plan: validPlan() })).toBeTruthy();
+    expect(assertReservePlan({ actorId: `user:${RUN_ID}`, idempotencyKey: 'any-printable-key!', plan: validPlan() })).toBeTruthy();
+    expect(cliActorId('Gallivan')).toMatch(/^cli:[0-9a-f]{16}$/);
+    expect(cliActorId('Gallivan')).not.toContain('allivan');
+    expect(idempotencyKeyDigest('password-hunter2')).toMatch(/^[0-9a-f]{64}$/);
     const db = recordingDb([]);
     const ledger = createRunLedger(db);
     const cases = [
-      { actorId: 'cli gallivan', idempotencyKey: 'k', plan: validPlan() },
-      { actorId: 'cli:x', idempotencyKey: 'k with space', plan: validPlan() },
-      { actorId: 'cli:x', idempotencyKey: 'https:example.com', plan: validPlan() },
-      { actorId: 'cli:x', idempotencyKey: 'eyJhbGciOiJIUzI1NiJ9.secret.signature', plan: validPlan() },
-      { actorId: 'cli:x', idempotencyKey: 'eyjhbgcioijiuzi1nij9.secret.signature', plan: validPlan() },
-      { actorId: 'cli:x', idempotencyKey: 'k'.repeat(41), plan: validPlan() },
+      { actorId: 'cli:gallivan', idempotencyKey: 'k', plan: validPlan() },
+      { actorId: 'cli:hunter2', idempotencyKey: 'k', plan: validPlan() },
+      { actorId: 'user:jane-doe@example.org', idempotencyKey: 'k', plan: validPlan() },
       { actorId: 'eyJhbGciOiJIUzI1NiJ9.secret.signature', idempotencyKey: 'k', plan: validPlan() },
-      { actorId: 'cli:https:example.com', idempotencyKey: 'k', plan: validPlan() },
-      { actorId: 'cli:eyjhbgcioijiuzi1nij9.secret.signature', idempotencyKey: 'k', plan: validPlan() },
-      { actorId: 'bot:x', idempotencyKey: 'k', plan: validPlan() },
-      { actorId: 'cli:Gallivan', idempotencyKey: 'k', plan: validPlan() },
-      { actorId: 'user:jane.doe@example.org', idempotencyKey: 'k', plan: validPlan() },
-      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), recipe: 'confidential' } },
-
-      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), fiscalYear: 'Confidential 2026' } },
-      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), sourceRevision: 'purpose text here' } },
-      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), destinationEnvironment: 'prod' } },
-      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), bundleSha256: 'nothex' } },
-      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), sourceDataverseHost: 'https://wmkf.crm.dynamics.com' } },
+      { actorId: 'bot:' + RUN_ID, idempotencyKey: 'k', plan: validPlan() },
+      { actorId: cliActorId('x'), idempotencyKey: '', plan: validPlan() },
+      { actorId: cliActorId('x'), idempotencyKey: 'has space', plan: validPlan() },
+      { actorId: cliActorId('x'), idempotencyKey: 'k'.repeat(201), plan: validPlan() },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), recipe: 'confidential' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), fiscalYear: 'Confidential 2026' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), sourceRevision: 'purpose text here' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), destinationEnvironment: 'prod' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), bundleSha256: 'nothex' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), sourceDataverseHost: 'https://wmkf.crm.dynamics.com' } },
     ];
+
     for (const bad of cases) {
       await expect(ledger.reserveRun(bad)).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
     }
     expect(db.calls).toHaveLength(0);
   });
 
-  test('test_label is derived from validated fields; caller text never reaches SQL', async () => {
+  test('caller text never reaches SQL: label derived, key hashed, cli actor digested', async () => {
     const runRow = { run_id: RUN_ID, plan_digest: 'c'.repeat(64), destination_request_id: '33333333-3333-4333-8333-333333333333' };
     for (const leaky of ['Confidential acquisition of Acme', 'Bearer eyJhbGciOiJIUzI1NiJ9.secret.signature', 'https:example.com', 'purpose text']) {
       const db = recordingDb([[{ run_id: RUN_ID }], [runRow]]);
-      await createRunLedger(db).reserveRun({ actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), testLabel: leaky } });
+      await createRunLedger(db).reserveRun({ actorId: cliActorId('hunter2'), idempotencyKey: 'password-hunter2', plan: { ...validPlan(), testLabel: leaky } });
+      expect(JSON.stringify(db.calls.map((c) => c.params))).not.toContain('hunter2');
+      expect(db.calls[0].params[2]).toBe(idempotencyKeyDigest('password-hunter2'));
       const bound = JSON.stringify(db.calls.map((c) => c.params));
       expect(bound).not.toContain('Confidential');
       expect(bound).not.toContain('eyJhbGci');
