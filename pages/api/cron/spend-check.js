@@ -20,9 +20,6 @@ import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import AlertService from '../../../lib/services/alert-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 import { ATTEMPT_COST_UNKNOWN_SQL } from '../../../lib/services/review-panel-store';
-import { withDalContext } from '../../../lib/dataverse/core/context';
-import { testRequestIsolationEnabled } from '../../../lib/services/test-requests/isolation.js';
-import { excludeTestRequestSpendRows } from '../../../lib/services/test-requests/spend-isolation.js';
 
 // Calibrated S183 from 60d prod spend data: max observed legitimate day
 // was $26.16 (a batch-processing day with 386 requests); avg active day
@@ -51,7 +48,7 @@ export default async function handler(req, res) {
   const runId = await MaintenanceService.startRun('spend-check');
 
   try {
-    const dailyThreshold = await withDalContext('cron-spend-check', () => checkDailyThreshold());
+    const dailyThreshold = await checkDailyThreshold();
     await MaintenanceService.completeRun(runId, {
       status: 'completed',
       recordsProcessed: dailyThreshold.requestCount ?? 0,
@@ -90,11 +87,7 @@ async function checkDailyThreshold() {
   const spentCents = Number(total_cost_cents) + panelKnownCents;
 
   const overThreshold = spentCents > thresholdCents;
-  const isolationMetadata = testRequestIsolationEnabled() ? {
-    testRequestIsolation: panel.isolation,
-    apiUsageAttribution: 'unattributable',
-  } : {};
-  const metadata = { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, overThreshold, panelAvailable: panel.available, ...isolationMetadata };
+  const metadata = { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, overThreshold, panelAvailable: panel.available };
 
   // Two INDEPENDENT alerts, each with its own dedupe key and its own
   // create/autoResolve pair, so one condition can never suppress or
@@ -138,7 +131,7 @@ async function checkDailyThreshold() {
     await AlertService.autoResolve(PANEL_UNKNOWN_ALERT_KEY);
   }
 
-  return { status: (overThreshold || (panel.available && panelUnknownCount > 0)) ? 'alerting' : 'ok', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, panelAvailable: panel.available, ...isolationMetadata };
+  return { status: (overThreshold || (panel.available && panelUnknownCount > 0)) ? 'alerting' : 'ok', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, panelAvailable: panel.available };
 }
 
 // Same day window as api_usage_log above (created_at::date = CURRENT_DATE).
@@ -160,24 +153,6 @@ async function checkDailyThreshold() {
 // alone. Any other error still propagates — this is not a blanket swallow.
 async function getReviewPanelDailyCost() {
   try {
-    if (testRequestIsolationEnabled()) {
-      const grouped = await sql.query(
-        `SELECT e.request_id AS request_id,
-                COUNT(*)::int AS attempt_count,
-                COALESCE(SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL}), 0)::numeric AS known_cost_cents,
-                COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})::int AS unknown_count
-         FROM review_panel_seat_attempts a
-         JOIN review_panel_entries e ON e.id = a.entry_id
-         WHERE a.created_at::date = CURRENT_DATE
-         GROUP BY e.request_id`);
-      const filtered = await excludeTestRequestSpendRows(grouped.rows);
-      return {
-        knownCents: filtered.rows.reduce((sum, row) => sum + Number(row.known_cost_cents), 0),
-        unknownCount: filtered.rows.reduce((sum, row) => sum + Number(row.unknown_count), 0),
-        available: true,
-        isolation: filtered.isolation,
-      };
-    }
     const panelResult = await sql.query(
       `SELECT COALESCE(SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL}), 0)::numeric AS panel_known_cost_cents,
               COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})::int AS panel_unknown_count

@@ -19,12 +19,7 @@ jest.mock('../../lib/utils/auth', () => ({ requireSuperuser: jest.fn(async () =>
 jest.mock('../../lib/services/test-requests/spend-isolation.js', () => ({
   excludeTestRequestSpendRows: jest.fn(async (rows) => ({
     rows: rows.filter((row) => row.request_id === 'ordinary'),
-    isolation: {
-      excludedAttemptCount: 3,
-      excludedKnownCostCents: 40,
-      excludedUnknownCostCount: 1,
-      testStateUnknown: 0,
-    },
+    isolation: { available: true, testSpend: { attemptCount: 3, knownCostCents: 40, unknownCount: 1 } },
   })),
 }));
 
@@ -49,7 +44,7 @@ beforeEach(() => {
 
 afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
 
-test('isolation on groups spend by request, excludes marked rows, and records unattributable API usage', async () => {
+test('isolation on groups spend by request, reports test spend as one separate line, and records unattributable API usage', async () => {
   process.env.TEST_REQUEST_ISOLATION = 'on';
   mockPanelRows([
     { state: 'completed', request_id: 'ordinary', attempt_count: 2, known_cost_cents: '25', unknown_count: 0 },
@@ -63,7 +58,7 @@ test('isolation on groups spend by request, excludes marked rows, and records un
   expect(res.body.reviewPanel).toMatchObject({
     knownCostCents: 25,
     unknownCount: 0,
-    isolation: { excludedAttemptCount: 3, excludedKnownCostCents: 40 },
+    isolation: { available: true, testSpend: { attemptCount: 3, knownCostCents: 40 } },
   });
   expect(res.body.usageAttribution).toEqual({ apiUsageLog: 'unattributable' });
 });

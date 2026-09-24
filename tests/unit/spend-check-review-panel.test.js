@@ -21,22 +21,10 @@ jest.mock('@vercel/postgres', () => {
 jest.mock('../../lib/utils/cron-auth', () => ({ verifyCronSecret: jest.fn(() => true) }));
 jest.mock('../../lib/services/alert-service', () => ({ createAlert: jest.fn(), autoResolve: jest.fn() }));
 jest.mock('../../lib/services/maintenance-service', () => ({ startRun: jest.fn(async () => 'run-1'), completeRun: jest.fn(async () => {}) }));
-jest.mock('../../lib/services/test-requests/spend-isolation.js', () => ({
-  excludeTestRequestSpendRows: jest.fn(async (rows) => ({
-    rows: rows.filter((row) => row.request_id === 'ordinary'),
-    isolation: {
-      excludedAttemptCount: 3,
-      excludedKnownCostCents: 40,
-      excludedUnknownCostCount: 1,
-      testStateUnknown: 0,
-    },
-  })),
-}));
 
 const { sql } = require('@vercel/postgres');
 const { ATTEMPT_COST_UNKNOWN_SQL } = require('../../lib/services/review-panel-store');
 const AlertService = require('../../lib/services/alert-service');
-const { excludeTestRequestSpendRows } = require('../../lib/services/test-requests/spend-isolation.js');
 const handler = require('../../pages/api/cron/spend-check').default;
 
 function response() {
@@ -51,30 +39,6 @@ function mockQueries({ usageRow, panelRow }) {
 beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.DAILY_SPEND_ALERT_CENTS;
-  delete process.env.TEST_REQUEST_ISOLATION;
-});
-
-afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
-
-test('isolation on groups panel spend by request and exposes excluded and unattributable totals', async () => {
-  process.env.TEST_REQUEST_ISOLATION = 'on';
-  sql.mockResolvedValueOnce({ rows: [{ total_cost_cents: '100', request_count: 2 }] });
-  sql.query.mockResolvedValueOnce({ rows: [
-    { request_id: 'ordinary', attempt_count: 2, known_cost_cents: '25', unknown_count: 0 },
-    { request_id: 'test', attempt_count: 3, known_cost_cents: '40', unknown_count: 1 },
-  ] });
-  const res = response();
-  await handler({ method: 'GET' }, res);
-
-  expect(sql.query.mock.calls[0][0]).toContain('JOIN review_panel_entries e ON e.id = a.entry_id');
-  expect(excludeTestRequestSpendRows).toHaveBeenCalled();
-  expect(res.body.dailyThreshold).toMatchObject({
-    spentCents: 125,
-    panelKnownCents: 25,
-    panelUnknownCount: 0,
-    testRequestIsolation: { excludedAttemptCount: 3, excludedKnownCostCents: 40 },
-    apiUsageAttribution: 'unattributable',
-  });
 });
 
 test('the panel query text embeds the SAME unified unknown-cost predicate as review-panel-store.js — this fails if the predicate is ever deleted or diverges', async () => {

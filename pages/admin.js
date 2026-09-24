@@ -1130,6 +1130,19 @@ function UsageSection() {
                   Cost total withheld: {stats.reviewPanel.unknownCount} attempt(s) with unknown outcome are not counted toward the figure above.
                 </div>
               )}
+              {stats.reviewPanel.isolation?.available === true && (
+                <div className="text-xs text-gray-600 mb-3">
+                  Test requests (not included above): {stats.reviewPanel.isolation.testSpend.attemptCount} attempt(s),{' '}
+                  {stats.reviewPanel.isolation.testSpend.unknownCount > 0
+                    ? 'cost withheld'
+                    : formatCost(stats.reviewPanel.isolation.testSpend.knownCostCents)}
+                </div>
+              )}
+              {stats.reviewPanel.isolation?.available === false && (
+                <div className="text-xs text-amber-700 mb-3">
+                  Test-request spend could not be separated, so the figures above include it.
+                </div>
+              )}
               {stats.reviewPanel.byState?.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
