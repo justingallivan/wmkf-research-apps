@@ -146,6 +146,23 @@ describe('fenceSource / validateCloneManifest', () => {
     expect(() => validateCloneManifest(legacy, { forExecute: true }))
       .toThrow('Only a source-bound v3 or bundle v4 manifest can execute a sandbox clone.');
   });
+
+  test('validateCloneManifest restricts only execute mode to the basic recipe', () => {
+    const initialAssessment = baseManifest({ recipe: 'initial_assessment' });
+    initialAssessment.createBodySha256 = sha256(initialAssessment.createBody);
+    expect(() => validateCloneManifest(initialAssessment, { forExecute: true }))
+      .toThrow('Only a basic recipe manifest can execute the legacy one-shot sandbox clone.');
+
+    const withoutRecipe = baseManifest();
+    withoutRecipe.createBodySha256 = sha256(withoutRecipe.createBody);
+    expect(() => validateCloneManifest(withoutRecipe, { forExecute: true })).not.toThrow();
+
+    const basic = baseManifest({ recipe: 'basic' });
+    basic.createBodySha256 = sha256(basic.createBody);
+    expect(() => validateCloneManifest(basic, { forExecute: true })).not.toThrow();
+
+    expect(() => validateCloneManifest(initialAssessment, { forExecute: false })).not.toThrow();
+  });
 });
 
 describe('checkPreallocatedRequestAbsent', () => {
