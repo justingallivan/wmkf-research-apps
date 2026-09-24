@@ -91,6 +91,7 @@ function dependencies(overrides = {}) {
       lastModified: '2026-09-20T10:00:00Z',
     }]),
     getDriveId: jest.fn(async () => 'drive-1'),
+    clearGraphCaches: jest.fn(),
     getFileMetadataById: jest.fn(async () => metadata),
     downloadFile: jest.fn(async () => ({
       buffer: bytes,
@@ -274,6 +275,30 @@ test('confirmed archive request-folder misses remain an empty bucket', async () 
     source,
     createStrictTestRequestSourceDependencies(deps),
   )).resolves.toEqual({ documents: [], errors: [] });
+});
+
+test('strict discovery accepts a root folder miss only after re-confirming the library', async () => {
+  const missingFolder = Object.assign(new Error('folder itemNotFound'), {
+    status: 404, code: 'graph_folder_not_found', dataverseCode: 'itemNotFound',
+  });
+  const libraryGone = Object.assign(new Error('Document library "RequestArchive1" not found.'), { status: 404 });
+  const deps = dependencies({
+    getRequestSharePointBuckets: jest.fn(async () => ([{
+      library: 'RequestArchive1', folder: '1002001_ARCHIVE', source: 'archive',
+    }])),
+    listFiles: jest.fn(async () => { throw missingFolder; }),
+    getDriveId: jest.fn(async () => { throw libraryGone; }),
+  });
+
+  await expect(discoverTestRequestSourceDocuments(
+    source,
+    createStrictTestRequestSourceDependencies(deps),
+  )).resolves.toEqual({
+    documents: [],
+    errors: [{ source: 'archive', code: 'SOURCE_BUCKET_UNAVAILABLE' }],
+  });
+  expect(deps.clearGraphCaches).toHaveBeenCalledTimes(1);
+  expect(deps.getDriveId).toHaveBeenCalledWith('RequestArchive1');
 });
 
 test('source hydration carries durable Graph drive and registered site identity', async () => {

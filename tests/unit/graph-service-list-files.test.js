@@ -90,6 +90,28 @@ test('marks a Graph itemNotFound 404 from folder listing as a folder-level miss'
   });
 });
 
+test('does not mark a missing child folder mid-walk as a folder-level miss', async () => {
+  global.fetch
+    .mockResolvedValueOnce(graphResponse({
+      value: [
+        { id: 'one', name: 'one.pdf', size: 1, file: { mimeType: 'application/pdf' } },
+        { id: 'sub', name: 'Phase I', folder: { childCount: 1 } },
+      ],
+    }))
+    .mockResolvedValueOnce(graphErrorResponse(404, {
+      error: { code: 'itemNotFound', message: 'The resource could not be found.' },
+    }));
+
+  let thrown;
+  try {
+    await GraphService.listFiles('akoya_request', 'root', { recursive: true, maxDepth: 3 });
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toMatchObject({ status: 404, dataverseCode: 'itemNotFound' });
+  expect(thrown).not.toHaveProperty('code');
+});
+
 test('does not mark another Graph 404 code as a folder-level miss', async () => {
   global.fetch.mockResolvedValueOnce(graphErrorResponse(404, {
     error: { code: 'resourceNotFound', message: 'Another resource was unavailable.' },
