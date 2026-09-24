@@ -11,6 +11,7 @@ import {
   buildRespondReminderBodyText,
   renderReviewDueReminder,
 } from '../../lib/external/reviewer-reminder-email';
+import { validateRehearsalTemplate } from './reviewer-reminder-validation';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const SUGGESTION_ID = '22222222-2222-4222-8222-222222222222';
@@ -47,7 +48,9 @@ window.fetch = async (input, init = {}) => {
     const key = keyFor(actorId, kind);
     if (method === 'GET') return response({ ok: true, ownSystemId: actorId, configured: saved.has(key), shared: shared[kind], template: saved.get(key) || shared[kind] });
     if (method === 'PUT') {
-      saved.set(key, { ...body.template });
+      const checked = validateRehearsalTemplate(kind, body.template);
+      if (!checked.valid) return response({ ok: false, reason: 'validation', errors: checked.errors }, 400);
+      saved.set(key, checked.value);
       notify();
       return response({ ok: true });
     }
@@ -64,6 +67,8 @@ window.fetch = async (input, init = {}) => {
     }
     if (body.action === 'preview') {
       const template = body.template || saved.get(keyFor(PD_ID, kind)) || shared[kind];
+      const checked = validateRehearsalTemplate(kind, template);
+      if (!checked.valid) return response({ ok: false, reason: 'invalid_preview', errors: checked.errors }, 400);
       const rendered = kind === 'respond'
         ? { subject: template.subject, bodyText: buildRespondReminderBodyText({ bodyTemplate: template.body, reviewerName, title, signatureBlock }) }
         : renderReviewDueReminder({ subjectTemplate: template.subject, bodyTemplate: template.body, reviewerName, title, reviewDueDate: '2026-10-15', signatureBlock });
@@ -81,6 +86,8 @@ window.fetch = async (input, init = {}) => {
       } });
     }
     if (body.action === 'send') {
+      const valid = validateRehearsalTemplate(kind, body.template);
+      if (!valid.valid) return response({ ok: false, reason: 'invalid_preview', errors: valid.errors }, 400);
       const checked = proofs.get(body.proof);
       if (!checked || checked.kind !== kind || checked.actorId !== actorId || JSON.stringify(checked.template) !== JSON.stringify(body.template)) {
         return response({ ok: false, reason: 'preview_stale' }, 409);

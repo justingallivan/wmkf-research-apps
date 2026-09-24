@@ -55,6 +55,13 @@ test('unavailable or malformed PD preference does not silently become Admin copy
   expect(await loadSenderReminderTemplate('pd-a', 'respond', shared)).toEqual({ ok: false, reason: 'preference_invalid' });
 });
 
+test('an invalid Admin fallback is rejected before an automatic reminder can claim a row', async () => {
+  const invalid = { subject: 'Admin subject', body: 'No review due date here' };
+  expect(await loadSenderReminderTemplate('pd-a', 'reviewdue', invalid)).toEqual({
+    ok: false, reason: 'misconfigured', errors: ['required:reviewDueDate'],
+  });
+});
+
 test('explicit save and reset use the exact session systemuser as preference owner', async () => {
   expect(await saveOwnReminderTemplate(OWN_ID, 'respond', own)).toEqual({ ok: true, template: own });
   expect(findByOwnerAndKey).toHaveBeenCalledWith(OWN_ID, 'reviewer_respond_reminder_template');

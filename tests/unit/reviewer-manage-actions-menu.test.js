@@ -10,8 +10,8 @@ import ReviewerManagePanel, {
 } from '../../shared/components/reviewers/ReviewerManagePanel';
 import { reviewerDocumentIsPending } from '../../shared/components/reviewers/reviewer-document-state';
 
-jest.mock('../../shared/components/reviewers/RespondReminderModal', () => function MockReminderModal({ kind, onClose }) {
-  return <div role="dialog" data-testid="reminder-composer" data-kind={kind}><button type="button" onClick={onClose}>Close composer</button></div>;
+jest.mock('../../shared/components/reviewers/RespondReminderModal', () => function MockReminderModal({ kind, onClose, onStale }) {
+  return <div role="dialog" data-testid="reminder-composer" data-kind={kind}><button type="button" onClick={onClose}>Close composer</button><button type="button" onClick={onStale}>Stale reminder</button></div>;
 });
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -364,6 +364,14 @@ describe('review-due reminder compose action', () => {
     expect(global.fetch).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Close composer' }));
     expect(screen.queryByTestId('reminder-composer')).not.toBeInTheDocument();
+  });
+
+  test('a stale review-due preview refreshes the parent reviewer list', () => {
+    const onRefresh = jest.fn();
+    render(<ReviewReminderAction requestId="P1" reviewer={reviewer} onSent={onRefresh} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stale reminder' }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
   test('read-only Preview cannot open a composer', () => {

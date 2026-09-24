@@ -15,10 +15,10 @@ const ERROR_MESSAGE = {
   send_unconfirmed: 'Dynamics did not confirm the send. Check reviewer activity before trying again.',
   invalid_preview: 'The template is incomplete or contains unsupported wording.',
   preview_stale: 'The reviewed email or reviewer details changed. Refresh the preview before sending.',
-  preference_unavailable: 'The sender’s saved default could not be read. Try again later.',
-  preference_invalid: 'The sender’s saved default needs correction before a reminder can be sent.',
+  preference_unavailable: 'The sender’s saved default could not be read. Edit the shared Admin copy and refresh the preview to send this reminder.',
+  preference_invalid: 'The sender’s saved default needs correction. Edit the shared Admin copy and refresh the preview to send this reminder.',
   identity_unavailable: 'Your account identity could not be verified. Try again later.',
-  misconfigured: 'The reminder email template is missing or blank in Admin.',
+  misconfigured: 'The reminder email template is missing or invalid in Admin.',
   token_revoked: 'This reviewer’s access was withdrawn.',
   token_not_minted: 'No review link is recorded. Check Materials history first.',
   token_invalid_data: 'The review-link metadata needs technical review.',
@@ -27,7 +27,27 @@ const ERROR_MESSAGE = {
   due_date_missing: 'Set a review due date before sending a reminder.',
 };
 const MALFORMED_BODY = Symbol('malformed-body');
-const errorMessage = (data, fallback) => ERROR_MESSAGE[data?.reason] || data?.errors?.[0] || fallback;
+function templateErrorDetail(code) {
+  if (typeof code !== 'string') return null;
+  if (code === 'subject') return 'Enter a subject of at most 500 characters on one line.';
+  if (code === 'body') return 'Enter a message of at most 12,000 characters.';
+  if (code === 'template') return 'Enter both a subject and a message.';
+  if (code === 'malformed:subject' || code === 'malformed:body') return 'Check the placeholder braces in the template.';
+  if (code?.startsWith('unknown:subject:')) return 'Placeholders are allowed in the message only.';
+  if (code?.startsWith('unknown:body:')) return `The placeholder {{${code.slice('unknown:body:'.length)}}} is not supported.`;
+  if (code === 'required:reviewDueDate') return 'Include {{reviewDueDate}} in the review due message.';
+  if (code === 'reviewer_link') return 'The review link is managed by the server; remove it from the template.';
+  if (code === 'link') return 'Remove web addresses from the template.';
+  return null;
+}
+const errorMessage = (data, fallback) => {
+  const general = ERROR_MESSAGE[data?.reason] || fallback;
+  if (data?.reason === 'invalid_preview' || data?.reason === 'validation') {
+    const detail = (Array.isArray(data?.errors) ? data.errors : []).map(templateErrorDetail).find(Boolean);
+    return detail ? `${general} ${detail}` : general;
+  }
+  return ERROR_MESSAGE[data?.reason] || data?.errors?.[0] || fallback;
+};
 
 export default function RespondReminderModal({ requestId, candidate, kind = 'respond', onClose, onSent, onStale }) {
   const [draft, setDraft] = useState(null);
@@ -70,6 +90,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
       if (!mountedRef.current || generation !== loadGenerationRef.current) return;
       if (!envelope.ok || !data?.ok || !data.draft) {
         setLoadError(errorMessage(data, 'Could not load the reminder preview.'));
+        if (editedTemplate === undefined && data?.shared) setTemplate(data.shared);
         if (['removed', 'revoked', 'not_found'].includes(data?.reason)) onStaleRef.current?.();
         return;
       }

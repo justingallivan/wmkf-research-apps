@@ -45,6 +45,15 @@ test('non-owner preview is denied before reading the assigned PD default or revi
   expect(sendManualReminderWithProof).not.toHaveBeenCalled();
 });
 
+test('authorized preference failure exposes only shared Admin copy for an explicit recovery preview', async () => {
+  previewManualReminder.mockResolvedValueOnce({ ok: false, reason: 'preference_invalid', shared: TEMPLATE });
+  const { req, res } = post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, kind: 'reviewdue', action: 'preview' });
+  await handler(req, res);
+  expect(res.statusCode).toBe(503);
+  expect(res._data).toMatchObject({ ok: false, reason: 'preference_invalid', shared: TEMPLATE });
+  expect(authorizeReviewerRequestMutation).toHaveBeenCalledTimes(1);
+});
+
 test.each(['respond', 'reviewdue'])('%s send reauthorizes then passes only the reviewed template and proof', async (kind) => {
   const { req, res } = post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, kind, action: 'send', template: TEMPLATE, proof: PROOF });
   await handler(req, res);

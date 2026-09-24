@@ -109,7 +109,10 @@ export default async function handler(req, res) {
 
     if (!result.ok) {
       const status = REASON_STATUS[result.reason] || 500;
-      return res.status(status).json({ ok: false, reason: result.reason, errors: result.errors });
+      return res.status(status).json({
+        ok: false, reason: result.reason, errors: result.errors,
+        ...(action === 'preview' && result.shared ? { shared: result.shared } : {}),
+      });
     }
     return res.status(200).json(result.draft ? { ok: true, draft: result.draft } : { ok: true });
   } catch (error) {

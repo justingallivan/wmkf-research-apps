@@ -217,6 +217,55 @@ test('a failed initial preview can retry the effective default without typing a 
   expect(global.fetch.mock.calls.filter(([url, options]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'preview').every(([, options]) => !Object.hasOwn(JSON.parse(options.body), 'template'))).toBe(true);
 });
 
+test('a preference failure offers editable Admin copy and requires a new preview proof', async () => {
+  const shared = { subject: 'Admin recovery subject', body: '{{greeting}}\n\n{{signature}}' };
+  let previews = 0;
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => {
+    if (url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'preview') {
+      const payload = JSON.parse(options.body);
+      previews += 1;
+      return Promise.resolve(previews === 1
+        ? response({ ok: false, reason: 'preference_invalid', shared }, false, 503)
+        : response({ ok: true, draft: { ...draft, template: payload.template, subject: payload.template.subject, proof: 'recovery-proof' } }));
+    }
+    return original(url, options);
+  });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
+  expect(await screen.findByDisplayValue('Admin recovery subject')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Send reminder' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Send reminder' })).toBeEnabled());
+  const previewCalls = global.fetch.mock.calls.filter(([url, options]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'preview');
+  expect(JSON.parse(previewCalls[1][1].body).template).toEqual(shared);
+});
+
+test('preview and Save show plain language for template validation failures', async () => {
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => {
+    if (url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).template) {
+      const edited = JSON.parse(options.body).template;
+      if (edited.body.includes('{{reviewDueDate}}')) {
+        return Promise.resolve(response({ ok: true, draft: { ...draft, template: edited, subject: edited.subject } }));
+      }
+      return Promise.resolve(response({ ok: false, reason: 'invalid_preview', errors: ['required:reviewDueDate'] }, false, 400));
+    }
+    if (url === '/api/review-manager/reminder-email-preferences' && options.method === 'PUT') {
+      return Promise.resolve(response({ ok: false, reason: 'validation', errors: ['unknown:body:externalLink'] }, false, 400));
+    }
+    return original(url, options);
+  });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} kind="reviewdue" onClose={jest.fn()} />);
+  await screen.findByText('Email preview');
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
+  expect(await screen.findByText(/Include \{\{reviewDueDate\}\}/)).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Message template' }), { target: { value: `${template.body}\n{{reviewDueDate}}` } });
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
+  await screen.findByText('Email preview');
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  expect(await screen.findByText(/placeholder \{\{externalLink\}\} is not supported/)).toBeInTheDocument();
+});
+
 test('a parent refresh error cannot turn a confirmed send into a failed send', async () => {
   const onSent = jest.fn(() => { throw new Error('refresh failed'); });
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={onSent} />);

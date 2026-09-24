@@ -173,6 +173,21 @@ describe('proof-bound personal reminder sends', () => {
     expect(setUserPreference).not.toHaveBeenCalled();
   });
 
+  test('explicit one-send copy recovers from a broken PD default without changing that default', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    findByOwnerAndKey.mockRejectedValue(new Error('preference read unavailable'));
+    const initial = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD });
+    expect(initial).toMatchObject({ ok: false, reason: 'preference_unavailable', shared: { subject: RESPOND_SUBJECT, body: RESPOND_BODY } });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    const edited = { subject: 'One-off recovery', body: '{{greeting}}\n\nPlease respond.\n\n{{signature}}' };
+    const preview = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited });
+    expect(preview.ok).toBe(true);
+    const sent = await sendManualReminderWithProof({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited, proof: preview.draft.proof });
+    expect(sent).toEqual({ ok: true });
+    expect(findByOwnerAndKey).toHaveBeenCalledTimes(1);
+    expect(setUserPreference).not.toHaveBeenCalled();
+  });
+
   test('preview proof accepts a template regardless of subject/body property order', async () => {
     installReads({ suggestion: pendingInvitation() });
     const reversed = { body: '{{greeting}}\n\n{{signature}}', subject: 'One-off' };

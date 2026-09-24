@@ -54,6 +54,7 @@ export function ReviewReminderAction({ requestId, reviewer, onSent, previewReadO
         kind="reviewdue"
         onClose={() => setOpen(false)}
         onSent={onSent}
+        onStale={onSent}
       />}
     </div>
   );

@@ -173,10 +173,10 @@ describe('sweepRespondReminders', () => {
     }));
   });
 
-  test('preference read failure leaves the automatic marker unclaimed', async () => {
+  test.each(['preference_unavailable', 'misconfigured'])('%s leaves the automatic marker unclaimed', async (reason) => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
-    loadSenderReminderTemplate.mockResolvedValueOnce({ ok: false, reason: 'preference_unavailable' });
+    loadSenderReminderTemplate.mockResolvedValueOnce({ ok: false, reason });
     const result = await sweepRespondReminders();
     expect(result).toMatchObject({ eligible: 1, sent: 0, skipped: 1 });
     expect(mintAndStore).not.toHaveBeenCalled();
