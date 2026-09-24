@@ -243,7 +243,7 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
     expect(migration).toContain('readback          JSONB NULL CHECK (test_request_receipt_ok(readback))');
     for (const key of LEDGER_RECEIPT_KEYS) expect(migration).toContain(`'${key}'`);
     // Credential prefixes are excluded at the run level too, inside the b! wrapper.
-    expect(migration).toContain("expected_graph_drive_id !~ '(^|[^A-Za-z0-9])(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'");
+    expect(migration).toContain("expected_graph_drive_id !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'");
     // The fresh-install mirror carries the identical function body.
     const setupSql = fs.readFileSync(path.join(process.cwd(), 'scripts/setup-database.js'), 'utf8');
     const fnBody = (sql) => {

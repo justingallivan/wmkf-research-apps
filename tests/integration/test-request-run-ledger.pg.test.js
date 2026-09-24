@@ -368,6 +368,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     const attempts = [
       [`UPDATE test_request_runs SET expected_graph_drive_id = $2 WHERE run_id = $1`, 'https://contoso.sharepoint.com/sites/x'],
       [`UPDATE test_request_runs SET expected_graph_site_id = $2 WHERE run_id = $1`, 'ghp_0123456789abcdefghijklmnopqrstuvwxyz'],
+      [`UPDATE test_request_runs SET expected_graph_drive_id = $2 WHERE run_id = $1`, 'b!AAAAAAAAAAAAAAAAgithub_pat_11AAAAAAA0123456789'],
       [`UPDATE test_request_runs SET actor_id = $2 WHERE run_id = $1`, 'cli:hunter2'],
       [`UPDATE test_request_runs SET idempotency_key = $2 WHERE run_id = $1`, 'my-secret-codename'],
       [`UPDATE test_request_runs SET last_error = $2 WHERE run_id = $1`, 'Authorization: Bearer abc'],
@@ -416,6 +417,8 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       { eTag: '"glpat-ABCDEFGHIJKLMNOPQRST"' },
       { eTag: 'W/"ghp_0123456789abcdefghijklmnop"' },
       { driveId: 'b!AAAAAAAAAAAAAAAA-ghp_0123456789abcdefghij' },
+      { driveId: 'b!AAAAAAAAAAAAAAAAgithub_pat_11AAAAAAA0123456789' },
+      { versionId: 'v1glpat-ABCDEFGHIJKLMNOPQRST' },
     ];
     for (const receipt of rejected) {
       expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
