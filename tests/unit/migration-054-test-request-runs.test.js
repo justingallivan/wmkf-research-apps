@@ -1,0 +1,267 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+/**
+ * Migration 054 (lib/db/migrations/054_test_request_runs.sql) adds CHECK
+ * constraints enforced by live Postgres, not application code. This repo has
+ * no live/in-memory Postgres harness for exercising CHECK constraint
+ * behavior directly (see
+ * tests/unit/migration-053-pre-site-distribution-review-bundle.test.js for
+ * the precedent this file mirrors). So this test is a pure-JS mirror of each
+ * constraint's boolean logic, kept byte-for-byte equivalent to the SQL — if
+ * the SQL and this mirror diverge, both must be re-checked together.
+ */
+
+const STATUSES = ['prepared', 'creating', 'ready', 'needs_attention', 'retiring', 'retired'];
+const RESOURCE_OUTCOMES = [
+  'planned', 'dispatched', 'verified', 'recovered', 'conflict', 'rejected', 'ambiguous', 'failed',
+];
+
+/** Mirrors the `status` CHECK on test_request_runs. */
+function isValidStatus(status) {
+  return STATUSES.includes(status);
+}
+
+/** Mirrors test_request_runs_needs_attention_reason_coherence. */
+function satisfiesNeedsAttentionCoherence({ status, needsAttentionReason = null }) {
+  if (status === 'needs_attention') return needsAttentionReason !== null;
+  return needsAttentionReason === null;
+}
+
+/** Mirrors test_request_runs_completed_at_coherence. */
+function satisfiesCompletedAtCoherence({ status, completedAt = null }) {
+  if (status === 'ready') return completedAt !== null;
+  if (['prepared', 'creating', 'needs_attention'].includes(status)) return completedAt === null;
+  // retiring/retired: reachable from ready (completed_at set) or from
+  // needs_attention (completed_at null), so either is admitted.
+  return status === 'retiring' || status === 'retired';
+}
+
+/** Mirrors the `resource_kind` CHECK on test_request_run_resources. */
+function isValidResourceKind(kind) {
+  return [
+    'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
+    'dataverse_document_location', 'sharepoint_file', 'workflow_bypass',
+  ].includes(kind);
+}
+
+/** Mirrors the `system` CHECK on test_request_run_resources. */
+function isValidResourceSystem(system) {
+  return system === 'dataverse' || system === 'sharepoint';
+}
+
+/** Mirrors the `outcome` CHECK on test_request_run_resources. */
+function isValidResourceOutcome(outcome) {
+  return RESOURCE_OUTCOMES.includes(outcome);
+}
+
+/** Mirrors the `destination_environment` CHECK on test_request_runs. */
+function isValidDestinationEnvironment(env) {
+  return env === 'sandbox' || env === 'production';
+}
+
+describe('migration 054 CHECK constraints (pure-JS mirror)', () => {
+  describe('status enum', () => {
+    it.each(STATUSES)('accepts %s', (status) => {
+      expect(isValidStatus(status)).toBe(true);
+    });
+
+    it('rejects an unknown status', () => {
+      expect(isValidStatus('archived')).toBe(false);
+      expect(isValidStatus('')).toBe(false);
+    });
+  });
+
+  describe('test_request_runs_needs_attention_reason_coherence', () => {
+    it('requires a reason when status is needs_attention', () => {
+      expect(satisfiesNeedsAttentionCoherence({ status: 'needs_attention', needsAttentionReason: 'stuck' })).toBe(true);
+      expect(satisfiesNeedsAttentionCoherence({ status: 'needs_attention', needsAttentionReason: null })).toBe(false);
+    });
+
+    it('forbids a reason for every other status', () => {
+      for (const status of STATUSES.filter((s) => s !== 'needs_attention')) {
+        expect(satisfiesNeedsAttentionCoherence({ status, needsAttentionReason: null })).toBe(true);
+        expect(satisfiesNeedsAttentionCoherence({ status, needsAttentionReason: 'stuck' })).toBe(false);
+      }
+    });
+  });
+
+  describe('test_request_runs_completed_at_coherence', () => {
+    it('ready requires completed_at', () => {
+      expect(satisfiesCompletedAtCoherence({ status: 'ready', completedAt: new Date() })).toBe(true);
+      expect(satisfiesCompletedAtCoherence({ status: 'ready', completedAt: null })).toBe(false);
+    });
+
+    it('pre-terminal states forbid completed_at', () => {
+      for (const status of ['prepared', 'creating', 'needs_attention']) {
+        expect(satisfiesCompletedAtCoherence({ status, completedAt: new Date() })).toBe(false);
+        expect(satisfiesCompletedAtCoherence({ status, completedAt: null })).toBe(true);
+      }
+    });
+
+    it('retiring/retired admit either, so ready -> retiring and needs_attention -> retiring are both legal', () => {
+      for (const status of ['retiring', 'retired']) {
+        expect(satisfiesCompletedAtCoherence({ status, completedAt: new Date() })).toBe(true);
+        expect(satisfiesCompletedAtCoherence({ status, completedAt: null })).toBe(true);
+      }
+    });
+  });
+
+  describe('destination_environment enum', () => {
+    it('accepts sandbox and production', () => {
+      expect(isValidDestinationEnvironment('sandbox')).toBe(true);
+      expect(isValidDestinationEnvironment('production')).toBe(true);
+    });
+
+    it('rejects anything else', () => {
+      expect(isValidDestinationEnvironment('staging')).toBe(false);
+    });
+  });
+
+  describe('resource_kind enum', () => {
+    it.each([
+      'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
+      'dataverse_document_location', 'sharepoint_file', 'workflow_bypass',
+    ])('accepts %s', (kind) => {
+      expect(isValidResourceKind(kind)).toBe(true);
+    });
+
+    it('rejects an unknown kind', () => {
+      expect(isValidResourceKind('dataverse_delete')).toBe(false);
+    });
+  });
+
+  describe('resource system enum', () => {
+    it('accepts dataverse and sharepoint', () => {
+      expect(isValidResourceSystem('dataverse')).toBe(true);
+      expect(isValidResourceSystem('sharepoint')).toBe(true);
+    });
+
+    it('rejects anything else', () => {
+      expect(isValidResourceSystem('graph')).toBe(false);
+    });
+  });
+
+  describe('resource outcome enum', () => {
+    it.each(RESOURCE_OUTCOMES)('accepts %s', (outcome) => {
+      expect(isValidResourceOutcome(outcome)).toBe(true);
+    });
+
+    it('rejects an unknown outcome', () => {
+      expect(isValidResourceOutcome('succeeded')).toBe(false);
+    });
+  });
+});
+
+describe('migration 054 real SQL contains the load-bearing predicates the pure-JS mirror assumes', () => {
+  const migration = fs.readFileSync(
+    path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql'),
+    'utf8',
+  );
+
+  it('defines the status CHECK with all six states', () => {
+    for (const status of STATUSES) {
+      expect(migration).toContain(`'${status}'`);
+    }
+  });
+
+  it('defines the needs_attention_reason coherence constraint', () => {
+    expect(migration).toContain('test_request_runs_needs_attention_reason_coherence');
+    expect(migration).toContain("status = 'needs_attention' AND needs_attention_reason IS NOT NULL");
+    expect(migration).toContain("status <> 'needs_attention' AND needs_attention_reason IS NULL");
+  });
+
+  it('defines the completed_at coherence constraint', () => {
+    expect(migration).toContain('test_request_runs_completed_at_coherence');
+    expect(migration).toContain("(status = 'ready' AND completed_at IS NOT NULL)");
+    expect(migration).toContain("(status IN ('prepared', 'creating', 'needs_attention') AND completed_at IS NULL)");
+    expect(migration).toContain("OR status IN ('retiring', 'retired')");
+  });
+
+  it('defines the resource outcome CHECK with all eight outcomes', () => {
+    for (const outcome of RESOURCE_OUTCOMES) {
+      expect(migration).toContain(`'${outcome}'`);
+    }
+  });
+
+  it('uses IF NOT EXISTS for both tables and both indexes', () => {
+    expect((migration.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(2);
+    expect((migration.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(3);
+  });
+
+  it('never stores credentials, bodies, or bundle contents (no such columns declared)', () => {
+    const ddlOnly = migration
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n');
+    expect(ddlOnly).not.toMatch(/credential|bearer|body_html|bundle_bytes|document_body|access_token/i);
+  });
+});
+
+describe('migrations manifest lists 054 last and its setup-database.js mirror matches', () => {
+  const manifest = JSON.parse(fs.readFileSync(
+    path.join(process.cwd(), 'lib/db/migrations-manifest.json'),
+    'utf8',
+  ));
+
+  it('has 054_test_request_runs.sql as the last entry', () => {
+    expect(manifest.files[manifest.files.length - 1]).toBe('054_test_request_runs.sql');
+  });
+
+  function normalize(sql) {
+    return sql.replace(/\s+/g, ' ').trim();
+  }
+
+  function extractCreateTableBodies(sql) {
+    const bodies = [];
+    const regex = /CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(/g;
+    let match;
+    while ((match = regex.exec(sql)) !== null) {
+      const tableName = match[1];
+      const start = match.index + match[0].length;
+      let depth = 1;
+      let i = start;
+      while (i < sql.length && depth > 0) {
+        if (sql[i] === '(') depth += 1;
+        else if (sql[i] === ')') depth -= 1;
+        i += 1;
+      }
+      bodies.push({ tableName, body: normalize(sql.slice(start, i - 1)) });
+    }
+    return bodies;
+  }
+
+  it('setup-database.js V55 mirror has the same CREATE TABLE bodies as migration 054', () => {
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql'),
+      'utf8',
+    );
+    const setupSql = fs.readFileSync(
+      path.join(process.cwd(), 'scripts/setup-database.js'),
+      'utf8',
+    );
+
+    const migrationTables = extractCreateTableBodies(migrationSql);
+    expect(migrationTables.map((t) => t.tableName)).toEqual([
+      'test_request_runs',
+      'test_request_run_resources',
+    ]);
+
+    // Isolate the v55Statements array text in setup-database.js so we don't
+    // accidentally match some other migration's mirrored CREATE TABLE.
+    const v55Start = setupSql.indexOf('const v55Statements = [');
+    expect(v55Start).toBeGreaterThan(-1);
+    const v55End = setupSql.indexOf('\n];', v55Start);
+    const v55Text = setupSql.slice(v55Start, v55End);
+
+    const setupTables = extractCreateTableBodies(v55Text);
+    expect(setupTables.map((t) => t.tableName)).toEqual([
+      'test_request_runs',
+      'test_request_run_resources',
+    ]);
+
+    for (let i = 0; i < migrationTables.length; i++) {
+      expect(setupTables[i].body).toBe(migrationTables[i].body);
+    }
+  });
+});
