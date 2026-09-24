@@ -212,13 +212,34 @@ The layer is three things, each already present somewhere in the tree:
    - `sql` — the tagged template, re-exported unchanged so every existing
      statement compiles without edit.
    - `withClient(fn)` — replaces the `db.connect()` / `client.release()`
-     pairs in 6 files; guarantees release in `finally`.
-   - `withTransaction(fn)` — replaces the 8 hand-rolled `BEGIN`/`COMMIT`/
-     `ROLLBACK` sequences (model: `withDossierTransaction` in
-     `lib/services/cycle-dossier-store.js:28`); `fn(client)` receives a
-     client whose `.query` accepts the existing `(text, params)` form.
-   - `getPool()` — the single `pg` Pool for the three Pool users; created
-     lazily; `POSTGRES_URL` read here and nowhere else.
+     pairs in 6 files (all six take `db` from `@vercel/postgres`); releases
+     in `finally`, passing the thrown error to `release(err)` when `fn`
+     threw so the connection is destroyed rather than returned (the form
+     `alert-service.js` and `auth/link-profile.js` already use; destroying
+     after an error is the strictly safer superset for the other four).
+   - `withTransaction(fn)` — replaces the SIMPLE hand-rolled
+     `BEGIN`/`COMMIT`/`ROLLBACK` sequences (model: `withDossierTransaction`
+     in `lib/services/cycle-dossier-store.js:28`, byte-identical twin
+     `withReviewPanelTransaction` in `review-panel-store.js:73`); `fn(client)`
+     receives a client whose `.query` accepts the existing `(text, params)`
+     form; `ROLLBACK` failure must not mask the original error. The live
+     census has 12 `BEGIN` literals in 10 files (Stage 1 probe, not the 8
+     first hand-counted); the ones with an early `ROLLBACK`-and-return or
+     more than one `COMMIT` (`briefing-link-store`, `auth/link-profile`,
+     `consultant-feedback`) and `drain-submissions-service` (client passed
+     in by the caller) keep their own statements on a `withClient` client —
+     rule 6 forbids reshaping them.
+   - `getPool()` — the single lazily created `pg` Pool for the three Pool
+     users. Today all three build a Pool from `POSTGRES_URL || DATABASE_URL`;
+     two (`irs-bmf-service`, `intake/submit`) build one per call and
+     `pool.end()` it, one (`cron/drain-submissions`) caches it. `getPool()`
+     keeps the same `POSTGRES_URL || DATABASE_URL` resolution (behaviour
+     freeze) and its missing-variable error names both; it is the only place
+     OUR code reads those variables — `@vercel/postgres` reads
+     `POSTGRES_URL` internally behind the re-exported `sql`/`db`, which the
+     seam cannot and need not change. The per-call `pool.end()` callers are
+     converted in their own stages (3 and 4) with the lifecycle change
+     stated in that stage's report.
    No query helpers, no naming conventions, no result mapping. Rule 8.
 2. **Per-domain stores** — one module per table cluster, the shape
    `lib/services/scheduled-email-store.js:14-49` already has: flat
@@ -406,7 +427,10 @@ green; full suite + build green.
 **Goal:** `lib/postgres/client.js` exists, is contract-tested, and is
 imported by nothing yet.
 
-**Preconditions:** Stage 1 gate green; `lib/postgres/` does not exist.
+**Preconditions:** Stage 1 gate green; `lib/postgres/` does not exist;
+the Stage 1 gate already treats `lib/postgres/**` as an allowed importer
+and the route law already forbids routes importing it (fresh-context
+review, 2026-09-23).
 
 **Tests before:**
 - `tests/unit/postgres-client.test.js` — `withClient` releases on throw;
@@ -416,20 +440,33 @@ imported by nothing yet.
   flow, not SQL).
 - `tests/pg-contract/postgres-client.test.js` — the same three helpers
   against the real database, including a nested-throw rollback that leaves
-  a probe table unchanged.
+  a probe table unchanged. Lane fact (fresh-context review): the lane's
+  `moduleNameMapper` swaps only `^@vercel/postgres$` for the `pg` shim, so
+  `withClient`/`withTransaction` (built on the re-exported `db`) are shimmed
+  automatically, but a `pg`-backed `getPool()` reads `POSTGRES_URL`, which
+  the lane deliberately never sets. The `getPool` contract test therefore
+  sets `process.env.POSTGRES_URL = process.env.PG_CONTRACT_URL` inside the
+  test file (the preload has already enforced loopback on that value) and
+  loads the seam under `jest.isolateModules`; it must also assert the
+  singleton and that `end()` is not part of the seam's public surface.
 
 **Work:**
 1. `lib/postgres/client.js` per §4 item 1. Header docblock states the law
    and points at this plan.
-2. Add `lib/postgres/**` to the gate's allowed-importer set; the route-law
-   extension already forbids routes importing it.
+2. ~~Add `lib/postgres/**` to the gate's allowed-importer set~~ — done in
+   Stage 1 (`isExemptFile` in the probe; check (c) in the ratchet; route
+   law family `postgres`). Remaining: delete the two "(does not exist yet)"
+   notes in the probe's docblock (the route law's driver predicate already
+   names `@neondatabase/serverless` since `1cd79e7ce`, Stage 1 follow-up).
 3. `docs/SERVICE_AND_UTILITY_CATALOG.md` entry; Atlas page
    `docs/atlas/postgres-infra-tables.md` gets an "Access layer" section
    describing the seam (no table ownership changes yet).
 
-**Verify:** both test files green; ratchet unchanged (census count
-identical: the new file is in the allowed set, not the allowlist); full
-suite + build; `check:atlas`, `check:doc-currency` (+ self-tests).
+**Verify:** both test files green; ratchet green with the allowlist
+byte-identical (the new file is in the allowed-importer set, so the
+`--report` driver-file total rises 60 → 61 and the kind totals rise by the
+seam's own records — that is expected, and nothing pins the 60); full suite
++ build; `check:atlas`, `check:doc-currency` (+ self-tests).
 
 **Rollback:** delete the directory; nothing imports it.
 
@@ -863,6 +900,176 @@ recorded Stage 1 obligations in the probe's docblock.
   `claude/postgres-access-layer`); Q3 sub-question resolved as "no
   through-line — migrations accreted" with a proposed follow-up (see Q3 row);
   Stage 1 timing to be discussed.
+
+### Stage 1 report — 2026-09-23 — `claude/postgres-access-layer@633104aad`
+Preconditions: `[VERIFIED via --report in a fresh Haiku agent before any
+edit]` 60 driver-import files (lib/services 36, pages/api 17, lib/utils 4,
+lib/bill 1, lib/external 1, lib/intake 1), 349 `sql` tags in 52 files, 62
+files with any record; kind totals driver-import 60, sql-tag 349,
+client.query 169, sql.query 40, begin-literal 12, db.connect 8, new-Pool 3,
+pool.connect 3, pool.query 1. Drift: none.
+Tests before: Stage 0 self-test and `check:route-service-boundary:self-test`
+[existed, green]. Written this stage:
+`tests/unit/route-service-boundary-postgres-carryover.test.js` (exact-set
+pin of `POSTGRES_CARRYOVER`), plus self-test fixtures for every new
+recognition form, every ratchet outcome, the Postgres route family, stale
+carry-over entries, the mixed-family wrapper, the override root guard, and
+a >64 KiB `--json` pipe.
+Commits: `72466b933` item 2 (`scripts/check-route-service-boundary.js`,
+its self-test, the pin test) · `99d0f3653` items 0, 1, 3
+(`scripts/check-postgres-access-layer.js`, new
+`scripts/postgres-access-allowlist.json`) — items 0 and 1 share one file
+and one commit because item 0's binding map is what item 1 freezes ·
+`6b21da269` item 4 (`docs/CI_GATES_REFERENCE.md`, `/start`) · `1cd79e7ce`
+route law names `@neondatabase/serverless` (fresh-context finding) ·
+`49e068dd7` Codex round 1: two new ratcheted kinds and the self-test
+unpinned · `633104aad` Codex round 2: CommonJS accessor exports and aliased
+`require` recognised (below).
+Ratchet: report-only → 156 `{file, kind, count}` keys (62 files × their
+kinds plus the 9 baselined `unresolved-import` sites in 6 files, Q5 files
+excluded; the probe now has 11 kinds — the plan's "nine" gained
+`unresolved-import` and `driver-export` in the Codex round). **Census line
+for the next preamble:** `--report` now prints 60 driver-import files, 349
+`sql` tags in 52 files, and **67** files with any record (the 62 with
+Postgres kinds plus 5 that carry only `unresolved-import`); kind totals
+unresolved-import 9, driver-export 0, the other nine unchanged. Stage 2's
+Verify already expects the driver total to move to 61; live census identical before and after item 0,
+which is the plan's proof that the recognition gaps were latent.
+`POSTGRES_CARRYOVER`: 17 routes, exactly the census's `pages/api`
+driver-import set, zero extras under propagation.
+Decisions taken in-stage (orchestrator, within the plan's ground rules):
+- A `sql` tag counts wherever it appears, with or without a driver import
+  in the same file (Opus P1: otherwise `export { sql }` from any
+  allowlisted file gave every new file — routes included — an uncounted
+  tag, and the plan's own Verify mutation on a driver-free route stayed
+  green). Over-recognition is the safe direction; no live false positive
+  (the only extra grep hit, `irs-bmf-service.js:379`, is a comment).
+- `--report` and `--json` apply the ratchet exit code, so `package.json`
+  and the CI workflow were not touched (shared-file fence).
+- Non-literal `require()`/`import()` sources resolve one hop through a
+  same-file string const; the remaining nine live sites (all deliberate
+  bundler bypasses in `lib/dataverse/client.js`, `request-correlation.js`,
+  `settings-service.js`, `app-access-service.js`, `database-service.js`,
+  `prompt-resolver.js`) are listed in `--report` for audit and neither
+  counted nor failed — failing them closed would have been a false red on
+  code this plan does not own.
+- `--postgres-carryover` exits 2 unless `--root` is non-default, so the
+  pinned list cannot be swapped by a `package.json`/workflow edit.
+- Q6 cast-lint: 465 live warnings, 448 of them `VALUES (${…})` where the
+  target column types the parameter; `--report` prints per-kind and
+  per-file×kind totals only, rows behind `--cast-lint-detail`/`--json`.
+  The Stage 7 false-positive record should treat `VALUES` separately.
+Reviews: Sonnet built two disjoint streams (never ran git); Opus reviewed
+each read-only with fixture and mutation harnesses — route stream: P1
+(mixed-family wrapper tracked as one family, so a carried-over route could
+reach Dataverse unflagged; fixed with family sets in the fixpoint), two P2
+(`pg-copy-streams` unguarded; override flag usable on the real root) —
+round 2 APPROVE; ratchet stream: P1 (bare `sql` tag uncounted without a
+driver import), six P2 (driver source set, const alias fail-open,
+`lib/postgres` index regex, two surviving mutants, cast-lint volume, item 4
+missing), round 2 conditional APPROVE on two P2 (64 KiB pipe truncation
+from `process.exit`, unpinned bare-tag case) — closed and re-verified by
+the orchestrator (mutant now killed; `--json | wc -c` 70122 and parses).
+Orchestrator's own checks: independent gap fixture against HEAD (0 for
+every gap kind) and the new script (all counted); allowlist == census
+recomputed from `--json`; the plan's three Verify mutations (driver import
+in a scratch `lib/services` file → red; `sql` tag in a driver-free route →
+red on the ratchet; driver import in the same route → red on the route law;
+removed → both green).
+Verify: `test:ci` 1058 suites / 15,646 tests pass (before the docs commit;
+no runtime code changed after); canonical `npm run build` passes
+(`✓ Compiled successfully`, 32 static pages); every `check:*` gate in
+`/start` with its self-test, run sequentially after the three commits: 69/69
+green (re-run after `49e068dd7`: 69/69; after `633104aad`: 69/69);
+`test:ci` re-run after `49e068dd7` and again after `633104aad`: 1058 suites
+/ 15,646 tests pass both times.
+Codex adversarial review (round 1, `--scope branch --base c56a005b4`):
+**needs-attention** — it executed two bypasses that left both gates green:
+(1) a new service loading the driver through a computed specifier
+(`['@vercel','postgres'].join('/')`), (2) an allowlisted service exporting
+`getRawSql() { return sql }` for a new route to call under another name;
+and (3) the JSON-pipe self-test pinned the live totals 60/349/62, which
+would have failed on Stage 2's exempt seam file or any legitimate shrink.
+Orchestrator decision: close (1) and (2) with LOCAL per-file kinds rather
+than the inter-procedural provenance Codex suggested — `unresolved-import`
+(computed sources ratcheted, the nine live deliberate bundler bypasses
+baselined so a new one is red at the file that loads it, which is why
+route propagation is unnecessary) and `driver-export` (identity export or
+exported function returning a driver-bound binding; live count 0). Full
+taint through function returns stays out of scope: the gate is a ratchet
+against accidental raw usage plus the cheap laundering shapes, and both
+DAL precedents drew the same line. (3) fixed: deep-equality against an
+in-process payload plus structural invariants, and a shrink fixture.
+Codex round 2 (`--scope branch --base c56a005b4`): confirmed all three
+round-1 cases fixed (computed load red, ESM raw getter red, shrink green,
+pipe deep-equality), then **needs-attention** on two more same-file shapes:
+a CommonJS accessor export (`module.exports.getRawSql = () => sql`) and an
+aliased `require` (`const load = require; load('pg')`), both of which
+produced no record. Both fixed in `633104aad` with red fixtures for every
+form and a CommonJS internal-use green control; the orchestrator re-ran its
+own seven-file fixture (three CJS accessors, aliased literal load, aliased
+computed load, `module.require`, CJS green control) against the committed
+gate before (all green — the evasion) and after (all red except the
+control). No Codex round 3: two rounds is the working model's cap for a
+build whose remaining surface is local AST shapes, and the orchestrator's
+own review (fixtures above, the plan's Verify mutations, allowlist ==
+census, mutant kill) is the last review. Route-gate side of both rounds:
+no change needed — a new file or route using either shape is red at the
+ratchet, and the 17 carry-over routes cannot add one without their counts
+rising.
+Fresh-context review of Stage 2: run (next log entry); 6 discrepancies,
+all fixed in §4 and Stage 2 before Stage 2 starts.
+Open:
+- **Stage 7 wording needs an owner decision, raised now so it is not a
+  surprise later.** Because `sql` tags count everywhere, the allowlist's
+  tag/query keys for the nine existing store modules and `database-service`
+  can only reach zero if Q4's relocation into `lib/postgres/stores/`
+  happens (the allowed-importer set) — otherwise Stage 7's precondition "0
+  raw sites outside `lib/postgres/**`" is unreachable and the law must be
+  defined as driver-import + route-import only, with tag counts left to the
+  route law and the store boundary. Either reading is coherent; Q4's
+  "confirm at Stage 7" is now load-bearing rather than cosmetic.
+- `pages/api/dataverse-export/` is exempt from both families (pre-existing
+  short-circuit); no carry-over route lives there.
+
+- **2026-09-23 — Fresh-context review of Stage 2 preconditions (§6).** A
+  fresh Opus agent probed the tree at `6b21da269` and found six assumptions
+  that did not hold, all fixed in §4 and Stage 2 above before Stage 2 may
+  start: (1) the contract lane's `moduleNameMapper` swaps only
+  `^@vercel/postgres$`, so a `pg`-backed `getPool()` would read a
+  `POSTGRES_URL` the lane never sets — the `getPool` contract test now sets
+  it from `PG_CONTRACT_URL` under `jest.isolateModules`; (2) Stage 2 work
+  item 2 (allowed-importer set) was already done by Stage 1, proven with
+  `--root` fixtures — item rewritten to the two docblock notes; the route
+  law's missing `@neondatabase/serverless` was fixed in Stage 1 (`1cd79e7ce`); (3) Stage 2's Verify
+  "census count identical" was false — the seam file is counted (60 → 61),
+  only the ratchet stays green, and nothing pins the 60; (4) §4 said 8
+  hand-rolled `BEGIN` sequences; the probe counts 12 in 10 files, and four
+  files cannot take a commit-on-return `withTransaction` unchanged (early
+  `ROLLBACK`-and-return, multiple `COMMIT`s, caller-supplied client) — §4
+  now scopes `withTransaction` to the simple sequences; (5) two of the three
+  `pg` Pool users build a Pool per call and `pool.end()` it, and two
+  `db.connect` sites use the destroy-on-error `release(err)` form — §4 now
+  specifies `withClient` destroys on error and defers the `pool.end()`
+  lifecycle change to the converting stages; (6) "`POSTGRES_URL` read in
+  `getPool()` and nowhere else" is unachievable while `sql`/`db` are
+  re-exported (`@vercel/postgres` reads it internally) and all three live
+  Pool users fall back to `DATABASE_URL` — §4 now says `getPool()` is the
+  only place OUR code reads `POSTGRES_URL || DATABASE_URL`. Named tests that
+  do not exist (expected — Stage 2 writes them): `tests/unit/postgres-client.test.js`,
+  `tests/pg-contract/postgres-client.test.js`. Facts recorded for the
+  builder: `withDossierTransaction` (`cycle-dossier-store.js:28`) and
+  `withReviewPanelTransaction` (`review-panel-store.js:73`) are
+  byte-identical models whose unguarded `ROLLBACK` can mask the original
+  error; `@vercel/postgres` 0.10.0 exports `sql`, `db`, `createPool`,
+  `createClient`, `VercelPool`, `VercelClient`, `postgresConnectionString`,
+  `types`; `pg` 8.22.0 is a direct dependency; live `POSTGRES_URL` readers
+  outside the seam: `irs-bmf-service.js:149`, `intake/submit.js:85`,
+  `cron/drain-submissions.js:49`, `scripts/apply-migrations.js:105`, plus
+  every `sql`/`db` importer implicitly; the `wmkf-pg-contract` container was
+  up. No drift: `lib/postgres/` absent; both Stage 1 gates green; the Atlas
+  page `docs/atlas/postgres-infra-tables.md` has no "Access layer" section
+  yet and `check:atlas` adds no requirement for one without new table names.
 
 ## Appendix A — Census (2026-09-23, commit `1046c1033`)
 
