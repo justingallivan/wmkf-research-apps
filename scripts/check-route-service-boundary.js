@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Stage-7 Route→Service boundary LAW gate.
+ * Stage-7 Route→Service boundary gate -- Dataverse LAW + Postgres
+ * LAW-with-shrink-only-carry-over.
  *
  * The Route→Service consolidation campaign (docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md,
  * Stages 0-5) shelled every `pages/api` route onto per-domain
@@ -8,30 +9,57 @@
  * Stage 7 made that permanent law: ANY in-scope route file that reaches the
  * Dataverse layer directly -- importing a `lib/dataverse/adapters/*` module or
  * `lib/services/dynamics-service` -- outside the one carried-over exempt dir
- * (pages/api/dataverse-export/) fails this gate.
- * There is no baseline file and no count ratchet -- this is the law, mirroring
+ * (pages/api/dataverse-export/) fails this gate. There is no baseline file
+ * and no count ratchet for Dataverse -- this is pure law, mirroring
  * scripts/check-dataverse-access-layer.js one layer up.
+ *
+ * Postgres access layer migration Stage 1 item 2
+ * (docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md) widened the
+ * SAME boundary-source recognition to a `pages/api` route reaching Postgres
+ * directly -- importing `@vercel/postgres`/`pg` (or a subpath) or anything
+ * under `lib/postgres/` -- with a narrowly scoped, SHRINK-ONLY carry-over:
+ * `POSTGRES_CARRYOVER` below lists the routes that were already red under the
+ * widened definition when it landed. A route on that list may keep reaching
+ * Postgres; an unlisted route reaching Postgres fails as law; a listed route
+ * that no longer reaches Postgres fails the gate too (stale entry -- forces
+ * the list to shrink, never grow silently). Dataverse detection has no list
+ * and is never excused by a Postgres carry-over entry in the same file. The
+ * carry-over is pinned exact-set by
+ * tests/unit/route-service-boundary-postgres-carryover.test.js; the list must
+ * reach zero by the end of Stage 6, at which point the array and that test
+ * are deleted and the gate is pure law again for both families.
  *
  * Detection reuses the hardened scanner primitives from
  * scripts/lib/ast-scan-core.js (the same core the Dataverse access-layer gate
  * uses): static import, ESM re-export, dynamic import(), and inline require()
- * of a boundary source are all recognized, and adapter re-export through a
- * thin wrapper module consumed by a route taints the route. This deliberately
- * avoids a looser per-file string matcher, which ordinary indirection evades.
- * Non-literal require()/import() sources reachable from a route fail CLOSED.
+ * of a boundary source are all recognized, and re-export through a thin
+ * wrapper module consumed by a route taints the route -- for BOTH the
+ * Dataverse and the Postgres source families, via the same propagation
+ * mechanism. This deliberately avoids a looser per-file string matcher, which
+ * ordinary indirection evades. Non-literal require()/import() sources
+ * reachable from a route fail CLOSED.
  *
  * A route that USES a normal per-domain service (which internally calls an
- * adapter but does NOT re-export it) is NOT counted -- that is the desired end
- * state. Only direct boundary imports and thin re-export wrappers count.
+ * adapter or Postgres but does NOT re-export it) is NOT counted -- that is
+ * the desired end state. Only direct boundary imports and thin re-export
+ * wrappers count.
  *
  * Modes:
- *   --report  Domain rollup + per-route listing of any in-scope
- *             boundary-importing routes (informational; exits 0). The Stage 1-5
- *             wave classification was retired with the campaign.
- *   --json    Raw { file, domain, reason } entries for in-scope
- *             boundary-importing routes.
- *   (default) LAW MODE: exits non-zero naming every in-scope
- *             boundary-importing route. Zero is the only passing state.
+ *   --report  Domain + family rollup, Postgres carry-over count, and the
+ *             per-route listing of any in-scope boundary-reaching routes
+ *             (informational; exits 0). The Stage 1-5 wave classification was
+ *             retired with the campaign.
+ *   --json    Raw { file, domain, reason, boundaryFamily } rows for in-scope
+ *             boundary-reaching routes -- one row per (file, family) so a
+ *             route hitting both families reports both reasons.
+ *   (default) LAW MODE: exits non-zero naming every in-scope Dataverse
+ *             violation, every unlisted Postgres violation, and every stale
+ *             Postgres carry-over entry.
+ *   --postgres-carryover <file>  SELF-TEST ONLY override: read the carry-over
+ *             list from a JSON array file instead of the in-script
+ *             POSTGRES_CARRYOVER constant, so fixtures can exercise the
+ *             stale-entry and unlisted-entry paths without touching the real
+ *             list.
  */
 
 const fs = require('fs');
@@ -78,12 +106,63 @@ function isAdapterSource(value) {
   return typeof value === 'string' && /(?:^|\/)lib\/dataverse\/adapters\/[^/]+/.test(value);
 }
 
-function isBoundarySource(value) {
-  return isAdapterSource(value) || isDynamicsServiceSource(value) || isDynamicsSubmoduleSource(value);
+// Postgres access layer migration Stage 1 item 2: bare-package driver sources
+// only -- exact match or a `<pkg>/subpath` form. Deliberately does NOT match
+// `pg` as a substring of another package name (`pg-copy-streams` is a real,
+// unrelated dependency used by lib/services/irs-bmf-service.js).
+function isPostgresDriverSource(value) {
+  if (typeof value !== 'string') return false;
+  return value === '@vercel/postgres' || value.startsWith('@vercel/postgres/')
+    || value === 'pg' || value.startsWith('pg/');
 }
 
+// Any source resolving under lib/postgres/ (the future access-layer dir),
+// matched the same way isDynamicsSubmoduleSource is -- directly on the raw
+// specifier string (so an aliased `@/lib/postgres/client` matches without
+// resolution) as well as on a resolved relative path.
+function isPostgresLayerSource(value) {
+  return typeof value === 'string' && /(?:^|\/)lib\/postgres(?:\/|$)/.test(value);
+}
+
+function isPostgresSource(value) {
+  return isPostgresDriverSource(value) || isPostgresLayerSource(value);
+}
+
+function isBoundarySource(value) {
+  return isAdapterSource(value) || isDynamicsServiceSource(value) || isDynamicsSubmoduleSource(value)
+    || isPostgresSource(value);
+}
+
+// Postgres access layer migration Stage 1 item 2 (docs/plans/
+// POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md): the 17 pages/api
+// routes that reached Postgres directly when the widened definition landed.
+// SHRINK-ONLY -- pinned exact-set by
+// tests/unit/route-service-boundary-postgres-carryover.test.js. Widening this
+// array requires editing that test in the same reviewed commit. The list must
+// reach zero by the end of Stage 6, at which point this array and that test
+// are deleted and the gate becomes pure law for Postgres too.
+const POSTGRES_CARRYOVER = [
+  'pages/api/admin/health-history.js',
+  'pages/api/admin/stats.js',
+  'pages/api/auth/[...nextauth].js',
+  'pages/api/auth/link-profile.js',
+  'pages/api/cron/drain-submissions.js',
+  'pages/api/cron/health-check.js',
+  'pages/api/cron/pricing-canary.js',
+  'pages/api/cron/pricing-refresh.js',
+  'pages/api/cron/secret-check.js',
+  'pages/api/cron/spend-check.js',
+  'pages/api/dynamics-explorer/restrictions.js',
+  'pages/api/dynamics-explorer/roles.js',
+  'pages/api/expertise-finder/history.js',
+  'pages/api/expertise-finder/match.js',
+  'pages/api/expertise-finder/roster.js',
+  'pages/api/intake/submit.js',
+  'pages/api/webhooks/bill.js',
+].sort();
+
 function parseArgs(argv) {
-  const args = { root: DEFAULT_ROOT, report: false, json: false };
+  const args = { root: DEFAULT_ROOT, report: false, json: false, postgresCarryoverFile: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--root') {
@@ -94,6 +173,10 @@ function parseArgs(argv) {
       args.report = true;
     } else if (arg === '--json') {
       args.json = true;
+    } else if (arg === '--postgres-carryover') {
+      const value = argv[++i];
+      if (!value) throw new Error('--postgres-carryover requires a JSON file path');
+      args.postgresCarryoverFile = path.resolve(value);
     } else if (arg === '--help' || arg === '-h') {
       args.help = true;
     } else {
@@ -103,15 +186,35 @@ function parseArgs(argv) {
   return args;
 }
 
+function loadCarryover(file) {
+  if (!file) return POSTGRES_CARRYOVER;
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!Array.isArray(parsed)) throw new Error(`--postgres-carryover file must contain a JSON array: ${file}`);
+  for (const entry of parsed) {
+    if (typeof entry !== 'string') {
+      throw new Error(`--postgres-carryover file must contain only strings, got ${JSON.stringify(entry)}: ${file}`);
+    }
+  }
+  return parsed;
+}
+
 function usage() {
   return [
     'Usage: node scripts/check-route-service-boundary.js [--root <dir>] [--report] [--json]',
+    '                                                     [--postgres-carryover <file>]',
     '',
     'Default mode is LAW MODE (Route→Service consolidation Stage 7): any',
     'pages/api route importing Dataverse adapters or dynamics-service (outside',
-    'the exempt dir) fails the gate. No baseline file, no count ratchet.',
-    '--report prints a per-domain rollup and the offending routes (exit 0).',
-    '--json prints the raw boundary-importing route entries.',
+    'the exempt dir) fails the gate -- pure law, no baseline, no ratchet.',
+    'A route importing a Postgres driver (@vercel/postgres, pg) or lib/postgres/',
+    'also fails UNLESS it is one of the 17 POSTGRES_CARRYOVER entries (shrink-only',
+    '-- a listed route that no longer reaches Postgres fails too, as a stale entry).',
+    '--report prints a domain + family rollup, the Postgres carry-over count, and',
+    'the offending routes (exit 0).',
+    '--json prints the raw boundary-reaching route rows (one per family; exit 0).',
+    '--postgres-carryover <file> is a SELF-TEST-ONLY override: read the carry-over',
+    'list from a JSON array file instead of the in-script POSTGRES_CARRYOVER. Rejected',
+    '(exit 2) unless --root is also set to something other than the real repo root.',
   ].join('\n');
 }
 
@@ -407,12 +510,15 @@ function analyzeRoot(root) {
   // resolved to its repo-relative target first (a wrapper's own re-export may
   // read `../dataverse/adapters/x`, which only reveals its adapter identity
   // after resolution); the raw string is the fallback when unresolvable.
+  // Returns { kind, family } ('dataverse' or 'postgres') or null.
   function boundaryKind(fromRel, spec) {
     const resolved = resolveLocalSpec(fromRel, spec, fileSet);
     const matchPath = resolved || spec;
-    if (isAdapterSource(matchPath)) return 'adapter';
-    if (isDynamicsServiceSource(matchPath)) return 'dynamics';
-    if (isDynamicsSubmoduleSource(matchPath)) return 'dynamics';
+    if (isAdapterSource(matchPath)) return { kind: 'adapter', family: 'dataverse' };
+    if (isDynamicsServiceSource(matchPath)) return { kind: 'dynamics', family: 'dataverse' };
+    if (isDynamicsSubmoduleSource(matchPath)) return { kind: 'dynamics', family: 'dataverse' };
+    if (isPostgresDriverSource(matchPath)) return { kind: 'postgres-driver', family: 'postgres' };
+    if (isPostgresLayerSource(matchPath)) return { kind: 'postgres-layer', family: 'postgres' };
     return null;
   }
 
@@ -422,31 +528,62 @@ function analyzeRoot(root) {
   // A file is boundary-equivalent (a thin PASSTHROUGH wrapper) if it re-exports a
   // boundary source wholesale via `export * from` / `export ... from` /
   // `module.exports = require(...)`, or does so for another boundary-equivalent
-  // module. Importing ANY name from such a file reaches the boundary.
-  const boundaryEquivalent = new Set();
+  // module. Importing ANY name from such a file reaches the boundary. Values
+  // are a Set<family> ('dataverse' and/or 'postgres') -- a wrapper CAN re-export
+  // both families at once (e.g. `export * from '@vercel/postgres'; export *
+  // from '<adapter>'`), and every family it reaches must be tracked, not just
+  // the first one a scan happens to hit, or a route consuming it would only
+  // ever fail on one family and silently pass the other.
+  const boundaryEquivalent = new Map();
   // Binding-level taint: per module, the EXTERNAL export names that re-publish a
-  // boundary binding by identity (import-then-export). A route reaches the
-  // boundary only if it imports one of THESE names -- so a legitimate service
-  // that re-exports one adapter constant does not taint consumers that import
-  // only its own functions. boundaryNamespace holds files whose WHOLE namespace
-  // is a re-published boundary binding (`module.exports = adapterBinding`).
+  // boundary binding by identity (import-then-export), mapped to the Set<family>
+  // they reach. A route reaches the boundary only if it imports one of THESE
+  // names -- so a legitimate service that re-exports one adapter constant does
+  // not taint consumers that import only its own functions. boundaryNamespace
+  // holds files whose WHOLE namespace is a re-published boundary binding
+  // (`module.exports = adapterBinding`), mapped to Set<family>.
   const boundaryExports = new Map();
-  const boundaryNamespace = new Set();
+  const boundaryNamespace = new Map();
   const exportsOf = (rel) => {
-    let s = boundaryExports.get(rel);
-    if (!s) { s = new Set(); boundaryExports.set(rel, s); }
-    return s;
+    let m = boundaryExports.get(rel);
+    if (!m) { m = new Map(); boundaryExports.set(rel, m); }
+    return m;
   };
-  // Is a local binding (an { spec, imported } entry) boundary-tainted?
-  function bindingIsBoundary(fromRel, entry) {
-    if (!entry) return false;
-    if (boundaryKind(fromRel, entry.spec)) return true;
+  const familiesOf = (map, rel) => map.get(rel) || new Set();
+  // Union `families` into `map.get(key)` (creating it if absent). Returns
+  // true if any NEW family was added, for fixpoint change tracking.
+  function unionFamilies(map, key, families) {
+    if (!families || families.size === 0) return false;
+    let set = map.get(key);
+    if (!set) { set = new Set(); map.set(key, set); }
+    let added = false;
+    for (const f of families) {
+      if (!set.has(f)) { set.add(f); added = true; }
+    }
+    return added;
+  }
+  // Every family a local binding (an { spec, imported } entry) is
+  // boundary-tainted with -- a binding can reach BOTH families at once
+  // (e.g. `import * as m from '<mixed-wrapper>'` where the wrapper re-exports
+  // both an adapter and a Postgres driver).
+  function bindingBoundaryFamilies(fromRel, entry) {
+    const result = new Set();
+    if (!entry) return result;
+    const bk = boundaryKind(fromRel, entry.spec);
+    if (bk) result.add(bk.family);
     const target = resolveLocalSpec(fromRel, entry.spec, fileSet);
-    if (target == null) return false;
-    if (boundaryEquivalent.has(target) || boundaryNamespace.has(target)) return true;
+    if (target == null) return result;
+    for (const f of familiesOf(boundaryEquivalent, target)) result.add(f);
+    for (const f of familiesOf(boundaryNamespace, target)) result.add(f);
     const exp = boundaryExports.get(target);
-    if (!exp) return false;
-    return entry.imported === '*' ? exp.size > 0 : exp.has(entry.imported);
+    if (exp) {
+      if (entry.imported === '*') {
+        for (const famSet of exp.values()) for (const f of famSet) result.add(f);
+      } else if (exp.has(entry.imported)) {
+        for (const f of exp.get(entry.imported)) result.add(f);
+      }
+    }
+    return result;
   }
 
   // A file is unresolved-equivalent if a non-literal require()/import() sits in
@@ -462,36 +599,35 @@ function analyzeRoot(root) {
     for (const rel of relPaths) {
       const info = infoOf(rel);
 
-      if (!boundaryEquivalent.has(rel)) {
-        const wraps = info.refs.some((ref) => {
-          if (!ref.reexport) return false;
-          if (boundaryKind(rel, ref.spec)) return true;
+      // boundaryEquivalent: union the family from EVERY re-export ref (not
+      // just the first that matches), so a wrapper re-exporting both an
+      // adapter AND a Postgres driver is tracked as reaching both families.
+      {
+        const wrapFamilies = new Set();
+        for (const ref of info.refs) {
+          if (!ref.reexport) continue;
+          const bk = boundaryKind(rel, ref.spec);
+          if (bk) { wrapFamilies.add(bk.family); continue; }
           const target = resolveLocalSpec(rel, ref.spec, fileSet);
-          return target != null && boundaryEquivalent.has(target);
-        });
-        if (wraps) {
-          boundaryEquivalent.add(rel);
-          changed = true;
-        }
-      }
-
-      if (!boundaryNamespace.has(rel)) {
-        for (const local of info.exportsWholeNamespace) {
-          if (bindingIsBoundary(rel, info.importedBindings.get(local))) {
-            boundaryNamespace.add(rel);
-            changed = true;
-            break;
+          if (target != null) {
+            for (const f of familiesOf(boundaryEquivalent, target)) wrapFamilies.add(f);
           }
         }
+        if (unionFamilies(boundaryEquivalent, rel, wrapFamilies)) changed = true;
       }
 
-      const already = boundaryExports.get(rel);
-      for (const [external, local] of info.exportedBindings) {
-        if (already && already.has(external)) continue;
-        if (bindingIsBoundary(rel, info.importedBindings.get(local))) {
-          exportsOf(rel).add(external);
-          changed = true;
+      // boundaryNamespace: union across EVERY exportsWholeNamespace local.
+      {
+        const nsFamilies = new Set();
+        for (const local of info.exportsWholeNamespace) {
+          for (const f of bindingBoundaryFamilies(rel, info.importedBindings.get(local))) nsFamilies.add(f);
         }
+        if (unionFamilies(boundaryNamespace, rel, nsFamilies)) changed = true;
+      }
+
+      for (const [external, local] of info.exportedBindings) {
+        const fams = bindingBoundaryFamilies(rel, info.importedBindings.get(local));
+        if (unionFamilies(exportsOf(rel), external, fams)) changed = true;
       }
 
       if (!unresolvedEquivalent.has(rel)) {
@@ -569,38 +705,63 @@ function analyzeRoot(root) {
     );
   }
 
-  // Why each route reaches the boundary, for reporting.
-  function routeReach(rel) {
+  // Why each route reaches the boundary, per family, for reporting. Returns
+  // { dataverse?: reason, postgres?: reason } -- a route can reach both
+  // families (e.g. a route importing an adapter AND a Postgres driver
+  // directly), and both are reported.
+  function routeReachByFamily(rel) {
     const info = infoOf(rel);
+    const found = {};
+    const record = (family, reason) => { if (!found[family]) found[family] = reason; };
+    const label = (family) => (family === 'postgres' ? 'postgres' : 'adapter');
+
     for (const ref of info.refs) {
-      const kind = boundaryKind(rel, ref.spec);
-      if (kind === 'adapter') return `adapter import (${ref.kind})`;
-      if (kind === 'dynamics') return `dynamics-service import (${ref.kind})`;
+      const bk = boundaryKind(rel, ref.spec);
+      if (!bk) continue;
+      if (bk.kind === 'adapter') record('dataverse', `adapter import (${ref.kind})`);
+      else if (bk.kind === 'dynamics') record('dataverse', `dynamics-service import (${ref.kind})`);
+      else if (bk.kind === 'postgres-driver') record('postgres', `postgres driver import (${ref.kind})`);
+      else if (bk.kind === 'postgres-layer') record('postgres', `postgres layer import (${ref.kind})`);
     }
     for (const ref of info.refs) {
       const target = resolveLocalSpec(rel, ref.spec, fileSet);
-      if (target != null && boundaryEquivalent.has(target)) return `adapter re-export via ${target} (${ref.kind})`;
+      if (target == null) continue;
+      for (const fam of familiesOf(boundaryEquivalent, target)) {
+        record(fam, `${label(fam)} re-export via ${target} (${ref.kind})`);
+      }
     }
     // Binding-level: the route imports a specific name that a module re-publishes
-    // from a boundary source by identity (import-then-export).
+    // from a boundary source by identity (import-then-export). Every family the
+    // target reaches is recorded -- a mixed wrapper (e.g. `import * as m` from a
+    // module re-exporting both an adapter and a Postgres driver) must report both.
     for (const [, entry] of info.importedBindings) {
       const target = resolveLocalSpec(rel, entry.spec, fileSet);
       if (target == null) continue;
-      if (boundaryNamespace.has(target)) return `adapter binding re-export via ${target} (import)`;
+      for (const fam of familiesOf(boundaryNamespace, target)) {
+        record(fam, `${label(fam)} binding re-export via ${target} (import)`);
+      }
       const exp = boundaryExports.get(target);
       if (!exp) continue;
-      if (entry.imported === '*' ? exp.size > 0 : exp.has(entry.imported)) {
-        return `adapter binding '${entry.imported}' re-export via ${target} (import)`;
+      if (entry.imported === '*') {
+        for (const [name, famSet] of exp) {
+          for (const fam of famSet) {
+            record(fam, `${label(fam)} binding '${name}' re-export via ${target} (import)`);
+          }
+        }
+      } else if (exp.has(entry.imported)) {
+        for (const fam of exp.get(entry.imported)) {
+          record(fam, `${label(fam)} binding '${entry.imported}' re-export via ${target} (import)`);
+        }
       }
     }
-    return null;
+    return found;
   }
 
   const routes = [];
   for (const rel of relPaths) {
     if (!rel.startsWith(ROUTE_ROOT) || isExemptRoute(rel)) continue;
-    const reason = routeReach(rel);
-    if (reason) routes.push({ file: rel, reason });
+    const reach = routeReachByFamily(rel);
+    if (Object.keys(reach).length > 0) routes.push({ file: rel, reach });
   }
   routes.sort((a, b) => a.file.localeCompare(b.file));
   return routes;
@@ -616,15 +777,24 @@ function routeDomain(rel) {
   return slash === -1 ? '(root)' : sub.slice(0, slash);
 }
 
+// One row per (file, family) so a route reaching both families reports both
+// reasons; `boundaryFamily` is 'dataverse' or 'postgres'.
 function buildRows(routes) {
-  return routes.map((route) => ({
-    file: route.file,
-    reason: route.reason,
-    domain: routeDomain(route.file),
-  }));
+  const rows = [];
+  for (const route of routes) {
+    for (const family of Object.keys(route.reach)) {
+      rows.push({
+        file: route.file,
+        reason: route.reach[family],
+        domain: routeDomain(route.file),
+        boundaryFamily: family,
+      });
+    }
+  }
+  return rows;
 }
 
-function formatReport(routes) {
+function formatReport(routes, carryover = POSTGRES_CARRYOVER) {
   const rows = buildRows(routes);
 
   const byDomain = new Map();
@@ -633,39 +803,96 @@ function formatReport(routes) {
   }
   const domainRollup = [...byDomain.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
+  const familyRollup = { dataverse: 0, postgres: 0 };
+  for (const row of rows) familyRollup[row.boundaryFamily] = (familyRollup[row.boundaryFamily] || 0) + 1;
+
+  const postgresRoutes = new Set(routes.filter((r) => r.reach.postgres).map((r) => r.file));
+  const staleEntries = carryover.filter((entry) => !postgresRoutes.has(entry));
+
   const lines = [
-    'Route-service boundary census (law mode since Stage 7 -- 0 is the only passing state)',
-    `Boundary-importing routes (in scope): ${rows.length}`,
+    'Route-service boundary census (Dataverse law since Stage 7; Postgres law + shrink-only carry-over since Stage 1 item 2)',
+    `Boundary-reaching routes (in scope): ${routes.length}`,
     `Domains: ${byDomain.size}`,
+    `Family rollup: dataverse=${familyRollup.dataverse}, postgres=${familyRollup.postgres}`,
+    `Postgres carry-over: ${carryover.length} listed, ${staleEntries.length} stale`,
   ];
   if (rows.length > 0) {
     lines.push('', '| Domain | Routes |', '|---|---:|');
     for (const [domain, count] of domainRollup) {
       lines.push(`| ${domain} | ${count} |`);
     }
-    lines.push('', '## Boundary-importing routes');
-    for (const row of rows.sort((a, b) => a.file.localeCompare(b.file))) {
-      lines.push(`  - ${row.file}  [${row.reason}]`);
+    lines.push('', '## Boundary-reaching routes');
+    for (const row of rows.sort((a, b) => a.file.localeCompare(b.file) || a.boundaryFamily.localeCompare(b.boundaryFamily))) {
+      lines.push(`  - ${row.file}  [${row.boundaryFamily}: ${row.reason}]`);
     }
+  }
+  if (staleEntries.length > 0) {
+    lines.push('', '## Stale Postgres carry-over entries (no longer reach Postgres -- remove)');
+    for (const entry of staleEntries) lines.push(`  - ${entry}`);
   }
   return lines.join('\n');
 }
 
-// Stage 7 law: no in-scope pages/api route may import lib/dataverse/adapters/*
-// or lib/services/dynamics-service (directly or through a thin re-export
-// wrapper). There is no allowlist and no count ratchet left to exempt a route.
-function checkLaw(routes) {
-  if (routes.length === 0) return 0;
+// Stage 7 Dataverse law + Postgres access-layer Stage 1 item 2 law-with-carry-over:
+//   - a route reaching Dataverse (adapter/dynamics-service, directly or via a
+//     thin re-export wrapper) always fails -- no list excuses it, ever.
+//   - a route reaching Postgres directly (or via a thin re-export wrapper)
+//     fails UNLESS it is a listed POSTGRES_CARRYOVER entry.
+//   - a listed POSTGRES_CARRYOVER entry that no longer reaches Postgres under
+//     the current scan fails too (stale entry -- the list is shrink-only).
+// A route on the carry-over list that ALSO reaches Dataverse still fails, on
+// the Dataverse reason -- the carry-over only ever excuses Postgres.
+function evaluateLawFailures(routes, carryover) {
+  const carrySet = new Set(carryover);
+  const postgresRoutes = new Set();
+  const failures = [];
+
+  for (const route of routes) {
+    if (route.reach.dataverse) {
+      failures.push({ file: route.file, boundaryFamily: 'dataverse', reason: route.reach.dataverse, stale: false });
+    }
+    if (route.reach.postgres) {
+      postgresRoutes.add(route.file);
+      if (!carrySet.has(route.file)) {
+        failures.push({ file: route.file, boundaryFamily: 'postgres', reason: route.reach.postgres, stale: false });
+      }
+    }
+  }
+  for (const entry of carryover) {
+    if (!postgresRoutes.has(entry)) {
+      failures.push({
+        file: entry,
+        boundaryFamily: 'postgres',
+        reason: 'stale Postgres carry-over entry -- remove it',
+        stale: true,
+      });
+    }
+  }
+  failures.sort((a, b) => a.file.localeCompare(b.file) || a.boundaryFamily.localeCompare(b.boundaryFamily));
+  return failures;
+}
+
+function checkLaw(routes, carryover = POSTGRES_CARRYOVER) {
+  const failures = evaluateLawFailures(routes, carryover);
+  if (failures.length === 0) return 0;
 
   console.error('route-service-boundary LAW VIOLATION:');
-  console.error(`  pages/api route(s) reaching the Dataverse layer directly (${routes.length}):`);
-  for (const route of routes.slice(0, 60)) {
-    console.error(`    + ${route.file} | ${route.reason}`);
+  console.error(`  boundary violation(s) (${failures.length}):`);
+  for (const f of failures.slice(0, 60)) {
+    if (f.stale) {
+      console.error(`    + ${f.file} | stale Postgres carry-over entry -- remove ${f.file}`);
+    } else {
+      console.error(`    + ${f.file} | [${f.boundaryFamily}] ${f.reason}`);
+    }
   }
-  if (routes.length > 60) console.error(`    ... ${routes.length - 60} more`);
+  if (failures.length > 60) console.error(`    ... ${failures.length - 60} more`);
   console.error('  Shell the route onto a per-domain lib/services/<domain>/ service;');
-  console.error('  a route may not import lib/dataverse/adapters/* or lib/services/dynamics-service.');
-  console.error('  (docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md, Stage 7 — law mode.)');
+  console.error('  a route may not import lib/dataverse/adapters/* or lib/services/dynamics-service');
+  console.error('  (no list excuses this), and may not import a Postgres driver or lib/postgres/');
+  console.error('  unless carried over in POSTGRES_CARRYOVER (shrink-only -- a listed route that');
+  console.error('  no longer reaches Postgres must be removed from the list).');
+  console.error('  (docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md, Stage 7; docs/plans/');
+  console.error('  POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md, Stage 1 item 2.)');
   return 1;
 }
 
@@ -676,15 +903,27 @@ function main(argv = process.argv.slice(2)) {
     return 0;
   }
 
+  // --postgres-carryover is a SELF-TEST-ONLY override. Reject it against the
+  // real repo root -- a package.json/CI edit passing this flag must never be
+  // able to bypass the pinned POSTGRES_CARRYOVER list.
+  if (args.postgresCarryoverFile && args.root === DEFAULT_ROOT) {
+    console.error(
+      'route-service-boundary: --postgres-carryover is a self-test-only override and '
+      + 'requires a non-default --root; it cannot be used against the real repo root.',
+    );
+    return 2;
+  }
+
+  const carryover = loadCarryover(args.postgresCarryoverFile);
   const routes = analyzeRoot(args.root);
   if (args.json) {
     console.log(JSON.stringify(buildRows(routes), null, 2));
   }
   if (args.report) {
-    console.log(formatReport(routes));
+    console.log(formatReport(routes, carryover));
   }
   if (args.report || args.json) return 0;
-  return checkLaw(routes);
+  return checkLaw(routes, carryover);
 }
 
 if (require.main === module) {
@@ -702,7 +941,13 @@ module.exports = {
   buildRows,
   formatReport,
   checkLaw,
+  evaluateLawFailures,
+  loadCarryover,
   isBoundarySource,
   isAdapterSource,
   isDynamicsServiceSource,
+  isPostgresDriverSource,
+  isPostgresLayerSource,
+  isPostgresSource,
+  POSTGRES_CARRYOVER,
 };
