@@ -52,6 +52,7 @@ const SHARE_POINT_TARGET = () => ({ registered: true, key: 'akoyago-shared', sit
 const ENV_KEYS = [
   'VERCEL_ENV', 'NODE_ENV', 'DATAVERSE_TARGET_INTERLOCK',
   'DYNAMICS_URL', 'DYNAMICS_TENANT_ID', 'DYNAMICS_CLIENT_ID', 'DYNAMICS_CLIENT_SECRET',
+  'REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY',
 ];
 let savedEnv;
 
@@ -66,6 +67,16 @@ beforeEach(() => {
   process.env.DYNAMICS_TENANT_ID = 't';
   process.env.DYNAMICS_CLIENT_ID = APP_USER_ID;
   process.env.DYNAMICS_CLIENT_SECRET = 's';
+  // Mutation check: without ia-sandbox-deps.js's sandboxCreateDocument
+  // forcing actorPolicy=SANDBOX_REHEARSAL, controls-service.js's own
+  // hardcoded actorPolicy=REQUIRED would reach resolveRequestDocumentActor's
+  // REQUIRED branch and throw request_document_actor_unavailable (no
+  // actingUserSystemId is ever passed here) -- but only once this readiness
+  // flag is 'on'; with it unset (the repo default), schemaReady() short
+  // circuits before the policy is even read, silently passing regardless of
+  // which policy is used. This flag must be 'on' for the happy-path test
+  // below to actually exercise that override.
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'on';
   _resetInterlockStateForTests();
   fetch.mockReset();
 });
