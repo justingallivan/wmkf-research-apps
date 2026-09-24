@@ -105,7 +105,7 @@ These are proposals, not implementation status. Each slice is one email family. 
 
 | Slice | Status | PR | Merged |
 | --- | --- | --- | --- |
-| 4. Grantee abstract invitation | Built; draft pending Cc scope decision | [#330](https://github.com/justingallivan/wmkf-research-apps/pull/330) | No |
+| 4. Grantee abstract invitation | Built; ready for review | [#330](https://github.com/justingallivan/wmkf-research-apps/pull/330) | No |
 | 1. Manual reviewer reminders | Not started | — | No |
 | 3. Reviewer release courtesies | Not started | — | No |
 | 2. Reviewer due-date extension | Not started | — | No |
@@ -130,7 +130,7 @@ The owner excluded the Admin diagnostic test email and the two generic reviewer 
 
 ## Owner decisions — 2026-09-24
 
-- [VERIFIED current behavior via `shared/components/workbench/AwardeeTab.js:1195` and `pages/api/workbench/grantee-deliverables/send-invite.js:47`; explicit owner direction] Keep the grantee invitation's To/Cc editable for the current send. A PD may know an assistant who is not in Dataverse and need to copy that person. The route currently validates address format and sends to the staff-confirmed addresses. This is an explicit exception to the general server-owned-recipient rule; link, signature, and status remain server-owned. The existing Cc input holds one address, initially the liaison's; whether to support an assistant alongside the liaison is a separate pending choice for slice 4.
+- [VERIFIED baseline via `shared/components/workbench/AwardeeTab.js:1195` and `pages/api/workbench/grantee-deliverables/send-invite.js:47`; explicit owner direction; BUILT in PR #330] Keep the grantee invitation's To/Cc editable for the current send. A PD may know an assistant who is not in Dataverse and need to copy that person. Allow the assistant to be added in Cc while retaining the prefilled liaison. The route validates every submitted address and sends to the staff-confirmed addresses. This is an explicit exception to the general server-owned-recipient rule; link, signature, and status remain server-owned. PR #330 accepts comma-separated Cc addresses, up to ten, without changing the Admin default or saving recipient edits.
 - [PLANNED; explicit owner direction] Newly created scheduled grantee reminder rows should use the owning Program Director's saved personal default. A later default change leaves already-created rows unchanged; their own row edits and approval state remain independent. This applies to proposed slice 5 and does not describe current behavior.
 - [PLANNED; explicit owner direction] Operational notification emails remain system-controlled and receive no personal-default capability. Their rows above remain not applicable.
 - [PLANNED; explicit owner direction] Do not add personal-default capability or restore a composer for the generic reviewer `followup`/`thankyou` compatibility sends, and do not personalize the superuser diagnostic test email. Preserve their existing routes, Admin defaults, and saved personal reviewer-template data. The Admin `email.reviewer_thankyou.*` default remains in use by the automatic thank-you sweep. Clarify the Profile Settings copy so staff know the personal compatibility templates are not used by current staff send actions. This is a scope decision, not a claim that Production traffic to the callable routes is zero.
