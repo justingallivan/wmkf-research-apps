@@ -129,23 +129,8 @@
   },
   {
     "file": "lib/services/cycle-dossier-store.js",
-    "kind": "begin-literal",
-    "count": 1
-  },
-  {
-    "file": "lib/services/cycle-dossier-store.js",
     "kind": "client.query",
-    "count": 22
-  },
-  {
-    "file": "lib/services/cycle-dossier-store.js",
-    "kind": "db.connect",
-    "count": 1
-  },
-  {
-    "file": "lib/services/cycle-dossier-store.js",
-    "kind": "driver-import",
-    "count": 1
+    "count": 19
   },
   {
     "file": "lib/services/cycle-dossier-store.js",
