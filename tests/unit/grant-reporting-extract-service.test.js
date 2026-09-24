@@ -19,9 +19,6 @@ jest.mock('../../lib/utils/usage-logger', () => ({
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { logAiRun: jest.fn(async () => ({})) },
 }));
-jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
-  findByIds: jest.fn(async () => ({ records: [{ akoya_requestid: 'guid-1' }] })),
-}));
 const withDalContextSpy = jest.fn((label, fn) => fn());
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: (label, fn) => withDalContextSpy(label, fn),
@@ -44,7 +41,6 @@ jest.mock('../../lib/services/llm-client', () => ({
 }));
 
 import { DynamicsService } from '../../lib/services/dynamics-service';
-import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import { logUsage } from '../../lib/utils/usage-logger';
 import {
   handleFullExtract,
@@ -57,37 +53,7 @@ const common = { apiKey: 'sk-ant-test', requestGuid: 'guid-1', profileId: 'p1', 
 
 beforeEach(() => {
   jest.clearAllMocks();
-  delete process.env.TEST_REQUEST_ISOLATION;
-  grantRequestAdapter.findByIds.mockResolvedValue({ records: [{ akoya_requestid: 'guid-1' }] });
   mockedText = 'report text';
-});
-
-afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
-
-describe('test-request report exclusion', () => {
-  it('does not read marker columns while the rollout switch is off', async () => {
-    await regenerateField({ ...common, reportRef: REF, fieldKey: 'project_impacts', currentValues: {} });
-    expect(grantRequestAdapter.findByIds).not.toHaveBeenCalled();
-  });
-
-  it('uses the ordinary-only server filter before loading or generating a report while on', async () => {
-    process.env.TEST_REQUEST_ISOLATION = 'on';
-    grantRequestAdapter.findByIds.mockResolvedValue({ records: [] });
-    const { loadFile } = require('../../lib/utils/file-loader');
-    const { LLMClient } = require('../../lib/services/llm-client');
-
-    await expect(regenerateField({
-      ...common, reportRef: REF, fieldKey: 'project_impacts', currentValues: {},
-    })).rejects.toMatchObject({ httpStatus: 404, message: 'Request not found.' });
-
-    expect(grantRequestAdapter.findByIds).toHaveBeenCalledWith(['guid-1'], {
-      select: 'akoya_requestid',
-      filter: expect.stringContaining('wmkf_istestrequest'),
-      top: 1,
-    });
-    expect(loadFile).not.toHaveBeenCalled();
-    expect(LLMClient).not.toHaveBeenCalled();
-  });
 });
 
 describe('mode validation (ServiceHttpError 400s)', () => {

@@ -25,8 +25,9 @@ const REPORT_EXPORT_ROUTES = {
   'pages/api/dataverse-export/metadata.js': { class: 'n/a', guard: 'fetchLiveTaxonomy' },
   'pages/api/dataverse-export/preview.js': { class: 'exclude', guard: 'excludeMarkedTestRequests' },
   'pages/api/dataverse-export/run.js': { class: 'exclude', guard: 'excludeMarkedTestRequests' },
-  'pages/api/grant-reporting/extract.js': { class: 'indirect', guard: 'handleFullExtract' },
-  'pages/api/grant-reporting/lookup-grant.js': { class: 'exclude', guard: 'lookupGrant' },
+  // Single-request actions stay available for test requests (owner decision 2026-09-23).
+  'pages/api/grant-reporting/extract.js': { class: 'single-request', guard: 'handleFullExtract' },
+  'pages/api/grant-reporting/lookup-grant.js': { class: 'single-request', guard: 'lookupGrant' },
   'pages/api/review-manager/export-reviews.js': { class: 'exclude', guard: 'exportCombinedReviews' },
   'pages/api/workbench/export-candidates.js': { class: 'exclude', guard: 'exportCandidates' },
   'pages/api/workbench/grantee-deliverables/awardees.js': { class: 'exclude', guard: 'listGranteeAwardees' },
@@ -38,7 +39,8 @@ const AGGREGATE_CALLERS = {
   'lib/services/dynamics-explorer/tool-executor.js': 'exclude',
   'lib/services/dynamics-service.js': 'primitive',
   'lib/services/dynamics/read-ops.js': 'primitive',
-  'lib/services/workbench/request-search-service.js': 'exclude',
+  // Cycle/status filter options are navigation and include test requests.
+  'lib/services/workbench/request-search-service.js': 'navigation',
   'pages/api/dataverse-export/preview.js': 'exclude',
   'pages/api/dataverse-export/run.js': 'exclude',
 };
@@ -46,8 +48,6 @@ const AGGREGATE_CALLERS = {
 const REPORT_SERVICE_CALLERS = {
   'lib/services/dynamics-explorer/tools/composite.js': 'ordinaryTestRequestODataFilterForNavigation',
   'lib/services/dynamics-explorer/tools/get-related.js': 'ordinaryTestRequestODataFilterForNavigation',
-  'lib/services/grant-reporting/extract-service.js': 'assertReportRequestIncluded',
-  'lib/services/grant-reporting/lookup-grant-service.js': 'TEST_REQUEST_ORDINARY_OData_FILTER',
 };
 
 const BADGE_COMPONENTS = [
