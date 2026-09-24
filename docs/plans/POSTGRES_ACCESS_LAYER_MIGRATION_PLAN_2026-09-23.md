@@ -74,14 +74,16 @@ replaces these with an AST probe.
   352/53; the AST probe excludes a comment at lib/intake/rate-limit.js:197, a
   docstring at lib/services/maintenance-service.js:237, and
   lib/services/irs-bmf-service.js, which has no sql tag (pool.query only)]`.
-  Idioms present: `` sql` `` (52 files), `sql.query(` (10), `client.query(` with `$n`
-  parameter arrays (8, e.g. `lib/services/cycle-dossier-store.js:12-23`),
-  `db.connect(` (6: `alert-service.js:30`, `consultant-feedback-service.js`,
-  `cycle-dossier-store.js`, `deliberation-briefing/briefing-link-store.js`,
-  `review-panel-store.js`, `pages/api/auth/link-profile.js:57`), `new Pool(`
-  (3), `pool.query(` (1), explicit `BEGIN` (8: the six `db.connect` files
-  plus `irs-bmf-service.js` and `pages/api/intake/submit.js`). No file uses
-  `sql.begin`.
+  Idioms present, as file counts from the probe `[VERIFIED via --json kind
+  totals, Stage 0 close]`: `` sql` `` 52, `sql.query(` 10, `client.query(`
+  10 (8 driver importers such as `lib/services/cycle-dossier-store.js:12-23`
+  plus the 2 client-passed files), `db.connect(` 6 (`alert-service.js:30`,
+  `consultant-feedback-service.js`, `cycle-dossier-store.js`,
+  `deliberation-briefing/briefing-link-store.js`, `review-panel-store.js`,
+  `pages/api/auth/link-profile.js:57`), `pool.connect(` 3, `new Pool(` 3,
+  `pool.query(` 1, explicit `BEGIN` 9 (the six `db.connect` files,
+  `irs-bmf-service.js`, `pages/api/intake/submit.js`,
+  `lib/services/cron/drain-submissions-service.js`). No file uses `sql.begin`.
 - **Routes:** 17 `pages/api` files reach Postgres directly: 13 with `` sql` ``
   plus `auth/link-profile.js` (`db`), `intake/submit.js` and
   `cron/drain-submissions.js` (`pg` Pool), `cron/secret-check.js` (imports
@@ -103,9 +105,11 @@ replaces these with an AST probe.
   (`scripts/check-drain-table-mentions.js:65-72`); one drained table,
   `grant_cycles` (drained, historical), is still among the 53 `setup-database.js` names,
   so the live count is 52 + 5.
-- **Hot tables:** `user_profiles` in 17 files; `system_alerts` 8;
-  `dynamics_user_roles` 7; `api_usage_log` 6. `lib/services/maintenance-service.js`
-  alone touches 14 tables.
+- **Hot tables** `[VERIFIED via probe table extraction, Stage 0 close —
+  the hand grep counted comment mentions and over-stated these]`:
+  `user_profiles` in 16 files; `dynamics_user_roles` 6; `expertise_roster`
+  5; `api_usage_log` 5; `system_alerts` 4. `lib/services/maintenance-service.js`
+  alone touches 13 tables.
 - **Existing seams to codify, not invent:** `lib/services/database-service.js`
   (519 lines, 14 importing files under `pages/`+`lib/`; `search_cache` +
   `user_profiles` static class),
@@ -256,7 +260,8 @@ re-derive with Appendix B).
    predicate matching `@vercel/postgres` and `pg`): for every `.js/.mjs`
    under `pages/`, `lib/`, `shared/`, `modules/` (excluding tests), record
    `{file, kind}` where `kind ∈ {driver-import, sql-tag, sql.query,
-   client.query, pool.query, db.connect, new-Pool, begin-literal}` and the
+   client.query, pool.query, db.connect, pool.connect, new-Pool,
+   begin-literal}` and the
    table names in each statement (regex over `FROM|INTO|UPDATE|JOIN|DELETE
    FROM`). Print counts by dir and the full table. Diff its output against
    Appendix A; reconcile Appendix A to the probe, never the reverse.
@@ -343,8 +348,21 @@ exactly (this stage turns that census into the allowlist).
 check:route-service-boundary:self-test` green.
 
 **Work:**
+0. **Close the probe's recorded recognition gaps BEFORE freezing the
+   baseline** (the Stage 0 docblock of `scripts/check-postgres-access-layer.js`
+   lists them): (a) resolve tag bindings to their import source so a renamed
+   or destructured tag (`import { sql as q }`, `const { sql: q } = require(…)`,
+   `vp.sql\`…\`` after a namespace import) counts as `sql-tag`; (b) recognise
+   `new pg.Pool()` (member callee) as `new-Pool`; (c) recognise `.query()` /
+   `.connect()` reached through a nested member path (`this.pool.query`,
+   `p.connect()` on any binding that resolves to a Pool/db) as their kinds.
+   Add a red self-test fixture for each. Re-run `--report`; the live counts
+   must not change (no live instance exists today), which is the proof the
+   gaps were latent, not the baseline shifting.
 1. `scripts/postgres-access-allowlist.json` = Stage 0 census collapsed into
-   line-tolerant count keys `{file, kind, count}`. This is the design the
+   line-tolerant count keys `{file, kind, count}` (the probe's `--json`
+   already exposes `files[].kinds` as a kind→count map; `pool.connect` is one
+   of the nine kinds). This is the design the
    Dataverse DAL used in its Stage 1 (`docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
    "Stage 1 — Ratchet gate"): no line numbers, so unrelated edits in legacy
    files do not break the ratchet; the Dataverse allowlist file itself was
@@ -353,13 +371,26 @@ check:route-service-boundary:self-test` green.
    any allowlist count above the current census or a vanished key (forces
    shrink), (c) any `pages/api` file importing `lib/postgres/**` once that
    dir exists.
-2. Extend `scripts/check-route-service-boundary.js` source recognition
-   (beside `isDynamicsServiceSource` / `isDynamicsSubmoduleSource` at
-   `:65-75`) to `@vercel/postgres`, `pg`, and `lib/postgres/*`. Because 17
-   routes are currently red under that definition, add them to a
-   `POSTGRES_CARRYOVER` list in that script with the same shrink-only
-   semantics; the list must reach zero by the end of Stage 6. Extend its
-   self-test with a Postgres-source red fixture.
+2. Extend `scripts/check-route-service-boundary.js` source recognition to
+   `@vercel/postgres`, `pg`, and `lib/postgres/*`: the hook is
+   `isBoundarySource` at `:81-83` (the Dataverse predicates it composes sit
+   at `:65-79`). **That gate is LAW MODE with no baseline and no ratchet**
+   (`scripts/check-route-service-boundary.js:3-12`; its self-test asserts
+   "zero boundary routes is the only passing state" at
+   `scripts/check-route-service-boundary-self-test.js:60-62` and `:379-380`),
+   so there is nothing to copy — this item DEFINES a new, narrowly scoped
+   carry-over: a `POSTGRES_CARRYOVER` array of the 17 route paths, red under
+   the widened definition today. Semantics: (a) a listed route that no longer
+   reaches Postgres FAILS the gate ("stale carry-over entry — remove it"), so
+   the list can only shrink; (b) an unlisted route reaching Postgres fails as
+   law; (c) Dataverse detection stays law with no list. Update the self-test:
+   keep the existing zero-baseline assertions for Dataverse, add fixtures for
+   (a) and (b), and change the "no baseline file exists" assertion to "no
+   Dataverse baseline exists; the Postgres carry-over is an in-script array
+   pinned by `tests/unit/route-service-boundary-postgres-carryover.test.js`"
+   (exact-set, same pattern as the reviewer-engagement recorded-set test).
+   The list must reach zero by the end of Stage 6, at which point the array
+   and its test are deleted and the gate is pure law again.
 3. Q6 cast-lint as `--warn` output in the report (no exit-code effect).
 4. Update `docs/CI_GATES_REFERENCE.md` rows and the `/start` skill list.
 
@@ -792,91 +823,112 @@ proof); remote-host override removed; catalog projection widened to
 relation kind/persistence, collation, identity/generated, owned sequences;
 base-table-only runtime check; bogus table names from `ON CONFLICT … SET`.
 Owner decisions: Q1–Q7 recorded; Q3 widened to five tables.
-Fresh-context review of Stage 1: see next log entry.
-Open: canonical Turbopack build in-worktree; CI run of the new lane; the
+Fresh-context review of Stage 1: run (next log entry); 6 discrepancies,
+all fixed in this doc before Stage 1 may start.
+Open: canonical Turbopack build in-worktree; CI run of the new lane (the
+workflow triggers on `pull_request` and `push` to `main` only, so a branch
+push alone does not run it — a draft PR is the owner's call); the
 Q3 sub-question (how a fresh Vercel install is stamped) remains
 undocumented; renamed/member `sql` tags and `new pg.Pool()` shapes are
 recorded Stage 1 obligations in the probe's docblock.
 
+- **2026-09-23 — Fresh-context review of Stage 1 preconditions (§6).** A
+  fresh agent checked 38 claims and found 6 discrepancies, all fixed above:
+  (1) Stage 1 item 2 assumed the route-law gate had ratchet semantics to
+  copy — it is pure law with no baseline; the item now defines the Postgres
+  carry-over explicitly, names the real hook (`isBoundarySource`), and says
+  how the self-test's zero-baseline assertions change. (2) The probe's
+  recorded recognition gaps (renamed/member `sql` tags, `new pg.Pool()`,
+  nested member `.query`/`.connect`) were not in Stage 1's work — added as
+  item 0, to close before the baseline freezes. (3) `pool.connect` is a
+  ninth kind the plan never named — added. (4) Appendix A's Tables column
+  still carried hand-grep names that exist only in comments
+  (`system_alerts` in both rate limiters, `submission_jobs` in
+  `intake-draft-service.js`, `maintenance_runs` in two cron routes,
+  `portal_upload_staging` in `maintenance-service.js`, …) — the whole table
+  is now generated from `--json`. (5) §1 idiom and hot-table counts were
+  hand-grep numbers (`client.query` 8→10 files, `BEGIN` 8→9,
+  `system_alerts` 8→4 files, `maintenance-service` 14→13 tables) —
+  replaced with probe counts. (6) The Stage 0 report pointed at a log entry
+  that did not exist — this is it. Stage 1 may start once the owner has
+  regrouped (owner decision: stop after Stage 0).
+
 ## Appendix A — Census (2026-09-23, commit `1046c1033`)
 
-`[VERIFIED via grep/awk over pages/ and lib/, excluding __tests__ and *.test.*,
-then each file opened to confirm the import is real]`. "Stmts" counts `` sql` ``
-tags only; `client/pool` files use `db.connect()`, `client.query()`, or a
-`pg` Pool. "Tables" was matched by name against `scripts/setup-database.js`;
-rows marked *(migration-only)* reference tables absent from that script (§1
-parity gap). Stage 0's AST probe supersedes this table.
+`[VERIFIED via node scripts/check-postgres-access-layer.js --json at Stage 0
+close, S536]` — every row below is generated from the probe's output (the
+first draft was a hand grep and carried comment-only table names; the
+fresh-context review after Stage 0 caught that). "Kinds" are the probe's
+per-file occurrence counts; "Tables" is the probe's best-effort extraction
+(CTE aliases such as `inserted`/`claimable` can appear and are tolerated).
+Regenerate with the probe, never edit rows by hand.
 
-| File | Lines | Stmts | Idiom | Tables | Stage |
+| File | Lines | sql tags | Kinds (probe) | Tables (probe, best-effort; CTE aliases may appear) | Stage |
 |---|---:|---:|---|---|---:|
-| `lib/bill/onboarding-state.js` | 159 | 10 | sql` | bill_onboarding_state *(migration-only)* | 5 |
-| `lib/external/rate-limit.js` | 242 | 3 | sql` | external_rate_limit, system_alerts | 5 |
-| `lib/intake/rate-limit.js` | 255 | 3 | sql` | external_rate_limit, system_alerts | 5 |
-| `lib/services/admin/policies-service.js` | 530 | 3 | sql` | policy_publish_audit, system_alerts | 3 |
-| `lib/services/admin/prompts-publish-service.js` | 587 | 5 | sql` | prompt_publish_audit, system_alerts | 3 |
-| `lib/services/admin/review-questions-service.js` | 275 | 3 | sql` | review_question_audit, system_alerts (the hand census wrongly listed policy_publish_audit; corrected from the AST probe) | 3 |
-| `lib/services/alert-recipients.js` | 192 | 1 | sql` | dynamics_user_roles, user_profiles | 6 |
-| `lib/services/alert-service.js` | 388 | 16 | sql` + db.connect | system_alerts, user_profiles | 3 |
-| `lib/services/consultant-feedback-service.js` | 800 | 0 | client/pool | consultant_feedback, expertise_roster | 3 |
-| `lib/services/cycle-dossier-store.js` | 186 | 0 | client.query($n) + db.connect | cycle_dossier_control, cycle_dossier_editions, cycle_dossier_entries, cycle_dossier_previews, cycle_dossier_runs, cycle_dossiers, dynamics_user_roles, user_profiles | 3 |
-| `lib/services/database-service.js` | 519 | 16 | sql` | search_cache, user_profiles | 5 |
-| `lib/services/dataverse-app-access-service.js` | 168 | 1 | sql` | user_profiles | 6 |
-| `lib/services/dataverse-identity-map.js` | 101 | 1 | sql` | user_profiles | 6 |
-| `lib/services/deliberation-briefing/briefing-link-store.js` | 153 | 4 | sql` + db.connect | deliberation_briefing_links, pre_site_distribution_attempts | 3 |
-| `lib/services/dynamics-explorer-request-telemetry.js` | 130 | 3 | sql` | dynamics_explorer_requests | 3 |
-| `lib/services/dynamics-explorer/explorer-store.js` | 40 | 4 | sql` | dynamics_query_log, dynamics_restrictions, dynamics_user_roles | 3 |
-| `lib/services/dynamics-identity-service.js` | 158 | 5 | sql` | user_profiles | 6 |
-| `lib/services/expertise-finder/batch-match-service.js` | 298 | 2 | sql` | expertise_matches, expertise_roster | 3 |
-| `lib/services/feedback-service.js` | 217 | 10 | sql` | dynamics_explorer_requests, dynamics_feedback, user_profiles | 3 |
-| `lib/services/intake-audit-service.js` | 109 | 3 | sql` | intake_audit | 3 |
-| `lib/services/intake-draft-service.js` | 595 | 20 | sql` | intake_drafts, submission_jobs | 3 |
-| `lib/services/integrity-service.js` | 709 | 11 | sql` | integrity_screenings, retractions, screening_dismissals | 3 |
-| `lib/services/irs-bmf-service.js` | 570 | 0 | private `pg` Pool: pool.query/client.query + BEGIN | irs_exempt_orgs, maintenance_runs | 3 |
-| `lib/services/maintenance-service.js` | 998 | 20 | sql` | api_usage_log, dynamics_explorer_requests, dynamics_query_log, health_check_history, intake_audit, intake_drafts, maintenance_runs, operational_events, portal_upload_staging, +5 more (14 total) | 5 |
-| `lib/services/meeting-tracker/agenda-store.js` | 201 | 12 | sql` | deliberation_agenda_sends | 3 |
-| `lib/services/operational-event-service.js` | 594 | 7 | sql` | operational_events | 3 |
-| `lib/services/panel-review-service.js` | 801 | 6 | sql` | panel_review_items, panel_reviews | 3 |
-| `lib/services/portal-upload-staging.js` | 639 | 15 | sql` | consultant_feedback, portal_upload_staging | 3 |
-| `lib/services/pre-site-visit/distribution-store.js` | 436 | 19 | sql` | pre_site_distribution_attempts | 3 |
-| `lib/services/review-draft-service.js` | 116 | 4 | sql` | review_drafts *(migration-only)* | 3 |
-| `lib/services/review-panel-store.js` | 686 | 0 | client.query + db.connect | cycle_dossier_runs, dynamics_user_roles, review_panel_control, review_panel_entries, review_panel_runs, review_panel_seat_attempts, review_panels, user_profiles | 3 |
-| `lib/services/review-synthesis-job-service.js` | 210 | 8 | sql` | review_synthesis_jobs | 3 |
-| `lib/services/reviewer-acceptance-job-service.js` | 295 | 10 | sql` | reviewer_acceptance_jobs | 3 |
-| `lib/services/reviewer-identity-shadow-log.js` | 157 | 1 | sql` | reviewer_identity_shadow_log | 3 |
-| `lib/services/reviewer-institution-measurement.js` | 161 | 1 | sql` | reviewer_institution_measurement_events | 3 |
-| `lib/services/reviewer-roster-store.js` | 1149 | 24 | sql` | reviewer_find_roster *(migration-only)* | 3 |
-| `lib/services/scheduled-email-store.js` | 535 | 32 | sql` | scheduled_email_digest_runs, scheduled_email_messages, scheduled_email_reviewer_vip_flags, scheduled_email_vip_flags | 3 |
-| `lib/services/site-visit-materials/collection-store.js` | 242 | 16 | sql` | site_visit_material_collections | 3 |
-| `lib/services/site-visit/recipient-directory-service.js` | 189 | 2 | sql` | expertise_roster, user_profiles | 3 |
-| `lib/utils/auth.js` | 462 | 6 | sql` | dynamics_user_roles, user_profiles | 6 |
-| `lib/utils/health-checker.js` | 182 | 1 | sql` | `information_schema` only (Q5 exemption candidate) | 5 |
-| `lib/utils/migration-drift.js` | 138 | 1 | sql` | system_alerts (Q5 exemption candidate) | 5 |
-| `lib/utils/usage-logger.js` | 90 | 2 | sql` | api_usage_log, user_profiles | 5 |
-| `pages/api/admin/health-history.js` | 53 | 1 | sql` | health_check_history | 4 |
-| `pages/api/admin/stats.js` | 213 | 7 | sql` | api_usage_log, review_panel_seat_attempts, user_profiles | 4 |
-| `pages/api/auth/[...nextauth].js` | 367 | 6 | sql` | dynamics_user_roles, user_profiles | 6 |
-| `pages/api/auth/link-profile.js` | 219 | 0 | client/pool (`db`) | user_profiles | 6 |
-| `pages/api/cron/drain-submissions.js` | 152 | 0 | module-scoped `pg` Pool | maintenance_runs | 4 |
-| `pages/api/cron/health-check.js` | 131 | 3 | sql` | health_check_history | 4 |
-| `pages/api/cron/pricing-canary.js` | 265 | 1 | sql` | api_usage_log | 4 |
-| `pages/api/cron/pricing-refresh.js` | 286 | 1 | sql` | api_usage_log, maintenance_runs, model_pricing_audit | 4 |
-| `pages/api/cron/secret-check.js` | 130 | 0 | imports `sql`, no tag of its own | (none directly) | 4 |
-| `pages/api/cron/spend-check.js` | 173 | 1 | sql` | api_usage_log, review_panel_seat_attempts, system_alerts | 4 (Q7) |
-| `pages/api/dynamics-explorer/restrictions.js` | 106 | 6 | sql` | dynamics_restrictions, user_profiles | 6 |
-| `pages/api/dynamics-explorer/roles.js` | 99 | 3 | sql` | dynamics_user_roles, user_profiles | 6 |
-| `pages/api/expertise-finder/history.js` | 50 | 2 | sql` | expertise_matches | 4 |
-| `pages/api/expertise-finder/match.js` | 235 | 2 | sql` | expertise_matches, expertise_roster | 4 |
-| `pages/api/expertise-finder/roster.js` | 403 | 4 | sql` | expertise_roster | 4 |
-| `pages/api/intake/submit.js` | 451 | 0 | private `pg` Pool | intake_drafts, submission_jobs | 4 |
-| `pages/api/webhooks/bill.js` | 202 | 1 | sql` | bill_webhook_events *(migration-only)* | 4 |
+| `lib/bill/onboarding-state.js` | 159 | 10 | sql-tag:10 | bill_onboarding_state | 5 |
+| `lib/external/rate-limit.js` | 242 | 3 | sql-tag:3 | external_rate_limit | 5 |
+| `lib/intake/rate-limit.js` | 255 | 3 | sql-tag:3 | external_rate_limit | 5 |
+| `lib/services/admin/policies-service.js` | 530 | 3 | sql-tag:3 | policy_publish_audit, system_alerts | 3 |
+| `lib/services/admin/prompts-publish-service.js` | 587 | 5 | sql-tag:5 | prompt_publish_audit, system_alerts | 3 |
+| `lib/services/admin/review-questions-service.js` | 275 | 3 | sql-tag:3 | review_question_audit, system_alerts | 3 |
+| `lib/services/alert-recipients.js` | 192 | 1 | sql-tag:1 | dynamics_user_roles, user_profiles | 6 |
+| `lib/services/alert-service.js` | 388 | 16 | db.connect:1, client.query:7, begin-literal:1, sql-tag:16 | system_alerts, user_profiles | 3 |
+| `lib/services/consultant-feedback-service.js` | 800 | 0 | sql.query:10, client.query:18, db.connect:3, begin-literal:3 | consultant_feedback, expertise_roster | 3 |
+| `lib/services/cron/drain-submissions-service.js` | 898 | 0 | client.query:17, begin-literal:2 | claimable, intake_audit, submission_jobs | n/a (client passed in) |
+| `lib/services/cycle-dossier-service.js` | 269 | 0 | client.query:5 | cycle_dossier_runs | n/a (client passed in) |
+| `lib/services/cycle-dossier-store.js` | 186 | 0 | client.query:22, db.connect:1, begin-literal:1, sql.query:12 | cycle_dossier_control, cycle_dossier_editions, cycle_dossier_entries, cycle_dossier_previews, cycle_dossier_runs, cycle_dossiers, dynamics_user_roles, user_profiles | 3 |
+| `lib/services/database-service.js` | 519 | 16 | sql-tag:16 | search_cache, user_profiles | 5 |
+| `lib/services/dataverse-app-access-service.js` | 168 | 1 | sql-tag:1 | user_profiles | 6 |
+| `lib/services/dataverse-identity-map.js` | 101 | 1 | sql-tag:1 | user_profiles | 6 |
+| `lib/services/deliberation-briefing/briefing-link-store.js` | 153 | 4 | sql-tag:4, db.connect:1, client.query:9, begin-literal:1 | deliberation_briefing_links, pre_site_distribution_attempts | 3 |
+| `lib/services/dynamics-explorer-request-telemetry.js` | 130 | 3 | sql-tag:3 | dynamics_explorer_requests | 3 |
+| `lib/services/dynamics-explorer/explorer-store.js` | 40 | 4 | sql-tag:4 | dynamics_query_log, dynamics_restrictions, dynamics_user_roles | 3 |
+| `lib/services/dynamics-identity-service.js` | 158 | 5 | sql-tag:5, sql.query:1 | user_profiles | 6 |
+| `lib/services/expertise-finder/batch-match-service.js` | 298 | 2 | sql-tag:2 | expertise_matches, expertise_roster | 3 |
+| `lib/services/feedback-service.js` | 217 | 10 | sql-tag:10 | dynamics_explorer_requests, dynamics_feedback, user_profiles | 3 |
+| `lib/services/intake-audit-service.js` | 109 | 3 | sql-tag:3 | intake_audit | 3 |
+| `lib/services/intake-draft-service.js` | 595 | 20 | sql-tag:20 | intake_drafts | 3 |
+| `lib/services/integrity-service.js` | 709 | 11 | sql-tag:11 | integrity_screenings, retractions, screening_dismissals | 3 |
+| `lib/services/irs-bmf-service.js` | 570 | 0 | new-Pool:1, pool.query:1, client.query:22, pool.connect:1, begin-literal:1 | irs_exempt_orgs, irs_exempt_orgs_new | 3 |
+| `lib/services/maintenance-service.js` | 998 | 20 | sql-tag:20 | api_usage_log, bill_webhook_events, dynamics_explorer_requests, dynamics_query_log, health_check_history, intake_audit, intake_drafts, maintenance_runs, operational_events, reviewer_identity_shadow_log, reviewer_institution_measurement_events, scheduled_email_messages, submission_jobs | 5 |
+| `lib/services/meeting-tracker/agenda-store.js` | 201 | 12 | sql-tag:12 | deliberation_agenda_sends, inserted | 3 |
+| `lib/services/operational-event-service.js` | 594 | 7 | sql-tag:7, sql.query:1 | operational_events | 3 |
+| `lib/services/panel-review-service.js` | 801 | 6 | sql-tag:6, sql.query:2 | panel_review_items, panel_reviews | 3 |
+| `lib/services/portal-upload-staging.js` | 639 | 15 | sql-tag:15 | consultant_feedback, portal_upload_staging | 3 |
+| `lib/services/pre-site-visit/distribution-store.js` | 436 | 19 | sql-tag:19 | inserted, pre_site_distribution_attempts | 3 |
+| `lib/services/review-draft-service.js` | 116 | 4 | sql-tag:4 | review_drafts | 3 |
+| `lib/services/review-panel-store.js` | 686 | 0 | db.connect:1, client.query:51, begin-literal:1, sql.query:7 | dynamics_user_roles, review_panel_control, review_panel_entries, review_panel_runs, review_panel_seat_attempts, review_panels, user_profiles | 3 |
+| `lib/services/review-synthesis-job-service.js` | 210 | 8 | sql-tag:8 | claimable, inserted, review_synthesis_jobs | 3 |
+| `lib/services/reviewer-acceptance-job-service.js` | 295 | 10 | sql-tag:10 | claimable, reviewer_acceptance_jobs | 3 |
+| `lib/services/reviewer-identity-shadow-log.js` | 157 | 1 | sql-tag:1 | reviewer_identity_shadow_log | 3 |
+| `lib/services/reviewer-institution-measurement.js` | 161 | 1 | sql-tag:1 | reviewer_institution_measurement_events | 3 |
+| `lib/services/reviewer-roster-store.js` | 1149 | 24 | sql-tag:24 | deleted, reviewer_find_roster | 3 |
+| `lib/services/scheduled-email-store.js` | 535 | 32 | sql-tag:32 | inserted, scheduled_email_digest_runs, scheduled_email_messages, scheduled_email_reviewer_vip_flags, scheduled_email_vip_flags | 3 |
+| `lib/services/site-visit-materials/collection-store.js` | 242 | 16 | sql-tag:16 | site_visit_material_collections | 3 |
+| `lib/services/site-visit/recipient-directory-service.js` | 189 | 2 | sql-tag:2 | expertise_roster, user_profiles | 3 |
+| `lib/utils/auth.js` | 462 | 6 | sql-tag:6 | dynamics_user_roles, user_profiles | 6 |
+| `lib/utils/health-checker.js` | 182 | 1 | sql-tag:1 | (none) | 5 |
+| `lib/utils/migration-drift.js` | 138 | 1 | sql-tag:1 | schema_migrations | 5 |
+| `lib/utils/usage-logger.js` | 90 | 2 | sql-tag:2 | api_usage_log | 5 |
+| `pages/api/admin/health-history.js` | 53 | 1 | sql-tag:1 | health_check_history | 4 |
+| `pages/api/admin/stats.js` | 213 | 7 | sql-tag:7, sql.query:1 | api_usage_log, user_profiles | 4 |
+| `pages/api/auth/[...nextauth].js` | 367 | 6 | sql-tag:6 | user_profiles | 6 |
+| `pages/api/auth/link-profile.js` | 219 | 0 | db.connect:1, client.query:10, begin-literal:1 | user_profiles | 6 |
+| `pages/api/cron/drain-submissions.js` | 152 | 0 | new-Pool:1, pool.connect:1 | (none) | 4 |
+| `pages/api/cron/health-check.js` | 131 | 3 | sql-tag:3 | health_check_history | 4 |
+| `pages/api/cron/pricing-canary.js` | 265 | 1 | sql-tag:1 | api_usage_log | 4 |
+| `pages/api/cron/pricing-refresh.js` | 286 | 1 | sql-tag:1, sql.query:1 | model_pricing_audit | 4 |
+| `pages/api/cron/secret-check.js` | 130 | 0 | (driver import only) | (none) | 4 |
+| `pages/api/cron/spend-check.js` | 173 | 1 | sql-tag:1, sql.query:1 | api_usage_log | 4 |
+| `pages/api/dynamics-explorer/restrictions.js` | 106 | 6 | sql-tag:6 | dynamics_restrictions, user_profiles | 6 |
+| `pages/api/dynamics-explorer/roles.js` | 99 | 3 | sql-tag:3 | dynamics_user_roles, user_profiles | 6 |
+| `pages/api/expertise-finder/history.js` | 50 | 2 | sql-tag:2 | expertise_matches | 4 |
+| `pages/api/expertise-finder/match.js` | 235 | 2 | sql-tag:2 | expertise_matches, expertise_roster | 4 |
+| `pages/api/expertise-finder/roster.js` | 403 | 4 | sql.query:4, sql-tag:4 | expertise_roster | 4 |
+| `pages/api/intake/submit.js` | 451 | 0 | new-Pool:1, pool.connect:1, client.query:8, begin-literal:1 | intake_drafts, submission_jobs | 4 |
+| `pages/api/webhooks/bill.js` | 202 | 1 | sql-tag:1 | bill_webhook_events | 4 |
 
-Totals: 60 files — Stage 3: 30, Stage 4: 13, Stage 5: 8, Stage 6: 9.
-Two further files carry `client.query` records without importing a driver —
-`lib/services/cron/drain-submissions-service.js` and
-`lib/services/cycle-dossier-service.js` receive a `pg` client as an argument
-from their callers (the drain route and `cycle-dossier-store.js`). They are
-not conversion targets themselves; they follow their callers in Stages 3–4.
-The probe reports them separately ("files with any record": 62).
+Totals: 62 census rows — 60 driver-import files (Stage 3: 30, Stage 4: 13, Stage 5: 8, Stage 6: 9) plus 2 files that receive a `pg` client as an argument (`lib/services/cron/drain-submissions-service.js`, `lib/services/cycle-dossier-service.js`; they follow their callers).
 Excluded after reading (comment-only mentions): `lib/utils/auth-policy.js`,
 `lib/utils/auth-bypass-monitor.js`. Out of scope (Q5 exemption candidates,
 not counted above): 49 `scripts/**/*.js` files import a driver (72 counting
