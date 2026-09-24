@@ -61,6 +61,11 @@ fallback.
 
 ## Consumers
 
+- **[SOURCE-BUILT ON `codex/bugfix-session-2026-09-24`; not deployed:]** Meeting Tracker's
+  visit GET offers read-only applicant attendee suggestions from the Request Project Leader and
+  liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
+  `SiteVisitEditor` fills missing required-attendee form entries by distinct email, preserving
+  saved attendees. The Activity and its parties change only when staff click Save.
 - **[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]** The Meeting
   Tracker cycle list is a read-only consumer. Its dashboard service calls
   `site-visit.js::findActiveByRequests(requestIds)` for the bounded cycle join,

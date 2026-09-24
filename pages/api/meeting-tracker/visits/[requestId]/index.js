@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     try {
       if (req.method === 'GET') {
         const result = await getSiteVisitLogistics({ requestId });
-        return res.status(200).json({ success: true, siteVisit: result.siteVisit });
+        return res.status(200).json({ success: true, siteVisit: result.siteVisit, applicantAttendees: result.applicantAttendees, applicantAttendeesUnavailable: result.applicantAttendeesUnavailable });
       }
       // The request id comes from the path, never the body (the body allowlist
       // excludes it), so a stale form cannot retarget another request.

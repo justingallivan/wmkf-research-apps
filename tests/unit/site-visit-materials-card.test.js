@@ -59,6 +59,14 @@ test('a created collection opens the resend composer and surfaces preview failur
   expect(await screen.findByRole('alert')).toHaveTextContent('preview unavailable');
 });
 
+test('a saved collection with no liaison email names the gap without rendering null as a recipient', async () => {
+  global.fetch = jest.fn(async () => response({ success: true, collection: collection({ contacts: { pi: { role: 'pi', name: 'Franklin Cat', email: 'franklin@example.edu' }, liaison: { role: 'liaison', name: null, email: null } } }) }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+  const sentTo = await screen.findByText(/Franklin Cat.*primary contact email missing from saved recipients/);
+  expect(sentTo).toHaveTextContent('Franklin Cat (franklin@example.edu)');
+  expect(sentTo).not.toHaveTextContent('null');
+});
+
 test('existing collection preserves waive, ready, and unavailable behaviors', async () => {
   global.fetch = jest.fn(async (url, options = {}) => {
     if (options.method === 'POST') {

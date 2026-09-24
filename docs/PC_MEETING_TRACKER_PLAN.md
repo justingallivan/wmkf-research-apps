@@ -146,7 +146,12 @@ calls the same service.
   cycle dashboard's `institution` is the fallback). The agenda email carries the same name
   after each proposal's title (owner request, 2026-09-11).
 - One visit editor per request: the fields the Activity already has, written through the existing
-  logistics service.
+  logistics service. **[SOURCE-BUILT ON `codex/bugfix-session-2026-09-24`; not deployed:]** the
+  tracker GET also suggests applicant-side calendar attendees from the Request Project Leader
+  and liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
+  The browser pre-fills missing email addresses as required attendees, keeps saved attendees,
+  deduplicates the same person by email, and writes nothing until the PC reviews and saves.
+  Failed contact lookup leaves the visit usable and displays an unavailable-suggestions note.
 
 ### 5.2 Schema (new wave, `kind: new-entity`)
 

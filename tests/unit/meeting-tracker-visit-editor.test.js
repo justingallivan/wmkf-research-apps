@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import SiteVisitEditor, { noEmailHint } from '../../shared/components/meeting-tracker/SiteVisitEditor';
+import SiteVisitEditor, { noEmailHint, withApplicantAttendees } from '../../shared/components/meeting-tracker/SiteVisitEditor';
 
 let routerQuery = {};
 jest.mock('next/router', () => ({ useRouter: () => ({ isReady: true, query: routerQuery }) }));
@@ -27,6 +27,43 @@ beforeEach(() => {
 test('visit attendee chip hints distinguish linked Contact failures from manual roster email', () => {
   expect(noEmailHint({ linked: true })).toMatch(/linked Dataverse contact.*fix or relink.*unlink/i);
   expect(noEmailHint({ linked: false })).toMatch(/preferred email.*Expertise Finder roster/i);
+});
+
+test('applicant prefill deduplicates the PI and liaison and preserves existing staff, Board, and manual attendees', () => {
+  const form = {
+    organizer: { kind: 'staff', profileId: 7 },
+    requiredAttendees: [{ kind: 'manual', name: 'Justin', email: 'justin@example.edu' }],
+    optionalAttendees: [{ kind: 'roster', rosterId: 3 }],
+  };
+  const suggested = [
+    { kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' },
+    { kind: 'manual', name: 'Franklin Cat', email: 'FRANKLIN@example.edu' },
+    { kind: 'manual', name: 'Board Member', email: 'b@example.org' },
+  ];
+  expect(withApplicantAttendees(form, suggested, recipients).requiredAttendees).toEqual([
+    form.requiredAttendees[0],
+    { kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' },
+  ]);
+});
+
+test('existing visit displays suggested applicant attendee and includes it only after Save', async () => {
+  const visit = { activityId: 'a1', etag: 'W/"1"', subject: 'Site Visit', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'manual', name: 'Justin', email: 'justin@example.edu' }], optionalAttendees: [] };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).includes('/recipients')) return response(recipients);
+    if (String(url).endsWith('/materials')) return response({ error: 'not enabled' }, 503);
+    if (options.method === 'PATCH') return response({ success: true, siteVisit: visit });
+    return response({ success: true, siteVisit: visit, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }] });
+  });
+  render(<SiteVisitEditor />);
+  expect(await screen.findByText(/Franklin Cat · franklin@example.edu/)).toBeInTheDocument();
+  expect(screen.getByText(/Justin · justin@example.edu/)).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+  const [, options] = await waitFor(() => global.fetch.mock.calls.find(([, value]) => value?.method === 'PATCH'));
+  expect(JSON.parse(options.body).requiredAttendees).toEqual([
+    { kind: 'manual', name: 'Justin', email: 'justin@example.edu' },
+    { kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' },
+  ]);
 });
 
 test('a new visit: the form posts the fields the logistics service expects, with the id from the path and no activity/etag', async () => {

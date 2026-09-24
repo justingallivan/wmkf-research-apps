@@ -72,6 +72,7 @@ function dependencies(overrides = {}) {
     })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     findActiveByRequest: jest.fn(async () => ({ records: [] })),
+    resolveApplicantContacts: jest.fn(async () => ({ pi: { name: 'Franklin Cat', email: 'franklin@example.edu' }, liaison: { name: 'Franklin Cat', email: 'franklin@example.edu' } })),
     getSiteVisitById: jest.fn(async () => savedRow()),
     createSiteVisit: jest.fn(async () => ({ activityid: ACTIVITY_ID })),
     updateSiteVisit: jest.fn(async () => undefined),
@@ -200,6 +201,17 @@ test('returns only eligible ready non-superseded material links for the request'
     filename: 'slides.pdf',
   })]);
   expect(result.siteVisit.startLocal).toBe('2026-09-15T09:00');
+  expect(result.applicantAttendees).toEqual([{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }]);
+  expect(result.applicantAttendeesUnavailable).toBe(false);
+});
+
+test('a failed applicant-contact read leaves the visit usable and reports unavailable suggestions', async () => {
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
+    resolveApplicantContacts: jest.fn(async () => { throw new Error('Dataverse unavailable'); }),
+  }));
+  expect(result.siteVisit).toBeNull();
+  expect(result.applicantAttendees).toEqual([]);
+  expect(result.applicantAttendeesUnavailable).toBe(true);
 });
 
 test('projects a Dynamics-scheduled visit without the app map via ActivityParty fallback', async () => {
