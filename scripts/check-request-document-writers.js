@@ -23,7 +23,7 @@ const WRITERS = Object.freeze([
   ['lib/services/site-visit-materials/contributor-service.js', 'dependencies.createDocument(', 'EXTERNAL_CONTRIBUTOR'],
   ['lib/services/consultant-feedback-attachment-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/pre-rp-brief/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
-  ['lib/services/test-requests/run-runner.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
+  ['lib/services/test-requests/run-runner.js', 'dependencies.createDocument(', 'SANDBOX_REHEARSAL'],
 ]);
 
 const ALLOWED_ORIGIN_FIELD_FILES = new Set([
