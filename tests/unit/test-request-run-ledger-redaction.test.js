@@ -184,8 +184,7 @@ describe('remaining text columns are finite or grammar-bound', () => {
       { actorId: 'cli gallivan', idempotencyKey: 'k', plan: validPlan() },
       { actorId: 'cli:x', idempotencyKey: 'k with space', plan: validPlan() },
       { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), recipe: 'confidential' } },
-      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), testLabel: 'see https://leak/x' } },
-      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), testLabel: 'x'.repeat(141) } },
+
       { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), fiscalYear: 'Confidential 2026' } },
       { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), sourceRevision: 'purpose text here' } },
       { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), destinationEnvironment: 'prod' } },
@@ -196,6 +195,20 @@ describe('remaining text columns are finite or grammar-bound', () => {
       await expect(ledger.reserveRun(bad)).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
     }
     expect(db.calls).toHaveLength(0);
+  });
+
+  test('test_label is derived from validated fields; caller text never reaches SQL', async () => {
+    const runRow = { run_id: RUN_ID, plan_digest: 'c'.repeat(64), destination_request_id: '33333333-3333-4333-8333-333333333333' };
+    for (const leaky of ['Confidential acquisition of Acme', 'Bearer eyJhbGciOiJIUzI1NiJ9.secret.signature', 'https:example.com', 'purpose text']) {
+      const db = recordingDb([[{ run_id: RUN_ID }], [runRow]]);
+      await createRunLedger(db).reserveRun({ actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), testLabel: leaky } });
+      const bound = JSON.stringify(db.calls.map((c) => c.params));
+      expect(bound).not.toContain('Confidential');
+      expect(bound).not.toContain('eyJhbGci');
+      expect(bound).not.toContain('example.com');
+      expect(bound).not.toContain('purpose text');
+      expect(db.calls[0].params).toContain(`TEST basic clone of 1003222 run ${RUN_ID.slice(0, 8)}`);
+    }
   });
 });
 

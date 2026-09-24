@@ -69,7 +69,7 @@ not perform.
   of `LEDGER_STEPS`; resource kind/system/outcome are checked against their
   enums before SQL; every text column written by `reserveRun` is validated
   by `assertReservePlan` (bounded identifiers, hostnames, digests, dates and
-  an operator label with no URL separators). No column accepts free text.
+  and `test_label` derived server-side from validated fields, never caller text). No column accepts free text.
 - **Trust:** `test_request_runs` is keyed by a caller-supplied
   `(actor_id, idempotency_key)` unique pair so a retried confirm cannot
   create a second run or a second destination GUID (see
