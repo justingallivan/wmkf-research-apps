@@ -273,6 +273,16 @@ re-derive with Appendix B).
    Q1=(a), add the `services: postgres:16` block to `test.yml` and the env
    var. First contract test: `tests/pg-contract/schema-applies.test.js` —
    steps (i)–(iii) succeed (proves the lane works).
+   **Local lane (owner's machine, verified 2026-09-23):** Colima 0.10.3
+   provides the Docker engine (`colima start`); a disposable server is
+   `docker run -d --name wmkf-pg-contract -e POSTGRES_PASSWORD=contract
+   -e POSTGRES_DB=wmkf_contract -p 55432:5432 postgres:16` and
+   `PG_CONTRACT_URL=postgresql://postgres:contract@127.0.0.1:55432/wmkf_contract`.
+   A plain `pg` client connected and the S504 statement
+   (`jsonb_build_object('k', $1)` with an untyped parameter) failed with
+   `could not determine data type of parameter $1` — the real planner
+   catches the class the mocked tests miss. `docker rm -f wmkf-pg-contract`
+   discards it.
 4. **Regression test for S504 as a contract test:**
    `tests/pg-contract/site-visit-collection-store.test.js` calling
    `acquireSlotLease` in
@@ -714,6 +724,12 @@ Open: …
   Sonnet worktrees, security-complete S330
   (`docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` Stage log) — not a multi-month
   effort.
+- **2026-09-23 — Local real-Postgres lane proven.** No Postgres or Docker
+  existed on the owner's machine; the owner installed Colima. A `postgres:16`
+  container accepted a `pg` connection from Node and reproduced the S504
+  planner error on an untyped `jsonb_build_object` parameter (Stage 0 item 3
+  records the commands). Q1(ii) transport is therefore confirmed workable
+  locally; CI proof still pending.
 
 ## Appendix A — Census (2026-09-23, commit `1046c1033`)
 
