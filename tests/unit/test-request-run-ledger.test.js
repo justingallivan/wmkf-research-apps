@@ -205,7 +205,7 @@ describe('advanceStep / markReady / markNeedsAttention / recordError share the f
       runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1, expectedVersion: 2,
     })],
     ['markNeedsAttention', (ledger) => ledger.markNeedsAttention({
-      runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1, expectedVersion: 2, reason: 'stuck',
+      runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1, expectedVersion: 2, reason: 'step_failed',
     })],
     ['recordError', (ledger) => ledger.recordError({
       runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1, expectedVersion: 2, error: new Error('boom'),

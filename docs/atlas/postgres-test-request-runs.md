@@ -48,7 +48,7 @@ not perform.
   provenance hashes inside `source_provenance`/`readback` JSONB), sizes,
   timestamps, and structured error codes are stored. `last_error`,
   `needs_attention_reason` and resource `error` never hold upstream message
-  text: `ledgerReasonOrThrow` accepts only an allowlisted code token (or an
+  text: `ledgerReasonOrThrow` accepts only a member of the finite exported `LEDGER_REASON_CODES` set (or an
   Error, which `describeLedgerError` reduces to an internal code or a
   classification such as `upstream_http (http 401)`, `timeout`, `network`,
   `unknown_error`) and rejects prose. Full messages belong in the operator's

@@ -1,6 +1,7 @@
 /** @jest-environment node */
 import { jest } from '@jest/globals';
 import {
+  LEDGER_REASON_CODES,
   LEDGER_RECEIPT_KEYS,
   assertLedgerReceipt,
   createRunLedger,
@@ -153,9 +154,16 @@ describe('ledger lifecycle additions', () => {
     expect(describeLedgerError(Object.assign(new Error('x'), { code: 'ECONNRESET' }))).toBe('network');
     expect(describeLedgerError(new Error('purpose text'))).toBe('unknown_error');
     expect(ledgerReasonOrThrow('ambiguous_create_outcome')).toBe('ambiguous_create_outcome');
-    for (const prose of ['second stall', 'Bearer secret stalled', 'https://leak', 'Confidential proposal purpose', '']) {
+    for (const prose of ['second stall', 'Bearer secret stalled', 'https://leak', 'Confidential proposal purpose', '',
+      'supersecret123', 'deadbeefcafe0123456789abcdef0123', 'hunter2', 'not_a_registered_code', 'upstream_http (http 99)']) {
       expect(thrownCode(() => ledgerReasonOrThrow(prose))).toBe('test_request_ledger_unsafe_value');
     }
+    // A foreign error's own token-shaped code is never copied; only registered codes pass through.
+    expect(describeLedgerError(Object.assign(new Error('x'), { code: 'supersecret123' }))).toBe('unknown_error');
+    expect(describeLedgerError(Object.assign(new Error('x'), { code: 'deadbeef', status: 500 }))).toBe('upstream_http (http 500)');
+    expect(LEDGER_REASON_CODES).toContain('ambiguous_create_outcome');
+    expect(new Set(LEDGER_REASON_CODES).size).toBe(LEDGER_REASON_CODES.length);
+    for (const code of LEDGER_REASON_CODES) expect(code).toMatch(/^[a-z][a-z0-9_]{0,63}$/);
     const fenceRow = { run_id: RUN_ID, lease_token: TOKEN, lease_generation: 1, lease_live: true, version: 4 };
     const db = recordingDb([[{ run_id: RUN_ID }], [{ run_id: RUN_ID }], [fenceRow], [{ resource_id: 1 }]]);
     const ledger = createRunLedger(db);
@@ -167,8 +175,15 @@ describe('ledger lifecycle additions', () => {
       expect(bound).not.toContain(fragment);
     }
     expect(db.calls[0].params[4]).toBe('upstream_http (http 401)');
-    await expect(ledger.markNeedsAttention({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 4, reason: 'ambiguous create outcome' }))
-      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    for (const secret of ['ambiguous create outcome', 'supersecret123', 'deadbeefcafe0123456789abcdef0123']) {
+      await expect(ledger.markNeedsAttention({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 4, reason: secret }))
+        .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+      await expect(ledger.recordError({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 4, error: secret }))
+        .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+      await expect(ledger.recordResourceFailure({ resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, outcome: 'failed', error: secret }))
+        .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    }
+    expect(JSON.stringify(db.calls.map((c) => c.params))).not.toMatch(/supersecret|deadbeef/);
   });
 
   test('markNeedsAttention releases the lease in the same statement', async () => {

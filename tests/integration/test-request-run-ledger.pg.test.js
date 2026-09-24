@@ -240,7 +240,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     // A needs_attention run can also be verified straight to ready after resume.
     const stuckAgain = await ledger.markNeedsAttention({
       runId: run.runId, leaseToken: resumed.leaseToken, leaseGeneration: resumed.leaseGeneration,
-      expectedVersion: advanced.version, reason: 'second_stall',
+      expectedVersion: advanced.version, reason: 'step_failed',
     });
     // markNeedsAttention releases the lease so Resume is not held to expiry;
     // the old token is now a fence miss and a new claim is required.
