@@ -24,7 +24,7 @@
 
 import { jest } from '@jest/globals';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
-import { ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
+import { ledgerReasonOrThrow, assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 import { MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { SANDBOX_HOSTS, PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 import { _resetInterlockStateForTests } from '../../lib/dataverse/core/interlock.js';
@@ -176,12 +176,19 @@ function createFakeLedger(initialRun) {
       return { ...run };
     },
     async journalPlannedResource({ runId, step, resourceKind, system, plannedIdentity }) {
+      // Real validator (run-ledger.js): every plannedIdentity key/value must
+      // satisfy its allowlisted grammar, exactly as Postgres would reject it.
+      assertLedgerReceipt(plannedIdentity ?? {}, 'plannedIdentity');
       calls.push({ op: 'journalPlannedResource', step, resourceKind, plannedIdentity });
       const resource = { resourceId: nextResourceId++, runId, sequence: nextSequence++, step, resourceKind, system, plannedIdentity, readback: null, outcome: 'planned' };
       resources.push(resource);
       return { ...resource };
     },
     async recordResourceReadback({ resourceId, responseStatus, readback, outcome }) {
+      // Real validator: catches a receipt shape that doesn't match its
+      // allowlisted grammar (e.g. the gdc1:-prefixed governed hash vs the
+      // ledger's HEX64 contentHash) instead of silently accepting it.
+      if (readback != null) assertLedgerReceipt(readback, 'readback');
       calls.push({ op: 'recordResourceReadback', resourceId, readback, outcome });
       const resource = resources.find((row) => row.resourceId === resourceId);
       resource.readback = readback;
@@ -353,6 +360,75 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
     expect(result.run.needsAttentionReason).toBe('ia_upload_ambiguous');
     expect(graph.uploadFile).not.toHaveBeenCalled();
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+  });
+
+  it('an upload attempted WITH a journaled item never re-PUTs -- it re-reads the exact item by stable id and proceeds to commit', async () => {
+    const { generationKey } = identityFor();
+    const run0 = baseRun();
+    const { ledger, calls, getResources } = createFakeLedger(run0);
+    const claimToken = 'claim-11111111';
+    const filename = '9009009 Initial Assessment aaaaaaaa-bbbbbbbb.docx';
+    const row = {
+      wmkf_requestdocumentid: REQUEST_DOCUMENT_ID, wmkf_artifacttype: 100000000, wmkf_operationstatus: 100000000, wmkf_lifecyclestate: 100000000,
+      wmkf_generationkey: generationKey, wmkf_claimtoken: claimToken,
+      wmkf_sharepointfolderpath: `9009009_${REQUEST_ID.replace(/-/g, '').toUpperCase()}/Artifacts/Initial Assessment`,
+      wmkf_filename: filename, wmkf_contenthash: null,
+      _wmkf_request_value: REQUEST_ID, '@odata.etag': 'W/"row-1"', modifiedon: new Date().toISOString(),
+    };
+    // Pre-seed the resource row: the PUT already committed and its item id
+    // (plus driveId/siteId, needed to re-fetch metadata without re-PUTting)
+    // was journaled by a prior invocation, which then crashed before the
+    // $batch commit.
+    await ledger.journalPlannedResource({
+      runId: RUN_ID, leaseToken: null, leaseGeneration: 0, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey },
+    });
+    const claimed = await ledger.claimLease({ runId: RUN_ID, expectedVersion: 1, leaseSeconds: 300 });
+    await ledger.recordResourceReadback({
+      resourceId: 1, runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      readback: {
+        generationKey, requestDocumentId: REQUEST_DOCUMENT_ID,
+        uploadAttemptedAt: new Date().toISOString(),
+        itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', driveId: 'b!driveIdSample1234567890', siteId: 'contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222',
+      },
+      outcome: 'dispatched',
+    });
+    await ledger.releaseLease({ runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration });
+
+    const state = { row, request: { akoya_requestid: REQUEST_ID, _wmkf_currentinitialassessment_value: null, '@odata.etag': 'W/"request-1"' } };
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method === 'PATCH' && href.includes('wmkf_requestdocuments(')) {
+        state.row = { ...state.row, ...JSON.parse(init.body), '@odata.etag': 'W/"row-2"' };
+        return Promise.resolve({ ok: true, status: 204, text: () => Promise.resolve('') });
+      }
+      if (href.includes('/$batch')) {
+        const opCount = (String(init.body).match(/Content-ID: \d+/g) || []).length;
+        state.row = { ...state.row, wmkf_operationstatus: 100000001, wmkf_sharepointdriveid: 'b!driveIdSample1234567890', wmkf_sharepointitemid: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', '@odata.etag': 'W/"row-3"' };
+        state.request = { ...state.request, _wmkf_currentinitialassessment_value: REQUEST_DOCUMENT_ID, '@odata.etag': 'W/"request-2"' };
+        return Promise.resolve(multipartResponse(Array.from({ length: opCount }, (_, i) => ({ contentId: i + 1, status: 204 }))));
+      }
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [state.row] });
+      if (href.includes('akoya_requests(')) return jsonResponse(state.request);
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+    const graph = fakeGraph({
+      getFileMetadataById: jest.fn(async (driveId, itemId) => ({
+        driveId, id: itemId, name: filename, size: 123, webUrl: 'https://contoso.sharepoint.com/item', eTag: '"1"', versionId: '2.0', lastModified: '2026-09-24T00:00:00Z',
+      })),
+    });
+    const manifest = baseManifest();
+    const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle: null,
+      deps: { client: fakeClient(), graph, sharePointTarget: () => ({}) },
+    }));
+
+    expect(result.outcome).toBe('advanced');
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+    expect(graph.getFileMetadataById).toHaveBeenCalledWith('b!driveIdSample1234567890', '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567');
+    const iaResource = getResources().find((r) => r.resourceKind === 'dataverse_request_document');
+    expect(iaResource.readback.sourceVersionId).toBe('2.0');
   });
 });
 
