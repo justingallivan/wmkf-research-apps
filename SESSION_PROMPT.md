@@ -23,7 +23,7 @@ No environment, deployment, schema, Dataverse or Vercel operation ran. Nothing w
 
 ### Verified Open
 
-0. **Fix the three Stage 1d root-review defects before accepting 1d** (spend-check alarm must count all spend; admin dashboard shows test spend as one separate line per owner decision; Dynamics Explorer Search must not throw on an unclassified hit; Workbench cycle discovery must include test requests). Details: the "Stage 1d root review" paragraph in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`. The Codex adversarial review's three high findings (invalid double FetchXML filter in cycle aggregation; unbound Grant Reporting request GUID; per-request spend reads that silently drop unreadable spend) are recorded in the same paragraph as defects 4–6. After fixing, rerun the Codex adversarial review from base `a69545697`.
+0. **Stage 1d defects 1–6 fixed in Session 536** (`f06b5d3a8`, `7c8edcf45`, `6f2d56c48`, `008612629`); fix record in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`. Next: Codex adversarial re-review from base `a69545697`; accept Stage 1d only if it returns no high finding.
 
 1. **Stage 1 rollout remains owner-gated.** Evidence: `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` Stage 1d record and `lib/services/test-requests/isolation.js`. Apply the marker schema to an environment before setting `TEST_REQUEST_ISOLATION=on`; production apply/enablement is a separate explicit authorization.
 2. **Creation still requires the durable ledger/resumable runner.** Evidence: the design's build-order amendment and current implementation boundary. Do not expose a deployed Create route before the run ledger, reservation, recovery and ownership contracts exist.
