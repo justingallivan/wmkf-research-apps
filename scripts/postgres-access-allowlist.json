@@ -49,11 +49,6 @@
   },
   {
     "file": "lib/services/admin/prompts-publish-service.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/admin/prompts-publish-service.js",
     "kind": "sql-tag",
     "count": 5
   },
