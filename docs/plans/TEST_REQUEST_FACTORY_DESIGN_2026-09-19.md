@@ -89,6 +89,8 @@ Each stage is a separate commit with a Codex adversarial review before acceptanc
 
 *Proof.* Re-export the 1003222 bundle immediately before the run (six-hour window), reserve one `initial_assessment` run and advance it to `ready`: one new sandbox Request. Evidence file under `evidence/test-request-factory/`. Start `wmkf-ledger-pg` and drop the three ledger objects before the live suites, since 054 changes.
 
+*Plan review.* Codex adversarial plan review (`gpt-5.6-sol`): round 1 needs-attention (sandbox target binding and atomic changeset, journal-before-dispatch, content hash never persisted, recipe token and idempotency), round 2 (unwrapped PATCH and folder mutations, snapshot bytes not hashed), round 3 (Basic safety checks ran before the IA writes), round 4 (no durable pre-IA Foundation/Contact baseline); each resolved in this paragraph. Round 5: **approve**, no material findings (2026-09-24).
+
 *Open checks at build time.* Whether the Basic clone's copied `ProposalNarrative_<number>.pdf` lands where `resolveActiveAiMaterialsFolder` expects (affects only the later-Generate note above); whether the sandbox app user can create `wmkf_requestdocument` rows (reads are proven, creates are not).
 
 ### Stage 1 decisions and plan (2026-09-23, Session 535)
