@@ -85,6 +85,62 @@ test('Clear my saved default affects future drafts and preserves the current one
   expect(JSON.parse(del[1].body)).toEqual({ kind: 'respond' });
 });
 
+test('refreshing the preview during Save does not leave the preference controls stuck', async () => {
+  let finishSave;
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => {
+    if (url === '/api/review-manager/reminder-email-preferences' && options.method === 'PUT') {
+      return new Promise((resolve) => { finishSave = resolve; });
+    }
+    return original(url, options);
+  });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
+  await screen.findByText('Email preview');
+  fireEvent.click(await screen.findByRole('button', { name: 'Save as my default' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
+  await act(async () => { finishSave(response({ ok: true })); });
+  expect(await screen.findByText('Saved for future reminders from your mailbox.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save as my default' })).toBeEnabled();
+});
+
+test('an invalid own default can be cleared and the Admin copy previewed again', async () => {
+  let previews = 0;
+  global.fetch = jest.fn((url, options) => {
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) {
+      return Promise.resolve(response({ ok: false, reason: 'preference_invalid', ownSystemId: SENDER_ID, configured: true, shared: template }, false, 409));
+    }
+    if (url === '/api/review-manager/reminder-email-preferences' && options.method === 'DELETE') return Promise.resolve(response({ ok: true }));
+    if (url === '/api/review-manager/send-review-reminder') {
+      previews += 1;
+      return Promise.resolve(previews === 1
+        ? response({ ok: false, reason: 'preference_invalid' }, false, 503)
+        : response({ ok: true, draft }));
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
+  expect(await screen.findByText(/Your saved default needs correction/)).toBeInTheDocument();
+  expect(screen.getByDisplayValue(template.subject)).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'Clear my saved default' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Send reminder' })).toBeEnabled();
+});
+
+test('an invalid own default does not overwrite a completed preview from another PD', async () => {
+  let finishOwn;
+  global.fetch = jest.fn((url) => {
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return new Promise((resolve) => { finishOwn = resolve; });
+    return Promise.resolve(response({ ok: true, draft }));
+  });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
+  await screen.findByText('Email preview');
+  await act(async () => {
+    finishOwn(response({ ok: false, reason: 'preference_invalid', ownSystemId: '44444444-4444-4444-8444-444444444444', configured: true, shared: { subject: 'Different Admin subject', body: template.body } }, false, 409));
+  });
+  expect(screen.getByDisplayValue('Original subject')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Send reminder' })).toBeEnabled();
+});
+
 test('superuser acting for another PD can save only their own default', async () => {
   installFetch({ ownSystemId: '44444444-4444-4444-8444-444444444444' });
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);

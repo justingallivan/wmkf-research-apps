@@ -17,6 +17,7 @@ const ERROR_MESSAGE = {
   preview_stale: 'The reviewed email or reviewer details changed. Refresh the preview before sending.',
   preference_unavailable: 'The sender’s saved default could not be read. Try again later.',
   preference_invalid: 'The sender’s saved default needs correction before a reminder can be sent.',
+  identity_unavailable: 'Your account identity could not be verified. Try again later.',
   misconfigured: 'The reminder email template is missing or blank in Admin.',
   token_revoked: 'This reviewer’s access was withdrawn.',
   token_not_minted: 'No review link is recorded. Check Materials history first.',
@@ -39,7 +40,9 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
   const [sendFeedback, setSendFeedback] = useState(null);
   const [ownSystemId, setOwnSystemId] = useState(null);
   const [configured, setConfigured] = useState(false);
+  const [repairableOwnDefault, setRepairableOwnDefault] = useState(false);
   const mountedRef = useRef(true);
+  const draftRef = useRef(null);
   const loadGenerationRef = useRef(0);
   const preferenceGenerationRef = useRef(0);
   const sendGenerationRef = useRef(0);
@@ -55,6 +58,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
     const generation = ++loadGenerationRef.current;
     setLoading(true);
     setDraft(null);
+    draftRef.current = null;
     setLoadError(null);
     setSendFeedback(null);
     try {
@@ -70,6 +74,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
         if (['removed', 'revoked', 'not_found'].includes(data?.reason)) onStaleRef.current?.();
         return;
       }
+      draftRef.current = data.draft;
       setDraft(data.draft);
       setTemplate(data.draft.template);
     } catch (error) {
@@ -85,13 +90,21 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOwnSystemId(null);
     setConfigured(false);
+    setRepairableOwnDefault(false);
     loadPreview();
     const generation = ++preferenceGenerationRef.current;
     requestEnvelope(`/api/review-manager/reminder-email-preferences?kind=${kind}`, { tolerantBody: true })
       .then((envelope) => {
-        if (mountedRef.current && generation === preferenceGenerationRef.current && envelope.ok && envelope.data?.ok) {
+        if (!mountedRef.current || generation !== preferenceGenerationRef.current) return;
+        if (envelope.ok && envelope.data?.ok) {
           setOwnSystemId(envelope.data.ownSystemId);
           setConfigured(envelope.data.configured === true);
+        } else if (envelope.data?.reason === 'preference_invalid' && envelope.data?.ownSystemId && envelope.data?.shared) {
+          setOwnSystemId(envelope.data.ownSystemId);
+          setConfigured(true);
+          setRepairableOwnDefault(true);
+          if (!draftRef.current) setTemplate(envelope.data.shared);
+          setSaveMessage('Your saved default needs correction. Clear it or replace it below, then refresh the preview.');
         }
       })
       .catch(() => {});
@@ -106,8 +119,8 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
 
   const blankEdit = !template.subject.trim() || !template.body.trim();
   const previewCurrent = Boolean(draft && draft.template.subject === template.subject && draft.template.body === template.body);
-  const canSaveOwn = Boolean(draft && ownSystemId);
-  const sendingForAnotherUser = canSaveOwn && ownSystemId.toLowerCase() !== draft.senderId?.toLowerCase();
+  const canSaveOwn = Boolean(ownSystemId && (draft || repairableOwnDefault));
+  const sendingForAnotherUser = Boolean(draft && canSaveOwn && ownSystemId.toLowerCase() !== draft.senderId?.toLowerCase());
   const editField = (field, value) => {
     setTemplate((current) => ({ ...current, [field]: value }));
     setSaveMessage(null);
@@ -116,45 +129,51 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
 
   const saveDefault = async () => {
     if (!canSaveOwn || blankEdit || saving || sendingRef.current) return;
-    const generation = loadGenerationRef.current;
+    const generation = preferenceGenerationRef.current;
     setSaving(true);
     setSaveMessage(null);
     try {
       const envelope = await requestEnvelope('/api/review-manager/reminder-email-preferences', {
         method: 'PUT', body: { kind, template }, tolerantBody: true,
       });
-      if (mountedRef.current && generation === loadGenerationRef.current) {
+      if (mountedRef.current && generation === preferenceGenerationRef.current) {
         setSaveMessage(envelope.ok && envelope.data?.ok ? 'Saved for future reminders from your mailbox.' : errorMessage(envelope.data, 'Could not save your default.'));
-        if (envelope.ok && envelope.data?.ok) setConfigured(true);
+        if (envelope.ok && envelope.data?.ok) {
+          setConfigured(true);
+          setRepairableOwnDefault(false);
+          if (!draft) loadPreview();
+        }
       }
     } catch {
-      if (mountedRef.current && generation === loadGenerationRef.current) setSaveMessage('Could not confirm the save. Reload your default before trying again.');
+      if (mountedRef.current && generation === preferenceGenerationRef.current) setSaveMessage('Could not confirm the save. Reload your default before trying again.');
     } finally {
-      if (mountedRef.current && generation === loadGenerationRef.current) setSaving(false);
+      if (mountedRef.current) setSaving(false);
     }
   };
 
   const resetDefault = async () => {
     if (!canSaveOwn || !configured || saving || sendingRef.current) return;
-    const generation = loadGenerationRef.current;
+    const generation = preferenceGenerationRef.current;
     setSaving(true);
     setSaveMessage(null);
     try {
       const envelope = await requestEnvelope('/api/review-manager/reminder-email-preferences', {
         method: 'DELETE', body: { kind }, tolerantBody: true,
       });
-      if (mountedRef.current && generation === loadGenerationRef.current) {
+      if (mountedRef.current && generation === preferenceGenerationRef.current) {
         if (envelope.ok && envelope.data?.ok) {
           setConfigured(false);
-          setSaveMessage('Your saved default was cleared. This one-send draft is unchanged.');
+          setRepairableOwnDefault(false);
+          setSaveMessage(draft ? 'Your saved default was cleared. This one-send draft is unchanged.' : 'Your saved default was cleared. Loading the shared Admin copy.');
+          if (!draft) loadPreview();
         } else {
           setSaveMessage(errorMessage(envelope.data, 'Could not clear your default.'));
         }
       }
     } catch {
-      if (mountedRef.current && generation === loadGenerationRef.current) setSaveMessage('Could not confirm the reset. Reload your default before trying again.');
+      if (mountedRef.current && generation === preferenceGenerationRef.current) setSaveMessage('Could not confirm the reset. Reload your default before trying again.');
     } finally {
-      if (mountedRef.current && generation === loadGenerationRef.current) setSaving(false);
+      if (mountedRef.current) setSaving(false);
     }
   };
 

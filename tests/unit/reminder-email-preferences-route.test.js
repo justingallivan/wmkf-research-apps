@@ -32,7 +32,7 @@ beforeEach(() => {
   sharedReminderTemplate.mockResolvedValue({ ok: true, template });
   loadSenderReminderTemplate.mockResolvedValue({ ok: true, configured: true, template });
   saveOwnReminderTemplate.mockResolvedValue({ ok: true, template });
-  clearOwnReminderTemplate.mockResolvedValue(true);
+  clearOwnReminderTemplate.mockResolvedValue({ ok: true });
 });
 
 test('GET reads exact session owner under the same reviewer app gate', async () => {
@@ -47,7 +47,7 @@ test('GET reads exact session owner under the same reviewer app gate', async () 
 test('PUT saves only the authenticated profile and rejects forged identity fields', async () => {
   const { req, res } = call('PUT', { template });
   await handler(req, res);
-  expect(saveOwnReminderTemplate).toHaveBeenCalledWith(17, 'respond', template);
+  expect(saveOwnReminderTemplate).toHaveBeenCalledWith(ownSystemId, 'respond', template);
   expect(res.statusCode).toBe(200);
   const forged = call('PUT', { template, profileId: 99 });
   await handler(forged.req, forged.res);
@@ -58,7 +58,7 @@ test('PUT saves only the authenticated profile and rejects forged identity field
 test('DELETE clears only the caller kind; disabled access does nothing', async () => {
   const { req, res } = call('DELETE', { kind: 'reviewdue' });
   await handler(req, res);
-  expect(clearOwnReminderTemplate).toHaveBeenCalledWith(17, 'reviewdue');
+  expect(clearOwnReminderTemplate).toHaveBeenCalledWith(ownSystemId, 'reviewdue');
   expect(sharedReminderTemplate).not.toHaveBeenCalled();
   requireAppAccess.mockResolvedValueOnce(null);
   const denied = call('DELETE');
@@ -72,4 +72,24 @@ test('preference read failure does not show shared copy as an apparent personal 
   await handler(req, res);
   expect(res.statusCode).toBe(503);
   expect(res._data).toEqual({ ok: false, reason: 'preference_unavailable' });
+});
+
+test('an invalid own default offers its owner a repair path without claiming it is usable', async () => {
+  loadSenderReminderTemplate.mockResolvedValueOnce({ ok: false, reason: 'preference_invalid' });
+  const { req, res } = call('GET');
+  await handler(req, res);
+  expect(res.statusCode).toBe(409);
+  expect(res._data).toEqual({ ok: false, reason: 'preference_invalid', ownSystemId, shared: template, configured: true });
+});
+
+test('save and clear use the session systemuser even when the profile id differs', async () => {
+  requireAppAccess.mockResolvedValue({ profileId: 6, session: { user: { dynamicsSystemuserId: ownSystemId } } });
+  const put = call('PUT', { template });
+  await handler(put.req, put.res);
+  expect(put.res.statusCode).toBe(200);
+  const del = call('DELETE');
+  await handler(del.req, del.res);
+  expect(del.res.statusCode).toBe(200);
+  expect(saveOwnReminderTemplate).toHaveBeenCalledWith(ownSystemId, 'respond', template);
+  expect(clearOwnReminderTemplate).toHaveBeenCalledWith(ownSystemId, 'respond');
 });

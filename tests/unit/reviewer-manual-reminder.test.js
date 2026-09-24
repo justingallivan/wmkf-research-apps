@@ -173,6 +173,15 @@ describe('proof-bound personal reminder sends', () => {
     expect(setUserPreference).not.toHaveBeenCalled();
   });
 
+  test('preview proof accepts a template regardless of subject/body property order', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    const reversed = { body: '{{greeting}}\n\n{{signature}}', subject: 'One-off' };
+    const preview = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: reversed });
+    expect(preview.ok).toBe(true);
+    const result = await sendManualReminderWithProof({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: reversed, proof: preview.draft.proof });
+    expect(result).toEqual({ ok: true });
+  });
+
   test('changed reviewer ETag invalidates preview before the claim', async () => {
     installReads({ suggestion: pendingInvitation(), suggestionAfterClaim: pendingInvitation({ _etag: 'W/"101"' }) });
     const edited = { subject: 'One-off', body: '{{greeting}}\n\n{{signature}}' };

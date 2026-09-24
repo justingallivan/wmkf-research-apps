@@ -10,6 +10,13 @@ import {
   clearOwnReminderTemplate,
 } from '../../../lib/services/reviewer-reminder-personalization';
 
+function writeStatus(result) {
+  if (result.ok) return 200;
+  if (result.reason === 'validation') return 400;
+  if (result.reason === 'identity_unavailable') return 503;
+  return 500;
+}
+
 export default async function handler(req, res) {
   if (!['GET', 'PUT', 'DELETE'].includes(req.method)) {
     res.setHeader('Allow', 'GET, PUT, DELETE');
@@ -33,15 +40,20 @@ export default async function handler(req, res) {
         const shared = await sharedReminderTemplate(kind);
         if (!shared.ok) return res.status(503).json({ ok: false, reason: shared.reason });
         const own = await loadSenderReminderTemplate(ownSystemId, kind, shared.template);
-        if (!own.ok) return res.status(503).json({ ok: false, reason: own.reason });
+        if (!own.ok) {
+          if (own.reason === 'preference_invalid') {
+            return res.status(409).json({ ok: false, reason: own.reason, ownSystemId, shared: shared.template, configured: true });
+          }
+          return res.status(503).json({ ok: false, reason: own.reason });
+        }
         return res.status(200).json({ ok: true, kind, ownSystemId, shared: shared.template, configured: own.configured, template: own.template });
       }
       if (req.method === 'DELETE') {
-        const cleared = await clearOwnReminderTemplate(access.profileId, kind);
-        return res.status(cleared ? 200 : 500).json({ ok: cleared, kind, reason: cleared ? undefined : 'persistence' });
+        const cleared = await clearOwnReminderTemplate(ownSystemId, kind);
+        return res.status(writeStatus(cleared)).json({ ...cleared, kind });
       }
-      const saved = await saveOwnReminderTemplate(access.profileId, kind, req.body?.template);
-      return res.status(saved.ok ? 200 : saved.reason === 'validation' ? 400 : 500).json(saved);
+      const saved = await saveOwnReminderTemplate(ownSystemId, kind, req.body?.template);
+      return res.status(writeStatus(saved)).json(saved);
     });
   } catch (error) {
     console.error('[review-manager reminder-email-preferences] error:', error);
