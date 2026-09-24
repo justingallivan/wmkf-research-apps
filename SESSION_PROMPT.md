@@ -23,7 +23,7 @@ No environment, deployment, schema, Dataverse or Vercel operation ran. Nothing w
 
 ### Verified Open
 
-0. **Stage 1d defects 1–6 fixed in Session 536** (`f06b5d3a8`, `7c8edcf45`, `6f2d56c48`, `008612629`); fix record in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`. Next: Codex adversarial re-review from base `a69545697`; accept Stage 1d only if it returns no high finding.
+0. **Stage 1d accepted by the owner (Session 536, 2026-09-23).** Six root-review defects fixed (`f06b5d3a8`, `7c8edcf45`, `6f2d56c48`, `008612629`), two Codex re-review findings fixed (`ee9901c59`, `c0cbf0dad`), and three further findings fixed by Codex rescue and reviewed by Claude (`6a293fe12`, `744bde88d`, `53260f1af`). Full record in the design doc's Stage 1d fix record. No fourth review round was run, by owner decision. Next: the source-bundle export from production Request 1003222 and the rest of the Factory build order (item 2).
 
 1. **Stage 1 rollout remains owner-gated.** Evidence: `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` Stage 1d record and `lib/services/test-requests/isolation.js`. Apply the marker schema to an environment before setting `TEST_REQUEST_ISOLATION=on`; production apply/enablement is a separate explicit authorization.
 2. **Creation still requires the durable ledger/resumable runner.** Evidence: the design's build-order amendment and current implementation boundary. Do not expose a deployed Create route before the run ledger, reservation, recovery and ownership contracts exist.
