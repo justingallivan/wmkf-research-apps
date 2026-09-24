@@ -1,3 +1,60 @@
+# Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
+
+## Session 539 Summary — 2026-09-24 PT (Codex independent queue slice; concurrent sessions continued)
+
+[VERIFIED via PRs #333/#334, `main` merge commits `374a2e51e`/`542da4d1e`, GitHub checks, and local gates] A bounded IRS BMF importer regression test and its canonical work-queue correction merged to `main`. The test uses a local CSV fixture; this session ran no live IRS download or database import. The other active Factory and personal-email worktrees were not edited. `main` auto-deploys; Production deployment/readiness for these two merges was not independently checked.
+
+### What Was Completed
+
+1. **IRS BMF parser regression coverage.** PR #333 merged `374a2e51e` (source commit `b09d395b2`). `tests/unit/irs-bmf-import-parser.test.js` calls the existing CSV-to-Postgres COPY stream helper and covers a BOM, quoted commas/newlines, escaping, EIN normalization, and malformed-row skips. The helper is exported for this direct test; import behavior was not otherwise changed. The focused test, lint, types, and GitHub checks passed.
+2. **Queue fact correction.** PR #334 merged `542da4d1e` (source commit `fbd1ce64e`). `docs/CURRENT_WORK_QUEUE.md` now records that the parser test exists while a fresh live IRS-file re-run remains unverified. The doc-currency, fact-consistency, doc-symbol-refs, and docs-catalog gates passed; the paired self-tests passed.
+3. **Concurrent-work status checked read-only at handoff.** PRs #329, #330, and #331 are merged. Factory slice 6a is owner-accepted [VERIFIED via `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` on `codex/test-request-preview-integration`]; slice 6b has new branch commits and belongs to that workstream. PR #332 remains open on `codex/personal-email-reviewer-reminders` [VERIFIED via GitHub]. These are other sessions' work.
+
+### Commits
+
+- `b09d395b2` — Test IRS BMF CSV stream import with parser fixture
+- `374a2e51e` — Merge PR #333
+- `fbd1ce64e` — Update IRS BMF test status in work queue
+- `542da4d1e` — Merge PR #334
+
+## Next Items
+
+### Verified Open
+
+1. **Factory slice 6b is in progress in its own worktree.** Evidence: Factory design doc's slice 6a acceptance record and branch commits `2bf5904a9`/`10e0a5e4f` at this handoff. The active Factory session owns the next build and review; check its newer handoff before acting.
+2. **Personal reviewer-reminder defaults remain under review.** Evidence: PR #332 is open at head `ac8f9bc05` and the owner’s Codex worktree is on that branch. Leave its files to that owner; recheck PR state before any follow-up.
+
+### Owner Decision Needed
+
+1. **No new owner decision from this IRS BMF test slice.** The other workstreams retain their own decision gates and handoffs.
+
+### Verify Before Acting
+
+1. **Live IRS-file import remains unproven by this test.** The fixture covers parsing and COPY text, not a fresh IRS download, Postgres staging, or atomic swap. Establish the intended target and authorization before running an import or dry run; `refresh()` writes staging even when `dryRun` is true.
+2. **Production deployment for PRs #333/#334 was not independently checked.** Both merged to auto-deploying `main`; verify Vercel Ready state if operational evidence is needed.
+3. **Concurrent branch state changes quickly.** Check the Factory branch, PR #332, worktree ownership, and `git status` before taking any of their tasks. Historical Session 538 next items naming PRs #329–#331 as open are superseded by the merged PR states above.
+
+### Do Not Reopen Without New Evidence
+
+1. **The missing IRS importer unit test is closed.** PR #333 supplies it and PR #334 corrected the current queue claim. A live IRS-file run is a separate operational proof, not a missing parser-test fix.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/irs-bmf-service.js` | CSV parser and COPY-stream importer |
+| `tests/unit/irs-bmf-import-parser.test.js` | Fixture-driven parser regression test |
+| `docs/CURRENT_WORK_QUEUE.md` | Current queue status and remaining live-file caveat |
+
+## Testing and Stop-time Notes
+
+- Focused IRS test, ESLint on touched source/test, TypeScript check, and PR #333 GitHub checks passed.
+- PR #334 GitHub checks and doc-currency, fact-consistency, doc-symbol-refs, docs-catalog gates passed; relevant self-tests passed sequentially.
+- `report:claim-evidence-pilot -- --current` was attempted both inside and outside the sandbox; it returned “local state could not be read.” No observation row was added because eligibility could not be determined.
+- `CLAUDE.md` needs no change: no app, endpoint, schema, script, configuration, or convention changed. No DEVELOPMENT_LOG milestone entry is required: this session shipped test coverage and documentation, not a new Production capability or cutover.
+
+## Prior Session 539 Prompt: Build IA recipe slice 6b (after owner accepts 6a)
+
 # Session 539 Prompt: Build IA recipe slice 6b (after owner accepts 6a)
 
 ## Session 538 Summary — 2026-09-24 PT (Claude root; Sonnet build agent, Codex review/rescue; owner drives a separate Codex session)
