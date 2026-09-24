@@ -58,6 +58,7 @@
 - PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail: ../docs/PC_MEETING_TRACKER_PLAN.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Grantee / email templates: ../docs/GRANTEE_PORTAL_SPEC.md; project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
+- Postgres access layer / raw `sql` imports / pg contract-test harness: ../docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md
 - Deferred cleanup / dead code: project-deferred-code-cleanup.md
 - Invitation-link validation strictness (post-cycle decision): project-invitation-link-strictness-open-decision.md
 - Public privacy / history remediation: ../docs/audits/public-repository-pii-history-audit-2026-07-27.md; ../docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md
