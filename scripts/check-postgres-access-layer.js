@@ -70,11 +70,22 @@
  *     brand-new, otherwise-unratcheted caller reach the driver under a name
  *     this gate never sees import a driver at all. See "driver-export
  *     detection" below for exactly what counts.
- * `lib/postgres/**` (the driver seam, `lib/postgres/client.js`) and the two Q5-exempt files
- * (`lib/utils/migration-drift.js`, `lib/utils/health-checker.js`; `scripts/**`
- * is already outside the scan roots) are the allowed-importer set: they are
- * skipped by ratchet checks (a)/(b) and must NOT appear in the allowlist
- * file, but they still show up in `--report`/`--json` like any other record.
+ * The exemption is KIND-SPECIFIC, not a blanket per-file skip (Codex Stage 2
+ * finding: a blanket `lib/postgres/**` exemption would let a future
+ * `lib/postgres/stores/rogue.js` import `pg` directly and stay green,
+ * silently defeating "one driver seam"). `lib/postgres/client.js` (the seam
+ * itself) and the two Q5 files (`lib/utils/migration-drift.js`,
+ * `lib/utils/health-checker.js`; `scripts/**` is already outside the scan
+ * roots) are exempt for EVERY kind. Any OTHER file under `lib/postgres/**`
+ * (a store) is exempt ONLY for `sql-tag`/`sql.query`/`client.query`/
+ * `pool.query`/`db.connect`/`pool.connect`/`begin-literal` -- using the
+ * seam's `sql` freely is the point of a store -- and is ratcheted like any
+ * other file for `driver-import`/`driver-export`/`unresolved-import`/
+ * `new-Pool`, since those are exactly the ways a store could reach the
+ * driver on its own instead of through the seam. Every exempt (file, kind)
+ * pair is skipped by ratchet checks (a)/(b) and must NOT appear in the
+ * allowlist file, but it still shows up in `--report`/`--json` like any
+ * other record.
  *
  * Classification is AST-only (plan §2 rule 12): a file whose only mention of
  * a driver name is inside a comment produces NO record. Detection reuses the
@@ -241,15 +252,39 @@ const KINDS = [
 ];
 
 // Q5 exemptions -- permanently allowed to import the driver, never ratcheted
-// (skipped in checks (a)/(b)), and must not appear in the allowlist file.
-// `scripts/**` is already outside SCAN_DIRS so it needs no exemption here.
+// for ANY kind (skipped in checks (a)/(b)), and must not appear in the
+// allowlist file. `scripts/**` is already outside SCAN_DIRS so it needs no
+// exemption here.
 const Q5_EXEMPT_FILES = new Set([
   'lib/utils/migration-drift.js',
   'lib/utils/health-checker.js',
 ]);
 
-function isExemptFile(rel) {
-  return rel.startsWith('lib/postgres/') || Q5_EXEMPT_FILES.has(rel);
+// The driver seam itself (plan §4 "One driver seam"): the ONLY module
+// allowed to import a Postgres driver directly, so it is exempt for every
+// kind, same as the Q5 files.
+const SEAM_FILE = 'lib/postgres/client.js';
+
+// Any OTHER file under lib/postgres/** (a store, per plan §4 "Per-domain
+// stores") is exempt ONLY for the kinds that mean "used the seam's sql
+// freely" -- it is still ratcheted like any other file for driver-import,
+// driver-export, unresolved-import, and new-Pool, because those are exactly
+// the ways a store could bypass the seam and touch the driver on its own
+// (Codex Stage 2 finding: a blanket lib/postgres/** exemption would let a
+// future `lib/postgres/stores/rogue.js` import `pg` directly and stay
+// green, silently defeating "one driver seam").
+const SEAM_USER_EXEMPT_KINDS = new Set([
+  'sql-tag', 'sql.query', 'client.query', 'pool.query', 'db.connect', 'pool.connect', 'begin-literal',
+]);
+
+// True if (file, kind) is exempt from ratchet checks (a)/(b) and must NOT
+// appear in the allowlist. Q5 files and the seam file are exempt for every
+// kind; any other lib/postgres/** file is exempt only for the
+// SEAM_USER_EXEMPT_KINDS.
+function isExemptKind(rel, kind) {
+  if (Q5_EXEMPT_FILES.has(rel) || rel === SEAM_FILE) return true;
+  if (rel.startsWith('lib/postgres/')) return SEAM_USER_EXEMPT_KINDS.has(kind);
+  return false;
 }
 
 // Q2/Q5 do not apply to recognition itself; this predicate matches the
@@ -1273,8 +1308,8 @@ function runRatchet(records, allowlist, root) {
 
   const censusMap = new Map();
   for (const rec of records) {
-    if (isExemptFile(rec.file)) continue;
     for (const [kind, count] of rec.kinds) {
+      if (isExemptKind(rec.file, kind)) continue;
       censusMap.set(`${rec.file}::${kind}`, count);
     }
   }
@@ -1297,7 +1332,7 @@ function runRatchet(records, allowlist, root) {
   // (b) every allowlist (file,kind) must still exist, at or under its count.
   for (const [key, allowed] of allowMap) {
     const [file, kind] = key.split('::');
-    if (isExemptFile(file)) {
+    if (isExemptKind(file, kind)) {
       violations.push(`allowlist must not list an exempt file: ${file} (${kind})`);
       continue;
     }
@@ -1793,8 +1828,10 @@ function runClassificationSelfTest() {
     const json = buildJson(fixtureRecords, fixtureCastWarnings, fixtureUnresolved);
     const permissiveEntries = [];
     for (const rec of fixtureRecords) {
-      if (isExemptFile(rec.file)) continue;
-      for (const [kind, count] of rec.kinds) permissiveEntries.push({ file: rec.file, kind, count });
+      for (const [kind, count] of rec.kinds) {
+        if (isExemptKind(rec.file, kind)) continue;
+        permissiveEntries.push({ file: rec.file, kind, count });
+      }
     }
     const permissiveAllowlist = writeAllowlist(tempRoot, permissiveEntries);
 
@@ -2308,6 +2345,99 @@ function runRatchetSelfTest() {
     }
   }
 
+  // ---- red: lib/postgres/** kind-specific exemption (Codex Stage 2) -- a
+  // store bypassing the seam and importing pg directly ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/postgres/stores/rogue.js', `
+        const { Pool } = require('pg');
+        module.exports.run = () => new Pool().query('SELECT 1');
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (lib/postgres/** store bypassing the seam via driver-import), got status ${result.status}`);
+      expect(result.stderr.includes('lib/postgres/stores/rogue.js') && result.stderr.includes('driver-import'),
+        `expected violation naming the file and driver-import, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red: lib/postgres/** store laundering the seam's sql back out ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/postgres/client.js', `
+        const { sql } = require('@vercel/postgres');
+        module.exports = { sql };
+      `);
+      write(tempRoot, 'lib/postgres/stores/x.js', `
+        const { sql } = require('../client');
+        export { sql };
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (lib/postgres/** store re-exporting sql, driver-export), got status ${result.status}`);
+      expect(result.stderr.includes('lib/postgres/stores/x.js') && result.stderr.includes('driver-export'),
+        `expected violation naming the file and driver-export, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- green: lib/postgres/** store using the seam's sql freely, no allowlist entry needed ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/postgres/client.js', `
+        const { sql } = require('@vercel/postgres');
+        module.exports = { sql };
+      `);
+      write(tempRoot, 'lib/postgres/stores/ok.js', `
+        const { sql } = require('../client');
+        module.exports.getWidgets = () => sql\`SELECT * FROM widget_requests\`;
+        module.exports.getUsers = () => sql\`SELECT * FROM user_profiles\`;
+        module.exports.getBills = () => sql\`SELECT * FROM bill_records\`;
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 0, `expected green (lib/postgres/stores/ok.js uses the seam's sql freely), got status ${result.status}\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- green: lib/postgres/client.js itself (the seam), all kinds exempt ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/postgres/client.js', `
+        const { sql, db } = require('@vercel/postgres');
+        const { Pool } = require('pg');
+        let poolInstance;
+        function getPool() {
+          if (!poolInstance) poolInstance = new Pool();
+          return poolInstance;
+        }
+        async function withClient(fn) {
+          const client = await db.connect();
+          try {
+            return await fn(client);
+          } finally {
+            client.release();
+          }
+        }
+        module.exports = { sql, getPool, withClient };
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 0, `expected green (lib/postgres/client.js is the seam, exempt for every kind), got status ${result.status}\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
   // ---- exit 2: duplicate allowlist (file,kind) key ----
   {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
@@ -2574,7 +2704,7 @@ function runRatchetSelfTest() {
     }
   }
 
-  console.log('postgres-access-layer ratchet self-test OK -- green exact-match, red (a)/(a-count)/(b)/(b-vanished)/(b-exempt)/(c)/(c-index-form), green (c) no-op, Q5 exemptions, malformed-allowlist exit-2, legitimate-shrink green, unresolved-import/driver-export red+green, CJS-accessor-export red, aliased-require red, and multi-hop-alias (require + namespace) red cases verified.');
+  console.log('postgres-access-layer ratchet self-test OK -- green exact-match, red (a)/(a-count)/(b)/(b-vanished)/(b-exempt)/(c)/(c-index-form), green (c) no-op, Q5 exemptions, malformed-allowlist exit-2, legitimate-shrink green, unresolved-import/driver-export red+green, CJS-accessor-export red, aliased-require red, multi-hop-alias (require + namespace) red, and lib/postgres/** kind-specific-exemption red/green cases verified.');
 }
 
 // P2-A: a `--json` payload over ~64 KiB used to be truncated by
@@ -2697,5 +2827,5 @@ module.exports = {
   isPostgresDriverSource,
   runRatchet,
   loadAllowlist,
-  isExemptFile,
+  isExemptKind,
 };
