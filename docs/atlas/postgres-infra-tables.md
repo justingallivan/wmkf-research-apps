@@ -323,7 +323,12 @@ send is resolved. Send has the same guard, and unique partial index
 row per session under concurrency. Drift compares the live start as an instant plus ordered
 request/minutes tuples with the frozen sent snapshot. Read/write
 paths are `lib/services/meeting-tracker/agenda-store.js` and
-`lib/services/meeting-tracker/agenda-service.js`; the guarded API is
+`lib/services/meeting-tracker/agenda-service.js` [RECHECKED after
+lib/services/meeting-tracker/agenda-store.js change:
+docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md Stage 3 item 3 —
+import-only swap onto `lib/postgres/client`, SQL text/state machine/table
+shape unchanged (rule 6 behavior freeze); this claim's file path and
+described behavior are unaffected]; the guarded API is
 `/api/meeting-tracker/sessions/[id]/agenda`. No cleanup is scheduled; rows
 remain audit history until a retention policy is explicitly approved.
 **[VERIFIED 2026-09-10 via migration/fresh-install parity and focused service,
