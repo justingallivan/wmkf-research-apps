@@ -65,6 +65,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
   const draftRef = useRef(null);
   const loadGenerationRef = useRef(0);
   const preferenceGenerationRef = useRef(0);
+  const templateEditGenerationRef = useRef(0);
   const sendGenerationRef = useRef(0);
   const sendingRef = useRef(false);
   const onSentRef = useRef(onSent);
@@ -114,6 +115,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
     setSendFeedback(null);
     loadPreview();
     const generation = ++preferenceGenerationRef.current;
+    const editGeneration = templateEditGenerationRef.current;
     requestEnvelope(`/api/review-manager/reminder-email-preferences?kind=${kind}`, { tolerantBody: true })
       .then((envelope) => {
         if (!mountedRef.current || generation !== preferenceGenerationRef.current) return;
@@ -124,7 +126,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
           setOwnSystemId(envelope.data.ownSystemId);
           setConfigured(true);
           setRepairableOwnDefault(true);
-          if (!draftRef.current) setTemplate(envelope.data.shared);
+          if (!draftRef.current && templateEditGenerationRef.current === editGeneration) setTemplate(envelope.data.shared);
           setSaveMessage('Your saved default needs correction. Clear it or replace it below, then refresh the preview.');
         }
       })
@@ -143,6 +145,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
   const canSaveOwn = Boolean(ownSystemId && (draft || repairableOwnDefault));
   const sendingForAnotherUser = Boolean(draft && canSaveOwn && ownSystemId.toLowerCase() !== draft.senderId?.toLowerCase());
   const editField = (field, value) => {
+    templateEditGenerationRef.current += 1;
     setTemplate((current) => ({ ...current, [field]: value }));
     setSaveMessage(null);
   };

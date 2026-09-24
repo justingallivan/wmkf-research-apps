@@ -240,6 +240,24 @@ test('a preference failure offers editable Admin copy and requires a new preview
   expect(JSON.parse(previewCalls[1][1].body).template).toEqual(shared);
 });
 
+test('a late invalid own-default response cannot overwrite staff edits to the recovery copy', async () => {
+  let finishOwn;
+  const shared = { subject: 'Admin recovery subject', body: '{{greeting}}\n\n{{signature}}' };
+  global.fetch = jest.fn((url) => {
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) {
+      return new Promise((resolve) => { finishOwn = resolve; });
+    }
+    return Promise.resolve(response({ ok: false, reason: 'preference_invalid', shared }, false, 503));
+  });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
+  fireEvent.change(await screen.findByDisplayValue('Admin recovery subject'), { target: { value: 'Staff edited recovery subject' } });
+  await act(async () => {
+    finishOwn(response({ ok: false, reason: 'preference_invalid', ownSystemId: SENDER_ID, configured: true, shared }, false, 409));
+  });
+  expect(screen.getByDisplayValue('Staff edited recovery subject')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Send reminder' })).toBeDisabled();
+});
+
 test('preview and Save show plain language for template validation failures', async () => {
   const original = global.fetch;
   global.fetch = jest.fn((url, options) => {
