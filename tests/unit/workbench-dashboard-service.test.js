@@ -112,16 +112,22 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
   });
 });
 
-test('Stage 1d: cycle totals add the ordinary-only filter only when enabled', async () => {
-  queryAllRequests.mockResolvedValue({ records: [], capped: false });
-  await loadDashboard(args());
-  expect(queryAllRequests.mock.calls[0][0].filter).not.toContain('wmkf_istestrequest');
-
+test('Stage 1d: cycle discovery keeps test requests but leaves them out of counts', async () => {
   process.env.TEST_REQUEST_ISOLATION = 'on';
-  await loadDashboard(args());
-  expect(queryAllRequests.mock.calls[1][0].filter).toContain(
-    '((wmkf_istestrequest eq false or wmkf_istestrequest eq null) and wmkf_testcreationrunid eq null)',
-  );
+  const testRow = {
+    akoya_requestid: 'r-test', wmkf_meetingdate: '2027-06-11', _wmkf_programdirector_value: 'pd-1',
+    wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
+  };
+  const ordinaryRow = {
+    akoya_requestid: 'r-1', wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-1',
+    wmkf_istestrequest: null, wmkf_testcreationrunid: null,
+  };
+  queryAllRequests.mockResolvedValue({ records: [testRow, ordinaryRow], capped: false });
+  const body = await loadDashboard(args());
+  const call = queryAllRequests.mock.calls[0][0];
+  expect(call.filter).not.toContain('wmkf_istestrequest');
+  expect(call.select).toContain('wmkf_istestrequest,wmkf_testcreationrunid');
+  expect(body.cycles.map((c) => [c.code, c.count, c.myCount])).toEqual([['J27', 0, 0], ['D26', 1, 1]]);
 });
 
 test('cycle-list mode: the default cycle is the same for every caller regardless of assignments or visibility', async () => {
