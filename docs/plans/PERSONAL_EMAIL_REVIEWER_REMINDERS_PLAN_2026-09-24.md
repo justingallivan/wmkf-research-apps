@@ -70,3 +70,17 @@ The follow-up changes make Workbench Reviews open the same review-due composer; 
 [VERIFIED via PR #332 CodeQL annotation and source, after final Opus review] GitHub's CodeQL alert identified polynomial backtracking in the existing `stripLegacyAutomationMarker` regex in `lib/external/automated-email-notice.js`. With the owner's explicit authorization to edit that shared helper, the branch replaced the regex with a trimmed, case-normalized marker and suffix comparison. It preserves exact standalone marker removal for reviewer and grantee email, including optional colon and surrounding whitespace, while retaining non-marker prose. A direct test covers long whitespace on matching and nonmatching lines. The focused email tests passed 3 suites/21 tests; the reviewer/reviews run passed 189 suites/3,628 tests; lint and build passed. GitHub CodeQL will be rechecked on the pushed commit. No live service or email probe was run.
 
 [VERIFIED via local commands after the follow-up edits] Focused Jest passed 7 suites/158 tests and the reviewer/reviews run passed 189 suites/3,626 tests. `npm run lint -- --quiet` and `npm run build` passed. The API route, lifecycle auth, service/DAL/context, reviewer engagement, GUID, reminder hold, fact consistency, doc symbol, catalog, doc currency, canonical pointer, types, and secret-scan gates passed, with each available self-test run sequentially. The cron remains unscheduled. No live service or email probe was run.
+
+## Staff rehearsal setup for PR #332
+
+[VERIFIED via local source and in-app browser on 2026-09-24] Run `npm run rehearse:reviewer-reminders`, then open `http://127.0.0.1:3132`. The page mounts the branch's actual `RespondReminderModal` with synthetic reviewer and PD data. A loopback-only static server serves the page; in-memory handlers intercept the composer API calls and reject any other fetch. Send records a local receipt only. Reload the page to reset all synthetic defaults and receipts. No Dataverse, Graph, SharePoint, Vercel, Postgres, or email service is contacted.
+
+Staff walkthrough (human sign-off pending):
+
+1. As Program Director, open **Respond by**. Edit the subject, verify Send becomes disabled, refresh preview, and check the sender, recipient, copy, and secure-link note.
+2. Save as the PD's default, close and reopen, and verify the saved wording loads. Edit again without saving, send, close and reopen, and verify only the saved wording persists.
+3. Switch to **Superuser**. Verify the preview still uses the PD mailbox and saved PD wording. Save a different default; verify the separate PD and superuser indicators, then reopen to confirm the PD's send wording remains unchanged.
+4. Open **Review due**. Verify the required due date appears and the preview says no new review link is included.
+5. Check **Make next Send result uncertain**, send, and verify Send stays disabled even after **Refresh preview**. Reload before another scenario; do not interpret this synthetic status as a real Dynamics send.
+
+Record the staff member, date, outcome, and any defects here after the walkthrough. This browser rehearsal covers the composer only; it does not establish live data, delivery, or Production behavior. Before promotion, record the last-known-good Production deployment and authorized rollback operator under the Tier 2 release procedure. The automatic reminder cron remains held.
