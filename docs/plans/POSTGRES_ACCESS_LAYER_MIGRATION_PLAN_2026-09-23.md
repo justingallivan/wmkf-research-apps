@@ -827,9 +827,12 @@ base-table-only runtime check; bogus table names from `ON CONFLICT … SET`.
 Owner decisions: Q1–Q7 recorded; Q3 widened to five tables.
 Fresh-context review of Stage 1: run (next log entry); 6 discrepancies,
 all fixed in this doc before Stage 1 may start.
-Open: CI run of the new lane (the workflow triggers on `pull_request` and
-`push` to `main` only, so a branch push alone does not run it — a draft PR
-is the owner's call); the
+CI proof: draft PR #328 (`Tests` run 35955014525) green; the
+`test:pg-contract` step connected to the `postgres:16` service container
+and reported 3 suites / 8 tests passed with the 43-table runtime check, not
+the skip line. (The workflow triggers on `pull_request` and `push` to
+`main` only, so a branch push alone never runs it.)
+Open: the
 Q3 sub-question (how a fresh Vercel install is stamped) remains
 undocumented; renamed/member `sql` tags and `new pg.Pool()` shapes are
 recorded Stage 1 obligations in the probe's docblock.
