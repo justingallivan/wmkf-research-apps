@@ -812,10 +812,12 @@ line without a URL; every gate in `/start` that guards a touched surface
 green with its self-test (atlas 58 Postgres tables, migrations-manifest,
 route-service-boundary, secret-scan, scaffolding, harness-framing,
 instruction-architecture, agent-invariants, doc gates); canonical
-`npm run build` blocked in this worktree by a symlinked `node_modules`
-(Turbopack: "points out of the filesystem root") — webpack build compiled
-clean as a fallback signal; canonical build proof: CI on push and a real
-`npm ci` in the worktree (see below).
+`npm run build` **passes** (`✓ Compiled successfully`, 32 static pages,
+manifest unchanged) after the worktree's symlinked `node_modules` — which
+Turbopack rejects ("points out of the filesystem root") — was replaced by a
+real `npm ci`; a webpack build had compiled clean beforehand as a fallback
+signal. Worktree note for future sessions: a `node_modules` symlink into a
+sibling checkout breaks the canonical build here.
 Reviews: Sonnet built, Opus reviewed each stream (census 2 rounds, harness
 3 rounds, parity 1 round); Codex adversarial review 3 rounds on the parity
 work. Material findings fixed: shim preferred `POSTGRES_URL` (P1, decoy DB
@@ -825,9 +827,9 @@ base-table-only runtime check; bogus table names from `ON CONFLICT … SET`.
 Owner decisions: Q1–Q7 recorded; Q3 widened to five tables.
 Fresh-context review of Stage 1: run (next log entry); 6 discrepancies,
 all fixed in this doc before Stage 1 may start.
-Open: canonical Turbopack build in-worktree; CI run of the new lane (the
-workflow triggers on `pull_request` and `push` to `main` only, so a branch
-push alone does not run it — a draft PR is the owner's call); the
+Open: CI run of the new lane (the workflow triggers on `pull_request` and
+`push` to `main` only, so a branch push alone does not run it — a draft PR
+is the owner's call); the
 Q3 sub-question (how a fresh Vercel install is stamped) remains
 undocumented; renamed/member `sql` tags and `new pg.Pool()` shapes are
 recorded Stage 1 obligations in the probe's docblock.
