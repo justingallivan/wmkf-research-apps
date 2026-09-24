@@ -1,4 +1,60 @@
-# Session 537 Prompt: Sandbox Basic clone from the source bundle
+# Session 538 Prompt: Accept build-order item 5; unblock item 6 with a sandbox solution import
+
+## Session 537 Summary — 2026-09-23/24 PT (Fable orchestrating; Sonnet builds, Opus reviews, Codex adversarial)
+
+[VERIFIED via pushed Factory-branch commits, 472 focused unit tests, 24 live tests against a throwaway local PostgreSQL 16 container, gates, mutation checks, fifteen Codex adversarial rounds, and two owner-authorized live sandbox creates] Build-order item 4 (sandbox Basic clone from the production source bundle with journaled file copy) was proven live and **accepted by the owner**; build-order item 5 (durable run ledger, slice 5a, and bounded resumable runner + CLI, slice 5b) was built, proven live as sandbox Request 1000341, and **approved by Codex in round fifteen with no findings**; it awaits owner acceptance. Build-order item 6 is **blocked** on a sandbox schema gap (owner action). All product work is on `codex/test-request-preview-integration` (now `2f591a67c`, 120 ahead / 0 behind `origin/main` after merging main at `29d3b1418`). Nothing was deployed; no production write occurred; production reads were limited to the authorized Request 1003222 bundle. `main` received only the memory commits `85f51a17b`, `f0582b646` and this handoff.
+
+### What Was Completed
+
+1. **Item 4 closed** (`8a82db600` … `3c8caf0d1`): `lib/services/test-requests/bundle-file-copy.js` (journal-before-write, item id journaled inside the PUT via the new additive `onItemCreated` hook in `lib/services/graph/writes.js` and `GraphService.uploadFile`, exact-item recovery, end-of-run re-verification by stable id) and the v4 bundle manifest in `scripts/rehearse-test-request-sandbox.mjs`. Live proof Request 1000340 (owner-run), receipt at `docs/plans/evidence/test-request-factory/bundle-clone-receipt-2026-09-24.json`.
+2. **Item 5a ledger** (`4f004e854` … `9ac9ccb3f`, then `804b1100a`, `094757de5`, `347552b1e`, `db3afe72a`, `6cffa26fb`): migration `lib/db/migrations/054_test_request_runs.sql` (+ `scripts/setup-database.js` V55 mirror, manifest entry), `lib/services/test-requests/run-ledger.js` and `run-ledger-db.js`, Atlas page `docs/atlas/postgres-test-request-runs.md`. Invariant reached through the Codex rounds: **no caller-typed or upstream text can persist in any column**, enforced in JavaScript (per-key receipt grammars, finite reason/step/kind/outcome sets, hashed idempotency keys, digested `cli:` actors, derived label, exact Graph id shapes, credential markers rejected anywhere in a value) and in PostgreSQL (CHECKs on every text column plus the IMMUTABLE function `test_request_receipt_ok(jsonb)` on the three receipt columns; identical regex text in both files, pinned by unit parity and live tests). Readbacks merge rather than replace. Lease model: version + lease token + generation + `locked_until`, every mutating WHERE re-checks; `markNeedsAttention` records `last_error` in the same fenced UPDATE. Required CI job `ledger-postgres` (PostgreSQL 16 service) runs both live suites.
+3. **Item 5b runner + CLI** (`13a04712a`, hardened in `347552b1e`, `db3afe72a`, `f2ba2d772`): `lib/services/test-requests/basic-clone-steps.js` (step bodies extracted from `--execute`), `lib/services/test-requests/run-runner.js` (`advanceRun`, exactly one step per call, journal before dispatch, dispatch-marker rule: an attempted POST/location POST/upload with no readable result stops the run, never re-dispatches), and CLI modes `--reserve` / `--advance [--steps=N] [--bypass-goverify]` / `--run-inspect` gated on `TEST_REQUEST_LEDGER_URL` (refuses unset, neon.tech, or any shared `POSTGRES_URL*`/`DATABASE_URL`). Opus review found and fixed twelve defects with nine live-ledger tests and four mutation checks; root added the stale-bundle stop, wider URL guard, location system label, CI wiring, and a plain report for a finished run. **Live proof:** run `3f83c1e2` → sandbox Request 1000341, two copied documents, `ready`, across four separate CLI invocations; evidence `docs/plans/evidence/test-request-factory/ledger-run-1000341-2026-09-24.json`.
+4. **Codex adversarial rounds 1–15** on the ledger/runner, each recorded in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (item 5 paragraphs). Round fifteen: approve, no material findings.
+5. **Item 6 reconnaissance and blocker** (`d935ece9f`): a read-only sandbox metadata probe shows the sandbox has no `wmkf_requestdocument` entity, no `wmkf_currentinitialassessment` / `wmkf_ai_fieldprimer` request columns, and none of the review, AI-run or other application-added entities (`docs/plans/evidence/test-request-factory/sandbox-schema-gap-2026-09-24.md`). The IA recipe's write path, identity, path/filename, hash, lineage commit and gate implications are recorded in the design doc for when the schema lands.
+6. **Per-machine allow rule** verified: the `.claude/settings.local.json` rule in memory `project-sandbox-rehearsal-bypass-allow-rule.md` cleared the classifier for reserve/advance/bypass; re-add it on another machine.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Accept build-order item 5** (ledger + runner + CLI) on the Factory branch. Evidence: design doc item 5 paragraphs, Codex round fifteen approve, live Request 1000341, CI job `ledger-postgres`. Migration 054 is applied to no shared database; its first shared apply needs your authorization (and freezes the file; later changes go in new numbered migrations).
+2. **Import the application solution into the sandbox** so later-stage recipes (item 6: IA → synthetic reviewers → materials → Pre-Site → Pre-RP/Final Writeup) can be proven live. Exact gap list: `docs/plans/evidence/test-request-factory/sandbox-schema-gap-2026-09-24.md`. Nothing in this repo can do this.
+3. **Sandbox create budget:** four permanent sandbox Requests exist from the Factory (1000338, 1000339, 1000340, 1000341); this session used one of the five you authorized for the autonomous run.
+4. Carried: old Preview aliases / Entra callbacks retire-or-keep (`docs/CURRENT_WORK_QUEUE.md`; destructive, grep callers first).
+
+### Verified Open (after the decisions above)
+
+1. **Item 6, IA recipe** once the sandbox schema exists: follow the recorded decomposition (recipe token, steps `seed_initial_assessment` / `seed_initial_assessment_snapshot`, resource kind `dataverse_request_document`, receipt keys for generation key and claim id, IA folder/filename grammar families, new reason codes) — every one of those is an enum/grammar edit in `run-ledger.js` **and** the matching SQL list in migration 054 + `setup-database.js` (the SQL lists were generated from the JS exports; keep them in step, the unit test pins both). Synthetic fixtures only (owner decision: no production reads beyond 1003222). Sandbox CLI steps write through the sandbox client under the ledger journal; the production form (item 7) must route through `requestDocumentAdapter` with a registered seam in `scripts/check-request-document-writers.js`; never write the immutable origin fields.
+2. **Item 7** (Admin creation form, resume/retire operations, production release) — hard stops: production marker schema apply then `TEST_REQUEST_ISOLATION=on`; merging the Factory branch to main.
+3. Known runner limits recorded in the design doc (not defects): same-key `--reserve` retry after a lost reserve response is a 409 (recover via `--run-inspect`); a GoVerify refusal has no operator-clear action (restore by hand, start a new run); superseded `planned`/`dispatched` rows remain after recoveries; `observe` is one 60-second call inside the 300-second lease.
+
+### Verify Before Acting
+
+1. Local throwaway ledger: docker container `wmkf-ledger-pg` (`postgres://postgres:ledger@127.0.0.1:5433/ledger`) was stopped at session end; start it (or any local PostgreSQL 16) and export `TEST_REQUEST_LEDGER_TEST_URL` to run the live suites. When migration 054 changes, drop `test_request_run_resources`, `test_request_runs` and `test_request_receipt_ok(jsonb)` first — the suites fail loudly on a stale schema by design.
+2. The 1003222 bundle in this session's scratchpad expires six hours after its 03:58Z export; re-export (owner-authorized production read) before any new clone.
+3. Codex must run with `--model gpt-5.6-sol` from the Factory worktree; runs take 5–10 minutes; the companion's `--base HEAD~N` scopes the diff.
+4. A Sonnet reconnaissance agent and an Opus review agent from this session are finished; the investigation worktree `/Users/gallivan/Code/WMKF_Apps-investigate` may still belong to another session; do not touch it.
+
+### Do Not Reopen Without New Decision
+
+1. Items 4 and 5 review history: fifteen Codex rounds are recorded; do not re-litigate the no-text invariant, the dispatch-marker rule, the no-lease-renewal decision, or in-place edits to unapplied migration 054.
+2. IA recipe uses synthetic fixtures only; no reviewer throwaway inboxes for now (owner, Session 537).
+3. Stage 1d, the exporter, and item 4 are accepted; existing requests are never changed by the Factory.
+
+## Key Files Reference
+
+- Design doc (build order, item 5 paragraphs, item 6 blocker): `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (Factory branch)
+- Ledger: `lib/db/migrations/054_test_request_runs.sql`, `lib/services/test-requests/run-ledger.js`, `run-ledger-db.js`, `docs/atlas/postgres-test-request-runs.md`
+- Runner/CLI: `lib/services/test-requests/run-runner.js`, `basic-clone-steps.js`, `bundle-file-copy.js`, `scripts/rehearse-test-request-sandbox.mjs`
+- Tests: `tests/unit/test-request-run-ledger*.test.js`, `tests/unit/migration-054-test-request-runs.test.js`, `tests/unit/test-request-run-runner.test.js`, `tests/unit/test-request-basic-clone-steps.test.js`, `tests/integration/test-request-run-ledger.pg.test.js`, `tests/integration/test-request-run-runner.pg.test.js`; CI job `ledger-postgres` in `.github/workflows/test.yml`
+- Evidence: `docs/plans/evidence/test-request-factory/` (bundle clone receipt 1000340, ledger run 1000341, sandbox schema gap)
+
+## Stop-time notes
+
+- Claim-evidence pilot report: no eligible plan/design edit recorded for this session key; no observation row added.
+- Memory: `project-sandbox-rehearsal-bypass-allow-rule.md` updated (rule verified). No router change.
+
+## Prior Session 537 Prompt: Sandbox Basic clone from the source bundle
 
 ## Session 536 Summary — 2026-09-23 PT (Claude root; Codex rescue builds, Claude reviews)
 
