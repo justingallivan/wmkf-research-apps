@@ -1,4 +1,4 @@
-# Session 537 Prompt: Sandbox Basic clone from the source bundle
+# Session 538 Prompt: resume Postgres access layer Stage 3 (branch) / Sandbox Basic clone (root)
 
 > **Two handoffs live in this file.** The section immediately below is the
 > parallel-branch handoff for `claude/postgres-access-layer` (worktree
@@ -6,7 +6,40 @@
 > worktree continues from it. Everything from "## Session 536 Summary" down
 > is the root (`main`) handoff written by the other Claude session.
 
-## Parallel branch handoff — Postgres access layer, Stage 0 complete (Session 537-PG prompt)
+## Parallel branch handoff — Postgres access layer, Stages 1–2 complete, Stage 3 in progress (Session 538-PG prompt)
+
+### Session 537-PG Summary — 2026-09-23/24 PT (Fable orchestrating; Sonnet builds; Opus reviews; Codex adversarial reviews)
+
+[VERIFIED via branch commits, per-commit contract-lane runs, gates 69/69 + full Jest + canonical build at every wave boundary, Opus and Codex reports] Executed **Stage 1** (ratchet gate + route law), **Stage 2** (the CommonJS driver seam `lib/postgres/client.js`) and most of **Stage 3** on `claude/postgres-access-layer` (pushed through `db2358ad4`; PR #328 still draft, never merged). The plan's Stage log is the state of record: Stage 1 report, Stage 2 report, and a "Stage 3 — IN PROGRESS" entry listing every commit.
+
+#### What Was Completed
+1. **Stage 1** — `scripts/check-postgres-access-layer.js` is a shrink-only count ratchet (11 kinds incl. `unresolved-import` and `driver-export`, alias fixpoint, cast-lint warn-only) against `scripts/postgres-access-allowlist.json`; the route law gained a `postgres` family with a pinned 17-route `POSTGRES_CARRYOVER`. Two Opus streams, three Codex rounds; every finding has a fixture.
+2. **Stage 2** — `lib/postgres/client.js` (CJS; exports exactly `sql`, `withClient`, `withTransaction`, `getPool` as a frozen facade; `pg` loaded lazily) with unit + real-planner contract tests. Codex approved round 2.
+3. **Stage 3** — driver-import files 61 → 34: item 1 template + items 2–3 (20 of 21 files; `integrity-service` deferred), item 4 all six connect/transaction users converted (five reviewed by me at diff level, irs-bmf **unreviewed WIP** `db2358ad4`), item 5 tests-before for scheduled-email-store. Every conversion has a contract test written first against the unconverted file; a batch Opus review drove a test-hardening commit (`830d0cd03`) so 13 previously surviving mutants die.
+
+### Next Items (branch)
+
+#### Verified Open — resume Stage 3 exactly here
+1. **First: run the item-4 boundary** (`run-gates` sequence, `npm run test:ci`, `npm run build`) at HEAD — it has NOT been run since `f6e94b33b`; three commits landed after it at session close (two tests, one WIP conversion).
+2. **Review `db2358ad4` (irs-bmf onto getPool)** with `git show -w db2358ad4 -- lib/services/irs-bmf-service.js`: expect only newPool()/per-call Pool → `getPool()`, both `pool.end()` deleted, statements verbatim. Revert the single commit if it fails; the contract test `tests/pg-contract/irs-bmf-service.test.js` (fetch stubbed) is the proof.
+3. **Opus per-file review of the item-4 conversions** (`6d95092ef`, `e57ed3231`, `8cf25e9c6`, `ae1ed3d4a`, `f6e94b33b`, then `db2358ad4`) — the review was stopped before reporting; the brief is in this session's transcript pattern (whitespace-insensitive diff, error-surface enumeration, mutants against the converted store).
+4. **Item 5**: reviewer-roster-store tests-before, then both swaps (scheduled-email-store test `4bea1ed47` exists, unreviewed), then the item-5 boundary, Codex on the stage's final diff, the Stage 3 report, and the §6 fresh-context review of Stage 4 (expect it to flag `spend-check.js` / Q7).
+5. Working rules that held: builders never touch the allowlist (the orchestrator's `commit-swap.sh`/`commit-conv.sh` helpers in the scratchpad remove a file's vanished keys at commit time — recreate them; they are ~30 lines); one file per commit; at most two builders on disjoint slices; push at every boundary.
+
+#### Owner Decision Needed
+1. **`lib/services/integrity-service.js` swap** — the builder's one-line edit was denied by the session's permission classifier ("Modify Shared Resources"); I did not perform it myself. Its contract test `5e1ef9d49` is green. One line: `require('@vercel/postgres')` → `require('../postgres/client')`, then remove its `driver-import` allowlist key.
+2. **PR #328 CI is red on `main`'s side**: `.claude-memory/project-sandbox-rehearsal-bypass-allow-rule.md` (`85f51a17b`, root session) cites two Factory-branch paths, so the merge-commit run fails at `check:doc-symbol-refs` and skips every later step. CI has not proved this branch's gates; local runs have. Fix belongs on `main`.
+3. **Stage 7 wording** (from Stage 1): since `sql` tags count everywhere, "0 raw sites outside `lib/postgres/**`" is reachable only via the Q4 relocation; otherwise the law must be import-only. Recorded in the Stage 1 report.
+4. Recorded behaviour differences to ratify: `withClient` destroys the connection on error (four callers previously returned it); `withTransaction` no longer lets a ROLLBACK failure mask the original error; `getPool()` keeps `POSTGRES_URL || DATABASE_URL`; `unresolved-import` ratchets computed `require()` everywhere under the scan roots; `setReviewPanelOperatorStop` authorises any active profile (pre-existing divergence from the dossier twin, observed not changed).
+
+#### Verify Before Acting
+1. Container: `docker ps --filter name=wmkf-pg-contract` (was up throughout); lane: `PG_CONTRACT_URL=postgresql://postgres:contract@127.0.0.1:55432/wmkf_contract npm run test:pg-contract` (now ~30 suites).
+2. Another Claude session may be active on `main` in `/Users/gallivan/Code/WMKF_Apps` — shared-file fence as before.
+3. Hard stops unchanged: never merge to `main`; PR #328 stays draft; stop before Stage 6's Verify; `spend-check.js` waits for the Factory merge.
+
+---
+
+## Parallel branch handoff — Postgres access layer, Stage 0 complete (Session 537-PG prompt — superseded by the section above)
 
 ### Session 536-PG Summary — 2026-09-23 PT (Fable orchestrating; Sonnet builds; Opus reviews; Codex adversarial reviews)
 

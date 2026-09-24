@@ -1339,8 +1339,47 @@ push and update this entry at every boundary.
   **Item 3 complete: 10 of 11 converted; integrity-service deferred
   (below).** Driver-import files 50 → 40. Wave-3 boundary at `f3496d903`: gates
   69/69, `test:ci` 1059 suites / 15,667 tests, build passes. Opus
-  batch review of the 20 wave-2/3 conversions: PENDING.
-- Item 4 tests-before in progress on both builders (contract tests against
+  batch review of the wave-2/3 conversions (19 swaps + template): every
+  swap is a pure one-line import change at the right depth with module
+  format preserved and only the file's `driver-import` key removed; lane
+  24 suites / 213 tests, no open handles, zero residue across all 59
+  tables; gate green. **Not approved on test quality:** scratch mutants
+  of three stores survived their contract tests (distribution-store 5 of
+  8, operational-event-service 3 of 6, agenda-store 2 of 3) and several
+  "discriminating" claims were decorative. A test-only hardening round
+  (no store edits) is fixing every finding with mutant proof; landed as
+  its own commit (below).
+- Item 4 in progress: `d140d11a3` cycle-dossier-store contract test ·
+  `df27bc220` briefing-link-store contract test · `6d95092ef`
+  briefing-link-store onto `withClient` (excluded shape, statements
+  verbatim; recorded difference: a throw out of the callback destroys the
+  connection) · `dd38182ca` consultant-feedback-service contract test ·
+  `e57ed3231` consultant-feedback-service onto `withClient` (excluded
+  shape; deleteFeedbackEntry's two in-try exits restructured into a
+  `{ done, result | marked }` return — JS only, no SQL change) ·
+  `4e6ef60fc` review-panel-store contract test (48 tests; observed, not
+  changed: `setReviewPanelOperatorStop`'s actor check requires only an
+  active profile, unlike `assertDossierActor`'s superuser check — a
+  pre-existing divergence for the owner to judge later) · `8cf25e9c6`
+  cycle-dossier-store onto `withTransaction` (`withDossierTransaction`
+  = `return withTransaction(fn)`; client.query 22 → 19) · `ae1ed3d4a`
+  review-panel-store onto `withTransaction` (client.query 51 → 48) ·
+  `5f0b84a9c` alert-service contract test · `f6e94b33b` alert-service's
+  autoResolveKey path onto `withTransaction` (client.query 7 → 3; three
+  assertions in `tests/unit/alert-service-open-keys.test.js` updated for
+  the recorded release differences). Test hardening from the batch
+  review: `830d0cd03` (16 test files, 13 mutants now die, no store
+  changed). `01b768389` irs-bmf-service contract test (9 tests, fetch
+  stubbed) · `db2358ad4` **UNREVIEWED WIP**: irs-bmf-service onto
+  `getPool()` (committed at session close so the branch stays green;
+  the builder's report and its passing contract test are the only
+  evidence — review with `git show -w` before trusting; revert that one
+  commit if it fails). `4bea1ed47` scheduled-email-store contract test
+  (item 5 tests-before, 30 tests, unreviewed). **Session closed here
+  (db2358ad4)**: item 4 has all six conversions committed but the item-4
+  boundary (gates, full suite, build) has NOT been run since
+  `f6e94b33b`, and the Opus per-file review of the item-4 conversions
+  was stopped before reporting. Remaining on both builders (contract tests against
   the unconverted files, with commit/rollback end-state and the
   open-transaction assertion, before any conversion).
   **Owner decision needed — `lib/services/integrity-service.js` swap
