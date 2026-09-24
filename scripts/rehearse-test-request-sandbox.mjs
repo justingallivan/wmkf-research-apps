@@ -50,8 +50,12 @@ import {
 } from '../lib/services/test-requests/sandbox-clone.js';
 import { readSourceBundle, summarizeSourceBundle } from '../lib/services/test-requests/source-bundle.js';
 import {
+  SANDBOX_REHEARSAL_COPY_POLICY,
+  assertBundleFresh,
   copyBundleFiles,
+  copyPolicyDigest,
   planBundleFileCopies,
+  reconcileJournaledCopies,
   verifyCopiedFiles,
 } from '../lib/services/test-requests/bundle-file-copy.js';
 
@@ -145,15 +149,14 @@ function parseArgs(argv) {
     throw new Error('Choose exactly one of --prepare, --execute, or --inspect.');
   }
   if (parsed.execute && !parsed.receipt) throw new Error('--execute requires --receipt.');
-  if (!parsed.execute && parsed.receipt) throw new Error('--receipt is valid only with --execute.');
+  if (!parsed.execute && !parsed.inspect && parsed.receipt) throw new Error('--receipt is valid only with --execute or --inspect.');
   if (parsed.bypassGoverify && !parsed.execute) {
     throw new Error('--bypass-goverify is valid only with --execute.');
   }
-  if (parsed.prepare && parsed.bundle && parsed.sourceRequestNumber !== null) {
-    throw new Error('--prepare takes either --bundle or --source-request-number, not both.');
-  }
-  if (parsed.prepare && !parsed.bundle && (!parsed.sourceRequestNumber || !/^\d{1,10}$/.test(parsed.sourceRequestNumber))) {
-    throw new Error('--prepare requires --bundle or a bounded numeric --source-request-number.');
+  // With --bundle the number is the operator's attestation of the authorized
+  // production source; prepare refuses a bundle for any other Request.
+  if (parsed.prepare && (!parsed.sourceRequestNumber || !/^\d{1,10}$/.test(parsed.sourceRequestNumber))) {
+    throw new Error('--prepare requires a bounded numeric --source-request-number (with --bundle it must match the bundle source).');
   }
   if (!parsed.prepare && (parsed.fiscalYear !== null || parsed.meetingDate !== null || parsed.sourceRequestNumber !== null || parsed.bundle !== null || parsed.testLabel !== null)) {
     throw new Error('--bundle, --source-request-number, --fiscal-year, --meeting-date, and --test-label are valid only with --prepare.');
@@ -167,7 +170,8 @@ function parseArgs(argv) {
 function printHelp() {
   console.log('Read-only: node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs');
   console.log('Prepare:  ... --prepare=/absolute/new-manifest.json --source-request-number=<actual-grant-request-number> [--fiscal-year=...] [--meeting-date=...]');
-  console.log('Prepare from a production source bundle (with file copy): ... --prepare=/absolute/new-manifest.json --bundle=/absolute/source-bundle.json');
+  console.log('Prepare from a production source bundle (with file copy): ... --prepare=/absolute/new-manifest.json --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number>');
+  console.log('Inspect a bundle run with its receipt (read-only, verifies copied items by stable ID): ... --inspect=/absolute/manifest.json --receipt=/absolute/receipt.json');
   console.log('Replace the source-number placeholder with an actual sandbox Grant Request number.');
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
   console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
@@ -573,10 +577,14 @@ function buildManifest(preflight, { source, fiscalYear, meetingDate, testLabel, 
   // production source: destinations stay templates until the server assigns
   // the new request number.
   const plannedFiles = bundle ? planBundleFileCopies(bundle) : [];
+  // A bundle manifest expires when either the manifest TTL or the bundle
+  // freshness window ends, whichever is earlier.
+  const preparedAt = Date.now();
+  const expiresAt = Math.min(preparedAt + MANIFEST_TTL_MS, bundle ? assertBundleFresh(bundle, preparedAt) : Infinity);
   return {
     kind: bundle ? MANIFEST_V4 : MANIFEST_V3,
-    preparedAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + MANIFEST_TTL_MS).toISOString(),
+    preparedAt: new Date(preparedAt).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
     target: SANDBOX_URL,
     values,
     expectedOrganization: {
@@ -598,7 +606,11 @@ function buildManifest(preflight, { source, fiscalYear, meetingDate, testLabel, 
         bundleSha256: sha256(bundle),
       } : {}),
     },
-    ...(bundle ? { bundle, plannedFiles } : {}),
+    ...(bundle ? {
+      bundle,
+      plannedFiles,
+      copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
+    } : {}),
     createBody,
     createBodySha256: sha256(createBody),
     invariants: {
@@ -615,16 +627,22 @@ function buildManifest(preflight, { source, fiscalYear, meetingDate, testLabel, 
 }
 
 /** Re-validate the embedded bundle and return its projected source Request. */
-function bundleSourceOf(manifest) {
+function bundleSourceOf(manifest, { allowStale = false } = {}) {
   const bundle = readSourceBundle(manifest.bundle);
   if (sha256(manifest.bundle) !== manifest.source?.bundleSha256) throw new Error('Embedded source bundle hash mismatch.');
   const request = bundle.source.request;
   if (request.akoya_requestid !== String(manifest.source.requestId).toLowerCase()
+      || request.akoya_requestnum !== manifest.source.requestNumber
       || request.revision !== manifest.source.revision
       || request.akoya_requesttype !== manifest.source.requestType
       || bundle.source.dataverseHost !== manifest.source.dataverseHost) {
     throw new Error('Embedded source bundle does not match the manifest source.');
   }
+  if (manifest.copyPolicy?.version !== SANDBOX_REHEARSAL_COPY_POLICY.version
+      || manifest.copyPolicy?.digest !== copyPolicyDigest()) {
+    throw new Error('Manifest copy policy does not match the current sandbox rehearsal copy policy; re-prepare.');
+  }
+  if (!allowStale) assertBundleFresh(bundle);
   return { bundle, request };
 }
 
@@ -643,7 +661,7 @@ function validateManifest(manifest, { allowExpired = false, forExecute = false }
     throw new Error('Source-bound manifest provenance is invalid.');
   }
   if (isBundleManifest(manifest)) {
-    const { bundle } = bundleSourceOf(manifest);
+    const { bundle } = bundleSourceOf(manifest, { allowStale: allowExpired });
     if (!Array.isArray(manifest.plannedFiles) || manifest.plannedFiles.length !== bundle.documents.length
         || manifest.invariants?.expectedSharePointFiles !== bundle.documents.length
         || manifest.invariants?.retryOnAmbiguousFileUpload !== false
@@ -679,8 +697,11 @@ function sanitizedRequestIdentity(request) {
   };
 }
 
-async function inspectManifest(client, manifest) {
+async function inspectManifest(client, manifest, receipt = null) {
   validateManifest(manifest, { allowExpired: true });
+  if (receipt && !guidEqual(receipt.requestId, manifest.values.requestId)) {
+    throw new Error('Receipt does not belong to this manifest.');
+  }
   const response = await client.get(
     `/akoya_requests(${manifest.values.requestId})?$select=${READBACK_FIELDS.join(',')}`,
   );
@@ -700,12 +721,22 @@ async function inspectManifest(client, manifest) {
   // (read-only) to show which planned destinations already exist.
   let sharePointFiles = null;
   let sharePointFilesError = null;
+  let journaledCopies = null;
   if (isBundleManifest(manifest) && expectedFolder) {
     try {
       sharePointFiles = await listSharePointFiles({ locations, locationParents });
     } catch (error) {
       sharePointFilesError = error.message;
     }
+  }
+  if (isBundleManifest(manifest) && Array.isArray(receipt?.fileCopies)) {
+    // Receipt-bound recovery: verify each journaled stable item ID by
+    // metadata, size and SHA-256 without any write.
+    const { GraphService } = await import('../lib/services/graph-service.js');
+    journaledCopies = await reconcileJournaledCopies(receipt.fileCopies, {
+      getFileMetadataById: (driveId, itemId) => GraphService.getFileMetadataById(driveId, itemId),
+      downloadFile: (driveId, itemId) => GraphService.downloadFile(driveId, itemId),
+    });
   }
   console.log(JSON.stringify({
     mode: 'READ_ONLY_RECOVERY_INSPECTION',
@@ -720,6 +751,7 @@ async function inspectManifest(client, manifest) {
       : null,
     sharePointFiles,
     sharePointFilesError,
+    journaledCopies,
     expectedLocationId: manifest.values.locationId || null,
     folderRecoveryHint: expectedFolder && locations.length === 0
       ? 'If the location is absent, inspect this deterministic folder path before creating anything.'
@@ -1310,7 +1342,7 @@ async function main() {
     return;
   }
   if (args.inspect) {
-    await inspectManifest(client, readJson(args.inspect));
+    await inspectManifest(client, readJson(args.inspect), args.receipt ? readJson(args.receipt) : null);
     return;
   }
 
@@ -1321,6 +1353,10 @@ async function main() {
     if (args.bundle) {
       bundle = readSourceBundle(readJson(args.bundle));
       source = bundle.source.request;
+      if (source.akoya_requestnum !== args.sourceRequestNumber) {
+        throw new Error(`Bundle source is Request ${source.akoya_requestnum}; --source-request-number attests ${args.sourceRequestNumber}. Refusing.`);
+      }
+      assertBundleFresh(bundle);
     } else {
       source = await getSourceRequestByNumber(client, args.sourceRequestNumber);
     }

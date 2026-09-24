@@ -2,11 +2,17 @@
 import crypto from 'node:crypto';
 import { jest } from '@jest/globals';
 import {
+  BUNDLE_MAX_AGE_MS,
+  SANDBOX_REHEARSAL_COPY_POLICY,
+  assertBundleFresh,
   classifyUploadError,
   copyBundleFiles,
+  copyPolicyDigest,
   planBundleFileCopies,
+  reconcileJournaledCopies,
   verifyCopiedFiles,
 } from '../../lib/services/test-requests/bundle-file-copy.js';
+import { TEST_REQUEST_PREVIEW_READ_LIMITS } from '../../lib/services/test-requests/admin-preview-service.js';
 
 const SITE = { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' };
 const TARGET = { ...SITE, registered: true };
@@ -103,6 +109,29 @@ describe('planBundleFileCopies', () => {
 
   test('refuses a document whose name does not match its kind', () => {
     expect(() => planBundleFileCopies(bundle([doc({ name: 'Other.pdf' })]))).toThrow(/blocked/);
+  });
+});
+
+describe('sandbox rehearsal copy policy and bundle freshness', () => {
+  test('is a named executor policy, not the preview read ceilings object, with a stable digest', () => {
+    expect(SANDBOX_REHEARSAL_COPY_POLICY).not.toBe(TEST_REQUEST_PREVIEW_READ_LIMITS);
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.version).toBe('sandbox-rehearsal-2026-09-23');
+    expect(Object.isFrozen(SANDBOX_REHEARSAL_COPY_POLICY)).toBe(true);
+    expect(copyPolicyDigest()).toMatch(/^[0-9a-f]{64}$/);
+    expect(copyPolicyDigest({ ...SANDBOX_REHEARSAL_COPY_POLICY, maxFiles: 8 })).not.toBe(copyPolicyDigest());
+  });
+
+  test('rejects a document the policy does not admit', () => {
+    expect(() => planBundleFileCopies(bundle([doc({ size: SANDBOX_REHEARSAL_COPY_POLICY.maxFileBytes + 1 })]))).toThrow(/FILE_SIZE_EXCEEDED/);
+    expect(() => planBundleFileCopies(bundle([doc({ mimeType: 'image/png' })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+  });
+
+  test('accepts a recent export and rejects stale or future-dated bundles', () => {
+    const now = Date.parse('2026-09-24T04:00:00Z');
+    expect(assertBundleFresh({ exportedAt: '2026-09-24T03:30:00Z' }, now)).toBe(Date.parse('2026-09-24T03:30:00Z') + BUNDLE_MAX_AGE_MS);
+    expect(() => assertBundleFresh({ exportedAt: new Date(now - BUNDLE_MAX_AGE_MS - 1000).toISOString() }, now)).toThrow(/older than/);
+    expect(() => assertBundleFresh({ exportedAt: new Date(now + 10 * 60 * 1000).toISOString() }, now)).toThrow(/in the future/);
+    expect(() => assertBundleFresh({ exportedAt: 'nope' }, now)).toThrow(/invalid/);
   });
 });
 
@@ -261,6 +290,48 @@ describe('copyBundleFiles', () => {
     const last = journal.mock.calls.at(-1)[0];
     expect(last.map((c) => c.status)).toEqual(['failed', 'planned']);
     expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('journals the exact item identity right after the PUT, before readback can fail', async () => {
+    const { deps } = fakeDependencies();
+    const base = deps.getFileMetadataById;
+    deps.getFileMetadataById = jest.fn(async (driveId, itemId) => {
+      if (itemId.startsWith('new-')) throw new Error('readback outage');
+      return base(driveId, itemId);
+    });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async () => {});
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/readback outage/);
+    const snapshots = journal.mock.calls.map((call) => JSON.parse(JSON.stringify(call[0][0])));
+    const firstWithItem = snapshots.find((entry) => entry.item?.id);
+    expect(firstWithItem).toMatchObject({ status: 'created-unverified', outcome: 'created', item: { id: 'new-ProposalNarrative_1000400.pdf' } });
+    // That journal write happened before the failing readback call.
+    expect(deps.getFileMetadataById.mock.calls.filter(([, id]) => id.startsWith('new-'))).toHaveLength(1);
+    const last = snapshots.at(-1);
+    expect(last).toMatchObject({ status: 'failed', item: { id: 'new-ProposalNarrative_1000400.pdf' } });
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+    expect(verifyCopiedFiles([last], [])).toEqual(['1 planned file(s) not verified']);
+  });
+
+  test('reconcileJournaledCopies verifies journaled stable IDs read-only', async () => {
+    const { deps, destination } = fakeDependencies();
+    destination.set('x', { id: 'new-1', name: 'ProposalNarrative_1000400.pdf', size: NARRATIVE.length, buffer: NARRATIVE });
+    destination.set('y', { id: 'partial', name: 'Proposal_1000400.pdf', size: 3, buffer: bytes('abc') });
+    const copies = [
+      { index: 0, status: 'created-unverified', outcome: 'created', destinationDriveId: REQUEST_DRIVE, item: { id: 'new-1' }, destination: { folder: 'f', filename: 'ProposalNarrative_1000400.pdf' }, source: { size: NARRATIVE.length, contentHash: hash(NARRATIVE) } },
+      { index: 1, status: 'failed', outcome: 'ambiguous-unrecovered', destinationDriveId: REQUEST_DRIVE, recoveryItem: { id: 'partial' }, destination: { folder: 'f', filename: 'Proposal_1000400.pdf' }, source: { size: PROPOSAL.length, contentHash: hash(PROPOSAL) } },
+      { index: 2, status: 'planned', destination: { folder: 'f', filename: 'Other.pdf' }, source: { size: 1, contentHash: 'x' } },
+      { index: 3, status: 'failed', destinationDriveId: REQUEST_DRIVE, item: { id: 'gone' }, destination: { folder: 'f', filename: 'Gone.pdf' }, source: { size: 1, contentHash: 'x' } },
+    ];
+    const report = await reconcileJournaledCopies(copies, deps);
+    expect(report.map(({ index, itemId, exists, sizeMatches, hashMatches }) => [index, itemId, exists, sizeMatches, hashMatches])).toEqual([
+      [0, 'new-1', true, true, true],
+      [1, 'partial', true, false, false],
+      [2, null, null, null, null],
+      [3, 'gone', false, null, null],
+    ]);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+    expect(deps.ensureFolderPath).not.toHaveBeenCalled();
   });
 
   test('requires resolved destinations and a well-formed request folder', async () => {

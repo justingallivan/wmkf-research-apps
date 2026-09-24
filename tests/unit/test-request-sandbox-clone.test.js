@@ -204,5 +204,14 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain('expectedSharePointFiles: plannedFiles.length');
     expect(script).toContain('verifyCopiedFiles(fileCopies, files)');
     expect(script).toContain("destinationRequestNumber: request.akoya_requestnum");
+    // Source attestation, policy binding and freshness fences for bundle manifests.
+    expect(script).toContain('source.akoya_requestnum !== args.sourceRequestNumber');
+    expect(script).toContain('request.akoya_requestnum !== manifest.source.requestNumber');
+    expect(script).toContain("manifest.copyPolicy?.digest !== copyPolicyDigest()");
+    expect(script).toContain('if (!allowStale) assertBundleFresh(bundle);');
+    expect(script).toContain('bundleSourceOf(manifest, { allowStale: allowExpired })');
+    // Receipt-bound inspection reconciles journaled stable IDs read-only.
+    expect(script).toContain('reconcileJournaledCopies(receipt.fileCopies');
+    expect(script).toContain("Receipt does not belong to this manifest.");
   });
 });
