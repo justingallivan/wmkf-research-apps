@@ -1,40 +1,57 @@
 #!/usr/bin/env node
 /**
- * Stage 0 census probe for docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md
- * (plan §5 Stage 0, items 1-2; Appendix A/B).
+ * Stage 0/1 census + ratchet gate for
+ * docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md (plan §5
+ * Stage 0 items 1-2, Stage 1 items 0/1/3; Appendix A/B).
  *
- * Reports where the repo touches Postgres directly today: files that
- * import a driver (`@vercel/postgres` or `pg`), `sql` tagged-template
+ * Reports where the repo touches Postgres directly today: files that import
+ * a driver (`@vercel/postgres`, `pg`, or `@neondatabase/serverless` -- and
+ * any subpath of those three, e.g. `pg/lib/client`), `sql` tagged-template
  * statements, `sql.query`/`client.query`/`pool.query` calls, `db.connect()`
- * / `pool.connect()` pairs, `new Pool(...)`, and explicit `BEGIN` literals
- * -- plus a best-effort table-name extraction per statement.
+ * / `pool.connect()` pairs, `new Pool(...)`, and explicit `BEGIN` literals --
+ * plus a best-effort table-name extraction per statement and (Q6, warn-only)
+ * a cast-lint scan of `${...}` placeholders that sit in a
+ * jsonb_build_object/jsonb_build_array/concat/format/CASE/VALUES region
+ * without an immediately-following `::cast`. Q6 scope is tagged templates
+ * only: a `${...}`-style placeholder inside a `sql.query('...$1...', params)`
+ * or `client.query('...$1...', params)` STRING literal is not linted -- those
+ * calls pass parameters positionally ($1, $2, ...), not by JS interpolation,
+ * so there is no `${...}` for this scan to find; Q6 is specifically about
+ * catching an uncast interpolated value inside a tagged-template statement.
  *
- * STAGE 0 IS REPORT-ONLY: this script never fails the build on census
- * content. Default mode, `--report`, and `--json` all exit 0 on any census
- * result; the only non-zero exit is 2, on a parse failure (a file under
- * scan that Babel cannot parse at all -- see analyzeRoot). The
- * ratchet/allowlist law (import outside lib/postgres/** + Q5 exemptions
- * fails) is Stage 1 work and is not built here.
+ * STAGE 1 IS A RATCHET (law arrives in Stage 7): default mode (no flags) applies the ratchet in
+ * `scripts/postgres-access-allowlist.json` and exits 1 on any violation.
+ * `--report` and `--json` print their output AND ALSO apply the ratchet,
+ * returning its exit code (so `npm run check:postgres-access-layer`, which
+ * is `--report`, goes red on a violation with no package.json change). If
+ * BOTH `--report` and `--json` are passed, the report goes to stderr and
+ * the JSON goes to stdout, so stdout is always valid JSON in that mode.
+ * Parse failure, a malformed allowlist (duplicate (file,kind) key, or an
+ * entry -- other than a `_comment` metadata entry -- missing `file`/`kind`/
+ * `count`), or a missing allowlist file are all exit 2.
  *
- * Known Stage 0 recognition gaps (by identifier name only), left for Stage 1
- * to close:
- *   - A renamed or destructured-and-renamed `sql` tag (`import { sql as q }
- *     from '@vercel/postgres'`, or `const { sql: q } = require(...)`) is
- *     still recorded as a driver-import (the import/require node itself is
- *     name-agnostic), but the resulting `q\`...\`` tagged template is NOT
- *     recorded as sql-tag, because sql-tag recognition keys on the literal
- *     identifier name `sql`. Likewise a MEMBER tag (`vp.sql\`...\`` after a
- *     namespace import) is never recorded as sql-tag. No live instance of
- *     either exists today (Appendix A), so this is acceptable for a Stage 0
- *     report, but Stage 1's ratchet MUST resolve tag bindings back to their
- *     import source before counting -- otherwise a renamed tag silently
- *     evades the per-file statement count and the ratchet baseline.
- *   - `new pg.Pool()` (member-expression callee, vs. the recognized bare
- *     `new Pool()`), a `.connect()` call on any object other than `db`/
- *     `pool` (e.g. `p.connect()`), and `.query()`/`.connect()` reached
- *     through a nested member path (e.g. `this.pool.query(...)`) are not
- *     recognized kinds. No live instance exists today; Stage 1 should widen
- *     recognition if one appears.
+ * Ratchet law (checked against `scripts/postgres-access-allowlist.json`,
+ * hand-edited, shrink-only -- there is no --update/regenerate flag):
+ *   (a) any (file, kind) recorded by the live census that is not in the
+ *       allowlist, or whose census count exceeds the allowed count, fails;
+ *   (b) any allowlist (file, kind) whose count exceeds the live census
+ *       count, or whose file/kind no longer appears in the census at all,
+ *       fails as a stale entry -- the allowlist may only shrink by hand; an
+ *       allowlist entry naming a Q5-exempt file is ALSO a violation (exempt
+ *       files are never ratcheted and must not appear in the allowlist);
+ *   (c) any `pages/api/**` file that imports `lib/postgres/**` (by
+ *       import/require/dynamic-import source matching `lib/postgres` as a
+ *       path segment, e.g. `../../lib/postgres`, `../../lib/postgres/client`)
+ *       fails -- routes go through `lib/services`, never the driver seam
+ *       directly. This check is a clean no-op while `lib/postgres/` does
+ *       not exist yet, and shares its file walker/skip rules with the
+ *       census scan (collectFiles) so the two never disagree about which
+ *       files are in scope.
+ * `lib/postgres/**` (does not exist yet) and the two Q5-exempt files
+ * (`lib/utils/migration-drift.js`, `lib/utils/health-checker.js`; `scripts/**`
+ * is already outside the scan roots) are the allowed-importer set: they are
+ * skipped by ratchet checks (a)/(b) and must NOT appear in the allowlist
+ * file, but they still show up in `--report`/`--json` like any other record.
  *
  * Classification is AST-only (plan §2 rule 12): a file whose only mention of
  * a driver name is inside a comment produces NO record. Detection reuses the
@@ -44,25 +61,63 @@
  * its boundary sources -- modeled on that gate's CLI shape (--report --json
  * --self-test --root <dir>) and output style.
  *
- * Design choice (barrel re-export propagation): unlike the route-service
- * boundary gate, this probe does NOT propagate driver reachability through a
- * re-export barrel. A file that re-exports `sql` from `@vercel/postgres` is
- * itself recorded as a driver-import; a second file that imports `sql` from
- * that barrel is NOT recorded as a driver-import (it has no direct AST edge
- * to the driver). This keeps Stage 0 a simple, auditable per-file scan; the
- * ratchet gate can add propagation in Stage 1 if the barrel pattern turns up
- * in the live tree (Appendix A found none: every `sql` tag today sits in a
- * file that also directly imports a driver).
+ * Module-source resolution (P2-3): a require()/dynamic-import() source that
+ * is not a direct string literal is resolved ONE hop through a same-file,
+ * scope-insensitive `const`/`let X = '...'` binding (`const d =
+ * '@vercel/postgres'; require(d)` is recognized as a driver import). Any
+ * other non-literal source (a template with an interpolation, a member
+ * access, a function call, a bare parameter, ...) is NOT resolved and does
+ * NOT fail the gate either way -- it is invisible to classification, exactly
+ * like before -- but every such call site anywhere in the scanned tree is
+ * recorded separately as an "unresolved module source" (file:line, plus the
+ * one-hop-resolved literal when the identifier path above found one) and
+ * surfaced in `--report`'s "Unresolved module sources" section and in
+ * `--json`'s per-file `unresolved` array, purely for human audit -- it has
+ * no exit-code effect and is not ratcheted.
+ *
+ * Tag/binding resolution (Stage 1 item 0, closes the Stage 0 recognition
+ * gaps): a per-file, scope-insensitive binding map resolves `sql`/`db`/
+ * `pool`/`Pool` re-exports and driver namespace imports back to their import
+ * site before classification, so a renamed or destructured-and-renamed `sql`
+ * tag (`import { sql as q } from '@vercel/postgres'`, `const { sql: q } =
+ * require(...)`), a namespace member tag (`import * as vp from
+ * '@vercel/postgres'; vp.sql\`...\`` / `const vp = require(...);
+ * vp.sql\`...\``), a member-callee `new pg.Pool()`, a renamed `Pool`
+ * specifier (`import { Pool as P } from 'pg'; new P()`, `const { Pool: P } =
+ * require('pg')`), and a `.query()`/`.connect()` reached through a nested
+ * member path or a variable bound to a `new Pool()` result or an imported
+ * `db`/`pool` (e.g. `this.pool.query`, `self.db.connect()`, `p.connect()`)
+ * are all recognized. The binding map is built per file, not per lexical
+ * scope -- a shadowed local re-using an import's name in a nested scope is
+ * not distinguished. No live instance of that shadowing exists today
+ * (Appendix A); if one appears, this scanner will over-recognize rather than
+ * silently miss it, which is the safe direction for a security/boundary
+ * gate.
+ *
+ * sql-tag recognition is intentionally SOURCE-AGNOSTIC (unlike driver-import
+ * and db/pool/namespace binding, which stay scoped to an actual driver
+ * import): a bare tag literally named `sql`, or ANY renamed import specifier
+ * or require()/dynamic-import() destructure binding `sql` to a local name,
+ * counts as sql-tag no matter what module it comes from. This closes a real
+ * evasion: re-exporting `sql` through an arbitrary barrel (`export { sql }`
+ * from any file, even one this gate does not itself recognize as a driver
+ * import) and consuming it elsewhere would otherwise silently escape the
+ * ratchet. Every live `sql` tag today already sits in a file with a direct
+ * driver import (Appendix A), so this is a strictly WIDER net, not a
+ * narrower one, and changes no live count.
  *
  * Self-test fixtures (--self-test) are built under a fresh os.tmpdir()
  * mkdtemp() directory, never under a tracked repo path, so a fixture can
  * never be picked up by another gate's scan (which walks lib/, pages/,
  * shared/, modules/ in this repo) and the temp dir is safe to build
  * concurrently with any other session. The fixture tree is removed in a
- * `finally` before this script exits.
+ * `finally` before this script exits. Ratchet self-test fixtures each build
+ * their own tmp root AND their own tmp allowlist file, passed via
+ * `--allowlist`, so they never touch the tracked
+ * scripts/postgres-access-allowlist.json.
  *
  * Usage:
- *   node scripts/check-postgres-access-layer.js [--root <dir>] [--report] [--json] [--self-test]
+ *   node scripts/check-postgres-access-layer.js [--root <dir>] [--allowlist <path>] [--report] [--json] [--cast-lint-detail] [--self-test]
  */
 
 'use strict';
@@ -76,14 +131,16 @@ const {
   walkAst,
   stringLiteralValue,
   importCallSourceNode,
+  unwrapExpression,
   propName,
   toRel,
-  createSourceRecognizers,
 } = require('./lib/ast-scan-core');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
+const DEFAULT_ALLOWLIST_PATH = path.join(__dirname, 'postgres-access-allowlist.json');
 const SCAN_DIRS = ['pages', 'lib', 'shared', 'modules'];
 const JS_EXT_RE = /\.(?:cjs|mjs|js|jsx|ts|tsx)$/;
+const SKIP_DIR_NAMES = new Set(['node_modules', '.next', '__tests__']);
 
 const KINDS = [
   'driver-import',
@@ -97,11 +154,113 @@ const KINDS = [
   'begin-literal',
 ];
 
-// Q2/Q5 do not apply yet (Stage 0 is report-only); this predicate binds the
-// shared scanner core's require()/dynamic-import() recognizers to the two
-// driver module names named in the plan (§5 Stage 0 item 1).
+// Q5 exemptions -- permanently allowed to import the driver, never ratcheted
+// (skipped in checks (a)/(b)), and must not appear in the allowlist file.
+// `scripts/**` is already outside SCAN_DIRS so it needs no exemption here.
+const Q5_EXEMPT_FILES = new Set([
+  'lib/utils/migration-drift.js',
+  'lib/utils/health-checker.js',
+]);
+
+function isExemptFile(rel) {
+  return rel.startsWith('lib/postgres/') || Q5_EXEMPT_FILES.has(rel);
+}
+
+// Q2/Q5 do not apply to recognition itself; this predicate matches the
+// three driver module names named in the plan (§5 Stage 0 item 1, widened
+// by Stage 1 review to include @neondatabase/serverless -- the transport
+// @vercel/postgres itself sits on top of, per plan §3 Q1b) and any subpath
+// of them (`pg/lib/client`, `@vercel/postgres/index`, ...).
+const DRIVER_MODULE_ROOTS = ['pg', '@vercel/postgres', '@neondatabase/serverless'];
 function isPostgresDriverSource(value) {
-  return value === '@vercel/postgres' || value === 'pg';
+  if (typeof value !== 'string') return false;
+  return DRIVER_MODULE_ROOTS.some((root) => value === root || value.startsWith(`${root}/`));
+}
+
+// ---- P2-3: one-hop module-source resolution ----------------------------
+
+// Same-file, scope-insensitive map of `const`/`let X = '...'` string-literal
+// bindings. Reassignment is not tracked (documented limitation): if a name
+// is bound to more than one literal, the first one wins. This is a resolver
+// for require()/import() SOURCE arguments only, not a general constant-
+// folding pass.
+const AMBIGUOUS_BINDING = Symbol('ambiguous-const-string-binding');
+
+function buildConstStringMap(ast) {
+  const map = new Map();
+  walkAst(ast, (node) => {
+    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier'
+      && node.init && node.init.type === 'StringLiteral') {
+      const name = node.id.name;
+      if (map.has(name) && map.get(name) !== AMBIGUOUS_BINDING && map.get(name) !== node.init.value) {
+        // More than one distinct same-file string binding of this name
+        // (reassignment or a second declaration) -- resolving it to
+        // "whichever came first" would be a silent guess, so it is marked
+        // ambiguous instead: resolveSourceValue treats it as unresolved
+        // (fails open, same as any other non-literal source), and the
+        // unresolved-sources audit reports "(ambiguous)" rather than a
+        // possibly-wrong literal.
+        map.set(name, AMBIGUOUS_BINDING);
+      } else if (!map.has(name)) {
+        map.set(name, node.init.value);
+      }
+    }
+  });
+  return map;
+}
+
+// Resolves a require()/import() source ARGUMENT node to a string, either
+// directly (a literal) or through one hop of the const-string map (a plain
+// Identifier bound to a same-file string literal). Returns null if neither
+// applies -- the source stays genuinely unresolved.
+function resolveSourceValue(argNode, constMap) {
+  const direct = stringLiteralValue(argNode);
+  if (direct != null) return direct;
+  if (argNode && argNode.type === 'Identifier' && constMap.has(argNode.name)) {
+    const bound = constMap.get(argNode.name);
+    // An ambiguous (multiply-bound) name resolves to nothing -- fails open,
+    // same as any other non-literal source, rather than guessing.
+    return bound === AMBIGUOUS_BINDING ? null : bound;
+  }
+  return null;
+}
+
+function isBareRequireCall(node) {
+  return !!node && node.type === 'CallExpression' && node.callee.type === 'Identifier'
+    && node.callee.name === 'require' && node.arguments.length > 0;
+}
+
+// True if `node` is a require()/dynamic-import() call whose source resolves
+// (directly or via the const-string map) to a module matching `isModuleSource`.
+function isModuleCallResolved(node, constMap, isModuleSource) {
+  if (isBareRequireCall(node)) return isModuleSource(resolveSourceValue(node.arguments[0], constMap));
+  const dynamicSource = importCallSourceNode(node);
+  if (dynamicSource) return isModuleSource(resolveSourceValue(dynamicSource, constMap));
+  return false;
+}
+
+// Collects every require()/dynamic-import() call site in the file whose
+// source argument is NOT itself a direct string literal (regardless of
+// whether the one-hop resolver above could resolve it) -- pure audit
+// output, no effect on classification or the ratchet. See docblock.
+function collectUnresolvedModuleSources(ast, constMap) {
+  const out = [];
+  walkAst(ast, (node) => {
+    let argNode = null;
+    if (isBareRequireCall(node)) argNode = node.arguments[0];
+    else {
+      const dynamicSource = importCallSourceNode(node);
+      if (dynamicSource) argNode = dynamicSource;
+    }
+    if (!argNode) return;
+    if (stringLiteralValue(argNode) != null) return; // a direct literal is not "unresolved"
+    const line = (node.loc && node.loc.start && node.loc.start.line) || 0;
+    const isAmbiguous = argNode && argNode.type === 'Identifier' && constMap.get(argNode.name) === AMBIGUOUS_BINDING;
+    const resolved = isAmbiguous ? '(ambiguous)' : resolveSourceValue(argNode, constMap);
+    out.push({ line, resolved });
+  });
+  out.sort((a, b) => a.line - b.line);
+  return out;
 }
 
 // Best-effort table-name extraction. Table identifiers can be bare
@@ -123,11 +282,11 @@ const TABLE_STOPWORDS = new Set([
 // CTE aliases (`WITH inserted AS (...) ... FROM inserted`) are NOT
 // distinguished from real tables by this best-effort regex -- a CTE alias
 // that happens to follow FROM/JOIN is reported the same as a table. This is
-// a known, tolerated over-approximation for Stage 0 (documented, not fixed):
-// resolving `WITH <name> AS` bindings would require tracking scope, which is
-// out of scope for a regex-based extractor. Reviewers reconciling this
-// report's table list against scripts/setup-database.js / migrations should
-// expect a handful of CTE-alias entries that are not real tables.
+// a known, tolerated over-approximation for Stage 0/1 (documented, not
+// fixed): resolving `WITH <name> AS` bindings would require tracking scope,
+// which is out of scope for a regex-based extractor. Reviewers reconciling
+// this report's table list against scripts/setup-database.js / migrations
+// should expect a handful of CTE-alias entries that are not real tables.
 function extractTables(sqlText, into) {
   if (!sqlText) return;
   TABLE_RE.lastIndex = 0;
@@ -157,14 +316,171 @@ function firstQuasiTrimmed(templateLiteral) {
   return text.trim();
 }
 
-function isQueryMemberCall(node, objectNames) {
-  if (node.type !== 'CallExpression') return null;
+// ---- binding resolution (Stage 1 item 0 + P1 sql-tag widening) ---------
+
+// sql-tag bindings are source-agnostic (P1): a `sql` (or renamed `sql`)
+// import specifier or require()/dynamic-import() destructure resolves to a
+// sql-tag local name no matter what module it comes from -- see docblock.
+function bindSqlTagFromObjectPattern(id, bindings) {
+  if (id.type !== 'ObjectPattern') return;
+  for (const prop of id.properties || []) {
+    if (prop.type !== 'ObjectProperty' || prop.value.type !== 'Identifier') continue;
+    if (propName(prop.computed ? null : prop.key) === 'sql') bindings.set(prop.value.name, 'sql-tag');
+  }
+}
+
+// Driver-scoped bindings (namespace / db / pool / pool-ctor) from an
+// ImportDeclaration/require()/dynamic-import() destructure whose SOURCE is
+// an actual driver import -- unlike sql-tag above, these stay scoped,
+// because Q2/Q5 (what may hold a live pool/connection) do not extend to
+// arbitrary re-exports.
+function bindDriverScopedFromPattern(id, bindings) {
+  if (id.type === 'Identifier') {
+    bindings.set(id.name, 'namespace');
+    return;
+  }
+  if (id.type === 'ObjectPattern') {
+    for (const prop of id.properties || []) {
+      if (prop.type !== 'ObjectProperty' || prop.value.type !== 'Identifier') continue;
+      const key = propName(prop.computed ? null : prop.key);
+      if (key === 'db') bindings.set(prop.value.name, 'db');
+      else if (key === 'pool') bindings.set(prop.value.name, 'pool');
+      else if (key === 'Pool') bindings.set(prop.value.name, 'pool-ctor');
+    }
+  }
+}
+
+function isPoolConstructorCall(node, bindings) {
+  if (!node || node.type !== 'NewExpression' || !node.callee) return false;
   const callee = node.callee;
-  if (!callee || (callee.type !== 'MemberExpression' && callee.type !== 'OptionalMemberExpression')) return null;
-  if (callee.object.type !== 'Identifier' || !objectNames.has(callee.object.name)) return null;
-  const property = propName(callee.computed ? null : callee.property) || (callee.computed ? null : callee.property.name);
-  if (property !== 'query') return null;
-  return callee.object.name;
+  if (callee.type === 'Identifier') {
+    if (callee.name === 'Pool') return true;
+    if (bindings.get(callee.name) === 'pool-ctor') return true;
+    return false;
+  }
+  if ((callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression')
+    && !callee.computed
+    && callee.object.type === 'Identifier'
+    && bindings.get(callee.object.name) === 'namespace'
+    && propName(callee.property) === 'Pool') {
+    return true;
+  }
+  return false;
+}
+
+// Builds a per-file, scope-insensitive map of local identifier -> role
+// ('sql-tag' | 'namespace' | 'db' | 'pool' | 'pool-ctor'). Passes:
+//   1. sql-tag bindings, source-agnostic (P1) -- any ImportSpecifier or
+//      require()/dynamic-import() destructure naming `sql`.
+//   2. Driver-scoped bindings (namespace/db/pool/pool-ctor) from an actual
+//      driver import/require/dynamic-import (source resolved per P2-3).
+//   3. `new Pool()` (or `new <namespace>.Pool()` / `new <pool-ctor>()`)
+//      assigned to a plain variable, which depends on pass 2's bindings.
+function buildBindings(ast, constMap) {
+  const bindings = new Map();
+
+  walkAst(ast, (node) => {
+    if (node.type === 'ImportDeclaration') {
+      for (const spec of node.specifiers || []) {
+        if (spec.type === 'ImportSpecifier' && propName(spec.imported) === 'sql') {
+          bindings.set(spec.local.name, 'sql-tag');
+        }
+      }
+      return;
+    }
+    if (node.type === 'VariableDeclarator' && node.id.type === 'ObjectPattern' && node.init) {
+      const unwrapped = unwrapExpression(node.init);
+      const isAnyModuleCall = isBareRequireCall(node.init) || isBareRequireCall(unwrapped)
+        || !!importCallSourceNode(unwrapped);
+      if (isAnyModuleCall) bindSqlTagFromObjectPattern(node.id, bindings);
+    }
+  });
+
+  walkAst(ast, (node) => {
+    if ((node.type === 'ImportDeclaration'
+      || node.type === 'ExportNamedDeclaration'
+      || node.type === 'ExportAllDeclaration')
+      && node.source && isPostgresDriverSource(stringLiteralValue(node.source))) {
+      if (node.type === 'ImportDeclaration') {
+        for (const spec of node.specifiers || []) {
+          if (spec.type === 'ImportSpecifier') {
+            const imported = propName(spec.imported);
+            if (imported === 'db') bindings.set(spec.local.name, 'db');
+            else if (imported === 'pool') bindings.set(spec.local.name, 'pool');
+            else if (imported === 'Pool') bindings.set(spec.local.name, 'pool-ctor');
+          } else if (spec.type === 'ImportNamespaceSpecifier' || spec.type === 'ImportDefaultSpecifier') {
+            bindings.set(spec.local.name, 'namespace');
+          }
+        }
+      }
+      return;
+    }
+  });
+
+  walkAst(ast, (node) => {
+    if (node.type !== 'VariableDeclarator' || !node.init) return;
+    const unwrapped = unwrapExpression(node.init);
+    if (isModuleCallResolved(node.init, constMap, isPostgresDriverSource)
+      || isModuleCallResolved(unwrapped, constMap, isPostgresDriverSource)) {
+      bindDriverScopedFromPattern(node.id, bindings);
+    }
+  });
+
+  walkAst(ast, (node) => {
+    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier'
+      && isPoolConstructorCall(node.init, bindings)) {
+      bindings.set(node.id.name, 'pool');
+    }
+  });
+
+  return bindings;
+}
+
+// A bare identifier tag literally named `sql` ALWAYS counts (P1,
+// source-agnostic); a renamed tag counts if the binding map resolved it to
+// 'sql-tag' (also source-agnostic, see bindSqlTagFromObjectPattern /
+// ImportSpecifier handling above). A MEMBER tag (`vp.sql\`...\``) counts
+// only when `vp` is a driver namespace binding -- that one stays
+// driver-scoped, since a bare namespace import of an arbitrary module is a
+// much weaker signal than an explicit `sql` name.
+function isSqlTagTag(tagNode, bindings) {
+  if (tagNode.type === 'Identifier') {
+    if (tagNode.name === 'sql') return true;
+    return bindings.get(tagNode.name) === 'sql-tag';
+  }
+  if ((tagNode.type === 'MemberExpression' || tagNode.type === 'OptionalMemberExpression') && !tagNode.computed) {
+    // Cosmetic widening: `X.sql\`...\`` counts as sql-tag regardless of
+    // what `X` is bound to (not just a recognized driver namespace) --
+    // verified zero live-count impact; a `.sql` property name is already a
+    // strong, low-noise signal on its own.
+    return propName(tagNode.property) === 'sql';
+  }
+  return false;
+}
+
+// Resolves the "role" (sql/client/pool/db) of a `.query()`/`.connect()`
+// callee's object -- an Identifier bound via the file's binding map (a
+// renamed db/pool import, or a variable holding a `new Pool()` result), an
+// Identifier literally named sql/client/pool/db (preserves original
+// unbound-identifier behavior), or a nested member access whose own
+// property is one of those names (`this.pool`, `self.db`).
+function resolveObjectRole(objectNode, bindings) {
+  if (objectNode.type === 'Identifier') {
+    const bound = bindings.get(objectNode.name);
+    if (bound === 'pool' || bound === 'db') return bound;
+    if (objectNode.name === 'sql' || objectNode.name === 'client'
+      || objectNode.name === 'pool' || objectNode.name === 'db') {
+      return objectNode.name;
+    }
+    return null;
+  }
+  if (objectNode.type === 'MemberExpression' || objectNode.type === 'OptionalMemberExpression') {
+    if (objectNode.computed) return null;
+    const prop = propName(objectNode.property);
+    if (prop === 'sql' || prop === 'client' || prop === 'pool' || prop === 'db') return prop;
+    return null;
+  }
+  return null;
 }
 
 // Case-insensitive, prefix match -- mirrors the sql-tag path
@@ -177,11 +493,88 @@ function firstArgIsBegin(node) {
   return typeof value === 'string' && value.trim().toUpperCase().startsWith('BEGIN');
 }
 
-// Classify one already-parsed file. Returns { kinds: Map<kind,count>, tables: Set<string> }.
-function classifyFile(ast, recognizers) {
+// ---- Q6 cast-lint (warn-only) ------------------------------------------
+
+const CAST_LINT_TOKEN_RE = /\b(jsonb_build_object|jsonb_build_array|concat|format)\s*\(|\bVALUES\s*\(|\bCASE\b|\bEND\b|[()]/gi;
+
+// Canonical report label for each trigger token.
+const CAST_LINT_KIND_LABELS = {
+  jsonb_build_object: 'jsonb_build_object',
+  jsonb_build_array: 'jsonb_build_array',
+  concat: 'concat',
+  format: 'format',
+  values: 'VALUES',
+  case: 'CASE',
+};
+
+// Best-effort lexical scan (not a real SQL parser, documented limitation):
+// walks the template's quasis left to right tracking (1) a stack of
+// paren-delimited "cast-sensitive" regions opened by
+// jsonb_build_object(/jsonb_build_array(/concat(/format(/VALUES( and closed
+// by their matching `)`, and (2) a CASE/END depth counter. At each `${...}`
+// placeholder, if either is active and the immediately following quasi text
+// (after leading whitespace) does not start with `::`, the placeholder is
+// warned and tagged with the innermost active region's kind (paren regions
+// take priority over an enclosing CASE, since they are more specific).
+function scanCastLintWarnings(taggedTemplate, rel, warnings) {
+  const quasis = taggedTemplate.quasi.quasis;
+  const exprs = taggedTemplate.quasi.expressions;
+  let parenDepth = 0;
+  const activeRegions = []; // [{ kind, openDepth }]
+  let caseDepth = 0;
+
+  for (let i = 0; i < quasis.length; i++) {
+    const text = quasis[i].value.cooked ?? quasis[i].value.raw;
+    CAST_LINT_TOKEN_RE.lastIndex = 0;
+    let match;
+    while ((match = CAST_LINT_TOKEN_RE.exec(text))) {
+      const tok = match[0].toLowerCase();
+      if (tok === '(') {
+        parenDepth += 1;
+      } else if (tok === ')') {
+        parenDepth = Math.max(0, parenDepth - 1);
+        while (activeRegions.length && activeRegions[activeRegions.length - 1].openDepth > parenDepth) {
+          activeRegions.pop();
+        }
+      } else if (tok === 'case') {
+        caseDepth += 1;
+      } else if (tok === 'end') {
+        caseDepth = Math.max(0, caseDepth - 1);
+      } else {
+        // one of the paren-opening keyword tokens (already includes the `(`)
+        parenDepth += 1;
+        const keyword = match[1] ? match[1].toLowerCase() : 'values';
+        activeRegions.push({ kind: CAST_LINT_KIND_LABELS[keyword] || keyword, openDepth: parenDepth });
+      }
+    }
+
+    if (i < exprs.length) {
+      const kind = activeRegions.length ? activeRegions[activeRegions.length - 1].kind
+        : (caseDepth > 0 ? 'CASE' : null);
+      if (kind) {
+        const nextText = quasis[i + 1] ? (quasis[i + 1].value.cooked ?? quasis[i + 1].value.raw) : '';
+        const followedByCast = /^\s*::/.test(nextText);
+        if (!followedByCast) {
+          const line = (exprs[i].loc && exprs[i].loc.start.line)
+            || (quasis[i].loc && quasis[i].loc.start.line) || 0;
+          warnings.push({ file: rel, line, kind });
+        }
+      }
+    }
+  }
+}
+
+// Classify one already-parsed file. Returns { kinds: Map<kind,count>,
+// tables: Set<string>, castWarnings: Array<{file,line,kind}>,
+// unresolved: Array<{line,resolved}> }.
+function classifyFile(ast, rel) {
   const kinds = new Map();
   const tables = new Set();
+  const castWarnings = [];
   const bump = (kind, n = 1) => kinds.set(kind, (kinds.get(kind) || 0) + n);
+  const constMap = buildConstStringMap(ast);
+  const bindings = buildBindings(ast, constMap);
+  const unresolved = collectUnresolvedModuleSources(ast, constMap);
 
   walkAst(ast, (node) => {
     // Static import declaration naming the driver, incl. `export ... from`
@@ -195,74 +588,83 @@ function classifyFile(ast, recognizers) {
       return;
     }
 
-    // require('@vercel/postgres' | 'pg') and dynamic import() of same,
-    // recognized via the shared hardened scanner core.
-    if (recognizers.isRequireCall(node) || recognizers.isDynamicImportOfSource(node)) {
+    // require(<driver>) / dynamic import(<driver>), source resolved
+    // directly or through the one-hop const-string map (P2-3).
+    if (isModuleCallResolved(node, constMap, isPostgresDriverSource)) {
       bump('driver-import');
       return;
     }
 
-    if (node.type === 'TaggedTemplateExpression'
-      && node.tag && node.tag.type === 'Identifier' && node.tag.name === 'sql') {
+    if (node.type === 'TaggedTemplateExpression' && node.tag
+      && isSqlTagTag(node.tag, bindings)) {
       bump('sql-tag');
       const text = quasisText(node.quasi);
       extractTables(text, tables);
       if (firstQuasiTrimmed(node.quasi).toUpperCase().startsWith('BEGIN')) bump('begin-literal');
-      return;
-    }
-
-    const queryObject = isQueryMemberCall(node, new Set(['sql', 'client', 'pool']));
-    if (queryObject) {
-      bump(`${queryObject}.query`);
-      const arg = node.arguments && node.arguments[0];
-      const literal = arg ? stringLiteralValue(arg) : null;
-      if (literal) extractTables(literal, tables);
-      if (firstArgIsBegin(node)) bump('begin-literal');
+      scanCastLintWarnings(node, rel, castWarnings);
       return;
     }
 
     if (node.type === 'CallExpression') {
       const callee = node.callee;
-      if (callee && (callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression')
-        && callee.object.type === 'Identifier'
-        && (callee.object.name === 'db' || callee.object.name === 'pool')
-        && propName(callee.computed ? null : callee.property) === 'connect') {
-        bump(`${callee.object.name}.connect`);
-        return;
+      if (callee && (callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') && !callee.computed) {
+        const property = propName(callee.property);
+        if (property === 'query') {
+          const role = resolveObjectRole(callee.object, bindings);
+          if (role === 'sql' || role === 'client' || role === 'pool') {
+            bump(`${role}.query`);
+            const arg = node.arguments && node.arguments[0];
+            const literal = arg ? stringLiteralValue(arg) : null;
+            if (literal) extractTables(literal, tables);
+            if (firstArgIsBegin(node)) bump('begin-literal');
+            return;
+          }
+        } else if (property === 'connect') {
+          const role = resolveObjectRole(callee.object, bindings);
+          if (role === 'db' || role === 'pool') {
+            bump(`${role}.connect`);
+            return;
+          }
+        }
       }
     }
 
-    if (node.type === 'NewExpression' && node.callee && node.callee.type === 'Identifier' && node.callee.name === 'Pool') {
+    if (node.type === 'NewExpression' && isPoolConstructorCall(node, bindings)) {
       bump('new-Pool');
     }
   });
 
-  return { kinds, tables };
+  return { kinds, tables, castWarnings, unresolved };
+}
+
+// Shared file walker/skip rules for both the main census scan and the
+// pages/api -> lib/postgres ratchet check (c) -- P2 cosmetic fix: the two
+// must never disagree about which files are in scope.
+function walkJsFiles(baseDir, out) {
+  if (!fs.existsSync(baseDir)) return;
+  walk(baseDir);
+  function walk(dir) {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name);
+      if (ent.isSymbolicLink && ent.isSymbolicLink()) continue;
+      if (ent.isDirectory()) {
+        if (SKIP_DIR_NAMES.has(ent.name)) continue;
+        walk(full);
+        continue;
+      }
+      if (!ent.isFile() || !JS_EXT_RE.test(ent.name)) continue;
+      if (/\.test\./.test(ent.name)) continue;
+      out.push(full);
+    }
+  }
 }
 
 function collectFiles(root) {
   const files = [];
   for (const relDir of SCAN_DIRS) {
-    const base = path.join(root, relDir);
-    if (!fs.existsSync(base)) continue;
-    walkDir(base);
+    walkJsFiles(path.join(root, relDir), files);
   }
   return files.sort((a, b) => toRel(root, a).localeCompare(toRel(root, b)));
-
-  function walkDir(dir) {
-    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, ent.name);
-      if (ent.isSymbolicLink && ent.isSymbolicLink()) continue;
-      if (ent.isDirectory()) {
-        if (ent.name === 'node_modules' || ent.name === '.next' || ent.name === '__tests__') continue;
-        walkDir(full);
-        continue;
-      }
-      if (!ent.isFile() || !JS_EXT_RE.test(ent.name)) continue;
-      if (/\.test\./.test(ent.name)) continue;
-      files.push(full);
-    }
-  }
 }
 
 function topDir(rel) {
@@ -273,9 +675,10 @@ function topDir(rel) {
 }
 
 function analyzeRoot(root) {
-  const recognizers = createSourceRecognizers(isPostgresDriverSource);
   const files = collectFiles(root);
   const records = [];
+  const allCastWarnings = [];
+  const allUnresolved = [];
   for (const full of files) {
     const rel = toRel(root, full);
     const source = fs.readFileSync(full, 'utf8');
@@ -285,12 +688,16 @@ function analyzeRoot(root) {
     } catch (err) {
       throw new Error(`postgres-access-layer parse error in ${rel}: ${err.message}`);
     }
-    const { kinds, tables } = classifyFile(ast, recognizers);
-    if (kinds.size === 0) continue; // no recognized kind -> not in the census
-    records.push({ file: rel, kinds, tables: [...tables].sort() });
+    const { kinds, tables, castWarnings, unresolved } = classifyFile(ast, rel);
+    if (castWarnings.length) allCastWarnings.push(...castWarnings);
+    if (unresolved.length) allUnresolved.push(...unresolved.map((u) => ({ file: rel, ...u })));
+    if (kinds.size === 0 && unresolved.length === 0) continue; // nothing recognized/auditable
+    records.push({ file: rel, kinds, tables: [...tables].sort(), unresolved });
   }
   records.sort((a, b) => a.file.localeCompare(b.file));
-  return records;
+  allCastWarnings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
+  allUnresolved.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
+  return { records, castWarnings: allCastWarnings, unresolved: allUnresolved };
 }
 
 function buildSummary(records) {
@@ -326,14 +733,14 @@ function buildSummary(records) {
     // received as an argument (e.g. from a caller's `withClient`) without
     // importing the driver themselves, so this is >= driverFileTotal, never
     // the same number, and the two must not be confused in a headline.
-    totalFilesInCensus: records.length,
+    totalFilesInCensus: records.filter((r) => r.kinds.size > 0).length,
   };
 }
 
-function formatReport(records) {
+function formatReport(records, castWarnings, unresolved, castLintDetail) {
   const summary = buildSummary(records);
   const lines = [
-    'Postgres access-layer census (Stage 0, REPORT-ONLY -- exits 0 on any census result; exits 2 only on a parse failure)',
+    'Postgres access-layer census (Stage 1 -- ratchet law; see exit code)',
     `Driver-import files (import/require/dynamic-import of a driver): ${summary.driverFileTotal}`,
     `Files with any recognized record (incl. non-driver-import callers, e.g. a client passed in as an argument): ${summary.totalFilesInCensus}`,
     '',
@@ -355,13 +762,45 @@ function formatReport(records) {
   }
   lines.push('', '## Files', '', '| File | Kinds | Tables |', '|---|---|---|');
   for (const rec of records) {
+    if (rec.kinds.size === 0) continue;
     const kindsStr = [...rec.kinds.entries()].map(([k, c]) => `${k}:${c}`).join(', ');
     lines.push(`| ${rec.file} | ${kindsStr} | ${rec.tables.join(', ')} |`);
   }
+
+  lines.push('', '## Cast-lint warnings (Q6, warn-only -- no exit-code effect)', '', `Total: ${castWarnings.length}`, '');
+  if (castWarnings.length) {
+    const byKind = new Map();
+    const byFileKind = new Map();
+    for (const w of castWarnings) {
+      byKind.set(w.kind, (byKind.get(w.kind) || 0) + 1);
+      const fkKey = `${w.file}::${w.kind}`;
+      byFileKind.set(fkKey, (byFileKind.get(fkKey) || 0) + 1);
+    }
+    lines.push('| Region kind | Count |', '|---|---:|');
+    for (const [kind, count] of [...byKind.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
+      lines.push(`| ${kind} | ${count} |`);
+    }
+    lines.push('', '| File | Region kind | Count |', '|---|---|---:|');
+    for (const [key, count] of [...byFileKind.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const [file, kind] = key.split('::');
+      lines.push(`| ${file} | ${kind} | ${count} |`);
+    }
+    if (castLintDetail) {
+      lines.push('', '### Full rows (--cast-lint-detail)', '', '| File | Line | Region kind |', '|---|---:|---|');
+      for (const w of castWarnings) lines.push(`| ${w.file} | ${w.line} | ${w.kind} |`);
+    }
+  }
+
+  lines.push('', '## Unresolved module sources (not ratcheted -- audit only)', '', `Total: ${unresolved.length}`, '');
+  if (unresolved.length) {
+    lines.push('| File | Line | One-hop resolution |', '|---|---:|---|');
+    for (const u of unresolved) lines.push(`| ${u.file} | ${u.line} | ${u.resolved != null ? u.resolved : '(unresolved)'} |`);
+  }
+
   return lines.join('\n');
 }
 
-function buildJson(records) {
+function buildJson(records, castWarnings, unresolved) {
   const summary = buildSummary(records);
   return {
     driverFileTotal: summary.driverFileTotal,
@@ -370,26 +809,177 @@ function buildJson(records) {
     sqlTagTotal: summary.sqlTagTotal,
     kindTotals: Object.fromEntries(summary.kindTotals),
     totalFilesInCensus: summary.totalFilesInCensus,
-    files: records.map((rec) => ({
+    // Cosmetic (3): only files with at least one recognized kind belong
+    // here -- a file whose only auditable content is an unresolved module
+    // source (no kind at all) is not "in the census" and appears solely in
+    // the top-level `unresolved` array below.
+    files: records.filter((rec) => rec.kinds.size > 0).map((rec) => ({
       file: rec.file,
       kinds: Object.fromEntries(rec.kinds),
       tables: rec.tables,
+      unresolved: rec.unresolved,
     })),
+    castLint: castWarnings,
+    unresolved,
   };
 }
 
+// ---- Stage 1 ratchet ----------------------------------------------------
+
+// Throws (-> exit 2) on a malformed allowlist: a duplicate (file,kind) key,
+// or an entry -- other than a `_comment` metadata entry -- missing any of
+// file/kind/count.
+function loadAllowlist(allowlistPath) {
+  if (!fs.existsSync(allowlistPath)) {
+    throw new Error(`allowlist not found: ${allowlistPath}`);
+  }
+  const raw = JSON.parse(fs.readFileSync(allowlistPath, 'utf8'));
+  if (!Array.isArray(raw)) throw new Error(`allowlist must be a JSON array: ${allowlistPath}`);
+
+  const entries = [];
+  const seenKeys = new Set();
+  for (const entry of raw) {
+    if (entry && typeof entry === 'object' && '_comment' in entry && !('file' in entry) && !('kind' in entry)) {
+      continue; // pure metadata entry
+    }
+    if (!entry || typeof entry !== 'object'
+      || typeof entry.file !== 'string' || !entry.file
+      || typeof entry.kind !== 'string' || !entry.kind
+      || typeof entry.count !== 'number') {
+      throw new Error(`malformed allowlist entry (missing file/kind/count): ${JSON.stringify(entry)}`);
+    }
+    const key = `${entry.file}::${entry.kind}`;
+    if (seenKeys.has(key)) {
+      throw new Error(`duplicate allowlist entry: ${entry.file} (${entry.kind})`);
+    }
+    seenKeys.add(key);
+    entries.push(entry);
+  }
+  return entries;
+}
+
+// Reads the raw import/require/dynamic-import source string off any node
+// that carries one, for the pages/api -> lib/postgres direct-import check.
+// Resolves the same one hop as classification (P2-3) so a route cannot dodge
+// this check by aliasing the path through a same-file const.
+function importSourceOf(node, constMap) {
+  if ((node.type === 'ImportDeclaration' || node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source) {
+    return stringLiteralValue(node.source);
+  }
+  if (isBareRequireCall(node)) {
+    return resolveSourceValue(node.arguments[0], constMap);
+  }
+  const dynamicSource = importCallSourceNode(node);
+  if (dynamicSource) return resolveSourceValue(dynamicSource, constMap);
+  return null;
+}
+
+// P2-4: match `lib/postgres` as a path SEGMENT, not merely a substring, so
+// both `.../lib/postgres` (index) and `.../lib/postgres/client` count, but
+// e.g. `.../lib/postgres-legacy` does not.
+const LIB_POSTGRES_IMPORT_RE = /(^|\/)lib\/postgres(\/|$)/;
+
+// Check (c): any pages/api/** file importing lib/postgres/** directly. A
+// clean no-op while lib/postgres/ does not exist in the tree under `root`.
+// Shares walkJsFiles with the main census scan (cosmetic fix) so the two
+// scans can never disagree about which files are in scope.
+function checkPagesApiPostgresImports(root) {
+  const violations = [];
+  if (!fs.existsSync(path.join(root, 'lib', 'postgres'))) return violations;
+  const files = [];
+  walkJsFiles(path.join(root, 'pages', 'api'), files);
+
+  for (const full of files) {
+    const rel = toRel(root, full);
+    let ast;
+    try {
+      ast = parseModule(fs.readFileSync(full, 'utf8'));
+    } catch (err) {
+      continue; // parse failures are reported separately by analyzeRoot
+    }
+    const constMap = buildConstStringMap(ast);
+    walkAst(ast, (node) => {
+      const source = importSourceOf(node, constMap);
+      if (source && LIB_POSTGRES_IMPORT_RE.test(source)) {
+        violations.push(`pages/api route imports lib/postgres/** directly: ${rel} (source: "${source}")`);
+      }
+    });
+  }
+  return violations;
+}
+
+function runRatchet(records, allowlist, root) {
+  const violations = [];
+  const allowMap = new Map();
+  for (const entry of allowlist) {
+    allowMap.set(`${entry.file}::${entry.kind}`, entry.count);
+  }
+
+  const censusMap = new Map();
+  for (const rec of records) {
+    if (isExemptFile(rec.file)) continue;
+    for (const [kind, count] of rec.kinds) {
+      censusMap.set(`${rec.file}::${kind}`, count);
+    }
+  }
+
+  // (a) every census (file,kind) must be allowed, at or under its count.
+  for (const [key, count] of censusMap) {
+    const [file, kind] = key.split('::');
+    const allowed = allowMap.get(key);
+    if (allowed === undefined) {
+      violations.push(`not in allowlist: ${file} (${kind}) count=${count}`);
+    } else if (count > allowed) {
+      violations.push(`census count exceeds allowlist: ${file} (${kind}) census=${count} allowed=${allowed}`);
+    }
+  }
+
+  // (b) every allowlist (file,kind) must still exist, at or under its count.
+  for (const [key, allowed] of allowMap) {
+    const [file, kind] = key.split('::');
+    if (isExemptFile(file)) {
+      violations.push(`allowlist must not list an exempt file: ${file} (${kind})`);
+      continue;
+    }
+    const count = censusMap.get(key);
+    if (count === undefined) {
+      violations.push(`stale entry -- shrink the allowlist: ${file} (${kind}) allowlist=${allowed}, no longer present in the census`);
+    } else if (allowed > count) {
+      violations.push(`stale entry -- shrink the allowlist: ${file} (${kind}) allowlist=${allowed} exceeds census=${count}`);
+    }
+  }
+
+  // (c) pages/api -> lib/postgres/** direct import.
+  violations.push(...checkPagesApiPostgresImports(root));
+
+  return violations;
+}
+
 function parseArgs(argv) {
-  const args = { root: DEFAULT_ROOT, report: false, json: false, selfTest: false };
+  const args = {
+    root: DEFAULT_ROOT,
+    allowlist: DEFAULT_ALLOWLIST_PATH,
+    report: false,
+    json: false,
+    selfTest: false,
+    castLintDetail: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--root') {
       const value = argv[++i];
       if (!value) throw new Error('--root requires a directory');
       args.root = path.resolve(value);
+    } else if (arg === '--allowlist') {
+      const value = argv[++i];
+      if (!value) throw new Error('--allowlist requires a path');
+      args.allowlist = path.resolve(value);
     } else if (arg === '--report') {
       args.report = true;
     } else if (arg === '--json') {
       args.json = true;
+    } else if (arg === '--cast-lint-detail') {
+      args.castLintDetail = true;
     } else if (arg === '--self-test') {
       args.selfTest = true;
     } else if (arg === '--help' || arg === '-h') {
@@ -403,16 +993,23 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    'Usage: node scripts/check-postgres-access-layer.js [--root <dir>] [--report] [--json] [--self-test]',
+    'Usage: node scripts/check-postgres-access-layer.js [--root <dir>] [--allowlist <path>] [--report] [--json] [--cast-lint-detail] [--self-test]',
     '',
-    'Stage 0 census probe (docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md).',
-    'REPORT-ONLY: default mode, --report, and --json exit 0 on any census',
-    'result; the only non-zero exit is 2, on a parse failure.',
-    '--report prints dir/kind rollups and the full per-file table.',
-    '--json prints the same data as JSON.',
-    '--self-test builds an isolated fixture tree under os.tmpdir() and',
-    '  verifies every recognized kind, a comment-only non-match, and the',
-    '  barrel/no-propagation design choice, then cleans up.',
+    'Stage 1 ratchet gate (docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md).',
+    'Default mode, --report, and --json all APPLY the ratchet against',
+    'scripts/postgres-access-allowlist.json (or --allowlist) and exit 1 on',
+    'any violation. Parse failure or a malformed allowlist is always exit 2.',
+    '--report prints dir/kind rollups, the full per-file table, Q6 cast-lint',
+    '  per-kind/per-file totals, and unresolved module sources (both audit',
+    '  sections, no exit-code effect).',
+    '--json prints the same data as JSON (full castLint/unresolved rows).',
+    '  If both --json and --report are given, the report goes to stderr so',
+    '  stdout stays valid JSON.',
+    '--cast-lint-detail adds the full per-line cast-lint rows to --report.',
+    '--self-test builds isolated fixture trees (and, for ratchet fixtures,',
+    '  isolated allowlists) under os.tmpdir(), verifies every recognized',
+    '  kind including the Stage 1 binding-resolution fixes, the ratchet',
+    '  pass/fail cases, and the Q6 warn scan, then cleans up.',
   ].join('\n');
 }
 
@@ -432,7 +1029,35 @@ function findRecord(json, file) {
   return json.files.find((f) => f.file === file);
 }
 
-function runSelfTest() {
+function runJson(tempRoot, allowlistPath) {
+  const args = [__filename, '--root', tempRoot, '--json'];
+  if (allowlistPath) args.push('--allowlist', allowlistPath);
+  try {
+    const output = execFileSync(process.execPath, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { status: 0, output, json: JSON.parse(output) };
+  } catch (err) {
+    return { status: err.status, output: err.stdout, stderr: err.stderr, json: err.stdout ? JSON.parse(err.stdout) : null };
+  }
+}
+
+function runDefault(tempRoot, allowlistPath) {
+  const args = [__filename, '--root', tempRoot];
+  if (allowlistPath) args.push('--allowlist', allowlistPath);
+  try {
+    const output = execFileSync(process.execPath, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { status: 0, output, stderr: '' };
+  } catch (err) {
+    return { status: err.status, output: err.stdout || '', stderr: err.stderr ? err.stderr.toString() : '' };
+  }
+}
+
+function writeAllowlist(tempDir, entries) {
+  const p = path.join(tempDir, `allowlist-${Math.random().toString(36).slice(2)}.json`);
+  fs.writeFileSync(p, JSON.stringify(entries, null, 2));
+  return p;
+}
+
+function runClassificationSelfTest() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-access-layer-selftest-'));
   try {
     write(tempRoot, 'lib/services/plain-import.js', `
@@ -442,6 +1067,7 @@ function runSelfTest() {
       }
     `);
 
+    // Namespace import + member tag: item 0(a) form 3 -- now recognized.
     write(tempRoot, 'lib/services/namespace-import.js', `
       import * as pgDriver from '@vercel/postgres';
       export async function get() {
@@ -449,6 +1075,7 @@ function runSelfTest() {
       }
     `);
 
+    // require() bound to a plain identifier + member tag: item 0(a) form 4.
     write(tempRoot, 'lib/services/cjs-require.js', `
       const postgres = require('@vercel/postgres');
       module.exports.run = () => postgres.sql\`SELECT 1\`;
@@ -459,14 +1086,19 @@ function runSelfTest() {
       module.exports.run = () => sql\`SELECT 1 FROM system_alerts\`;
     `);
 
-    // Barrel + non-propagated consumer (documented design choice).
+    // Barrel + consumer: P1 fix -- sql-tag recognition is source-agnostic,
+    // so the consumer's `sql\`...\`` counts as sql-tag even though its
+    // import source is the barrel, not the driver directly. This is the
+    // exact evasion the fix closes (re-exporting `sql` through an arbitrary
+    // file). driver-import itself still does NOT propagate through the
+    // barrel (documented, unrelated design choice).
     write(tempRoot, 'lib/services/barrel.js', `
       export { sql } from '@vercel/postgres';
     `);
     write(tempRoot, 'lib/services/barrel-consumer.js', `
       import { sql } from './barrel';
       export async function get() {
-        return sql\`SELECT 1\`;
+        return sql\`SELECT 1 FROM barrel_table\`;
       }
     `);
 
@@ -498,23 +1130,26 @@ function runSelfTest() {
       module.exports.run = () => 1;
     `);
 
-    // Alias-import / alias-require (Stage 0 known gap, documented in the
-    // docblock): the driver import/require is still recorded regardless of
-    // local name, but the resulting `q\`...\`` tag is NOT recorded as
-    // sql-tag because sql-tag recognition keys on the literal name `sql`.
+    // Comment-only member-tag mention: rule 12 still applies after widening
+    // sql-tag recognition -- a comment is not an AST edge.
+    write(tempRoot, 'lib/services/comment-only-vp-sql.js', `
+      // Formerly: import * as vp from '@vercel/postgres'; vp.sql\`SELECT 1\`;
+      module.exports.run = () => 1;
+    `);
+
+    // Item 0(a) form 1: renamed destructured import.
     write(tempRoot, 'lib/services/alias-import.js', `
       import { sql as q } from '@vercel/postgres';
       export async function get() {
         return q\`SELECT 1 FROM aliased_table\`;
       }
     `);
+    // Item 0(a) form 2: renamed require destructure.
     write(tempRoot, 'lib/services/alias-require.js', `
       const { sql: q } = require('@vercel/postgres');
       module.exports.run = () => q\`SELECT 1\`;
     `);
 
-    // sql.query(text, params) -- exercises the sql.query kind (live tree has
-    // 40 occurrences and the prior self-test never exercised this kind).
     write(tempRoot, 'lib/services/sql-query-call.js', `
       import { sql } from '@vercel/postgres';
       export async function run(id) {
@@ -522,9 +1157,6 @@ function runSelfTest() {
       }
     `);
 
-    // pool.connect() -- the pg-Pool sibling of db.connect(), live at
-    // pages/api/intake/submit.js, pages/api/cron/drain-submissions.js, and
-    // lib/services/irs-bmf-service.js.
     write(tempRoot, 'lib/services/pool-connect.js', `
       const { Pool } = require('pg');
       module.exports.run = async () => {
@@ -535,11 +1167,70 @@ function runSelfTest() {
       };
     `);
 
-    // Table-extraction edge cases: ON CONFLICT DO UPDATE SET (would misread
-    // 'set' as a table), FOR UPDATE SKIP LOCKED ('skip'), a double-quoted
-    // identifier (case preserved), and a FROM-clause function call
-    // ('jsonb_array_elements'). None of these must appear in the extracted
-    // table set; widget_requests and Mixed_Case_Table must.
+    // Item 0(b): new pg.Pool() -- member-callee form.
+    write(tempRoot, 'lib/services/pg-namespace-pool.js', `
+      const pg = require('pg');
+      const pool = new pg.Pool();
+      module.exports.run = () => pool.query('SELECT 1 FROM widget_requests');
+    `);
+
+    // P2-5: renamed Pool specifier / require destructure.
+    write(tempRoot, 'lib/services/renamed-pool-import.js', `
+      import { Pool as P } from 'pg';
+      const pool = new P();
+      module.exports.run = () => pool.query('SELECT 1 FROM renamed_pool_table');
+    `);
+    write(tempRoot, 'lib/services/renamed-pool-require.js', `
+      const { Pool: P } = require('pg');
+      const pool = new P();
+      module.exports.run = () => pool.query('SELECT 1');
+    `);
+
+    // Item 0(c) form 1: nested member path, this.pool.query(...).
+    write(tempRoot, 'lib/services/nested-pool-query.js', `
+      const { Pool } = require('pg');
+      class Service {
+        constructor() { this.pool = new Pool(); }
+        async run() {
+          return this.pool.query('SELECT 1 FROM nested_table');
+        }
+      }
+      module.exports = Service;
+    `);
+
+    // Item 0(c) form 2: nested member path, self.db.connect().
+    write(tempRoot, 'lib/services/nested-db-connect.js', `
+      const { db } = require('@vercel/postgres');
+      const self = { db };
+      module.exports.run = async () => {
+        const client = await self.db.connect();
+        await client.query('SELECT 1');
+        client.release();
+      };
+    `);
+
+    // Item 0(c) form 3: p.connect() where p is bound to a new Pool() result.
+    write(tempRoot, 'lib/services/pool-var-connect.js', `
+      const { Pool } = require('pg');
+      module.exports.run = async () => {
+        const p = new Pool();
+        const client = await p.connect();
+        await client.query('SELECT 1');
+        client.release();
+      };
+    `);
+
+    // Item 0(c) form 4: p.connect() where p is bound to an imported `db`
+    // under a renamed local name.
+    write(tempRoot, 'lib/services/imported-db-var-connect.js', `
+      const { db: p } = require('@vercel/postgres');
+      module.exports.run = async () => {
+        const client = await p.connect();
+        await client.query('SELECT 1');
+        client.release();
+      };
+    `);
+
     write(tempRoot, 'lib/services/table-edge-cases.js', `
       import { sql } from '@vercel/postgres';
       export async function run(id) {
@@ -553,6 +1244,59 @@ function runSelfTest() {
       }
     `);
 
+    // Q6 cast-lint: one warned jsonb_build_object placeholder (no cast), one
+    // safe (::text cast immediately follows, inside the same region).
+    write(tempRoot, 'lib/services/cast-lint-cases.js', `
+      import { sql } from '@vercel/postgres';
+      export async function run(id, name) {
+        await sql\`SELECT jsonb_build_object('id', \${id})\`;
+        await sql\`SELECT jsonb_build_object('name', \${name}::text)\`;
+      }
+    `);
+
+    // P2-2: @neondatabase/serverless and driver subpaths.
+    write(tempRoot, 'lib/services/neon-driver.js', `
+      import { sql } from '@neondatabase/serverless';
+      module.exports = { run: () => sql\`SELECT 1\` };
+    `);
+    write(tempRoot, 'lib/services/pg-subpath.js', `
+      const { Client } = require('pg/lib/client');
+      module.exports.run = () => new Client();
+    `);
+    write(tempRoot, 'lib/services/vercel-postgres-subpath.js', `
+      const { sql } = require('@vercel/postgres/index');
+      module.exports.run = () => sql\`SELECT 1\`;
+    `);
+
+    // P2-3: non-literal source resolved one hop through a same-file const.
+    write(tempRoot, 'lib/services/resolved-const-require.js', `
+      const driverName = '@vercel/postgres';
+      const { sql } = require(driverName);
+      module.exports.run = () => sql\`SELECT 1\`;
+    `);
+
+    // P2-3: genuinely unresolved dynamic import source (a function
+    // parameter, not a same-file const) -- must be reported as unresolved,
+    // must NOT fail the gate, and must NOT be recognized as a driver import.
+    write(tempRoot, 'lib/services/unresolved-dynamic-import.js', `
+      export async function loadFallback(fallbackModule) {
+        const mod = await import(fallbackModule);
+        return mod;
+      }
+    `);
+    // A non-postgres one-hop-resolved require (mirrors the live bundler-
+    // bypass pattern: const fsName = 'fs'; require(fsName)) -- resolves,
+    // but to a non-driver module, so no driver-import record, and it still
+    // appears in the unresolved-sources audit list (the ARGUMENT itself is
+    // not a literal, even though it resolves).
+    write(tempRoot, 'lib/services/resolved-non-driver-require.js', `
+      function loadFs() {
+        const fsName = 'fs';
+        return require(fsName);
+      }
+      module.exports = { loadFs };
+    `);
+
     write(tempRoot, 'pages/api/health.js', `
       import { sql } from '@vercel/postgres';
       export default async function handler(req, res) {
@@ -560,86 +1304,157 @@ function runSelfTest() {
       }
     `);
 
-    const output = execFileSync(process.execPath, [__filename, '--root', tempRoot, '--json'], {
-      encoding: 'utf8',
-    });
-    const json = JSON.parse(output);
+    // P2-B: pin the bare-unbound-`sql`-tag case with NO import/require of
+    // any kind in the file at all -- a regression here (e.g. accidentally
+    // re-requiring a driver import before counting) would otherwise go
+    // unnoticed since every other sql-tag fixture also has an import.
+    write(tempRoot, 'lib/services/bare-sql-param.js', `
+      export const f = (sql) => sql\`SELECT 1 FROM bare_param_table\`;
+    `);
+    write(tempRoot, 'lib/services/bare-sql-from-call.js', `
+      const sql = neon(url);
+      module.exports.run = () => sql\`SELECT 1 FROM bare_call_table\`;
+    `);
 
-    // Comment-only mention must produce zero records (rule 12).
+    // Build the census in-process (this file's own analyzeRoot/buildJson)
+    // and a permissive allowlist derived from it, so the CLI sanity checks
+    // below (--report/default mode) exit 0 without duplicating the exact
+    // ratchet semantics tested separately in runRatchetSelfTest().
+    const { records: fixtureRecords, castWarnings: fixtureCastWarnings, unresolved: fixtureUnresolved } = analyzeRoot(tempRoot);
+    const json = buildJson(fixtureRecords, fixtureCastWarnings, fixtureUnresolved);
+    const permissiveEntries = [];
+    for (const rec of fixtureRecords) {
+      if (isExemptFile(rec.file)) continue;
+      for (const [kind, count] of rec.kinds) permissiveEntries.push({ file: rec.file, kind, count });
+    }
+    const permissiveAllowlist = writeAllowlist(tempRoot, permissiveEntries);
+
+    // Comment-only mentions must produce zero records (rule 12), including
+    // the member-tag comment-only case.
     expect(findRecord(json, 'lib/services/comment-only.js') === undefined,
       'comment-only.js must not appear in the census');
+    expect(findRecord(json, 'lib/services/comment-only-vp-sql.js') === undefined,
+      'comment-only-vp-sql.js must not appear in the census');
 
-    // Driver-import: every file with a real AST edge to the driver, EXCEPT
-    // the barrel consumer (no propagation through the barrel -- documented
-    // design choice).
     const driverImportFiles = json.files.filter((f) => f.kinds['driver-import']).map((f) => f.file).sort();
     expect(!driverImportFiles.includes('lib/services/barrel-consumer.js'),
       `barrel-consumer.js must NOT be recorded as driver-import (no propagation); got ${JSON.stringify(driverImportFiles)}`);
+    expect(!driverImportFiles.includes('lib/services/resolved-non-driver-require.js'),
+      'resolved-non-driver-require.js resolves to fs, not a driver -- must not be driver-import');
+    expect(!driverImportFiles.includes('lib/services/unresolved-dynamic-import.js'),
+      'unresolved-dynamic-import.js must not be driver-import (fails open, per P2-3)');
     const expectedDriverImportFiles = [
       'lib/services/alias-import.js',
       'lib/services/alias-require.js',
       'lib/services/barrel.js',
       'lib/services/begin-client.js',
+      'lib/services/cast-lint-cases.js',
       'lib/services/cjs-require.js',
       'lib/services/destructured-require.js',
       'lib/services/dynamic-import.js',
+      'lib/services/imported-db-var-connect.js',
       'lib/services/namespace-import.js',
+      'lib/services/neon-driver.js',
+      'lib/services/nested-db-connect.js',
+      'lib/services/nested-pool-query.js',
+      'lib/services/pg-namespace-pool.js',
       'lib/services/pg-pool.js',
+      'lib/services/pg-subpath.js',
       'lib/services/plain-import.js',
       'lib/services/pool-connect.js',
+      'lib/services/pool-var-connect.js',
+      'lib/services/renamed-pool-import.js',
+      'lib/services/renamed-pool-require.js',
+      'lib/services/resolved-const-require.js',
       'lib/services/sql-query-call.js',
       'lib/services/table-edge-cases.js',
+      'lib/services/vercel-postgres-subpath.js',
       'pages/api/health.js',
     ];
     expect(JSON.stringify(driverImportFiles) === JSON.stringify(expectedDriverImportFiles),
       `driver-import file set mismatch: got ${JSON.stringify(driverImportFiles)}, expected ${JSON.stringify(expectedDriverImportFiles)}`);
     expect(json.driverFileTotal === expectedDriverImportFiles.length,
       `driverFileTotal expected ${expectedDriverImportFiles.length}, got ${json.driverFileTotal}`);
-    expect(json.driverFilesByDir['lib/services'] === 13,
-      `expected 13 driver-import files under lib/services, got ${json.driverFilesByDir['lib/services']}`);
-    expect(json.driverFilesByDir['pages/api'] === 1,
-      `expected 1 driver-import file under pages/api, got ${json.driverFilesByDir['pages/api']}`);
 
-    // Alias-import/alias-require are driver-import (checked above) but must
-    // NOT be sql-tag: the tag identifier is `q`, not `sql` (documented Stage
-    // 0 gap, Stage 1 obligation).
-    expect(!findRecord(json, 'lib/services/alias-import.js').kinds['sql-tag'],
-      'alias-import.js (tag `q`) must NOT be recorded as sql-tag');
-    expect(!findRecord(json, 'lib/services/alias-require.js').kinds['sql-tag'],
-      'alias-require.js (tag `q`) must NOT be recorded as sql-tag');
-
-    // sql-tag: plain-import, destructured-require, dynamic-import,
-    // barrel-consumer (own tag, independent of driver-import propagation),
-    // health, table-edge-cases (4 tags in one file). namespace-import/
-    // cjs-require use a MEMBER tag (pgDriver.sql / postgres.sql), and
-    // alias-import/alias-require use the renamed identifier `q`, not a bare
-    // `sql` identifier tag, so none of those four count (documented gap).
+    // sql-tag: P1 -- source-agnostic. Now includes the barrel consumer.
     const sqlTagFiles = json.files.filter((f) => f.kinds['sql-tag']).map((f) => f.file).sort();
     const expectedSqlTagFiles = [
+      'lib/services/alias-import.js',
+      'lib/services/alias-require.js',
+      'lib/services/bare-sql-from-call.js',
+      'lib/services/bare-sql-param.js',
       'lib/services/barrel-consumer.js',
+      'lib/services/cast-lint-cases.js',
+      'lib/services/cjs-require.js',
       'lib/services/destructured-require.js',
       'lib/services/dynamic-import.js',
+      'lib/services/namespace-import.js',
+      'lib/services/neon-driver.js',
       'lib/services/plain-import.js',
+      'lib/services/resolved-const-require.js',
       'lib/services/table-edge-cases.js',
+      'lib/services/vercel-postgres-subpath.js',
       'pages/api/health.js',
     ];
     expect(JSON.stringify(sqlTagFiles) === JSON.stringify(expectedSqlTagFiles),
       `sql-tag file set mismatch: got ${JSON.stringify(sqlTagFiles)}, expected ${JSON.stringify(expectedSqlTagFiles)}`);
-    expect(json.sqlTagFiles === expectedSqlTagFiles.length,
-      `sqlTagFiles expected ${expectedSqlTagFiles.length}, got ${json.sqlTagFiles}`);
-    const expectedSqlTagTotal = expectedSqlTagFiles.length + 3; // table-edge-cases.js has 4 tags, not 1
-    expect(json.sqlTagTotal === expectedSqlTagTotal,
-      `sqlTagTotal expected ${expectedSqlTagTotal}, got ${json.sqlTagTotal}`);
+    expect(findRecord(json, 'lib/services/barrel-consumer.js').tables.includes('barrel_table'),
+      'barrel-consumer.js sql-tag statement table extraction should still work');
 
-    // Kind-specific occurrence checks, incl. the two kinds the prior
-    // self-test never exercised (sql.query, pool.connect).
-    expect(json.kindTotals['new-Pool'] === 2, `expected new-Pool: 2, got ${json.kindTotals['new-Pool']}`);
-    expect(json.kindTotals['pool.query'] === 1, `expected pool.query: 1, got ${json.kindTotals['pool.query']}`);
-    expect(json.kindTotals['db.connect'] === 1, `expected db.connect: 1, got ${json.kindTotals['db.connect']}`);
-    expect(json.kindTotals['pool.connect'] === 1, `expected pool.connect: 1, got ${json.kindTotals['pool.connect']}`);
-    expect(json.kindTotals['client.query'] === 3, `expected client.query: 3, got ${json.kindTotals['client.query']}`);
+    // P2-B: bare unbound `sql` tag, no import/require of any kind anywhere
+    // in the file -- must still count as sql-tag, and must NOT count as
+    // driver-import (there is nothing to import here).
+    const bareParam = findRecord(json, 'lib/services/bare-sql-param.js');
+    expect(bareParam && bareParam.kinds['sql-tag'] === 1 && !bareParam.kinds['driver-import'],
+      `bare-sql-param.js (sql as a bare function parameter) should be sql-tag only, got ${JSON.stringify(bareParam)}`);
+    const bareCall = findRecord(json, 'lib/services/bare-sql-from-call.js');
+    expect(bareCall && bareCall.kinds['sql-tag'] === 1 && !bareCall.kinds['driver-import'],
+      `bare-sql-from-call.js (sql assigned from neon(url), no import) should be sql-tag only, got ${JSON.stringify(bareCall)}`);
+    expect(!driverImportFiles.includes('lib/services/bare-sql-param.js') && !driverImportFiles.includes('lib/services/bare-sql-from-call.js'),
+      'neither bare-sql fixture should be driver-import');
+
+    // P2-5: renamed Pool specifier/require both count as new-Pool.
+    expect(findRecord(json, 'lib/services/renamed-pool-import.js').kinds['new-Pool'] === 1,
+      'renamed-pool-import.js (import { Pool as P }; new P()) should record new-Pool');
+    expect(findRecord(json, 'lib/services/renamed-pool-require.js').kinds['new-Pool'] === 1,
+      'renamed-pool-require.js (const { Pool: P } = require(...); new P()) should record new-Pool');
+
+    // P2-3: unresolved module sources are audited, not ratcheted.
+    const unresolvedFiles = json.unresolved.map((u) => u.file);
+    expect(unresolvedFiles.includes('lib/services/unresolved-dynamic-import.js'),
+      `unresolved-dynamic-import.js should appear in the unresolved-sources audit, got ${JSON.stringify(json.unresolved)}`);
+    expect(unresolvedFiles.includes('lib/services/resolved-non-driver-require.js'),
+      `resolved-non-driver-require.js (argument is an Identifier, even though resolvable) should appear in the unresolved-sources audit, got ${JSON.stringify(json.unresolved)}`);
+    const resolvedConstEntry = json.unresolved.find((u) => u.file === 'lib/services/resolved-non-driver-require.js');
+    expect(resolvedConstEntry && resolvedConstEntry.resolved === 'fs',
+      `resolved-non-driver-require.js should report its one-hop resolution ('fs'), got ${JSON.stringify(resolvedConstEntry)}`);
+    const unresolvedDynamicEntry = json.unresolved.find((u) => u.file === 'lib/services/unresolved-dynamic-import.js');
+    expect(unresolvedDynamicEntry && unresolvedDynamicEntry.resolved === null,
+      `unresolved-dynamic-import.js should have no one-hop resolution, got ${JSON.stringify(unresolvedDynamicEntry)}`);
+
+    // Kind-specific occurrence checks, incl. the Stage 1 item 0 additions.
+    expect(json.kindTotals['new-Pool'] === 7, `expected new-Pool: 7, got ${json.kindTotals['new-Pool']}`);
+    expect(json.kindTotals['pool.query'] === 5, `expected pool.query: 5, got ${json.kindTotals['pool.query']}`);
+    expect(json.kindTotals['db.connect'] === 3, `expected db.connect: 3, got ${json.kindTotals['db.connect']}`);
+    expect(json.kindTotals['pool.connect'] === 2, `expected pool.connect: 2, got ${json.kindTotals['pool.connect']}`);
+    expect(json.kindTotals['client.query'] === 6, `expected client.query: 6, got ${json.kindTotals['client.query']}`);
     expect(json.kindTotals['begin-literal'] === 1, `expected begin-literal: 1, got ${json.kindTotals['begin-literal']}`);
     expect(json.kindTotals['sql.query'] === 1, `expected sql.query: 1, got ${json.kindTotals['sql.query']}`);
+
+    // Item 0(b): member-callee new Pool().
+    const pgNamespacePool = findRecord(json, 'lib/services/pg-namespace-pool.js');
+    expect(pgNamespacePool.kinds['new-Pool'] === 1,
+      `pg-namespace-pool.js should record new-Pool via new pg.Pool(), got ${JSON.stringify(pgNamespacePool.kinds)}`);
+
+    // Item 0(c): nested member paths and variable-bound instances.
+    expect(findRecord(json, 'lib/services/nested-pool-query.js').kinds['pool.query'] === 1,
+      'nested-pool-query.js (this.pool.query(...)) should record pool.query');
+    expect(findRecord(json, 'lib/services/nested-db-connect.js').kinds['db.connect'] === 1,
+      'nested-db-connect.js (self.db.connect()) should record db.connect');
+    expect(findRecord(json, 'lib/services/pool-var-connect.js').kinds['pool.connect'] === 1,
+      'pool-var-connect.js (p bound to new Pool()) should record pool.connect');
+    expect(findRecord(json, 'lib/services/imported-db-var-connect.js').kinds['db.connect'] === 1,
+      'imported-db-var-connect.js (p bound to an imported db) should record db.connect');
 
     // Table extraction (best-effort, only from sql-tag quasis / query args).
     const plainImport = findRecord(json, 'lib/services/plain-import.js');
@@ -654,10 +1469,6 @@ function runSelfTest() {
     expect(!sqlQueryCall.tables.includes('where'),
       `sql-query-call.js tables must NOT include the WHERE keyword, got ${JSON.stringify(sqlQueryCall.tables)}`);
 
-    // Table-extraction edge cases (item 1): ON CONFLICT DO UPDATE SET,
-    // FOR UPDATE SKIP LOCKED, a quoted identifier, and a FROM-clause
-    // function call must not leak keywords/functions as table names, and
-    // the placeholder join token must never itself appear as a table.
     const edgeCases = findRecord(json, 'lib/services/table-edge-cases.js');
     const edgeTables = edgeCases.tables;
     expect(edgeTables.includes('widget_requests'),
@@ -669,20 +1480,351 @@ function runSelfTest() {
         `table-edge-cases.js tables must NOT include '${bogus}', got ${JSON.stringify(edgeTables)}`);
     }
 
-    // --report and default mode must also exit 0 (Stage 0 is report-only),
-    // and --report's headline must expose BOTH the driver-import count and
-    // the (larger) any-record count as distinct numbers.
-    const reportOutput = execFileSync(process.execPath, [__filename, '--root', tempRoot, '--report'], { encoding: 'utf8' });
+    // Q6 cast-lint: the uncast jsonb_build_object(...) placeholder warns
+    // (kind === 'jsonb_build_object'); the ::text-cast placeholder must not.
+    // table-edge-cases.js also legitimately warns once with kind === 'VALUES'
+    // (its `VALUES (${id})` placeholder has no cast) -- correct Q6 behavior.
+    const castLintFiles = json.castLint.map((w) => w.file).sort();
+    expect(JSON.stringify(castLintFiles) === JSON.stringify(['lib/services/cast-lint-cases.js', 'lib/services/table-edge-cases.js']),
+      `unexpected cast-lint warning file set: ${JSON.stringify(json.castLint)}`);
+    const castLintCasesWarnings = json.castLint.filter((w) => w.file === 'lib/services/cast-lint-cases.js');
+    expect(castLintCasesWarnings.length === 1 && castLintCasesWarnings[0].kind === 'jsonb_build_object',
+      `cast-lint-cases.js should warn exactly once with kind jsonb_build_object, got ${JSON.stringify(castLintCasesWarnings)}`);
+    const edgeCaseWarnings = json.castLint.filter((w) => w.file === 'lib/services/table-edge-cases.js');
+    expect(edgeCaseWarnings.length === 1 && edgeCaseWarnings[0].kind === 'VALUES',
+      `table-edge-cases.js should warn exactly once with kind VALUES, got ${JSON.stringify(edgeCaseWarnings)}`);
+
+    const { output: reportOutput } = (() => {
+      const out = execFileSync(process.execPath, [__filename, '--root', tempRoot, '--report', '--allowlist', permissiveAllowlist], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      return { output: out };
+    })();
     expect(reportOutput.includes(`Driver-import files (import/require/dynamic-import of a driver): ${json.driverFileTotal}`),
       `--report headline missing/mismatched driver-import count:\n${reportOutput}`);
     expect(reportOutput.includes(`Files with any recognized record (incl. non-driver-import callers, e.g. a client passed in as an argument): ${json.totalFilesInCensus}`),
       `--report headline missing/mismatched total-files-in-census count:\n${reportOutput}`);
-    execFileSync(process.execPath, [__filename, '--root', tempRoot], { encoding: 'utf8' });
+    expect(reportOutput.includes('## Cast-lint warnings') && reportOutput.includes(`Total: ${json.castLint.length}`),
+      `--report must include the cast-lint warnings section with the right total:\n${reportOutput}`);
+    expect(reportOutput.includes('| Region kind | Count |') && reportOutput.includes('jsonb_build_object'),
+      `--report cast-lint section must include the per-kind total table:\n${reportOutput}`);
+    expect(!reportOutput.includes('### Full rows'),
+      `--report without --cast-lint-detail must NOT include the full per-line rows:\n${reportOutput}`);
+    expect(reportOutput.includes('## Unresolved module sources') && reportOutput.includes('lib/services/unresolved-dynamic-import.js'),
+      `--report must include the unresolved module sources section naming the file:\n${reportOutput}`);
 
-    console.log('postgres-access-layer self-test OK -- all fixture kinds, comment exclusion, alias/renamed-tag gap, and no-propagation behavior verified.');
+    const detailReportOutput = execFileSync(process.execPath, [__filename, '--root', tempRoot, '--report', '--cast-lint-detail', '--allowlist', permissiveAllowlist], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    expect(detailReportOutput.includes('### Full rows'),
+      `--report --cast-lint-detail must include the full per-line rows:\n${detailReportOutput}`);
+
+    // --json + --report together: stdout must stay valid JSON (report goes
+    // to stderr).
+    const combined = execFileSync(process.execPath, [__filename, '--root', tempRoot, '--json', '--report', '--allowlist', permissiveAllowlist], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    let parsedCombined;
+    try {
+      parsedCombined = JSON.parse(combined);
+    } catch (err) {
+      throw new Error(`self-test FAILED: --json --report stdout must stay valid JSON, got parse error: ${err.message}\n${combined}`);
+    }
+    expect(parsedCombined.driverFileTotal === json.driverFileTotal,
+      '--json --report combined stdout should still be the full JSON payload');
+
+    console.log('postgres-access-layer classification self-test OK -- Stage 1 binding-resolution fixes (a)/(b)/(c), P1 source-agnostic sql-tag, P2-2 driver sources, P2-3 one-hop resolution + unresolved audit, P2-5 renamed Pool, P2-6 cast-lint kinds, comment exclusion verified.');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+}
+
+function runRatchetSelfTest() {
+  // ---- green: exact-match allowlist ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/foo-store.js', `
+        import { sql } from '@vercel/postgres';
+        export async function get() { return sql\`SELECT 1 FROM foo\`; }
+      `);
+      const { json } = runJson(tempRoot, writeAllowlist(tempRoot, []));
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'lib/services/foo-store.js', kind: 'driver-import', count: json.files[0].kinds['driver-import'] },
+        { file: 'lib/services/foo-store.js', kind: 'sql-tag', count: json.files[0].kinds['sql-tag'] },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 0, `expected green at exact-match allowlist, got status ${result.status}\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red (a): unknown key not in allowlist ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/foo-store.js', `
+        import { sql } from '@vercel/postgres';
+        export async function get() { return sql\`SELECT 1 FROM foo\`; }
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (unknown key), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/foo-store.js') && result.stderr.includes('not in allowlist'),
+        `expected violation to name the offending file, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red (a): census count above allowed ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/foo-store.js', `
+        import { sql } from '@vercel/postgres';
+        export async function get() {
+          await sql\`SELECT 1 FROM foo\`;
+          return sql\`SELECT 2 FROM foo\`;
+        }
+      `);
+      const { json } = runJson(tempRoot, writeAllowlist(tempRoot, []));
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'lib/services/foo-store.js', kind: 'driver-import', count: json.files[0].kinds['driver-import'] },
+        { file: 'lib/services/foo-store.js', kind: 'sql-tag', count: 1 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (count above allowed), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/foo-store.js') && result.stderr.includes('sql-tag')
+        && result.stderr.includes('exceeds allowlist'),
+        `expected violation to name file+kind, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red (b): allowlist count above census ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/foo-store.js', `
+        import { sql } from '@vercel/postgres';
+        export async function get() { return sql\`SELECT 1 FROM foo\`; }
+      `);
+      const { json } = runJson(tempRoot, writeAllowlist(tempRoot, []));
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'lib/services/foo-store.js', kind: 'driver-import', count: json.files[0].kinds['driver-import'] },
+        { file: 'lib/services/foo-store.js', kind: 'sql-tag', count: 5 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (allowlist above census), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/foo-store.js') && result.stderr.includes('shrink the allowlist'),
+        `expected 'shrink the allowlist' naming the file, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red (b): vanished key ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/foo-store.js', 'module.exports.get = () => 1;\n');
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'lib/services/foo-store.js', kind: 'driver-import', count: 1 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (vanished key), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/foo-store.js') && result.stderr.includes('shrink the allowlist'),
+        `expected 'shrink the allowlist' for a vanished key, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red (b): allowlist entry naming a Q5-exempt file ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/utils/health-checker.js', `
+        const { Pool } = require('pg');
+        module.exports.check = async () => new Pool().query('SELECT 1');
+      `);
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'lib/utils/health-checker.js', kind: 'driver-import', count: 1 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (allowlist lists an exempt file), got status ${result.status}`);
+      expect(result.stderr.includes('lib/utils/health-checker.js') && result.stderr.includes('must not list an exempt file'),
+        `expected 'must not list an exempt file' naming health-checker.js, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red (c): pages/api importing lib/postgres/** when it exists ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/postgres/client.js', 'module.exports.sql = null;\n');
+      write(tempRoot, 'pages/api/widgets.js', `
+        const { sql } = require('../../lib/postgres/client');
+        module.exports = async (req, res) => { res.json(await sql\`SELECT 1\`); };
+      `);
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'pages/api/widgets.js', kind: 'sql-tag', count: 1 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (pages/api imports lib/postgres), got status ${result.status}`);
+      expect(result.stderr.includes('pages/api/widgets.js') && result.stderr.includes('lib/postgres'),
+        `expected violation naming the route, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red (c): index-form import (no trailing segment after lib/postgres) ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/postgres/index.js', 'module.exports.sql = null;\n');
+      write(tempRoot, 'pages/api/widgets.js', `
+        const { sql } = require('../../lib/postgres');
+        module.exports = async (req, res) => { res.json(await sql\`SELECT 1\`); };
+      `);
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'pages/api/widgets.js', kind: 'sql-tag', count: 1 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (index-form lib/postgres import), got status ${result.status}`);
+      expect(result.stderr.includes('pages/api/widgets.js'),
+        `expected violation naming the route for the index-form import, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- green (c): no-op when lib/postgres/ does not exist in the tree ----
+  // (P1 means the bare `sql` tag here DOES count as sql-tag now, so the
+  // allowlist needs that entry for the fixture to stay green on other
+  // grounds -- the point of THIS fixture is specifically that check (c)
+  // itself is a no-op without lib/postgres/ present, not that the file has
+  // no census record at all.)
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'pages/api/widgets.js', `
+        const { sql } = require('../../lib/postgres/client');
+        module.exports = async (req, res) => { res.json(await sql\`SELECT 1\`); };
+      `);
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'pages/api/widgets.js', kind: 'sql-tag', count: 1 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 0, `expected green (c) no-op without lib/postgres/, got status ${result.status}\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- green: Q5 exemption (lib/utils/health-checker.js), no allowlist entry needed ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/utils/health-checker.js', `
+        const { Pool } = require('pg');
+        module.exports.check = async () => {
+          const pool = new Pool();
+          return pool.query('SELECT 1 FROM information_schema.tables');
+        };
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 0, `expected green (Q5 exemption, no allowlist entry needed), got status ${result.status}\n${result.stderr}`);
+      const { json } = runJson(tempRoot, allowlist);
+      expect(findRecord(json, 'lib/utils/health-checker.js') !== undefined,
+        'lib/utils/health-checker.js must still appear in --json/--report despite being ratchet-exempt');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- green: Q5 exemption (lib/utils/migration-drift.js), no allowlist entry needed ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/utils/migration-drift.js', `
+        const { Pool } = require('pg');
+        module.exports.check = async () => new Pool().query('SELECT 1 FROM schema_migrations');
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 0, `expected green (migration-drift.js Q5 exemption), got status ${result.status}\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- exit 2: duplicate allowlist (file,kind) key ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/foo-store.js', 'module.exports.get = () => 1;\n');
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'lib/services/foo-store.js', kind: 'driver-import', count: 1 },
+        { file: 'lib/services/foo-store.js', kind: 'driver-import', count: 2 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 2, `expected exit 2 (duplicate allowlist key), got status ${result.status}\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- exit 2: allowlist entry missing a required field (not _comment) ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/foo-store.js', 'module.exports.get = () => 1;\n');
+      const allowlist = writeAllowlist(tempRoot, [
+        { _comment: 'this metadata entry is fine, no file/kind' },
+        { file: 'lib/services/foo-store.js', kind: 'driver-import' }, // missing count
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 2, `expected exit 2 (malformed entry missing count), got status ${result.status}\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  console.log('postgres-access-layer ratchet self-test OK -- green exact-match, red (a)/(a-count)/(b)/(b-vanished)/(b-exempt)/(c)/(c-index-form), green (c) no-op, Q5 exemptions, and malformed-allowlist exit-2 cases verified.');
+}
+
+// P2-A: a `--json` payload over ~64 KiB used to be truncated by
+// `process.exit(main())` racing the async stdout-to-pipe write (observed
+// exactly at the 64 KiB highWaterMark via `node ... --json | wc -c`). Runs
+// through a REAL shell pipe (not just execFileSync's internal capture,
+// which reads via a synchronous blocking loop and can mask the bug) against
+// this repo's own tree/allowlist, whose --json output is well over 64 KiB.
+function runJsonPipeSelfTest() {
+  const wcOutput = execFileSync('/bin/sh', ['-c', `'${process.execPath}' '${__filename}' --json | wc -c`],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const byteCount = parseInt(wcOutput.trim(), 10);
+  expect(byteCount > 65536, `expected piped --json output over 65536 bytes (regression guard for the exit()-truncation bug), got ${byteCount}`);
+
+  const jsonOutput = execFileSync(process.execPath, [__filename, '--json'],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024 });
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonOutput);
+  } catch (err) {
+    throw new Error(`self-test FAILED: piped --json output did not parse as JSON (truncated?): ${err.message}`);
+  }
+  expect(parsed.driverFileTotal === 60 && parsed.sqlTagTotal === 349 && parsed.totalFilesInCensus === 62,
+    `piped --json payload should still carry the full, untruncated live census, got ${JSON.stringify({ driverFileTotal: parsed.driverFileTotal, sqlTagTotal: parsed.sqlTagTotal, totalFilesInCensus: parsed.totalFilesInCensus })}`);
+
+  console.log(`postgres-access-layer JSON-pipe self-test OK -- ${byteCount} bytes through a real shell pipe, parsed intact.`);
+}
+
+function runSelfTest() {
+  runClassificationSelfTest();
+  runRatchetSelfTest();
+  runJsonPipeSelfTest();
 }
 
 function main(argv = process.argv.slice(2)) {
@@ -696,25 +1838,42 @@ function main(argv = process.argv.slice(2)) {
     return 0;
   }
 
-  const records = analyzeRoot(args.root);
-  if (args.json) {
-    console.log(JSON.stringify(buildJson(records), null, 2));
-  }
+  const { records, castWarnings, unresolved } = analyzeRoot(args.root);
+
   if (args.report) {
-    console.log(formatReport(records));
+    const reportOut = formatReport(records, castWarnings, unresolved, args.castLintDetail);
+    // Cosmetic fix: with both --json and --report, the report goes to
+    // stderr so stdout stays valid JSON.
+    if (args.json) console.error(reportOut);
+    else console.log(reportOut);
+  }
+  if (args.json) {
+    console.log(JSON.stringify(buildJson(records, castWarnings, unresolved), null, 2));
   }
   if (!args.report && !args.json) {
-    console.log('postgres-access-layer: report-only in Stage 0 (use --report or --json for detail).');
+    console.log('postgres-access-layer: use --report or --json for detail (ratchet still applies).');
   }
-  return 0; // Stage 0 is report-only: exits 0 on any census result; exit 2 is parse-failure only (below).
+
+  const allowlist = loadAllowlist(args.allowlist);
+  const violations = runRatchet(records, allowlist, args.root);
+  if (violations.length) {
+    for (const v of violations) console.error(`VIOLATION: ${v}`);
+    console.error(`postgres-access-layer ratchet: ${violations.length} violation(s) -- see docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md §5 Stage 1`);
+    return 1;
+  }
+  return 0;
 }
 
 if (require.main === module) {
+  // P2-A: process.exitCode + a natural exit (never process.exit(...) here),
+  // so Node drains a piped stdout before the process ends -- process.exit()
+  // can truncate a large --json payload when stdout is a pipe (observed at
+  // exactly the 64 KiB highWaterMark).
   try {
-    process.exit(main());
+    process.exitCode = main();
   } catch (err) {
     console.error(err.message || err);
-    process.exit(2);
+    process.exitCode = 2;
   }
 }
 
@@ -724,4 +1883,7 @@ module.exports = {
   buildJson,
   formatReport,
   isPostgresDriverSource,
+  runRatchet,
+  loadAllowlist,
+  isExemptFile,
 };
