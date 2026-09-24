@@ -144,8 +144,12 @@ describe('sandbox operator write boundary', () => {
 
   test('keeps one Request create and routes it through execute only', () => {
     expect(script.match(/client\.postWithOptions\('\/akoya_requests'/g)).toHaveLength(1);
-    expect(script).toContain('Only a source-bound v3 manifest can execute a sandbox clone.');
-    expect(script).toContain('assertSourceUnchanged(manifest.source, sourceRow, preflightBefore.grantOption.value)');
+    expect(script).toContain('Only a source-bound v3 or bundle v4 manifest can execute a sandbox clone.');
+    expect(script).toContain('const source = await fenceSource(client, manifest, preflightBefore.grantOption.value)');
+    // The fence re-reads a sandbox source (v3) or re-validates the embedded
+    // bundle (v4); the sandbox client never reads production.
+    expect(script).toContain('await getSourceRequestById(client, manifest.source.requestId, requestOptions)');
+    expect(script).toContain('source = bundleSourceOf(manifest).request;');
     expect(script).toContain('reserveRehearsalReceipt(receiptPath, receipt)');
     expect(script).toContain('manifest.values.locationId');
     expect(script).toContain('expectedFolder');
@@ -182,5 +186,23 @@ describe('sandbox operator write boundary', () => {
     const mainBody = script.slice(script.indexOf('async function main()'), script.indexOf('main().catch'));
     expect(mainBody).not.toMatch(/client\.(post|patch|delete)\s*\(/);
     expect(script).toContain('verifyCloneRequestReadback(manifest, request)');
+  });
+
+  test('copies bundle files only after the location exists, through the journaled copy module', () => {
+    // File copy runs after the Request and its location are proven, never before.
+    const locationProvision = script.indexOf('const location = await provisionSharePointLocation(');
+    const copyCall = script.indexOf('await copyBundleDocuments(manifest, datedRequest, location.folder, preflightBefore, receipt, receiptPath)');
+    expect(locationProvision).toBeGreaterThan(-1);
+    expect(copyCall).toBeGreaterThan(locationProvision);
+    // The receipt journal is persisted synchronously on every copy-module callback.
+    const journalAssign = script.indexOf('receipt.fileCopies = journal;');
+    expect(journalAssign).toBeGreaterThan(-1);
+    expect(script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', journalAssign) - journalAssign).toBeLessThan(80);
+    // The script itself never uploads; the copy module owns the single create-only PUT.
+    expect(script).not.toMatch(/GraphService\.uploadFile\([^)]*\)\s*;/);
+    expect(script).toContain('retryOnAmbiguousFileUpload: false');
+    expect(script).toContain('expectedSharePointFiles: plannedFiles.length');
+    expect(script).toContain('verifyCopiedFiles(fileCopies, files)');
+    expect(script).toContain("destinationRequestNumber: request.akoya_requestnum");
   });
 });

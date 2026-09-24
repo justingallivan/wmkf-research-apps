@@ -9,10 +9,20 @@
  *
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --prepare=/absolute/manifest.json --source-request-number=<actual-grant-request-number>
+ *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --prepare=/absolute/manifest.json --bundle=/absolute/source-bundle.json
  *   node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs --execute=/absolute/manifest.json --receipt=/absolute/receipt.json
  *
- * The script never deletes or resets the created Request. An ambiguous create
- * is not retried: the preallocated GUID in the manifest is the recovery key.
+ * A v3 manifest clones a sandbox source Request (no files). A v4 manifest
+ * clones a production source exported by scripts/export-test-request-source-bundle.mjs
+ * and copies each bundle document into the new Request folder: destination
+ * journaled in the receipt before each write, create-only with conflict
+ * refusal, drive re-resolved on the registered site with eTag and SHA-256
+ * re-verified, ambiguous outcomes recovered by exact item and never retried
+ * (lib/services/test-requests/bundle-file-copy.js).
+ *
+ * The script never deletes or resets the created Request or copied files. An
+ * ambiguous create is not retried: the preallocated GUID in the manifest is
+ * the recovery key.
  */
 
 import crypto from 'crypto';
@@ -38,6 +48,12 @@ import {
   resolveCloneCycle,
   verifyCloneRequestReadback,
 } from '../lib/services/test-requests/sandbox-clone.js';
+import { readSourceBundle, summarizeSourceBundle } from '../lib/services/test-requests/source-bundle.js';
+import {
+  copyBundleFiles,
+  planBundleFileCopies,
+  verifyCopiedFiles,
+} from '../lib/services/test-requests/bundle-file-copy.js';
 
 const require = createRequire(import.meta.url);
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
@@ -108,10 +124,12 @@ function parseArgs(argv) {
     fiscalYear: null,
     meetingDate: null,
     sourceRequestNumber: null,
+    bundle: null,
     testLabel: null,
   };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
+    else if (arg.startsWith('--bundle=')) parsed.bundle = arg.slice('--bundle='.length);
     else if (arg.startsWith('--execute=')) parsed.execute = arg.slice('--execute='.length);
     else if (arg.startsWith('--inspect=')) parsed.inspect = arg.slice('--inspect='.length);
     else if (arg.startsWith('--receipt=')) parsed.receipt = arg.slice('--receipt='.length);
@@ -131,14 +149,17 @@ function parseArgs(argv) {
   if (parsed.bypassGoverify && !parsed.execute) {
     throw new Error('--bypass-goverify is valid only with --execute.');
   }
-  if (parsed.prepare && (!parsed.sourceRequestNumber || !/^\d{1,10}$/.test(parsed.sourceRequestNumber))) {
-    throw new Error('--prepare requires a bounded numeric --source-request-number.');
+  if (parsed.prepare && parsed.bundle && parsed.sourceRequestNumber !== null) {
+    throw new Error('--prepare takes either --bundle or --source-request-number, not both.');
   }
-  if (!parsed.prepare && (parsed.fiscalYear !== null || parsed.meetingDate !== null || parsed.sourceRequestNumber !== null || parsed.testLabel !== null)) {
-    throw new Error('--source-request-number, --fiscal-year, --meeting-date, and --test-label are valid only with --prepare.');
+  if (parsed.prepare && !parsed.bundle && (!parsed.sourceRequestNumber || !/^\d{1,10}$/.test(parsed.sourceRequestNumber))) {
+    throw new Error('--prepare requires --bundle or a bounded numeric --source-request-number.');
   }
-  for (const value of [parsed.prepare, parsed.execute, parsed.inspect, parsed.receipt].filter(Boolean)) {
-    if (!path.isAbsolute(value)) throw new Error('Manifest and receipt paths must be absolute.');
+  if (!parsed.prepare && (parsed.fiscalYear !== null || parsed.meetingDate !== null || parsed.sourceRequestNumber !== null || parsed.bundle !== null || parsed.testLabel !== null)) {
+    throw new Error('--bundle, --source-request-number, --fiscal-year, --meeting-date, and --test-label are valid only with --prepare.');
+  }
+  for (const value of [parsed.prepare, parsed.execute, parsed.inspect, parsed.receipt, parsed.bundle].filter(Boolean)) {
+    if (!path.isAbsolute(value)) throw new Error('Manifest, receipt, and bundle paths must be absolute.');
   }
   return parsed;
 }
@@ -146,6 +167,7 @@ function parseArgs(argv) {
 function printHelp() {
   console.log('Read-only: node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs');
   console.log('Prepare:  ... --prepare=/absolute/new-manifest.json --source-request-number=<actual-grant-request-number> [--fiscal-year=...] [--meeting-date=...]');
+  console.log('Prepare from a production source bundle (with file copy): ... --prepare=/absolute/new-manifest.json --bundle=/absolute/source-bundle.json');
   console.log('Replace the source-number placeholder with an actual sandbox Grant Request number.');
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
   console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
@@ -396,6 +418,27 @@ async function getSourceRequestById(client, requestId, requestOptions = null) {
   return bodyOrThrow('source Request revalidation', response);
 }
 
+/**
+ * Fence the source before a write. A v3 manifest re-reads its sandbox source;
+ * a v4 manifest re-validates the embedded production bundle instead, because
+ * the sandbox client must never read production.
+ */
+async function fenceSource(client, manifest, grantType, requestOptions = null) {
+  let source;
+  if (isBundleManifest(manifest)) {
+    source = bundleSourceOf(manifest).request;
+    if (source.akoya_requesttype !== grantType) throw new Error('Bundle source is not a Grant Request for the sandbox Grant option.');
+  } else {
+    source = assertSourceUnchanged(
+      manifest.source,
+      await getSourceRequestById(client, manifest.source.requestId, requestOptions),
+      grantType,
+    );
+  }
+  assertCopiedSourceValues(source, manifest.createBody);
+  return source;
+}
+
 async function getAppUser(client) {
   const applicationId = process.env.DYNAMICS_CLIENT_ID;
   if (!/^[0-9a-f-]{36}$/i.test(applicationId || '')) throw new Error('Configured Dataverse application ID is invalid.');
@@ -506,7 +549,14 @@ function preflightSummary(preflight) {
   };
 }
 
-function buildManifest(preflight, { source, fiscalYear, meetingDate, testLabel }) {
+const MANIFEST_V3 = 'test-request-sandbox-rehearsal-manifest/v3';
+const MANIFEST_V4 = 'test-request-sandbox-rehearsal-manifest/v4';
+
+function isBundleManifest(manifest) {
+  return manifest?.kind === MANIFEST_V4;
+}
+
+function buildManifest(preflight, { source, fiscalYear, meetingDate, testLabel, bundle = null }) {
   const requestId = crypto.randomUUID();
   const runId = crypto.randomUUID();
   const locationId = crypto.randomUUID();
@@ -519,8 +569,12 @@ function buildManifest(preflight, { source, fiscalYear, meetingDate, testLabel }
     meetingDate,
   };
   const createBody = compileBody(preflight, values, source);
+  // A bundle manifest carries the validated bundle so execute never reads the
+  // production source: destinations stay templates until the server assigns
+  // the new request number.
+  const plannedFiles = bundle ? planBundleFileCopies(bundle) : [];
   return {
-    kind: 'test-request-sandbox-rehearsal-manifest/v3',
+    kind: bundle ? MANIFEST_V4 : MANIFEST_V3,
     preparedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + MANIFEST_TTL_MS).toISOString(),
     target: SANDBOX_URL,
@@ -531,44 +585,77 @@ function buildManifest(preflight, { source, fiscalYear, meetingDate, testLabel }
     },
     expectedRequestType: preflight.grantOption,
     expectedAppUserId: preflight.appUser.systemuserid,
+    expectedGraphSiteId: preflight.siteId,
+    expectedGraphDriveId: preflight.driveId,
     source: {
       requestId: source.akoya_requestid,
       requestNumber: source.akoya_requestnum,
       requestType: source.akoya_requesttype,
       revision: source.revision,
+      ...(bundle ? {
+        dataverseHost: bundle.source.dataverseHost,
+        exportedAt: bundle.exportedAt,
+        bundleSha256: sha256(bundle),
+      } : {}),
     },
+    ...(bundle ? { bundle, plannedFiles } : {}),
     createBody,
     createBodySha256: sha256(createBody),
     invariants: {
       exactlyOneCreate: true,
       retryOnAmbiguousCreate: false,
+      retryOnAmbiguousFileUpload: false,
       deleteOrReset: false,
       expectedPayments: 0,
       expectedRegardingEmails: 0,
       expectedDynamicsLocations: 1,
-      expectedSharePointFiles: 0,
+      expectedSharePointFiles: plannedFiles.length,
     },
   };
 }
 
+/** Re-validate the embedded bundle and return its projected source Request. */
+function bundleSourceOf(manifest) {
+  const bundle = readSourceBundle(manifest.bundle);
+  if (sha256(manifest.bundle) !== manifest.source?.bundleSha256) throw new Error('Embedded source bundle hash mismatch.');
+  const request = bundle.source.request;
+  if (request.akoya_requestid !== String(manifest.source.requestId).toLowerCase()
+      || request.revision !== manifest.source.revision
+      || request.akoya_requesttype !== manifest.source.requestType
+      || bundle.source.dataverseHost !== manifest.source.dataverseHost) {
+    throw new Error('Embedded source bundle does not match the manifest source.');
+  }
+  return { bundle, request };
+}
+
 function validateManifest(manifest, { allowExpired = false, forExecute = false } = {}) {
-  if (!['test-request-sandbox-rehearsal-manifest/v1', 'test-request-sandbox-rehearsal-manifest/v2', 'test-request-sandbox-rehearsal-manifest/v3'].includes(manifest?.kind)) {
+  if (!['test-request-sandbox-rehearsal-manifest/v1', 'test-request-sandbox-rehearsal-manifest/v2', MANIFEST_V3, MANIFEST_V4].includes(manifest?.kind)) {
     throw new Error('Unsupported manifest kind.');
   }
-  if (forExecute && manifest.kind !== 'test-request-sandbox-rehearsal-manifest/v3') {
-    throw new Error('Only a source-bound v3 manifest can execute a sandbox clone.');
+  if (forExecute && ![MANIFEST_V3, MANIFEST_V4].includes(manifest.kind)) {
+    throw new Error('Only a source-bound v3 or bundle v4 manifest can execute a sandbox clone.');
   }
   if (manifest.target !== SANDBOX_URL) throw new Error('Manifest target is not the registered sandbox.');
-  if (manifest.kind.endsWith('/v3') && (!/^[0-9a-f-]{36}$/i.test(manifest.source?.requestId || '') ||
+  const sourceBound = manifest.kind === MANIFEST_V3 || manifest.kind === MANIFEST_V4;
+  if (sourceBound && (!/^[0-9a-f-]{36}$/i.test(manifest.source?.requestId || '') ||
       !manifest.source?.revision || !Number.isInteger(manifest.source?.requestType) ||
       !String(manifest.createBody?.akoya_title || '').startsWith('TEST: '))) {
-    throw new Error('Source-bound v3 manifest provenance is invalid.');
+    throw new Error('Source-bound manifest provenance is invalid.');
+  }
+  if (isBundleManifest(manifest)) {
+    const { bundle } = bundleSourceOf(manifest);
+    if (!Array.isArray(manifest.plannedFiles) || manifest.plannedFiles.length !== bundle.documents.length
+        || manifest.invariants?.expectedSharePointFiles !== bundle.documents.length
+        || manifest.invariants?.retryOnAmbiguousFileUpload !== false
+        || !manifest.expectedGraphSiteId || !manifest.expectedGraphDriveId) {
+      throw new Error('Bundle manifest file plan is invalid.');
+    }
   }
   if (!manifest.expiresAt || (!allowExpired && Date.parse(manifest.expiresAt) <= Date.now())) throw new Error('Manifest is expired.');
   if (manifest.createBodySha256 !== sha256(manifest.createBody)) throw new Error('Manifest create body hash mismatch.');
   if (!guidEqual(manifest.createBody.akoya_requestid, manifest.values?.requestId) ||
       !guidEqual(manifest.createBody.wmkf_testcreationrunid, manifest.values?.runId) ||
-      ((manifest.kind.endsWith('/v2') || manifest.kind.endsWith('/v3')) && (!/^[0-9a-f-]{36}$/i.test(manifest.values?.locationId || '') ||
+      (!manifest.kind.endsWith('/v1') && (!/^[0-9a-f-]{36}$/i.test(manifest.values?.locationId || '') ||
         !/^[0-9a-f-]{36}$/i.test(manifest.expectedAppUserId || '')))) {
     throw new Error('Manifest identity mismatch.');
   }
@@ -609,6 +696,17 @@ async function inspectManifest(client, manifest) {
   const expectedFolder = request?.akoya_requestnum
     ? expectedRequestFolder(request.akoya_requestnum, request.akoya_requestid)
     : null;
+  // Bundle manifests copy files, so recovery also lists the exact folder
+  // (read-only) to show which planned destinations already exist.
+  let sharePointFiles = null;
+  let sharePointFilesError = null;
+  if (isBundleManifest(manifest) && expectedFolder) {
+    try {
+      sharePointFiles = await listSharePointFiles({ locations, locationParents });
+    } catch (error) {
+      sharePointFilesError = error.message;
+    }
+  }
   console.log(JSON.stringify({
     mode: 'READ_ONLY_RECOVERY_INSPECTION',
     target: SANDBOX_URL,
@@ -616,6 +714,12 @@ async function inspectManifest(client, manifest) {
     requestExists: Boolean(request),
     request: sanitizedRequestIdentity(request),
     expectedSharePointFolder: expectedFolder,
+    expectedSharePointFiles: manifest.invariants?.expectedSharePointFiles ?? 0,
+    plannedFiles: isBundleManifest(manifest)
+      ? manifest.plannedFiles.map((file) => ({ kind: file.kind, destination: file.destination, sourceName: file.source.name }))
+      : null,
+    sharePointFiles,
+    sharePointFilesError,
     expectedLocationId: manifest.values.locationId || null,
     folderRecoveryHint: expectedFolder && locations.length === 0
       ? 'If the location is absent, inspect this deterministic folder path before creating anything.'
@@ -864,7 +968,46 @@ async function listSharePointFiles(observation) {
   });
 }
 
-function verify(manifest, preflightBefore, observation, files, foundationAfter, contactsAfter) {
+async function copyBundleDocuments(manifest, request, requestFolder, preflight, receipt, receiptPath) {
+  const { bundle } = bundleSourceOf(manifest);
+  if (!request.akoya_requestnum) throw new Error('Destination request number is missing; cannot resolve file destinations.');
+  // Numbered destinations resolve only now that the server assigned the number.
+  const plannedFiles = planBundleFileCopies(bundle, { destinationRequestNumber: request.akoya_requestnum });
+  const { GraphService } = await import('../lib/services/graph-service.js');
+  const { configuredSharePointTargetInfo } = await import('../lib/services/sharepoint-target-registry.js');
+  receipt.fileCopyStartedAt = new Date().toISOString();
+  receipt.fileCopies = [];
+  updateRehearsalReceipt(receiptPath, receipt);
+  const copies = await copyBundleFiles({
+    plannedFiles,
+    requestFolder,
+    expectedSiteId: preflight.siteId,
+    expectedDestinationDriveId: preflight.driveId,
+  }, {
+    clearGraphCaches: () => GraphService.clearCaches(),
+    configuredSharePointTarget: () => configuredSharePointTargetInfo(),
+    getSiteId: () => GraphService.getSiteId(),
+    getDriveId: (library, options) => GraphService.getDriveId(library, options),
+    getFileMetadataById: (driveId, itemId) => GraphService.getFileMetadataById(driveId, itemId),
+    downloadFile: (driveId, itemId) => GraphService.downloadFile(driveId, itemId),
+    getFileMetadataByPath: (library, folder, filename, options) => (
+      GraphService.getFileMetadataByPath(library, folder, filename, options)
+    ),
+    ensureFolderPath: (library, folder, options) => GraphService.ensureFolderPath(library, folder, options),
+    uploadFile: (library, folder, filename, content, contentType, options) => (
+      GraphService.uploadFile(library, folder, filename, content, contentType, options)
+    ),
+  }, (journal) => {
+    // Durable before every Graph write; a failure here stops the copy.
+    receipt.fileCopies = journal;
+    updateRehearsalReceipt(receiptPath, receipt);
+  });
+  receipt.fileCopyCompletedAt = new Date().toISOString();
+  updateRehearsalReceipt(receiptPath, receipt);
+  return copies;
+}
+
+function verify(manifest, preflightBefore, observation, files, foundationAfter, contactsAfter, fileCopies = null) {
   const failures = [];
   const request = observation.request;
   failures.push(...verifyCloneRequestReadback(manifest, request));
@@ -890,7 +1033,12 @@ function verify(manifest, preflightBefore, observation, files, foundationAfter, 
     }
   }
   if (!Array.isArray(files)) failures.push('SharePoint folder could not be inspected');
-  else if (files.length !== 0) failures.push(`SharePoint folder contains ${files.length} file(s)`);
+  else if (fileCopies) {
+    if (fileCopies.length !== manifest.invariants.expectedSharePointFiles) {
+      failures.push(`journaled ${fileCopies.length} file copies; manifest expected ${manifest.invariants.expectedSharePointFiles}`);
+    }
+    failures.push(...verifyCopiedFiles(fileCopies, files));
+  } else if (files.length !== 0) failures.push(`SharePoint folder contains ${files.length} file(s)`);
 
   const accountChanges = compareSnapshots(
     [preflightBefore.foundation],
@@ -934,9 +1082,11 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
     if (!guidEqual(preflightBefore.appUser.systemuserid, manifest.expectedAppUserId)) {
       throw new Error('App-suite application user changed since prepare.');
     }
-    const sourceRow = await getSourceRequestById(client, manifest.source?.requestId);
-    const source = assertSourceUnchanged(manifest.source, sourceRow, preflightBefore.grantOption.value);
-    assertCopiedSourceValues(source, manifest.createBody);
+    if (isBundleManifest(manifest) && (preflightBefore.siteId !== manifest.expectedGraphSiteId
+        || preflightBefore.driveId !== manifest.expectedGraphDriveId)) {
+      throw new Error('Graph site or Request drive identity changed since prepare.');
+    }
+    const source = await fenceSource(client, manifest, preflightBefore.grantOption.value);
     const rebuiltBody = compileBody(preflightBefore, manifest.values, source);
     if (sha256(rebuiltBody) !== manifest.createBodySha256) throw new Error('Fresh preflight does not reproduce manifest body.');
 
@@ -982,16 +1132,12 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
 
       // Fence the source again after any optional automation change and just
       // before the sole Request POST.
-      const sourceBeforePost = assertSourceUnchanged(
-        manifest.source,
-        await getSourceRequestById(
-          client,
-          manifest.source.requestId,
-          signalFence ? { signal: signalFence.signal, timeoutMs: BYPASS_REQUEST_TIMEOUT_MS } : null,
-        ),
+      await fenceSource(
+        client,
+        manifest,
         preflightBefore.grantOption.value,
+        signalFence ? { signal: signalFence.signal, timeoutMs: BYPASS_REQUEST_TIMEOUT_MS } : null,
       );
-      assertCopiedSourceValues(sourceBeforePost, manifest.createBody);
       throwIfInterrupted(signalFence);
 
       receipt.createAttempted = true;
@@ -1071,7 +1217,10 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
 
     const createdRequest = await getRequest(client, manifest.values.requestId);
     const datedRequest = await correctMeetingDate(client, manifest, createdRequest, receipt, receiptPath);
-    await provisionSharePointLocation(client, manifest, datedRequest, receipt, receiptPath);
+    const location = await provisionSharePointLocation(client, manifest, datedRequest, receipt, receiptPath);
+    if (isBundleManifest(manifest)) {
+      await copyBundleDocuments(manifest, datedRequest, location.folder, preflightBefore, receipt, receiptPath);
+    }
 
     receipt.observationStartedAt = new Date().toISOString();
     updateRehearsalReceipt(receiptPath, receipt);
@@ -1094,14 +1243,10 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       files,
       foundationAfter,
       contactsAfter,
+      isBundleManifest(manifest) ? receipt.fileCopies || [] : null,
     );
     try {
-      const finalSource = assertSourceUnchanged(
-        manifest.source,
-        await getSourceRequestById(client, manifest.source.requestId),
-        preflightBefore.grantOption.value,
-      );
-      assertCopiedSourceValues(finalSource, manifest.createBody);
+      await fenceSource(client, manifest, preflightBefore.grantOption.value);
     } catch {
       verification.ok = false;
       verification.failures.push('source changed during clone rehearsal');
@@ -1171,18 +1316,29 @@ async function main() {
 
   const preflight = await runPreflight(client);
   if (args.prepare) {
-    const source = await getSourceRequestByNumber(client, args.sourceRequestNumber);
+    let source;
+    let bundle = null;
+    if (args.bundle) {
+      bundle = readSourceBundle(readJson(args.bundle));
+      source = bundle.source.request;
+    } else {
+      source = await getSourceRequestByNumber(client, args.sourceRequestNumber);
+    }
     if (source.akoya_requesttype !== preflight.grantOption.value) {
       throw new Error('Source Request must be a Grant Request matching the live Grant option.');
     }
     const cycle = resolveCloneCycle(source, args);
-    const manifest = buildManifest(preflight, { ...cycle, source, testLabel: args.testLabel });
+    const manifest = buildManifest(preflight, { ...cycle, source, testLabel: args.testLabel, bundle });
     writeNewJson(args.prepare, manifest);
     console.log(JSON.stringify({
       manifestPath: args.prepare,
       requestId: manifest.values.requestId,
       runId: manifest.values.runId,
       createBodySha256: manifest.createBodySha256,
+      ...(bundle ? {
+        bundle: summarizeSourceBundle(bundle),
+        plannedFiles: manifest.plannedFiles.map((file) => ({ kind: file.kind, sourceName: file.source.name, destination: file.destination })),
+      } : {}),
       preflight: preflightSummary(preflight),
     }, null, 2));
     return;
