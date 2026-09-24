@@ -30,7 +30,7 @@ No environment, deployment, schema, Dataverse or Vercel operation ran. Nothing w
 
 ### Owner Decision Needed
 
-1. **Single-request artifact boundary.** Stage 1d conservatively treats one deliberately selected request's proposal/material/IA/brief/review-panel/final-writeup artifacts as normal workflow actions, while population files and named exports exclude tests. Reclassifying every single-request Word/PDF artifact as a report would conflict with the existing normal-actions decision and needs an explicit owner change.
+None open on Stage 1d. The single-request artifact boundary was confirmed by the owner in Session 536 (2026-09-23): single-request Word/PDF artifacts stay available for test requests; see the design doc Stage 1d record.
 
 ### Parked
 
