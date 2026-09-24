@@ -334,11 +334,6 @@
   },
   {
     "file": "lib/services/operational-event-service.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/operational-event-service.js",
     "kind": "sql-tag",
     "count": 7
   },
