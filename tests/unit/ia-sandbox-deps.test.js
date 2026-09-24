@@ -19,6 +19,7 @@ import { createIaSandboxDeps } from '../../lib/services/test-requests/ia-sandbox
 import { PRODUCTION_HOSTS, SANDBOX_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
 import { _resetInterlockStateForTests } from '../../lib/dataverse/core/interlock.js';
+import { commitReadyLineage } from '../../lib/services/initial-assessment/artifact-lineage.js';
 
 const SANDBOX_URL = `https://${SANDBOX_HOSTS[0]}`;
 const PROD_HOST = PRODUCTION_HOSTS[0];
@@ -228,5 +229,173 @@ describe('createIaSandboxDeps — runChangeset atomicity', () => {
 
     const batchCalls = fetch.mock.calls.filter(([url]) => String(url).includes('/$batch'));
     expect(batchCalls).toHaveLength(1);
+  }));
+
+  it('every embedded operation URL inside the $batch body uses the sandbox host, never the production host (Opus mutation: embedded-URL-only host swap)', ctx(async () => {
+    fetch.mockImplementation((url) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (href.includes('/$batch')) return Promise.resolve(multipartResponse([
+        { contentId: 1, status: 204 },
+        { contentId: 2, status: 204 },
+      ]));
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+
+    const deps = createIaSandboxDeps({ resourceUrl: SANDBOX_URL });
+    await deps.runChangeset([
+      {
+        method: 'PATCH', entitySet: 'wmkf_requestdocuments', key: SAMPLE_ROW.wmkf_requestdocumentid, body: { wmkf_operationstatus: 5 },
+      },
+      {
+        method: 'PATCH', entitySet: 'akoya_requests', key: SAMPLE_REQUEST.akoya_requestid, body: { akoya_title: 'x' },
+      },
+    ]);
+
+    const batchCall = fetch.mock.calls.find(([url]) => String(url).includes('/$batch'));
+    expect(batchCall).toBeDefined();
+    const body = batchCall[1].body;
+    // Embedded op request lines look like "PATCH https://<host>/... HTTP/1.1"
+    // (lib/services/dynamics/changeset.js buildChangesetOp), CRLF-joined.
+    const embeddedRequestLines = body.match(/^(?:GET|POST|PATCH|DELETE) https?:\/\/\S+ HTTP\/1\.1\r?$/gm) || [];
+    expect(embeddedRequestLines).toHaveLength(2);
+    for (const line of embeddedRequestLines) {
+      const embeddedUrl = line.split(' ')[1];
+      expect(new URL(embeddedUrl).hostname).toBe(SANDBOX_HOSTS[0]);
+    }
+    expect(body.includes(PROD_HOST)).toBe(false);
+  }));
+});
+
+describe('createIaSandboxDeps — annotation shape parity with production reads', () => {
+  it('maps @odata.etag to _etag and a FormattedValue annotation to its *_formatted field', ctx(async () => {
+    fetch.mockImplementation((url) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (href.includes('akoya_requests(')) return jsonResponse({
+        akoya_requestid: SAMPLE_REQUEST.akoya_requestid,
+        akoya_requesttype: 1,
+        'akoya_requesttype@OData.Community.Display.V1.FormattedValue': 'Grant',
+        '@odata.etag': 'W/"request-9"',
+      });
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+
+    const deps = createIaSandboxDeps({ resourceUrl: SANDBOX_URL });
+    const result = await deps.getRequest(SAMPLE_REQUEST.akoya_requestid, { select: ['akoya_requestid'] });
+
+    expect(result._etag).toBe('W/"request-9"');
+    expect(result.akoya_requesttype_formatted).toBe('Grant');
+    expect(result['@odata.etag']).toBeUndefined();
+    expect(result['akoya_requesttype@OData.Community.Display.V1.FormattedValue']).toBeUndefined();
+
+    const getCall = fetch.mock.calls.find(([url]) => String(url).includes('akoya_requests('));
+    expect(getCall[1]?.headers?.Prefer).toBe('odata.include-annotations="*"');
+  }));
+});
+
+describe('createIaSandboxDeps — trusted DAL context is required', () => {
+  it('the three read dependencies throw outside a trusted DAL context', async () => {
+    const deps = createIaSandboxDeps({ resourceUrl: SANDBOX_URL });
+    await expect(deps.findByGenerationKey('key')).rejects.toThrow(/trusted Dataverse context/);
+    await expect(deps.findByRequest(SAMPLE_REQUEST.akoya_requestid, {})).rejects.toThrow(/trusted Dataverse context/);
+    await expect(deps.getRequest(SAMPLE_REQUEST.akoya_requestid, {})).rejects.toThrow(/trusted Dataverse context/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('runChangeset throws outside a trusted DAL context', () => {
+    const deps = createIaSandboxDeps({ resourceUrl: SANDBOX_URL });
+    expect(() => deps.runChangeset([
+      { method: 'PATCH', entitySet: 'akoya_requests', key: SAMPLE_REQUEST.akoya_requestid, body: { x: 1 } },
+    ])).toThrow(/trusted Dataverse context/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('createIaSandboxDeps — resourceUrl origin validation (P3.1)', () => {
+  it('rejects http (non-https) resource URLs', () => {
+    expect(() => createIaSandboxDeps({ resourceUrl: `http://${SANDBOX_HOSTS[0]}` })).toThrow(/must use https:/);
+  });
+
+  it('rejects a resourceUrl carrying a path, query, or trailing slash', () => {
+    expect(() => createIaSandboxDeps({ resourceUrl: `${SANDBOX_URL}/` })).toThrow(/bare origin/);
+    expect(() => createIaSandboxDeps({ resourceUrl: `${SANDBOX_URL}/api/data/v9.2` })).toThrow(/bare origin/);
+    expect(() => createIaSandboxDeps({ resourceUrl: `${SANDBOX_URL}?x=1` })).toThrow(/bare origin/);
+  });
+
+  it('rejects a resourceUrl carrying a non-default port or userinfo', () => {
+    expect(() => createIaSandboxDeps({ resourceUrl: `https://${SANDBOX_HOSTS[0]}:8443` })).toThrow(/bare origin/);
+    expect(() => createIaSandboxDeps({ resourceUrl: `https://user:pass@${SANDBOX_HOSTS[0]}` })).toThrow(/bare origin/);
+  });
+});
+
+describe('createIaSandboxDeps — end-to-end with commitReadyLineage (required by Stage A round 2)', () => {
+  it('commitReadyLineage, driven entirely by sandbox deps, reaches the $batch and activates the Ready lineage', ctx(async () => {
+    const GENERATION_KEY = 'a'.repeat(64);
+    const state = {
+      row: {
+        wmkf_requestdocumentid: SAMPLE_ROW.wmkf_requestdocumentid,
+        wmkf_artifacttype: 100000000,
+        wmkf_operationstatus: 100000000, // GENERATING
+        wmkf_lifecyclestate: 100000000, // DRAFT
+        wmkf_generationkey: GENERATION_KEY,
+        wmkf_claimtoken: 'claim-1',
+        _wmkf_request_value: SAMPLE_REQUEST.akoya_requestid,
+        '@odata.etag': 'W/"row-1"',
+        modifiedon: new Date().toISOString(),
+      },
+      request: {
+        akoya_requestid: SAMPLE_REQUEST.akoya_requestid,
+        _wmkf_currentinitialassessment_value: null,
+        '@odata.etag': 'W/"request-1"',
+      },
+    };
+
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (href.includes('/$batch')) {
+        const opCount = (String(init.body).match(/Content-ID: \d+/g) || []).length;
+        // Apply the exact mutation THIS changeset performs (no prior-ready
+        // rows to supersede): target -> Ready/Draft with the SharePoint
+        // metadata, request pointer -> the target row.
+        state.row = {
+          ...state.row,
+          wmkf_operationstatus: 100000001, // READY
+          wmkf_sharepointdriveid: 'drive',
+          wmkf_sharepointitemid: 'item',
+          '@odata.etag': 'W/"row-2"',
+        };
+        state.request = {
+          ...state.request,
+          _wmkf_currentinitialassessment_value: state.row.wmkf_requestdocumentid,
+          '@odata.etag': 'W/"request-2"',
+        };
+        const ops = Array.from({ length: opCount }, (_, i) => ({ contentId: i + 1, status: 204 }));
+        return Promise.resolve(multipartResponse(ops));
+      }
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [state.row] });
+      if (href.includes('akoya_requests(')) return jsonResponse(state.request);
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+
+    const metadata = {
+      siteId: 'site', driveId: 'drive', id: 'item',
+      webUrl: 'https://example.sharepoint.com/item', versionId: '1.0', eTag: '"1"',
+      size: 10, lastModified: '2026-07-29T12:00:00Z',
+    };
+    const sandboxDeps = createIaSandboxDeps({ resourceUrl: SANDBOX_URL });
+
+    const result = await commitReadyLineage(state.row, { metadata, claimToken: 'claim-1' }, sandboxDeps);
+
+    expect(result.wmkf_operationstatus).toBe(100000001);
+    expect(result._etag).toBe('W/"row-2"');
+    const batchCalls = fetch.mock.calls.filter(([u]) => String(u).includes('/$batch'));
+    expect(batchCalls.length).toBeGreaterThan(0);
+    for (const [u] of fetch.mock.calls) {
+      const href = String(u);
+      if (href.includes('login.microsoftonline.com')) continue;
+      expect(new URL(href).hostname).toBe(SANDBOX_HOSTS[0]);
+    }
   }));
 });

@@ -67,7 +67,12 @@ function baseRow(overrides = {}) {
 }
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  // resetAllMocks (not clearAllMocks): also drops any mockImplementation/
+  // mockResolvedValue left by a prior test, so a test that forgets to set up
+  // a module-adapter mock fails loudly instead of silently reusing another
+  // test's stale return value (this is exactly how the dependencies seam
+  // being dropped got masked during an earlier mutation check).
+  jest.resetAllMocks();
 });
 
 describe('default dependencies (no dependencies argument) — pins today\'s wiring', () => {
@@ -218,13 +223,87 @@ describe('caller-supplied dependencies fully replace the module adapters', () =>
     };
     const result = await commitReadyLineage(
       state.row,
-      { metadata, claimToken: 'claim-1', dependencies },
+      { metadata, claimToken: 'claim-1' },
+      dependencies,
     );
 
     expect(dependencies.runChangeset).toHaveBeenCalledTimes(1);
     expect(result.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
     expect(state.request._wmkf_currentinitialassessment_value).toBe(ARTIFACT_ID);
     // Nothing routed through the module-level (production) adapters.
+    expect(grantRequestAdapter.getById).not.toHaveBeenCalled();
+    expect(requestDocumentAdapter.findByGenerationKey).not.toHaveBeenCalled();
+    expect(requestDocumentAdapter.findByRequest).not.toHaveBeenCalled();
+    expect(runChangeset).not.toHaveBeenCalled();
+  });
+});
+
+describe('commitReadyLineage error paths stay on the injected dependencies (never fall through to the module adapters)', () => {
+  function makeDependencies({ row, request, runChangesetImpl }) {
+    return {
+      getRequest: jest.fn(async () => ({ ...request })),
+      findByGenerationKey: jest.fn(async () => ({ records: [{ ...row }] })),
+      findByRequest: jest.fn(async () => ({ records: [{ ...row }] })),
+      runChangeset: jest.fn(runChangesetImpl),
+    };
+  }
+
+  const metadata = {
+    siteId: 'site', driveId: 'drive', id: 'item',
+    webUrl: 'https://example.sharepoint.com/item', versionId: '1.0', eTag: '"1"',
+    size: 10, lastModified: '2026-07-29T12:00:00Z',
+  };
+
+  it('a 412 changeset conflict rereads through the injected dependencies and eventually throws ready_lineage_conflict', async () => {
+    const row = baseRow();
+    const request = baseRequest();
+    const dependencies = makeDependencies({
+      row,
+      request,
+      runChangesetImpl: async () => {
+        const error = new Error('precondition failed');
+        error.status = 412;
+        throw error;
+      },
+    });
+
+    await expect(
+      commitReadyLineage(row, { metadata, claimToken: 'claim-1' }, dependencies),
+    ).rejects.toMatchObject({ httpStatus: 409, body: { code: 'ready_lineage_conflict' } });
+
+    // Three passes (the function's own retry cap), each rereading/refetching
+    // through the injected dependencies alone.
+    expect(dependencies.runChangeset).toHaveBeenCalledTimes(3);
+    expect(dependencies.findByGenerationKey.mock.calls.length).toBeGreaterThan(0);
+    expect(dependencies.findByRequest).toHaveBeenCalledTimes(3);
+    expect(dependencies.getRequest).toHaveBeenCalledTimes(3);
+    expect(grantRequestAdapter.getById).not.toHaveBeenCalled();
+    expect(requestDocumentAdapter.findByGenerationKey).not.toHaveBeenCalled();
+    expect(requestDocumentAdapter.findByRequest).not.toHaveBeenCalled();
+    expect(runChangeset).not.toHaveBeenCalled();
+  });
+
+  it('a non-412 changeset failure verifies/rereads through the injected dependencies and rethrows the original error', async () => {
+    const row = baseRow();
+    const request = baseRequest();
+    const boom = new Error('dataverse unavailable');
+    const dependencies = makeDependencies({
+      row,
+      request,
+      runChangesetImpl: async () => { throw boom; },
+    });
+
+    await expect(
+      commitReadyLineage(row, { metadata, claimToken: 'claim-1' }, dependencies),
+    ).rejects.toBe(boom);
+
+    // Single pass: one changeset attempt, one post-error verifyReadyLineage
+    // (findByGenerationKey/getRequest/findByRequest via Promise.all), plus one
+    // more findByGenerationKey for the "observed newer claimant" check.
+    expect(dependencies.runChangeset).toHaveBeenCalledTimes(1);
+    expect(dependencies.findByGenerationKey.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(dependencies.findByRequest.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(dependencies.getRequest.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(grantRequestAdapter.getById).not.toHaveBeenCalled();
     expect(requestDocumentAdapter.findByGenerationKey).not.toHaveBeenCalled();
     expect(requestDocumentAdapter.findByRequest).not.toHaveBeenCalled();
