@@ -19,8 +19,15 @@ import { fillInviteBody, fillInviteSubject } from '../../shared/config/granteeIn
 // jest.mock factory reference them) so profile-switch behavior is testable.
 let mockPreferences = {};
 let mockProfileId = 'p1';
+const mockSetPreference = jest.fn();
+const mockDeletePreference = jest.fn();
 jest.mock('../../shared/context/ProfileContext', () => ({
-  useProfile: () => ({ preferences: mockPreferences, currentProfile: { id: mockProfileId } }),
+  useProfile: () => ({
+    preferences: mockPreferences,
+    currentProfile: { id: mockProfileId },
+    setPreference: mockSetPreference,
+    deletePreference: mockDeletePreference,
+  }),
 }));
 jest.mock('@vercel/blob/client', () => ({ put: jest.fn() }));
 jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
@@ -42,6 +49,8 @@ jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
 beforeEach(() => {
   mockPreferences = {};
   mockProfileId = 'p1';
+  mockSetPreference.mockReset();
+  mockDeletePreference.mockReset();
   put.mockReset().mockResolvedValue({ pathname: 'portal-staging/staff/x' });
 });
 
@@ -284,6 +293,57 @@ test('full flow: generate then send → status Invited + confirmation', async ()
   expect(JSON.parse(sendCall[1].body)).toMatchObject({
     requestId: REQ, toEmail: 'monika.raj@emory.edu', ccEmail: 'lorena.mclaren@emory.edu',
   });
+});
+
+test('keeps the liaison copied when staff add an assistant for this invitation', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Cc email')).toHaveValue('lorena.mclaren@emory.edu'));
+
+  fireEvent.change(screen.getByLabelText('Cc email'), {
+    target: { value: 'lorena.mclaren@emory.edu, assistant@emory.edu' },
+  });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
+  const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
+  expect(JSON.parse(sendCall[1].body).ccEmail).toBe('lorena.mclaren@emory.edu, assistant@emory.edu');
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/api/user-preferences'))).toBe(false);
+  expect(mockSetPreference).not.toHaveBeenCalled();
+  expect(mockDeletePreference).not.toHaveBeenCalled();
+});
+
+test('disables sending if an additional Cc address is invalid', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Cc email')).toHaveValue('lorena.mclaren@emory.edu'));
+  fireEvent.change(screen.getByLabelText('Cc email'), {
+    target: { value: 'lorena.mclaren@emory.edu, not-an-email' },
+  });
+  expect(screen.getByText(/enter up to 10 distinct Cc addresses/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+});
+
+test('allows ten distinct Cc addresses but blocks eleven or duplicates', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Cc email')).toHaveValue('lorena.mclaren@emory.edu'));
+  const ten = ['lorena.mclaren@emory.edu', ...Array.from({ length: 9 }, (_, i) => `assistant${i}@emory.edu`)];
+  fireEvent.change(screen.getByLabelText('Cc email'), { target: { value: ten.join(', ') } });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeEnabled();
+
+  fireEvent.change(screen.getByLabelText('Cc email'), { target: { value: [...ten, 'another@emory.edu'].join(', ') } });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText('Cc email'), {
+    target: { value: 'lorena.mclaren@emory.edu, LORENA.MCLAREN@emory.edu' },
+  });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText('Cc email'), { target: { value: 'monika.raj@emory.edu' } });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
 });
 
 test('successful send reloads the recorded invite date into the status header', async () => {
@@ -672,6 +732,37 @@ test('seeds the body from the PD saved custom body (placeholders still filled)',
   expect(screen.getByText(/saved custom body/i)).toBeInTheDocument();
 });
 
+test('seeds the subject independently from the PD saved subject, filling the request title', async () => {
+  mockPreferences = { grantee_invite_subject: 'Review {{proposalTitle}} soon' };
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={{ ...CYCLE_CTX, title: 'Quantum Study' }} />);
+
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue('Review Quantum Study soon'));
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/));
+  fireEvent.click(screen.getByRole('button', { name: /use shared subject for this email/i }));
+  expect(screen.getByLabelText('Subject')).toHaveValue(GRANTEE_INVITE_SEED_SUBJECT);
+  expect(mockPreferences.grantee_invite_subject).toBe('Review {{proposalTitle}} soon');
+  expect(mockSetPreference).not.toHaveBeenCalled();
+  expect(mockDeletePreference).not.toHaveBeenCalled();
+});
+
+test('a blank personal subject falls back to Admin; a saved subject can supply a blank Admin subject', async () => {
+  mockPreferences = { grantee_invite_subject: '  ' };
+  wireFetch();
+  const first = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue(GRANTEE_INVITE_SEED_SUBJECT));
+  first.unmount();
+
+  mockPreferences = { grantee_invite_subject: 'My subject' };
+  wireFetch({
+    abstract: ready(),
+    emailDefaults: defaultEmailDefaults({ subject: '', configured: false }),
+  });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue('My subject'));
+  await waitFor(() => expect(screen.getByRole('button', { name: /send invitation/i })).toBeEnabled());
+});
+
 test('whitespace-only saved body falls back to the Foundation default', async () => {
   mockPreferences = { grantee_invite_body: '   \n  ' };
   wireFetch();
@@ -728,6 +819,47 @@ test('switching profile reseeds the body to the new PD saved body (not stale)', 
   mockPreferences = { grantee_invite_body: 'Body B for [Name].' };
   rerender(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Body B for Raj\./));
+});
+
+test('switching profile never carries one PD saved subject into another PD draft', async () => {
+  mockProfileId = 'pA';
+  mockPreferences = { grantee_invite_subject: 'A private subject', grantee_invite_body: 'A private body' };
+  wireFetch();
+  const { rerender } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue('A private subject'));
+
+  mockProfileId = 'pB';
+  mockPreferences = { grantee_invite_body: 'B private body' };
+  rerender(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue(GRANTEE_INVITE_SEED_SUBJECT));
+  expect(screen.getByLabelText('Email body')).toHaveValue('B private body');
+});
+
+test('one-send subject and body edits send once without changing saved defaults', async () => {
+  mockPreferences = {
+    grantee_invite_subject: 'Saved subject',
+    grantee_invite_body: 'Saved body for [Name].',
+  };
+  wireFetch({ abstract: ready() });
+  const { unmount } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue('Saved subject'));
+  await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue('Saved body for Raj.'));
+
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Only this email' } });
+  fireEvent.change(screen.getByLabelText('Email body'), { target: { value: 'One-time message' } });
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
+  const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
+  expect(JSON.parse(sendCall[1].body)).toMatchObject({ subject: 'Only this email', bodyText: 'One-time message' });
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/api/user-preferences'))).toBe(false);
+  expect(mockSetPreference).not.toHaveBeenCalled();
+  expect(mockDeletePreference).not.toHaveBeenCalled();
+
+  unmount();
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue('Saved subject'));
+  await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue('Saved body for Raj.'));
 });
 
 test('switching profile AFTER editing discards the edit and loads the new PD body (#1)', async () => {
