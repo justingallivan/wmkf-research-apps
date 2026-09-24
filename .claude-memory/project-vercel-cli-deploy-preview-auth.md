@@ -17,12 +17,18 @@ Do:
   auth-gated smoke. For this project, first inspect the already registered
   `wmkfresearchapps-preview.vercel.app` callback/alias; temporarily repoint that
   stable alias to an attested immutable Preview deployment, then restore and
-  verify its prior target after the smoke. Add an Entra callback only when no
-  already registered stable alias can serve the exact deployment.
+  verify its prior target after the smoke. For a signed-in alias-hosted POST,
+  follow `docs/AUTHENTICATION_SETUP.md` Step 2.4: set the exact alias origin as
+  branch-scoped Preview `NEXTAUTH_URL`, redeploy, prove a validation-only POST,
+  then remove that branch-scoped setting and restore the alias. Add an Entra
+  callback only when no already registered stable alias can serve the exact
+  deployment.
 
 Do not:
 - Run `vercel --prod` merely to duplicate a `main` push.
 - Rely on the old preview-URL/Azure-wildcard claim.
+- Set a project-wide Preview `NEXTAUTH_URL` or reuse the Production staff host
+  for a branch smoke; the override belongs only to the tested Git branch.
 
 Ground truth: owner correction S350, `docs/AUTHENTICATION_SETUP.md`, and the
 2026-08-02 Reviewer Find read-only Preview preflight recorded in

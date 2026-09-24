@@ -28,6 +28,7 @@ import { isGuid } from '../../../lib/utils/guid';
 import { findById } from '../../../lib/services/grant-cycles-dataverse';
 import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
 import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-material-ref';
+import { contentDisposition } from '../../../lib/utils/content-disposition';
 
 // Collect the cycle's private materials as pathname → { filename }. This is the
 // record-scope allowlist: only these pathnames may be served for this cycle. Both
@@ -66,15 +67,6 @@ const CONTENT_TYPES = {
 function contentTypeFor(filename) {
   const ext = String(filename || '').toLowerCase().split('.').pop();
   return /** @type {Record<string, string>} */ (CONTENT_TYPES)[ext || ''] || 'application/octet-stream';
-}
-
-/** @param {any} name */
-function sanitizeFilename(name) {
-  // \x22 is the double-quote char; written as a hex escape so no literal `"`
-  // appears in source ahead of the handler (a stray quote here would pair with
-  // the `filename="…"` quote below and hide this file's requireAppAccess call
-  // from the comment/string-stripping endpoint counter — see check-fact-consistency).
-  return String(name || 'download').replace(/[\x22\r\n]/g, '');
 }
 
 /**
@@ -134,7 +126,7 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Content-Type', contentTypeFor(material.filename));
-  res.setHeader('Content-Disposition', `attachment; filename="${sanitizeFilename(material.filename)}"`);
+  res.setHeader('Content-Disposition', contentDisposition('attachment', material.filename));
   res.setHeader('Content-Length', buffer.length);
   // A material stored as an inline-renderable type could execute script under our
   // origin if opened inline; force download + nosniff (the cited download-review.js
