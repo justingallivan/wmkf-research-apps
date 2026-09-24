@@ -454,11 +454,6 @@
   },
   {
     "file": "lib/services/site-visit-materials/collection-store.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/site-visit-materials/collection-store.js",
     "kind": "sql-tag",
     "count": 16
   },
