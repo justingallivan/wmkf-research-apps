@@ -116,5 +116,31 @@ how many rows meet, partly meet, or miss the requirement.
 
 ## Handoff
 
-(Codex: record what you delivered, the denominators, the gates you ran with
-results, and anything you left open.)
+Codex delivered `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`
+and ticked the inventory item in
+`docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`. Source-only inventory:
+17 transport send expressions map to 56 distinct email cases (22
+workflow/diagnostic and 34 conditionally emailed operational notifications).
+Four meet the owner contract, nine partly meet it, three miss it, and forty
+are not applicable because they have no human sender. No runtime, template,
+configuration, test, schema, or production state changed. No email was read
+or sent; no Dataverse/Vercel/production command ran.
+
+Verification: all 67 `/start` local `check:*` gate runs, including paired
+self-tests, passed before inventory work. The brief's four required final
+gates passed sequentially:
+`check:doc-symbol-refs`, `check:build-claim-freshness`,
+`check:scaffolding-tokens`, and `check:harness-framing`. Citation path/line
+validation found 222 valid `path:line` references and 56 numbered rows;
+`check:doc-currency` and its self-test also passed sequentially, as did
+`git diff --check`. Residual product decisions and source-only limits are
+recorded in the inventory's Residual questions section. No follow-up
+implementation was started.
+
+The local documentation commit contains the three files. A push to
+the existing `origin/codex/personal-email-inventory` branch was attempted
+twice and rejected by automatic approval review. After remote verification,
+the second rejection said the user's message asked only to read this brief,
+so it did not authorize exporting the internal documentation or changing the
+remote branch. The commit remains local and the worktree is clean; the owner
+must explicitly authorize the push if a remote handoff is wanted.
