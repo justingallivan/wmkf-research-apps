@@ -35,7 +35,7 @@ Three candidates survived a survey of every plan doc, the work queue,
 
 | Candidate | Size | Already planned? | Why not first |
 |---|---|---|---|
-| **Postgres access layer** (this plan) | 60 non-test files import a Postgres driver; 352 `` sql` `` statements in 53 files; 17 files under `pages/api/` touch Postgres directly; 53 fresh-install tables plus 4 migration-only tables | **No plan doc exists.** `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` and `scripts/check-route-service-boundary.js` only recognise Dataverse sources, so a route can pass the "thin route" law while running SQL inline | — |
+| **Postgres access layer** (this plan) | 60 non-test files import a Postgres driver; 349 `` sql` `` statements in 52 files; 17 files under `pages/api/` touch Postgres directly; 53 fresh-install tables plus 5 migration-only tables | **No plan doc exists.** `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` and `scripts/check-route-service-boundary.js` only recognise Dataverse sources, so a route can pass the "thin route" law while running SQL inline | — |
 | `pages/admin.js` | 3,571 lines, 99 `useState` | Deferred by three plans (`docs/plans/CLIENT_REQUEST_LAYER_PLAN_2026-09-19.md:64`) | One file, one app; UI-only; no cross-cutting law is missing |
 | Flat `lib/services/` namespace | 174 root files next to 27 domain dirs (46 `reviewer-*` root files beside `reviewer-engagement/`, `reviewer-finder/`, `review-manager/`, `review-documents/`) | Explicitly out of scope in `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md:78` ("Existing flat services are NOT moved") | Mostly moves; low defect yield per commit; the Postgres stores are a large share of it and get relocated by Stage 7 of this plan anyway |
 
@@ -68,8 +68,13 @@ replaces these with an AST probe.
   36 in `lib/services/`, 17 in `pages/api/`, 4 in `lib/utils/`, and one each
   in `lib/intake/`, `lib/external/`, `lib/bill/`. Every file with a `` sql` ``
   tag also imports the driver (no tag-only files). Full list: Appendix A.
-- **Statements:** 352 `` sql` `` tagged statements in 53 files. Idioms present:
-  `` sql` `` (53 files), `sql.query(` (10), `client.query(` with `$n`
+- **Statements:** 349 `` sql` `` tagged statements in 52 files
+  `[RECHECKED after scripts/check-postgres-access-layer.js change: node
+  scripts/check-postgres-access-layer.js --report, S536 — the hand grep said
+  352/53; the AST probe excludes a comment at lib/intake/rate-limit.js:197, a
+  docstring at lib/services/maintenance-service.js:237, and
+  lib/services/irs-bmf-service.js, which has no sql tag (pool.query only)]`.
+  Idioms present: `` sql` `` (52 files), `sql.query(` (10), `client.query(` with `$n`
   parameter arrays (8, e.g. `lib/services/cycle-dossier-store.js:12-23`),
   `db.connect(` (6: `alert-service.js:30`, `consultant-feedback-service.js`,
   `cycle-dossier-store.js`, `deliberation-briefing/briefing-link-store.js`,
@@ -84,16 +89,20 @@ replaces these with an AST probe.
   reports 0 violations because its source predicates
   (`isDynamicsServiceSource`, `isDynamicsSubmoduleSource`, adapters) do not
   include a Postgres driver `[VERIFIED via scripts/check-route-service-boundary.js:65-79]`.
-- **Tables:** 53 `CREATE TABLE` names in `scripts/setup-database.js` plus at
-  least 4 live tables created only by migrations and **absent from
+- **Tables:** 53 `CREATE TABLE` names in `scripts/setup-database.js` plus
+  exactly 5 live tables created only by migrations and **absent from
   `setup-database.js`**: `reviewer_find_roster` (`020`, `023`, `025`, `027`,
-  `029`), `review_drafts` (`021`), `bill_onboarding_state` (`017`),
-  `bill_webhook_events` (`015`). CLAUDE.md names `setup-database.js` the
+  `029`), `review_drafts` (`021`), `review_question_audit` (`022`),
+  `bill_onboarding_state` (`017`), `bill_webhook_events` (`015`)
+  `[RECHECKED S536 via full pass: every migration CREATE TABLE name minus
+  every migration DROP TABLE name, tested against setup-database.js —
+  tests/unit/postgres-schema-parity.test.js KNOWN_GAPS; the plan's first draft
+  listed four because it only probed four suspected names]`. CLAUDE.md names `setup-database.js` the
   fresh-install shape of record, so this is a parity defect this plan must
   close (Stage 0, item 5). 6 tables are drained and out of scope
   (`scripts/check-drain-table-mentions.js:65-72`); one drained table,
   `grant_cycles` (drained, historical), is still among the 53 `setup-database.js` names,
-  so the live count is 52 + 4.
+  so the live count is 52 + 5.
 - **Hot tables:** `user_profiles` in 17 files; `system_alerts` 8;
   `dynamics_user_roles` 7; `api_usage_log` 6. `lib/services/maintenance-service.js`
   alone touches 14 tables.
@@ -182,9 +191,9 @@ Additional rules specific to this plan:
 
 | # | Decision | Decision (2026-09-23, owner) | Rationale / residual risk |
 |---|---|---|---|
-| Q1 | **Real-Postgres contract-test harness.** Options: (a) GitHub Actions `services: postgres` container + `npm run test:pg-contract`; (b) opt-in local only via `PG_CONTRACT_URL`, skipped in CI; (c) a Neon/Vercel branch database per CI run. **Sub-decision Q1b (transport):** `@vercel/postgres` is `@neondatabase/serverless` over WebSocket (`node_modules/@vercel/postgres/package.json` deps; `dist/index-node.cjs:15-16` sets `neonConfig.webSocketConstructor`), so a plain container is reachable only via (i) Neon's `wsproxy` sidecar with `neonConfig.wsProxy` / `useSecureWebSocket=false` / `forceDisablePgSSL` set in the harness, or (ii) the Stage 2 seam selecting `pg` when `PG_CONTRACT_URL` is set — the S504 error is planner output, so `pg` surfaces it identically. No doc in `docs/` describes running Postgres locally today `[VERIFIED via grep of docs/ for local/docker postgres, S536]`. | **DECIDED: (a) + (ii)** — CI `services: postgres:16`, seam selects `pg` when `PG_CONTRACT_URL` is set | (a) is the cheapest venue that makes the tests mandatory; (b) would recreate the S504 blind spot; (c) needs credentials the runbook lacks. (ii) is one branch in one owned file versus a third-party sidecar nobody has run. Residual: `sql`-tag files are contract-tested through `pg`, not Neon's driver; typing/`jsonb`/`ON CONFLICT` semantics are server-side so the S504 class is covered. Sidecar (i) stays available as an additive upgrade. |
+| Q1 | **Real-Postgres contract-test harness.** Options: (a) GitHub Actions `services: postgres` container + `npm run test:pg-contract`; (b) opt-in local only via `PG_CONTRACT_URL`, skipped in CI; (c) a Neon/Vercel branch database per CI run. **Sub-decision Q1b (transport):** `@vercel/postgres` is `@neondatabase/serverless` over WebSocket (`node_modules/@vercel/postgres/package.json` deps; `dist/index-node.cjs:15-16` sets `neonConfig.webSocketConstructor`), so a plain container is reachable only via (i) Neon's `wsproxy` sidecar with `neonConfig.wsProxy` / `useSecureWebSocket=false` / `forceDisablePgSSL` set in the harness, or (ii) the Stage 2 seam selecting `pg` when `PG_CONTRACT_URL` is set — the S504 error is planner output, so `pg` surfaces it identically. No doc in `docs/` describes running Postgres locally today `[VERIFIED via grep of docs/ for local/docker postgres, S536]`. | **DECIDED: (a) + (ii)** — CI `services: postgres:16`; under the contract lane a Jest `moduleNameMapper` swaps `@vercel/postgres` for a `pg`-backed shim (Stage 0 built it that way, so no production seam change is needed for tests); the lane refuses any non-loopback host with **no override** (Codex S536 finding) | (a) is the cheapest venue that makes the tests mandatory; (b) would recreate the S504 blind spot; (c) needs credentials the runbook lacks. (ii) is one branch in one owned file versus a third-party sidecar nobody has run. Residual: `sql`-tag files are contract-tested through `pg`, not Neon's driver; typing/`jsonb`/`ON CONFLICT` semantics are server-side so the S504 class is covered. Sidecar (i) stays available as an additive upgrade. |
 | Q2 | **Target directory.** `lib/postgres/` (new, mirrors `lib/dataverse/`) vs. growing `lib/db/` (currently migrations, `migrations-manifest.json`, `schema.sql` — the latter a `check:atlas` table source). | **DECIDED: `lib/postgres/`** with `client.js`, `stores/`, `core/` | Mirrors `lib/dataverse/` so executor and gates have a template; keeps runtime code out of a directory that `check:migrations-manifest` and `check:atlas` treat as schema-only |
-| Q3 | **Fresh-install parity for the 4 migration-only tables.** Add them to `scripts/setup-database.js`, or amend CLAUDE.md so migrations alone define shape. Related: `setup-database.js` never writes `schema_migrations` (`grep schema_migrations scripts/setup-database.js` → 0 hits), and the manifest starts at `002`, so neither script alone yields a stamped, complete schema; the harness (Stage 0 item 3) needs an explicit stamping step. | **DECIDED 2026-09-23 (owner):** add the four tables to `setup-database.js`; harness stamps every manifest file after setup. The omissions were in-the-moment lapses, not a policy: no doc, migration header, or log entry records a decision, and the established pairing is migration + inline `setup-database.js` block (`docs/INTAKE_PORTAL_DESIGN.md:629`, migration `009` + V30). | Still open: how a fresh Vercel install gets its `schema_migrations` rows today — no doc in `docs/` describes that step |
+| Q3 | **Fresh-install parity for the 5 migration-only tables** (four named at decision time; `review_question_audit` found by the Stage 0 parity test and folded in under the same decision). Add them to `scripts/setup-database.js`, or amend CLAUDE.md so migrations alone define shape. Related: `setup-database.js` never writes `schema_migrations` (`grep schema_migrations scripts/setup-database.js` → 0 hits), and the manifest starts at `002`, so neither script alone yields a stamped, complete schema; the harness (Stage 0 item 3) needs an explicit stamping step. | **DECIDED 2026-09-23 (owner):** add the five tables to `setup-database.js`; harness stamps every manifest file after setup. The omissions were in-the-moment lapses, not a policy: no doc, migration header, or log entry records a decision, and the established pairing is migration + inline `setup-database.js` block (`docs/INTAKE_PORTAL_DESIGN.md:629`, migration `009` + V30). | Still open: how a fresh Vercel install gets its `schema_migrations` rows today — no doc in `docs/` describes that step |
 | Q4 | **Physical moves in Stage 7.** Relocate the nine existing store modules and `database-service.js` under `lib/postgres/stores/`, or leave them and only enforce the import law. | **DECIDED: relocate**, confirmed at Stage 7 rather than now | The law is what matters; location is legibility. Cheap once everything else is done (one commit per file, one-release re-export shim) and retires part of the flat-`lib/services/` debt. Skipping at Stage 7 loses nothing structural. |
 | Q5 | **Permanent exemptions** allowed to import the driver forever: `scripts/**` (setup, apply-migrations, backfills, probes), `lib/utils/migration-drift.js`, `lib/utils/health-checker.js` (`information_schema` probe). | **DECIDED: exempt all three classes**; everything else converts; pin the set in `tests/unit/postgres-access-layer-recorded-set.test.js` (Stage 7) | They inspect the database rather than read domain tables; routing them through domain stores adds indirection with no boundary benefit. Same recorded-set mechanism as the reviewer-engagement gate so growth is a reviewed edit. |
 | Q6 | **Parameter-cast lint.** Add a static check to the gate that flags bound parameters inside `jsonb_build_object|jsonb_build_array|concat|format|CASE|VALUES` without a `::cast`. | **DECIDED: ship as `--warn` in Stage 1**; decide on red at Stage 7 from its false-positive record | Contract tests (Q1) are the real defence; this is defence-in-depth for statements no test covers. A noisy red gate erodes trust in all gates, so it earns promotion. |
@@ -291,15 +300,25 @@ re-derive with Appendix B).
 5. **Parity (Q3).** `tests/unit/postgres-schema-parity.test.js`: the set of
    `CREATE TABLE` names across `lib/db/migrations/*.sql` minus tables dropped
    by later migrations must be a subset of `scripts/setup-database.js`
-   names. Seed it with the 4 known gaps as an explicit `KNOWN_GAPS` list;
-   then add the 4 tables to `setup-database.js` (one commit per table) and
-   shrink `KNOWN_GAPS` to empty. Second assertion in the same test: no
+   names. Seed it with the 5 known gaps as an explicit `KNOWN_GAPS` list
+   (exact-set assertion, so it must shrink as blocks land); then add the 5
+   tables to `setup-database.js` and shrink `KNOWN_GAPS` to empty. Landing
+   note (S536): the five blocks (V55–V59) and the `KNOWN_GAPS = []` change
+   land as ONE commit, not one per table — the exact-set assertion means any
+   split leaves the test red between commits, and the blocks are
+   independent additions to a single file (ground rule 3 is about caller
+   files, not about splitting one file's additive blocks). Second assertion in the same test: no
    `setup-database.js` table is the target of a `DROP TABLE` in any
    migration (today none is — `grep -l "DROP TABLE.*grant_cycles"
    lib/db/migrations/*.sql` is empty, so the drained `grant_cycles` table
-   still exists in every environment and is not a parity problem). `check:atlas` must stay green — all four
+   still exists in every environment and is not a parity problem). Parser
+   note for the executor: both `setup-database.js` (JS comments near `:429`
+   and `:433`) and `lib/db/migrations/034_pre_site_distribution_attempts.sql:131`
+   (a SQL comment) contain the literal words `CREATE TABLE IF NOT EXISTS`;
+   parse only template-literal contents / comment-stripped SQL. `check:atlas` must stay green — all five
    tables already have Atlas coverage (`docs/atlas/postgres-reviewer-find-roster.md`,
-   `docs/atlas/postgres-review-drafts.md`, and the two BILL tables in
+   `docs/atlas/postgres-review-drafts.md`, `review_question_audit` in
+   `docs/atlas/dataverse-wmkf-reviewquestion.md`, and the two BILL tables in
    `docs/atlas/postgres-infra-tables.md`).
 6. Record Q1–Q7 answers in §3 and the Stage log.
 
@@ -730,6 +749,54 @@ Open: …
   planner error on an untyped `jsonb_build_object` parameter (Stage 0 item 3
   records the commands). Q1(ii) transport is therefore confirmed workable
   locally; CI proof still pending.
+- **2026-09-23 — Stage 0 in progress** (branch `claude/postgres-access-layer`,
+  Sonnet builders / Opus reviewers / Fable orchestrating). The AST census
+  probe reconciled Appendix A: 349 `sql` tags in 52 files (three text-grep
+  artefacts removed, `irs-bmf-service.js` re-labelled pool-only); the 60-file
+  driver split matched exactly. The parity test found a fifth migration-only
+  table, `review_question_audit` (`022`), folded into Q3. Owner-directed
+  change to the working model: the `setup-database.js` parity diff gets a
+  Codex adversarial review before it lands; Stage 0 ends with a regroup, not
+  an automatic Stage 1.
+
+### Stage 0 report — 2026-09-23 — `claude/postgres-access-layer`
+Preconditions: `[VERIFIED via Appendix B commands + AST probe]`; drift found
+and reconciled: 352/53 → 349/52 statements, four → five migration-only
+tables, `irs-bmf-service.js` pool-only, `review-questions-service.js` table
+list corrected.
+Tests before: none required (Stage 0 creates them) — created:
+`tests/unit/postgres-schema-parity.test.js`, `tests/pg-contract/schema-applies.test.js`,
+`tests/pg-contract/site-visit-collection-store.test.js`,
+`tests/pg-contract/setup-database-parity.test.js`; gate self-test
+`check:postgres-access-layer:self-test`.
+Commits (one per Stage 0 item, in order): census probe; parity fix +
+unit test (`setup-database.js` V55–V59); pg-contract lane; registrations
+(`package.json`, `jest.config.js`, `test.yml`, `CI_GATES_REFERENCE.md`,
+`/start`); this plan update.
+Ratchet: n/a (report-only). Baseline: 60 driver-import files, 349 `sql` tags
+in 52 files, 62 files with any record.
+Verify: `test:ci` 1057 suites / 15,645 tests pass; `test:pg-contract` 3
+suites / 8 tests pass locally (Colima `postgres:16`) and prints the skip
+line without a URL; every gate in `/start` that guards a touched surface
+green with its self-test (atlas 58 Postgres tables, migrations-manifest,
+route-service-boundary, secret-scan, scaffolding, harness-framing,
+instruction-architecture, agent-invariants, doc gates); canonical
+`npm run build` blocked in this worktree by a symlinked `node_modules`
+(Turbopack: "points out of the filesystem root") — webpack build compiled
+clean as a fallback signal; canonical build proof: CI on push and a real
+`npm ci` in the worktree (see below).
+Reviews: Sonnet built, Opus reviewed each stream (census 2 rounds, harness
+3 rounds, parity 1 round); Codex adversarial review 3 rounds on the parity
+work. Material findings fixed: shim preferred `POSTGRES_URL` (P1, decoy DB
+proof); remote-host override removed; catalog projection widened to
+relation kind/persistence, collation, identity/generated, owned sequences;
+base-table-only runtime check; bogus table names from `ON CONFLICT … SET`.
+Owner decisions: Q1–Q7 recorded; Q3 widened to five tables.
+Fresh-context review of Stage 1: see next log entry.
+Open: canonical Turbopack build in-worktree; CI run of the new lane; the
+Q3 sub-question (how a fresh Vercel install is stamped) remains
+undocumented; renamed/member `sql` tags and `new pg.Pool()` shapes are
+recorded Stage 1 obligations in the probe's docblock.
 
 ## Appendix A — Census (2026-09-23, commit `1046c1033`)
 
@@ -744,10 +811,10 @@ parity gap). Stage 0's AST probe supersedes this table.
 |---|---:|---:|---|---|---:|
 | `lib/bill/onboarding-state.js` | 159 | 10 | sql` | bill_onboarding_state *(migration-only)* | 5 |
 | `lib/external/rate-limit.js` | 242 | 3 | sql` | external_rate_limit, system_alerts | 5 |
-| `lib/intake/rate-limit.js` | 255 | 4 | sql` | external_rate_limit, system_alerts | 5 |
+| `lib/intake/rate-limit.js` | 255 | 3 | sql` | external_rate_limit, system_alerts | 5 |
 | `lib/services/admin/policies-service.js` | 530 | 3 | sql` | policy_publish_audit, system_alerts | 3 |
 | `lib/services/admin/prompts-publish-service.js` | 587 | 5 | sql` | prompt_publish_audit, system_alerts | 3 |
-| `lib/services/admin/review-questions-service.js` | 275 | 3 | sql` | policy_publish_audit, system_alerts | 3 |
+| `lib/services/admin/review-questions-service.js` | 275 | 3 | sql` | review_question_audit, system_alerts (the hand census wrongly listed policy_publish_audit; corrected from the AST probe) | 3 |
 | `lib/services/alert-recipients.js` | 192 | 1 | sql` | dynamics_user_roles, user_profiles | 6 |
 | `lib/services/alert-service.js` | 388 | 16 | sql` + db.connect | system_alerts, user_profiles | 3 |
 | `lib/services/consultant-feedback-service.js` | 800 | 0 | client/pool | consultant_feedback, expertise_roster | 3 |
@@ -764,8 +831,8 @@ parity gap). Stage 0's AST probe supersedes this table.
 | `lib/services/intake-audit-service.js` | 109 | 3 | sql` | intake_audit | 3 |
 | `lib/services/intake-draft-service.js` | 595 | 20 | sql` | intake_drafts, submission_jobs | 3 |
 | `lib/services/integrity-service.js` | 709 | 11 | sql` | integrity_screenings, retractions, screening_dismissals | 3 |
-| `lib/services/irs-bmf-service.js` | 570 | 1 | sql` + private `pg` Pool | irs_exempt_orgs, maintenance_runs | 3 |
-| `lib/services/maintenance-service.js` | 998 | 21 | sql` | api_usage_log, dynamics_explorer_requests, dynamics_query_log, health_check_history, intake_audit, intake_drafts, maintenance_runs, operational_events, portal_upload_staging, +5 more (14 total) | 5 |
+| `lib/services/irs-bmf-service.js` | 570 | 0 | private `pg` Pool: pool.query/client.query + BEGIN | irs_exempt_orgs, maintenance_runs | 3 |
+| `lib/services/maintenance-service.js` | 998 | 20 | sql` | api_usage_log, dynamics_explorer_requests, dynamics_query_log, health_check_history, intake_audit, intake_drafts, maintenance_runs, operational_events, portal_upload_staging, +5 more (14 total) | 5 |
 | `lib/services/meeting-tracker/agenda-store.js` | 201 | 12 | sql` | deliberation_agenda_sends | 3 |
 | `lib/services/operational-event-service.js` | 594 | 7 | sql` | operational_events | 3 |
 | `lib/services/panel-review-service.js` | 801 | 6 | sql` | panel_review_items, panel_reviews | 3 |
@@ -804,6 +871,12 @@ parity gap). Stage 0's AST probe supersedes this table.
 | `pages/api/webhooks/bill.js` | 202 | 1 | sql` | bill_webhook_events *(migration-only)* | 4 |
 
 Totals: 60 files — Stage 3: 30, Stage 4: 13, Stage 5: 8, Stage 6: 9.
+Two further files carry `client.query` records without importing a driver —
+`lib/services/cron/drain-submissions-service.js` and
+`lib/services/cycle-dossier-service.js` receive a `pg` client as an argument
+from their callers (the drain route and `cycle-dossier-store.js`). They are
+not conversion targets themselves; they follow their callers in Stages 3–4.
+The probe reports them separately ("files with any record": 62).
 Excluded after reading (comment-only mentions): `lib/utils/auth-policy.js`,
 `lib/utils/auth-bypass-monitor.js`. Out of scope (Q5 exemption candidates,
 not counted above): 49 `scripts/**/*.js` files import a driver (72 counting
@@ -822,8 +895,9 @@ form (anchored to import/require lines, so comments do not count).
 grep -rlE "^\s*(import|const|let|var|\}).*(@vercel/postgres|from 'pg'|require\('pg'\))" pages lib --include='*.js' \
   | grep -vE "__tests__|\.test\." | awk -F/ '{print $1"/"$2}' | sort | uniq -c
 
-# Statement count → 352 in 53 files
+# Statement count → text grep says 352 in 53 files; the AST probe (authoritative) says 349 in 52
 grep -rE "\bsql\`" pages lib --include='*.js' | grep -vE "__tests__|\.test\." | wc -l
+node scripts/check-postgres-access-layer.js --report
 
 # Routes reaching Postgres → 17
 grep -rlE "^\s*(import|const|let|var|\}).*(@vercel/postgres|from 'pg')" pages/api --include='*.js'
@@ -831,7 +905,7 @@ grep -rlE "^\s*(import|const|let|var|\}).*(@vercel/postgres|from 'pg')" pages/ap
 # Table inventory (fresh-install script) → 53 names, and migration-only tables
 # (the filter drops two comment artefacts, "IF" and "is", at setup-database.js:429/:433)
 grep -oiE "CREATE TABLE (IF NOT EXISTS )?[a-z_]+" scripts/setup-database.js | awk '{print $NF}' | sort -u | grep -vE '^(IF|is)$'
-for t in reviewer_find_roster review_drafts bill_onboarding_state bill_webhook_events; do
+for t in reviewer_find_roster review_drafts review_question_audit bill_onboarding_state bill_webhook_events; do
   echo "$t setup:$(grep -cw $t scripts/setup-database.js) migs:$(grep -lw $t lib/db/migrations/*.sql | wc -l)"; done
 
 # Tests that mock the driver (79) vs tests naming a URL (6, all dummy)
