@@ -52,3 +52,9 @@ may launch in background regardless of foreground intent — capture the
 `task-…` id and poll `codex-companion.mjs status <id>` with a background
 until-loop. Related: [[feedback-share-codex-verbatim]],
 [[feedback-surface-full-review-findings]].
+
+**Builder/reviewer split (2026-09-23):** when the owner says "have Codex fix/build
+it, you review", Claude is the reviewer. Do not also launch a Codex adversarial
+review of Codex's own build without asking — the owner questioned exactly that
+("What adversarial review? Didn't we just get the build back from Codex?"). Offer
+it as an option instead; per-stage Codex reviews still apply to Claude-built work.
