@@ -287,7 +287,7 @@ function buildBundle() {
 function reservePlan(manifest, bundle) {
   return {
     runId: manifest.values.runId,
-    recipe: 'basic',
+    recipe: manifest.recipe ?? 'basic',
     sourceDataverseHost: bundle.source.dataverseHost,
     sourceRequestId: manifest.source.requestId,
     sourceRequestNumber: manifest.source.requestNumber,
@@ -296,7 +296,9 @@ function reservePlan(manifest, bundle) {
     bundleExportedAt: manifest.source.exportedAt,
     copyPolicyVersion: manifest.copyPolicy.version,
     copyPolicyDigest: manifest.copyPolicy.digest,
-    planDigest: sha256({ runId: manifest.values.runId, createBodySha256: manifest.createBodySha256 }),
+    // Mirrors runReserve: recipe is bound into the digest so a same-key
+    // retry naming a different recipe conflicts (tested in the ledger pg suite).
+    planDigest: sha256({ runId: manifest.values.runId, recipe: manifest.recipe ?? 'basic', createBodySha256: manifest.createBodySha256 }),
     createBodySha256: manifest.createBodySha256,
     destinationEnvironment: 'sandbox',
     destinationDataverseHost: new URL(manifest.target).hostname,
@@ -346,14 +348,14 @@ describeIf('slice 5b runner against the live run ledger', () => {
     process.env.DYNAMICS_CLIENT_ID = previousClientId;
   });
 
-  async function setup() {
+  async function setup({ recipe = 'basic' } = {}) {
     log = [];
     const world = makeWorld(log);
     const preflight = await runPreflight(world.client, world.graph, world.sharePointTarget);
     const bundle = buildBundle();
     const source = bundle.source.request;
     const manifest = buildCloneManifest(preflight, {
-      source, fiscalYear: source.akoya_fiscalyear, meetingDate: source.wmkf_meetingdate, testLabel: 'Runner proof', bundle,
+      source, fiscalYear: source.akoya_fiscalyear, meetingDate: source.wmkf_meetingdate, testLabel: 'Runner proof', bundle, recipe,
     });
     const idempotencyKey = `runner-${crypto.randomBytes(4).toString('hex')}`;
     const { run } = await ledger.reserveRun({ actorId: cliActorId('runner-proof'), idempotencyKey, plan: reservePlan(manifest, bundle) });
@@ -413,6 +415,40 @@ describeIf('slice 5b runner against the live run ledger', () => {
     expect(first('journal:dataverse_document_location')).toBeLessThan(first('dispatch:ensure_folder'));
     expect(first('journal:dataverse_document_location')).toBeLessThan(first('dispatch:location_post'));
     expect(first('journal:sharepoint_file')).toBeLessThan(first('dispatch:upload'));
+
+    // Nothing source-derived or message-shaped reached Postgres.
+    const { rows } = await db.query(
+      `SELECT (SELECT row_to_json(r)::text FROM test_request_runs r WHERE run_id = $1::uuid) AS run,
+              (SELECT json_agg(x)::text FROM test_request_run_resources x WHERE run_id = $1::uuid) AS resources`,
+      [run.runId],
+    );
+    const stored = `${rows[0].run}${rows[0].resources}`;
+    expect(stored).not.toContain('CONFIDENTIAL');
+    expect(stored).not.toContain('Runner proof');
+    expect(stored).not.toMatch(/https?:\/\//);
+  });
+
+  it('slice 6a: an initial_assessment run advances past verify (recording the Foundation/Contact baseline digest) to seed_initial_assessment, then stops needs_attention there since 6a registers no IA step bodies', async () => {
+    const { world, run, advance } = await setup({ recipe: 'initial_assessment' });
+    const results = await runUntil(advance, null, { bypassGoverify: true });
+    const summary = results.map((result) => `${result.step}:${result.outcome}`);
+    expect(summary).toEqual([
+      'fence_source:advanced', 'create_request:advanced', 'correct_meeting_date:advanced', 'provision_location:advanced',
+      'copy_file:advanced', 'copy_file:advanced', 'observe:advanced', 'verify:advanced', 'seed_initial_assessment:needs_attention',
+    ]);
+    expect(results.at(-1)).toMatchObject({ outcome: 'needs_attention' });
+
+    const final = await ledger.getRun(run.runId);
+    expect(final).toMatchObject({
+      recipe: 'initial_assessment', status: 'needs_attention', currentStep: 'seed_initial_assessment',
+      needsAttentionReason: 'recipe_step_not_built', destinationRequestNumber: '1000400',
+    });
+    expect(world.state.counts.requestPost).toBe(1); // never markReady, never a second create
+
+    const resources = await ledger.listRunResources(run.runId);
+    const baseline = resources.find((row) => row.step === 'verify' && row.resourceKind === 'dataverse_request_document');
+    expect(baseline).toMatchObject({ outcome: 'verified' });
+    expect(baseline.readback.foundationBaselineSha256).toMatch(/^[0-9a-f]{64}$/);
 
     // Nothing source-derived or message-shaped reached Postgres.
     const { rows } = await db.query(

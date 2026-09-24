@@ -7,7 +7,7 @@
  * injected, so no module mocking is needed to run it offline).
  */
 import { jest } from '@jest/globals';
-import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
+import { advanceRun, nextStepFor, RECIPE_STEP_ORDER } from '../../lib/services/test-requests/run-runner.js';
 import { sha256, MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
@@ -138,6 +138,7 @@ function createFakeLedger(initialRun) {
 function baseRun(overrides = {}) {
   return {
     runId: RUN_ID,
+    recipe: 'basic',
     status: 'prepared',
     currentStep: 'fence_source',
     stepIndex: 0,
@@ -369,5 +370,104 @@ describe('advanceRun: version threading through a failure', () => {
     expect(result.run.status).not.toBe('needs_attention');
     expect(calls.filter((call) => call.op === 'recordError')).toHaveLength(0);
     expect(calls.filter((call) => call.op === 'getRun').length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('slice 6a: per-recipe step order (RECIPE_STEP_ORDER / nextStepFor)', () => {
+  test('basic order is unchanged: fence_source through verify, verify is the final step', () => {
+    expect(RECIPE_STEP_ORDER.basic).toEqual([
+      'fence_source', 'create_request', 'correct_meeting_date', 'provision_location', 'copy_file', 'observe', 'verify',
+    ]);
+    const transitions = [
+      ['fence_source', 'create_request', 1],
+      ['create_request', 'correct_meeting_date', 2],
+      ['correct_meeting_date', 'provision_location', 3],
+      ['provision_location', 'copy_file', 4],
+      ['copy_file', 'observe', 5],
+      ['observe', 'verify', 6],
+    ];
+    for (const [from, to, index] of transitions) {
+      expect(nextStepFor('basic', from)).toEqual({ step: to, index });
+    }
+    expect(nextStepFor('basic', 'verify')).toBeNull();
+  });
+
+  test('initial_assessment is the Basic steps through verify, then three IA-only steps; verify_initial_assessment is the final step', () => {
+    expect(RECIPE_STEP_ORDER.initial_assessment).toEqual([
+      'fence_source', 'create_request', 'correct_meeting_date', 'provision_location', 'copy_file', 'observe', 'verify',
+      'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+    ]);
+    const transitions = [
+      ['fence_source', 'create_request', 1],
+      ['create_request', 'correct_meeting_date', 2],
+      ['correct_meeting_date', 'provision_location', 3],
+      ['provision_location', 'copy_file', 4],
+      ['copy_file', 'observe', 5],
+      ['observe', 'verify', 6],
+      ['verify', 'seed_initial_assessment', 7],
+      ['seed_initial_assessment', 'seed_initial_assessment_snapshot', 8],
+      ['seed_initial_assessment_snapshot', 'verify_initial_assessment', 9],
+    ];
+    for (const [from, to, index] of transitions) {
+      expect(nextStepFor('initial_assessment', from)).toEqual({ step: to, index });
+    }
+    expect(nextStepFor('initial_assessment', 'verify_initial_assessment')).toBeNull();
+  });
+
+  test('fails closed on an unrecognized recipe or a step outside the recipe order', () => {
+    expect(() => nextStepFor('nonexistent_recipe', 'fence_source')).toThrow('Unknown Test Request Factory recipe');
+    expect(() => nextStepFor('basic', 'seed_initial_assessment')).toThrow("not part of the basic recipe's step order");
+  });
+});
+
+describe('slice 6a: manifest/run recipe binding', () => {
+  test('a manifest recipe that does not match the reserved run recipe is refused before any lease claim', async () => {
+    const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'initial_assessment' }));
+    const manifest = baseManifest({ recipe: 'basic' });
+    await expect(advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle: null,
+      deps: { client: {}, graph: {}, sharePointTarget: () => ({}) },
+    })).rejects.toThrow('recipe');
+    expect(calls.filter((call) => call.op === 'claimLease')).toHaveLength(0);
+  });
+
+  test('a manifest with no recipe field (pre-6a v4 manifest) is treated as basic and resumes a basic run', async () => {
+    const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'basic' }));
+    const manifest = baseManifest(); // no `recipe` key
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle: null,
+      deps: { client: { get: jest.fn(async () => { throw new Error('boom'); }) }, graph: {}, sharePointTarget: () => ({}) },
+    });
+    // Reaches the step body (needs_attention from the thrown error), proving
+    // the recipe compare did not refuse it up front.
+    expect(result.outcome).toBe('needs_attention');
+    expect(calls.filter((call) => call.op === 'claimLease')).toHaveLength(1);
+  });
+
+  test('a same-recipe manifest and run advance normally (recipe compare passes)', async () => {
+    const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'initial_assessment' }));
+    const manifest = baseManifest({ recipe: 'initial_assessment' });
+    await expect(advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle: null,
+      deps: { client: { get: jest.fn(async () => { throw new Error('boom'); }) }, graph: {}, sharePointTarget: () => ({}) },
+    })).resolves.toMatchObject({ outcome: 'needs_attention' });
+    expect(calls.filter((call) => call.op === 'claimLease')).toHaveLength(1);
+  });
+});
+
+describe('slice 6a: IA-only steps stop cleanly instead of running unbuilt bodies', () => {
+  test('reaching seed_initial_assessment, seed_initial_assessment_snapshot or verify_initial_assessment marks needs_attention with recipe_step_not_built, never markReady, never an unhandled throw', async () => {
+    for (const step of ['seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment']) {
+      const run = baseRun({ recipe: 'initial_assessment', currentStep: step, stepIndex: 7 });
+      const { ledger, calls } = createFakeLedger(run);
+      const manifest = baseManifest({ recipe: 'initial_assessment' });
+      const result = await advanceRun({
+        runId: RUN_ID, ledger, manifest, bundle: null,
+        deps: { client: {}, graph: {}, sharePointTarget: () => ({}) },
+      });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('recipe_step_not_built');
+      expect(calls.filter((call) => call.op === 'markReady')).toHaveLength(0);
+    }
   });
 });

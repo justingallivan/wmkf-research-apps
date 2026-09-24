@@ -1,4 +1,15 @@
-import { cliActorId, createRunLedger, sanitizeErrorMessage } from '../../lib/services/test-requests/run-ledger.js';
+import {
+  IA_ATTEMPT_MARKER_KEYS,
+  LEDGER_REASON_CODES,
+  LEDGER_RECEIPT_KEYS,
+  LEDGER_STEPS,
+  assertLedgerReceipt,
+  assertReservePlan,
+  cliActorId,
+  createRunLedger,
+  sanitizeErrorMessage,
+  stepOrThrow,
+} from '../../lib/services/test-requests/run-ledger.js';
 
 /**
  * Recording fake db: satisfies the `{ query, transaction }` interface
@@ -328,5 +339,128 @@ describe('journalPlannedResource', () => {
     expect(calls[1].text).not.toContain('FOR UPDATE'); // aggregate cannot lock; run row lock in calls[0] serializes
     expect(calls[2].text).toContain('INSERT INTO test_request_run_resources');
     expect(calls[2].params[1]).toBe(3);
+  });
+});
+
+describe('slice 6a: initial_assessment recipe token', () => {
+  it('assertReservePlan accepts both basic and initial_assessment', () => {
+    expect(assertReservePlan({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: { ...BASE_PLAN, recipe: 'basic' },
+    })).toBeTruthy();
+    expect(assertReservePlan({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: { ...BASE_PLAN, recipe: 'initial_assessment' },
+    })).toBeTruthy();
+  });
+
+  it('rejects an unlisted recipe token', () => {
+    expect(() => assertReservePlan({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: { ...BASE_PLAN, recipe: 'initial_assessment_v2' },
+    })).toThrow(/recipe is not an allowlisted value/);
+  });
+});
+
+describe('slice 6a: new LEDGER_STEPS accepted, unknown steps still rejected', () => {
+  it('accepts the three Initial Assessment steps', () => {
+    for (const step of ['seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment']) {
+      expect(stepOrThrow(step)).toBe(step);
+    }
+  });
+
+  it('rejects a step outside LEDGER_STEPS', () => {
+    expect(() => stepOrThrow('seed_final_writeup')).toThrow(/not a member of LEDGER_STEPS/);
+  });
+});
+
+describe('slice 6a: new resource kind dataverse_request_document', () => {
+  it('journals a dataverse_request_document resource once the fence holds', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([runRow({ recipe: 'initial_assessment', current_step: 'verify', lease_token: 'tok-1', lease_generation: 1, locked_until: new Date(Date.now() + 60000).toISOString(), lease_live: true })]);
+    queueRows([{ next_sequence: 1 }]);
+    queueRows([{ resource_id: 1, run_id: BASE_PLAN.runId, sequence: 1, step: 'verify', resource_kind: 'dataverse_request_document', system: 'dataverse', planned_identity: {}, outcome: 'planned' }]);
+    const ledger = createRunLedger(db);
+
+    const resource = await ledger.journalPlannedResource({
+      runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1,
+      step: 'verify', resourceKind: 'dataverse_request_document', system: 'dataverse', plannedIdentity: {},
+    });
+    expect(resource.resourceKind).toBe('dataverse_request_document');
+    expect(calls[2].text).toContain('INSERT INTO test_request_run_resources');
+  });
+
+  it('rejects an unlisted resource kind', async () => {
+    const { db, queueRows } = createFakeDb();
+    queueRows([runRow({ lease_token: 'tok-1', lease_generation: 1, locked_until: new Date(Date.now() + 60000).toISOString(), lease_live: true })]);
+    const ledger = createRunLedger(db);
+    await expect(ledger.journalPlannedResource({
+      runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1,
+      step: 'verify', resourceKind: 'dataverse_request_document_v2', system: 'dataverse', plannedIdentity: {},
+    })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+});
+
+describe('slice 6a: new reason codes accepted, malformed reasons still rejected', () => {
+  it.each(['ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed', 'recipe_step_not_built'])(
+    'markNeedsAttention accepts %s as a reason before any SQL',
+    async (reason) => {
+      const { db, calls, queueRows } = createFakeDb();
+      queueRows([runRow({ lease_token: 'tok-1', lease_generation: 1, locked_until: new Date(Date.now() + 60000).toISOString() })]);
+      const ledger = createRunLedger(db);
+      await ledger.markNeedsAttention({
+        runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1, expectedVersion: 1, reason,
+      });
+      expect(calls[0].params).toContain(reason);
+    },
+  );
+
+  it('LEDGER_REASON_CODES contains every new Initial Assessment code', () => {
+    for (const code of ['ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed', 'recipe_step_not_built']) {
+      expect(LEDGER_REASON_CODES).toContain(code);
+    }
+  });
+});
+
+describe('slice 6a: new receipt keys and their grammars', () => {
+  it('accepts valid values for every new receipt key', () => {
+    expect(assertLedgerReceipt({
+      requestDocumentId: '11111111-1111-4111-8111-111111111111',
+      sourceVersionId: '3.0',
+      generationKey: 'a'.repeat(64),
+      claimTokenSha256: 'b'.repeat(64),
+      foundationBaselineSha256: 'c'.repeat(64),
+    })).toBeTruthy();
+  });
+
+  it('rejects malformed or text-bearing values for every new receipt key', () => {
+    const badValues = {
+      requestDocumentId: 'not-a-guid',
+      sourceVersionId: 'https://example.com/v1',
+      generationKey: 'not-hex',
+      claimTokenSha256: 'ghp_1234567890123456789012345678901234',
+      foundationBaselineSha256: 'CONFIDENTIAL text value',
+    };
+    for (const [key, value] of Object.entries(badValues)) {
+      expect(() => assertLedgerReceipt({ [key]: value })).toThrow(/Ledger receipt rejected/);
+    }
+  });
+
+  it('LEDGER_RECEIPT_KEYS contains every new key', () => {
+    for (const key of ['requestDocumentId', 'sourceVersionId', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256']) {
+      expect(LEDGER_RECEIPT_KEYS).toContain(key);
+    }
+  });
+});
+
+describe('slice 6a: IA attempt-marker timestamp keys', () => {
+  it('each marker key is accepted as a generic <stem>At timestamp, and a non-timestamp value is rejected', () => {
+    for (const key of IA_ATTEMPT_MARKER_KEYS) {
+      expect(assertLedgerReceipt({ [key]: '2026-09-24T00:00:00.000Z' })).toBeTruthy();
+      expect(() => assertLedgerReceipt({ [key]: 'not a timestamp' })).toThrow(/Ledger receipt rejected/);
+    }
+  });
+
+  it('none of the marker keys needed a dedicated KEY_RULES entry (they are not in LEDGER_RECEIPT_KEYS)', () => {
+    for (const key of IA_ATTEMPT_MARKER_KEYS) {
+      expect(LEDGER_RECEIPT_KEYS).not.toContain(key);
+    }
   });
 });

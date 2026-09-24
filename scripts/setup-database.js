@@ -1245,7 +1245,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
            AND s.v !~ '(://|[[:cntrl:]])'
            AND s.v !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
            AND CASE
-             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
              WHEN e.key IN ('itemId', 'folderItemId', 'graphItemId', 'sourceGraphItemId') THEN s.v ~ '^01[A-Z2-7]{32}$'
              WHEN e.key IN ('driveId', 'sourceDriveId') THEN s.v ~ '^b![A-Za-z0-9_-]{16,120}$'
@@ -1255,9 +1255,9 @@ LANGUAGE sql IMMUTABLE AS $receipt$
              WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx)$'
              WHEN e.key = 'mimeType' THEN s.v ~ '^[a-z]+/[a-z0-9.+-]{1,80}$'
              WHEN e.key = 'eTag' THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
-             WHEN e.key = 'versionId' THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
+             WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
              WHEN e.key IN ('versionNumber', 'versionNumberBefore', 'versionNumberAfter') THEN s.v ~ '^[0-9]{1,20}$'
-             WHEN e.key = 'contentHash' THEN s.v ~ '^[0-9a-f]{64}$'
+             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256') THEN s.v ~ '^[0-9a-f]{64}$'
              WHEN e.key IN ('outcome', 'kind') THEN s.v ~ '^[a-z][a-z0-9_-]{0,39}$'
              WHEN e.key = 'field' THEN s.v ~ '^[a-z][a-z0-9_]{0,63}$'
              WHEN e.key IN ('expectedValue', 'actualValue', 'valueBefore', 'valueAfter', 'fiscalYear', 'meetingDate') THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
@@ -1314,9 +1314,10 @@ $receipt$`,
     CONSTRAINT test_request_runs_idempotency_key_digest CHECK (idempotency_key ~ '^[0-9a-f]{64}$'),
     CONSTRAINT test_request_runs_current_step_enum CHECK (current_step IN (
       'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
-      'copy_file', 'observe', 'verify', 'ready'
+      'copy_file', 'observe', 'verify', 'ready',
+      'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment'
     )),
-    CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN ('basic')),
+    CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN ('basic', 'initial_assessment')),
     CONSTRAINT test_request_runs_host_shapes CHECK (
       source_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
       AND destination_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
@@ -1357,7 +1358,9 @@ $receipt$`,
         'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
         'file_source_changed', 'file_verification_failed', 'file_copy_failed',
         'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
-        'preallocated_request_present', 'file_journal_unverified'
+        'preallocated_request_present', 'file_journal_unverified',
+        'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
+        'recipe_step_not_built'
       ))
       AND (last_error IS NULL OR regexp_replace(last_error, ' [(]http [0-9]{3}[)]$', '') IN (
         'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
@@ -1373,7 +1376,9 @@ $receipt$`,
         'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
         'file_source_changed', 'file_verification_failed', 'file_copy_failed',
         'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
-        'preallocated_request_present', 'file_journal_unverified'
+        'preallocated_request_present', 'file_journal_unverified',
+        'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
+        'recipe_step_not_built'
       ))
     )
   )`,
@@ -1384,7 +1389,7 @@ $receipt$`,
     sequence INTEGER NOT NULL, step TEXT NOT NULL,
     resource_kind TEXT NOT NULL CHECK (resource_kind IN (
       'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
-      'dataverse_document_location', 'sharepoint_file', 'workflow_bypass'
+      'dataverse_document_location', 'sharepoint_file', 'workflow_bypass', 'dataverse_request_document'
     )),
     system TEXT NOT NULL CHECK (system IN ('dataverse', 'sharepoint')),
     planned_identity JSONB NOT NULL CHECK (test_request_receipt_ok(planned_identity)),
@@ -1398,7 +1403,8 @@ $receipt$`,
     CONSTRAINT test_request_run_resources_run_sequence UNIQUE (run_id, sequence),
     CONSTRAINT test_request_run_resources_step_enum CHECK (step IN (
       'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
-      'copy_file', 'observe', 'verify', 'ready'
+      'copy_file', 'observe', 'verify', 'ready',
+      'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment'
     )),
     CONSTRAINT test_request_run_resources_error_code CHECK (
       error IS NULL OR regexp_replace(error, ' [(]http [0-9]{3}[)]$', '') IN (
@@ -1415,7 +1421,9 @@ $receipt$`,
         'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
         'file_source_changed', 'file_verification_failed', 'file_copy_failed',
         'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
-        'preallocated_request_present', 'file_journal_unverified'
+        'preallocated_request_present', 'file_journal_unverified',
+        'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
+        'recipe_step_not_built'
       )
     )
   )`,

@@ -190,7 +190,10 @@ describe('remaining text columns are finite or grammar-bound', () => {
     await expect(ledger.recordResourceReadback({ resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, readback: {}, outcome: 'Confidential' }))
       .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
     expect(db.calls).toHaveLength(0);
-    expect(LEDGER_STEPS).toEqual(['fence_source', 'create_request', 'correct_meeting_date', 'provision_location', 'copy_file', 'observe', 'verify', 'ready']);
+    expect(LEDGER_STEPS).toEqual([
+      'fence_source', 'create_request', 'correct_meeting_date', 'provision_location', 'copy_file', 'observe', 'verify', 'ready',
+      'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+    ]);
   });
 
   test('reserveRun validates every text column before SQL', async () => {

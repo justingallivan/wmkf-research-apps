@@ -124,6 +124,7 @@ function parseArgs(argv) {
     bundle: null,
     testLabel: null,
     reserve: false,
+    recipe: 'basic',
     manifestOut: null,
     idempotencyKey: null,
     actor: null,
@@ -144,6 +145,7 @@ function parseArgs(argv) {
     else if (arg.startsWith('--test-label=')) parsed.testLabel = arg.slice('--test-label='.length);
     else if (arg === '--bypass-goverify') parsed.bypassGoverify = true;
     else if (arg === '--reserve') parsed.reserve = true;
+    else if (arg.startsWith('--recipe=')) parsed.recipe = arg.slice('--recipe='.length);
     else if (arg.startsWith('--manifest-out=')) parsed.manifestOut = arg.slice('--manifest-out='.length);
     else if (arg.startsWith('--idempotency-key=')) parsed.idempotencyKey = arg.slice('--idempotency-key='.length);
     else if (arg.startsWith('--actor=')) parsed.actor = arg.slice('--actor='.length);
@@ -177,6 +179,14 @@ function parseArgs(argv) {
   if (parsed.reserve && (!parsed.bundle || !parsed.manifestOut || !parsed.idempotencyKey)) {
     throw new Error('--reserve requires --bundle, --manifest-out, and --idempotency-key.');
   }
+  if (!parsed.reserve && parsed.recipe !== 'basic') {
+    throw new Error('--recipe is valid only with --reserve.');
+  }
+  // Mirrors run-ledger.js's finite RECIPES set; the ledger enforces this
+  // again server-side, but a bad value should fail before any Dataverse read.
+  if (!['basic', 'initial_assessment'].includes(parsed.recipe)) {
+    throw new Error('--recipe must be basic or initial_assessment.');
+  }
   if (parsed.reserve) {
     parsed.actorId = resolveActorId(parsed.actor);
     try {
@@ -209,7 +219,8 @@ function printHelp() {
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
   console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
-  console.log('Reserve a ledger-driven bundle run: ... --reserve --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number> --manifest-out=/absolute/new-manifest.json --idempotency-key=<key> [--actor=<id>]');
+  console.log('Reserve a ledger-driven bundle run: ... --reserve --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number> --manifest-out=/absolute/new-manifest.json --idempotency-key=<key> [--actor=<id>] [--recipe=basic|initial_assessment]');
+  console.log('  --recipe: basic (default) or initial_assessment; a same idempotency key reserved under a different recipe is a conflict, not a return of the first run.');
   console.log('  --idempotency-key: 1-200 printable ASCII characters, no spaces; the ledger stores only its SHA-256.');
   console.log('  --actor: admin:<guid> or user:<guid>, or an OS username; a username (default: the current OS user) is stored only as cli:<16 hex digest>.');
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
@@ -545,14 +556,16 @@ async function runReserve(client, args, ledgerUrl) {
     throw new Error('Source Request must be a Grant Request matching the live Grant option.');
   }
   const cycle = resolveCloneCycle(source, args);
-  const manifest = buildCloneManifest(preflight, { ...cycle, source, testLabel: args.testLabel, bundle });
+  const manifest = buildCloneManifest(preflight, { ...cycle, source, testLabel: args.testLabel, bundle, recipe: args.recipe });
   if (!isBundleManifest(manifest)) throw new Error('The bounded ledger-driven runner only supports bundle (v4) manifests.');
 
   const { actorId } = args;
   // The plan digest binds the ledger-relevant identities/hashes, never
-  // purpose text or the create body itself.
+  // purpose text or the create body itself. Recipe is included so a same-key
+  // retry naming a different recipe conflicts instead of returning the first run.
   const planDigest = sha256({
     runId: manifest.values.runId,
+    recipe: manifest.recipe,
     destinationRequestId: manifest.values.requestId,
     destinationLocationId: manifest.values.locationId,
     sourceRequestId: manifest.source.requestId,
@@ -563,7 +576,7 @@ async function runReserve(client, args, ledgerUrl) {
   });
   const plan = {
     runId: manifest.values.runId,
-    recipe: 'basic',
+    recipe: manifest.recipe,
     sourceDataverseHost: bundle.source.dataverseHost,
     sourceRequestId: manifest.source.requestId,
     sourceRequestNumber: manifest.source.requestNumber,

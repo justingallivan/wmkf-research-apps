@@ -142,6 +142,39 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
   });
 
+  it('slice 6a: reserves both basic and initial_assessment runs', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const basicPlan = basePlan({ recipe: 'basic' });
+    const iaPlan = basePlan({ recipe: 'initial_assessment' });
+    createdRunIds.push(basicPlan.runId, iaPlan.runId);
+
+    const { run: basicRun } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-recipe-basic', plan: basicPlan });
+    const { run: iaRun } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-recipe-ia', plan: iaPlan });
+
+    expect(basicRun.recipe).toBe('basic');
+    expect(iaRun.recipe).toBe('initial_assessment');
+  });
+
+  it("slice 6a: a same idempotency key reserved under a different recipe is a conflict, not a return of the first run (mirrors runReserve's planDigest, which includes recipe)", async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const idempotencyKey = 'key-cross-recipe';
+    const shared = basePlan();
+    const basicPlan = { ...shared, recipe: 'basic', planDigest: '1'.repeat(64) };
+    const iaPlan = { ...shared, recipe: 'initial_assessment', planDigest: '2'.repeat(64) };
+    createdRunIds.push(shared.runId);
+
+    const { run: firstRun, created } = await ledger.reserveRun({ actorId, idempotencyKey, plan: basicPlan });
+    expect(created).toBe(true);
+    expect(firstRun.recipe).toBe('basic');
+
+    await expect(ledger.reserveRun({ actorId, idempotencyKey, plan: iaPlan }))
+      .rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
+
+    // The stored row is unchanged: still the first (basic) reservation.
+    const stillBasic = await ledger.getRun(firstRun.runId);
+    expect(stillBasic.recipe).toBe('basic');
+  });
+
   it('claimLease succeeds once; a second claim with the stale version returns null', async () => {
     const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
     const plan = basePlan();
