@@ -1,4 +1,179 @@
-# Session 538 Prompt: Accept build-order item 5; unblock item 6 with a sandbox solution import
+# Session 541 Prompt: Review PR #332 and decide reviewer-reminder promotion
+
+## Session 540 Summary — 2026-09-24 PT (Codex personal-email reviewer reminders)
+
+[VERIFIED via branch source, local checks, the PR plan, and GitHub] PRs #329 and #330 are merged. PR #332 remains open on `codex/personal-email-reviewer-reminders` at `4cf8976e8`; its checks passed and GitHub reported `mergeStateStatus: CLEAN` before this handoff edit. The owner confirmed the staff rehearsal and walkthrough were completed. The reviewer-reminder automatic cron remains unscheduled. This branch has not been merged to `main`, and no Production behavior or live delivery was tested in this session.
+
+### What Was Completed
+
+1. **Reviewer reminder personal defaults and manual sends.** The branch implements the sending PD's saved default for both reminder kinds, proof-bound editable preview/send, owner-keyed preference routes, and strict PD preference reads before automatic claims. The generic preference route reserves the new keys. The full caller-to-send contract and remaining uncertainty semantics are recorded in `docs/plans/PERSONAL_EMAIL_REVIEWER_REMINDERS_PLAN_2026-09-24.md`.
+2. **Adversarial review fixes.** OAuth Claude Opus reviews found and then verified fixes for authorization, stale preview, uncertain-send, preference isolation, fallback, and recovery-edit issues. The last independent diff review found a late preference response could overwrite a recovery edit; `b74d385c4` added an edit-generation guard and regression test. The CodeQL rehearsal-loader findings were fixed by `e55cf26dc`.
+3. **Staff rehearsal evidence.** `4cf8976e8` records the owner's confirmation and the synthetic browser walkthrough. A later targeted browser check on final runtime head `b74d385c4` showed an unknown template token blocked Send with a specific validation message, then a corrected body and refreshed preview enabled Send. The temporary loopback server on port 3133 was stopped; the separate 3132 rehearsal server was left running for the owner. Human observations were not itemized, and no live service or email probe was run.
+4. **Verification.** After the final fixes, focused Jest passed 7 suites/176 tests, lint and build passed, and relevant API route, lifecycle auth, route service, reviewer engagement, reminder hold, fact consistency, secret scan, and scaffolding gates with their self-tests passed sequentially. GitHub checks on `4cf8976e8` all passed, including Jest, Playwright, static/security analysis, Claude review, and Preview status. A documentation-only handoff push will require a fresh PR check before merge.
+
+### Commits on the PR Branch
+
+- `2eab48fd2` — Add personal reviewer reminder defaults and preview-bound sends
+- `d001180a4`, `ac8f9bc05`, `7af043073`, `11091eaaa`, `b74d385c4` — Fix review findings and preserve recovery edits
+- `38000ffeb` — Record final reviewer reminder review
+- `814285827` — Avoid backtracking in automated email marker stripping
+- `fa86dd571`, `e55cf26dc` — Add and harden the synthetic staff rehearsal
+- `4cf8976e8` — Record staff rehearsal evidence
+
+## Next Items
+
+### Verified Open
+
+1. **PR #332 is open for owner review.** Evidence: GitHub PR state and checks at `4cf8976e8`, plus the branch plan. Recheck the new head, checks, and merge state after this handoff push; do not infer Production readiness from a Preview check.
+
+### Owner Decision Needed
+
+1. **Release preparation and promotion.** The Tier 2 plan still calls for a last-known-good Production deployment and an authorized rollback operator before promotion. Merging #332 to `main` auto-deploys and requires Justin's explicit approval. No Vercel commands, live-service probes, or merge are authorized by this handoff.
+
+### Parked
+
+1. **Automatic reviewer reminder cron.** Evidence: the plan and existing cron-hold gate. It remains unscheduled; any restoration needs a separate decision and release verification.
+2. **Remaining personal-email slices.** The owner requested one slice at a time with review between slices. Continue only after PR #332 review and owner ordering.
+
+### Verify Before Acting
+
+1. The PR and `main` can move concurrently. Recheck branch, working tree, PR head, checks, and Production release record before any merge decision.
+2. The loopback rehearsal process on port 3132 may not survive a new session. Treat it as a local synthetic aid, not evidence of live behavior.
+
+### Do Not Reopen Without New Evidence
+
+1. The owner-confirmed staff walkthrough and the reviewed P3 fixes are recorded in the PR plan. Reopen them only for a new defect or changed diff.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/PERSONAL_EMAIL_REVIEWER_REMINDERS_PLAN_2026-09-24.md` | Contract, review findings, verification, and release hold |
+| `scripts/rehearse-reviewer-reminders.js` | Isolated synthetic staff rehearsal |
+| `docs/API_ROUTE_SECURITY_MATRIX.md` | Dedicated preference and preview/send route gates |
+
+## Testing and Stop-time Notes
+
+- `npm run report:claim-evidence-pilot -- --current` returned “local state could not be read”; no pilot observation row was added.
+- No `CLAUDE.md` update was needed: the branch's route and script contracts are covered in the plan and route matrix; no cross-agent instruction changed.
+- No `DEVELOPMENT_LOG.md` milestone entry was required: #332 remains unmerged and no Production capability or cutover shipped in this session.
+- This branch-local handoff starts from `origin/main`'s Session 540 prompt at `f9cf1e8c2`, preserving the newer concurrent session history.
+
+## Prior Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
+
+# Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
+
+## Session 539 Summary — 2026-09-24 PT (Codex independent queue slice; concurrent sessions continued)
+
+[VERIFIED via PRs #333/#334, `main` merge commits `374a2e51e`/`542da4d1e`, GitHub checks, and local gates] A bounded IRS BMF importer regression test and its canonical work-queue correction merged to `main`. The test uses a local CSV fixture; this session ran no live IRS download or database import. The other active Factory and personal-email worktrees were not edited. `main` auto-deploys; Production deployment/readiness for these two merges was not independently checked.
+
+### What Was Completed
+
+1. **IRS BMF parser regression coverage.** PR #333 merged `374a2e51e` (source commit `b09d395b2`). `tests/unit/irs-bmf-import-parser.test.js` calls the existing CSV-to-Postgres COPY stream helper and covers a BOM, quoted commas/newlines, escaping, EIN normalization, and malformed-row skips. The helper is exported for this direct test; import behavior was not otherwise changed. The focused test, lint, types, and GitHub checks passed.
+2. **Queue fact correction.** PR #334 merged `542da4d1e` (source commit `fbd1ce64e`). `docs/CURRENT_WORK_QUEUE.md` now records that the parser test exists while a fresh live IRS-file re-run remains unverified. The doc-currency, fact-consistency, doc-symbol-refs, and docs-catalog gates passed; the paired self-tests passed.
+3. **Concurrent-work status checked read-only at handoff.** PRs #329, #330, and #331 are merged. Factory slice 6a is owner-accepted [VERIFIED via `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` on `codex/test-request-preview-integration`]; slice 6b has new branch commits and belongs to that workstream. PR #332 remains open on `codex/personal-email-reviewer-reminders` [VERIFIED via GitHub]. These are other sessions' work.
+
+### Commits
+
+- `b09d395b2` — Test IRS BMF CSV stream import with parser fixture
+- `374a2e51e` — Merge PR #333
+- `fbd1ce64e` — Update IRS BMF test status in work queue
+- `542da4d1e` — Merge PR #334
+
+## Next Items
+
+### Verified Open
+
+1. **Factory slice 6b is in progress in its own worktree.** Evidence: Factory design doc's slice 6a acceptance record and branch commits `2bf5904a9`/`10e0a5e4f` at this handoff. The active Factory session owns the next build and review; check its newer handoff before acting.
+2. **Personal reviewer-reminder defaults remain under review.** Evidence: PR #332 is open at head `ac8f9bc05` and the owner’s Codex worktree is on that branch. Leave its files to that owner; recheck PR state before any follow-up.
+
+### Owner Decision Needed
+
+1. **No new owner decision from this IRS BMF test slice.** The other workstreams retain their own decision gates and handoffs.
+
+### Verify Before Acting
+
+1. **Live IRS-file import remains unproven by this test.** The fixture covers parsing and COPY text, not a fresh IRS download, Postgres staging, or atomic swap. Establish the intended target and authorization before running an import or dry run; `refresh()` writes staging even when `dryRun` is true.
+2. **Production deployment for PRs #333/#334 was not independently checked.** Both merged to auto-deploying `main`; verify Vercel Ready state if operational evidence is needed.
+3. **Concurrent branch state changes quickly.** Check the Factory branch, PR #332, worktree ownership, and `git status` before taking any of their tasks. Historical Session 538 next items naming PRs #329–#331 as open are superseded by the merged PR states above.
+
+### Do Not Reopen Without New Evidence
+
+1. **The missing IRS importer unit test is closed.** PR #333 supplies it and PR #334 corrected the current queue claim. A live IRS-file run is a separate operational proof, not a missing parser-test fix.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/irs-bmf-service.js` | CSV parser and COPY-stream importer |
+| `tests/unit/irs-bmf-import-parser.test.js` | Fixture-driven parser regression test |
+| `docs/CURRENT_WORK_QUEUE.md` | Current queue status and remaining live-file caveat |
+
+## Testing and Stop-time Notes
+
+- Focused IRS test, ESLint on touched source/test, TypeScript check, and PR #333 GitHub checks passed.
+- PR #334 GitHub checks and doc-currency, fact-consistency, doc-symbol-refs, docs-catalog gates passed; relevant self-tests passed sequentially.
+- `report:claim-evidence-pilot -- --current` was attempted both inside and outside the sandbox; it returned “local state could not be read.” No observation row was added because eligibility could not be determined.
+- `CLAUDE.md` needs no change: no app, endpoint, schema, script, configuration, or convention changed. No DEVELOPMENT_LOG milestone entry is required: this session shipped test coverage and documentation, not a new Production capability or cutover.
+
+## Prior Session 539 Prompt: Build IA recipe slice 6b (after owner accepts 6a)
+
+# Session 539 Prompt: Build IA recipe slice 6b (after owner accepts 6a)
+
+## Session 538 Summary — 2026-09-24 PT (Claude root; Sonnet build agent, Codex review/rescue; owner drives a separate Codex session)
+
+[VERIFIED via pushed commits, PR list, 544 focused tests including live suites against a local throwaway PostgreSQL 16, gates, mutation checks, and Codex adversarial reviews] The owner accepted Factory build-order item 5. The sandbox was brought to production `wmkf_` schema parity from this repository (PR #331, open), which unblocked item 6. The Initial Assessment recipe plan was approved by Codex after five rounds, and slice 6a was built and approved by Codex (round 3); owner acceptance of 6a is pending. The owner handed the personal-email-defaults work to their own Codex session (PRs #329, #330 open). Nothing was deployed; no production write occurred. Production reads were definitions-only (table/column/choice metadata), owner-authorized.
+
+### What Was Completed
+
+1. **Red gate fixed on `main`**: `check:doc-symbol-refs` (`f1178bfda`).
+2. **Item 5 accepted by the owner**; recorded on the Factory branch (`4a52f3127`).
+3. **Sandbox schema parity (PR #331, branch `claude/sandbox-schema-parity`, 8 commits)**: waves `wave0-prod-parity-foundation` and `wave29-prod-parity-tail` generated from production metadata; `schema-apply.js` gained global option sets, multiselect and file columns with metadata-lag retries; `apply-dataverse-schema.js --new-first`; `scripts/compare-sandbox-schema-parity.js` and `scripts/apply-sandbox-choice-parity.js`; record `docs/plans/SANDBOX_SCHEMA_PARITY_2026-09-24.md`. Every wave applied to the sandbox, 54 choice values inserted. Result: every production `wmkf_` table, column and choice value exists in the sandbox except the rollup helpers; 0 type differences over 1,023 shared columns. Owner decisions: leave the 3 label differences and 112 sandbox-only values; land by PR.
+4. **Factory docs**: item 6 blocker marked resolved (`4a52f3127`); IA recipe plan (`9de3114b7` … `4fb87095b`, Codex plan rounds 1–4 needs-attention, round 5 approve).
+5. **Slice 6a built** (`86c8549dc`, `a13b7b885`, `178d56d00`, `38c2a34f6`, record `4dd526dca`): recipe `initial_assessment`, recipe bound into plan digest and pre-lease check, per-recipe step order, `foundation_baseline` resource (digest at insert, one per run, repeated verify compares), IA folder/filename grammar in JS and SQL, legacy `--execute` refuses non-basic manifests, pre-existing red `check:secret-scan` on the Factory branch fixed. Codex 6a rounds: 1 and 2 needs-attention (all fixed; round 2's fix built by Codex rescue, reviewed by Claude), 3 approve.
+6. **Codex worktree** `/Users/gallivan/Code/WMKF_Apps-codex` set up for the owner's personal-email work; brief `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_CODEX_BRIEF_2026-09-24.md` (on that branch). Temporary production-read allow rule removed from `.claude/settings.local.json`.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Accept slice 6a** (Factory branch, record paragraph "Slice 6a built" in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`).
+2. **Review/merge PR #331** (sandbox schema parity; changes schema tooling that can also target production, additively).
+3. **Owner's Codex PRs #329 (inventory) and #330 (grantee invite subject)**: the owner drives these in Codex; review/merge on their say.
+4. Carried: migration 054 first shared apply needs explicit authorization (freezes the file). Old Preview aliases / Entra callbacks retire-or-keep (destructive; grep callers first).
+
+### Verified Open
+
+1. **Slice 6b, IA step bodies** (after 6a acceptance). Plan: the approved paragraph "Build-order item 6, Initial Assessment recipe — plan" in the Factory design doc (items 1–7 of slice 6b): default-preserving dependency seams on `commitReadyLineage` / `resolveCanonicalInitialAssessment` / `executeChangeset`; one sandbox-host-bound service (`ia-sandbox-deps.js`, register the seam in `scripts/check-request-document-writers.js`); synthetic fixture; journal-before-dispatch wrappers around every mutating dependency including the board snapshot's; persist `wmkf_contenthash` before upload; terminal verifier repeats Basic safety checks, compares against the `foundation_baseline`, hashes the snapshot bytes. Then Claude review, Codex adversarial review, and one live sandbox run (re-export the 1003222 bundle immediately before — production read, authorized for this task; one new sandbox Request, up to two creates authorized).
+2. Remaining item 6 recipes after IA (synthetic reviewers, site-visit materials, Pre-Site, Pre-RP/Final Writeup) and item 7.
+
+### Verify Before Acting
+
+1. Local ledger: Docker runs through Colima (`colima start`); container `wmkf-ledger-pg` was recreated this session (memory `project-local-docker-is-colima.md`). Drop the three ledger objects before live suites when 054 changes; run suites `--runInBand`.
+2. Factory worktree `/Users/gallivan/Code/WMKF_Apps-factory` is at the branch head (`4dd526dca`); the branch is 132 ahead / 3 behind `main` (main's later commits are docs/memory only).
+3. Owner rule this session: bring every review finding to the owner before fixing it (memory `feedback-reviewer-differs-from-author.md`); reviewer must differ from author.
+4. `/Users/gallivan/Code/WMKF_Apps-codex` belongs to the owner's Codex session; `/Users/gallivan/Code/WMKF_Apps-investigate` may belong to another session. Do not touch either.
+
+### Do Not Reopen Without New Decision
+
+1. IA recipe plan (Codex-approved round 5) and slice 6a design: keep `basic` token, baseline-at-insert, one baseline per run, legacy `--execute` basic-only.
+2. Sandbox parity deviations (rollup/formula columns plain, Akoya vendor tables excluded, sandbox-only values and labels kept).
+3. Earlier: no-text invariant, dispatch-marker rule, no lease renewal, in-place edits to unapplied 054; synthetic IA fixtures only.
+
+## Key Files Reference
+
+- Factory design doc: `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (Factory branch)
+- Ledger/runner: `lib/services/test-requests/run-ledger.js`, `run-runner.js`, `basic-clone-steps.js`, `lib/db/migrations/054_test_request_runs.sql`, `scripts/setup-database.js`, `scripts/rehearse-test-request-sandbox.mjs`
+- IA services for 6b: `lib/services/initial-assessment/{artifact-service,artifact-lineage,artifact-reader,controls-service}.js`, `lib/services/dynamics/changeset.js`
+- Sandbox parity: `docs/plans/SANDBOX_SCHEMA_PARITY_2026-09-24.md`, `lib/dataverse/schema-apply.js`, `scripts/apply-dataverse-schema.js` (PR #331)
+
+## Stop-time notes
+
+- Claim-evidence pilot: report showed no eligible plan/design edit for this session key; no observation row.
+- Memory: added `feedback-reviewer-differs-from-author.md`, `project-local-docker-is-colima.md`; router updated (7,320 bytes, gate green).
+- Milestone: none required (nothing shipped to production; PR #331 and 6a are unmerged).
+
+## Prior Session 538 Prompt: Accept build-order item 5; unblock item 6 with a sandbox solution import
 
 ## Session 537 Summary — 2026-09-23/24 PT (Fable orchestrating; Sonnet builds, Opus reviews, Codex adversarial)
 
