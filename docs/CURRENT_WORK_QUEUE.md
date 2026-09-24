@@ -79,8 +79,12 @@ sequence.
   Option (b), if later needed, is to accept `VERCEL_BRANCH_URL` and a fixed
   allowlist of registered alias origins alongside `VERCEL_URL`, never a request
   header; it widens a CSRF allowlist and requires `/contract-reconcile` under
-  `docs/API_ROUTE_SECURITY_MATRIX.md`. Separately remove the two temporary Entra
-  callbacks for retired Codex branch aliases after checking their current use.
+  `docs/API_ROUTE_SECURITY_MATRIX.md`. The two temporary Entra callbacks for the
+  retired Codex branch aliases (`git-codex-pau-5b4bef`, `git-codex-wor-464bcd`)
+  were removed from the app registration on 2026-09-24 (Session 539, owner
+  authorized; both source branches were already gone from origin). Seven Web
+  redirect URIs remain, including three older deployment-hash callbacks that
+  were not part of that directive.
 - **Dependabot triage 2026-09-12 (S509).** Patch bumps (Next 16.3.5, xmldom 0.8.15,
   sharp 0.35.4, qs 6.16.0, js-yaml 3.15.2/4.3.2) and csv-parse 7.0.2 (a mistaken major
   with no breaking changes; the IRS BMF importer's option set was smoke-tested but the
