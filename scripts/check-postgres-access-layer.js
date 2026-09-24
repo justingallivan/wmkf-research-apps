@@ -46,10 +46,9 @@
  *       import/require/dynamic-import source matching `lib/postgres` as a
  *       path segment, e.g. `../../lib/postgres`, `../../lib/postgres/client`)
  *       fails -- routes go through `lib/services`, never the driver seam
- *       directly. This check is a clean no-op while `lib/postgres/` does
- *       not exist yet, and shares its file walker/skip rules with the
- *       census scan (collectFiles) so the two never disagree about which
- *       files are in scope.
+ *       directly. It shares its file walker/skip rules with the census
+ *       scan (collectFiles) so the two never disagree about which files
+ *       are in scope.
  * Two kinds close computed-access evasions and are ratcheted exactly like
  * every other kind (checks (a)/(b) above apply to them too):
  *   - `unresolved-import`: a require()/dynamic-import() call whose source
@@ -71,7 +70,7 @@
  *     brand-new, otherwise-unratcheted caller reach the driver under a name
  *     this gate never sees import a driver at all. See "driver-export
  *     detection" below for exactly what counts.
- * `lib/postgres/**` (does not exist yet) and the two Q5-exempt files
+ * `lib/postgres/**` (the driver seam, `lib/postgres/client.js`) and the two Q5-exempt files
  * (`lib/utils/migration-drift.js`, `lib/utils/health-checker.js`; `scripts/**`
  * is already outside the scan roots) are the allowed-importer set: they are
  * skipped by ratchet checks (a)/(b) and must NOT appear in the allowlist
