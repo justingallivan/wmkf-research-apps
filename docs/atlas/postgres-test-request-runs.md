@@ -64,8 +64,11 @@ not perform.
   credential-shaped values (recognized token prefixes are rejected
   outright), SHA-256 shape for `*Hash`, digits for `requestNumber`, and
   exact Microsoft Graph shapes for site, drive and item identifiers. The
-  same grammars are CHECK constraints in migration 054, so a writer that
-  bypasses the JS validators cannot store a URL, token or prose either. Unknown keys and unsafe values are rejected with
+  same grammars are CHECK constraints in migration 054 for every text
+  column, and the SQL function `test_request_receipt_ok(jsonb)` applies
+  the receipt allowlist and per-key grammars to `planned_identity`,
+  `source_provenance` and `readback`, so a writer that bypasses the JS
+  validators cannot store a URL, token, body or prose in any column. Unknown keys and unsafe values are rejected with
   `400 test_request_ledger_unsafe_value`, never redacted, so a Dataverse
   response body, purpose text or Graph download URL cannot land in the
   ledger. `ready` additionally requires `destination_request_number`

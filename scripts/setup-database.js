@@ -1221,6 +1221,54 @@ const v53Statements = [
 
 // V55: Test Request Factory run ledger. Mirrors migration 054.
 const v55Statements = [
+  `CREATE OR REPLACE FUNCTION test_request_receipt_ok(receipt JSONB) RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE AS $receipt$
+  SELECT receipt IS NULL OR (
+    jsonb_typeof(receipt) = 'object'
+    AND (SELECT count(*) FROM jsonb_object_keys(receipt)) <= 40
+    AND NOT EXISTS (
+      SELECT 1
+        FROM jsonb_each(receipt) AS e(key, value)
+        CROSS JOIN LATERAL (SELECT e.value #>> '{}' AS v, jsonb_typeof(e.value) AS t) AS s
+       WHERE NOT (
+         (e.key IN ('size', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber') AND s.t = 'number')
+         OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
+         OR (e.key IN ('requestIds', 'locationIds') AND s.t = 'array' AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
+         OR (e.key = 'itemIds' AND s.t = 'array' AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~ '^01[A-Z2-7]{32}$'))
+         OR (e.key = 'resourceIds' AND s.t = 'array' AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~ '^[0-9]{1,20}$'))
+         OR (
+           s.t = 'string'
+           AND length(s.v) BETWEEN 1 AND 200
+           AND s.v !~ '(://|[[:cntrl:]])'
+           AND s.v !~ '^(b!)?(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
+           AND CASE
+             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
+             WHEN e.key IN ('itemId', 'folderItemId', 'graphItemId', 'sourceGraphItemId') THEN s.v ~ '^01[A-Z2-7]{32}$'
+             WHEN e.key IN ('driveId', 'sourceDriveId') THEN s.v ~ '^b![A-Za-z0-9_-]{16,120}$'
+             WHEN e.key = 'siteId' THEN s.v ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key = 'library' THEN s.v ~ '^[a-z][a-z0-9_]{1,60}$'
+             WHEN e.key IN ('folder', 'relativeUrl') THEN s.v ~ '^([0-9]{1,10}_[0-9A-F]{32}(/(Phase I|AI Materials|Reviewer Materials))?|(Phase I|AI Materials|Reviewer Materials))$'
+             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx)$'
+             WHEN e.key = 'mimeType' THEN s.v ~ '^[a-z]+/[a-z0-9.+-]{1,80}$'
+             WHEN e.key = 'eTag' THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
+             WHEN e.key = 'versionId' THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
+             WHEN e.key IN ('versionNumber', 'versionNumberBefore', 'versionNumberAfter') THEN s.v ~ '^[0-9]{1,20}$'
+             WHEN e.key = 'contentHash' THEN s.v ~ '^[0-9a-f]{64}$'
+             WHEN e.key IN ('outcome', 'kind') THEN s.v ~ '^[a-z][a-z0-9_-]{0,39}$'
+             WHEN e.key = 'field' THEN s.v ~ '^[a-z][a-z0-9_]{0,63}$'
+             WHEN e.key IN ('expectedValue', 'actualValue', 'valueBefore', 'valueAfter', 'fiscalYear', 'meetingDate') THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
+             WHEN e.key ~ '^[a-z][A-Za-z0-9]{0,40}At$' AND e.key !~* 'body|content|purpose|token|secret|download|narrative|bytes|title|text|note|message' THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
+             ELSE FALSE
+           END
+         )
+       )
+    )
+  )
+$receipt$`,
   `CREATE TABLE IF NOT EXISTS test_request_runs (
     run_id UUID PRIMARY KEY, actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN (
@@ -1285,6 +1333,8 @@ const v55Statements = [
     CONSTRAINT test_request_runs_graph_identity_shapes CHECK (
       expected_graph_site_id ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       AND expected_graph_drive_id ~ '^b![A-Za-z0-9_-]{16,120}$'
+      AND expected_graph_drive_id !~ '^(b!)?(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
+      AND expected_graph_site_id !~ '^(b!)?(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
     ),
     CONSTRAINT test_request_runs_fiscal_year_shape CHECK (
       fiscal_year ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
@@ -1337,8 +1387,9 @@ const v55Statements = [
       'dataverse_document_location', 'sharepoint_file', 'workflow_bypass'
     )),
     system TEXT NOT NULL CHECK (system IN ('dataverse', 'sharepoint')),
-    planned_identity JSONB NOT NULL, source_provenance JSONB NULL,
-    dispatched_at TIMESTAMPTZ NULL, response_status INTEGER NULL, readback JSONB NULL,
+    planned_identity JSONB NOT NULL CHECK (test_request_receipt_ok(planned_identity)),
+    source_provenance JSONB NULL CHECK (test_request_receipt_ok(source_provenance)),
+    dispatched_at TIMESTAMPTZ NULL, response_status INTEGER NULL, readback JSONB NULL CHECK (test_request_receipt_ok(readback)),
     outcome TEXT NOT NULL DEFAULT 'planned' CHECK (outcome IN (
       'planned', 'dispatched', 'verified', 'recovered', 'conflict', 'rejected', 'ambiguous', 'failed'
     )),

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { LEDGER_REASON_CODES, LEDGER_STEPS } from '../../lib/services/test-requests/run-ledger.js';
+import { LEDGER_REASON_CODES, LEDGER_RECEIPT_KEYS, LEDGER_STEPS } from '../../lib/services/test-requests/run-ledger.js';
 
 /**
  * Migration 054 (lib/db/migrations/054_test_request_runs.sql) adds CHECK
@@ -225,11 +225,36 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
   });
 
   it('never stores credentials, bodies, or bundle contents (no such columns declared)', () => {
-    const ddlOnly = migration
+    // Column declarations only: the receipt function and the credential CHECKs
+    // legitimately NAME the shapes they reject.
+    const columnNames = migration
       .split('\n')
-      .filter((line) => !line.trim().startsWith('--'))
-      .join('\n');
-    expect(ddlOnly).not.toMatch(/credential|bearer|body_html|bundle_bytes|document_body|access_token/i);
+      .map((line) => line.match(/^\s{2}([a-z_]+)\s+(?:UUID|TEXT|INTEGER|BIGSERIAL|TIMESTAMPTZ|DATE|JSONB)\b/))
+      .filter(Boolean)
+      .map((match) => match[1]);
+    expect(columnNames.length).toBeGreaterThan(40);
+    expect(columnNames.join('\n')).not.toMatch(/credential|bearer|body|bundle_bytes|document|access_token|purpose|narrative/i);
+  });
+
+  it('enforces the receipt grammar in PostgreSQL (Codex round twelve): a receipt function guards all three JSONB columns', () => {
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION test_request_receipt_ok(receipt JSONB)');
+    expect(migration).toContain('planned_identity  JSONB NOT NULL CHECK (test_request_receipt_ok(planned_identity))');
+    expect(migration).toContain('source_provenance JSONB NULL CHECK (test_request_receipt_ok(source_provenance))');
+    expect(migration).toContain('readback          JSONB NULL CHECK (test_request_receipt_ok(readback))');
+    for (const key of LEDGER_RECEIPT_KEYS) expect(migration).toContain(`'${key}'`);
+    // Credential prefixes are excluded at the run level too, inside the b! wrapper.
+    expect(migration).toContain("expected_graph_drive_id !~ '^(b!)?(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'");
+    // The fresh-install mirror carries the identical function body.
+    const setupSql = fs.readFileSync(path.join(process.cwd(), 'scripts/setup-database.js'), 'utf8');
+    const fnBody = (sql) => {
+      const start = sql.indexOf('CREATE OR REPLACE FUNCTION test_request_receipt_ok');
+      const end = sql.indexOf('$receipt$', sql.indexOf('$receipt$', start) + 9);
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      return sql.slice(start, end).replace(/\s+/g, ' ').trim();
+    };
+    expect(fnBody(setupSql)).toBe(fnBody(migration));
+    expect(fnBody(migration)).not.toContain('\\');
   });
 
   it('enforces the JS text grammars in PostgreSQL (Codex round eleven): every grammar-bound column has a CHECK', () => {

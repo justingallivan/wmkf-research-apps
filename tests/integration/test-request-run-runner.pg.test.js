@@ -35,6 +35,20 @@ if (/neon\.tech/i.test(TEST_URL) || (process.env.POSTGRES_URL && TEST_URL === pr
 const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
+
+/** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
+async function assertLedgerSchemaCurrent(db, migrationSql) {
+  const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
+  const { rows } = await db.query(
+    `SELECT conname FROM pg_constraint WHERE conrelid IN ('test_request_runs'::regclass, 'test_request_run_resources'::regclass)`,
+  );
+  const present = new Set(rows.map((row) => row.conname));
+  const missing = expected.filter((name) => !present.has(name));
+  const fn = await db.query(`SELECT to_regproc('test_request_receipt_ok') AS fn`);
+  if (missing.length || !fn.rows[0]?.fn) {
+    throw new Error(`Throwaway ledger schema is stale (missing: ${[...missing, ...(fn.rows[0]?.fn ? [] : ['test_request_receipt_ok()'])].join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
+  }
+}
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const APP_USER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const DV_SITE_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -304,7 +318,9 @@ describeIf('slice 5b runner against the live run ledger', () => {
     process.env.DYNAMICS_CLIENT_ID = '12345678-1234-4234-8234-123456789012';
     db = pgLedgerDb(TEST_URL);
     const { rows } = await db.query(`SELECT to_regclass('public.test_request_runs') AS reg`);
-    if (!rows[0]?.reg) await db.query(fs.readFileSync(MIGRATION_PATH, 'utf8'));
+    const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf8');
+    if (!rows[0]?.reg) await db.query(migrationSql);
+    await assertLedgerSchemaCurrent(db, migrationSql);
     const real = createRunLedger(db);
     // Record ledger writes into the same event log as the fake dispatches so
     // journal-before-dispatch ordering is asserted end to end.
@@ -568,6 +584,62 @@ describeIf('slice 5b runner against the live run ledger', () => {
     expect(world.state.counts.upload).toBe(2);
     const files = (await ledger.listRunResources(run.runId)).filter((row) => row.resourceKind === 'sharepoint_file');
     expect(files.map((row) => row.outcome)).toEqual(['verified', 'verified']);
+  });
+
+  it('dispatch-marker rule: an attempted POST, location POST or upload with nothing readable stops the run with zero dispatches', async () => {
+    const attempt = async (run, spec, readback, outcome) => {
+      const claimed = await ledger.claimLease({ runId: run.runId, expectedVersion: (await ledger.getRun(run.runId)).version });
+      const resource = await ledger.journalPlannedResource({
+        runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration, ...spec,
+      });
+      await ledger.recordResourceReadback({
+        resourceId: resource.resourceId, runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+        responseStatus: null, readback, outcome,
+      });
+      await expireLease(run.runId);
+    };
+
+    // create_request: the earlier worker journaled createAttemptedAt and its POST never became readable.
+    {
+      const { world, run, advance } = await setup();
+      await runUntil(advance, 'create_request');
+      await attempt(run, {
+        step: 'create_request', resourceKind: 'dataverse_request', system: 'dataverse', plannedIdentity: { requestId: run.destinationRequestId },
+      }, { createAttemptedAt: new Date().toISOString() }, 'planned');
+      const result = await advance({ bypassGoverify: true });
+      expect(result).toMatchObject({ step: 'create_request', outcome: 'needs_attention' });
+      const stopped = await ledger.getRun(run.runId);
+      expect(stopped.needsAttentionReason).toBe('ambiguous_create_outcome');
+      expect(stopped.lastError).toBe('ambiguous_create_outcome'); // recorded in the same fenced UPDATE
+      expect(world.state.counts.requestPost).toBe(0);
+      expect(world.state.counts.workflowPatch ?? 0).toBe(0);
+    }
+
+    // provision_location: locationCreateAttemptedAt journaled, no location readable.
+    {
+      const { world, run, advance } = await setup();
+      await runUntil(advance, 'provision_location');
+      await attempt(run, {
+        step: 'provision_location', resourceKind: 'dataverse_document_location', system: 'dataverse', plannedIdentity: { locationId: run.destinationLocationId },
+      }, { locationCreateAttemptedAt: new Date().toISOString() }, 'dispatched');
+      const result = await advance();
+      expect(result).toMatchObject({ step: 'provision_location', outcome: 'needs_attention' });
+      expect((await ledger.getRun(run.runId)).needsAttentionReason).toBe('location_readback_mismatch');
+      expect(world.state.counts.locationPost).toBe(0);
+    }
+
+    // copy_file: uploadAttemptedAt journaled without an item id.
+    {
+      const { world, run, advance } = await setup();
+      await runUntil(advance, 'copy_file');
+      await attempt(run, {
+        step: 'copy_file', resourceKind: 'sharepoint_file', system: 'sharepoint', plannedIdentity: { index: 0 },
+      }, { index: 0, uploadAttemptedAt: new Date().toISOString() }, 'dispatched');
+      const result = await advance();
+      expect(result).toMatchObject({ step: 'copy_file', outcome: 'needs_attention' });
+      expect((await ledger.getRun(run.runId)).needsAttentionReason).toBe('file_ambiguous_unrecovered');
+      expect(world.state.counts.upload).toBe(0);
+    }
   });
 
   it('a meeting-date readback that does not match is never journaled as verified', async () => {

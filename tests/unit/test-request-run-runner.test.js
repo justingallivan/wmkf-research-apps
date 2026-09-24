@@ -88,10 +88,13 @@ function createFakeLedger(initialRun) {
       };
       return { ...run };
     },
-    async markNeedsAttention({ runId, leaseToken, leaseGeneration, expectedVersion, reason }) {
-      calls.push({ op: 'markNeedsAttention', runId, leaseToken, leaseGeneration, expectedVersion, reason });
+    async markNeedsAttention({ runId, leaseToken, leaseGeneration, expectedVersion, reason, error = null }) {
+      calls.push({ op: 'markNeedsAttention', runId, leaseToken, leaseGeneration, expectedVersion, reason, error });
       if (!fenceOk(leaseToken, leaseGeneration, expectedVersion)) return null;
-      run = { ...run, status: 'needs_attention', needsAttentionReason: reason, leaseToken: null, lockedUntil: null, version: run.version + 1 };
+      run = {
+        ...run, status: 'needs_attention', needsAttentionReason: reason, lastError: error ?? run.lastError ?? null,
+        leaseToken: null, lockedUntil: null, version: run.version + 1,
+      };
       return { ...run };
     },
     async recordError({ runId, leaseToken, leaseGeneration, expectedVersion, error }) {
@@ -212,10 +215,14 @@ describe('advanceRun: needs_attention on a thrown step', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     const ops = calls.map((call) => call.op);
-    expect(ops).toContain('recordError');
+    // One fenced transition carries both the reason and the error; the
+    // separate recordError round-trip is gone (Codex round twelve).
+    expect(ops).not.toContain('recordError');
     expect(ops).toContain('markNeedsAttention');
     const attention = calls.find((call) => call.op === 'markNeedsAttention');
     expect(attention.reason).toBeInstanceOf(Error);
+    expect(attention.error).toBe(attention.reason);
+    expect(result.run.lastError).toBeInstanceOf(Error);
     expect(result.errorMessage).toBeTruthy();
   });
 
@@ -348,18 +355,19 @@ describe('advanceRun: copy_file index derivation', () => {
 });
 
 describe('advanceRun: version threading through a failure', () => {
-  test('when recordError itself loses the fence, markNeedsAttention is never called', async () => {
+  test('when the needs_attention transition loses the fence, the outcome is lease_lost and the durable row is re-read', async () => {
     const run = baseRun();
     const { ledger, calls } = createFakeLedger(run);
     const manifest = baseManifest();
-    const originalRecordError = ledger.recordError;
-    ledger.recordError = async (...args) => { await originalRecordError(...args); return null; };
+    ledger.markNeedsAttention = async (args) => { calls.push({ op: 'markNeedsAttention', ...args }); return null; };
     const client = { get: jest.fn(async () => { throw new Error('boom'); }) };
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle: null,
       deps: { client, graph: {}, sharePointTarget: () => ({}) },
     });
     expect(result.outcome).toBe('lease_lost');
-    expect(calls.filter((call) => call.op === 'markNeedsAttention')).toHaveLength(0);
+    expect(result.run.status).not.toBe('needs_attention');
+    expect(calls.filter((call) => call.op === 'recordError')).toHaveLength(0);
+    expect(calls.filter((call) => call.op === 'getRun').length).toBeGreaterThanOrEqual(2);
   });
 });

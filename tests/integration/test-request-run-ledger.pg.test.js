@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { cliActorId, createRunLedger, idempotencyKeyDigest } from '../../lib/services/test-requests/run-ledger.js';
+import { assertLedgerReceipt, cliActorId, createRunLedger, idempotencyKeyDigest } from '../../lib/services/test-requests/run-ledger.js';
 import { pgLedgerDb } from '../../lib/services/test-requests/run-ledger-db.js';
 
 /**
@@ -24,6 +24,20 @@ if (/neon\.tech/i.test(TEST_URL) || (process.env.POSTGRES_URL && TEST_URL === pr
 const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
+
+/** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
+async function assertLedgerSchemaCurrent(db, migrationSql) {
+  const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
+  const { rows } = await db.query(
+    `SELECT conname FROM pg_constraint WHERE conrelid IN ('test_request_runs'::regclass, 'test_request_run_resources'::regclass)`,
+  );
+  const present = new Set(rows.map((row) => row.conname));
+  const missing = expected.filter((name) => !present.has(name));
+  const fn = await db.query(`SELECT to_regproc('test_request_receipt_ok') AS fn`);
+  if (missing.length || !fn.rows[0]?.fn) {
+    throw new Error(`Throwaway ledger schema is stale (missing: ${[...missing, ...(fn.rows[0]?.fn ? [] : ['test_request_receipt_ok()'])].join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
+  }
+}
 
 function basePlan(overrides = {}) {
   const runId = crypto.randomUUID();
@@ -65,10 +79,9 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     const { rows } = await db.query(
       `SELECT to_regclass('public.test_request_runs') AS reg`,
     );
-    if (!rows[0]?.reg) {
-      const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf8');
-      await db.query(migrationSql);
-    }
+    const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf8');
+    if (!rows[0]?.reg) await db.query(migrationSql);
+    await assertLedgerSchemaCurrent(db, migrationSql);
     ledger = createRunLedger(db);
   });
 
@@ -370,6 +383,47 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       `INSERT INTO test_request_run_resources (run_id, sequence, step, resource_kind, system, planned_identity)
        VALUES ($1, 999, 'not_a_step', 'sharepoint_file', 'sharepoint', '{}'::jsonb)`,
       [plan.runId],
+    )).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('the PostgreSQL receipt function accepts every receipt the live run 1000341 stored and rejects what the JS validator rejects', async () => {
+    const evidence = JSON.parse(fs.readFileSync(
+      path.join(process.cwd(), 'docs/plans/evidence/test-request-factory/ledger-run-1000341-2026-09-24.json'), 'utf8',
+    ));
+    const stored = (evidence.resources || []).flatMap((row) => [row.plannedIdentity, row.sourceProvenance, row.readback]).filter(Boolean);
+    expect(stored.length).toBeGreaterThanOrEqual(6);
+    for (const receipt of stored) {
+      expect(assertLedgerReceipt(receipt, 'fixture')).toBe(receipt);
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(true);
+    }
+    const rejected = [
+      { body: 'x' },
+      { requestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', purpose: 'confidential' },
+      { folder: 'https://contoso.sharepoint.com/sites/x' },
+      { driveId: 'b!ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
+      { itemId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
+      { readbackAt: 'Authorization: Bearer abc' },
+      { nested: { a: 1 } },
+      { requestIds: ['not-a-guid'] },
+      { filename: 'Confidential proposal.pdf' },
+      { size: '12' },
+      { restored: 'yes' },
+    ];
+    for (const receipt of rejected) {
+      expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(false);
+    }
+    // And a direct INSERT that bypasses the JS validator is refused by the CHECK.
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan();
+    createdRunIds.push(plan.runId);
+    await ledger.reserveRun({ actorId, idempotencyKey: 'key-receipt-check', plan });
+    await expect(db.query(
+      `INSERT INTO test_request_run_resources (run_id, sequence, step, resource_kind, system, planned_identity)
+       VALUES ($1, 998, 'copy_file', 'sharepoint_file', 'sharepoint', $2::jsonb)`,
+      [plan.runId, JSON.stringify({ downloadUrl: 'https://graph.microsoft.com/x?tempauth=abc' })],
     )).rejects.toMatchObject({ code: '23514' });
   });
 
