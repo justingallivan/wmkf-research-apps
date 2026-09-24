@@ -9,6 +9,7 @@ import {
   FOUNDATION_NAME,
   GOVERIFY_WORKFLOW,
   buildCloneManifest,
+  foundationBaselineDigest,
   runPreflight,
   sha256,
 } from '../../lib/services/test-requests/basic-clone-steps.js';
@@ -446,7 +447,7 @@ describeIf('slice 5b runner against the live run ledger', () => {
     expect(world.state.counts.requestPost).toBe(1); // never markReady, never a second create
 
     const resources = await ledger.listRunResources(run.runId);
-    const baseline = resources.find((row) => row.step === 'verify' && row.resourceKind === 'dataverse_request_document');
+    const baseline = resources.find((row) => row.step === 'verify' && row.resourceKind === 'foundation_baseline');
     expect(baseline).toMatchObject({ outcome: 'verified' });
     expect(baseline.readback.foundationBaselineSha256).toMatch(/^[0-9a-f]{64}$/);
 
@@ -460,6 +461,48 @@ describeIf('slice 5b runner against the live run ledger', () => {
     expect(stored).not.toContain('CONFIDENTIAL');
     expect(stored).not.toContain('Runner proof');
     expect(stored).not.toMatch(/https?:\/\//);
+  });
+
+  // A verify attempt that recorded the baseline but lost its lease before
+  // advancing: the retry must compare against that baseline, never record a
+  // second one (which would accept a between-attempts change).
+  async function recordPriorBaseline(run, digest) {
+    const claimed = await ledger.claimLease({ runId: run.runId, expectedVersion: (await ledger.getRun(run.runId)).version });
+    const row = await ledger.journalPlannedResource({
+      runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      step: 'verify', resourceKind: 'foundation_baseline', system: 'dataverse', plannedIdentity: {},
+    });
+    await ledger.recordResourceReadback({
+      resourceId: row.resourceId, runId: run.runId, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      responseStatus: null, readback: { foundationBaselineSha256: digest }, outcome: 'verified',
+    });
+    await expireLease(run.runId);
+  }
+
+  it('slice 6a: a repeated initial_assessment verify reuses a matching recorded baseline instead of recording a second one', async () => {
+    const { run, advance } = await setup({ recipe: 'initial_assessment' });
+    await runUntil(advance, 'verify', { bypassGoverify: true });
+    expect((await ledger.getRun(run.runId)).currentStep).toBe('verify');
+    await recordPriorBaseline(run, foundationBaselineDigest({ accountid: ORG_ID, versionnumber: 1 }, []));
+
+    expect(await advance()).toMatchObject({ step: 'verify', outcome: 'advanced' });
+    const baselines = (await ledger.listRunResources(run.runId)).filter((row) => row.resourceKind === 'foundation_baseline');
+    expect(baselines).toHaveLength(1);
+  });
+
+  it('slice 6a: a repeated initial_assessment verify stops when Foundation/Contact rows changed since the recorded baseline', async () => {
+    const { run, advance } = await setup({ recipe: 'initial_assessment' });
+    await runUntil(advance, 'verify', { bypassGoverify: true });
+    // The world serves the Foundation account at versionnumber 1; a baseline
+    // recorded at versionnumber 0 means it changed between the two attempts.
+    await recordPriorBaseline(run, foundationBaselineDigest({ accountid: ORG_ID, versionnumber: 0 }, []));
+
+    expect(await advance()).toMatchObject({ step: 'verify', outcome: 'needs_attention' });
+    expect(await ledger.getRun(run.runId)).toMatchObject({
+      status: 'needs_attention', currentStep: 'verify', needsAttentionReason: 'ia_verification_failed',
+    });
+    const baselines = (await ledger.listRunResources(run.runId)).filter((row) => row.resourceKind === 'foundation_baseline');
+    expect(baselines).toHaveLength(1);
   });
 
   it('resumes a create whose response was lost: exact GUID recovered, never a second POST', async () => {

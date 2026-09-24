@@ -1389,7 +1389,8 @@ $receipt$`,
     sequence INTEGER NOT NULL, step TEXT NOT NULL,
     resource_kind TEXT NOT NULL CHECK (resource_kind IN (
       'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
-      'dataverse_document_location', 'sharepoint_file', 'workflow_bypass', 'dataverse_request_document'
+      'dataverse_document_location', 'sharepoint_file', 'workflow_bypass', 'dataverse_request_document',
+      'foundation_baseline'
     )),
     system TEXT NOT NULL CHECK (system IN ('dataverse', 'sharepoint')),
     planned_identity JSONB NOT NULL CHECK (test_request_receipt_ok(planned_identity)),

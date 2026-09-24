@@ -90,7 +90,7 @@ import {
   verifyClone,
 } from '../lib/services/test-requests/basic-clone-steps.js';
 import { advanceRun } from '../lib/services/test-requests/run-runner.js';
-import { cliActorId, createRunLedger, idempotencyKeyDigest } from '../lib/services/test-requests/run-ledger.js';
+import { LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest } from '../lib/services/test-requests/run-ledger.js';
 import { pgLedgerDb } from '../lib/services/test-requests/run-ledger-db.js';
 
 const require = createRequire(import.meta.url);
@@ -182,10 +182,10 @@ function parseArgs(argv) {
   if (!parsed.reserve && parsed.recipe !== 'basic') {
     throw new Error('--recipe is valid only with --reserve.');
   }
-  // Mirrors run-ledger.js's finite RECIPES set; the ledger enforces this
-  // again server-side, but a bad value should fail before any Dataverse read.
-  if (!['basic', 'initial_assessment'].includes(parsed.recipe)) {
-    throw new Error('--recipe must be basic or initial_assessment.');
+  // run-ledger.js's finite recipe set; the ledger enforces it again
+  // server-side, but a bad value should fail before any Dataverse read.
+  if (!LEDGER_RECIPES.includes(parsed.recipe)) {
+    throw new Error(`--recipe must be one of: ${LEDGER_RECIPES.join(', ')}.`);
   }
   if (parsed.reserve) {
     parsed.actorId = resolveActorId(parsed.actor);

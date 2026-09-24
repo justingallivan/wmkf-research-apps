@@ -371,19 +371,19 @@ describe('slice 6a: new LEDGER_STEPS accepted, unknown steps still rejected', ()
   });
 });
 
-describe('slice 6a: new resource kind dataverse_request_document', () => {
-  it('journals a dataverse_request_document resource once the fence holds', async () => {
+describe('slice 6a: new resource kinds dataverse_request_document and foundation_baseline', () => {
+  it.each(['dataverse_request_document', 'foundation_baseline'])('journals a %s resource once the fence holds', async (kind) => {
     const { db, calls, queueRows } = createFakeDb();
     queueRows([runRow({ recipe: 'initial_assessment', current_step: 'verify', lease_token: 'tok-1', lease_generation: 1, locked_until: new Date(Date.now() + 60000).toISOString(), lease_live: true })]);
     queueRows([{ next_sequence: 1 }]);
-    queueRows([{ resource_id: 1, run_id: BASE_PLAN.runId, sequence: 1, step: 'verify', resource_kind: 'dataverse_request_document', system: 'dataverse', planned_identity: {}, outcome: 'planned' }]);
+    queueRows([{ resource_id: 1, run_id: BASE_PLAN.runId, sequence: 1, step: 'verify', resource_kind: kind, system: 'dataverse', planned_identity: {}, outcome: 'planned' }]);
     const ledger = createRunLedger(db);
 
     const resource = await ledger.journalPlannedResource({
       runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1,
-      step: 'verify', resourceKind: 'dataverse_request_document', system: 'dataverse', plannedIdentity: {},
+      step: 'verify', resourceKind: kind, system: 'dataverse', plannedIdentity: {},
     });
-    expect(resource.resourceKind).toBe('dataverse_request_document');
+    expect(resource.resourceKind).toBe(kind);
     expect(calls[2].text).toContain('INSERT INTO test_request_run_resources');
   });
 

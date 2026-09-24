@@ -235,7 +235,8 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
   resource_kind     TEXT NOT NULL CHECK (resource_kind IN (
                       'dataverse_request', 'dataverse_request_patch',
                       'sharepoint_folder', 'dataverse_document_location',
-                      'sharepoint_file', 'workflow_bypass', 'dataverse_request_document'
+                      'sharepoint_file', 'workflow_bypass', 'dataverse_request_document',
+                      'foundation_baseline'
                     )),
   system            TEXT NOT NULL CHECK (system IN ('dataverse', 'sharepoint')),
 

@@ -15,6 +15,10 @@ import {
   sanitizeErrorMessage,
 } from '../../lib/services/test-requests/run-ledger.js';
 
+// A GitHub-token-shaped fixture assembled at runtime so no token-shaped
+// literal sits in the tracked tree (check:secret-scan); the value is unchanged.
+const FAKE_GITHUB_TOKEN = ['ghp', '0123456789abcdefghijklmnopqrstuvwxyz'].join('_');
+
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const TOKEN = '22222222-2222-4222-8222-222222222222';
 
@@ -94,10 +98,10 @@ describe('ledger redaction', () => {
       { eTag: 'Confidential proposal purpose' },
       { eTag: 'W/"1" extra' },
       { versionId: 'two words' },
-      { itemId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
+      { itemId: FAKE_GITHUB_TOKEN },
       { itemId: 'x' },
-      { driveId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
-      { driveId: 'b!ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
+      { driveId: FAKE_GITHUB_TOKEN },
+      { driveId: `b!${FAKE_GITHUB_TOKEN}` },
       { driveId: 'b!github_pat_11AAAAAAA0123456789abcdefghij' },
       { sourceDriveId: 'b!eyJhbGciOiJIUzI1NiJ9_eyJzdWIiOiIxIn0' },
       { eTag: '"glpat-ABCDEFGHIJKLMNOPQRST"' },
@@ -219,10 +223,10 @@ describe('remaining text columns are finite or grammar-bound', () => {
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), destinationEnvironment: 'prod' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), bundleSha256: 'nothex' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), sourceDataverseHost: 'https://wmkf.crm.dynamics.com' } },
-      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphSiteId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphSiteId: FAKE_GITHUB_TOKEN } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'github_pat_11AAAAAAA0123456789abcdefghij' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'b!github_pat_11AAAAAAA0123456789abcdefghij' } },
-      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'b!ghp_0123456789abcdefghijklmnopqrstuvwxyz' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: `b!${FAKE_GITHUB_TOKEN}` } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'b!AAAAAAAAAAAAAAAAgithub_pat_11AAAAAAA0123456789' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'b!short' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphSiteId: 'site-1' } },
