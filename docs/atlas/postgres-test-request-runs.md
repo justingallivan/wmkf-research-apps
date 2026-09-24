@@ -57,8 +57,9 @@ not perform.
   `assertLedgerReceipt` BEFORE any SQL: an allowlist of receipt keys
   (`LEDGER_RECEIPT_KEYS`: identities, hashes, sizes, statuses, timestamps),
   flat objects only, bounded string lengths, no URLs, line breaks or
-  credential-shaped values, SHA-256 shape for `*Hash`, digits for
-  `requestNumber`. Unknown keys and unsafe values are rejected with
+  credential-shaped values (recognized token prefixes are rejected
+  outright), SHA-256 shape for `*Hash`, digits for `requestNumber`, and
+  exact Microsoft Graph shapes for site, drive and item identifiers. Unknown keys and unsafe values are rejected with
   `400 test_request_ledger_unsafe_value`, never redacted, so a Dataverse
   response body, purpose text or Graph download URL cannot land in the
   ledger. `ready` additionally requires `destination_request_number`

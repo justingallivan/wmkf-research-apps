@@ -94,6 +94,11 @@ describe('ledger redaction', () => {
       { eTag: 'Confidential proposal purpose' },
       { eTag: 'W/"1" extra' },
       { versionId: 'two words' },
+      { itemId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
+      { itemId: 'x' },
+      { driveId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
+      { siteId: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig' },
+      { itemIds: ['01G4GVMS34H6SGDJZCGNF2NLBTIUMXWRAW', 'sk-abcdefghijklmnopqrstuvwxyz'] },
       { size: -1 }, { size: 'twelve' }, { restored: 'yes' },
       { eTag: 'W/"1" Bearer x' },
       { createdAt: 'Bearer x' },
@@ -113,11 +118,11 @@ describe('ledger redaction', () => {
     await ledger.journalPlannedResource({
       runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, step: 'copy_file', resourceKind: 'sharepoint_file', system: 'sharepoint',
       plannedIdentity: { filename: 'Proposal_1000340.pdf', folder: '1000340_5D54ABC57F744D23B4BE39599147E674/Reviewer Materials' },
-      sourceProvenance: { graphItemId: 'x', contentHash: 'b'.repeat(64) },
+      sourceProvenance: { graphItemId: '01G4GVMS34H6SGDJZCGNF2NLBTIUMXWRAW', contentHash: 'b'.repeat(64) },
     });
     await ledger.recordResourceReadback({
       resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, responseStatus: 201,
-      readback: { itemId: 'x', eTag: 'W/"98622844"' }, outcome: 'verified',
+      readback: { itemId: '01G4GVMS34H6SGDJZCGNF2NLBTIUMXWRAW', eTag: 'W/"98622844"' }, outcome: 'verified',
     });
     const before = db.calls.length;
     await expect(ledger.journalPlannedResource({
@@ -157,7 +162,7 @@ describe('remaining text columns are finite or grammar-bound', () => {
     destinationDataverseHost: 'orgd9e66399.crm.dynamics.com', sourceRequestNumber: '1003222', sourceRevision: 'W/"98622844"',
     bundleSha256: 'a'.repeat(64), copyPolicyDigest: 'b'.repeat(64), planDigest: 'c'.repeat(64), createBodySha256: 'd'.repeat(64),
     copyPolicyVersion: 'sandbox-rehearsal-2026-09-23', bundleExportedAt: '2026-09-24T03:58:33.103Z',
-    expectedGraphSiteId: 'appriver3651007194.sharepoint.com,48930e19-0000-4000-8000-000000000000,1', expectedGraphDriveId: 'b!GQ6TSC-650adweD3-K',
+    expectedGraphSiteId: 'appriver3651007194.sharepoint.com,48930e19-0000-4000-8000-000000000000,11111111-1111-4111-8111-111111111111', expectedGraphDriveId: 'b!GQ6TSC-650adweD3-KAAAAAAAAAAAA',
     fiscalYear: 'December 2026', meetingDate: '2026-12-11', testLabel: 'Codex sandbox request factory rehearsal 2026-09-24 05d56f5d',
   });
 
@@ -201,6 +206,10 @@ describe('remaining text columns are finite or grammar-bound', () => {
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), destinationEnvironment: 'prod' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), bundleSha256: 'nothex' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), sourceDataverseHost: 'https://wmkf.crm.dynamics.com' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphSiteId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'github_pat_11AAAAAAA0123456789abcdefghij' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'b!short' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphSiteId: 'site-1' } },
     ];
 
     for (const bad of cases) {
