@@ -173,6 +173,29 @@ test('network uncertainty after Send never reports confirmed delivery', async ()
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
   expect(await screen.findByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
   expect(onSent).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
+  await screen.findByText('Email preview');
+  expect(screen.getByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Send reminder' })).toBeDisabled();
+  expect(global.fetch.mock.calls.filter(([url, options]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'send')).toHaveLength(1);
+});
+
+test('the template cannot be edited while a refreshed preview is in flight', async () => {
+  let finishPreview;
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => {
+    if (url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'preview' && JSON.parse(options.body).template) {
+      return new Promise((resolve) => { finishPreview = resolve; });
+    }
+    return original(url, options);
+  });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
+  fireEvent.change(await screen.findByDisplayValue('Original subject'), { target: { value: 'Edited subject' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
+  expect(screen.getByDisplayValue('Edited subject')).toBeDisabled();
+  expect(screen.getByRole('textbox', { name: 'Message template' })).toBeDisabled();
+  await act(async () => { finishPreview(response({ ok: true, draft: { ...draft, subject: 'Edited subject', template: { ...template, subject: 'Edited subject' } } })); });
+  expect(screen.getByDisplayValue('Edited subject')).toBeEnabled();
 });
 
 test('a parent refresh error cannot turn a confirmed send into a failed send', async () => {

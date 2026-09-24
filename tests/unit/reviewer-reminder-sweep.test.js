@@ -702,6 +702,28 @@ test('a direct review-due caller cannot bypass the final token-liveness guard', 
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
+test('respond reminder notice names the PD and reply mailbox when signature lookup failed', async () => {
+  const result = {
+    sent: 0, skipped: 0, prepareFailed: 0, claimFailed: 0,
+    sendFailed: 0, sendUnconfirmed: 0, errors: [],
+  };
+  await sendOneReminder({
+    kind: 'respond',
+    subjectTemplate: RESPOND_SUBJECT,
+    bodyTemplate: RESPOND_BODY,
+    row: { wmkf_appreviewersuggestionid: SUG, _etag: 'W/"respond"' },
+    request: requestConfig(),
+    pd: { systemuserid: PD, fullname: 'Dr. Program Director', internalemailaddress: 'pd@keck.org' },
+    signatureBlock: null,
+    reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'rev@example.org' },
+    result,
+  });
+  expect(result.sent).toBe(1);
+  expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+    body: expect.stringContaining('Dr. Program Director at pd@keck.org'),
+  }));
+});
+
 test('unknown reminder kind fails before any marker or token write', async () => {
   const result = {
     sent: 0,

@@ -22,9 +22,8 @@
  * when the relevant marker is already set IS allowed — see that module's
  * header for the full semantics.
  *
- * Data boundary: preview remains read-only and staff-shared. Send resolves the
- * suggestion/request ownership server-side and permits only the lead PD or a
- * superuser before any marker, token, or email side effect.
+ * Data boundary: preview remains read-only and, like send, requires the lead
+ * PD or a superuser because it may show the assigned PD's personal copy.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';

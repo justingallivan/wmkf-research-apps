@@ -145,6 +145,21 @@ describe('reserved-key guard', () => {
     expect(DatabaseService.deleteUserPreference).not.toHaveBeenCalled();
   });
 
+  it.each(REMINDER_KEYS)('blocks generic reads of personal reminder key %s', async (reservedKey) => {
+    const res = mockRes();
+    await handler({ method: 'GET', query: { key: reservedKey } }, res);
+    expect(res.statusCode).toBe(403);
+    expect(DatabaseService.getUserPreferences).not.toHaveBeenCalled();
+  });
+
+  it('omits personal reminder keys from the generic bulk read', async () => {
+    DatabaseService.getUserPreferences.mockResolvedValueOnce({ safe: 'visible', [REMINDER_KEYS[0]]: 'private A', [REMINDER_KEYS[1]]: 'private B' });
+    const res = mockRes();
+    await handler({ method: 'GET', query: {} }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.preferences).toEqual({ safe: 'visible' });
+  });
+
   it('rejects an invitation-template save without {{externalLink}} before persistence', async () => {
     const res = mockRes();
     await handler({

@@ -30,6 +30,14 @@ const RESERVED_WRITE_KEYS = new Set([
   PREFERENCE_KEYS.REVIEWER_REVIEW_DUE_REMINDER_TEMPLATE,
 ]);
 
+// These personal copies are read through their app-gated endpoint using the
+// session's Dataverse user ID. The legacy profile mapper may remap a profile to
+// another system user, so this generic route must not expose either copy.
+const PRIVATE_REMINDER_KEYS = new Set([
+  PREFERENCE_KEYS.REVIEWER_RESPOND_REMINDER_TEMPLATE,
+  PREFERENCE_KEYS.REVIEWER_REVIEW_DUE_REMINDER_TEMPLATE,
+]);
+
 const INVITATION_TEMPLATE_SAVE_ERROR = 'Invitation templates must include {{externalLink}} in the subject or body.';
 
 async function validateEmailTemplatesPreference(value) {
@@ -91,6 +99,7 @@ async function handleGet(req, res, profileId) {
     const { key } = req.query;
 
     if (key) {
+      if (PRIVATE_REMINDER_KEYS.has(key)) return res.status(403).json({ error: 'Use the reminder email preferences endpoint.' });
       const preferences = await DatabaseService.getUserPreferences(profileId, false);
       const isEncrypted = DatabaseService.ENCRYPTED_PREFERENCE_KEYS.includes(key);
       return res.status(200).json({
@@ -102,7 +111,8 @@ async function handleGet(req, res, profileId) {
       });
     }
 
-    const preferences = await DatabaseService.getUserPreferences(profileId, false);
+    const preferences = { ...await DatabaseService.getUserPreferences(profileId, false) };
+    for (const privateKey of PRIVATE_REMINDER_KEYS) delete preferences[privateKey];
     const encryptedKeys = DatabaseService.ENCRYPTED_PREFERENCE_KEYS;
 
     return res.status(200).json({

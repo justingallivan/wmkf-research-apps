@@ -60,7 +60,6 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
     setDraft(null);
     draftRef.current = null;
     setLoadError(null);
-    setSendFeedback(null);
     try {
       const envelope = await requestEnvelope('/api/review-manager/send-review-reminder', {
         method: 'POST',
@@ -91,6 +90,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
     setOwnSystemId(null);
     setConfigured(false);
     setRepairableOwnDefault(false);
+    setSendFeedback(null);
     loadPreview();
     const generation = ++preferenceGenerationRef.current;
     requestEnvelope(`/api/review-manager/reminder-email-preferences?kind=${kind}`, { tolerantBody: true })
@@ -178,7 +178,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
   };
 
   const handleSend = async () => {
-    if (!draft || !previewCurrent || sendingRef.current) return;
+    if (!draft || !previewCurrent || sendingRef.current || sendFeedback?.status === 'uncertain') return;
     const generation = ++sendGenerationRef.current;
     sendingRef.current = true;
     setSending(true);
@@ -234,10 +234,10 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
             <p><span className="font-medium text-gray-700">To:</span> {draft.name || candidate.name || 'Reviewer'} &lt;{draft.to}&gt;</p>
           </div>}
           <label className="block"><span className="text-xs font-medium text-gray-600">Subject template</span>
-            <input type="text" value={template.subject} onChange={(event) => editField('subject', event.target.value)} disabled={sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100" />
+            <input type="text" value={template.subject} onChange={(event) => editField('subject', event.target.value)} disabled={loading || sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100" />
           </label>
           <label className="block"><span className="text-xs font-medium text-gray-600">Message template</span>
-            <textarea rows={10} value={template.body} onChange={(event) => editField('body', event.target.value)} disabled={sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono disabled:bg-gray-100" />
+            <textarea rows={10} value={template.body} onChange={(event) => editField('body', event.target.value)} disabled={loading || sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono disabled:bg-gray-100" />
           </label>
           <p className="text-xs text-gray-500">Available: {'{{greeting}}'}, {'{{reviewerName}}'}, {'{{proposalClause}}'}, {'{{signature}}'}{kind === 'reviewdue' ? <>, {'{{reviewDueDate}}'} (required)</> : null}.</p>
           {draft && previewCurrent && <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
