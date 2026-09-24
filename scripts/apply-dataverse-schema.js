@@ -11,6 +11,10 @@
  *   --target=sandbox|prod   (default: sandbox)
  *   --wave=1                (default: 1)
  *   --execute               Perform writes. Without this, runs dry.
+ *   --new-first             Apply wave{N}/ before wave{N}-existing/. For replaying
+ *                           waves into an environment that lacks the wave's new
+ *                           tables (e.g. rebuilding the sandbox), where the
+ *                           -existing specs extend those tables.
  *
  * Design notes:
  *   - Idempotent: creation only, no updates. Reruns are safe.
@@ -34,9 +38,10 @@ const {
 loadEnvLocal();
 
 function parseArgs(argv) {
-  const out = { target: 'sandbox', wave: 1, execute: false };
+  const out = { target: 'sandbox', wave: 1, execute: false, newFirst: false };
   for (const a of argv.slice(2)) {
     if (a === '--execute') out.execute = true;
+    else if (a === '--new-first') out.newFirst = true;
     else if (a.startsWith('--target=')) out.target = a.slice('--target='.length);
     else if (a.startsWith('--wave=')) {
       // Accept integer waves (e.g. --wave=4) and string-suffixed followup waves
@@ -46,7 +51,7 @@ function parseArgs(argv) {
       out.wave = /^\d+$/.test(v) ? parseInt(v, 10) : v;
     }
     else if (a === '--help' || a === '-h') {
-      console.log('Usage: node scripts/apply-dataverse-schema.js [--target=sandbox|prod] [--wave=1] [--execute]');
+      console.log('Usage: node scripts/apply-dataverse-schema.js [--target=sandbox|prod] [--wave=1] [--execute] [--new-first]');
       process.exit(0);
     } else {
       console.error(`Unknown flag: ${a}`);
@@ -61,7 +66,7 @@ function loadSolutionManifest() {
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
-function loadWaveSchemas(wave) {
+function loadWaveSchemas(wave, { newFirst = false } = {}) {
   // Existing-entity extensions in `wave{N}-existing/` are applied first so
   // their relationships/alt-keys are available when new-entity specs reference
   // them (e.g., a new entity's lookup pointing at an existing-table column).
@@ -70,6 +75,7 @@ function loadWaveSchemas(wave) {
     { dir: path.join(baseDir, `wave${wave}-existing`), required: false },
     { dir: path.join(baseDir, `wave${wave}`), required: true },
   ];
+  if (newFirst) dirs.reverse();
   const specs = [];
   for (const { dir, required } of dirs) {
     if (!fs.existsSync(dir)) {
@@ -158,7 +164,7 @@ async function applySpec(client, spec) {
   console.log('');
 
   const solutionManifest = loadSolutionManifest();
-  const specs = loadWaveSchemas(args.wave);
+  const specs = loadWaveSchemas(args.wave, { newFirst: args.newFirst });
 
   const token = await getAccessToken(resource);
   const client = createClient({
