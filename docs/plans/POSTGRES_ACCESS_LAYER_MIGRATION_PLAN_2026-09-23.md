@@ -253,7 +253,10 @@ The layer is three things, each already present somewhere in the tree:
    unchanged. New stores copy that file's layout. Stores are the only
    modules that import `lib/postgres/client`.
 3. **The law** — `scripts/check-postgres-access-layer.js`: (a) outside
-   `lib/postgres/**` and the Q5 exemptions, no file imports the driver;
+   `lib/postgres/client.js` and the Q5 exemptions, no file imports the
+   driver (other `lib/postgres/**` files may use the seam's `sql` freely but
+   are ratcheted for driver-import, driver-export, unresolved-import and
+   `new Pool` — Codex Stage 2 finding, `bf63c1213`);
    (b) no `pages/api` file imports `lib/postgres/**` directly (routes go
    through `lib/services`); (c) `scripts/check-route-service-boundary.js`
    learns the driver and `lib/postgres/client` as boundary sources.
