@@ -1,3 +1,63 @@
+# Session 541 Prompt: Check active workstreams after the Site Visit contact fix release
+
+## Session 540 Summary — 2026-09-24 PT (Codex Site Visit bug fix)
+
+[VERIFIED via PR #335, merge `407ca908d`, Vercel deployment `dpl_F9nTp3Rd5fkUUtsWHvRwdE6pN4KG`, staff Preview screenshots, and the owner's signed-in Production confirmation] Request 1003222 exposed a materials email preview blocked by a blank Request Primary Contact even though the applicant Account had an Org Primary Contact. The fix is merged and live. The owner confirmed the Production Meeting Tracker opens. No email was sent during rehearsal or release verification; the request's materials are all received, so its reminder path cannot currently be exercised without changing data.
+
+### What Was Completed
+
+1. **Required materials recipients.** The Request Project Leader remains the PI. When Request Primary Contact is blank, the liaison resolves from the applicant Account's Org Primary Contact; both roles need usable email addresses. Manual preview reads current contacts without writing, and Send revalidates the reviewed envelope before refreshing the collection snapshot. The automatic sweep keeps its saved-contact policy and is unscheduled by the prior owner decision. A shared PI/liaison email receives one copy.
+2. **Site Visit calendar attendees.** A new visit prefills distinct applicant contacts. A saved visit preserves its recorded attendees and offers missing contacts as explicit Add suggestions. These contact reads are scoped to the Meeting Tracker visit GET; Workbench logistics keeps its previous response shape.
+3. **Review and release.** Two ordinary OAuth Claude Opus reviews completed. Staff Preview rehearsal on Request 1003222 rendered an invitation to Franklin Cat, resolved the liaison name, enabled Send, and showed Franklin as an Add suggestion while the existing attendee remained unchanged. PR #335 merged; Production deployed Ready. The owner later confirmed the signed-in Production Meeting Tracker opens. The release note and PR body record the evidence and limits.
+4. **Preview cleanup.** The temporary stable Preview alias was restored to its prior deployment; the four branch-scoped rehearsal Config values were removed. No Preview Send, Add, or Save was used.
+
+### Commits
+
+- `be089e398`, `a4d42798f`, `353f66e8a`, `7b009f4e6`, `46fe89607` — recipient fix, attendee suggestions, review corrections, and GET scoping
+- `407ca908d` — merge PR #335 to `main`
+- `f9cf1e8c2`, `34e63c682`, `6051f0d23` — production release record and staff smoke confirmation
+
+## Next Items
+
+### Verified Open
+
+1. **No remaining implementation item for this bug fix.** Evidence: PR #335 is merged; the Production deployment checked before this handoff was Ready on `applications.wmkeck.org`; staff confirmed the page opens. A production email transport rehearsal was outside the agreed inspection-only test.
+
+### Owner Decision Needed
+
+1. **None for this release.**
+
+### Parked
+
+1. **Live reminder-send proof on an incomplete collection.** Request 1003222 now has all required files, so its “nothing to remind about” guard applies. Use a naturally eligible or separately authorized test request if this proof is later needed; do not delete received files just to recreate the earlier state.
+
+### Verify Before Acting
+
+1. **Other workstreams have independent owners and moving branches.** PR #332 was open at head `b6c9dd079` at this handoff; the Factory branch `codex/test-request-preview-integration` was at `1499b0fdb`. Read their current handoffs, PR state, and worktree status before touching them. The prior Session 539 list is historical, not an automatic worklist.
+2. **The IRS BMF parser test is shipped, but a fresh live IRS import remains unproven.** The previous handoff records the operational limit; a dry run writes staging. Verify the target and authorization before any import.
+
+### Do Not Reopen Without New Evidence
+
+1. **The Site Visit contact fallback and attendee suggestion fix is shipped.** PR #335 and `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.12 carry its contract. A future report should be diagnosed from its current contact and document state rather than assuming Request 1003222 still has a missing file.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/site-visit/applicant-contacts.js` | Server-owned PI and liaison resolution |
+| `lib/services/site-visit-materials/collection-service.js` | Manual materials preview and send contact checks |
+| `lib/services/site-visit/logistics-service.js` | Applicant attendee suggestions for Meeting Tracker |
+| `shared/components/meeting-tracker/SiteVisitEditor.js` | New-visit prefill and saved-visit Add suggestions |
+| `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.12 | Release contract and staff rehearsal record |
+
+## Testing and Stop-time Notes
+
+- Focused Site Visit suites passed 115 tests; relevant gates/self-tests, lint, types, and build passed before merge. PR #335 CI passed. After the release-note commits, the `main` Tests and E2E workflows passed on `34e63c682`; local doc gates passed on the final note. The latest deployment verified before this handoff commit, `dpl_F9nTp3Rd5fkUUtsWHvRwdE6pN4KG`, was Ready and owned `applications.wmkeck.org`.
+- `report:claim-evidence-pilot -- --current` returned “local state could not be read”; no observation row was added.
+- `CLAUDE.md` needs no change: no new app, endpoint, schema, script, configuration, or convention was introduced. No `DEVELOPMENT_LOG.md` milestone entry is required: this corrected the existing Site Visit materials and Meeting Tracker workflows already recorded in the milestone log; it was not a separate cutover or declared incident.
+
+## Prior Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
+
 # Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
 
 ## Session 539 Summary — 2026-09-24 PT (Codex independent queue slice; concurrent sessions continued)
