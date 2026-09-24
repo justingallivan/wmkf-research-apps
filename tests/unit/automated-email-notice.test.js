@@ -3,12 +3,20 @@ import {
   renderThankYou,
 } from '../../lib/external/reviewer-reminder-email';
 import { renderGranteeReminderHtml } from '../../lib/external/grantee-invite-email';
+import { stripLegacyAutomationMarker } from '../../lib/external/automated-email-notice';
 
 const signatureBlock = {
   name: 'Justin Gallivan',
   email: 'jgallivan@wmkeck.org',
   signature: 'Sincerely,\nJustin Gallivan\n---------------\nJustin Gallivan\nSenior Program Director',
 };
+
+test('legacy marker stripping handles long whitespace and preserves non-marker copy', () => {
+  const tabs = '\t'.repeat(10000);
+  expect(stripLegacyAutomationMarker(`Intro\n${tabs}AUTOMATICALLY SENT ON BEHALF OF${tabs}:${tabs}\nOutro`)).toBe('Intro\nOutro');
+  expect(stripLegacyAutomationMarker(`Intro\nAutomatically sent on behalf of${tabs}else\nOutro`))
+    .toBe(`Intro\nAutomatically sent on behalf of${tabs}else\nOutro`);
+});
 
 test('automated reviewer thank-you puts the on-behalf/reply notice before the greeting', () => {
   const result = renderThankYou({
