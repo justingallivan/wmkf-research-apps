@@ -71,16 +71,25 @@ test('generic Search performs no marker read off and adds only a TEST signal to 
   expect(on.results).not.toContain(RUN_ID);
 });
 
-test('generic Search fails closed instead of showing an unclassified request without a badge', async () => {
+test.each([
+  ['a stale index hit is missing from the read', () => findByIds.mockResolvedValue({ records: [] })],
+  ['the marker read fails', () => findByIds.mockRejectedValue(new Error('transport'))],
+])('generic Search renders an unclassified request without a badge when %s', async (_label, arrange) => {
   process.env.TEST_REQUEST_ISOLATION = 'on';
   searchRecords.mockResolvedValue({
-    results: [{ entity: 'akoya_request', objectId: REQUEST_ID, attributes: {}, highlights: {} }],
+    results: [{
+      entity: 'akoya_request',
+      objectId: REQUEST_ID,
+      attributes: { akoya_requestnum: '1001', akoya_applicantidname: 'Example', akoya_title: 'Project' },
+      highlights: {},
+    }],
     totalCount: 1,
     queryContext: {},
   });
-  findByIds.mockResolvedValue({ records: [] });
-  await expect(searchExplorerRecords({ search: 'missing', entities: ['akoya_request'], top: 20 }))
-    .rejects.toThrow('Could not classify every request returned by Dataverse Search.');
+  arrange();
+  const result = await searchExplorerRecords({ search: 'Project', entities: ['akoya_request'], top: 20 });
+  expect(result.results).toContain('Req 1001 | Example');
+  expect(result.results).not.toContain('TEST');
 });
 
 test('get_related request lists add marker projections and only the TEST signal when on', async () => {
