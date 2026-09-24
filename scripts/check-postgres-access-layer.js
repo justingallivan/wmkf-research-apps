@@ -138,22 +138,45 @@
  * driver import (Appendix A), so this is a strictly WIDER net, not a
  * narrower one, and changes no live count.
  *
- * driver-export detection (Codex round 2, P1): a binding whose role is
+ * driver-export detection (Codex round 2, P1; CJS accessor forms added
+ * round 3): a binding whose role is
  * `sql-tag`/`db`/`pool`/`pool-ctor`/`namespace` is a live handle on the
  * driver. countDriverExports() counts two shapes that hand such a handle to
  * an arbitrary NEW caller without that caller ever importing a driver
  * itself: (i) an identity export/re-export of a role-bound identifier
  * (`export { sql }`, `export default db`, `module.exports.pool = pool`,
- * `module.exports = { sql }`, `exports.pool = pool`); (ii) an exported
- * function (named, default, or an arrow assigned to an exported const --
- * including one exported later via a separate `export { name }`) whose
- * body returns such an identifier DIRECTLY (`return sql;`, or an
- * implicit-return arrow `() => sql`). A function that merely USES the
- * binding internally (`return sql\`...\``, `return await sql.query(...)`)
- * does not match (ii): the return value there is a query result or a
- * template-tag call, never the bare identifier. Live count is 0 (verified
- * 2026-09-23) -- no allowlist entries exist for this kind; any nonzero
- * count is a real finding, not baseline noise.
+ * `module.exports = { sql }`, `exports.pool = pool`); (ii) a function that
+ * returns such an identifier DIRECTLY, in EITHER an ESM shape (named,
+ * default, or an arrow assigned to an exported const -- including one
+ * exported later via a separate `export { name }`) or a CJS accessor shape
+ * -- a function expression/arrow/method assigned to `module.exports.X`,
+ * `exports.X`, or `module.exports` itself (`module.exports.getRawSql = ()
+ * => sql`, `exports.getRawSql = function () { return sql; }`, and
+ * function-valued properties inside `module.exports = { ... }`, whether an
+ * `ObjectMethod` (`{ getRawSql() { return sql; } }`) or an arrow/function
+ * property value (`{ getRawSql: () => sql }`)). `return sql;` and an
+ * implicit-return arrow `() => sql` both match. A function that merely USES
+ * the binding internally (`return sql\`...\``, `return await
+ * sql.query(...)`) does not match (ii) in either shape: the return value
+ * there is a query result or a template-tag call, never the bare
+ * identifier. Live count is 0 (verified 2026-09-23, re-verified after the
+ * CJS accessor widening) -- no allowlist entries exist for this kind; any
+ * nonzero count is a real finding, not baseline noise.
+ *
+ * Aliased-require recognition (Codex round 3, P1): buildRequireAliasNames()
+ * finds same-file bindings of `require` itself -- `const load = require;`,
+ * `const load = module.require;`, or `const { require: r } = module;` --
+ * and every check that recognizes a literal `require(...)` call
+ * (driver-import, sql/db/pool/namespace binding resolution, the
+ * one-hop const-string resolver, and the unresolved-import audit/kind)
+ * treats a call through one of those aliases exactly like `require(...)`.
+ * `module.require(...)` itself is recognized directly, with no aliasing
+ * needed. This closes an evasion where `const load = require; const d =
+ * load('pg'); new d.Pool()` previously produced no record at all -- the
+ * literal case now classifies normally (driver-import + the returned
+ * binding's downstream roles) and a computed source reached the same way
+ * (`load(getModuleName())`) is caught as `unresolved-import`, same as a
+ * direct `require(getModuleName())` would be.
  *
  * Self-test fixtures (--self-test) are built under a fresh os.tmpdir()
  * mkdtemp() directory, never under a tracked repo path, so a fixture can
@@ -279,15 +302,57 @@ function resolveSourceValue(argNode, constMap) {
   return null;
 }
 
-function isBareRequireCall(node) {
-  return !!node && node.type === 'CallExpression' && node.callee.type === 'Identifier'
-    && node.callee.name === 'require' && node.arguments.length > 0;
+// Same-file, scope-insensitive set of local names bound to `require` itself
+// -- `const load = require;`, `const load = module.require;`, or `const {
+// require: r } = module;` -- so a call through one of them is recognized
+// exactly like a literal `require(...)` call (Codex round 3: an aliased
+// loader was previously invisible to every check below).
+function buildRequireAliasNames(ast) {
+  const names = new Set();
+  walkAst(ast, (node) => {
+    if (node.type !== 'VariableDeclarator' || !node.init) return;
+    const init = node.init;
+    if (node.id.type === 'Identifier') {
+      if (init.type === 'Identifier' && init.name === 'require') {
+        names.add(node.id.name);
+      } else if ((init.type === 'MemberExpression' || init.type === 'OptionalMemberExpression') && !init.computed
+        && init.object.type === 'Identifier' && init.object.name === 'module'
+        && propName(init.property) === 'require') {
+        names.add(node.id.name);
+      }
+      return;
+    }
+    if (node.id.type === 'ObjectPattern' && init.type === 'Identifier' && init.name === 'module') {
+      for (const prop of node.id.properties || []) {
+        if (prop.type !== 'ObjectProperty' || prop.computed || prop.value.type !== 'Identifier') continue;
+        if (propName(prop.key) === 'require') names.add(prop.value.name);
+      }
+    }
+  });
+  return names;
+}
+
+// A require-shaped call: a literal `require(...)`, a call through an
+// aliased loader identifier (see buildRequireAliasNames), or a direct
+// `module.require(...)` (no aliasing needed for this form).
+function isBareRequireCall(node, requireAliasNames) {
+  if (!node || node.type !== 'CallExpression' || node.arguments.length === 0) return false;
+  const callee = node.callee;
+  if (callee.type === 'Identifier') {
+    return callee.name === 'require' || !!(requireAliasNames && requireAliasNames.has(callee.name));
+  }
+  if ((callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') && !callee.computed
+    && callee.object.type === 'Identifier' && callee.object.name === 'module'
+    && propName(callee.property) === 'require') {
+    return true;
+  }
+  return false;
 }
 
 // True if `node` is a require()/dynamic-import() call whose source resolves
 // (directly or via the const-string map) to a module matching `isModuleSource`.
-function isModuleCallResolved(node, constMap, isModuleSource) {
-  if (isBareRequireCall(node)) return isModuleSource(resolveSourceValue(node.arguments[0], constMap));
+function isModuleCallResolved(node, constMap, isModuleSource, requireAliasNames) {
+  if (isBareRequireCall(node, requireAliasNames)) return isModuleSource(resolveSourceValue(node.arguments[0], constMap));
   const dynamicSource = importCallSourceNode(node);
   if (dynamicSource) return isModuleSource(resolveSourceValue(dynamicSource, constMap));
   return false;
@@ -295,13 +360,13 @@ function isModuleCallResolved(node, constMap, isModuleSource) {
 
 // Collects every require()/dynamic-import() call site in the file whose
 // source argument is NOT itself a direct string literal (regardless of
-// whether the one-hop resolver above could resolve it) -- pure audit
-// output, no effect on classification or the ratchet. See docblock.
-function collectUnresolvedModuleSources(ast, constMap) {
+// whether the one-hop resolver above could resolve it) -- surfaced for
+// audit and ratcheted as the `unresolved-import` kind. See docblock.
+function collectUnresolvedModuleSources(ast, constMap, requireAliasNames) {
   const out = [];
   walkAst(ast, (node) => {
     let argNode = null;
-    if (isBareRequireCall(node)) argNode = node.arguments[0];
+    if (isBareRequireCall(node, requireAliasNames)) argNode = node.arguments[0];
     else {
       const dynamicSource = importCallSourceNode(node);
       if (dynamicSource) argNode = dynamicSource;
@@ -430,7 +495,7 @@ function isPoolConstructorCall(node, bindings) {
 //      driver import/require/dynamic-import (source resolved per P2-3).
 //   3. `new Pool()` (or `new <namespace>.Pool()` / `new <pool-ctor>()`)
 //      assigned to a plain variable, which depends on pass 2's bindings.
-function buildBindings(ast, constMap) {
+function buildBindings(ast, constMap, requireAliasNames) {
   const bindings = new Map();
 
   walkAst(ast, (node) => {
@@ -444,7 +509,7 @@ function buildBindings(ast, constMap) {
     }
     if (node.type === 'VariableDeclarator' && node.id.type === 'ObjectPattern' && node.init) {
       const unwrapped = unwrapExpression(node.init);
-      const isAnyModuleCall = isBareRequireCall(node.init) || isBareRequireCall(unwrapped)
+      const isAnyModuleCall = isBareRequireCall(node.init, requireAliasNames) || isBareRequireCall(unwrapped, requireAliasNames)
         || !!importCallSourceNode(unwrapped);
       if (isAnyModuleCall) bindSqlTagFromObjectPattern(node.id, bindings);
     }
@@ -474,8 +539,8 @@ function buildBindings(ast, constMap) {
   walkAst(ast, (node) => {
     if (node.type !== 'VariableDeclarator' || !node.init) return;
     const unwrapped = unwrapExpression(node.init);
-    if (isModuleCallResolved(node.init, constMap, isPostgresDriverSource)
-      || isModuleCallResolved(unwrapped, constMap, isPostgresDriverSource)) {
+    if (isModuleCallResolved(node.init, constMap, isPostgresDriverSource, requireAliasNames)
+      || isModuleCallResolved(unwrapped, constMap, isPostgresDriverSource, requireAliasNames)) {
       bindDriverScopedFromPattern(node.id, bindings);
     }
   });
@@ -612,6 +677,34 @@ function isExportedFunctionNode(node, parentMap, exportedLocalNames) {
 //     identifier; (ii) an exported function whose body returns such an
 //     identifier directly (`export function getRawSql() { return sql; }`).
 // Scope-insensitive, same as the rest of this scanner (see docblock).
+// Counts direct returns of a role-bound identifier inside one function-like
+// node: an ArrowFunctionExpression (block or implicit-return body), a
+// FunctionExpression/FunctionDeclaration, or an ObjectMethod (always a
+// block body). Shared by both the ESM exported-function pass and the CJS
+// accessor-export pass below -- a function is a function regardless of how
+// it got attached to an export.
+function countDirectReturnRole(fnLikeNode, bindings) {
+  let n = 0;
+  if (fnLikeNode.type === 'ArrowFunctionExpression' && fnLikeNode.body.type !== 'BlockStatement') {
+    // Implicit-return arrow, e.g. `() => sql`.
+    if (fnLikeNode.body.type === 'Identifier' && DRIVER_HANDLE_ROLES.has(bindings.get(fnLikeNode.body.name))) n += 1;
+    return n;
+  }
+  if (!fnLikeNode.body) return n;
+  walkAst(fnLikeNode.body, (inner) => {
+    if (inner.type === 'ReturnStatement' && inner.argument && inner.argument.type === 'Identifier'
+      && DRIVER_HANDLE_ROLES.has(bindings.get(inner.argument.name))) {
+      n += 1;
+    }
+  });
+  return n;
+}
+
+function isFunctionLikeNode(node) {
+  return !!node && (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression'
+    || node.type === 'ArrowFunctionExpression' || node.type === 'ObjectMethod');
+}
+
 function countDriverExports(ast, bindings) {
   let count = 0;
 
@@ -637,11 +730,23 @@ function countDriverExports(ast, bindings) {
       if (isBareModuleExportsTarget(left)) {
         if (right.type === 'Identifier' && DRIVER_HANDLE_ROLES.has(bindings.get(right.name))) {
           count += 1;
+        } else if (isFunctionLikeNode(right)) {
+          // `module.exports = () => sql;` / `module.exports = function () { return sql; };`
+          count += countDirectReturnRole(right, bindings);
         } else if (right.type === 'ObjectExpression') {
           for (const prop of right.properties || []) {
-            if (prop.type !== 'ObjectProperty' || prop.computed || !prop.value) continue;
+            if (prop.computed) continue;
+            if (prop.type === 'ObjectMethod') {
+              // `module.exports = { getRawSql() { return sql; } }`
+              count += countDirectReturnRole(prop, bindings);
+              continue;
+            }
+            if (prop.type !== 'ObjectProperty' || !prop.value) continue;
             if (prop.value.type === 'Identifier' && DRIVER_HANDLE_ROLES.has(bindings.get(prop.value.name))) {
               count += 1;
+            } else if (isFunctionLikeNode(prop.value)) {
+              // `module.exports = { getRawSql: () => sql }`
+              count += countDirectReturnRole(prop.value, bindings);
             }
           }
         }
@@ -649,6 +754,10 @@ function countDriverExports(ast, bindings) {
         // module.exports.X = ... / exports.X = ... (single named property)
         if (right.type === 'Identifier' && DRIVER_HANDLE_ROLES.has(bindings.get(right.name))) {
           count += 1;
+        } else if (isFunctionLikeNode(right)) {
+          // `module.exports.getRawSql = () => sql;` /
+          // `exports.getRawSql = function () { return sql; };`
+          count += countDirectReturnRole(right, bindings);
         }
       }
       return;
@@ -660,17 +769,7 @@ function countDriverExports(ast, bindings) {
   walkAst(ast, (node) => {
     if (node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression' && node.type !== 'ArrowFunctionExpression') return;
     if (!isExportedFunctionNode(node, parentMap, exportedLocalNames)) return;
-    if (node.type === 'ArrowFunctionExpression' && node.body.type !== 'BlockStatement') {
-      // Implicit-return arrow, e.g. `export const getRawSql = () => sql;`.
-      if (node.body.type === 'Identifier' && DRIVER_HANDLE_ROLES.has(bindings.get(node.body.name))) count += 1;
-      return;
-    }
-    walkAst(node.body, (inner) => {
-      if (inner.type === 'ReturnStatement' && inner.argument && inner.argument.type === 'Identifier'
-        && DRIVER_HANDLE_ROLES.has(bindings.get(inner.argument.name))) {
-        count += 1;
-      }
-    });
+    count += countDirectReturnRole(node, bindings);
   });
 
   return count;
@@ -756,8 +855,9 @@ function classifyFile(ast, rel) {
   const castWarnings = [];
   const bump = (kind, n = 1) => kinds.set(kind, (kinds.get(kind) || 0) + n);
   const constMap = buildConstStringMap(ast);
-  const bindings = buildBindings(ast, constMap);
-  const unresolved = collectUnresolvedModuleSources(ast, constMap);
+  const requireAliasNames = buildRequireAliasNames(ast);
+  const bindings = buildBindings(ast, constMap, requireAliasNames);
+  const unresolved = collectUnresolvedModuleSources(ast, constMap, requireAliasNames);
   if (unresolved.length) bump('unresolved-import', unresolved.length);
   const driverExportCount = countDriverExports(ast, bindings);
   if (driverExportCount) bump('driver-export', driverExportCount);
@@ -776,7 +876,7 @@ function classifyFile(ast, rel) {
 
     // require(<driver>) / dynamic import(<driver>), source resolved
     // directly or through the one-hop const-string map (P2-3).
-    if (isModuleCallResolved(node, constMap, isPostgresDriverSource)) {
+    if (isModuleCallResolved(node, constMap, isPostgresDriverSource, requireAliasNames)) {
       bump('driver-import');
       return;
     }
@@ -1536,6 +1636,54 @@ function runClassificationSelfTest() {
       }
     `);
 
+    // Codex round 3, P1 shape 1: CJS accessor exports -- a function
+    // expression/arrow/method assigned to a CJS export target, or a
+    // function-valued property in a `module.exports = { ... }` object.
+    write(tempRoot, 'lib/services/cjs-getter-property-assign.js', `
+      const { sql } = require('@vercel/postgres');
+      module.exports.getRawSql = () => sql;
+    `);
+    write(tempRoot, 'lib/services/cjs-getter-exports-fn.js', `
+      const { sql } = require('@vercel/postgres');
+      exports.getRawSql = function () { return sql; };
+    `);
+    write(tempRoot, 'lib/services/cjs-getter-object-method.js', `
+      const { sql } = require('@vercel/postgres');
+      module.exports = {
+        getRawSql() { return sql; },
+      };
+    `);
+    write(tempRoot, 'lib/services/cjs-getter-object-arrow.js', `
+      const { sql } = require('@vercel/postgres');
+      module.exports = { getRawSql: () => sql };
+    `);
+    // CJS control: uses sql internally, never returns/exports it raw.
+    write(tempRoot, 'lib/services/cjs-uses-sql-internally.js', `
+      const { sql } = require('@vercel/postgres');
+      module.exports.getWidgets = () => sql\`SELECT * FROM widget_requests\`;
+    `);
+
+    // Codex round 3, P1 shape 2: aliased require hides a literal/computed
+    // load from every check that only recognized the bare identifier
+    // `require`.
+    write(tempRoot, 'lib/services/aliased-require-literal.js', `
+      const load = require;
+      const d = load('pg');
+      const pool = new d.Pool();
+      module.exports.run = () => pool.query('SELECT 1 FROM aliased_table');
+    `);
+    write(tempRoot, 'lib/services/aliased-require-computed.js', `
+      function getName() { return '@vercel/postgres'; }
+      const load = require;
+      const packageName = getName();
+      const driver = load(packageName);
+      module.exports.run = () => driver;
+    `);
+    write(tempRoot, 'lib/services/module-dot-require.js', `
+      const { sql } = module.require('@vercel/postgres');
+      module.exports.run = () => sql\`SELECT 1\`;
+    `);
+
     // Build the census in-process (this file's own analyzeRoot/buildJson)
     // and a permissive allowlist derived from it, so the CLI sanity checks
     // below (--report/default mode) exit 0 without duplicating the exact
@@ -1566,13 +1714,20 @@ function runClassificationSelfTest() {
     const expectedDriverImportFiles = [
       'lib/services/alias-import.js',
       'lib/services/alias-require.js',
+      'lib/services/aliased-require-literal.js',
       'lib/services/barrel.js',
       'lib/services/begin-client.js',
       'lib/services/cast-lint-cases.js',
+      'lib/services/cjs-getter-exports-fn.js',
+      'lib/services/cjs-getter-object-arrow.js',
+      'lib/services/cjs-getter-object-method.js',
+      'lib/services/cjs-getter-property-assign.js',
       'lib/services/cjs-require.js',
+      'lib/services/cjs-uses-sql-internally.js',
       'lib/services/destructured-require.js',
       'lib/services/dynamic-import.js',
       'lib/services/imported-db-var-connect.js',
+      'lib/services/module-dot-require.js',
       'lib/services/namespace-import.js',
       'lib/services/neon-driver.js',
       'lib/services/nested-db-connect.js',
@@ -1609,8 +1764,10 @@ function runClassificationSelfTest() {
       'lib/services/barrel-consumer.js',
       'lib/services/cast-lint-cases.js',
       'lib/services/cjs-require.js',
+      'lib/services/cjs-uses-sql-internally.js',
       'lib/services/destructured-require.js',
       'lib/services/dynamic-import.js',
+      'lib/services/module-dot-require.js',
       'lib/services/namespace-import.js',
       'lib/services/neon-driver.js',
       'lib/services/plain-import.js',
@@ -1665,6 +1822,34 @@ function runClassificationSelfTest() {
     expect(usesSqlInternally && !usesSqlInternally.kinds['driver-export'],
       `uses-sql-internally.js (returns a query result, not the sql binding) must NOT record driver-export, got ${JSON.stringify(usesSqlInternally && usesSqlInternally.kinds)}`);
 
+    // Codex round 3, P1 shape 1: CJS accessor exports -- function
+    // expression/arrow/method assigned to a CJS export target.
+    for (const cjsFile of [
+      'lib/services/cjs-getter-property-assign.js',
+      'lib/services/cjs-getter-exports-fn.js',
+      'lib/services/cjs-getter-object-method.js',
+      'lib/services/cjs-getter-object-arrow.js',
+    ]) {
+      const rec = findRecord(json, cjsFile);
+      expect(rec && rec.kinds['driver-export'] === 1,
+        `${cjsFile} should record driver-export:1, got ${JSON.stringify(rec)}`);
+    }
+    const cjsUsesInternally = findRecord(json, 'lib/services/cjs-uses-sql-internally.js');
+    expect(cjsUsesInternally && !cjsUsesInternally.kinds['driver-export'],
+      `cjs-uses-sql-internally.js must NOT record driver-export, got ${JSON.stringify(cjsUsesInternally && cjsUsesInternally.kinds)}`);
+
+    // Codex round 3, P1 shape 2: aliased/module.require loaders.
+    const aliasedLiteral = findRecord(json, 'lib/services/aliased-require-literal.js');
+    expect(aliasedLiteral && aliasedLiteral.kinds['driver-import'] === 1
+      && aliasedLiteral.kinds['new-Pool'] === 1 && aliasedLiteral.kinds['pool.query'] === 1,
+      `aliased-require-literal.js (const load = require; load('pg')) should record driver-import/new-Pool/pool.query, got ${JSON.stringify(aliasedLiteral && aliasedLiteral.kinds)}`);
+    const aliasedComputed = findRecord(json, 'lib/services/aliased-require-computed.js');
+    expect(aliasedComputed && aliasedComputed.kinds['unresolved-import'] === 1 && !aliasedComputed.kinds['driver-import'],
+      `aliased-require-computed.js (load(packageName), non-literal) should record unresolved-import:1 and NOT driver-import, got ${JSON.stringify(aliasedComputed && aliasedComputed.kinds)}`);
+    const moduleDotRequire = findRecord(json, 'lib/services/module-dot-require.js');
+    expect(moduleDotRequire && moduleDotRequire.kinds['driver-import'] === 1,
+      `module-dot-require.js (module.require('@vercel/postgres')) should record driver-import:1, got ${JSON.stringify(moduleDotRequire && moduleDotRequire.kinds)}`);
+
     // P2-3: unresolved module sources are audited (and, per Codex round 2,
     // ratcheted as the unresolved-import kind above).
     const unresolvedFiles = json.unresolved.map((u) => u.file);
@@ -1680,8 +1865,8 @@ function runClassificationSelfTest() {
       `unresolved-dynamic-import.js should have no one-hop resolution, got ${JSON.stringify(unresolvedDynamicEntry)}`);
 
     // Kind-specific occurrence checks, incl. the Stage 1 item 0 additions.
-    expect(json.kindTotals['new-Pool'] === 7, `expected new-Pool: 7, got ${json.kindTotals['new-Pool']}`);
-    expect(json.kindTotals['pool.query'] === 5, `expected pool.query: 5, got ${json.kindTotals['pool.query']}`);
+    expect(json.kindTotals['new-Pool'] === 8, `expected new-Pool: 8, got ${json.kindTotals['new-Pool']}`);
+    expect(json.kindTotals['pool.query'] === 6, `expected pool.query: 6, got ${json.kindTotals['pool.query']}`);
     expect(json.kindTotals['db.connect'] === 3, `expected db.connect: 3, got ${json.kindTotals['db.connect']}`);
     expect(json.kindTotals['pool.connect'] === 2, `expected pool.connect: 2, got ${json.kindTotals['pool.connect']}`);
     expect(json.kindTotals['client.query'] === 6, `expected client.query: 6, got ${json.kindTotals['client.query']}`);
@@ -2148,7 +2333,68 @@ function runRatchetSelfTest() {
     }
   }
 
-  console.log('postgres-access-layer ratchet self-test OK -- green exact-match, red (a)/(a-count)/(b)/(b-vanished)/(b-exempt)/(c)/(c-index-form), green (c) no-op, Q5 exemptions, malformed-allowlist exit-2, legitimate-shrink green, and unresolved-import/driver-export red+green cases verified.');
+  // ---- red: driver-export (Codex round 3, P1 shape 1) -- CJS accessor exports ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/cjs-getter-property-assign.js', `
+        const { sql } = require('@vercel/postgres');
+        module.exports.getRawSql = () => sql;
+      `);
+      const allowlist = writeAllowlist(tempRoot, [
+        { file: 'lib/services/cjs-getter-property-assign.js', kind: 'driver-import', count: 1 },
+      ]);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (CJS accessor export), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/cjs-getter-property-assign.js') && result.stderr.includes('driver-export'),
+        `expected violation naming the file and driver-export, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red: unresolved-import (Codex round 3, P1 shape 2) -- aliased computed require ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/aliased-require-computed.js', `
+        function getName() { return '@vercel/postgres'; }
+        const load = require;
+        const packageName = getName();
+        const driver = load(packageName);
+        module.exports.run = () => driver;
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (aliased computed require), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/aliased-require-computed.js') && result.stderr.includes('unresolved-import'),
+        `expected violation naming the file and unresolved-import, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ---- red: driver-import (Codex round 3, P1 shape 2) -- aliased literal require, no allowlist entry ----
+  {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-ratchet-selftest-'));
+    try {
+      write(tempRoot, 'lib/services/aliased-require-literal.js', `
+        const load = require;
+        const d = load('pg');
+        const pool = new d.Pool();
+        module.exports.run = () => pool.query('SELECT 1');
+      `);
+      const allowlist = writeAllowlist(tempRoot, []);
+      const result = runDefault(tempRoot, allowlist);
+      expect(result.status === 1, `expected red (aliased literal require, unratcheted), got status ${result.status}`);
+      expect(result.stderr.includes('lib/services/aliased-require-literal.js') && result.stderr.includes('driver-import'),
+        `expected violation naming the file and driver-import, got:\n${result.stderr}`);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  console.log('postgres-access-layer ratchet self-test OK -- green exact-match, red (a)/(a-count)/(b)/(b-vanished)/(b-exempt)/(c)/(c-index-form), green (c) no-op, Q5 exemptions, malformed-allowlist exit-2, legitimate-shrink green, unresolved-import/driver-export red+green, CJS-accessor-export red, and aliased-require red cases verified.');
 }
 
 // P2-A: a `--json` payload over ~64 KiB used to be truncated by
