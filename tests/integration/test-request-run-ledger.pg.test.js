@@ -87,7 +87,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('two concurrent reserveRun calls with the same key yield one row and the same destination GUIDs', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const idempotencyKey = 'key-concurrent';
     const plan = basePlan();
     createdRunIds.push(plan.runId);
@@ -109,7 +109,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('a differing plan digest on the same key returns 409', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const idempotencyKey = 'key-conflict';
     const plan = basePlan();
     createdRunIds.push(plan.runId);
@@ -123,7 +123,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('claimLease succeeds once; a second claim with the stale version returns null', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const plan = basePlan();
     createdRunIds.push(plan.runId);
     const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-claim', plan });
@@ -136,7 +136,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('a stale (older generation) token cannot advanceStep or journal a resource', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const plan = basePlan();
     createdRunIds.push(plan.runId);
     const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-stale-gen', plan });
@@ -172,7 +172,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('an expired lease can be re-claimed, and the new generation fences the old worker', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const plan = basePlan();
     createdRunIds.push(plan.runId);
     const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-expiry', plan });
@@ -188,7 +188,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('resource sequence is gapless and unique under concurrent journal calls', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const plan = basePlan();
     createdRunIds.push(plan.runId);
     const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-sequence', plan });
@@ -210,7 +210,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('a needs_attention run can be re-claimed and resumed; the reason clears on leaving needs_attention', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const plan = basePlan();
     createdRunIds.push(plan.runId);
     const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-resume', plan });
@@ -272,7 +272,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('the generation fence alone rejects a worker whose token still matches but generation is stale', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const plan = basePlan();
     createdRunIds.push(plan.runId);
     const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-generation-only', plan });
@@ -300,7 +300,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('an expired lease (same token and generation, nobody reclaimed) cannot journal a resource', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const plan = basePlan();
     createdRunIds.push(plan.runId);
     const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-expired-journal', plan });
@@ -317,7 +317,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('the completed_at constraint admits ready -> retiring -> retired and needs_attention -> retiring', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const readyPlan = basePlan();
     const stuckPlan = basePlan();
     createdRunIds.push(readyPlan.runId, stuckPlan.runId);
@@ -341,7 +341,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   it('needs_attention requires a reason: the DB constraint rejects a missing one', async () => {
-    const actorId = `actor-${crypto.randomUUID()}`;
+    const actorId = `cli:actor-${crypto.randomUUID()}`;
     const plan = basePlan();
     createdRunIds.push(plan.runId);
     const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-needs-attention', plan });

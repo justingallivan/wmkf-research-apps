@@ -178,11 +178,22 @@ describe('remaining text columns are finite or grammar-bound', () => {
 
   test('reserveRun validates every text column before SQL', async () => {
     expect(assertReservePlan({ actorId: 'cli:gallivan', idempotencyKey: 'run-2026-09-24-a', plan: validPlan() })).toBeTruthy();
+    expect(assertReservePlan({ actorId: 'user:jane-doe@example.org', idempotencyKey: 'clone-1003222-20260924-a1b2c3d4', plan: validPlan() })).toBeTruthy();
     const db = recordingDb([]);
     const ledger = createRunLedger(db);
     const cases = [
       { actorId: 'cli gallivan', idempotencyKey: 'k', plan: validPlan() },
       { actorId: 'cli:x', idempotencyKey: 'k with space', plan: validPlan() },
+      { actorId: 'cli:x', idempotencyKey: 'https:example.com', plan: validPlan() },
+      { actorId: 'cli:x', idempotencyKey: 'eyJhbGciOiJIUzI1NiJ9.secret.signature', plan: validPlan() },
+      { actorId: 'cli:x', idempotencyKey: 'eyjhbgcioijiuzi1nij9.secret.signature', plan: validPlan() },
+      { actorId: 'cli:x', idempotencyKey: 'k'.repeat(41), plan: validPlan() },
+      { actorId: 'eyJhbGciOiJIUzI1NiJ9.secret.signature', idempotencyKey: 'k', plan: validPlan() },
+      { actorId: 'cli:https:example.com', idempotencyKey: 'k', plan: validPlan() },
+      { actorId: 'cli:eyjhbgcioijiuzi1nij9.secret.signature', idempotencyKey: 'k', plan: validPlan() },
+      { actorId: 'bot:x', idempotencyKey: 'k', plan: validPlan() },
+      { actorId: 'cli:Gallivan', idempotencyKey: 'k', plan: validPlan() },
+      { actorId: 'user:jane.doe@example.org', idempotencyKey: 'k', plan: validPlan() },
       { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), recipe: 'confidential' } },
 
       { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), fiscalYear: 'Confidential 2026' } },
