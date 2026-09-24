@@ -26,6 +26,9 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 }));
 const mintAndStore = jest.fn(async () => ({ url: 'https://reviews.example/external/review/jwt' }));
 jest.mock('../../lib/external/token-lifecycle', () => ({ mintAndStore: (...a) => mintAndStore(...a) }));
+jest.mock('../../lib/services/reviewer-reminder-personalization', () => ({
+  loadSenderReminderTemplate: jest.fn(async (_senderId, _kind, shared) => ({ ok: true, template: shared })),
+}));
 const getSettingStrict = jest.fn();
 jest.mock('../../lib/services/settings-service', () => ({
   getSettingStrict: (...a) => getSettingStrict(...a),

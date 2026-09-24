@@ -1,0 +1,113 @@
+import { findByOwnerAndKey, create, update, remove } from '../../lib/dataverse/adapters/user-preference';
+import { readRequiredEmailDefaults } from '../../lib/services/email-defaults';
+import {
+  loadSenderReminderTemplate,
+  saveOwnReminderTemplate,
+  clearOwnReminderTemplate,
+  sharedReminderTemplate,
+  validateReminderTemplate,
+  reminderPreviewDigest,
+  mintReminderPreviewProof,
+  verifyReminderPreviewProof,
+} from '../../lib/services/reviewer-reminder-personalization';
+
+jest.mock('../../lib/dataverse/adapters/user-preference', () => ({
+  findByOwnerAndKey: jest.fn(), create: jest.fn(), update: jest.fn(), remove: jest.fn(),
+}));
+jest.mock('../../lib/services/email-defaults', () => ({ readRequiredEmailDefaults: jest.fn() }));
+jest.mock('../../lib/services/external-token', () => ({
+  mintScopedToken: jest.fn(async ({ subject, audience, ops }) => ({ jwt: `${subject}:${audience}:${ops[0]}` })),
+  verifyToken: jest.fn(async (proof) => {
+    const [subject, aud, op] = proof.split(':');
+    return { valid: true, payload: { subject, aud, ops: [op] } };
+  }),
+}));
+
+const shared = { subject: 'Admin subject', body: '{{greeting}}\n\n{{signature}}' };
+const own = { subject: 'PD subject', body: '{{greeting}}\n\nMy wording\n\n{{signature}}' };
+const OWN_ID = '33333333-3333-4333-8333-333333333333';
+const OTHER_ID = '44444444-4444-4444-8444-444444444444';
+beforeEach(() => {
+  jest.clearAllMocks();
+  findByOwnerAndKey.mockResolvedValue(null);
+  readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: {
+    'email.reviewer_reminder_respond_by.subject': shared.subject,
+    'email.reviewer_reminder_respond_by.body': shared.body,
+  } });
+});
+
+test('Admin fallback and exact PD ownership isolate defaults across users', async () => {
+  findByOwnerAndKey.mockImplementation(async (owner) => owner === 'pd-a'
+    ? { wmkf_preferencevalue: JSON.stringify(own), wmkf_isencrypted: false }
+    : null);
+  const a = await loadSenderReminderTemplate('pd-a', 'respond', shared);
+  const b = await loadSenderReminderTemplate('pd-b', 'respond', shared);
+  expect(a).toEqual({ ok: true, configured: true, template: own });
+  expect(b).toEqual({ ok: true, configured: false, template: shared });
+  expect(findByOwnerAndKey).toHaveBeenNthCalledWith(1, 'pd-a', 'reviewer_respond_reminder_template');
+  expect(findByOwnerAndKey).toHaveBeenNthCalledWith(2, 'pd-b', 'reviewer_respond_reminder_template');
+});
+
+test('unavailable or malformed PD preference does not silently become Admin copy', async () => {
+  findByOwnerAndKey.mockRejectedValueOnce(new Error('Dataverse down'));
+  expect(await loadSenderReminderTemplate('pd-a', 'respond', shared)).toEqual({ ok: false, reason: 'preference_unavailable' });
+  findByOwnerAndKey.mockResolvedValueOnce({ wmkf_preferencevalue: '{bad json', wmkf_isencrypted: false });
+  expect(await loadSenderReminderTemplate('pd-a', 'respond', shared)).toEqual({ ok: false, reason: 'preference_invalid' });
+});
+
+test('an invalid Admin fallback is rejected before an automatic reminder can claim a row', async () => {
+  const invalid = { subject: 'Admin subject', body: 'No review due date here' };
+  expect(await loadSenderReminderTemplate('pd-a', 'reviewdue', invalid)).toEqual({
+    ok: false, reason: 'misconfigured', errors: ['required:reviewDueDate'],
+  });
+});
+
+test('explicit save and reset use the exact session systemuser as preference owner', async () => {
+  expect(await saveOwnReminderTemplate(OWN_ID, 'respond', own)).toEqual({ ok: true, template: own });
+  expect(findByOwnerAndKey).toHaveBeenCalledWith(OWN_ID, 'reviewer_respond_reminder_template');
+  expect(create).toHaveBeenCalledWith({
+    wmkf_preferencekey: 'reviewer_respond_reminder_template',
+    wmkf_preferencevalue: JSON.stringify(own),
+    wmkf_isencrypted: false,
+    'ownerid@odata.bind': `/systemusers(${OWN_ID})`,
+  });
+  expect(await clearOwnReminderTemplate(OWN_ID, 'respond')).toEqual({ ok: true });
+  expect(remove).not.toHaveBeenCalled();
+});
+
+test('user A update and clear cannot touch user B row even when both use the same key', async () => {
+  findByOwnerAndKey.mockImplementation(async (owner) => owner === OWN_ID
+    ? { wmkf_appuserpreferenceid: 'row-a' }
+    : { wmkf_appuserpreferenceid: 'row-b' });
+  expect(await saveOwnReminderTemplate(OWN_ID, 'respond', own)).toEqual({ ok: true, template: own });
+  expect(update).toHaveBeenCalledWith('row-a', { wmkf_preferencevalue: JSON.stringify(own), wmkf_isencrypted: false });
+  expect(update).not.toHaveBeenCalledWith('row-b', expect.anything());
+  expect(await clearOwnReminderTemplate(OWN_ID, 'respond')).toEqual({ ok: true });
+  expect(remove).toHaveBeenCalledWith('row-a');
+  expect(remove).not.toHaveBeenCalledWith('row-b');
+  expect(findByOwnerAndKey).toHaveBeenCalledTimes(2);
+  expect(findByOwnerAndKey).not.toHaveBeenCalledWith(OTHER_ID, expect.anything());
+});
+
+test('invalid review-due copy cannot save a missing date or reviewer link', async () => {
+  expect(validateReminderTemplate('reviewdue', { subject: 'Soon', body: '{{greeting}}' }).errors).toContain('required:reviewDueDate');
+  expect(validateReminderTemplate('reviewdue', { subject: 'Soon', body: '{{reviewDueDate}} /external/review/secret' }).errors).toContain('reviewer_link');
+  expect(validateReminderTemplate('respond', { subject: 'Soon', body: 'Go to https://example.org instead.' }).errors).toContain('link');
+  await saveOwnReminderTemplate(OWN_ID, 'reviewdue', { subject: 'Soon', body: '{{greeting}}' });
+  expect(create).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+});
+
+test('shared template uses the existing Admin registry keys', async () => {
+  expect(await sharedReminderTemplate('respond')).toEqual({ ok: true, template: shared });
+  expect(readRequiredEmailDefaults).toHaveBeenCalledWith([
+    'email.reviewer_reminder_respond_by.subject', 'email.reviewer_reminder_respond_by.body',
+  ], expect.any(Object));
+});
+
+test('preview proof is scoped to the exact context digest', async () => {
+  const digest = reminderPreviewDigest({ actor: 'pd-a', subject: own.subject });
+  const proof = await mintReminderPreviewProof(digest);
+  expect(await verifyReminderPreviewProof(proof, digest)).toBe(true);
+  expect(await verifyReminderPreviewProof(proof, reminderPreviewDigest({ actor: 'pd-b', subject: own.subject }))).toBe(false);
+});

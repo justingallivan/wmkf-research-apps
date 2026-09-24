@@ -381,21 +381,30 @@ test('a sent reminder cannot be sent again while its refresh is held', async () 
     ...REVIEWER, reviewReceivedAt: null, reviewStatus: 'materials_sent',
     materialsSentAt: '2026-09-01', reviewDueReminderEligibility: 'eligible',
   }] }] };
-  jest.spyOn(global, 'fetch').mockImplementation((url) => {
+  jest.spyOn(global, 'fetch').mockImplementation((url, opts) => {
     const href = String(url);
     if (href.includes('/review-manager/reviewers?')) {
       reads += 1;
       return reads === 1 ? Promise.resolve({ ok: true, json: async () => body }) : refresh;
     }
-    if (href === '/api/review-manager/send-review-reminder') return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    if (href.includes('/api/review-manager/reminder-email-preferences?')) return Promise.resolve({ ok: true, json: async () => ({ ok: true, ownSystemId: 'pd-1' }) });
+    if (href === '/api/review-manager/send-review-reminder') {
+      const payload = JSON.parse(opts.body);
+      return Promise.resolve({ ok: true, json: async () => payload.action === 'preview'
+        ? { ok: true, draft: { name: 'Reviewer', to: 'reviewer@example.org', from: 'pd@example.org', senderId: 'pd-1', subject: 'Reminder', previewHtml: '<p>Due soon</p>', template: { subject: 'Reminder', body: '{{reviewDueDate}}' }, proof: 'proof' } }
+        : { ok: true } });
+    }
     return Promise.resolve({ ok: true, json: async () => ({ items: [] }) });
   });
   render(<ReviewsTab requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Send reminder' }));
+  await screen.findByText('Email preview');
+  const buttons = screen.getAllByRole('button', { name: 'Send reminder' });
+  fireEvent.click(buttons[buttons.length - 1]);
   await waitFor(() => expect(reads).toBe(2));
   const reminder = screen.getByRole('button', { name: 'Send reminder' });
   expect(reminder).toBeDisabled();
   fireEvent.click(reminder);
-  expect(global.fetch.mock.calls.filter(([url]) => url === '/api/review-manager/send-review-reminder')).toHaveLength(1);
+  expect(global.fetch.mock.calls.filter(([url, opts]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(opts.body).action === 'send')).toHaveLength(1);
   await act(async () => { release({ ok: true, json: async () => body }); });
 });

@@ -55,6 +55,8 @@ export const PREFERENCE_KEYS = {
   GRANTEE_INVITE_SUBJECT: 'grantee_invite_subject',
   SITE_VISIT_MATERIALS_INVITATION_TEMPLATE: 'site_visit_materials_invitation_template',
   SITE_VISIT_MATERIALS_REMINDER_TEMPLATE: 'site_visit_materials_reminder_template',
+  REVIEWER_RESPOND_REMINDER_TEMPLATE: 'reviewer_respond_reminder_template',
+  REVIEWER_REVIEW_DUE_REMINDER_TEMPLATE: 'reviewer_review_due_reminder_template',
   // Explicit per-PD choice for automatic outbound email handling:
   //   { mode: 'automatic' }
   //   { mode: 'review', leadDays: 1..14 }

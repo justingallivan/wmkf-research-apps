@@ -1,3 +1,66 @@
+# Session 541 Prompt: Review PR #332 and decide reviewer-reminder promotion
+
+## Session 540 Summary — 2026-09-24 PT (Codex personal-email reviewer reminders)
+
+[VERIFIED via branch source, local checks, the PR plan, and GitHub] PRs #329 and #330 are merged. PR #332 remains open on `codex/personal-email-reviewer-reminders` at `4cf8976e8`; its checks passed and GitHub reported `mergeStateStatus: CLEAN` before this handoff edit. The owner confirmed the staff rehearsal and walkthrough were completed. The reviewer-reminder automatic cron remains unscheduled. This branch has not been merged to `main`, and no Production behavior or live delivery was tested in this session.
+
+### What Was Completed
+
+1. **Reviewer reminder personal defaults and manual sends.** The branch implements the sending PD's saved default for both reminder kinds, proof-bound editable preview/send, owner-keyed preference routes, and strict PD preference reads before automatic claims. The generic preference route reserves the new keys. The full caller-to-send contract and remaining uncertainty semantics are recorded in `docs/plans/PERSONAL_EMAIL_REVIEWER_REMINDERS_PLAN_2026-09-24.md`.
+2. **Adversarial review fixes.** OAuth Claude Opus reviews found and then verified fixes for authorization, stale preview, uncertain-send, preference isolation, fallback, and recovery-edit issues. The last independent diff review found a late preference response could overwrite a recovery edit; `b74d385c4` added an edit-generation guard and regression test. The CodeQL rehearsal-loader findings were fixed by `e55cf26dc`.
+3. **Staff rehearsal evidence.** `4cf8976e8` records the owner's confirmation and the synthetic browser walkthrough. A later targeted browser check on final runtime head `b74d385c4` showed an unknown template token blocked Send with a specific validation message, then a corrected body and refreshed preview enabled Send. The temporary loopback server on port 3133 was stopped; the separate 3132 rehearsal server was left running for the owner. Human observations were not itemized, and no live service or email probe was run.
+4. **Verification.** After the final fixes, focused Jest passed 7 suites/176 tests, lint and build passed, and relevant API route, lifecycle auth, route service, reviewer engagement, reminder hold, fact consistency, secret scan, and scaffolding gates with their self-tests passed sequentially. GitHub checks on `4cf8976e8` all passed, including Jest, Playwright, static/security analysis, Claude review, and Preview status. A documentation-only handoff push will require a fresh PR check before merge.
+
+### Commits on the PR Branch
+
+- `2eab48fd2` — Add personal reviewer reminder defaults and preview-bound sends
+- `d001180a4`, `ac8f9bc05`, `7af043073`, `11091eaaa`, `b74d385c4` — Fix review findings and preserve recovery edits
+- `38000ffeb` — Record final reviewer reminder review
+- `814285827` — Avoid backtracking in automated email marker stripping
+- `fa86dd571`, `e55cf26dc` — Add and harden the synthetic staff rehearsal
+- `4cf8976e8` — Record staff rehearsal evidence
+
+## Next Items
+
+### Verified Open
+
+1. **PR #332 is open for owner review.** Evidence: GitHub PR state and checks at `4cf8976e8`, plus the branch plan. Recheck the new head, checks, and merge state after this handoff push; do not infer Production readiness from a Preview check.
+
+### Owner Decision Needed
+
+1. **Release preparation and promotion.** The Tier 2 plan still calls for a last-known-good Production deployment and an authorized rollback operator before promotion. Merging #332 to `main` auto-deploys and requires Justin's explicit approval. No Vercel commands, live-service probes, or merge are authorized by this handoff.
+
+### Parked
+
+1. **Automatic reviewer reminder cron.** Evidence: the plan and existing cron-hold gate. It remains unscheduled; any restoration needs a separate decision and release verification.
+2. **Remaining personal-email slices.** The owner requested one slice at a time with review between slices. Continue only after PR #332 review and owner ordering.
+
+### Verify Before Acting
+
+1. The PR and `main` can move concurrently. Recheck branch, working tree, PR head, checks, and Production release record before any merge decision.
+2. The loopback rehearsal process on port 3132 may not survive a new session. Treat it as a local synthetic aid, not evidence of live behavior.
+
+### Do Not Reopen Without New Evidence
+
+1. The owner-confirmed staff walkthrough and the reviewed P3 fixes are recorded in the PR plan. Reopen them only for a new defect or changed diff.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/PERSONAL_EMAIL_REVIEWER_REMINDERS_PLAN_2026-09-24.md` | Contract, review findings, verification, and release hold |
+| `scripts/rehearse-reviewer-reminders.js` | Isolated synthetic staff rehearsal |
+| `docs/API_ROUTE_SECURITY_MATRIX.md` | Dedicated preference and preview/send route gates |
+
+## Testing and Stop-time Notes
+
+- `npm run report:claim-evidence-pilot -- --current` returned “local state could not be read”; no pilot observation row was added.
+- No `CLAUDE.md` update was needed: the branch's route and script contracts are covered in the plan and route matrix; no cross-agent instruction changed.
+- No `DEVELOPMENT_LOG.md` milestone entry was required: #332 remains unmerged and no Production capability or cutover shipped in this session.
+- This branch-local handoff starts from `origin/main`'s Session 540 prompt at `f9cf1e8c2`, preserving the newer concurrent session history.
+
+## Prior Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
+
 # Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
 
 ## Session 539 Summary — 2026-09-24 PT (Codex independent queue slice; concurrent sessions continued)

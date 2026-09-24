@@ -20,6 +20,15 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 
 const mintAndStore = jest.fn(async () => ({ url: 'https://reviews.example/external/review/jwt' }));
 jest.mock('../../lib/external/token-lifecycle', () => ({ mintAndStore: (...a) => mintAndStore(...a) }));
+const mockProofDigest = { value: null };
+jest.mock('../../lib/services/external-token', () => ({
+  mintScopedToken: jest.fn(async ({ subject }) => { mockProofDigest.value = subject; return { jwt: 'proof' }; }),
+  verifyToken: jest.fn(async () => ({ valid: true, payload: { subject: mockProofDigest.value, aud: 'reviewer-reminder-preview', ops: ['send'] } })),
+}));
+const findByOwnerAndKey = jest.fn();
+jest.mock('../../lib/dataverse/adapters/user-preference', () => ({ findByOwnerAndKey: (...a) => findByOwnerAndKey(...a) }));
+const setUserPreference = jest.fn();
+jest.mock('../../lib/services/database-service', () => ({ DatabaseService: { setUserPreference: (...a) => setUserPreference(...a) } }));
 
 const getSettingStrict = jest.fn();
 jest.mock('../../lib/services/settings-service', () => ({
@@ -40,6 +49,8 @@ const {
   previewManualRespondReminder,
   sendManualRespondReminder,
   sendManualReviewDueReminder,
+  previewManualReminder,
+  sendManualReminderWithProof,
 } = require('../../lib/services/reviewer-manual-reminder');
 
 const REQ = '11111111-1111-4111-8111-111111111111';
@@ -124,6 +135,100 @@ beforeEach(() => {
   mintAndStore.mockResolvedValue({ url: 'https://reviews.example/external/review/jwt' });
   createAndSendEmail.mockResolvedValue({ emailId: 'e-1' });
   updateRecord.mockResolvedValue(undefined);
+  findByOwnerAndKey.mockResolvedValue(null);
+  setUserPreference.mockResolvedValue(true);
+});
+
+describe('proof-bound personal reminder sends', () => {
+  const pendingInvitation = (over = {}) => suggestionRow({ wmkf_accepted: false, wmkf_reviewstatus: null, ...over });
+  test('respond preview loads the assigned PD default without a marker, token, email or preference write', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    const personal = { subject: 'PD reminder', body: '{{greeting}},\n\nPlease respond to {{proposalClause}}.\n\n{{signature}}' };
+    findByOwnerAndKey.mockResolvedValue({ wmkf_preferencevalue: JSON.stringify(personal), wmkf_isencrypted: false });
+    const result = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD });
+    expect(result.ok).toBe(true);
+    expect(result.draft.template).toEqual(personal);
+    expect(result.draft.bodyText).toContain('Please respond');
+    expect(result.draft.proof).toBe('proof');
+    expect(findByOwnerAndKey).toHaveBeenCalledWith(PD, 'reviewer_respond_reminder_template');
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(setUserPreference).not.toHaveBeenCalled();
+  });
+
+  test('edited one-send respond copy sends through the server link and never saves a default', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    const edited = { subject: 'My one-off note', body: '{{greeting}},\n\nA personal note about {{proposalClause}}.\n\n{{signature}}' };
+    const preview = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited });
+    expect(preview.ok).toBe(true);
+    const sent = await sendManualReminderWithProof({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited, proof: preview.draft.proof });
+    expect(sent).toEqual({ ok: true });
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: edited.subject,
+      from: 'pd@keck.org', to: 'rev@example.org',
+      body: expect.stringContaining('A personal note'),
+    }));
+    expect(createAndSendEmail.mock.calls[0][0].body).toContain('https://reviews.example/external/review/jwt');
+    expect(setUserPreference).not.toHaveBeenCalled();
+  });
+
+  test('explicit one-send copy recovers from a broken PD default without changing that default', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    findByOwnerAndKey.mockRejectedValue(new Error('preference read unavailable'));
+    const initial = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD });
+    expect(initial).toMatchObject({ ok: false, reason: 'preference_unavailable', shared: { subject: RESPOND_SUBJECT, body: RESPOND_BODY } });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    const edited = { subject: 'One-off recovery', body: '{{greeting}}\n\nPlease respond.\n\n{{signature}}' };
+    const preview = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited });
+    expect(preview.ok).toBe(true);
+    const sent = await sendManualReminderWithProof({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited, proof: preview.draft.proof });
+    expect(sent).toEqual({ ok: true });
+    expect(findByOwnerAndKey).toHaveBeenCalledTimes(1);
+    expect(setUserPreference).not.toHaveBeenCalled();
+  });
+
+  test('preview proof accepts a template regardless of subject/body property order', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    const reversed = { body: '{{greeting}}\n\n{{signature}}', subject: 'One-off' };
+    const preview = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: reversed });
+    expect(preview.ok).toBe(true);
+    const result = await sendManualReminderWithProof({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: reversed, proof: preview.draft.proof });
+    expect(result).toEqual({ ok: true });
+  });
+
+  test('changed reviewer ETag invalidates preview before the claim', async () => {
+    installReads({ suggestion: pendingInvitation(), suggestionAfterClaim: pendingInvitation({ _etag: 'W/"101"' }) });
+    const edited = { subject: 'One-off', body: '{{greeting}}\n\n{{signature}}' };
+    const preview = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited });
+    const result = await sendManualReminderWithProof({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited, proof: preview.draft.proof });
+    expect(result).toEqual({ ok: false, reason: 'preview_stale' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a row change between proof verification and claim cannot alter the reviewed send', async () => {
+    const original = pendingInvitation();
+    installReads({ suggestion: original });
+    const edited = { subject: 'One-off', body: '{{greeting}}\n\n{{signature}}' };
+    const preview = await previewManualReminder({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited });
+    installReads({ suggestion: original, suggestionAfterClaim: pendingInvitation({ _etag: 'W/"101"' }) });
+    const result = await sendManualReminderWithProof({ kind: 'respond', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited, proof: preview.draft.proof });
+    expect(result).toEqual({ ok: false, reason: 'conflict' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('review-due preview renders the effective date and excludes a new reviewer link', async () => {
+    installReads();
+    const edited = { subject: 'Review due soon', body: '{{greeting}},\n\nDue {{reviewDueDate}}.\n\n{{signature}}' };
+    const preview = await previewManualReminder({ kind: 'reviewdue', requestId: REQ, suggestionId: SUG, actingUserSystemId: PD, template: edited });
+    expect(preview.ok).toBe(true);
+    expect(preview.draft.bodyText).toContain('September 9, 2099');
+    expect(preview.draft.previewHtml).toContain('original review materials email');
+    expect(preview.draft.previewHtml).not.toContain('/external/review/');
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
 });
 
 describe('sendManualReviewDueReminder', () => {

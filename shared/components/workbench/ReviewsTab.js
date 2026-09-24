@@ -26,7 +26,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
-import EmailSendFeedback from '../EmailSendFeedback';
+import RespondReminderModal from '../reviewers/RespondReminderModal';
 import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/external/review-form-schema';
 import { deriveReviewMatrix } from '../../utils/review-matrix';
 import ManualReviewEntryForm from './ManualReviewEntryForm';
@@ -740,8 +740,7 @@ const REMINDER_ELIGIBILITY_INFO = {
 };
 
 function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, updating = false, previewReadOnly = false }) {
-  const [sending, setSending] = useState(false);
-  const [feedback, setFeedback] = useState(null);
+  const [composerOpen, setComposerOpen] = useState(false);
   const lastReminder = formatDate(reviewer.reminderSentAt);
   const reminderEligibility = reviewer.materialsSentAt
     ? reviewer.reviewDueReminderEligibility
@@ -752,51 +751,6 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, updating =
       || { title: 'Reminder eligibility could not be verified', message: 'Reminder eligibility could not be verified. Refresh before trying again.' };
   const canSend = reminderEligibility === 'eligible';
   const affiliation = reviewerAffiliationOf(reviewer);
-
-  const handleSend = useCallback(async () => {
-    if (previewReadOnly || updating || sending) return;
-    setSending(true);
-    setFeedback(null);
-    try {
-      const { ok: resOk, data } = await requestEnvelope('/api/review-manager/send-review-reminder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: { requestId, suggestionId: reviewer.suggestionId },
-        tolerantBody: true,
-      });
-      if (!resOk || !data.ok) {
-        const messages = {
-          conflict: 'Already claimed by another send — refresh to see the latest status.',
-          removed: 'This reviewer was removed from the proposal — restore them first.',
-          revoked: "This reviewer's access was withdrawn — reissue their link before sending a reminder.",
-          token_revoked: REMINDER_ELIGIBILITY_INFO.token_revoked.message,
-          token_not_minted: REMINDER_ELIGIBILITY_INFO.token_not_minted.message,
-          token_invalid_data: REMINDER_ELIGIBILITY_INFO.token_invalid_data.message,
-          token_expired: REMINDER_ELIGIBILITY_INFO.token_expired.message,
-          token_insufficient_window: REMINDER_ELIGIBILITY_INFO.token_insufficient_window.message,
-          due_date_missing: REMINDER_ELIGIBILITY_INFO.due_date_missing.message,
-          not_found: 'This reviewer is no longer available — refresh to update the list.',
-          read_failed: "Couldn't verify this reviewer's latest status. No reminder was sent; try again.",
-          prepare_failed: 'Could not prepare the reminder. No reminder was sent; try again.',
-          send_unconfirmed: 'Dynamics did not confirm the send. Check reviewer activity before trying again.',
-        };
-        setFeedback({
-          status: data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed',
-          message: messages[data.reason] || 'The reminder was not sent.',
-        });
-        return;
-      }
-      setFeedback({ status: 'sent' });
-      if (onSent) onSent();
-    } catch (e) {
-      setFeedback({
-        status: 'uncertain',
-        message: 'The app could not confirm the result. Check reviewer activity before trying again.',
-      });
-    } finally {
-      setSending(false);
-    }
-  }, [requestId, reviewer.suggestionId, onSent, previewReadOnly, updating, sending]);
 
   return (
     <div className="grid gap-3 border-b border-gray-100 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_16rem_20rem] lg:items-start">
@@ -826,24 +780,16 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, updating =
             ? `${reviewer.reminderCount} reminder${reviewer.reminderCount === 1 ? '' : 's'} sent${lastReminder ? ` (last ${lastReminder})` : ''}`
             : 'No reminders sent yet'}
         </p>
-        {feedback && (
-          <EmailSendFeedback
-            compact
-            className="mt-2"
-            status={feedback.status}
-            message={feedback.message}
-          />
-        )}
       </div>
       <div className="flex flex-wrap items-center gap-2 lg:justify-start">
         <button
           type="button"
-          onClick={handleSend}
-          disabled={previewReadOnly || updating || sending || !canSend}
+          onClick={() => setComposerOpen(true)}
+          disabled={previewReadOnly || updating || composerOpen || !canSend}
           title={previewReadOnly ? 'Reminders are disabled in read-only Preview' : eligibilityInfo.title}
           className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? 'Sending…' : 'Send reminder'}
+          Send reminder
         </button>
         <button
           type="button"
@@ -855,6 +801,15 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, updating =
           Enter review manually
         </button>
       </div>
+      {composerOpen && <RespondReminderModal
+        key={`${requestId}:${reviewer.suggestionId}`}
+        requestId={requestId}
+        candidate={reviewer}
+        kind="reviewdue"
+        onClose={() => setComposerOpen(false)}
+        onSent={onSent}
+        onStale={onSent}
+      />}
     </div>
   );
 }
