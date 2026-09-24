@@ -420,12 +420,12 @@ describe('stepVerifyInitialAssessment', () => {
     };
   }
 
-  function mockDataverse({ ia = iaRow(), snapshot = snapshotRow(), request = requestReadback() } = {}) {
+  function mockDataverse({ ia = iaRow(), snapshot = snapshotRow(), request = requestReadback(), extraRows = [] } = {}) {
     fetch.mockImplementation((url) => {
       const href = String(url);
       if (href.includes('login.microsoftonline.com')) return tokenResponse();
       if (href.startsWith(`https://${SANDBOX_HOST}/api/data/v9.2/akoya_requests(${REQUEST_ID})`)) return jsonResponse(request);
-      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [ia, snapshot].filter(Boolean) });
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [ia, snapshot, ...extraRows].filter(Boolean) });
       throw new Error(`unexpected fetch to ${href}`);
     });
   }
@@ -566,6 +566,165 @@ describe('stepVerifyInitialAssessment', () => {
 
   it('a request pointer that is not the canonical Initial Assessment row stops with ia_pointer_mismatch', async () => {
     mockDataverse({ request: requestReadback({ _wmkf_currentinitialassessment_value: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }) });
+    const graph = baseGraph();
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+  });
+
+  // Stage C round 2 (Opus P2/P3): previously-untested arms of existing stop
+  // rules, each verified to be load-bearing by a mutation run (see the
+  // build report).
+
+  it('a size-only difference between the two retained snapshot metadata reads stops with ia_verification_failed', async () => {
+    mockDataverse();
+    let call = 0;
+    // listFiles reports the SAME (mutated) size the second metadata read
+    // returns, so the census/reverifyClone cross-checks cannot independently
+    // catch this -- only the before/after double-read's own size comparison can.
+    const mutatedSize = snapshotMetadata().size + 1;
+    const graph = baseGraph({
+      listFiles: jest.fn(async () => [
+        { id: BASIC_ITEM_ID, name: BASIC_FILENAME, folder: BASIC_FOLDER, size: BASIC_FILE_BYTES.length },
+        { id: iaId, name: 'ia.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment`, size: iaBuffer.length },
+        { id: snapId, name: 'snap.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment/Board Milestones`, size: mutatedSize },
+      ]),
+      getFileMetadataById: jest.fn(async (driveId, itemId) => {
+        if (itemId === iaId) return iaMetadata();
+        if (itemId === BASIC_ITEM_ID) return basicMetadata();
+        if (itemId === snapId) {
+          call += 1;
+          return call === 1 ? snapshotMetadata() : { ...snapshotMetadata(), size: mutatedSize };
+        }
+        return null;
+      }),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+  });
+
+  it('a lastModified-only difference between the two retained snapshot metadata reads stops with ia_verification_failed', async () => {
+    mockDataverse();
+    let call = 0;
+    const graph = baseGraph({
+      getFileMetadataById: jest.fn(async (driveId, itemId) => {
+        if (itemId === iaId) return iaMetadata();
+        if (itemId === BASIC_ITEM_ID) return basicMetadata();
+        if (itemId === snapId) {
+          call += 1;
+          return call === 1 ? snapshotMetadata() : { ...snapshotMetadata(), lastModified: '2026-09-25T00:00:00Z' };
+        }
+        return null;
+      }),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+  });
+
+  it('a snapshot row whose source content hash no longer matches the current Initial Assessment stops with ia_snapshot_stale', async () => {
+    mockDataverse({ snapshot: snapshotRow({ wmkf_sourcecontenthash: 'f'.repeat(64) }) });
+    const graph = baseGraph();
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_snapshot_stale');
+  });
+
+  it('retained snapshot bytes that no longer hash to the row\'s own or source content hash stop with ia_verification_failed', async () => {
+    mockDataverse();
+    // A DETERMINISTIC different-but-valid DOCX (rendered once, reused for
+    // every downloadFile call) so reverifyClone's own raw-byte re-check
+    // (which downloads a second time) cannot independently catch this via
+    // docProps timestamp drift between two independent renders -- isolating
+    // the failure to this step's own governed-hash-vs-row check.
+    const differentSnapshotBytes = await renderInitialAssessmentDocx({
+      requestNumber: REQUEST_NUMBER, title: 'A different rendered document', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    const graph = baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === iaId) return { buffer: iaBuffer };
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
+        if (itemId === snapId) return { buffer: differentSnapshotBytes };
+        return null;
+      }),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+  });
+
+  it('an unexpected extra file in the destination folder stops with ia_verification_failed', async () => {
+    mockDataverse();
+    const graph = baseGraph({
+      listFiles: jest.fn(async () => [
+        { id: BASIC_ITEM_ID, name: BASIC_FILENAME, folder: BASIC_FOLDER, size: BASIC_FILE_BYTES.length },
+        { id: iaId, name: 'ia.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment`, size: iaBuffer.length },
+        { id: snapId, name: 'snap.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment/Board Milestones`, size: iaBuffer.length },
+        { id: '01UNEXPECTEDFILEABCDEFGHIJKLMNOPQ', name: 'unexpected.pdf', folder: `${REQUEST_FOLDER}/AI Materials`, size: 10 },
+      ]),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+  });
+
+  it('a mutated Basic-recipe copied file (bytes no longer match its journaled hash) stops with ia_verification_failed via reverifyClone', async () => {
+    mockDataverse();
+    const graph = baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === iaId) return { buffer: iaBuffer };
+        if (itemId === snapId) return { buffer: iaBuffer };
+        if (itemId === BASIC_ITEM_ID) return { buffer: Buffer.from('mutated Basic-recipe bytes') };
+        return null;
+      }),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+  });
+
+  it('a different, valid Ready Initial Assessment on the request (as a staff Generate would create) is refused with ia_pointer_mismatch', async () => {
+    // Exactly ONE active Ready IA row exists (satisfying
+    // resolveCanonicalInitialAssessment's own uniqueness/pointer checks on
+    // their own), and the request's pointer correctly references it -- but
+    // it is NOT the seed step's journaled requestDocumentId, isolating the
+    // `expectedArtifactId` mismatch arm specifically (a staff Generate could
+    // have superseded the seeded row with a new one after the seed step ran).
+    const OTHER_READY_ID = '99999999-9999-4999-8999-999999999999';
+    const otherReady = { ...iaRow(), wmkf_requestdocumentid: OTHER_READY_ID, wmkf_generationkey: 'e'.repeat(64) };
+    mockDataverse({
+      ia: otherReady,
+      request: requestReadback({ _wmkf_currentinitialassessment_value: OTHER_READY_ID }),
+    });
     const graph = baseGraph();
     const { result } = await runStep({
       deps: { graph },

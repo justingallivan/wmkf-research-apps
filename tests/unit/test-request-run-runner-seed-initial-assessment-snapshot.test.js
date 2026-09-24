@@ -478,4 +478,61 @@ describe('stepSeedInitialAssessmentSnapshot', () => {
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
   });
+
+  describe('wrappedCreateDocument lost-response recovery (Stage C round 2, P2 V4)', () => {
+    it('a create POST that throws, with NO row ever committed, stops with ambiguous_create_outcome after exactly one POST', async () => {
+      const state = { seed: seedRow(governedHash), snapshot: null, request: requestRow() };
+      let postCount = 0;
+      fetch.mockImplementation((url, init) => {
+        const href = String(url);
+        if (href.includes('login.microsoftonline.com')) return tokenResponse();
+        if (init?.method === 'POST' && href.includes('wmkf_requestdocuments')) {
+          postCount += 1;
+          // The write never committed server-side: no readable row exists at any generation key.
+          return Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('Something unexpected happened'), json: () => Promise.resolve({}) });
+        }
+        if (href.includes('wmkf_requestdocuments') && href.includes('%24filter=wmkf_generationkey')) {
+          return jsonResponse({ value: [] });
+        }
+        if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [state.seed].filter(Boolean) });
+        if (href.startsWith(`https://${SANDBOX_HOST}/api/data/v9.2/akoya_requests(${REQUEST_ID})`)) return jsonResponse(state.request);
+        throw new Error(`unexpected fetch to ${href} (${init?.method || 'GET'})`);
+      });
+      const graph = fakeGraph();
+      const { result } = await runStep({ deps: { graph } });
+
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('ambiguous_create_outcome');
+      expect(postCount).toBe(1);
+      expect(graph.ensureFolderPath).not.toHaveBeenCalled();
+      expect(graph.uploadFile).not.toHaveBeenCalled();
+    });
+
+    it('a create POST that throws, but the row actually committed (reread finds it), is adopted and never re-POSTed', async () => {
+      const state = { seed: seedRow(governedHash), snapshot: null, request: requestRow() };
+      let postCount = 0;
+      mockDataverse(state);
+      // Wrap the base mockDataverse fetch mock so the FIRST POST response is
+      // replaced with a lost-response-shaped error (not 409/412, no
+      // duplicate-shaped message) while state.snapshot is still committed by
+      // the underlying implementation, exactly as a real lost HTTP response
+      // would look: the write committed server-side but the client saw a
+      // generic failure.
+      const baseImpl = fetch.getMockImplementation();
+      fetch.mockImplementation(async (url, init) => {
+        const href = String(url);
+        if (init?.method === 'POST' && href.includes('wmkf_requestdocuments')) {
+          postCount += 1;
+          await baseImpl(url, init); // let the real handler commit state.snapshot
+          return { ok: false, status: 500, text: () => Promise.resolve('Something unexpected happened'), json: () => Promise.resolve({}) };
+        }
+        return baseImpl(url, init);
+      });
+      const graph = fakeGraph();
+      const { result } = await runStep({ deps: { graph } });
+
+      expect(result.outcome).toBe('advanced');
+      expect(postCount).toBe(1);
+    });
+  });
 });
