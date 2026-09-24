@@ -781,8 +781,9 @@ The materials card names a missing saved liaison email instead of displaying lit
 
 PR #335 merged as `407ca908d48d050d9607aee8d111bc49c02ecbb8` on
 2026-09-24. Production deployment `dpl_J7dPgJRrUmMMfYodC689fnye8QQY`
-reached Ready and serves `applications.wmkeck.org`. Staff Preview rehearsal on
-Request 1003222 showed a rendered invitation addressed to Franklin Cat with the
-liaison name resolved and Send enabled. No email was sent in that rehearsal or
-during release verification. Production auth-provider and unauthenticated route
-checks passed; a signed-in production smoke check remains pending staff confirmation.
+reached Ready and was assigned `applications.wmkeck.org` at release time. Staff
+Preview rehearsal on Request 1003222 showed a rendered invitation addressed to
+Franklin Cat with the liaison name resolved and Send enabled. No email was sent
+in that rehearsal or during release verification. Production auth-provider and
+unauthenticated route checks passed; a signed-in production smoke check remains
+pending staff confirmation.
