@@ -255,6 +255,26 @@ describeIfDb('pre-site-visit/distribution-store: contract', () => {
 
       const latest = await store.getLatestSentAttempt(requestId);
       expect(latest.operation_id).toBe(sentInput.operationId);
+
+      // DISCRIMINATING: two SENT rows whose created_at order is the reverse
+      // of their sent_at order -- kills a mutant that replaces
+      // "ORDER BY sent_at DESC NULLS LAST, ..." with "ORDER BY created_at
+      // DESC" (a plain created_at sort would pick the wrong row here).
+      const orderRequestId = crypto.randomUUID();
+      const olderCreatedNewerSent = baseInput({ requestId: orderRequestId });
+      await store.createOrGetDistributionAttempt(olderCreatedNewerSent);
+      await client.query(`UPDATE pre_site_distribution_attempts SET created_at = NOW() - INTERVAL '2 hours' WHERE operation_id = $1`, [olderCreatedNewerSent.operationId]);
+      await markSentDirectly(olderCreatedNewerSent.operationId, crypto.randomUUID());
+      await client.query(`UPDATE pre_site_distribution_attempts SET send_requested_at = NOW() - INTERVAL '10 minutes', sent_at = NOW() - INTERVAL '10 minutes' WHERE operation_id = $1`, [olderCreatedNewerSent.operationId]);
+
+      const newerCreatedOlderSent = baseInput({ requestId: orderRequestId });
+      await store.createOrGetDistributionAttempt(newerCreatedOlderSent);
+      await client.query(`UPDATE pre_site_distribution_attempts SET created_at = NOW() - INTERVAL '5 minutes' WHERE operation_id = $1`, [newerCreatedOlderSent.operationId]);
+      await markSentDirectly(newerCreatedOlderSent.operationId, crypto.randomUUID());
+      await client.query(`UPDATE pre_site_distribution_attempts SET send_requested_at = NOW() - INTERVAL '90 minutes', sent_at = NOW() - INTERVAL '90 minutes' WHERE operation_id = $1`, [newerCreatedOlderSent.operationId]);
+
+      const latestByOrder = await store.getLatestSentAttempt(orderRequestId);
+      expect(latestByOrder.operation_id).toBe(olderCreatedNewerSent.operationId);
     });
   });
 
@@ -319,6 +339,13 @@ describeIfDb('pre-site-visit/distribution-store: contract', () => {
       const blockedClaim = await store.claimDistributionSend(input.operationId, { lockSeconds: 60 });
       expect(blockedClaim).toBeNull();
 
+      // DISCRIMINATING: renewDistributionSendLease is fenced to
+      // state = 'send_requested' -- this attempt is still 'prepared' at
+      // this point, so it must be a no-op (kills a mutant that drops the
+      // state fence).
+      const renewTooEarly = await store.renewDistributionSendLease(claimed, { lockSeconds: 120 });
+      expect(renewTooEarly).toBeNull();
+
       const emailId = crypto.randomUUID();
       const activity = await store.recordDistributionEmailActivity(claimed, emailId);
       expect(activity.dynamics_email_id).toBe(emailId);
@@ -336,6 +363,14 @@ describeIfDb('pre-site-visit/distribution-store: contract', () => {
       const attached = await store.recordDistributionAttachment(claimed, 'docx');
       expect(attached.docx_attached_at).not.toBeNull();
       expect(attached.state).toBe('attachments_added');
+
+      // DISCRIMINATING: repeating recordDistributionEmailActivity for the
+      // same id after attachments have advanced the state must NOT reset
+      // it back to 'activity_created' -- kills a mutant that replaces the
+      // "CASE WHEN state = 'prepared' THEN 'activity_created' ELSE state
+      // END" with an unconditional 'activity_created'.
+      const activityAfterAttach = await store.recordDistributionEmailActivity(attached, emailId);
+      expect(activityAfterAttach.state).toBe('attachments_added');
 
       const sendRequested = await store.recordDistributionSendRequested(claimed);
       expect(sendRequested.state).toBe('send_requested');
@@ -433,6 +468,45 @@ describeIfDb('pre-site-visit/distribution-store: contract', () => {
       expect(failed.last_error_code).toBe('transport_error');
       expect(failed.last_error_message.length).toBe(1000);
       expect(failed.last_failed_at).not.toBeNull();
+
+      // DISCRIMINATING: a stale/wrong lease_token must not be able to
+      // stamp a failure onto the row -- kills a mutant that drops the
+      // lease_token fence from the WHERE clause.
+      const staleFailure = await store.recordDistributionFailure({ ...claimed, lease_token: crypto.randomUUID() }, new Error('stale'), 'stale_error');
+      expect(staleFailure).toBeNull();
+    });
+  });
+
+  describe('recordDistributionPrepared: source_byte_hash fence on a fresh preparing row', () => {
+    test('rejects a mismatched byteHash and accepts the matching one', async () => {
+      const input = baseInput();
+      await store.createOrGetDistributionAttempt(input);
+      const source = {
+        driveId: 'drive-fresh', itemId: 'item-fresh', versionId: '1.0',
+        contentHash: 'gdc1:fresh', byteHash: hex('fresh-source-bytes'), filename: 'Fresh.docx',
+      };
+      await store.recordDistributionSource(input.operationId, source);
+
+      // DISCRIMINATING: the row is still 'preparing' here (not yet
+      // 'prepared'), so a wrong byteHash must be rejected by the
+      // source_byte_hash fence itself, not by a state fence -- kills a
+      // mutant that drops "AND source_byte_hash = ${source.byteHash}".
+      const wrongHash = await store.recordDistributionPrepared(input.operationId, {
+        source: { ...source, byteHash: hex('wrong-fresh-bytes') },
+        docx: { documentId: crypto.randomUUID(), driveId: 'd', itemId: 'i', versionId: '1.0', webUrl: null, filename: 'x.docx', contentType: 'application/x', byteHash: hex('docx-fresh'), size: 1 },
+        pdf: null,
+        previewHash: hex('preview-fresh'),
+      });
+      expect(wrongHash).toBeNull();
+
+      const rightHash = await store.recordDistributionPrepared(input.operationId, {
+        source,
+        docx: { documentId: crypto.randomUUID(), driveId: 'd', itemId: 'i', versionId: '1.0', webUrl: null, filename: 'x.docx', contentType: 'application/x', byteHash: hex('docx-fresh'), size: 1 },
+        pdf: null,
+        previewHash: hex('preview-fresh'),
+      });
+      expect(rightHash).not.toBeNull();
+      expect(rightHash.state).toBe('prepared');
     });
   });
 

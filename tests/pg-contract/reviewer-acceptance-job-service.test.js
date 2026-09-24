@@ -159,9 +159,12 @@ describeIfDb('reviewer-acceptance-job-service: contract', () => {
       const acceptedAt = new Date().toISOString();
       const existingLease = crypto.randomUUID();
       const existingLockedUntil = new Date(Date.now() + 60 * 60_000).toISOString();
+      const existingNextAttempt = new Date(Date.now() + 30 * 60_000);
+      const existingCompletedAt = null;
       const existing = await seedJob({
         suggestionId, acceptedAt, status: 'accept_pending',
         leaseToken: existingLease, lockedUntil: existingLockedUntil,
+        nextAttemptAt: existingNextAttempt, completedAt: existingCompletedAt,
       });
 
       const row = await store.enqueueReviewerAcceptanceJob({
@@ -175,6 +178,12 @@ describeIfDb('reviewer-acceptance-job-service: contract', () => {
       expect(row.status).toBe('accept_pending'); // unchanged, not 'queued'
       expect(row.lease_token).toBe(existingLease);
       expect(new Date(row.locked_until).toISOString()).toBe(existingLockedUntil);
+      // DISCRIMINATING: next_attempt_at/completed_at must also be left
+      // unchanged for an active job -- kills a mutant that drops the
+      // "WHEN status IN ('failed','cancelled')" guard from either CASE
+      // and unconditionally resets it (NOW()/NULL).
+      expect(new Date(row.next_attempt_at).toISOString()).toBe(existingNextAttempt.toISOString());
+      expect(row.completed_at).toBeNull();
       await assertNoOpenTransactionAnywhere();
     });
 
@@ -187,13 +196,16 @@ describeIfDb('reviewer-acceptance-job-service: contract', () => {
     test('DISCRIMINATING: re-enqueueing a terminal (failed) job resets lease/lock and applies the new status', async () => {
       const suggestionId = crypto.randomUUID();
       const acceptedAt = new Date().toISOString();
+      const staleNextAttempt = new Date(Date.now() - 60 * 60_000);
       const existing = await seedJob({
         suggestionId, acceptedAt, status: 'failed',
         leaseToken: crypto.randomUUID(),
         lockedUntil: new Date(Date.now() + 60 * 60_000).toISOString(),
         completedAt: new Date().toISOString(),
+        nextAttemptAt: staleNextAttempt,
       });
 
+      const beforeReset = Date.now();
       const row = await store.enqueueReviewerAcceptanceJob({
         acceptanceKey: `contract-reset-${crypto.randomBytes(6).toString('hex')}`,
         acceptedAt,
@@ -206,6 +218,10 @@ describeIfDb('reviewer-acceptance-job-service: contract', () => {
       expect(row.lease_token).toBeNull();
       expect(row.locked_until).toBeNull();
       expect(row.completed_at).toBeNull();
+      // DISCRIMINATING: next_attempt_at resets to "now", not left at the
+      // stale value -- kills a mutant that drops the guard from the
+      // next_attempt_at CASE (would otherwise leave staleNextAttempt).
+      expect(new Date(row.next_attempt_at).getTime()).toBeGreaterThanOrEqual(beforeReset);
       await assertNoOpenTransactionAnywhere();
     });
   });
@@ -221,16 +237,18 @@ describeIfDb('reviewer-acceptance-job-service: contract', () => {
       await assertNoOpenTransactionAnywhere();
     });
 
-    // DISCRIMINATING: status is already 'queued' (not 'accept_pending'), so
-    // it must stay 'queued' (ELSE branch) -- kills a mutant that always
-    // sets status = 'queued' unconditionally, which would pass a naive
-    // "result.status === 'queued'" check either way.
-    test('DISCRIMINATING: a job already queued keeps its status and a past next_attempt_at unchanged', async () => {
+    // DISCRIMINATING: status is already 'failed' (neither 'accept_pending'
+    // nor 'queued'), so it must stay 'failed' (ELSE branch) -- kills a
+    // mutant that always sets status = 'queued' unconditionally. Starting
+    // from 'queued' itself couldn't distinguish this, since an
+    // unconditional "always queued" mutant would produce the same
+    // 'queued' result either way.
+    test('DISCRIMINATING: a job already terminal keeps its status and a past next_attempt_at unchanged', async () => {
       const pastAttempt = new Date('2020-01-01T00:00:00Z');
-      const job = await seedJob({ status: 'queued', nextAttemptAt: pastAttempt });
+      const job = await seedJob({ status: 'failed', nextAttemptAt: pastAttempt, completedAt: new Date().toISOString() });
 
       const result = await store.markReviewerAcceptanceJobQueued(job.id);
-      expect(result.status).toBe('queued');
+      expect(result.status).toBe('failed');
       expect(new Date(result.next_attempt_at).toISOString()).toBe(pastAttempt.toISOString());
     });
   });
@@ -310,12 +328,19 @@ describeIfDb('reviewer-acceptance-job-service: contract', () => {
         status: 'accept_pending', nextAttemptAt: new Date(Date.now() - 60_000),
         leaseToken: crypto.randomUUID(), lockedUntil: new Date(Date.now() + 60 * 60_000).toISOString(),
       });
+      // DISCRIMINATING: a due, unlocked job whose status is TERMINAL
+      // ('failed') must never be claimed -- kills a mutant that drops the
+      // "status = ANY(REVIEWER_ACCEPTANCE_JOB_ACTIVE_STATUSES)" filter (the
+      // other two fixtures alone don't rule this out, since they only vary
+      // timing/lock, not a terminal status).
+      const terminalDue = await seedJob({ status: 'failed', nextAttemptAt: new Date(Date.now() - 60_000), completedAt: new Date().toISOString() });
 
       const claimed = await store.claimReviewerAcceptanceJobs({ limit: 5, lockSeconds: 120 });
       const claimedIds = claimed.map((r) => r.id);
       expect(claimedIds).toContain(due.id);
       expect(claimedIds).not.toContain(notYetDue.id);
       expect(claimedIds).not.toContain(alreadyLocked.id);
+      expect(claimedIds).not.toContain(terminalDue.id);
 
       const dueRow = claimed.find((r) => r.id === due.id);
       expect(dueRow.lease_token).toMatch(/^[0-9a-f-]{36}$/);

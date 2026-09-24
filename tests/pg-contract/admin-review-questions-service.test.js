@@ -193,8 +193,9 @@ describeIfDb('admin/review-questions-service: contract', () => {
     await assertNoOpenTransactionAnywhere();
   });
 
-  // DISCRIMINATING: forces a REAL failure in bestEffortAudit's own sql-tag
-  // statement -- not a mocked rejection. The mocked Dataverse adapter hands
+  // DISCRIMINATING: forces a REAL JavaScript TypeError inside bestEffortAudit,
+  // thrown by JSON.stringify before its sql-tag statement ever runs -- not a
+  // mocked rejection and not a sql-tag/driver failure. The mocked Dataverse adapter hands
   // back the 'riskDetail' row (a non-parent-bound key, safe to omit from
   // the submitted set) with wmkf_reviewquestionid set to a BigInt.
   // readActiveSetWithIds copies that id straight through into

@@ -161,8 +161,9 @@ describeIfDb('admin/policies-service: contract', () => {
     await assertNoOpenTransactionAnywhere();
   });
 
-  // DISCRIMINATING: forces a REAL failure in writeFinalAudit's own sql-tag
-  // statement -- not a mocked rejection -- by having the (mocked) Dataverse
+  // DISCRIMINATING: forces a REAL JavaScript TypeError inside writeFinalAudit,
+  // thrown by JSON.stringify before its sql-tag statement ever runs -- not a
+  // mocked rejection and not a sql-tag/driver failure -- by having the (mocked) Dataverse
   // adapter hand back a BigInt id. duplicate_slot_rows -> failure() puts
   // `duplicateIds: [BigInt(...)]` into finalOutcome.details, and
   // `JSON.stringify(outcomeJson)` (evaluated INSIDE writeFinalAudit's try,

@@ -147,14 +147,13 @@ describeIfDb('site-visit/recipient-directory-service: contract', () => {
     });
 
     // DISCRIMINATING: id tie-break. Two rows with the identical
-    // COALESCE(display_name, name) value, inserted with the SECOND row
-    // getting the lower... no -- Postgres SERIAL ids are assigned in
-    // insertion order, so to prove the `, id` tie-break independent of
-    // insertion order we assert the returned pair is ascending by id
-    // (the only order consistent with the ORDER BY clause), which a mutant
-    // dropping the `, id` clause could still satisfy by accident on some
-    // runs but never violate if the clause is present -- so this proves
-    // presence of a stable, id-ascending tie-break for equal COALESCE keys.
+    // COALESCE(display_name, name) value are inserted with idFirst < idSecond,
+    // then idFirst is UPDATEd afterward -- an UPDATE writes a new heap tuple
+    // version, so idFirst's row now physically follows idSecond's on disk.
+    // Without an explicit `, id` ORDER BY, a plain sequential scan would
+    // tend to return idSecond before idFirst (heap/physical order), so
+    // asserting ascending-by-id here only passes if the `, id` tie-break
+    // clause is actually present and driving the sort.
     test('ties on COALESCE(display_name, name) break by ascending id', async () => {
       const tag = crypto.randomBytes(4).toString('hex');
       const tieName = `tie_${tag}`;
@@ -165,6 +164,9 @@ describeIfDb('site-visit/recipient-directory-service: contract', () => {
         name: uname('tie2'), displayName: tieName, azureEmail: `t2_${tag}@example.org`, isActive: true,
       });
       expect(idSecond).toBeGreaterThan(idFirst);
+      // Force a heap move: idFirst's tuple is rewritten AFTER idSecond was
+      // inserted, so its new physical location trails idSecond's.
+      await client.query(`UPDATE user_profiles SET azure_email = azure_email WHERE id = $1`, [idFirst]);
 
       const rows = await deps.listProfiles();
       const ours = rows.filter((r) => r.id === idFirst || r.id === idSecond);
@@ -230,13 +232,17 @@ describeIfDb('site-visit/recipient-directory-service: contract', () => {
     });
 
     // DISCRIMINATING: within the same role_type, ties on name are broken
-    // by ascending id (same rationale as the listProfiles id tie-break).
+    // by ascending id (same rationale, and same heap-move technique, as
+    // the listProfiles id tie-break above).
     test('within a role_type, ties on name break by ascending id', async () => {
       const tag = crypto.randomBytes(4).toString('hex');
       const sameName = `same_${tag}`;
       const idFirst = await insertRoster({ name: sameName, roleType: 'Consultant', isActive: true });
       const idSecond = await insertRoster({ name: sameName, roleType: 'Consultant', isActive: true });
       expect(idSecond).toBeGreaterThan(idFirst);
+      // Force a heap move: rewrite idFirst's tuple after idSecond exists,
+      // so idFirst's row physically trails idSecond's on disk.
+      await client.query(`UPDATE expertise_roster SET affiliation = affiliation WHERE id = $1`, [idFirst]);
 
       const rows = await deps.listRoster();
       const ours = rows.filter((r) => r.id === idFirst || r.id === idSecond);

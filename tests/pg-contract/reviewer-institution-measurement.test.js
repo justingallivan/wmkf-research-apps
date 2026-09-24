@@ -15,10 +15,11 @@
  * v52, ~:1155) so there is nothing to seed beyond the row itself.
  *
  * Fail-open (best-effort) telemetry writer (plan §7): recordInstitutionMeasurement
- * must never throw. The DISCRIMINATING test forces a real constraint
- * violation (independent_identity CHECK) through the internal buildRow +
- * direct sql insert path by exercising the module's own catch branch via a
- * value that reaches the planner as invalid.
+ * must never throw. The DISCRIMINATING test below proves buildRow's
+ * pre-write captureSource guard: an out-of-domain captureSource is
+ * 'skipped' before any INSERT is attempted, never reaching the database
+ * and never landing a row -- it does not itself force a real
+ * independent_identity (or any other) CHECK violation through the planner.
  */
 
 const crypto = require('node:crypto');

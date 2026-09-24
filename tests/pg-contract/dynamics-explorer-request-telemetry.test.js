@@ -241,11 +241,15 @@ describeIfDb('dynamics-explorer-request-telemetry: contract', () => {
   // ~:236, max 32767). normalizeRounds only guards "is a non-negative
   // integer" -- it does not cap the upper bound -- so roundsUsed: 99999
   // passes the app-level guard but is a genuine planner rejection (22003,
-  // smallint out of range) once it reaches the INSERT recovery path (no
-  // start row exists for this request_id, so finalizeRequest goes straight
-  // to INSERT). This proves the try/catch in finalizeRequest reaches the
-  // database call, not just the two early-return guards: a mutant that
-  // removed it would make this call reject instead of resolving false.
+  // smallint out of range). finalizeRequest tries its UPDATE first
+  // (binding rounds_used there), and the invalid SMALLINT value fails at
+  // bind time regardless of whether any row matches -- so the rejection
+  // happens on that UPDATE itself, never reaching the INSERT recovery
+  // path (no start row exists for this request_id, but the UPDATE never
+  // gets far enough to check that). This proves the try/catch in
+  // finalizeRequest reaches the database call, not just the two
+  // early-return guards: a mutant that removed it would make this call
+  // reject instead of resolving false.
   test('DISCRIMINATING: an out-of-range SMALLINT roundsUsed is a real planner rejection that resolves false, never throws', async () => {
     const requestId = crypto.randomUUID();
     insertedRequestIds.push(requestId); // no-op cleanup target; row is never created

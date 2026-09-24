@@ -380,6 +380,43 @@ describeIfDb('portal-upload-staging: contract', () => {
         [pruneMint.stagingId]
       );
 
+      // DISCRIMINATING: a row that is old and non-terminal (status =
+      // 'pending') must survive the prune -- kills a mutant that drops the
+      // "status IN ('consumed','rejected','expired')" filter (the
+      // pruneMint row above alone can't distinguish this, since dropping
+      // that filter wouldn't change pruneMint's outcome).
+      const staleNonTerminal = await store.createPortalUpload({
+        scope: store.PORTAL_UPLOAD_SCOPES.GRANTEE_IMAGE,
+        resourceId, actorBinding: 'grantee:cleanup-flow', filename: 'stale-pending.png',
+        contentType: 'image/png', maxBytes: 500,
+      });
+      insertedStagingIds.push(staleNonTerminal.stagingId);
+      await client.query(
+        `UPDATE portal_upload_staging
+            SET expires_at = NOW() + INTERVAL '1 day', updated_at = NOW() - INTERVAL '10 days'
+          WHERE id = $1`,
+        [staleNonTerminal.stagingId]
+      );
+
+      // DISCRIMINATING: an old, terminal ('rejected') row that still has a
+      // candidate_result must ALSO survive the prune -- kills a mutant
+      // that drops the "candidate_result IS NULL" filter (pruneMint's
+      // candidate_result is already NULL by default, so it alone can't
+      // distinguish this either).
+      const staleWithCandidate = await store.createPortalUpload({
+        scope: store.PORTAL_UPLOAD_SCOPES.GRANTEE_IMAGE,
+        resourceId, actorBinding: 'grantee:cleanup-flow', filename: 'stale-candidate.png',
+        contentType: 'image/png', maxBytes: 500,
+      });
+      insertedStagingIds.push(staleWithCandidate.stagingId);
+      await client.query(
+        `UPDATE portal_upload_staging
+            SET status = 'rejected', expires_at = NOW() + INTERVAL '1 day', updated_at = NOW() - INTERVAL '10 days',
+                candidate_result = '{"kept": true}'::jsonb
+          WHERE id = $1`,
+        [staleWithCandidate.stagingId]
+      );
+
       const outcome = await store.cleanupExpiredPortalUploads();
       expect(outcome.deleted).toBeGreaterThanOrEqual(1);
       expect(outcome.pruned).toBeGreaterThanOrEqual(1);
@@ -390,6 +427,12 @@ describeIfDb('portal-upload-staging: contract', () => {
 
       const prunedRow = await readStagingRow(pruneMint.stagingId);
       expect(prunedRow).toBeUndefined();
+
+      const survivingNonTerminal = await readStagingRow(staleNonTerminal.stagingId);
+      expect(survivingNonTerminal).toBeDefined();
+
+      const survivingWithCandidate = await readStagingRow(staleWithCandidate.stagingId);
+      expect(survivingWithCandidate).toBeDefined();
       await assertNoOpenTransactionAnywhere();
     });
   });

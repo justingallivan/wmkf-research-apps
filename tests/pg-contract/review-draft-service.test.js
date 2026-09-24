@@ -111,13 +111,18 @@ describeIfDb('review-draft-service: contract', () => {
     // from the SET list (would leave the first value in place).
     test('UPDATE path (autosave) overwrites draft_json in place and advances updated_at, keeping one row', async () => {
       const id = freshUuid();
-      const first = await ReviewDraftService.upsertDraftJson({ suggestionId: id, draftJson: { step: 'first' } });
+      // Disjoint keys between the two saves: a full REPLACE leaves only
+      // { b: 2 }, whereas a mutant that merges (draft_json ||
+      // EXCLUDED.draft_json) instead of overwriting would leave both keys
+      // -- { step: 'first' } vs { step: 'second' } shares a key and can't
+      // tell replace from merge apart.
+      const first = await ReviewDraftService.upsertDraftJson({ suggestionId: id, draftJson: { a: 1 } });
       await new Promise((resolve) => setTimeout(resolve, 5));
-      const second = await ReviewDraftService.upsertDraftJson({ suggestionId: id, draftJson: { step: 'second' } });
+      const second = await ReviewDraftService.upsertDraftJson({ suggestionId: id, draftJson: { b: 2 } });
 
       expect(second.id).toBe(first.id);
       expect(second.suggestion_id).toBe(id);
-      expect(second.draft_json).toEqual({ step: 'second' });
+      expect(second.draft_json).toEqual({ b: 2 });
       expect(new Date(second.updated_at).getTime()).toBeGreaterThan(new Date(first.updated_at).getTime());
 
       const { rows } = await client.query('SELECT count(*)::int AS n FROM review_drafts WHERE suggestion_id = $1', [id]);

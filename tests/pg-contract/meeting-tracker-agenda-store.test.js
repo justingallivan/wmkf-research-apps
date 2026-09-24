@@ -194,9 +194,17 @@ describeIfDb('meeting-tracker/agenda-store: contract', () => {
     // DESC ordering (not created_at, not insertion order).
     test('returns the most recently sent row for the session, excluding non-sent states', async () => {
       const sessionId = crypto.randomUUID();
-      const older = await seedRow({ sessionId, state: 'sent', sentAt: new Date(Date.now() - 60000).toISOString() });
+      // Insert the newer-by-sent_at row FIRST (so created_at/insertion order
+      // is the REVERSE of sent_at order) -- kills a mutant that replaces
+      // "ORDER BY sent_at DESC ..." with "ORDER BY created_at DESC", which
+      // would otherwise agree with the correct answer by coincidence.
       const newer = await seedRow({ sessionId, state: 'sent', sentAt: new Date().toISOString() });
-      await seedRow({ sessionId, state: 'prepared' }); // must be excluded despite being inserted last
+      const older = await seedRow({ sessionId, state: 'sent', sentAt: new Date(Date.now() - 60000).toISOString() });
+      // Give the excluded 'prepared' row a FUTURE sent_at so it would sort
+      // ABOVE both 'sent' rows if the state = 'sent' filter were dropped --
+      // kills a mutant that drops "AND state = 'sent'" (a NULL sent_at on
+      // the prepared row would otherwise sort last and not discriminate).
+      await seedRow({ sessionId, state: 'prepared', sentAt: new Date(Date.now() + 120000).toISOString() });
 
       const latest = await store.getLatestSentAgendaSend(sessionId);
       expect(latest.operation_id).toBe(newer.operation_id);

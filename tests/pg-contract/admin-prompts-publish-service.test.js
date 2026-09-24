@@ -178,8 +178,9 @@ describeIfDb('admin/prompts-publish-service: contract', () => {
     await assertNoOpenTransactionAnywhere();
   });
 
-  // DISCRIMINATING: forces a REAL failure in finalizeAudit's own sql-tag
-  // statement -- not a mocked rejection. The mocked Dataverse adapter's
+  // DISCRIMINATING: forces a REAL JavaScript TypeError inside finalizeAudit,
+  // thrown by JSON.stringify before its sql-tag statement ever runs -- not a
+  // mocked rejection and not a sql-tag/driver failure. The mocked Dataverse adapter's
   // create() hands back a BigInt new-row id (`wmkf_ai_promptid`), a field
   // with NO validation anywhere on this path (unlike body/model, which are
   // reshaped by real validators). That BigInt flows into

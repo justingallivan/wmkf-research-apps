@@ -77,7 +77,10 @@ describeIfDb('intake-audit-service: contract', () => {
     const actorOid = `actor_${crypto.randomBytes(6).toString('hex')}`;
     insertedActorOids.push(actorOid);
     const payload = { foo: 'bar', n: 1 };
-    const expectedDigest = IntakeAuditService.digestPayload(payload);
+    // Computed independently of IntakeAuditService.digestPayload (not via
+    // the module under test) so a constant or wrong-input digest in the
+    // module cannot pass by construction.
+    const expectedDigest = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 
     const id = await IntakeAuditService.log({
       actorOid,

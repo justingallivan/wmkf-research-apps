@@ -185,12 +185,19 @@ describeIfDb('operational-event-service: contract', () => {
       expect(first.folded).toBe(false);
 
       await client.query(`UPDATE operational_events SET status = 'resolved' WHERE id = $1`, [first.id]);
+      const beforeSecond = await fetchEvent(first.id);
 
+      // DISCRIMINATING: pass a distinct, LATER occurredAt on the fold
+      // occurrence and assert last_occurred_at actually moves -- kills a
+      // mutant that keeps the row's old last_occurred_at instead of
+      // "last_occurred_at = EXCLUDED.last_occurred_at".
+      const laterOccurredAt = new Date(Date.now() + 3600000).toISOString();
       const second = await OperationalEventService.recordEvent({
         eventType: 'contract_fold_event',
         severity: 'warning',
         summary: 'second occurrence, different severity/summary',
         dedupeKey,
+        occurredAt: laterOccurredAt,
       });
       expect(second.id).toBe(first.id);
       expect(second.folded).toBe(true);
@@ -200,6 +207,8 @@ describeIfDb('operational-event-service: contract', () => {
       expect(row.occurrence_count).toBe(2);
       expect(row.severity).toBe('warning');
       expect(row.summary).toBe('second occurrence, different severity/summary');
+      expect(new Date(row.last_occurred_at).getTime()).toBeGreaterThan(new Date(beforeSecond.last_occurred_at).getTime());
+      expect(new Date(row.last_occurred_at).toISOString()).toBe(laterOccurredAt);
       await assertNoOpenTransactionAnywhere();
     });
 
@@ -213,6 +222,8 @@ describeIfDb('operational-event-service: contract', () => {
         dedupeKey,
       });
       insertedEventIds.push(first.id);
+      const beforeFold = await fetchEvent(first.id);
+      expect(beforeFold.status).toBe('open');
 
       await OperationalEventService.recordEvent({
         eventType: 'contract_coalesce_event',
@@ -223,6 +234,13 @@ describeIfDb('operational-event-service: contract', () => {
       const row = await fetchEvent(first.id);
       expect(row.subsystem).toBe('kept-subsystem');
       expect(row.stage).toBe('kept-stage');
+
+      // DISCRIMINATING: folding an occurrence onto an already-OPEN row
+      // (not resolved/recovered/superseded) must leave status and
+      // status_changed_at untouched -- covers the CASE's ELSE branch,
+      // which the reopen test above never exercises.
+      expect(row.status).toBe('open');
+      expect(new Date(row.status_changed_at).getTime()).toBe(new Date(beforeFold.status_changed_at).getTime());
     });
   });
 
@@ -427,6 +445,28 @@ describeIfDb('operational-event-service: contract', () => {
       await assertNoOpenTransactionAnywhere();
     });
 
+    test('DISCRIMINATING: orders rows by last_occurred_at DESC', async () => {
+      const marker = `contract_order_${crypto.randomBytes(6).toString('hex')}`;
+      const older = await OperationalEventService.recordEvent({
+        eventType: `${marker}_older`, summary: `${marker} older`, requestNumber: marker,
+      });
+      insertedEventIds.push(older.id);
+      await client.query(`UPDATE operational_events SET last_occurred_at = NOW() - interval '10 minutes' WHERE id = $1`, [older.id]);
+
+      const newer = await OperationalEventService.recordEvent({
+        eventType: `${marker}_newer`, summary: `${marker} newer`, requestNumber: marker,
+      });
+      insertedEventIds.push(newer.id);
+
+      const rows = await OperationalEventService.queryEvents({ search: marker, hours: 1, limit: 10 });
+      const ids = rows.map((r) => r.id);
+      const newerIdx = ids.indexOf(newer.id);
+      const olderIdx = ids.indexOf(older.id);
+      expect(newerIdx).toBeGreaterThanOrEqual(0);
+      expect(olderIdx).toBeGreaterThanOrEqual(0);
+      expect(newerIdx).toBeLessThan(olderIdx);
+    });
+
     test('status filter excludes non-matching statuses', async () => {
       const marker = `contract_status_${crypto.randomBytes(6).toString('hex')}`;
       const openEvt = await OperationalEventService.recordEvent({ eventType: marker, summary: marker });
@@ -447,13 +487,19 @@ describeIfDb('operational-event-service: contract', () => {
       const a = await OperationalEventService.recordEvent({ eventType: `${marker}_a`, severity: 'error', summary: marker });
       const b = await OperationalEventService.recordEvent({ eventType: `${marker}_b`, severity: 'error', summary: marker });
       const c = await OperationalEventService.recordEvent({ eventType: `${marker}_c`, severity: 'critical', summary: marker });
-      insertedEventIds.push(a.id, b.id, c.id);
+      // DISCRIMINATING: seed an 'info' severity row too -- kills a mutant
+      // that adds an extra "severity <> 'info'" filter to getEventSummary.
+      const d = await OperationalEventService.recordEvent({ eventType: `${marker}_d`, severity: 'info', summary: marker });
+      insertedEventIds.push(a.id, b.id, c.id, d.id);
 
       const summary = await OperationalEventService.getEventSummary({ hours: 1 });
       const errorOpen = summary.find((r) => r.status === 'open' && r.severity === 'error');
       const criticalOpen = summary.find((r) => r.status === 'open' && r.severity === 'critical');
+      const infoBucket = summary.find((r) => r.status === 'info' && r.severity === 'info');
       expect(errorOpen.count).toBeGreaterThanOrEqual(2);
       expect(criticalOpen.count).toBeGreaterThanOrEqual(1);
+      expect(infoBucket).toBeDefined();
+      expect(infoBucket.count).toBeGreaterThanOrEqual(1);
       await assertNoOpenTransactionAnywhere();
     });
   });

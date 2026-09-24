@@ -173,7 +173,7 @@ describeIfDb('site-visit-materials collection-store: contract', () => {
       expect(released).toBe(false);
     });
 
-    test('DISCRIMINATING CONTROL: the pre-fix (uncast) statement shape is rejected by the real planner', async () => {
+    test('CONTROL: the pre-fix (uncast) statement shape is rejected by the real planner', async () => {
       // The exact acquireSlotLease UPDATE from collection-store.js, run
       // against a freshly inserted row, with the explicit ::text /
       // ::double precision casts removed — the exact bug that shipped in

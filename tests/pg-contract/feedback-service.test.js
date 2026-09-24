@@ -278,6 +278,12 @@ describeIfDb('feedback-service: contract', () => {
       insertedFeedbackIds.push(created.id);
 
       await FeedbackService.updateFeedback(created.id, { status: 'reviewed', adminNote: 'first note', reviewedBy: firstReviewer });
+      // Backdate reviewed_at well before the second update so the
+      // preservation assertion below is not dependent on the two
+      // updateFeedback calls racing within the same millisecond (a
+      // `reviewed_at = NOW()` mutant would only be caught if enough real
+      // time passed between the two calls).
+      await client.query(`UPDATE dynamics_feedback SET reviewed_at = NOW() - interval '1 hour' WHERE id = $1`, [created.id]);
       const firstResult = await fetchFeedback(created.id);
       const firstReviewedAt = firstResult.reviewed_at;
 

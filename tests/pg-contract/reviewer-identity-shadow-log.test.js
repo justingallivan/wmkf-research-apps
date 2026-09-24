@@ -155,7 +155,12 @@ describeIfDb('reviewer-identity-shadow-log: contract', () => {
   // just a simulated JS throw. A mutant that lets the insert throw
   // synchronously (dropping the try/catch around `sql\`...\``) or that
   // never resolves (dropping the timeout race) would fail this test by
-  // rejecting the returned promise or timing out the test itself.
+  // rejecting the returned promise or timing out the test itself. The
+  // rejection here lands asynchronously in the module's
+  // `.catch((error) => finish('failed', error))` on the insert promise
+  // (store :95) -- that `.catch`, not the outer synchronous try/catch
+  // around insertRow's setup, is what turns this real 23514 into a
+  // resolved 'failed' instead of an unhandled rejection.
   test('DISCRIMINATING: a real constraint violation (invalid event_type) resolves "failed", never throws', async () => {
     const runId = `contract_${crypto.randomBytes(6).toString('hex')}`;
     insertedRunIds.push(runId); // no-op cleanup target; row is never created
