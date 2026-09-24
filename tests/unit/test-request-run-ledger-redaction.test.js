@@ -36,6 +36,7 @@ describe('ledger redaction', () => {
     }
     for (const quoted of [
       'Authorization: "Basic QUOTED1"', "Authorization='Basic QUOTED2'", '{"Authorization":"Bearer QUOTED3"}', 'Authorization=Basic QUOTED4,next',
+      'Authorization: Digest username="admin", realm="QUOTED5", nonce="QUOTED6"', '{"Authorization":"Basic \\"QUOTED7\\""}',
     ]) {
       expect(sanitizeErrorMessage(quoted)).not.toMatch(/QUOTED/);
     }
@@ -45,7 +46,9 @@ describe('ledger redaction', () => {
   test('assertLedgerReceipt is an allowlist: unknown keys, nested objects, bodies, links and credentials are rejected, not redacted', () => {
     const ok = {
       requestId: '5d54abc5-7f74-4d23-b4be-39599147e674', requestNumber: '1000340', itemId: '01G4GVMS34H6SGDJZCGNF2NLBTIUMXWRAW',
-      contentHash: 'a'.repeat(64), size: 287771, eTag: '"{1}"', versionId: '1.0', outcome: 'verified',
+      contentHash: 'a'.repeat(64), size: 287771, eTag: '"{7B3A1C2D-0000-4000-8000-000000000000},2"', versionId: '1.0', outcome: 'verified',
+      folder: '1000340_5D54ABC57F744D23B4BE39599147E674/AI Materials', filename: 'ProposalNarrative_1000340.pdf',
+      fiscalYear: 'December 2026', meetingDate: '2026-12-11', valueBefore: '2024-12-13', valueAfter: '2026-12-11',
       dispatchedAt: '2026-09-24T04:40:00.000Z', restoreVerified: true, requestIds: ['5d54abc5-7f74-4d23-b4be-39599147e674'],
     };
     expect(assertLedgerReceipt(ok)).toBe(ok);
@@ -73,7 +76,17 @@ describe('ledger redaction', () => {
       { relativeUrl: '../escape' },
       { folder: 'a//b' },
       { itemIds: ['QmFzZSBzaXh0eS1mb3VyIGVuY29kZWQgdGV4dCB0aGF0IGlzIGxvbmcgZW5vdWdoIHRvIGNhcnJ5IGNvbnRlbnQ='] },
-      { status: 'x'.repeat(41) },
+      { status: 'creating' },
+      { status: 'Confidential proposal purpose' },
+      { folder: 'Confidential proposal purpose and narrative' },
+      { folder: 'AI Materials/extra' },
+      { filename: 'Confidential proposal purpose and narrative.pdf' },
+      { filename: 'Proposal_1000340.PDF.exe' },
+      { expectedValue: 'Password 2026' },
+      { fiscalYear: 'Confidential 2026' },
+      { eTag: 'Confidential proposal purpose' },
+      { eTag: 'W/"1" extra' },
+      { versionId: 'two words' },
       { size: -1 }, { size: 'twelve' }, { restored: 'yes' },
       { eTag: 'W/"1" Bearer x' },
       { createdAt: 'Bearer x' },
@@ -92,17 +105,17 @@ describe('ledger redaction', () => {
     const ledger = createRunLedger(db);
     await ledger.journalPlannedResource({
       runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, step: 'copy_file', resourceKind: 'sharepoint_file', system: 'sharepoint',
-      plannedIdentity: { filename: 'a.pdf', folder: 'F/AI Materials' },
+      plannedIdentity: { filename: 'Proposal_1000340.pdf', folder: '1000340_5D54ABC57F744D23B4BE39599147E674/Reviewer Materials' },
       sourceProvenance: { graphItemId: 'x', contentHash: 'b'.repeat(64) },
     });
     await ledger.recordResourceReadback({
       resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, responseStatus: 201,
-      readback: { itemId: 'x', eTag: '"2"' }, outcome: 'verified',
+      readback: { itemId: 'x', eTag: 'W/"98622844"' }, outcome: 'verified',
     });
     const before = db.calls.length;
     await expect(ledger.journalPlannedResource({
       runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, step: 'copy_file', resourceKind: 'sharepoint_file', system: 'sharepoint',
-      plannedIdentity: { filename: 'a.pdf', downloadUrl: 'https://leak' },
+      plannedIdentity: { filename: 'Proposal_1000340.pdf', downloadUrl: 'https://leak' },
     })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
     await expect(ledger.recordResourceReadback({
       resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, responseStatus: 201,
@@ -111,7 +124,7 @@ describe('ledger redaction', () => {
     // Validation happens before any SQL for the rejected calls.
     expect(db.calls.length).toBe(before);
     const inserted = db.calls.find((c) => c.text.includes('INSERT INTO test_request_run_resources'));
-    expect(inserted.params[5]).toBe(JSON.stringify({ filename: 'a.pdf', folder: 'F/AI Materials' }));
+    expect(inserted.params[5]).toBe(JSON.stringify({ filename: 'Proposal_1000340.pdf', folder: '1000340_5D54ABC57F744D23B4BE39599147E674/Reviewer Materials' }));
   });
 
   test('requestNumberOrThrow is shared by advanceStep and markReady, and markReady requires a number atomically', async () => {

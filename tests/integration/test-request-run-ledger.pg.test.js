@@ -201,7 +201,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       step: 'provision',
       resourceKind: 'sharepoint_folder',
       system: 'sharepoint',
-      plannedIdentity: { folder: `Test/${crypto.randomUUID()}` },
+      plannedIdentity: { folder: `1000999_${crypto.randomUUID().replace(/-/g, '').toUpperCase()}` },
     });
 
     const results = await Promise.all([journalOne(), journalOne(), journalOne()]);
