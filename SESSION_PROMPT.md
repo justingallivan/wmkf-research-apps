@@ -1,4 +1,58 @@
-# Session 536 Prompt: Fix six Stage 1d defects; decide presentation Slice 0
+# Session 537 Prompt: Sandbox Basic clone from the source bundle
+
+## Session 536 Summary — 2026-09-23 PT (Claude root; Codex rescue builds, Claude reviews)
+
+[VERIFIED via pushed branch commits, full Jest runs, gates, mutation checks, Codex adversarial reviews and owner-authorized production reads] Test Request Factory Stage 1d was fixed and **accepted by the owner**; the read-only production source-bundle exporter (build-order item 4, first half) was built, hardened through three Codex review rounds, run live on Request 1003222, and **accepted by the owner**. No commit landed on `main` this session except this handoff; all product work is on `codex/test-request-preview-integration` (now `57d823b14`, 26 commits this session, 19 behind / 89 ahead of main). Nothing was deployed and no production write occurred.
+
+### What Was Completed
+
+1. **Stage 1d accepted** (Factory branch). Six root-review defects fixed (`f06b5d3a8`, `7c8edcf45`, `6f2d56c48`, `008612629`), two Codex re-review findings fixed (`ee9901c59` default cycle from ordinary requests only; `c0cbf0dad` export-preview waterfall step), three more fixed by Codex rescue and reviewed (`6a293fe12` export token binds isolation policy; `744bde88d` Explorer page-local CSV hidden while isolation is on; `53260f1af` no default cycle for all-test programs). Owner decisions: single-request Word/PDF artifacts (incl. Grant Reporting) stay available for test requests; spend alarm counts all spend, dashboard shows test spend as one line; accept without a fourth review round.
+2. **Source-bundle exporter accepted** (Factory branch). `scripts/export-test-request-source-bundle.mjs` + `lib/services/test-requests/source-bundle.js` (bundle v2: production host + registered `akoyago-shared` site enforced, drive/item/site identity, strict SharePoint discovery, post-hash membership fence, root-only archive folder misses with library re-confirmation). Commits `414af81d9`, `ebd6796e4`, `433609a38`, `17085332a`, `4b8ebec7b`, `aba21a5a9`, `57d823b14` (+ doc commits). Live runs on 1003222 (owner authorized prod Dataverse reads this session): GUID `e43ae6ea-698f-f111-8076-6045bd018a07`, revision `W/"98622844"`, December 2026 / 2026-12-11, no purpose text, two recognized documents (`ProposalNarrative_1003222.pdf`, `Proposal_1003222.pdf`); no Phase I or bibliography file matched the recognized names.
+3. **Presentation Slice 0 decisions** (`codex/feature-request`, `6b9f1fd15`, `1fe8777d5`): Chrome and Edge accepted; macOS/iPadOS Safari deferred to a Production run on a Factory-created test request; browser-independent recovery rows move to one agent-run Chrome pass.
+4. **Investigation worktree** created for a parallel Claude session: `/Users/gallivan/Code/WMKF_Apps-investigate`, branch `claude/investigation` (no upstream). Another Claude session may be working there; do not touch it.
+
+## Next Items
+
+### Verified Open
+
+1. **Sandbox Basic clone from the bundle, with create-only file copy** (build-order item 4, second half).
+   Evidence: Factory branch design doc `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (source-bundle paragraph and build order item 4), `lib/services/test-requests/source-bundle.js` header (consumer obligations), `scripts/rehearse-test-request-sandbox.mjs`.
+   Teach the rehearsal to read a v2 bundle instead of a sandbox source Request; each file copy is journaled in the receipt before the write, create-only with conflict refusal, re-resolves the drive on the registered site and re-verifies eTag + SHA-256, and recovers an ambiguous outcome by exact item. Re-export the bundle first (the Session 536 file lives in that session's scratchpad): `DATAVERSE_ALLOW_PROD_READS=yes node --env-file=/Users/gallivan/Code/WMKF_Apps/.env.local scripts/export-test-request-source-bundle.mjs --source-request-number=1003222 --out=<new absolute path outside the repo>` — needs fresh owner authorization for the production read. Codex adversarial review before acceptance.
+2. **After item 1:** durable run ledger/runner, later-stage recipes, Admin form (design build order items 5–7).
+
+### Owner Decision Needed
+
+1. **Old Preview aliases / Entra callbacks** (`git-codex-pau-5b4bef`, `git-codex-wor-464bcd`): retire or keep. Evidence: `docs/CURRENT_WORK_QUEUE.md`. Retirement is destructive — grep live callers first.
+2. **1003222 has only two recognized documents.** If Phase I PDFs were expected, their names differ from the factory's recognized filenames; decide whether that is acceptable for the first clone or pick another source.
+
+### Verify Before Acting
+
+1. Production marker schema apply and `TEST_REQUEST_ISOLATION=on` each need explicit owner authorization; the switch stays off until the apply succeeds.
+2. The Factory branch is 19 commits behind main; merge main deliberately before integration.
+3. Codex rescue's sandbox cannot write the Factory worktree's git metadata (`index.lock: Operation not permitted`) — expect to commit its changes yourself after review. Codex must run with `--model gpt-5.6-sol`; the default `gpt-6-sol` fails on ChatGPT auth.
+4. Two early presentation fragment-probe upload sessions have unknown state; do not infer cleanup.
+
+### Do Not Reopen Without New Decision
+
+1. Stage 1d and the source-bundle exporter are accepted (owner, Session 536); no fourth review round.
+2. Existing requests are never changed by the Factory; test requests visible with TEST badge; reports/exports/cycle totals exclude them; single-request actions stay available.
+3. Safari Slice 0 runs in Production on a Factory test request; no further Edge runs.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| Factory branch `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Stage 1d fix record, source-bundle contract, build order |
+| Factory branch `lib/services/test-requests/source-bundle.js` | Bundle v2 build/read/export orchestration |
+| Factory branch `scripts/export-test-request-source-bundle.mjs` | Read-only production exporter CLI |
+| Factory branch `scripts/rehearse-test-request-sandbox.mjs` | Sandbox clone rehearsal to extend next |
+| Factory worktree | `/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps` |
+
+## Stop-time notes
+
+No DEVELOPMENT_LOG milestone: nothing shipped to production; Stage 1d and the exporter are branch-local. Claim-evidence pilot: no eligible plan/design edit recorded for this session key, so no observation row.
+
+## Prior Session 536 Prompt: Fix six Stage 1d defects; decide presentation Slice 0
 
 ## Session 535 Summary — 2026-09-23 PT (Claude root; Codex builds/reviews)
 

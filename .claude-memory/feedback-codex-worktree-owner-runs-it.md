@@ -41,3 +41,5 @@ Codex thread there, so `codex-companion.mjs task -C /path/to/WMKF_Apps-codex --w
 `WMKF_Apps-codex-…`, S510). Rule: always pass `-C <worktree>`; still pass `--model
 gpt-5.6-sol` ([[feedback-codex-model-gpt56-sol]]); when the owner says they will run
 Codex themselves, hand over the prompt instead.
+
+**Update (S536, 2026-09-23):** owner pattern this session was "Codex rescue fixes, Claude reviews" for adversarial-review findings. In the `~/.codex/worktrees/...` Factory worktree, Codex rescue could edit and test but its sandbox could NOT commit (`index.lock: Operation not permitted` on the main repo's `.git/worktrees/...` metadata); Claude reviewed the uncommitted diff and committed it. Always pass `--model gpt-5.6-sol` (default `gpt-6-sol` fails on ChatGPT auth). The review-delegation hook requires the `CODEX RESCUE HANDOFF` preface, an `[INTENTIONAL-RESCUE: …]` tag when the brief mentions review findings, and TRACED file:line evidence for any find/check ask.
