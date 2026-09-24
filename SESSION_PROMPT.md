@@ -10,8 +10,8 @@ No environment, deployment, schema, Dataverse or Vercel operation ran. Nothing w
 
 1. **Census and durable record.** The Stage 1d design record classifies Workbench, Review Manager, Meeting Tracker, Dynamics Explorer, Administration, Grant Reporting, grantee exports, Dataverse export, cycle dossiers, cycle/count aggregates and spend. Generic Dataverse Search is inventoried without claiming a server-side marker-filter contract.
 2. **Visibility.** Shared `isTestRequest` DTO projection and `TestRequestBadge` cover the Workbench dashboard/search/header/follow-up, Initial Assessments, Staff Deliberations, Final Writeups, Expertise Finder, Review Panel, Meeting Tracker, Admin preview and Dynamics Explorer request/query/search/relationship results. Raw marker/run fields are stripped from staff DTOs.
-3. **Exclusions.** The canonical OData/FetchXML ordinary-only fragments are composed before report/export paging or counts for awardees, grantee cycle export, candidate/review downloads, Grant Reporting, Dataverse bulk export, Dynamics Explorer reports/exports/counts and Workbench cycle/status aggregates. The Dynamics page-only CSV control is suppressed for request-result tables so staff use the guarded server export.
-4. **Spend.** Admin cost stats and the spend-check cron group review-panel usage by trusted `review_panel_entries.request_id`, exclude non-ordinary/unknown request state, and report excluded/unknown attribution. `api_usage_log.request_id` remains an Explorer correlation ID and is labeled unattributable rather than misclassified.
+3. **Exclusions.** (Session 536 reversed the Grant Reporting and Workbench cycle/status exclusions; see item 0 below.) The canonical OData/FetchXML ordinary-only fragments are composed before report/export paging or counts for awardees, grantee cycle export, candidate/review downloads, Grant Reporting, Dataverse bulk export, Dynamics Explorer reports/exports/counts and Workbench cycle/status aggregates. The Dynamics page-only CSV control is suppressed for request-result tables so staff use the guarded server export.
+4. **Spend.** (Session 536: spend-check now counts all spend; the admin dashboard shows test spend as one line.) Admin cost stats and the spend-check cron group review-panel usage by trusted `review_panel_entries.request_id`, exclude non-ordinary/unknown request state, and report excluded/unknown attribution. `api_usage_log.request_id` remains an Explorer correlation ID and is labeled unattributable rather than misclassified.
 5. **Mechanized census and mutation proof.** `test-request-visibility-census.test.js` derives report/export routes and aggregate callers and pins each shared badge surface. Mutations produced 2 badge failures, 5 report/count failures, 1 spend failure and 1 census failure; the first census attempt exposed and fixed a filename-only assertion weakness.
 
 ### Commits
@@ -34,7 +34,7 @@ None open on Stage 1d. The single-request artifact boundary was confirmed by the
 
 ### Parked
 
-1. **Unattributable provider spend.** Existing `api_usage_log` rows and Grant Reporting calls without `requestGuid` cannot be assigned safely to a Grant Request. Add trusted request attribution in a separately designed schema/contract before attempting exclusion; do not infer it from filenames or correlation IDs.
+1. **Unattributable provider spend.** Existing `api_usage_log` rows cannot be assigned safely to a Grant Request (Grant Reporting is no longer excluded, so its missing-`requestGuid` case is moot since Session 536). Add trusted request attribution in a separately designed schema/contract before attempting exclusion; do not infer it from filenames or correlation IDs.
 
 ### Verify Before Acting
 

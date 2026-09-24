@@ -44,7 +44,7 @@ const RECORDED_CRONS = {
   'secret-check': { scheduled: true, class: 'operational' },
   'send-review-thankyous': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-thankyou-sweep.js'] },
   'site-visit-materials-reminders': { scheduled: false, class: 'guarded', guardFiles: ['lib/services/site-visit-materials/reminder-sweep.js'] },
-  'spend-check': { scheduled: true, class: 'operational', note: 'aggregate spend; report exclusion is Stage 1d' },
+  'spend-check': { scheduled: true, class: 'operational', note: 'aggregate spend alarm; counts all spend, test requests included' },
   'sweep-stale-invites': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-suggestion-sweep.js'] },
 };
 
