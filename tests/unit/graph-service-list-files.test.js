@@ -13,6 +13,15 @@ function graphResponse(body) {
   };
 }
 
+function graphErrorResponse(status, body) {
+  return {
+    ok: false,
+    status,
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  };
+}
+
 beforeEach(() => {
   jest.restoreAllMocks();
   global.fetch = jest.fn();
@@ -67,6 +76,36 @@ test('fails loud when a strict inventory exceeds maxFiles', async () => {
     maxFiles: 1,
     failOnTruncation: true,
   })).rejects.toMatchObject({ code: 'graph_file_list_truncated' });
+});
+
+test('marks a Graph itemNotFound 404 from folder listing as a folder-level miss', async () => {
+  global.fetch.mockResolvedValueOnce(graphErrorResponse(404, {
+    error: { code: 'itemNotFound', message: 'The resource could not be found.' },
+  }));
+
+  await expect(GraphService.listFiles('akoya_request', 'missing-folder')).rejects.toMatchObject({
+    status: 404,
+    code: 'graph_folder_not_found',
+    dataverseCode: 'itemNotFound',
+  });
+});
+
+test('does not mark another Graph 404 code as a folder-level miss', async () => {
+  global.fetch.mockResolvedValueOnce(graphErrorResponse(404, {
+    error: { code: 'resourceNotFound', message: 'Another resource was unavailable.' },
+  }));
+
+  let thrown;
+  try {
+    await GraphService.listFiles('akoya_request', 'missing-folder');
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toMatchObject({
+    status: 404,
+    dataverseCode: 'resourceNotFound',
+  });
+  expect(thrown).not.toHaveProperty('code');
 });
 
 test('preserves bounded partial results for non-strict callers', async () => {

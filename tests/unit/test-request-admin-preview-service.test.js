@@ -227,6 +227,55 @@ test('strict source export discovery aborts when parent resolution fails', async
   });
 });
 
+test('strict source export discovery reports a missing archive library as unavailable', async () => {
+  const missingLibrary = Object.assign(new Error('graph failed (404): Document library not found'), {
+    serviceName: 'graph',
+    status: 404,
+    isTransient: false,
+  });
+  const deps = dependencies({
+    getRequestSharePointBuckets: jest.fn(async () => ([{
+      library: 'RequestArchive1',
+      folder: '1002001_ARCHIVE',
+      source: 'archive',
+    }])),
+    listFiles: jest.fn(async () => { throw missingLibrary; }),
+  });
+
+  const inventory = await discoverTestRequestSourceDocuments(
+    source,
+    createStrictTestRequestSourceDependencies(deps),
+  );
+
+  expect(inventory).toEqual({
+    documents: [],
+    errors: [{ source: 'archive', code: 'SOURCE_BUCKET_UNAVAILABLE' }],
+  });
+});
+
+test('confirmed archive request-folder misses remain an empty bucket', async () => {
+  const missingFolder = Object.assign(new Error('folder itemNotFound'), {
+    serviceName: 'graph',
+    status: 404,
+    code: 'graph_folder_not_found',
+    dataverseCode: 'itemNotFound',
+    isTransient: false,
+  });
+  const deps = dependencies({
+    getRequestSharePointBuckets: jest.fn(async () => ([{
+      library: 'RequestArchive1',
+      folder: '1002001_ARCHIVE',
+      source: 'archive',
+    }])),
+    listFiles: jest.fn(async () => { throw missingFolder; }),
+  });
+
+  await expect(discoverTestRequestSourceDocuments(
+    source,
+    createStrictTestRequestSourceDependencies(deps),
+  )).resolves.toEqual({ documents: [], errors: [] });
+});
+
 test('source hydration carries durable Graph drive and registered site identity', async () => {
   const deps = dependencies();
   const inventory = await discoverTestRequestSourceDocuments(source, deps);
