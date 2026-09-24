@@ -851,7 +851,7 @@ exact prior alias target, remove only
 the approved presentation-branch settings, and redeploy the active branch if needed so future
 deployments use normal Preview `VERCEL_URL` derivation. Do not edit the Factory branch settings.
 
-**Owner decision (2026-09-23, Session 536):** Chrome and Edge are accepted as working; no further Edge runs are planned. macOS and iPadOS Safari are deferred until the Test Request Factory can create test requests, and will then run in Production against a test request instead of a newly approved real request. The Edge-assigned recovery rows below (expiry, token expiry, near-2 GB) are not rescheduled by this decision and remain open.
+**Owner decision (2026-09-23, Session 536):** Chrome and Edge are accepted as working; no further Edge runs are planned. macOS and iPadOS Safari are deferred until the Test Request Factory can create test requests, and will then run in Production against a test request instead of a newly approved real request. Follow-up owner decision (same session): the recovery rows below (reload/reselect resume, upload-session expiry, proof-token expiry) are browser-independent server/Graph logic and move to a single agent-run desktop Chrome pass when presentation work resumes. The Production Safari run covers upload, both Watch shapes with long seeking, and Download on macOS and iPadOS, with one large (near-cap) upload on iPadOS for backgrounding/memory behavior. No row waits on Edge; the Edge runner assignments in the table below are superseded.
 
 | Browser | Scenario | Expected recorded evidence | Runner |
 |---|---|---|---|

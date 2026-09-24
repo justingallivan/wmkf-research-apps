@@ -21,6 +21,8 @@ for any further live run, Production Dataverse read, Preview deployment, or alia
 **Owner decision (2026-09-23, Session 536):** Chrome and Edge are accepted as working. macOS/iPadOS
 Safari waits until the Test Request Factory can create test requests, then runs in Production on
 a test request. No new real-request approval is needed for that run.
+Recovery checks (reload resume, session/token expiry) move to one agent-run Chrome pass; no
+row waits on Edge. See the plan's matrix note.
 The detailed matrix, click steps, and receipt are in
 `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`.
 
