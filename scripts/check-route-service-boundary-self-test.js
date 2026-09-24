@@ -60,6 +60,31 @@
  * LAW MODE (Stage 7): the default run must exit non-zero naming EVERY red
  * route (no baseline, no ratchet — zero boundary routes is the only passing
  * state), and a green-only fixture tree must exit 0.
+ *
+ * Postgres access layer migration Stage 1 item 2 (docs/plans/
+ * POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md) widened the SAME gate
+ * to Postgres sources (@vercel/postgres, pg, lib/postgres/*) with a narrowly
+ * scoped, SHRINK-ONLY carry-over instead of Dataverse's plain law. There is
+ * no Dataverse baseline file; the Postgres carry-over is an in-script array
+ * (POSTGRES_CARRYOVER) pinned exact-set by tests/unit/
+ * route-service-boundary-postgres-carryover.test.js. `runPostgresAssertions`
+ * and `runPostgresStaleAssertions` cover it, using the SELF-TEST-ONLY
+ * `--postgres-carryover <file>` override flag so fixtures never touch the
+ * real 17-entry list:
+ *   - a route importing `@vercel/postgres` directly (red, unlisted)
+ *   - a route importing `pg` directly (red, unlisted)
+ *   - a route importing a `lib/postgres/*` source directly (red, unlisted)
+ *   - a route reaching a Postgres driver through a thin re-export wrapper,
+ *     via the SAME propagation mechanism the Dataverse fixtures exercise
+ *     (red, unlisted)
+ *   - a listed carry-over route importing the driver (green)
+ *   - a route importing a lib/services module that itself imports the driver
+ *     without re-exporting it (green — the desired end state)
+ *   - a route with a Dataverse violation AND a Postgres carry-over entry
+ *     still fails, on the Dataverse reason (the carry-over never excuses
+ *     Dataverse)
+ *   - a carry-over list naming a route that no longer reaches Postgres
+ *     (stale entry — fails the gate, forcing the list to shrink)
  */
 
 const fs = require('fs');
@@ -104,19 +129,37 @@ const GREEN_ROUTES = [
 // on catchable exit); every pre-existing cleanup() call point below is kept 1:1.
 const { cleanup } = registerRepoFixture('.route_service_boundary_selftest_tmp');
 
+// Every fixture tree lives entirely under tempRoot, which the gate only scans
+// under pages/lib/shared/modules -- a JSON carry-over file at the tempRoot
+// root is never picked up as a source file. runGate() always passes
+// `--postgres-carryover <CARRYOVER_PATH>` so a fixture run is judged against
+// an explicit, scenario-scoped carry-over rather than the real 17-entry
+// POSTGRES_CARRYOVER (whose paths do not exist under any fixture tree, which
+// would otherwise make every entry a spurious stale failure).
+const CARRYOVER_PATH = path.join(tempRoot, '__postgres_carryover.json');
+
 function write(root, rel, body) {
   const full = path.join(root, rel);
   fs.mkdirSync(path.dirname(full), { recursive: true });
   fs.writeFileSync(full, body);
 }
 
+function writeCarryover(list) {
+  fs.mkdirSync(tempRoot, { recursive: true });
+  fs.writeFileSync(CARRYOVER_PATH, JSON.stringify(list));
+}
+
 function runGate(args = []) {
   try {
-    const output = execSync(`node ${JSON.stringify(gate)} --root ${JSON.stringify(tempRoot)} ${args.join(' ')}`, {
-      cwd: repoRoot,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      encoding: 'utf8',
-    });
+    const output = execSync(
+      `node ${JSON.stringify(gate)} --root ${JSON.stringify(tempRoot)} `
+      + `--postgres-carryover ${JSON.stringify(CARRYOVER_PATH)} ${args.join(' ')}`,
+      {
+        cwd: repoRoot,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        encoding: 'utf8',
+      },
+    );
     return { status: 0, output };
   } catch (err) {
     return { status: err.status || 1, output: (err.stdout || '') + (err.stderr || '') };
@@ -129,6 +172,9 @@ function expect(condition, message) {
 
 function setupFixtures() {
   cleanup();
+  // Dataverse-only fixture tree never reaches Postgres -- an empty carry-over
+  // keeps the Postgres stale-entry check silent for these assertions.
+  writeCarryover([]);
 
   // Boundary sources + a thin re-export wrapper + a legitimate domain service.
   write(tempRoot, 'lib/dataverse/adapters/reviewer-suggestion.js', `
@@ -314,8 +360,13 @@ function runDetectionAssertions() {
   for (const green of GREEN_ROUTES) {
     expect(!files.has(green), `GREEN fixture wrongly flagged: ${green}`);
   }
-  expect(entries.length === RED_ROUTES.length,
-    `expected exactly ${RED_ROUTES.length} boundary routes, got ${entries.length}`);
+  // One JSON row per (file, family) -- a route hitting both families would
+  // produce two rows for one file, so compare DISTINCT files, not row count.
+  expect(files.size === RED_ROUTES.length,
+    `expected exactly ${RED_ROUTES.length} distinct boundary routes, got ${files.size} (${entries.length} rows)`);
+  for (const entry of entries) {
+    expect(entry.boundaryFamily === 'dataverse', `expected dataverse family for Dataverse-only fixture ${entry.file}, got ${entry.boundaryFamily}`);
+  }
 
   // (g) root-level routes carry the '(root)' domain (not skipped).
   const root = entries.find((e) => e.file === 'pages/api/red-root.js');
@@ -355,8 +406,9 @@ function runReportAssertions() {
   const run = runGate(['--report']);
   expect(run.status === 0, `--report exited ${run.status}\n${run.output}`);
   expect(run.output.includes('Route-service boundary census'), 'report missing header');
-  expect(run.output.includes('law mode since Stage 7'), 'report missing law-mode banner');
-  expect(run.output.includes('## Boundary-importing routes'), 'report missing route listing');
+  expect(run.output.includes('Dataverse law since Stage 7'), 'report missing Dataverse law-mode banner');
+  expect(run.output.includes('Postgres carry-over:'), 'report missing Postgres carry-over line');
+  expect(run.output.includes('## Boundary-reaching routes'), 'report missing route listing');
   expect(run.output.includes('| workbench |'), 'report missing the domain rollup');
   console.log('PASS report assertions');
 }
@@ -376,6 +428,9 @@ function runLawModeAssertions() {
   for (const green of GREEN_ROUTES) {
     expect(!red.output.includes(green), `law failure wrongly named GREEN fixture ${green}:\n${red.output}`);
   }
+  // No Dataverse baseline exists; the Postgres carry-over is an in-script
+  // array (POSTGRES_CARRYOVER) pinned by tests/unit/
+  // route-service-boundary-postgres-carryover.test.js, not a baseline file.
   expect(!fs.existsSync(path.join(repoRoot, 'scripts', 'route-service-boundary-baseline.json')),
     'law mode must have no baseline file (scripts/route-service-boundary-baseline.json should be deleted)');
 
@@ -395,6 +450,7 @@ function runLawModeAssertions() {
 // hard-errors with file:line. Pre-patch these passed silently (fail OPEN).
 function runUnresolvedFailClosedAssertions() {
   cleanup();
+  writeCarryover([]);
   write(tempRoot, 'lib/dataverse/adapters/reviewer-suggestion.js', `
     export function getById(id) { return { id }; }
   `);
@@ -527,6 +583,271 @@ function runUnresolvedFailClosedAssertions() {
   console.log('PASS non-literal sources fail closed (j/k in-route, m via wrapper, n/o/p via local binding, r late-assign, u alias chain; q lazy-backend green)');
 }
 
+// Postgres access layer migration Stage 1 item 2: the SAME gate, widened to
+// Postgres sources with a shrink-only carry-over instead of Dataverse's plain
+// law. Uses the SELF-TEST-ONLY --postgres-carryover override so no fixture
+// touches the real 17-entry POSTGRES_CARRYOVER.
+function runPostgresAssertions() {
+  cleanup();
+
+  // Thin re-export wrapper of the driver -- SAME propagation mechanism the
+  // Dataverse fixtures exercise (export * from a boundary source).
+  write(tempRoot, 'lib/wrappers/postgres-driver-wrapper.js', `
+    export * from '@vercel/postgres';
+  `);
+  // The Postgres access-layer dir (does not exist in the real repo yet, but
+  // the recognizer must catch it once it does).
+  write(tempRoot, 'lib/postgres/client.js', `
+    export function getClient() { return {}; }
+  `);
+  // Legitimate per-domain service: USES the driver, does NOT re-export it.
+  write(tempRoot, 'lib/services/postgres-consumer-service.js', `
+    import { sql } from '@vercel/postgres';
+    export async function fetchThing(id) { return sql\`select 1\`; }
+  `);
+
+  // RED, unlisted: direct '@vercel/postgres' import.
+  write(tempRoot, 'pages/api/workbench/red-postgres-vercel.js', `
+    import { sql } from '@vercel/postgres';
+    export default function handler(req, res) { return sql\`select 1\`; }
+  `);
+  // RED, unlisted: direct 'pg' import.
+  write(tempRoot, 'pages/api/cron/red-postgres-pg.js', `
+    import { Pool } from 'pg';
+    export default function handler(req, res) { return new Pool(); }
+  `);
+  // RED, unlisted: direct '@neondatabase/serverless' import (Codex round 2:
+  // the ratchet gate names three driver packages -- @vercel/postgres, pg,
+  // @neondatabase/serverless -- this gate must recognize all three).
+  write(tempRoot, 'pages/api/cron/red-postgres-neon.js', `
+    import { neon } from '@neondatabase/serverless';
+    export default function handler(req, res) { return neon('x'); }
+  `);
+  // RED, unlisted: direct lib/postgres/* import.
+  write(tempRoot, 'pages/api/admin/red-postgres-layer.js', `
+    import { getClient } from '../../../lib/postgres/client.js';
+    export default function handler(req, res) { return getClient(); }
+  `);
+  // RED, unlisted: reaches the driver through the thin re-export wrapper.
+  write(tempRoot, 'pages/api/workbench/red-postgres-wrapper.js', `
+    import { sql } from '../../../lib/wrappers/postgres-driver-wrapper.js';
+    export default function handler(req, res) { return sql\`select 1\`; }
+  `);
+  // GREEN: a carry-over-listed route importing the driver directly.
+  write(tempRoot, 'pages/api/webhooks/green-postgres-listed.js', `
+    import { sql } from '@vercel/postgres';
+    export default function handler(req, res) { return sql\`select 1\`; }
+  `);
+  // GREEN: imports a lib/services module that itself imports the driver
+  // WITHOUT re-exporting it -- the desired end state.
+  write(tempRoot, 'pages/api/review-manager/green-postgres-service.js', `
+    import { fetchThing } from '../../../lib/services/postgres-consumer-service.js';
+    export default async function handler(req, res) { return fetchThing(req.query.id); }
+  `);
+  // RED (Dataverse), carry-over-listed for Postgres: a route with BOTH a
+  // Dataverse adapter import and a direct Postgres driver import. The
+  // carry-over lists it for Postgres, but that never excuses Dataverse --
+  // the route must still fail, on the Dataverse reason.
+  write(tempRoot, 'lib/dataverse/adapters/reviewer-suggestion.js', `
+    export function getById(id) { return { id }; }
+  `);
+  write(tempRoot, 'pages/api/admin/red-postgres-and-dataverse.js', `
+    import { getById } from '../../../lib/dataverse/adapters/reviewer-suggestion.js';
+    import { sql } from '@vercel/postgres';
+    export default function handler(req, res) { return { a: getById(req.query.id), b: sql\`select 1\` }; }
+  `);
+
+  // GREEN: 'pg-copy-streams' is a real, unrelated npm package (used by
+  // lib/services/irs-bmf-service.js). isPostgresDriverSource must NOT match
+  // it as a substring/prefix of 'pg' -- a `startsWith('pg')` mutation (as
+  // opposed to the correct `=== 'pg' || startsWith('pg/')`) would wrongly
+  // flag this fixture.
+  write(tempRoot, 'pages/api/workbench/green-pg-copy-streams.js', `
+    import { from as copyFrom } from 'pg-copy-streams';
+    export default function handler(req, res) { return copyFrom('x'); }
+  `);
+
+  // RED: a MIXED wrapper reaching BOTH families at once, in two different
+  // forms -- must be tracked as reaching BOTH, not just the first one a scan
+  // happens to hit (Codex round 1 P1). This route is carry-over-listed for
+  // Postgres, so it must still fail on the Dataverse reason and must NOT be
+  // reported as a stale carry-over entry.
+  write(tempRoot, 'lib/wrappers/mixed-reexport-wrapper.js', `
+    export * from '@vercel/postgres';
+    export * from '../dataverse/adapters/reviewer-suggestion.js';
+  `);
+  write(tempRoot, 'pages/api/workbench/red-mixed-reexport.js', `
+    import { sql, getById } from '../../../lib/wrappers/mixed-reexport-wrapper.js';
+    export default function handler(req, res) { return { a: getById('x'), b: sql\`select 1\` }; }
+  `);
+  // Form 2: import-then-export-named, consumed via a NAMESPACE import so a
+  // single binding-lookup ('*') must surface every family the module reaches.
+  write(tempRoot, 'lib/wrappers/mixed-import-then-export-wrapper.js', `
+    import { sql } from '@vercel/postgres';
+    import { getById } from '../dataverse/adapters/reviewer-suggestion.js';
+    export { sql, getById };
+  `);
+  write(tempRoot, 'pages/api/workbench/red-mixed-namespace.js', `
+    import * as m from '../../../lib/wrappers/mixed-import-then-export-wrapper.js';
+    export default function handler(req, res) { return { a: m.getById('x'), b: m.sql\`select 1\` }; }
+  `);
+
+  writeCarryover([
+    'pages/api/webhooks/green-postgres-listed.js',
+    'pages/api/admin/red-postgres-and-dataverse.js',
+    'pages/api/workbench/red-mixed-reexport.js',
+    'pages/api/workbench/red-mixed-namespace.js',
+  ]);
+
+  const RED = [
+    'pages/api/workbench/red-postgres-vercel.js',
+    'pages/api/cron/red-postgres-pg.js',
+    'pages/api/cron/red-postgres-neon.js',
+    'pages/api/admin/red-postgres-layer.js',
+    'pages/api/workbench/red-postgres-wrapper.js',
+    'pages/api/admin/red-postgres-and-dataverse.js',
+    'pages/api/workbench/red-mixed-reexport.js',
+    'pages/api/workbench/red-mixed-namespace.js',
+  ];
+  // Carry-over-listed for Postgres, but still expected to fail (on Dataverse).
+  const MIXED_DATAVERSE_ROUTES = [
+    'pages/api/admin/red-postgres-and-dataverse.js',
+    'pages/api/workbench/red-mixed-reexport.js',
+    'pages/api/workbench/red-mixed-namespace.js',
+  ];
+  // A route the report/json layer never detects reaching Postgres at all
+  // (does not import the driver, only a service that does; or imports an
+  // unrelated package that merely starts with 'pg').
+  const GREEN_UNDETECTED = [
+    'pages/api/review-manager/green-postgres-service.js',
+    'pages/api/workbench/green-pg-copy-streams.js',
+  ];
+  // A route that DOES reach Postgres (so it legitimately appears in --json /
+  // --report) but must never appear as a LAW failure, because it is listed.
+  const GREEN_LAW_ONLY = ['pages/api/webhooks/green-postgres-listed.js'];
+  const GREEN = [...GREEN_UNDETECTED, ...GREEN_LAW_ONLY];
+
+  const json = runGate(['--json']);
+  expect(json.status === 0, `--json exited ${json.status}\n${json.output}`);
+  const entries = JSON.parse(json.output);
+  const byFile = new Map();
+  for (const e of entries) {
+    if (!byFile.has(e.file)) byFile.set(e.file, []);
+    byFile.get(e.file).push(e);
+  }
+  for (const red of RED) {
+    expect(byFile.has(red), `Postgres RED fixture not flagged: ${red}\nflagged: ${[...byFile.keys()].join(', ')}`);
+  }
+  for (const green of GREEN_UNDETECTED) {
+    expect(!byFile.has(green), `Postgres GREEN fixture wrongly flagged: ${green}`);
+  }
+  for (const green of GREEN_LAW_ONLY) {
+    const rows = byFile.get(green);
+    expect(rows && rows.some((r) => r.boundaryFamily === 'postgres'),
+      `carry-over-listed route should still appear in --json (informational): ${green}`);
+  }
+  for (const red of RED.slice(0, 4)) {
+    const rows = byFile.get(red);
+    expect(rows.some((r) => r.boundaryFamily === 'postgres'), `expected postgres family for ${red}, got ${JSON.stringify(rows)}`);
+  }
+  // --json is informational: it reports BOTH reasons for the dual route
+  // regardless of the carry-over (which only ever affects the LAW exit code).
+  const dualRoute = byFile.get('pages/api/admin/red-postgres-and-dataverse.js');
+  expect(dualRoute.some((r) => r.boundaryFamily === 'dataverse'), `carry-over-listed dual route did not report dataverse: ${JSON.stringify(dualRoute)}`);
+  expect(dualRoute.some((r) => r.boundaryFamily === 'postgres'), `carry-over-listed dual route did not also report postgres: ${JSON.stringify(dualRoute)}`);
+
+  const wrapperRow = byFile.get('pages/api/workbench/red-postgres-wrapper.js').find((r) => r.boundaryFamily === 'postgres');
+  expect(wrapperRow && /re-export via .*postgres-driver-wrapper/.test(wrapperRow.reason),
+    `wrapper propagation did not name the wrapper: ${JSON.stringify(wrapperRow)}`);
+
+  // Both mixed-family fixtures must report BOTH families in --json (P1 fix):
+  // a wrapper/binding reaching both an adapter and a Postgres driver must not
+  // collapse to only the first family a scan happens to hit.
+  for (const mixed of ['pages/api/workbench/red-mixed-reexport.js', 'pages/api/workbench/red-mixed-namespace.js']) {
+    const rows = byFile.get(mixed);
+    expect(rows && rows.some((r) => r.boundaryFamily === 'dataverse'),
+      `mixed-family fixture missing dataverse family: ${mixed}\n${JSON.stringify(rows)}`);
+    expect(rows && rows.some((r) => r.boundaryFamily === 'postgres'),
+      `mixed-family fixture missing postgres family: ${mixed}\n${JSON.stringify(rows)}`);
+  }
+
+  const law = runGate([]);
+  expect(law.status !== 0, `law mode should fail with Postgres violations present, exited 0:\n${law.output}`);
+  for (const red of RED) {
+    expect(law.output.includes(red), `law failure did not name Postgres RED fixture ${red}:\n${law.output}`);
+  }
+  for (const green of GREEN) {
+    expect(!law.output.includes(green), `law failure wrongly named Postgres GREEN fixture ${green}:\n${law.output}`);
+  }
+  // Every route carry-over-listed for Postgres but ALSO reaching Dataverse
+  // must still fail, explicitly on its [dataverse] reason, and must NEVER be
+  // reported as a stale carry-over entry (it legitimately still reaches
+  // Postgres too -- the carry-over only ever excuses Postgres, never
+  // Dataverse, in the same file). This is the regression the mixed-family
+  // fixtures above exist to catch: before the P1 fix, a mixed wrapper's
+  // family map stopped at the first match and could silently drop the
+  // Dataverse reason for a carry-over-listed route.
+  for (const dual of MIXED_DATAVERSE_ROUTES) {
+    expect(law.output.includes(`${dual} | [dataverse]`),
+      `expected an explicit [dataverse] law failure line for ${dual}, got:\n${law.output}`);
+    expect(!law.output.includes(`stale Postgres carry-over entry -- remove ${dual}`),
+      `${dual} wrongly reported as a stale carry-over entry:\n${law.output}`);
+  }
+
+  console.log(`PASS Postgres assertions (${RED.length} reds named incl. ${MIXED_DATAVERSE_ROUTES.length} dual-family carry-over routes, ${GREEN.length} greens clean, wrapper propagation confirmed)`);
+}
+
+// Stale carry-over entry: a carry-over list naming a route that no longer
+// reaches Postgres must fail the gate itself, forcing the list to shrink.
+function runPostgresStaleAssertions() {
+  cleanup();
+  write(tempRoot, 'pages/api/workbench/green-clean.js', `
+    export default function handler(req, res) { res.status(200).end(); }
+  `);
+  // A carry-over entry naming a route file that does not exist at all must
+  // also fail as stale -- the check is "does this entry currently reach
+  // Postgres", not "does this file exist".
+  writeCarryover([
+    'pages/api/workbench/green-clean.js',
+    'pages/api/workbench/does-not-exist.js',
+  ]);
+
+  const law = runGate([]);
+  expect(law.status !== 0, `stale carry-over entry should fail the gate, exited 0:\n${law.output}`);
+  expect(law.output.includes('stale Postgres carry-over entry -- remove pages/api/workbench/green-clean.js'),
+    `expected stale-entry message naming the clean route, got:\n${law.output}`);
+  expect(law.output.includes('stale Postgres carry-over entry -- remove pages/api/workbench/does-not-exist.js'),
+    `expected stale-entry message naming the nonexistent route, got:\n${law.output}`);
+
+  console.log('PASS Postgres stale carry-over assertion (unlisted-clean-route + nonexistent-route entries fail the gate)');
+}
+
+// P2: --postgres-carryover is a SELF-TEST-ONLY override -- it must be
+// rejected (exit 2) against the real repo root, so a package.json/CI edit
+// passing this flag could never bypass the pinned POSTGRES_CARRYOVER list.
+// Exercised directly against repoRoot (not via runGate/tempRoot).
+function runCarryoverRootGuardAssertion() {
+  const carryoverFile = path.join(tempRoot, '__root_guard_carryover.json');
+  fs.mkdirSync(tempRoot, { recursive: true });
+  fs.writeFileSync(carryoverFile, JSON.stringify([]));
+  try {
+    execSync(`node ${JSON.stringify(gate)} --postgres-carryover ${JSON.stringify(carryoverFile)}`, {
+      cwd: repoRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+    });
+    throw new Error('--postgres-carryover against the real repo root should have exited non-zero');
+  } catch (err) {
+    if (!('status' in err)) throw err;
+    expect(err.status === 2, `expected exit 2 for --postgres-carryover without a non-default --root, got ${err.status}:\n${err.stderr}`);
+    expect(String(err.stderr).includes('self-test-only override'),
+      `expected a self-test-only override message, got:\n${err.stderr}`);
+  } finally {
+    cleanup();
+  }
+  console.log('PASS --postgres-carryover root-guard assertion (rejected with exit 2 against the real repo root)');
+}
+
 function runLiveParseAssertion() {
   const output = execSync(`node ${JSON.stringify(gate)} --report`, {
     cwd: repoRoot,
@@ -542,7 +863,7 @@ function parseMode(argv) {
   if (modeIndex === -1) return 'all';
   const mode = argv[modeIndex + 1];
   if (!mode) {
-    throw new Error('--mode requires one of: all, detection, report, law, unresolved, live');
+    throw new Error('--mode requires one of: all, detection, report, law, unresolved, postgres, postgres-stale, postgres-root-guard, live');
   }
   return mode;
 }
@@ -553,6 +874,9 @@ function runMode(mode) {
     runReportAssertions();
     runLawModeAssertions();
     runUnresolvedFailClosedAssertions();
+    runPostgresAssertions();
+    runPostgresStaleAssertions();
+    runCarryoverRootGuardAssertion();
     runLiveParseAssertion();
     return;
   }
@@ -560,6 +884,9 @@ function runMode(mode) {
   if (mode === 'report') return runReportAssertions();
   if (mode === 'law') return runLawModeAssertions();
   if (mode === 'unresolved') return runUnresolvedFailClosedAssertions();
+  if (mode === 'postgres') return runPostgresAssertions();
+  if (mode === 'postgres-stale') return runPostgresStaleAssertions();
+  if (mode === 'postgres-root-guard') return runCarryoverRootGuardAssertion();
   if (mode === 'live') return runLiveParseAssertion();
   throw new Error(`unknown --mode ${mode}`);
 }

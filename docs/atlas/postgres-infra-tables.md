@@ -323,7 +323,12 @@ send is resolved. Send has the same guard, and unique partial index
 row per session under concurrency. Drift compares the live start as an instant plus ordered
 request/minutes tuples with the frozen sent snapshot. Read/write
 paths are `lib/services/meeting-tracker/agenda-store.js` and
-`lib/services/meeting-tracker/agenda-service.js`; the guarded API is
+`lib/services/meeting-tracker/agenda-service.js` [RECHECKED after
+lib/services/meeting-tracker/agenda-store.js change:
+docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md Stage 3 item 3 —
+import-only swap onto `lib/postgres/client`, SQL text/state machine/table
+shape unchanged (rule 6 behavior freeze); this claim's file path and
+described behavior are unaffected]; the guarded API is
 `/api/meeting-tracker/sessions/[id]/agenda`. No cleanup is scheduled; rows
 remain audit history until a retention policy is explicitly approved.
 **[VERIFIED 2026-09-10 via migration/fresh-install parity and focused service,
@@ -694,3 +699,16 @@ registry, malformed-result, or thrown dependency failures and render those rows 
 the collection row and sealed contributor link are created only on explicit Send. A user's
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
 this Postgres row. One-off edits are not saved as defaults.
+
+## Access layer
+
+`lib/postgres/client.js` (Stage 2, `docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md`) is the
+INTENDED single point where the raw Postgres drivers (`@vercel/postgres`, `pg`) are imported at runtime;
+enforced by `scripts/check-postgres-access-layer.js`'s ratchet and the route-service boundary law, so no
+`pages/api/**` route imports it directly. As of Stage 2 it is built but not yet the actual single import point:
+`scripts/postgres-access-allowlist.json` still freezes the 60 pre-existing direct `@vercel/postgres`/`pg`
+importers, and nothing in the tree imports `lib/postgres/client.js` yet. It exports four names — `sql`
+(re-exported unchanged), `withClient(fn)`, `withTransaction(fn)`, `getPool()` — deliberately NOT `db` (imported
+internally only, since every live `db` use is `db.connect()` and `withClient` replaces it); no table above
+changes ownership, storage, or schema as a result. Stage 3+ moves the existing `lib/services` stores' driver
+imports onto this seam one file at a time, in place, with no SQL or response-shape change.

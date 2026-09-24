@@ -17,7 +17,7 @@
 - Evidence / reconciliation: ../.claude/skills/sweep/SKILL.md; ../.claude/skills/contract-reconcile/SKILL.md; ../.claude/rules/durable-docs.md
 - Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-run-harness-framing-before-handoff-commit.md; feedback-one-session-runs-gates-per-worktree.md
 - External systems / literals: feedback-verify-external-platform-claims.md; feedback-no-fabricated-placeholder-values.md
-- Delegated work: ../docs/AGENT_COLLABORATION_PLAN.md; ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-codex-model-gpt56-sol.md; feedback-codex-worktree-owner-runs-it.md
+- Delegated work: ../docs/AGENT_COLLABORATION_PLAN.md; ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-codex-model-gpt56-sol.md; feedback-codex-worktree-owner-runs-it.md; feedback-orchestrated-build-review-model.md
 - Environment / deployment / Vercel env+logs / require(esm) hazard: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-verify-deploy-is-the-merge-build.md; project-vercel-node22-no-require-esm.md; project-preview-rehearsal-venue-limits.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
@@ -59,6 +59,7 @@
 - PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail: ../docs/PC_MEETING_TRACKER_PLAN.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Grantee / email templates: ../docs/GRANTEE_PORTAL_SPEC.md; project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
+- Postgres access layer / raw `sql` imports / pg contract-test harness: ../docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md
 - Deferred cleanup / dead code: project-deferred-code-cleanup.md
 - Invitation-link validation strictness (post-cycle decision): project-invitation-link-strictness-open-decision.md
 - Public privacy / history remediation: ../docs/audits/public-repository-pii-history-audit-2026-07-27.md; ../docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md

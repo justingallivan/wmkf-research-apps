@@ -18,7 +18,7 @@ related:
 
 # Service & Utility Catalog
 
-One-line lookup index for files under `lib/services/`, `lib/external/`, `lib/bill/`, `lib/utils/`, and `lib/observability/`. **Source-file headers are authoritative** for per-file contracts, safety posture, storage source-of-truth, and migration/drop history — this doc points there, it doesn't replace them.
+One-line lookup index for files under `lib/services/`, `lib/postgres/`, `lib/external/`, `lib/bill/`, `lib/utils/`, and `lib/observability/`. **Source-file headers are authoritative** for per-file contracts, safety posture, storage source-of-truth, and migration/drop history — this doc points there, it doesn't replace them.
 
 If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your change rather than rely on this doc.
 
@@ -318,6 +318,12 @@ If you're touching a service or utility, read its header before this catalog. If
 
 - **`irs-bmf-service.js`** — IRS Business Master File 501(c)(3) lookup for EIN verification. Used by `/api/irs/verify-ein` (PowerAutomate-callable via `IRS_VERIFY_SECRET`).
 - **`dataverse-export/`** (subdirectory) — Dataverse Bulk Export (Track B) services. Deterministic QuerySpec→FetchXML translation, paging, trust-bounded Excel emission. See `docs/DATAVERSE_POWER_TOOLS_TRACK_B_BUILD_PLAN.md`.
+
+---
+
+## `lib/postgres/`
+
+- **`client.js`** — The INTENDED single driver seam: the only runtime module meant to import `@vercel/postgres` or `pg`, enforced by `scripts/check-postgres-access-layer.js`'s ratchet plus the route-service boundary law (routes never import it; `lib/services` stores do). As of Stage 2, nothing imports it yet — `scripts/postgres-access-allowlist.json` still freezes the 60 pre-existing direct driver importers until Stages 3–7 move them here one file at a time. Re-exports `sql` unchanged from `@vercel/postgres` (`db` is imported internally only, not re-exported, since every live `db` use is `db.connect()` and `withClient` replaces it), and adds `withClient(fn)` (connect, release on success, destroy-on-error `release(error ?? true)` on throw) and `withTransaction(fn)` (`BEGIN`/`COMMIT`, or `ROLLBACK` — inside its own try/catch so a rollback failure never masks the original error — and rethrow on throw) plus `getPool()`, a lazy singleton `pg` `Pool` reading `POSTGRES_URL || DATABASE_URL`. It does not add query helpers, result mapping, logging, or naming conventions. See `docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md`.
 
 ---
 

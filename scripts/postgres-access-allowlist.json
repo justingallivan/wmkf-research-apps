@@ -1,0 +1,615 @@
+[
+  {
+    "_comment": "Stage 0 census frozen 2026-09-23 (docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md), re-verified 2026-09-23 after Stage 1 fix round 1 (source-agnostic sql-tag, widened driver sources incl. @neondatabase/serverless + subpaths, one-hop const resolution, renamed Pool specifiers) with identical live counts. Hand-edited only; may only shrink (lower a count or remove an entry) as files convert to lib/postgres/**. Never regenerate wholesale -- there is no --update/regenerate flag. lib/postgres/** and the Q5 exemptions (lib/utils/migration-drift.js, lib/utils/health-checker.js) are not ratcheted and must not appear here. 2026-09-23 Codex round 2: added the six unresolved-import entries (9 sites) for the live computed-require bundler bypasses; the ratchet now also covers unresolved-import and driver-export (0 live)."
+  },
+  {
+    "file": "lib/bill/onboarding-state.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/bill/onboarding-state.js",
+    "kind": "sql-tag",
+    "count": 10
+  },
+  {
+    "file": "lib/dataverse/client.js",
+    "kind": "unresolved-import",
+    "count": 3
+  },
+  {
+    "file": "lib/external/rate-limit.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/external/rate-limit.js",
+    "kind": "sql-tag",
+    "count": 3
+  },
+  {
+    "file": "lib/intake/rate-limit.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/intake/rate-limit.js",
+    "kind": "sql-tag",
+    "count": 3
+  },
+  {
+    "file": "lib/observability/request-correlation.js",
+    "kind": "unresolved-import",
+    "count": 2
+  },
+  {
+    "file": "lib/services/admin/policies-service.js",
+    "kind": "sql-tag",
+    "count": 3
+  },
+  {
+    "file": "lib/services/admin/prompts-publish-service.js",
+    "kind": "sql-tag",
+    "count": 5
+  },
+  {
+    "file": "lib/services/admin/review-questions-service.js",
+    "kind": "sql-tag",
+    "count": 3
+  },
+  {
+    "file": "lib/services/alert-recipients.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/alert-recipients.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "lib/services/alert-service.js",
+    "kind": "client.query",
+    "count": 3
+  },
+  {
+    "file": "lib/services/alert-service.js",
+    "kind": "sql-tag",
+    "count": 16
+  },
+  {
+    "file": "lib/services/app-access-service.js",
+    "kind": "unresolved-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/consultant-feedback-service.js",
+    "kind": "begin-literal",
+    "count": 3
+  },
+  {
+    "file": "lib/services/consultant-feedback-service.js",
+    "kind": "client.query",
+    "count": 18
+  },
+  {
+    "file": "lib/services/consultant-feedback-service.js",
+    "kind": "sql.query",
+    "count": 10
+  },
+  {
+    "file": "lib/services/cron/drain-submissions-service.js",
+    "kind": "begin-literal",
+    "count": 2
+  },
+  {
+    "file": "lib/services/cron/drain-submissions-service.js",
+    "kind": "client.query",
+    "count": 17
+  },
+  {
+    "file": "lib/services/cycle-dossier-service.js",
+    "kind": "client.query",
+    "count": 5
+  },
+  {
+    "file": "lib/services/cycle-dossier-store.js",
+    "kind": "client.query",
+    "count": 19
+  },
+  {
+    "file": "lib/services/cycle-dossier-store.js",
+    "kind": "sql.query",
+    "count": 12
+  },
+  {
+    "file": "lib/services/database-service.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/database-service.js",
+    "kind": "sql-tag",
+    "count": 16
+  },
+  {
+    "file": "lib/services/database-service.js",
+    "kind": "unresolved-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/dataverse-app-access-service.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/dataverse-app-access-service.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "lib/services/dataverse-identity-map.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/dataverse-identity-map.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "lib/services/deliberation-briefing/briefing-link-store.js",
+    "kind": "begin-literal",
+    "count": 1
+  },
+  {
+    "file": "lib/services/deliberation-briefing/briefing-link-store.js",
+    "kind": "client.query",
+    "count": 9
+  },
+  {
+    "file": "lib/services/deliberation-briefing/briefing-link-store.js",
+    "kind": "sql-tag",
+    "count": 4
+  },
+  {
+    "file": "lib/services/dynamics-explorer-request-telemetry.js",
+    "kind": "sql-tag",
+    "count": 3
+  },
+  {
+    "file": "lib/services/dynamics-explorer/explorer-store.js",
+    "kind": "sql-tag",
+    "count": 4
+  },
+  {
+    "file": "lib/services/dynamics-identity-service.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/dynamics-identity-service.js",
+    "kind": "sql-tag",
+    "count": 5
+  },
+  {
+    "file": "lib/services/dynamics-identity-service.js",
+    "kind": "sql.query",
+    "count": 1
+  },
+  {
+    "file": "lib/services/expertise-finder/batch-match-service.js",
+    "kind": "sql-tag",
+    "count": 2
+  },
+  {
+    "file": "lib/services/feedback-service.js",
+    "kind": "sql-tag",
+    "count": 10
+  },
+  {
+    "file": "lib/services/intake-audit-service.js",
+    "kind": "sql-tag",
+    "count": 3
+  },
+  {
+    "file": "lib/services/intake-draft-service.js",
+    "kind": "sql-tag",
+    "count": 20
+  },
+  {
+    "file": "lib/services/integrity-service.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/integrity-service.js",
+    "kind": "sql-tag",
+    "count": 11
+  },
+  {
+    "file": "lib/services/irs-bmf-service.js",
+    "kind": "begin-literal",
+    "count": 1
+  },
+  {
+    "file": "lib/services/irs-bmf-service.js",
+    "kind": "client.query",
+    "count": 22
+  },
+  {
+    "file": "lib/services/irs-bmf-service.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/irs-bmf-service.js",
+    "kind": "new-Pool",
+    "count": 1
+  },
+  {
+    "file": "lib/services/irs-bmf-service.js",
+    "kind": "pool.connect",
+    "count": 1
+  },
+  {
+    "file": "lib/services/irs-bmf-service.js",
+    "kind": "pool.query",
+    "count": 1
+  },
+  {
+    "file": "lib/services/maintenance-service.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/maintenance-service.js",
+    "kind": "sql-tag",
+    "count": 20
+  },
+  {
+    "file": "lib/services/meeting-tracker/agenda-store.js",
+    "kind": "sql-tag",
+    "count": 12
+  },
+  {
+    "file": "lib/services/operational-event-service.js",
+    "kind": "sql-tag",
+    "count": 7
+  },
+  {
+    "file": "lib/services/operational-event-service.js",
+    "kind": "sql.query",
+    "count": 1
+  },
+  {
+    "file": "lib/services/panel-review-service.js",
+    "kind": "sql-tag",
+    "count": 6
+  },
+  {
+    "file": "lib/services/panel-review-service.js",
+    "kind": "sql.query",
+    "count": 2
+  },
+  {
+    "file": "lib/services/portal-upload-staging.js",
+    "kind": "sql-tag",
+    "count": 15
+  },
+  {
+    "file": "lib/services/pre-site-visit/distribution-store.js",
+    "kind": "sql-tag",
+    "count": 19
+  },
+  {
+    "file": "lib/services/prompt-resolver.js",
+    "kind": "unresolved-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/review-draft-service.js",
+    "kind": "sql-tag",
+    "count": 4
+  },
+  {
+    "file": "lib/services/review-panel-store.js",
+    "kind": "client.query",
+    "count": 48
+  },
+  {
+    "file": "lib/services/review-panel-store.js",
+    "kind": "sql.query",
+    "count": 7
+  },
+  {
+    "file": "lib/services/review-synthesis-job-service.js",
+    "kind": "sql-tag",
+    "count": 8
+  },
+  {
+    "file": "lib/services/reviewer-acceptance-job-service.js",
+    "kind": "sql-tag",
+    "count": 10
+  },
+  {
+    "file": "lib/services/reviewer-identity-shadow-log.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "lib/services/reviewer-institution-measurement.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "lib/services/reviewer-roster-store.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/reviewer-roster-store.js",
+    "kind": "sql-tag",
+    "count": 24
+  },
+  {
+    "file": "lib/services/scheduled-email-store.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/scheduled-email-store.js",
+    "kind": "sql-tag",
+    "count": 32
+  },
+  {
+    "file": "lib/services/settings-service.js",
+    "kind": "unresolved-import",
+    "count": 1
+  },
+  {
+    "file": "lib/services/site-visit-materials/collection-store.js",
+    "kind": "sql-tag",
+    "count": 16
+  },
+  {
+    "file": "lib/services/site-visit/recipient-directory-service.js",
+    "kind": "sql-tag",
+    "count": 2
+  },
+  {
+    "file": "lib/utils/auth.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/utils/auth.js",
+    "kind": "sql-tag",
+    "count": 6
+  },
+  {
+    "file": "lib/utils/usage-logger.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "lib/utils/usage-logger.js",
+    "kind": "sql-tag",
+    "count": 2
+  },
+  {
+    "file": "pages/api/admin/health-history.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/admin/health-history.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "pages/api/admin/stats.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/admin/stats.js",
+    "kind": "sql-tag",
+    "count": 7
+  },
+  {
+    "file": "pages/api/admin/stats.js",
+    "kind": "sql.query",
+    "count": 1
+  },
+  {
+    "file": "pages/api/auth/[...nextauth].js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/auth/[...nextauth].js",
+    "kind": "sql-tag",
+    "count": 6
+  },
+  {
+    "file": "pages/api/auth/link-profile.js",
+    "kind": "begin-literal",
+    "count": 1
+  },
+  {
+    "file": "pages/api/auth/link-profile.js",
+    "kind": "client.query",
+    "count": 10
+  },
+  {
+    "file": "pages/api/auth/link-profile.js",
+    "kind": "db.connect",
+    "count": 1
+  },
+  {
+    "file": "pages/api/auth/link-profile.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/drain-submissions.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/drain-submissions.js",
+    "kind": "new-Pool",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/drain-submissions.js",
+    "kind": "pool.connect",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/health-check.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/health-check.js",
+    "kind": "sql-tag",
+    "count": 3
+  },
+  {
+    "file": "pages/api/cron/pricing-canary.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/pricing-canary.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/pricing-refresh.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/pricing-refresh.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/pricing-refresh.js",
+    "kind": "sql.query",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/secret-check.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/spend-check.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/spend-check.js",
+    "kind": "sql-tag",
+    "count": 1
+  },
+  {
+    "file": "pages/api/cron/spend-check.js",
+    "kind": "sql.query",
+    "count": 1
+  },
+  {
+    "file": "pages/api/dynamics-explorer/restrictions.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/dynamics-explorer/restrictions.js",
+    "kind": "sql-tag",
+    "count": 6
+  },
+  {
+    "file": "pages/api/dynamics-explorer/roles.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/dynamics-explorer/roles.js",
+    "kind": "sql-tag",
+    "count": 3
+  },
+  {
+    "file": "pages/api/expertise-finder/history.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/expertise-finder/history.js",
+    "kind": "sql-tag",
+    "count": 2
+  },
+  {
+    "file": "pages/api/expertise-finder/match.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/expertise-finder/match.js",
+    "kind": "sql-tag",
+    "count": 2
+  },
+  {
+    "file": "pages/api/expertise-finder/roster.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/expertise-finder/roster.js",
+    "kind": "sql-tag",
+    "count": 4
+  },
+  {
+    "file": "pages/api/expertise-finder/roster.js",
+    "kind": "sql.query",
+    "count": 4
+  },
+  {
+    "file": "pages/api/intake/submit.js",
+    "kind": "begin-literal",
+    "count": 1
+  },
+  {
+    "file": "pages/api/intake/submit.js",
+    "kind": "client.query",
+    "count": 8
+  },
+  {
+    "file": "pages/api/intake/submit.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/intake/submit.js",
+    "kind": "new-Pool",
+    "count": 1
+  },
+  {
+    "file": "pages/api/intake/submit.js",
+    "kind": "pool.connect",
+    "count": 1
+  },
+  {
+    "file": "pages/api/webhooks/bill.js",
+    "kind": "driver-import",
+    "count": 1
+  },
+  {
+    "file": "pages/api/webhooks/bill.js",
+    "kind": "sql-tag",
+    "count": 1
+  }
+]
