@@ -135,6 +135,36 @@ test('plain visit resolves the working cycle and writes it into the URL with rep
   await waitFor(() => expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=D26&scope=my&programId=p1']));
 });
 
+test('an all-test program requires an explicit cycle choice', async () => {
+  mockFetch({
+    '/api/workbench/dashboard': () => response({
+      success: true,
+      programs,
+      programId: 'p1',
+      cycles: CYCLES.map((cycle) => ({ ...cycle, count: 0, myCount: 0 })),
+      defaultCycleCode: null,
+      lastDecidedCycleCode: null,
+    }),
+  });
+  render(<WorkbenchShell />);
+
+  const cycleSelect = await screen.findByLabelText('Grant cycle');
+  await waitFor(() => {
+    expect(cycleSelect).toHaveValue('');
+    expect(cycleSelect).toBeEnabled();
+  });
+  expect(screen.getByRole('option', { name: 'Select a cycle…' })).toBeInTheDocument();
+  expect(await screen.findByText('Select a grant cycle to view this workspace.')).toBeInTheDocument();
+  expect(rowFetches()).toEqual([]);
+  expect(replace).not.toHaveBeenCalled();
+
+  fireEvent.change(cycleSelect, { target: { value: 'D26' } });
+  expect(push).toHaveBeenLastCalledWith('/workbench?cycleCode=D26', undefined, expect.any(Object));
+  await waitFor(() => expect(rowFetches()).toEqual([
+    '/api/workbench/dashboard?cycleCode=D26&scope=my&programId=p1',
+  ]));
+});
+
 test('a deep-linked cycle the program lists is honored without rewriting the URL', async () => {
   routerState.query = { cycleCode: 'J26', scope: 'all', setAside: '1' };
   routerState.asPath = '/workbench?cycleCode=J26&scope=all&setAside=1';

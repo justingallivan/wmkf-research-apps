@@ -132,6 +132,23 @@ test('Stage 1d: cycle discovery keeps test requests but leaves them out of count
   expect(body.defaultCycleCode).toBe('J27');
 });
 
+test('Stage 1d: an all-test program lists its cycles without choosing a default', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  const run = '22222222-2222-4222-8222-222222222222';
+  queryAllRequests.mockResolvedValue({
+    capped: false,
+    records: [
+      { akoya_requestid: 'r-t1', wmkf_meetingdate: '2026-06-04', wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+      { akoya_requestid: 'r-t2', wmkf_meetingdate: '2026-12-11', wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+    ],
+  });
+  const body = await loadDashboard(args());
+  expect(body.cycles.map((cycle) => [cycle.code, cycle.count, cycle.myCount]))
+    .toEqual([['D26', 0, 0], ['J26', 0, 0]]);
+  expect(body.defaultCycleCode).toBeNull();
+  expect(body.lastDecidedCycleCode).toBeNull();
+});
+
 test('Stage 1d: a later test request in a mixed cycle does not move its rollover day', async () => {
   process.env.TEST_REQUEST_ISOLATION = 'on';
   const run = '22222222-2222-4222-8222-222222222222';
