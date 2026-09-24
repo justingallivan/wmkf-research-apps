@@ -85,6 +85,35 @@ describe('schema-apply option sets and file columns', () => {
       .rejects.toThrow(/could not read it back/);
   });
 
+  test('retries the attribute create while the new global option set is not yet bindable', async () => {
+    jest.useFakeTimers();
+    const client = fakeClient({ globalOptionSet: { MetadataId: GOS_ID, Name: 'wmkf_status' } });
+    const realPost = client.post;
+    let refusals = 2;
+    client.post = async (p, b) => {
+      if (p.endsWith('/Attributes') && refusals > 0) {
+        refusals -= 1;
+        return { ok: false, status: 400, text: '{"error":{"code":"0x80048403","message":"IsGlobal is not specified."}}' };
+      }
+      return realPost(p, b);
+    };
+    const pending = ensureAttribute(client, 'wmkf_thing', {
+      type: 'Picklist', schemaName: 'wmkf_Status', globalOptionSet: { name: 'wmkf_status' }, options: OPTIONS,
+    });
+    await jest.runAllTimersAsync();
+    await expect(pending).resolves.toMatchObject({ created: true });
+    expect(refusals).toBe(0);
+    jest.useRealTimers();
+  });
+
+  test('does not retry other attribute-create failures', async () => {
+    const client = fakeClient();
+    let calls = 0;
+    client.post = async () => { calls += 1; return { ok: false, status: 400, text: 'some other error' }; };
+    await expect(ensureAttribute(client, 'account', { type: 'File', schemaName: 'wmkf_BoardList' })).rejects.toThrow(/Failed to create attribute/);
+    expect(calls).toBe(1);
+  });
+
   test('dry run of a missing global option set binds a placeholder id', async () => {
     const client = fakeClient({ dryRun: true });
     const id = await ensureGlobalOptionSet(client, { name: 'wmkf_status' }, OPTIONS);
