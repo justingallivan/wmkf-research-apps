@@ -479,11 +479,6 @@
   },
   {
     "file": "lib/services/reviewer-identity-shadow-log.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/reviewer-identity-shadow-log.js",
     "kind": "sql-tag",
     "count": 1
   },
