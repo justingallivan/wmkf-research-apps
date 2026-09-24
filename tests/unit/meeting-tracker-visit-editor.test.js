@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import SiteVisitEditor, { noEmailHint } from '../../shared/components/meeting-tracker/SiteVisitEditor';
+import SiteVisitEditor, { noEmailHint, withApplicantAttendees } from '../../shared/components/meeting-tracker/SiteVisitEditor';
 
 let routerQuery = {};
 jest.mock('next/router', () => ({ useRouter: () => ({ isReady: true, query: routerQuery }) }));
@@ -27,6 +27,83 @@ beforeEach(() => {
 test('visit attendee chip hints distinguish linked Contact failures from manual roster email', () => {
   expect(noEmailHint({ linked: true })).toMatch(/linked Dataverse contact.*fix or relink.*unlink/i);
   expect(noEmailHint({ linked: false })).toMatch(/preferred email.*Expertise Finder roster/i);
+});
+
+test('applicant prefill deduplicates the PI and liaison and preserves existing staff, Board, and manual attendees', () => {
+  const form = {
+    organizer: { kind: 'staff', profileId: 7 },
+    requiredAttendees: [{ kind: 'manual', name: 'Justin', email: 'justin@example.edu' }],
+    optionalAttendees: [{ kind: 'roster', rosterId: 3 }],
+  };
+  const suggested = [
+    { kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' },
+    { kind: 'manual', name: 'Franklin Cat', email: 'FRANKLIN@example.edu' },
+    { kind: 'manual', name: 'Board Member', email: 'b@example.org' },
+  ];
+  expect(withApplicantAttendees(form, suggested, recipients).requiredAttendees).toEqual([
+    form.requiredAttendees[0],
+    { kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' },
+  ]);
+});
+
+test('existing visit offers a missing applicant as one-click Add and includes them only after Save', async () => {
+  let visit = { activityId: 'a1', etag: 'W/"1"', subject: 'Site Visit', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'manual', name: 'Justin', email: 'justin@example.edu' }], optionalAttendees: [] };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).includes('/recipients')) return response(recipients);
+    if (String(url).endsWith('/materials')) return response({ error: 'not enabled' }, 503);
+    if (options.method === 'PATCH') {
+      visit = { ...visit, requiredAttendees: JSON.parse(options.body).requiredAttendees };
+      return response({ success: true, siteVisit: visit });
+    }
+    return response({ success: true, siteVisit: visit, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }] });
+  });
+  render(<SiteVisitEditor />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Franklin Cat (franklin@example.edu)' }));
+  expect(screen.getByText(/Franklin Cat · franklin@example.edu/)).toBeInTheDocument();
+  expect(screen.getByText(/Justin · justin@example.edu/)).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+  const [, options] = await waitFor(() => global.fetch.mock.calls.find(([, value]) => value?.method === 'PATCH'));
+  expect(JSON.parse(options.body).requiredAttendees).toEqual([
+    { kind: 'manual', name: 'Justin', email: 'justin@example.edu' },
+    { kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' },
+  ]);
+});
+
+test('removing a saved applicant attendee and reopening shows Add without re-adding them', async () => {
+  let visit = { activityId: 'a1', etag: 'W/"1"', subject: 'Site Visit', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }], optionalAttendees: [] };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).includes('/recipients')) return response(recipients);
+    if (String(url).endsWith('/materials')) return response({ error: 'not enabled' }, 503);
+    if (options.method === 'PATCH') {
+      visit = { ...visit, requiredAttendees: JSON.parse(options.body).requiredAttendees };
+      return response({ success: true, siteVisit: visit });
+    }
+    return response({ success: true, siteVisit: visit, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }] });
+  });
+  const first = render(<SiteVisitEditor />);
+  fireEvent.click(await screen.findByRole('button', { name: /Franklin Cat · franklin@example.edu.*×/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+  await waitFor(() => expect(visit.requiredAttendees).toEqual([]));
+  first.unmount();
+
+  render(<SiteVisitEditor />);
+  expect(await screen.findByRole('button', { name: 'Add Franklin Cat (franklin@example.edu)' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Franklin Cat · franklin@example.edu.*×/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+  await waitFor(() => expect(global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH')).toHaveLength(2));
+  const patches = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');
+  expect(JSON.parse(patches[1][1].body).requiredAttendees).toEqual([]);
+});
+
+test('a new visit automatically prefills a distinct applicant attendee without saving', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).includes('/recipients')) return response(recipients);
+    return response({ success: true, siteVisit: null, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }] });
+  });
+  render(<SiteVisitEditor />);
+  expect(await screen.findByRole('button', { name: /Franklin Cat · franklin@example.edu.*×/ })).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
 });
 
 test('a new visit: the form posts the fields the logistics service expects, with the id from the path and no activity/etag', async () => {

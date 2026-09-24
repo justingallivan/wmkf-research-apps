@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../utils/api-request';
 import Layout, { Button } from '../Layout';
-import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL } from '../../config/siteVisit';
+import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL, SITE_VISIT_LIMITS } from '../../config/siteVisit';
 import SiteVisitMaterialsCard from './SiteVisitMaterialsCard';
 
 const DEFAULT_TIME_ZONE = 'America/Los_Angeles';
@@ -47,6 +47,26 @@ function formFromVisit(visit, requestNumber) {
     requiredAttendees: visit.requiredAttendees || [],
     optionalAttendees: visit.optionalAttendees || [],
   };
+}
+
+function emailForRef(ref, directory) {
+  if (ref?.kind === 'manual') return String(ref.email || '').trim().toLowerCase();
+  const people = ref?.kind === 'staff' ? directory?.staff || [] : ref?.kind === 'roster' ? directory?.board || [] : [];
+  return String(people.find((person) => sameRef(person.ref, ref))?.email || '').trim().toLowerCase();
+}
+
+export function withApplicantAttendees(form, suggestions, directory) {
+  const seen = new Set([form.organizer, ...form.requiredAttendees, ...form.optionalAttendees]
+    .map((ref) => emailForRef(ref, directory)).filter(Boolean));
+  const added = [];
+  for (const suggestion of suggestions || []) {
+    if (form.requiredAttendees.length + added.length >= SITE_VISIT_LIMITS.attendeesPerRole) break;
+    const email = String(suggestion?.email || '').trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    added.push({ kind: 'manual', name: suggestion.name || email, email });
+  }
+  return added.length ? { ...form, requiredAttendees: [...form.requiredAttendees, ...added] } : form;
 }
 
 export function sameRef(left, right) {
@@ -105,6 +125,8 @@ export default function SiteVisitEditor() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [applicantAttendees, setApplicantAttendees] = useState([]);
+  const [applicantAttendeesUnavailable, setApplicantAttendeesUnavailable] = useState(false);
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -121,9 +143,13 @@ export default function SiteVisitEditor() {
       if (recipientSettled.status === 'rejected') throw recipientSettled.reason;
       const visitBody = visitSettled.value;
       const recipientBody = recipientSettled.value;
+      const directory = { staff: recipientBody.staff || [], board: recipientBody.board || [] };
       setVisit(visitBody.siteVisit || null);
-      setForm(formFromVisit(visitBody.siteVisit, requestNumber));
-      setRecipients({ staff: recipientBody.staff || [], board: recipientBody.board || [] });
+      const savedForm = formFromVisit(visitBody.siteVisit, requestNumber);
+      setForm(visitBody.siteVisit ? savedForm : withApplicantAttendees(savedForm, visitBody.applicantAttendees, directory));
+      setRecipients(directory);
+      setApplicantAttendees(visitBody.applicantAttendees || []);
+      setApplicantAttendeesUnavailable(visitBody.applicantAttendeesUnavailable === true);
     } catch (loadError) {
       setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
@@ -198,6 +224,7 @@ export default function SiteVisitEditor() {
   const backHref = { pathname: '/meeting-tracker', query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } };
   const backLink = <Link href={backHref} className="text-sm font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-900">Back to the cycle schedule</Link>;
   const manualRows = [...form.requiredAttendees, ...form.optionalAttendees].filter((ref) => ref.kind === 'manual');
+  const missingApplicantAttendees = visit ? applicantAttendees.filter((person) => withApplicantAttendees(form, [person], recipients) !== form) : [];
   const canSave = Boolean(form.organizer && form.startLocal && form.endLocal && form.timeZone.trim() && form.locationOrLink.trim() && form.subject.trim()) && !busy;
 
   return (
@@ -263,6 +290,18 @@ export default function SiteVisitEditor() {
           <fieldset className="mt-6 border-t border-gray-100 pt-5">
             <legend className="text-base font-semibold text-gray-900">Applicant-side attendees</legend>
             <p className="mt-1 text-sm text-gray-600">People outside the foundation, such as the project leader. They receive the calendar entry.</p>
+            <p className="mt-1 text-xs text-gray-500">New visits prefill the Project Leader and primary contact from AkoyaGo when they have email addresses. For a saved visit, add any missing contacts below, then save to include them in the calendar entry.</p>
+            {applicantAttendeesUnavailable && <p role="status" className="mt-1 text-xs text-amber-800">Applicant contacts could not be loaded. Add attendees manually or reload the page.</p>}
+            {missingApplicantAttendees.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <p className="w-full text-xs font-medium text-gray-600">Suggested from AkoyaGo</p>
+                {missingApplicantAttendees.map((person) => (
+                  <Button key={person.email.toLowerCase()} type="button" size="sm" disabled={busy} onClick={() => setForm((current) => withApplicantAttendees(current, [person], recipients))}>
+                    Add {person.name || person.email} ({person.email})
+                  </Button>
+                ))}
+              </div>
+            )}
             {manualRows.length > 0 && (
               <ul className="mt-3 flex flex-wrap gap-2">
                 {manualRows.map((ref) => (

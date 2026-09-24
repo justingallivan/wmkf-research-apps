@@ -503,7 +503,9 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 
 - PI and liaison: `resolveGranteeInviteRecipients({ requestId })` in
   `lib/services/workbench/grantee-deliverables/recipients-service.js` (PI = `wmkf_projectleader`,
-  liaison = `akoya_primarycontactid`, both → contact email).
+  liaison = `akoya_primarycontactid`, both → contact email). The branch-only
+  `site-visit/applicant-contacts.js` wrapper uses applicant Account `primarycontactid`
+  only when the Request liaison lookup is blank (§16.12).
 - Contributor link: stored-digest token like the briefing link (`mintScopedToken` with audience
   `materials`, sealed with `lib/utils/encryption.js`, verifier cloned from
   `lib/external/verify-briefing-token.js`).
@@ -527,7 +529,8 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 `site_visit_activity_id UUID NOT NULL`, `status TEXT` in `open | ready | closed`, `due_at TIMESTAMPTZ
 NOT NULL`, `closes_at TIMESTAMPTZ NOT NULL`, `checklist JSONB NOT NULL` (ordered items
 `{ key, label, required, waived }` for `presentation_pdf`, `presentation_source`, `participant_bios`),
-`contacts JSONB NOT NULL` (`{ pi: { name, email }, liaison: { name, email } }` snapshot at creation),
+`contacts JSONB NOT NULL` (`{ pi: { name, email }, liaison: { name, email } }` snapshot at creation,
+refreshed from the Request on a reviewed manual send after the 2026-09-24 branch fix),
 `jti TEXT UNIQUE`, `token_digest CHAR(64) UNIQUE`, `token_ciphertext TEXT`, `created_by UUID`,
 `invited_at`, `invitation_email_id UUID`, `last_reminder_at`, `reminder_count INTEGER DEFAULT 0`,
 `ready_confirmed_at`, `created_at`, `updated_at`. One non-closed collection per request (partial
@@ -756,3 +759,21 @@ and serves `applications.wmkeck.org`. After that compatible runtime was live, ex
 four shared invitation/reminder subject/body values were saved through Admin.
 Independent Dataverse readback at `2026-09-21T04:29:49.271420Z` matched all
 four tracked seed values exactly. No email was sent during release verification.
+
+### 16.12 2026-09-24: required PI and liaison recipients [SOURCE-BUILT ON BRANCH; NOT DEPLOYED]
+
+Request 1003222 exposed an existing collection whose saved liaison contact could not be
+verified for the named email copy. The owner chose to require the liaison recipient rather than
+remove the liaison paragraph and send only to the PI. The branch fix requires non-empty email
+addresses for both recipient roles on every invitation and reminder, regardless of template edits.
+The Project Leader comes from the Request. When its Primary Contact lookup is blank, the
+liaison comes from the applicant Account's Org Primary Contact; a set Request Primary Contact
+still takes precedence. If the roles share one email address, the envelope sends one copy.
+The preview names the missing role and remains read-only. For an existing collection, a fresh
+preview reads current Request contacts; Send rechecks the signed To/Cc envelope and saves those
+contacts to the collection only after validation. A manual reminder saves them in its atomic
+claim, before email transport; a later invitation uses a conditional update before transport.
+If the contact changed, staff must refresh the preview. The unscheduled automatic sweep continues
+using the saved collection contacts and skips a row missing either role. When every required file
+is received, the separate “nothing to remind about” guard still applies.
+The materials card names a missing saved liaison email instead of displaying literal `null`.
