@@ -76,7 +76,11 @@ test('createAlert treats acknowledged alerts as open for deduplication', async (
   );
   expect(mockClient.query.mock.calls[2][0]).toContain("status IN ('active', 'acknowledged')");
   expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
-  expect(mockClient.release).toHaveBeenCalledWith(null);
+  // Stage 3 conversion onto lib/postgres/client's withTransaction/withClient
+  // (docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md §4 item 1,
+  // recorded difference): the success path calls `client.release()` with NO
+  // arguments, not `client.release(null)`.
+  expect(mockClient.release).toHaveBeenCalledWith();
   expect(sql).not.toHaveBeenCalled();
 });
 
@@ -98,7 +102,9 @@ test('createAlert inserts under the same advisory-lock transaction', async () =>
 
   expect(mockClient.query.mock.calls[3][0]).toContain('INSERT INTO system_alerts');
   expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
-  expect(mockClient.release).toHaveBeenCalledWith(null);
+  // See the no-args note above: withClient's success path releases with no
+  // arguments.
+  expect(mockClient.release).toHaveBeenCalledWith();
 });
 
 test('createAlert discards the pooled client when rollback fails', async () => {
@@ -117,7 +123,12 @@ test('createAlert discards the pooled client when rollback fails', async () => {
   })).rejects.toBe(originalError);
 
   expect(mockClient.query).toHaveBeenLastCalledWith('ROLLBACK');
-  expect(mockClient.release).toHaveBeenCalledWith(rollbackError);
+  // Stage 3 conversion recorded difference: a ROLLBACK failure no longer
+  // masks the original error. lib/postgres/client's withTransaction
+  // swallows the rollback failure internally and rethrows the ORIGINAL
+  // error, which withClient's catch then releases (destroys) the client
+  // with -- so release now sees originalError, never rollbackError.
+  expect(mockClient.release).toHaveBeenCalledWith(originalError);
   consoleSpy.mockRestore();
 });
 
