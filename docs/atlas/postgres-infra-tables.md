@@ -694,3 +694,16 @@ registry, malformed-result, or thrown dependency failures and render those rows 
 the collection row and sealed contributor link are created only on explicit Send. A user's
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
 this Postgres row. One-off edits are not saved as defaults.
+
+## Access layer
+
+`lib/postgres/client.js` (Stage 2, `docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md`) is the
+INTENDED single point where the raw Postgres drivers (`@vercel/postgres`, `pg`) are imported at runtime;
+enforced by `scripts/check-postgres-access-layer.js`'s ratchet and the route-service boundary law, so no
+`pages/api/**` route imports it directly. As of Stage 2 it is built but not yet the actual single import point:
+`scripts/postgres-access-allowlist.json` still freezes the 60 pre-existing direct `@vercel/postgres`/`pg`
+importers, and nothing in the tree imports `lib/postgres/client.js` yet. It exports four names — `sql`
+(re-exported unchanged), `withClient(fn)`, `withTransaction(fn)`, `getPool()` — deliberately NOT `db` (imported
+internally only, since every live `db` use is `db.connect()` and `withClient` replaces it); no table above
+changes ownership, storage, or schema as a result. Stage 3+ moves the existing `lib/services` stores' driver
+imports onto this seam one file at a time, in place, with no SQL or response-shape change.
