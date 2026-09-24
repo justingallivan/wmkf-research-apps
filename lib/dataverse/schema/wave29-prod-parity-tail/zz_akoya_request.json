@@ -1,0 +1,35 @@
+{
+  "name": "akoya_request-prod-parity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Production-parity tail (Session 538): generated from read-only production metadata. Columns production has that no schema file created on this table (wmkf_heldat was added by scripts/add-reviewer-suggestion-heldat-column.mjs). Runs after every other wave.",
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_DeclineReason",
+      "displayName": "Decline Reason",
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Limited impact"
+        },
+        {
+          "value": 682090001,
+          "label": "Too applied/translational"
+        },
+        {
+          "value": 682090002,
+          "label": "Basic science question unclear"
+        },
+        {
+          "value": 682090003,
+          "label": "Continuation/incremental"
+        },
+        {
+          "value": 682090004,
+          "label": "Implementation/risk"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "wmkf_glaccount",
+  "kind": "new-entity",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "schemaName": "wmkf_GLAccount",
+  "displayName": "GL Account",
+  "displayCollectionName": "GL Accounts",
+  "ownershipType": "UserOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "maxLength": 100,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_dc_importid",
+      "displayName": "dc_importid",
+      "minValue": -2147483648,
+      "maxValue": 2147483647
+    }
+  ]
+}

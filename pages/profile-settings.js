@@ -67,21 +67,30 @@ export default function ProfileSettings() {
   const emailSignaturePreference = preferences?.[PREFERENCE_KEYS.EMAIL_SIGNATURE] || '';
   const senderInfoPreference = preferences?.[PREFERENCE_KEYS.SENDER_INFO] || '';
 
-  // Grantee-invitation custom email body (S272). Body-only — the server appends the
-  // signature; the textarea must not contain one. Absent pref => the admin default.
+  // Grantee-invitation subject and body are independent own-profile preferences.
+  // The body remains plain text (S272); the server appends the signature.
+  const [inviteSubject, setInviteSubject] = useState('');
   const [inviteBody, setInviteBody] = useState('');
   const [inviteDefault, setInviteDefault] = useState({
+    subject: '',
     body: '',
     loaded: false,
     unavailable: false,
   });
+  const [isSavingInviteSubject, setIsSavingInviteSubject] = useState(false);
+  const [inviteSubjectStatus, setInviteSubjectStatus] = useState(null);
   const [isSavingInviteBody, setIsSavingInviteBody] = useState(false);
   const [inviteBodyStatus, setInviteBodyStatus] = useState(null);
+  const loadedInviteSubjectSourceRef = useRef('');
   const loadedInviteBodySourceRef = useRef('');
+  const inviteProfileIdRef = useRef(null);
+  const inviteSubjectDirtyRef = useRef(false);
   const inviteBodyDirtyRef = useRef(false);
+  const inviteSubjectPreference = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_SUBJECT] || '';
   const inviteBodyPreference = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';
 
-  // Reviewer email templates (the 6-type set sent from Workbench → Reviewers).
+  // Reviewer email templates (four stored types; only invitation/materials
+  // have current first-party staff send actions).
   // Edited in the shared EmailTemplatesModal, which loads/saves via the same
   // preference key the Workbench tab uses — so this is a second entry point to the
   // ONE editor, not a separate copy. Defaults are seeded by the modal itself.
@@ -118,6 +127,11 @@ export default function ProfileSettings() {
 
   useEffect(() => {
     if (status !== 'ready') return;
+    if (inviteProfileIdRef.current !== currentProfile?.id) {
+      inviteProfileIdRef.current = currentProfile?.id;
+      inviteSubjectDirtyRef.current = false;
+      inviteBodyDirtyRef.current = false;
+    }
     if (!inviteDefault.loaded && !inviteBodyPreference.trim()) return;
     const sourceKey = [
       currentProfile?.id || '',
@@ -143,6 +157,32 @@ export default function ProfileSettings() {
   ]);
 
   useEffect(() => {
+    if (status !== 'ready') return;
+    if (!inviteDefault.loaded && !inviteSubjectPreference.trim()) return;
+    const sourceKey = [
+      currentProfile?.id || '',
+      inviteSubjectPreference,
+      inviteDefault.subject,
+      inviteDefault.loaded ? 'loaded' : 'pending',
+      inviteDefault.unavailable ? 'unavailable' : 'available',
+    ].join('::');
+    if (sourceKey === loadedInviteSubjectSourceRef.current) return;
+    const next = inviteSubjectPreference.trim() ? inviteSubjectPreference : inviteDefault.subject;
+    if (!inviteSubjectDirtyRef.current) {
+      setInviteSubject((prev) => (prev === next ? prev : next));
+      setInviteSubjectStatus(null);
+    }
+    loadedInviteSubjectSourceRef.current = sourceKey;
+  }, [
+    status,
+    currentProfile?.id,
+    inviteSubjectPreference,
+    inviteDefault.subject,
+    inviteDefault.loaded,
+    inviteDefault.unavailable,
+  ]);
+
+  useEffect(() => {
     if (status !== 'ready' || !currentProfile?.id) return;
     let cancelled = false;
     requestJson('/api/email-defaults/grantee-invite', {
@@ -152,6 +192,7 @@ export default function ProfileSettings() {
       .then((data) => {
         if (cancelled) return;
         setInviteDefault({
+          subject: String(data.subject || ''),
           body: String(data.body || ''),
           loaded: true,
           unavailable: Boolean(data.unavailable),
@@ -159,7 +200,7 @@ export default function ProfileSettings() {
       })
       .catch(() => {
         if (cancelled) return;
-        setInviteDefault({ body: '', loaded: true, unavailable: true });
+        setInviteDefault({ subject: '', body: '', loaded: true, unavailable: true });
       });
     return () => { cancelled = true; };
   }, [status, currentProfile?.id]);
@@ -243,6 +284,36 @@ export default function ProfileSettings() {
     setIsSavingSignature(false);
     setSignatureStatus(ok ? 'saved' : 'error');
     if (!ok) setError('Failed to save email signature.');
+  };
+
+  const handleSaveInviteSubject = async (e) => {
+    e.preventDefault();
+    if (!currentProfile) return;
+    setIsSavingInviteSubject(true);
+    setError(null);
+    setInviteSubjectStatus(null);
+    const ok = await setPreference(PREFERENCE_KEYS.GRANTEE_INVITE_SUBJECT, inviteSubject);
+    setIsSavingInviteSubject(false);
+    setInviteSubjectStatus(ok ? 'saved' : 'error');
+    if (ok) inviteSubjectDirtyRef.current = false;
+    if (!ok) setError('Failed to save the Request Abstract email subject.');
+  };
+
+  const handleResetInviteSubject = async () => {
+    if (!currentProfile) return;
+    setIsSavingInviteSubject(true);
+    setError(null);
+    setInviteSubjectStatus(null);
+    const ok = await deletePreference(PREFERENCE_KEYS.GRANTEE_INVITE_SUBJECT);
+    setIsSavingInviteSubject(false);
+    if (ok) {
+      inviteSubjectDirtyRef.current = false;
+      setInviteSubject(inviteDefault.subject || '');
+      setInviteSubjectStatus('reset');
+    } else {
+      setInviteSubjectStatus('error');
+      setError('Failed to reset the Request Abstract email subject.');
+    }
   };
 
   const handleSaveInviteBody = async (e) => {
@@ -409,12 +480,51 @@ export default function ProfileSettings() {
               {inviteBodyStatus === 'reset' && <span className="text-sm text-green-700">Reset to default</span>}
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Your default body for the grantee abstract-review email (the Workbench
-              Awardee tab). Do not include your name or signature — your saved Email
-              Signature is appended automatically when you send. Keep the{' '}
+              Your default subject and body for the grantee abstract-review email (the Workbench
+              Awardee tab). Changes here apply to future drafts; edits made while sending are for that email only.
+              Do not include your name or signature in the body — your saved Email Signature is appended automatically.
+              The subject supports <code className="text-xs">{'{{proposalTitle}}'}</code>. In the body, keep{' '}
               <code className="text-xs">{'{{granteeName}}'}</code>, <code className="text-xs">{'{{proposalTitle}}'}</code>, and{' '}
-              <code className="text-xs">COB {'{{dueDate}}'}</code> placeholders; they’re filled in per-grantee.
+              <code className="text-xs">COB {'{{dueDate}}'}</code> placeholders; they’re filled in for each grantee.
             </p>
+            <form onSubmit={handleSaveInviteSubject} className="space-y-3 mb-5">
+              <label className="block text-sm font-medium text-gray-700">
+                Email subject
+                <input
+                  type="text"
+                  value={inviteSubject}
+                  onChange={(e) => {
+                    inviteSubjectDirtyRef.current = true;
+                    setInviteSubject(e.target.value);
+                    setInviteSubjectStatus(null);
+                  }}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                />
+              </label>
+              {inviteSubjectStatus === 'saved' && <p className="text-sm text-green-700">Subject saved</p>}
+              {inviteSubjectStatus === 'reset' && <p className="text-sm text-green-700">Subject reset to default</p>}
+              {inviteSubjectStatus === 'error' && <p className="text-sm text-red-700">Could not save the Request Abstract email subject.</p>}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  onClick={handleResetInviteSubject}
+                  disabled={isSavingInviteSubject || !inviteDefault.loaded || inviteDefault.unavailable}
+                >
+                  Reset subject to default
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  disabled={isSavingInviteSubject}
+                  loading={isSavingInviteSubject}
+                >
+                  Save Email Subject
+                </Button>
+              </div>
+            </form>
             <form onSubmit={handleSaveInviteBody} className="space-y-4">
               <label className="block text-sm font-medium text-gray-700">
                 Email body
@@ -436,7 +546,12 @@ export default function ProfileSettings() {
               )}
               {inviteDefault.loaded && !inviteDefault.unavailable && !inviteBodyPreference.trim() && inviteDefault.body.trim() === '' && (
                 <p className="text-sm text-amber-700">
-                  The shared default is blank - not configured.
+                  The shared body default is blank - not configured.
+                </p>
+              )}
+              {inviteDefault.loaded && !inviteDefault.unavailable && !inviteSubjectPreference.trim() && inviteDefault.subject.trim() === '' && (
+                <p className="text-sm text-amber-700">
+                  The shared subject default is blank - not configured.
                 </p>
               )}
               {inviteBodyStatus === 'error' && (
@@ -472,9 +587,9 @@ export default function ProfileSettings() {
               <h2 className="text-lg font-semibold text-gray-900">Reviewer Emails</h2>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Your templates for the emails sent to peer reviewers from the Workbench
-              Reviewers tab. Everyone starts from a default; edits here are saved to your
-              profile and used wherever you send. Your saved Email Signature fills the{' '}
+              Your reviewer templates start from the Admin defaults. Invitation and materials
+              templates saved here are used when you send those emails from Workbench.
+              Your saved Email Signature fills the{' '}
               <code className="text-xs">{'{{signature}}'}</code> placeholder.
             </p>
             <ul className="text-sm text-gray-600 mb-4 flex flex-wrap gap-x-4 gap-y-1">
@@ -482,6 +597,10 @@ export default function ProfileSettings() {
                 <li key={t} className="text-gray-700">• {TEMPLATE_TYPE_LABELS[t] || t}</li>
               ))}
             </ul>
+            <p className="text-sm text-gray-600 mb-4">
+              Follow-up reminder and Thank-you personal templates remain available for compatibility;
+              current staff send actions do not use them. Automatic reviewer thank-yous use the Admin default.
+            </p>
             <div className="flex justify-end">
               <Button variant="primary" size="sm" type="button" onClick={() => setShowReviewerTemplates(true)}>
                 Edit reviewer email templates

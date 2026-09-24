@@ -1,0 +1,14 @@
+{
+  "name": "systemuser-prod-parity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "systemuser",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_expertise",
+      "displayName": "Expertise",
+      "maxLength": 1000000
+    }
+  ]
+}

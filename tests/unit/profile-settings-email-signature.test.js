@@ -101,6 +101,31 @@ test('loads and resets the Request Abstract email body from the admin default en
   expect(screen.getByLabelText('Email body')).toHaveValue(GRANTEE_INVITE_SEED_BODY);
 });
 
+test('loads and explicitly saves a personal Request Abstract subject', async () => {
+  render(<ProfileSettings />);
+  await waitFor(() => expect(screen.getByLabelText('Email subject')).toHaveValue('Stored subject'));
+
+  fireEvent.change(screen.getByLabelText('Email subject'), { target: { value: 'My {{proposalTitle}} invitation' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save Email Subject' }));
+
+  await waitFor(() => expect(setPreference).toHaveBeenCalledWith(
+    PREFERENCE_KEYS.GRANTEE_INVITE_SUBJECT,
+    'My {{proposalTitle}} invitation',
+  ));
+  expect(setPreference).not.toHaveBeenCalledWith(PREFERENCE_KEYS.GRANTEE_INVITE_BODY, expect.anything());
+});
+
+test('resetting the personal Request Abstract subject deletes only its preference', async () => {
+  render(<ProfileSettings />);
+  await waitFor(() => expect(screen.getByLabelText('Email subject')).toHaveValue('Stored subject'));
+  fireEvent.change(screen.getByLabelText('Email subject'), { target: { value: 'One draft subject' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Reset subject to default' }));
+
+  await waitFor(() => expect(deletePreference).toHaveBeenCalledWith(PREFERENCE_KEYS.GRANTEE_INVITE_SUBJECT));
+  expect(deletePreference).not.toHaveBeenCalledWith(PREFERENCE_KEYS.GRANTEE_INVITE_BODY);
+  expect(screen.getByLabelText('Email subject')).toHaveValue('Stored subject');
+});
+
 test('the automation preference card stays out of Profile Settings (it lives on /scheduled-emails)', () => {
   render(<ProfileSettings />);
   expect(screen.queryByText(/automatic email review/i)).toBeNull();

@@ -1,0 +1,153 @@
+{
+  "name": "akoya_requestpayment-prod-parity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_requestpayment",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_FiscalYear",
+      "displayName": "Fiscal Year",
+      "maxLength": 100
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_FollowupQuestions",
+      "displayName": "Follow-up Questions",
+      "maxLength": 2000
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_GLAccountID",
+      "displayName": "GL Account ID",
+      "minValue": -2147483648,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_InvoiceNumber",
+      "displayName": "Invoice Number",
+      "maxLength": 100
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_NoCostExtensionDate",
+      "displayName": "No Cost Extension Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_Published",
+      "displayName": "Published",
+      "description": "GOapply Status Tracking created for Requirement",
+      "trueLabel": "Yes",
+      "falseLabel": "No"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ReportingContactEmail",
+      "displayName": "Reporting Contact Email",
+      "maxLength": 100,
+      "format": "Email"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ReportingContactName",
+      "displayName": "Reporting Contact Name",
+      "maxLength": 100
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ReportingContactPhone",
+      "displayName": "Reporting Contact Phone",
+      "maxLength": 100
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ReportingContactTitle",
+      "displayName": "Reporting Contact Title",
+      "maxLength": 100
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ReportType",
+      "displayName": "Report Type",
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Interim Report"
+        },
+        {
+          "value": 682090001,
+          "label": "Final Report"
+        },
+        {
+          "value": 682090002,
+          "label": "Follow-up to Final Report"
+        },
+        {
+          "value": 682090003,
+          "label": "Contingency Update"
+        },
+        {
+          "value": 682090004,
+          "label": "No Cost Extension"
+        },
+        {
+          "value": 682090005,
+          "label": "Budget Reallocation"
+        },
+        {
+          "value": 682090006,
+          "label": "Returned Postcard"
+        },
+        {
+          "value": 682090007,
+          "label": "Deferral Update"
+        }
+      ]
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_RequirementCheckedIn",
+      "displayName": "Checked In",
+      "trueLabel": "Yes",
+      "falseLabel": "No"
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_akoya_requestpayment_GLAccount_wmkf_glaccount",
+      "referencedEntity": "wmkf_glaccount",
+      "lookupSchemaName": "wmkf_GLAccount",
+      "lookupDisplayName": "GL Account",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "RemoveLink",
+        "Merge": "NoCascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_akoya_requestpayment_PaymentContact_contact",
+      "referencedEntity": "contact",
+      "lookupSchemaName": "wmkf_PaymentContact",
+      "lookupDisplayName": "Payment Contact",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "RemoveLink",
+        "Merge": "Cascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    }
+  ]
+}

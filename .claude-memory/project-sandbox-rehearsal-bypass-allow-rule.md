@@ -1,6 +1,6 @@
 ---
 name: project-sandbox-rehearsal-bypass-allow-rule
-description: "Per-machine Claude Code allow rule so the sandbox rehearsal script's --bypass-goverify execute is not blocked by the auto-mode classifier; must be re-added on each machine"
+description: "Per-machine Claude Code allow rule so the sandbox rehearsal script (execute, reserve, advance with --bypass-goverify) is not blocked by the auto-mode classifier; verified working 2026-09-24; must be re-added on each machine"
 metadata:
   node_type: memory
   type: project
@@ -16,14 +16,16 @@ permission rule so the Test Request Factory sandbox rehearsal can run
 gitignored `.claude/settings.local.json` at the repo root, under
 `permissions.allow`, and does NOT travel with git:
 
-```
-"Bash(DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com node --env-file=/Users/gallivan/Code/WMKF_Apps/.env.local scripts/rehearse-test-request-sandbox.mjs:*)"
-```
+`"Bash(DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com node --env-file=/Users/gallivan/Code/WMKF_Apps/.env.local scripts/rehearse-test-request-sandbox.mjs:*)"` <!-- doc-symbol-refs:ignore reason=factory-branch-only -->
 
 The prefix pins the sandbox URL and the env file, so it cannot match a
 production target. Adjust the `--env-file` path if the repo lives elsewhere on
-another machine. Whether the rule actually clears the classifier is unverified
-until the first execute runs under it.
+another machine. Verified 2026-09-24 (later in Session 537): under this rule the
+ledger-driven `--reserve`, `--advance` and `--advance --bypass-goverify` calls
+ran without a prompt (Request 1000341). Extra leading environment assignments
+such as `TEST_REQUEST_LEDGER_URL=...` before `DYNAMICS_SANDBOX_URL=...` also
+passed, and the command must run with the Factory worktree as the working
+directory so the relative `scripts/` path resolves.
 
 **Why:** every live sandbox create needs the bypass (GoVerify rejects the POST
 otherwise; the script deactivates and restores it around the single POST, and
@@ -33,4 +35,4 @@ owner must run each execute by hand.
 **How to apply:** on a new machine, add the rule to
 `.claude/settings.local.json` (create the file if missing; it is gitignored).
 Never widen it beyond this script. See [[project-test-request-factory]] and
-`docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` on the Factory branch.
+`docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` on the Factory branch. <!-- doc-symbol-refs:ignore reason=factory-branch-only -->

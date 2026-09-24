@@ -3,8 +3,9 @@
  *
  * Chunk 3c of the Grantee Deliverables Portal. Staff-initiated (Awardee tab):
  * email the grantee a magic-link to the deliverables portal (PI in To,
- * liaison Cc'd — owner S268). Staff have already confirmed/overridden the
- * recipients and previewed/edited the body.
+ * liaison Cc'd, with optional additional Cc addresses — owner S268).
+ * Staff have already confirmed/overridden the recipients and previewed/edited
+ * the body.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 4 series C):
  * method dispatch → auth guard → sender/recipient/subject/body validation →
@@ -50,14 +51,22 @@ export default async function handler(req, res) {
   }
 
   const toEmail = (req.body?.toEmail || '').trim();
-  const ccEmail = (req.body?.ccEmail || '').trim();
+  const rawCcEmail = req.body?.ccEmail ?? '';
+  if (typeof rawCcEmail !== 'string') {
+    return res.status(400).json({ error: 'Cc addresses must be a comma-separated string.' });
+  }
+  const ccAddresses = rawCcEmail.trim() ? rawCcEmail.split(',').map((email) => email.trim()) : [];
   const subject = (req.body?.subject || '').trim();
   const bodyText = String(req.body?.bodyText || '');
   if (!isEmail(toEmail)) {
     return res.status(400).json({ error: 'A valid recipient (To) email is required.' });
   }
-  if (ccEmail && !isEmail(ccEmail)) {
-    return res.status(400).json({ error: 'The Cc email is invalid.' });
+  if (ccAddresses.length > 10 || ccAddresses.some((email) => !isEmail(email))) {
+    return res.status(400).json({ error: 'Cc must contain up to 10 valid email addresses separated by commas.' });
+  }
+  const ccAddressKeys = ccAddresses.map((email) => email.toLowerCase());
+  if (new Set(ccAddressKeys).size !== ccAddresses.length || ccAddressKeys.includes(toEmail.toLowerCase())) {
+    return res.status(400).json({ error: 'Cc addresses must be distinct and different from To.' });
   }
   if (!subject) {
     return res.status(400).json({ error: 'A subject is required.' });
@@ -67,6 +76,7 @@ export default async function handler(req, res) {
   }
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const ccEmail = ccAddresses.length > 1 ? ccAddresses : (ccAddresses[0] || '');
 
   return withDalContext('grantee-send-invite', async () => {
     try {
