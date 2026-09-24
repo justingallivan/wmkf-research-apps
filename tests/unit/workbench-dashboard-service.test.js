@@ -115,11 +115,11 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
 test('Stage 1d: cycle discovery keeps test requests but leaves them out of counts', async () => {
   process.env.TEST_REQUEST_ISOLATION = 'on';
   const testRow = {
-    akoya_requestid: 'r-test', wmkf_meetingdate: '2027-06-11', _wmkf_programdirector_value: 'pd-1',
+    akoya_requestid: 'r-test', wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-1',
     wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
   };
   const ordinaryRow = {
-    akoya_requestid: 'r-1', wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-1',
+    akoya_requestid: 'r-1', wmkf_meetingdate: '2027-06-11', _wmkf_programdirector_value: 'pd-1',
     wmkf_istestrequest: null, wmkf_testcreationrunid: null,
   };
   queryAllRequests.mockResolvedValue({ records: [testRow, ordinaryRow], capped: false });
@@ -127,7 +127,23 @@ test('Stage 1d: cycle discovery keeps test requests but leaves them out of count
   const call = queryAllRequests.mock.calls[0][0];
   expect(call.filter).not.toContain('wmkf_istestrequest');
   expect(call.select).toContain('wmkf_istestrequest,wmkf_testcreationrunid');
-  expect(body.cycles.map((c) => [c.code, c.count, c.myCount])).toEqual([['J27', 0, 0], ['D26', 1, 1]]);
+  expect(body.cycles.map((c) => [c.code, c.count, c.myCount])).toEqual([['J27', 1, 1], ['D26', 0, 0]]);
+  // The earlier test-only D26 must not displace the ordinary J27 as the default.
+  expect(body.defaultCycleCode).toBe('J27');
+});
+
+test('Stage 1d: a later test request in a mixed cycle does not move its rollover day', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  const run = '22222222-2222-4222-8222-222222222222';
+  queryAllRequests.mockResolvedValue({
+    capped: false,
+    records: [
+      { akoya_requestid: 'r-1', wmkf_meetingdate: '2026-12-04', wmkf_istestrequest: null, wmkf_testcreationrunid: null },
+      { akoya_requestid: 'r-t', wmkf_meetingdate: '2026-12-18', wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+    ],
+  });
+  const body = await loadDashboard(args());
+  expect(body.cycles).toEqual([expect.objectContaining({ code: 'D26', meetingDate: '2026-12-04', count: 1 })]);
 });
 
 test('cycle-list mode: the default cycle is the same for every caller regardless of assignments or visibility', async () => {
