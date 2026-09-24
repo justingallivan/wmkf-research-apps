@@ -209,16 +209,6 @@
   },
   {
     "file": "lib/services/deliberation-briefing/briefing-link-store.js",
-    "kind": "db.connect",
-    "count": 1
-  },
-  {
-    "file": "lib/services/deliberation-briefing/briefing-link-store.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/deliberation-briefing/briefing-link-store.js",
     "kind": "sql-tag",
     "count": 4
   },
