@@ -284,11 +284,6 @@
   },
   {
     "file": "lib/services/intake-audit-service.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/intake-audit-service.js",
     "kind": "sql-tag",
     "count": 3
   },
