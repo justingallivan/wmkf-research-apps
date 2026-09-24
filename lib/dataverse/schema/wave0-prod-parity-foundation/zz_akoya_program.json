@@ -1,0 +1,15 @@
+{
+  "name": "akoya_program-prod-parity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_program",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_AlternateName",
+      "displayName": "Alternate Name",
+      "description": "no special characters",
+      "maxLength": 100
+    }
+  ]
+}
