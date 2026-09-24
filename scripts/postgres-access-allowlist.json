@@ -59,11 +59,6 @@
   },
   {
     "file": "lib/services/admin/review-questions-service.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/admin/review-questions-service.js",
     "kind": "sql-tag",
     "count": 3
   },
