@@ -32,14 +32,14 @@ function basePlan(overrides = {}) {
     recipe: 'basic',
     sourceDataverseHost: 'source.crm.dynamics.com',
     sourceRequestId: crypto.randomUUID(),
-    sourceRequestNumber: 'REQ-0001',
+    sourceRequestNumber: '1003222',
     sourceRevision: 'rev-1',
-    bundleSha256: 'a'.repeat(64),
+    bundleSha256: 'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb',
     bundleExportedAt: new Date().toISOString(),
     copyPolicyVersion: '1',
-    copyPolicyDigest: 'b'.repeat(64),
-    planDigest: 'digest-a',
-    createBodySha256: 'c'.repeat(64),
+    copyPolicyDigest: '3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d',
+    planDigest: '0649f282d35bcb0d7688e39055d04af4c9ee54ea8ec0c7758ec63f04844a39a8',
+    createBodySha256: '2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6',
     destinationEnvironment: 'sandbox',
     destinationDataverseHost: 'sandbox.crm.dynamics.com',
     destinationRequestId: crypto.randomUUID(),
@@ -48,7 +48,7 @@ function basePlan(overrides = {}) {
     expectedOrganizationId: crypto.randomUUID(),
     expectedGraphSiteId: 'site-1',
     expectedGraphDriveId: 'drive-1',
-    fiscalYear: 'FY26',
+    fiscalYear: 'December 2026',
     meetingDate: '2026-10-01',
     testLabel: 'ZZTEST',
     ...overrides,
@@ -118,7 +118,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     await expect(ledger.reserveRun({
       actorId,
       idempotencyKey,
-      plan: basePlan({ ...plan, runId: crypto.randomUUID(), planDigest: 'digest-different' }),
+      plan: basePlan({ ...plan, runId: crypto.randomUUID(), planDigest: '933da5bc7f45ad93424e42d19e38986cc333b102d612b5849909517b4af073a3' }),
     })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
   });
 
@@ -198,7 +198,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       runId: run.runId,
       leaseToken: claim.leaseToken,
       leaseGeneration: claim.leaseGeneration,
-      step: 'provision',
+      step: 'provision_location',
       resourceKind: 'sharepoint_folder',
       system: 'sharepoint',
       plannedIdentity: { folder: `1000999_${crypto.randomUUID().replace(/-/g, '').toUpperCase()}` },
@@ -231,7 +231,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     expect(resumed).not.toBeNull();
     const advanced = await ledger.advanceStep({
       runId: run.runId, leaseToken: resumed.leaseToken, leaseGeneration: resumed.leaseGeneration,
-      expectedVersion: resumed.version, nextStep: 'provision', nextStepIndex: 2, status: 'creating',
+      expectedVersion: resumed.version, nextStep: 'create_request', nextStepIndex: 2, status: 'creating',
     });
     expect(advanced).not.toBeNull();
     expect(advanced.status).toBe('creating');

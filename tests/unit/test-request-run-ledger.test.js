@@ -29,14 +29,14 @@ const BASE_PLAN = {
   recipe: 'basic',
   sourceDataverseHost: 'source.crm.dynamics.com',
   sourceRequestId: '22222222-2222-2222-2222-222222222222',
-  sourceRequestNumber: 'REQ-0001',
+  sourceRequestNumber: '1003222',
   sourceRevision: 'rev-1',
-  bundleSha256: 'a'.repeat(64),
+  bundleSha256: 'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb',
   bundleExportedAt: '2026-09-23T00:00:00.000Z',
   copyPolicyVersion: '1',
-  copyPolicyDigest: 'b'.repeat(64),
-  planDigest: 'digest-a',
-  createBodySha256: 'c'.repeat(64),
+  copyPolicyDigest: '3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d',
+  planDigest: '0649f282d35bcb0d7688e39055d04af4c9ee54ea8ec0c7758ec63f04844a39a8',
+  createBodySha256: '2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6',
   destinationEnvironment: 'sandbox',
   destinationDataverseHost: 'sandbox.crm.dynamics.com',
   destinationRequestId: '33333333-3333-3333-3333-333333333333',
@@ -45,7 +45,7 @@ const BASE_PLAN = {
   expectedOrganizationId: '66666666-6666-6666-6666-666666666666',
   expectedGraphSiteId: 'site-1',
   expectedGraphDriveId: 'drive-1',
-  fiscalYear: 'FY26',
+  fiscalYear: 'December 2026',
   meetingDate: '2026-10-01',
   testLabel: 'ZZTEST',
 };
@@ -145,7 +145,7 @@ describe('reserveRun', () => {
     await expect(ledger.reserveRun({
       actorId: 'actor-1',
       idempotencyKey: 'key-1',
-      plan: { ...BASE_PLAN, planDigest: 'digest-b' },
+      plan: { ...BASE_PLAN, planDigest: 'd921855e42ae1f28d6a612394ac4cf6902fde039bb6714ff3ea34e09a5ee84ce' },
     })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
   });
 });
@@ -243,7 +243,7 @@ describe('advanceStep status guard and markReady terminal clearing', () => {
       const ledger = createRunLedger(db);
       await expect(ledger.advanceStep({
         runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1, expectedVersion: 2,
-        nextStep: 'x', nextStepIndex: 1, status,
+        nextStep: 'create_request', nextStepIndex: 1, status,
       })).rejects.toMatchObject({ httpStatus: 400, code: 'test_request_run_invalid_status' });
       expect(calls).toHaveLength(0);
     },
@@ -255,7 +255,7 @@ describe('advanceStep status guard and markReady terminal clearing', () => {
     const ledger = createRunLedger(db);
     await ledger.advanceStep({
       runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1, expectedVersion: 2,
-      nextStep: 'provision', nextStepIndex: 2, status: 'creating',
+      nextStep: 'create_request', nextStepIndex: 2, status: 'creating',
     });
     expect(calls[0].text).toMatch(/needs_attention_reason = CASE\s+WHEN COALESCE\(\$7::text, status\) = 'needs_attention' THEN needs_attention_reason\s+ELSE NULL/);
     expect(calls[0].params[6]).toBe('creating');

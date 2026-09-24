@@ -3,7 +3,9 @@ import { jest } from '@jest/globals';
 import {
   LEDGER_REASON_CODES,
   LEDGER_RECEIPT_KEYS,
+  LEDGER_STEPS,
   assertLedgerReceipt,
+  assertReservePlan,
   createRunLedger,
   describeLedgerError,
   ledgerReasonOrThrow,
@@ -145,6 +147,58 @@ describe('ledger redaction', () => {
   });
 });
 
+describe('remaining text columns are finite or grammar-bound', () => {
+  const validPlan = () => ({
+    runId: RUN_ID, sourceRequestId: RUN_ID, destinationRequestId: '33333333-3333-4333-8333-333333333333',
+    destinationLocationId: '44444444-4444-4444-8444-444444444444', expectedAppUserId: RUN_ID, expectedOrganizationId: RUN_ID,
+    recipe: 'basic', destinationEnvironment: 'sandbox', sourceDataverseHost: 'wmkf.crm.dynamics.com',
+    destinationDataverseHost: 'orgd9e66399.crm.dynamics.com', sourceRequestNumber: '1003222', sourceRevision: 'W/"98622844"',
+    bundleSha256: 'a'.repeat(64), copyPolicyDigest: 'b'.repeat(64), planDigest: 'c'.repeat(64), createBodySha256: 'd'.repeat(64),
+    copyPolicyVersion: 'sandbox-rehearsal-2026-09-23', bundleExportedAt: '2026-09-24T03:58:33.103Z',
+    expectedGraphSiteId: 'appriver3651007194.sharepoint.com,48930e19-0000-4000-8000-000000000000,1', expectedGraphDriveId: 'b!GQ6TSC-650adweD3-K',
+    fiscalYear: 'December 2026', meetingDate: '2026-12-11', testLabel: 'Codex sandbox request factory rehearsal 2026-09-24 05d56f5d',
+  });
+
+  test('step names come from LEDGER_STEPS; prose, secrets and URLs never reach SQL', async () => {
+    const db = recordingDb([]);
+    const ledger = createRunLedger(db);
+    for (const bad of ['https://secret.example/download?token=hunter2', 'Confidential proposal purpose', 'supersecret123', 'deadbeefcafe', '']) {
+      await expect(ledger.advanceStep({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 2, nextStep: bad, nextStepIndex: 1 }))
+        .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+      await expect(ledger.journalPlannedResource({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, step: bad, resourceKind: 'sharepoint_file', system: 'sharepoint', plannedIdentity: {} }))
+        .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    }
+    await expect(ledger.journalPlannedResource({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, step: 'copy_file', resourceKind: 'purpose_dump', system: 'sharepoint', plannedIdentity: {} }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    await expect(ledger.recordResourceReadback({ resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, readback: {}, outcome: 'Confidential' }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    expect(db.calls).toHaveLength(0);
+    expect(LEDGER_STEPS).toEqual(['fence_source', 'create_request', 'correct_meeting_date', 'provision_location', 'copy_file', 'observe', 'verify', 'ready']);
+  });
+
+  test('reserveRun validates every text column before SQL', async () => {
+    expect(assertReservePlan({ actorId: 'cli:gallivan', idempotencyKey: 'run-2026-09-24-a', plan: validPlan() })).toBeTruthy();
+    const db = recordingDb([]);
+    const ledger = createRunLedger(db);
+    const cases = [
+      { actorId: 'cli gallivan', idempotencyKey: 'k', plan: validPlan() },
+      { actorId: 'cli:x', idempotencyKey: 'k with space', plan: validPlan() },
+      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), recipe: 'confidential' } },
+      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), testLabel: 'see https://leak/x' } },
+      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), testLabel: 'x'.repeat(141) } },
+      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), fiscalYear: 'Confidential 2026' } },
+      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), sourceRevision: 'purpose text here' } },
+      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), destinationEnvironment: 'prod' } },
+      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), bundleSha256: 'nothex' } },
+      { actorId: 'cli:x', idempotencyKey: 'k', plan: { ...validPlan(), sourceDataverseHost: 'https://wmkf.crm.dynamics.com' } },
+    ];
+    for (const bad of cases) {
+      await expect(ledger.reserveRun(bad)).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    }
+    expect(db.calls).toHaveLength(0);
+  });
+});
+
 describe('ledger lifecycle additions', () => {
   test('error columns hold an allowlisted code and status only, never upstream text', async () => {
     const leaky = Object.assign(new Error('Authentication failed: Basic dXNlcjpwYXNz at https://x.sharepoint.com/sites/akoyaGO/_layouts/download.aspx?id=1; purpose: confidential proposal purpose'), { status: 401 });
@@ -210,11 +264,11 @@ describe('ledger lifecycle additions', () => {
     expect(db.calls[0].text).toMatch(/destination_request_number = COALESCE\(\$8::text, destination_request_number\)/);
     expect(db.calls[0].params[7]).toBe('1000340');
     await ledger.advanceStep({
-      runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 3, nextStep: 'x', nextStepIndex: 3,
+      runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 3, nextStep: 'verify', nextStepIndex: 3,
     });
     expect(db.calls[1].params[7]).toBeNull();
     await expect(ledger.advanceStep({
-      runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 3, nextStep: 'x', nextStepIndex: 3,
+      runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 3, nextStep: 'verify', nextStepIndex: 3,
       destinationRequestNumber: 'DROP TABLE',
     })).rejects.toMatchObject({ code: 'test_request_run_invalid_request_number' });
     expect(db.calls).toHaveLength(2);
