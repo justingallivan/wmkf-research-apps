@@ -51,11 +51,18 @@ not perform.
   header values, SAS/`tempauth`/`sig=` query credentials and SharePoint
   download links, and caps length at 500 chars; `last_error` and
   `needs_attention_reason` pass through it. Every JSONB write
-  (`planned_identity`, `source_provenance`, `readback`) passes through
-  `sanitizeLedgerJson`, which replaces keys naming credentials, links,
-  bodies, content or purpose text with `[redacted]` and sanitizes every
-  string value, so a Dataverse response body or Graph download URL cannot
-  land in the ledger.
+  (`planned_identity`, `source_provenance`, `readback`) is validated by
+  `assertLedgerReceipt` BEFORE any SQL: an allowlist of receipt keys
+  (`LEDGER_RECEIPT_KEYS`: identities, hashes, sizes, statuses, timestamps),
+  flat objects only, bounded string lengths, no URLs, line breaks or
+  credential-shaped values, SHA-256 shape for `*Hash`, digits for
+  `requestNumber`. Unknown keys and unsafe values are rejected with
+  `400 test_request_ledger_unsafe_value`, never redacted, so a Dataverse
+  response body, purpose text or Graph download URL cannot land in the
+  ledger. `ready` additionally requires `destination_request_number`
+  (validator in `markReady` plus the `test_request_runs_ready_request_number`
+  CHECK). The live PostgreSQL suite is a required CI job
+  (`.github/workflows/test.yml` `ledger-postgres`, fails rather than skips).
 - **Trust:** `test_request_runs` is keyed by a caller-supplied
   `(actor_id, idempotency_key)` unique pair so a retried confirm cannot
   create a second run or a second destination GUID (see

@@ -1,13 +1,20 @@
 /** @jest-environment node */
 import { jest } from '@jest/globals';
 import {
+  LEDGER_RECEIPT_KEYS,
+  assertLedgerReceipt,
   createRunLedger,
+  requestNumberOrThrow,
   sanitizeErrorMessage,
-  sanitizeLedgerJson,
 } from '../../lib/services/test-requests/run-ledger.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const TOKEN = '22222222-2222-4222-8222-222222222222';
+
+function thrownCode(fn) {
+  try { fn(); } catch (error) { return error.code; }
+  return 'did-not-throw';
+}
 
 function recordingDb(rowsPerCall = []) {
   const calls = [];
@@ -21,64 +28,86 @@ function recordingDb(rowsPerCall = []) {
 }
 
 describe('ledger redaction', () => {
-  test('sanitizeErrorMessage strips bearer tokens, Authorization headers, SAS signatures and download links', () => {
-    const text = 'Bearer abc.def Authorization: Basic xyz https://x.sharepoint.com/_layouts/15/download.aspx?a=1 ?sig=SECRET&sv=2020';
+  test('sanitizeErrorMessage removes the secret itself, not just its label', () => {
+    const text = 'Bearer abc.def; Authorization: Basic dXNlcjpwYXNz; url https://x.sharepoint.com/_layouts/15/download.aspx?a=1&sig=SECRET123&sv=2020';
     const cleaned = sanitizeErrorMessage(text);
-    expect(cleaned).not.toContain('abc.def');
-    expect(cleaned).not.toContain('Basic xyz');
-    expect(cleaned).not.toContain('download.aspx');
-    expect(cleaned).not.toContain('SECRET');
+    for (const secret of ['abc.def', 'dXNlcjpwYXNz', 'SECRET123', 'download.aspx']) {
+      expect(cleaned).not.toContain(secret);
+    }
     expect(cleaned.length).toBeLessThanOrEqual(500);
   });
 
-  test('sanitizeLedgerJson redacts credential, link, body and purpose keys but keeps identities, hashes and sizes', () => {
-    const scrubbed = sanitizeLedgerJson({
-      id: '01ABC',
-      graphItemId: '01ABC',
-      contentHash: 'a'.repeat(64),
-      size: 12,
-      eTag: '"1"',
-      '@microsoft.graph.downloadUrl': 'https://x/download?tempauth=zzz',
-      akoya_purpose: 'confidential purpose text',
-      createBody: { akoya_purpose: 'x' },
-      nested: { authorization: 'Bearer q', requestIds: ['a'], note: 'Bearer leaked' },
-      list: [{ token: 't' }],
-    });
-    expect(scrubbed).toEqual({
-      id: '01ABC',
-      graphItemId: '01ABC',
-      contentHash: 'a'.repeat(64),
-      size: 12,
-      eTag: '"1"',
-      '@microsoft.graph.downloadUrl': '[redacted]',
-      akoya_purpose: '[redacted]',
-      createBody: '[redacted]',
-      nested: { authorization: '[redacted]', requestIds: ['a'], note: 'Bearer [redacted]' },
-      list: [{ token: '[redacted]' }],
-    });
+  test('assertLedgerReceipt is an allowlist: unknown keys, nested objects, bodies, links and credentials are rejected, not redacted', () => {
+    const ok = {
+      requestId: '5d54abc5-7f74-4d23-b4be-39599147e674', requestNumber: '1000340', itemId: '01G4GVMS34H6SGDJZCGNF2NLBTIUMXWRAW',
+      contentHash: 'a'.repeat(64), size: 287771, eTag: '"{1}"', versionId: '1.0', outcome: 'verified',
+      dispatchedAt: '2026-09-24T04:40:00.000Z', restoreVerified: true, requestIds: ['5d54abc5-7f74-4d23-b4be-39599147e674'],
+    };
+    expect(assertLedgerReceipt(ok)).toBe(ok);
+    const rejects = [
+      { akoya_purpose: 'confidential text' },
+      { createBody: { akoya_title: 'x' } },
+      { '@microsoft.graph.downloadUrl': 'https://x' },
+      { body: 'x' }, { bytes: 'x' }, { narrative: 'x' }, { token: 'x' }, { bodyId: 'x' },
+      { reason: 'Bearer abc' },
+      { reason: 'Authorization: Basic zzz' },
+      { name: 'https://sharepoint.com/file' },
+      { filename: 'x'.repeat(201) },
+      { reason: 'x'.repeat(81) },
+      { contentHash: 'not-hex' },
+      { requestNumber: 'DROP TABLE' },
+      { verifiedAt: 'yesterday' },
+      { nested: { a: 1 } },
+      { requestIds: [{ id: 1 }] },
+      { reason: 'line\nbreak' },
+    ];
+    for (const bad of rejects) {
+      expect([JSON.stringify(bad).slice(0, 40), thrownCode(() => assertLedgerReceipt(bad))])
+        .toEqual([JSON.stringify(bad).slice(0, 40), 'test_request_ledger_unsafe_value']);
+    }
+    expect(LEDGER_RECEIPT_KEYS).not.toEqual(expect.arrayContaining(['purpose', 'body', 'content', 'token', 'downloadUrl']));
   });
 
-  test('every JSONB write passes through the scrubber', async () => {
+  test('every JSONB write is validated before binding, so an unsafe receipt never reaches SQL', async () => {
     const runRow = { run_id: RUN_ID, lease_token: TOKEN, lease_generation: 1, lease_live: true, version: 2 };
-    const db = recordingDb([
-      [runRow], [{ next_sequence: 1 }], [{ resource_id: 1 }], // journalPlannedResource
-      [runRow], [{ resource_id: 1 }], // recordResourceReadback
-    ]);
+    const db = recordingDb([[runRow], [{ next_sequence: 1 }], [{ resource_id: 1 }], [runRow], [{ resource_id: 1 }]]);
     const ledger = createRunLedger(db);
     await ledger.journalPlannedResource({
       runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, step: 'copy_file', resourceKind: 'sharepoint_file', system: 'sharepoint',
-      plannedIdentity: { filename: 'a.pdf', downloadUrl: 'https://leak' },
-      sourceProvenance: { graphItemId: 'x', akoya_purpose: 'text' },
+      plannedIdentity: { filename: 'a.pdf', folder: 'F/AI Materials' },
+      sourceProvenance: { graphItemId: 'x', contentHash: 'b'.repeat(64) },
     });
     await ledger.recordResourceReadback({
       resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, responseStatus: 201,
-      readback: { id: 'x', body: 'huge', eTag: '"2"' }, outcome: 'verified',
+      readback: { itemId: 'x', eTag: '"2"' }, outcome: 'verified',
     });
+    const before = db.calls.length;
+    await expect(ledger.journalPlannedResource({
+      runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, step: 'copy_file', resourceKind: 'sharepoint_file', system: 'sharepoint',
+      plannedIdentity: { filename: 'a.pdf', downloadUrl: 'https://leak' },
+    })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    await expect(ledger.recordResourceReadback({
+      resourceId: 1, runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, responseStatus: 201,
+      readback: { itemId: 'x', body: 'huge' }, outcome: 'verified',
+    })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    // Validation happens before any SQL for the rejected calls.
+    expect(db.calls.length).toBe(before);
     const inserted = db.calls.find((c) => c.text.includes('INSERT INTO test_request_run_resources'));
-    expect(inserted.params[5]).toBe(JSON.stringify({ filename: 'a.pdf', downloadUrl: '[redacted]' }));
-    expect(inserted.params[6]).toBe(JSON.stringify({ graphItemId: 'x', akoya_purpose: '[redacted]' }));
-    const readback = db.calls.find((c) => c.text.includes('readback = $4::jsonb'));
-    expect(readback.params[3]).toBe(JSON.stringify({ id: 'x', body: '[redacted]', eTag: '"2"' }));
+    expect(inserted.params[5]).toBe(JSON.stringify({ filename: 'a.pdf', folder: 'F/AI Materials' }));
+  });
+
+  test('requestNumberOrThrow is shared by advanceStep and markReady, and markReady requires a number atomically', async () => {
+    expect(requestNumberOrThrow(1000340)).toBe('1000340');
+    expect(requestNumberOrThrow(null)).toBeNull();
+    expect(thrownCode(() => requestNumberOrThrow('12x'))).toBe('test_request_run_invalid_request_number');
+    const db = recordingDb([[{ run_id: RUN_ID, status: 'ready' }]]);
+    const ledger = createRunLedger(db);
+    await expect(ledger.markReady({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 2, destinationRequestNumber: 'abc' }))
+      .rejects.toMatchObject({ code: 'test_request_run_invalid_request_number' });
+    expect(db.calls).toHaveLength(0);
+    await ledger.markReady({ runId: RUN_ID, leaseToken: TOKEN, leaseGeneration: 1, expectedVersion: 2, destinationRequestNumber: '1000340' });
+    expect(db.calls[0].text).toMatch(/AND COALESCE\(\$5::text, destination_request_number\) IS NOT NULL/);
+    expect(db.calls[0].params[4]).toBe('1000340');
   });
 });
 

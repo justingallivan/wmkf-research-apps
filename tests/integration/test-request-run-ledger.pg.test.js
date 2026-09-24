@@ -14,6 +14,13 @@ import { pgLedgerDb } from '../../lib/services/test-requests/run-ledger-db.js';
  * POSTGRES_URL.
  */
 const TEST_URL = process.env.TEST_REQUEST_LEDGER_TEST_URL || '';
+if (!TEST_URL && process.env.TEST_REQUEST_LEDGER_REQUIRE === '1') {
+  // CI runs this suite against a PostgreSQL service and must never skip it.
+  throw new Error('TEST_REQUEST_LEDGER_REQUIRE=1 but TEST_REQUEST_LEDGER_TEST_URL is unset.');
+}
+if (/neon\.tech/i.test(TEST_URL) || (process.env.POSTGRES_URL && TEST_URL === process.env.POSTGRES_URL)) {
+  throw new Error('Refusing to run the ledger proof against the shared Production/Preview database.');
+}
 const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
@@ -194,7 +201,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       step: 'provision',
       resourceKind: 'sharepoint_folder',
       system: 'sharepoint',
-      plannedIdentity: { path: `/Test/${crypto.randomUUID()}` },
+      plannedIdentity: { folder: `Test/${crypto.randomUUID()}` },
     });
 
     const results = await Promise.all([journalOne(), journalOne(), journalOne()]);

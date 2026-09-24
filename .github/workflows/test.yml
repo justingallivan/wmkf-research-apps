@@ -71,3 +71,34 @@ jobs:
       - run: npm run build
       - run: git diff --exit-code lib/db/migrations-manifest.json
       - run: npm run test:ci
+
+  ledger-postgres:
+    # Live PostgreSQL proof for the Test Request Factory run ledger. The unit
+    # fake cannot see SQL grammar or parameter typing (an aggregate FOR UPDATE
+    # once passed it), so this suite is REQUIRED here: it fails, not skips,
+    # when the connection URL is missing (TEST_REQUEST_LEDGER_REQUIRE=1).
+    name: Run ledger (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ledger
+          POSTGRES_DB: ledger
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx jest tests/integration/test-request-run-ledger.pg.test.js
+        env:
+          TEST_REQUEST_LEDGER_TEST_URL: postgres://postgres:ledger@127.0.0.1:5432/ledger
+          TEST_REQUEST_LEDGER_REQUIRE: '1'

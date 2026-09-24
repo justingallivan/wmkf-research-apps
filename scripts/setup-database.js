@@ -1253,6 +1253,9 @@ const v55Statements = [
       (status = 'ready' AND completed_at IS NOT NULL)
       OR (status IN ('prepared', 'creating', 'needs_attention') AND completed_at IS NULL)
       OR status IN ('retiring', 'retired')
+    ),
+    CONSTRAINT test_request_runs_ready_request_number CHECK (
+      status <> 'ready' OR destination_request_number IS NOT NULL
     )
   )`,
   `CREATE INDEX IF NOT EXISTS test_request_runs_status_idx ON test_request_runs (status)`,

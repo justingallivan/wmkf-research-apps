@@ -28,6 +28,11 @@ function satisfiesNeedsAttentionCoherence({ status, needsAttentionReason = null 
   return needsAttentionReason === null;
 }
 
+/** Mirrors test_request_runs_ready_request_number. */
+function satisfiesReadyRequestNumber({ status, destinationRequestNumber = null }) {
+  return status !== 'ready' || destinationRequestNumber !== null;
+}
+
 /** Mirrors test_request_runs_completed_at_coherence. */
 function satisfiesCompletedAtCoherence({ status, completedAt = null }) {
   if (status === 'ready') return completedAt !== null;
@@ -107,6 +112,16 @@ describe('migration 054 CHECK constraints (pure-JS mirror)', () => {
     });
   });
 
+  describe('test_request_runs_ready_request_number', () => {
+    it('ready requires a destination request number; other states do not', () => {
+      expect(satisfiesReadyRequestNumber({ status: 'ready', destinationRequestNumber: '1000340' })).toBe(true);
+      expect(satisfiesReadyRequestNumber({ status: 'ready' })).toBe(false);
+      for (const status of ['prepared', 'creating', 'needs_attention', 'retiring', 'retired']) {
+        expect(satisfiesReadyRequestNumber({ status })).toBe(true);
+      }
+    });
+  });
+
   describe('destination_environment enum', () => {
     it('accepts sandbox and production', () => {
       expect(isValidDestinationEnvironment('sandbox')).toBe(true);
@@ -169,6 +184,11 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
     expect(migration).toContain('test_request_runs_needs_attention_reason_coherence');
     expect(migration).toContain("status = 'needs_attention' AND needs_attention_reason IS NOT NULL");
     expect(migration).toContain("status <> 'needs_attention' AND needs_attention_reason IS NULL");
+  });
+
+  it('defines the ready-requires-request-number constraint', () => {
+    expect(migration).toContain('test_request_runs_ready_request_number');
+    expect(migration).toContain("status <> 'ready' OR destination_request_number IS NOT NULL");
   });
 
   it('defines the completed_at coherence constraint', () => {
