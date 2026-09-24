@@ -98,7 +98,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx jest tests/integration/test-request-run-ledger.pg.test.js
+      - run: npx jest tests/integration/test-request-run-ledger.pg.test.js tests/integration/test-request-run-runner.pg.test.js
         env:
           TEST_REQUEST_LEDGER_TEST_URL: postgres://postgres:ledger@127.0.0.1:5432/ledger
           TEST_REQUEST_LEDGER_REQUIRE: '1'

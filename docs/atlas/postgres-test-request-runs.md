@@ -29,9 +29,13 @@ not perform.
 ## Contract
 
 - **Writer:** `lib/services/test-requests/run-ledger.js` (`createRunLedger`),
-  called by the not-yet-built admin-driven, lease-based step endpoint for
-  the Test Request Factory. No route or worker calls it yet in this slice;
-  slice 5a delivers only the ledger and its tests.
+  called by the bounded resumable runner
+  `lib/services/test-requests/run-runner.js` (`advanceRun`, one step per
+  call) through the CLI modes `--reserve` / `--advance` / `--run-inspect`
+  of `scripts/rehearse-test-request-sandbox.mjs`, which connect only to
+  the operator-supplied `TEST_REQUEST_LEDGER_URL` (refused when unset, when
+  it names a neon.tech host, or when it equals any shared `POSTGRES_URL*` /
+  `DATABASE_URL` value). No API route or worker calls the ledger yet.
 - **Reader:** the same run-ledger store (`getRun`, `listRunResources`,
   `listRuns`) and, eventually, the admin Test Requests operations panel
   (list/status/resume/retire, design-doc stage 5, not yet built).

@@ -139,56 +139,41 @@ describe('sandbox clone source fence', () => {
 });
 
 describe('sandbox operator write boundary', () => {
+  // Slice 5b (build order item 5) extracted executeManifest's step bodies
+  // into lib/services/test-requests/basic-clone-steps.js so a bounded
+  // resumable runner (run-runner.js) can reuse them. Every pin that used to
+  // check literal text inside a NOW-MOVED function was replaced by an
+  // equivalent behavioral test in tests/unit/test-request-basic-clone-steps.test.js
+  // (see that file's header comment for the full list); only the pins for
+  // logic that stays in this script -- main()'s read-only boundary, the
+  // still-unmoved copyBundleDocuments/inspectManifest/prepare helpers -- stay
+  // here as literal-text pins.
   const scriptPath = path.resolve(process.cwd(), 'scripts/rehearse-test-request-sandbox.mjs');
   const script = fs.readFileSync(scriptPath, 'utf8');
 
-  test('keeps one Request create and routes it through execute only', () => {
-    expect(script.match(/client\.postWithOptions\('\/akoya_requests'/g)).toHaveLength(1);
-    expect(script).toContain('Only a source-bound v3 or bundle v4 manifest can execute a sandbox clone.');
-    expect(script).toContain('const source = await fenceSource(client, manifest, preflightBefore.grantOption.value)');
-    // The fence re-reads a sandbox source (v3) or re-validates the embedded
-    // bundle (v4); the sandbox client never reads production.
-    expect(script).toContain('await getSourceRequestById(client, manifest.source.requestId, requestOptions)');
-    expect(script).toContain('source = bundleSourceOf(manifest).request;');
+  test('keeps the receipt-open call and generic write-boundary markers intact in the orchestrating script', () => {
     expect(script).toContain('reserveRehearsalReceipt(receiptPath, receipt)');
-    expect(script).toContain('manifest.values.locationId');
     expect(script).toContain('expectedFolder');
-    expect(script).toContain('SharePoint location parent identity mismatch');
-    expect(script).toContain('Preallocated request GUID is not absent');
+    expect(script).toContain('checkPreallocatedRequestAbsent');
     expect(script).toContain('READ_ONLY_PREFLIGHT');
     expect(script).toContain('writeNewJson(args.prepare, manifest)');
-    const bypassIntent = script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', script.indexOf('signalFence = createBypassSignalFence()'));
-    const bypassWrite = script.indexOf('const workflowDeactivated = await setGoverifyWorkflowState(', bypassIntent);
-    expect(bypassIntent).toBeGreaterThan(-1);
-    expect(bypassWrite).toBeGreaterThan(bypassIntent);
-    const requestIntent = script.indexOf('receipt.createAttempted = true;');
-    const receiptPersist = script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', requestIntent);
-    const requestWrite = script.indexOf("client.postWithOptions('/akoya_requests'", receiptPersist);
-    expect(receiptPersist).toBeGreaterThan(requestIntent);
-    expect(requestWrite).toBeGreaterThan(receiptPersist);
-    expect(script).toContain('receipt.createResponseReceivedAt = new Date().toISOString()');
-    const datePatchIntent = script.indexOf('receipt.meetingDateCorrection.patchAttempted = true;');
-    expect(script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', datePatchIntent))
-      .toBeLessThan(script.indexOf('patched = await client.patch(', datePatchIntent));
-    const graphFolderIntent = script.indexOf('graphFolderAttempted: true');
-    expect(script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', graphFolderIntent))
-      .toBeLessThan(script.indexOf('GraphService.ensureFolderPath', graphFolderIntent));
-    expect(script).toContain('locationCreateAttempted = true');
     expect(script).toContain('receipt.observationStartedAt = new Date().toISOString()');
     expect(script).toContain('expectedSharePointFolder: expectedFolder');
     expect(script).toContain('postCreateStepsSkippedReason =');
-    expect(script).toContain('restoreManualRecheckRequired = true');
-    expect(script).toContain('Workflow ID: ${receipt.goverifyBypass.workflowId}.');
-    expect(script).toContain('isGoverifyDeactivationUncertain(receipt.goverifyBypass)');
-    expect(script).toContain('restoreVerified = true');
-    expect(script).toContain('signalFence?.dispose()');
-    expect(script).toContain('client.postWithOptions');
     const mainBody = script.slice(script.indexOf('async function main()'), script.indexOf('main().catch'));
     expect(mainBody).not.toMatch(/client\.(post|patch|delete)\s*\(/);
-    expect(script).toContain('verifyCloneRequestReadback(manifest, request)');
+    // --reserve writes the private manifest before reserving, so no reserved
+    // run can exist without its manifest; the actor is a digest, never free text.
+    expect(script.indexOf('writeNewJson(args.manifestOut, manifest)')).toBeGreaterThan(-1);
+    expect(script.indexOf('writeNewJson(args.manifestOut, manifest)')).toBeLessThan(script.indexOf('ledger.reserveRun('));
+    expect(script).toContain('cliActorId(');
+    expect(script).not.toMatch(/cli:\$\{/);
+    expect(script).toContain('destinationDataverseHost: new URL(SANDBOX_URL).hostname');
+    // --run-inspect must not construct the Dataverse client at all.
+    expect(script.indexOf("if (args.runInspect)")).toBeLessThan(script.indexOf('createClient({'));
   });
 
-  test('copies bundle files only after the location exists, through the journaled copy module', () => {
+  test('copies bundle files only after the location exists, through the journaled copy module (unmoved copyBundleDocuments)', () => {
     // File copy runs after the Request and its location are proven, never before.
     const locationProvision = script.indexOf('const location = await provisionSharePointLocation(');
     const copyCall = script.indexOf('await copyBundleDocuments(manifest, datedRequest, location.folder, preflightBefore, receipt, receiptPath)');
@@ -200,25 +185,25 @@ describe('sandbox operator write boundary', () => {
     expect(script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', journalAssign) - journalAssign).toBeLessThan(80);
     // The script itself never uploads; the copy module owns the single create-only PUT.
     expect(script).not.toMatch(/GraphService\.uploadFile\([^)]*\)\s*;/);
-    expect(script).toContain('retryOnAmbiguousFileUpload: false');
-    expect(script).toContain('expectedSharePointFiles: plannedFiles.length');
-    expect(script).toContain('verifyCopiedFiles(fileCopies, files)');
     expect(script).toContain("destinationRequestNumber: request.akoya_requestnum");
-    // Source attestation, policy binding and freshness fences for bundle manifests.
+    // Source attestation for both file-receipt prepare and the ledger-driven reserve.
     expect(script).toContain('source.akoya_requestnum !== args.sourceRequestNumber');
-    expect(script).toContain('request.akoya_requestnum !== manifest.source.requestNumber');
-    expect(script).toContain("manifest.copyPolicy?.digest !== copyPolicyDigest()");
-    expect(script).toContain('if (!allowStale) assertBundleFresh(bundle);');
-    expect(script).toContain('bundleSourceOf(manifest, { allowStale: allowExpired })');
     // Receipt-bound inspection reconciles journaled stable IDs read-only.
     expect(script).toContain('reconcileJournaledCopies(receipt.fileCopies');
     expect(script).toContain("Receipt does not belong to this manifest.");
-    // Final manifest-authoritative byte check by stable ID runs after observation and gates verification.ok.
+    // The reverify wrapper still runs after observation and before the final receipt persist.
     const observation = script.indexOf('const observation = await observe(client, manifest.values.requestId);');
-    const reverify = script.indexOf('reverifyCopiedItems(receipt.fileCopies || []');
+    const reverify = script.indexOf('reverifyClone(graph, receipt.fileCopies || [])');
     const persisted = script.indexOf('updateRehearsalReceipt(receiptPath, receipt);', reverify);
     expect(reverify).toBeGreaterThan(observation);
     expect(persisted).toBeGreaterThan(reverify);
     expect(script).toContain("verification.failures.push(...reverifyFailures.map((failure) => `final file check: ${failure}`))");
+  });
+
+  test('ledger-driven modes refuse an unset or shared-production TEST_REQUEST_LEDGER_URL', () => {
+    expect(script).toContain("if (!url) {");
+    expect(script).toContain('TEST_REQUEST_LEDGER_URL is required for ledger-driven modes');
+    expect(script).toMatch(/neon\\?\.tech/);
+    expect(script).toContain('must not be the shared Production/Preview database');
   });
 });
