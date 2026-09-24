@@ -109,16 +109,6 @@
   },
   {
     "file": "lib/services/consultant-feedback-service.js",
-    "kind": "db.connect",
-    "count": 3
-  },
-  {
-    "file": "lib/services/consultant-feedback-service.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/consultant-feedback-service.js",
     "kind": "sql.query",
     "count": 10
   },
