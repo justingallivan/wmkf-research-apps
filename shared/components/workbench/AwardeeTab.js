@@ -7,8 +7,9 @@
  *   - website HTML (b):   GET  /api/workbench/grantee-deliverables/website-html?requestId=
  *   - cycle export (c):   GET  /api/workbench/grantee-deliverables/cycle-export?cycleCode=
  *
- * Flow: Generate (or load) the style-guide abstract → confirm the two recipients
- * (PI in To, liaison in Cc; both pre-filled, editable) → preview/edit the email →
+ * Flow: Generate (or load) the style-guide abstract → confirm recipients
+ * (PI in To, liaison in Cc; both pre-filled, editable, with additional Cc addresses
+ * allowed) → preview/edit the email →
  * Send. Research-only scope (the workflow is only run on research grants).
  * Action-driven: no dedicated state-read endpoint — "Generate abstract" reuses an
  * existing one without a paid call, so it doubles as a load.
@@ -834,10 +835,12 @@ export default function AwardeeTab({ requestId, context }) {
   const sendClosed = status !== null
     && !Number.isNaN(status)
     && status >= GRANTEE_DELIVERABLE_STATUS.SUBMITTED;
+  const ccAddresses = ccEmail.trim() ? ccEmail.split(',').map((email) => email.trim()) : [];
+  const ccAddressesValid = ccAddresses.length <= 10 && ccAddresses.every(isEmail);
   const canSend = invitableStatus
     && hasAbstract
     && isEmail(toEmail)
-    && (!ccEmail || isEmail(ccEmail))
+    && ccAddressesValid
     && !sending
     && emailDefaults.loaded
     && !emailDefaultsUnavailable
@@ -1207,10 +1210,12 @@ export default function AwardeeTab({ requestId, context }) {
             Always review automated emails to {recipients.pi.name || 'this PI'} before sending (future messages only)
           </label>
         )}
-        <label className="block text-sm">Cc (liaison)
+        <label className="block text-sm">Cc (liaison and others)
           <input aria-label="Cc email" value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} className="w-full border rounded p-1" />
           {recipients?.liaison?.name && <span className="text-xs text-gray-500"> {recipients.liaison.name}</span>}
         </label>
+        <p className="text-xs text-gray-500">To copy an assistant as well as the liaison, add their email after a comma (up to 10 Cc addresses).</p>
+        {!ccAddressesValid && <p className="text-xs text-red-700">Enter up to 10 valid Cc addresses, separated by commas.</p>}
         {vipContactIds !== null && recipients?.liaison?.contactId && (
           <label className="flex items-center gap-2 text-xs text-gray-600">
             <input

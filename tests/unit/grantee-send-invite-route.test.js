@@ -165,6 +165,28 @@ test('invalid Cc email → 400', async () => {
   expect(res.statusCode).toBe(400);
 });
 
+test('liaison and added assistant are both sent as Cc addresses', async () => {
+  const res = mockRes();
+  await handler(reqOf(body({ ccEmail: 'lorena.mclaren@emory.edu, assistant@emory.edu' })), res);
+  expect(res.statusCode).toBe(200);
+  expect(DynamicsService.createAndSendEmail.mock.calls[0][0].cc).toEqual([
+    'lorena.mclaren@emory.edu', 'assistant@emory.edu',
+  ]);
+});
+
+test.each([
+  'lorena.mclaren@emory.edu, bad',
+  'lorena.mclaren@emory.edu,',
+  Array.from({ length: 11 }, (_, i) => `assistant${i}@emory.edu`).join(', '),
+  ['lorena.mclaren@emory.edu', 'assistant@emory.edu'],
+])('invalid Cc list is rejected before the link is minted or mail is sent: %p', async (ccEmail) => {
+  const res = mockRes();
+  await handler(reqOf(body({ ccEmail })), res);
+  expect(res.statusCode).toBe(400);
+  expect(mintForRequest).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
 test('missing azureEmail (no sender) → 400', async () => {
   requireAppAccess.mockResolvedValue({ profileId: 'p', session: { user: { dynamicsSystemuserId: 'sys-1' } } });
   const res = mockRes();

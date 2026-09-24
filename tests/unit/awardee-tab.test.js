@@ -286,6 +286,35 @@ test('full flow: generate then send → status Invited + confirmation', async ()
   });
 });
 
+test('keeps the liaison copied when staff add an assistant for this invitation', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Cc email')).toHaveValue('lorena.mclaren@emory.edu'));
+
+  fireEvent.change(screen.getByLabelText('Cc email'), {
+    target: { value: 'lorena.mclaren@emory.edu, assistant@emory.edu' },
+  });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+
+  await waitFor(() => expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(true));
+  const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
+  expect(JSON.parse(sendCall[1].body).ccEmail).toBe('lorena.mclaren@emory.edu, assistant@emory.edu');
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/api/user-preferences'))).toBe(false);
+});
+
+test('disables sending if an additional Cc address is invalid', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Cc email')).toHaveValue('lorena.mclaren@emory.edu'));
+  fireEvent.change(screen.getByLabelText('Cc email'), {
+    target: { value: 'lorena.mclaren@emory.edu, not-an-email' },
+  });
+  expect(screen.getByText(/enter up to 10 valid Cc addresses/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+});
+
 test('successful send reloads the recorded invite date into the status header', async () => {
   wireFetch({
     abstract: {
