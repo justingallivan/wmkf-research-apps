@@ -21,6 +21,12 @@
  * already enforced loopback on `PG_CONTRACT_URL` (assertLocalHost), so
  * pointing `getPool()` at that same value is safe; this file must never
  * copy this pattern to point `getPool()` at a non-loopback URL.
+ *
+ * `getPool()` returns a frozen facade with no `.end()` (P1 hardening: a
+ * raw `Pool` export would let any importer poison the process-wide
+ * singleton). This test file closes that isolated module's real pool via
+ * the seam's non-enumerable `__endPoolForTests()` escape hatch instead,
+ * which only works because Jest sets `JEST_WORKER_ID`.
  */
 
 const crypto = require('node:crypto');
@@ -42,7 +48,7 @@ describeIfDb('lib/postgres/client: contract', () => {
   const { getPool: getShimPool } = require('./support/vercel-postgres-pg-shim.js');
 
   let client;
-  let seamPool;
+  let isolatedSeamForCleanup;
   const tableName = `pg_contract_probe_${crypto.randomBytes(6).toString('hex')}`;
 
   beforeAll(async () => {
@@ -58,7 +64,7 @@ describeIfDb('lib/postgres/client: contract', () => {
     // line of defense -- a real bug (e.g. a missing ROLLBACK) fails this
     // suite fast instead of hanging --runInBand.
     await getShimPool().end();
-    if (seamPool) await seamPool.end();
+    if (isolatedSeamForCleanup) await isolatedSeamForCleanup.__endPoolForTests();
     await client.query('SET statement_timeout = 5000');
     await client.query(`DROP TABLE IF EXISTS ${tableName}`);
     await client.end();
@@ -162,13 +168,22 @@ describeIfDb('lib/postgres/client: contract', () => {
         expect(Object.keys(seam)).not.toContain('end');
         const pool = seam.getPool();
         const poolAgain = seam.getPool();
+        expect(pool.end).toBeUndefined();
         const { rows } = await pool.query('SELECT 1 AS one');
         expect(rows[0].one).toBe(1);
         expect(poolAgain).toBe(pool);
-        // Held at describe scope so the outer afterAll ends it -- this
-        // isolated module registry's pool is not reachable once
-        // isolateModulesAsync returns.
-        seamPool = pool;
+        // A caller that optionally-chains `.end?.()` (the shape a
+        // converting Stage 3/4 caller might still carry) must be a no-op,
+        // and the pool must remain usable afterwards -- proof the facade
+        // cannot be used to poison the process-wide singleton.
+        await pool.end?.();
+        const { rows: stillWorks } = await pool.query('SELECT 2 AS two');
+        expect(stillWorks[0].two).toBe(2);
+        // Held at describe scope so the outer afterAll can close the real
+        // handle via the seam's own test-only escape hatch -- this
+        // isolated module registry's pool is not otherwise reachable
+        // once isolateModulesAsync returns.
+        isolatedSeamForCleanup = seam;
       });
     });
   });

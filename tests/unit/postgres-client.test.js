@@ -53,7 +53,7 @@ describe('lib/postgres/client', () => {
     process.env = ORIGINAL_ENV;
   });
 
-  test('public exports are exactly sql, withClient, withTransaction, getPool (db is internal-only)', () => {
+  test('require() yields exactly the four keys sql, withClient, withTransaction, getPool (CJS surface; db is internal-only)', () => {
     jest.isolateModules(() => {
       mockVercelPostgres();
       mockPg();
@@ -61,6 +61,17 @@ describe('lib/postgres/client', () => {
       expect(Object.keys(mod).sort()).toEqual(
         ['getPool', 'sql', 'withClient', 'withTransaction'].sort()
       );
+      expect(mod.db).toBeUndefined();
+    });
+  });
+
+  test('import * as yields exactly the same four keys (ESM surface via CJS interop / cjs-module-lexer)', async () => {
+    await jest.isolateModulesAsync(async () => {
+      mockVercelPostgres();
+      mockPg();
+      const mod = await import('../../lib/postgres/client');
+      const keys = Object.keys(mod).filter((k) => k !== 'default').sort();
+      expect(keys).toEqual(['getPool', 'sql', 'withClient', 'withTransaction'].sort());
       expect(mod.db).toBeUndefined();
     });
   });
@@ -119,6 +130,34 @@ describe('lib/postgres/client', () => {
         })).rejects.toBeUndefined();
         expect(client.release).toHaveBeenCalledTimes(1);
         expect(client.release).toHaveBeenCalledWith(true);
+      });
+    });
+
+    test('surfaces the ORIGINAL error when release() itself throws on the error path', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const { client } = mockVercelPostgres();
+        mockPg();
+        const { withClient } = require('../../lib/postgres/client');
+        const original = new Error('fn failure');
+        client.release.mockImplementation(() => {
+          throw new Error('double release');
+        });
+        await expect(withClient(async () => {
+          throw original;
+        })).rejects.toBe(original);
+      });
+    });
+
+    test('surfaces a release() failure on the success path (no other error to mask)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const { client } = mockVercelPostgres();
+        mockPg();
+        const { withClient } = require('../../lib/postgres/client');
+        const releaseFailure = new Error('release failed on success path');
+        client.release.mockImplementation(() => {
+          throw releaseFailure;
+        });
+        await expect(withClient(async () => 'fn-result')).rejects.toBe(releaseFailure);
       });
     });
   });
@@ -194,6 +233,34 @@ describe('lib/postgres/client', () => {
         expect(client.release).toHaveBeenCalledWith(commitErr);
       });
     });
+
+    test('surfaces the ORIGINAL fn error when release() itself throws (rollback path)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const { client } = mockVercelPostgres();
+        mockPg();
+        const { withTransaction } = require('../../lib/postgres/client');
+        const original = new Error('fn failure');
+        client.release.mockImplementation(() => {
+          throw new Error('double release');
+        });
+        await expect(withTransaction(async () => {
+          throw original;
+        })).rejects.toBe(original);
+      });
+    });
+
+    test('surfaces a release() failure on the commit success path (no other error to mask)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const { client } = mockVercelPostgres();
+        mockPg();
+        const { withTransaction } = require('../../lib/postgres/client');
+        const releaseFailure = new Error('release failed on success path');
+        client.release.mockImplementation(() => {
+          throw releaseFailure;
+        });
+        await expect(withTransaction(async () => 'tx-result')).rejects.toBe(releaseFailure);
+      });
+    });
   });
 
   describe('getPool', () => {
@@ -209,6 +276,36 @@ describe('lib/postgres/client', () => {
         const second = getPool();
         expect(Pool).toHaveBeenCalledTimes(1);
         expect(second).toBe(first);
+      });
+    });
+
+    test('returns a frozen facade with no end/on/totalCount, not the raw Pool', () => {
+      jest.isolateModules(() => {
+        mockVercelPostgres();
+        mockPg();
+        process.env.POSTGRES_URL = 'postgres://example/db';
+        const { getPool } = require('../../lib/postgres/client');
+        const facade = getPool();
+        expect(Object.isFrozen(facade)).toBe(true);
+        expect(facade.end).toBeUndefined();
+        expect(facade.on).toBeUndefined();
+        expect(facade.totalCount).toBeUndefined();
+        expect(typeof facade.query).toBe('function');
+        expect(typeof facade.connect).toBe('function');
+      });
+    });
+
+    test('connect() delegates to the underlying pool and yields its client', async () => {
+      await jest.isolateModulesAsync(async () => {
+        mockVercelPostgres();
+        const { poolInstances } = mockPg();
+        process.env.POSTGRES_URL = 'postgres://example/db';
+        const { getPool } = require('../../lib/postgres/client');
+        const facade = getPool();
+        const mockedClient = { query: jest.fn(), release: jest.fn() };
+        poolInstances[0].connect.mockResolvedValue(mockedClient);
+        const client = await facade.connect();
+        expect(client).toBe(mockedClient);
       });
     });
 
