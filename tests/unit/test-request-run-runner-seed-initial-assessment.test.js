@@ -430,6 +430,56 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
     const iaResource = getResources().find((r) => r.resourceKind === 'dataverse_request_document');
     expect(iaResource.readback.sourceVersionId).toBe('2.0');
   });
+
+  it('a journaled item that is no longer readable (404) stops with ia_upload_ambiguous, never re-PUTs', async () => {
+    const { generationKey } = identityFor();
+    const run0 = baseRun();
+    const { ledger } = createFakeLedger(run0);
+    await ledger.journalPlannedResource({
+      runId: RUN_ID, leaseToken: null, leaseGeneration: 0, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey },
+    });
+    const claimed = await ledger.claimLease({ runId: RUN_ID, expectedVersion: 1, leaseSeconds: 300 });
+    await ledger.recordResourceReadback({
+      resourceId: 1, runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
+      readback: {
+        generationKey, requestDocumentId: REQUEST_DOCUMENT_ID, uploadAttemptedAt: new Date().toISOString(),
+        itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', driveId: 'b!driveIdSample1234567890', siteId: 'contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222',
+      },
+      outcome: 'dispatched',
+    });
+    await ledger.releaseLease({ runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration });
+
+    const row = {
+      wmkf_requestdocumentid: REQUEST_DOCUMENT_ID, wmkf_artifacttype: 100000000, wmkf_operationstatus: 100000000, wmkf_lifecyclestate: 100000000,
+      wmkf_generationkey: generationKey, wmkf_claimtoken: 'claim-11111111',
+      wmkf_sharepointfolderpath: `9009009_${REQUEST_ID.replace(/-/g, '').toUpperCase()}/Artifacts/Initial Assessment`,
+      wmkf_filename: '9009009 Initial Assessment aaaaaaaa-bbbbbbbb.docx', wmkf_contenthash: null,
+      _wmkf_request_value: REQUEST_ID, '@odata.etag': 'W/"row-1"', modifiedon: new Date().toISOString(),
+    };
+    const state = { row };
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method === 'PATCH' && href.includes('wmkf_requestdocuments(')) {
+        state.row = { ...state.row, ...JSON.parse(init.body), '@odata.etag': 'W/"row-2"' };
+        return Promise.resolve({ ok: true, status: 204, text: () => Promise.resolve('') });
+      }
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [state.row] });
+      throw new Error(`unexpected fetch to ${href} -- the step must stop before any $batch or Graph re-PUT`);
+    });
+    // getFileMetadataById returns null on a clean 404 (files.js).
+    const graph = fakeGraph({ getFileMetadataById: jest.fn(async () => null) });
+    const manifest = baseManifest();
+    const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle: null,
+      deps: { client: fakeClient(), graph, sharePointTarget: () => ({}) },
+    }));
+
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_upload_ambiguous');
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+  });
 });
 
 describe('stepSeedInitialAssessment — upload durability', () => {
