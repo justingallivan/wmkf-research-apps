@@ -198,6 +198,25 @@ test('the template cannot be edited while a refreshed preview is in flight', asy
   expect(screen.getByDisplayValue('Edited subject')).toBeEnabled();
 });
 
+test('a failed initial preview can retry the effective default without typing a template', async () => {
+  let previews = 0;
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => {
+    if (url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'preview') {
+      previews += 1;
+      return Promise.resolve(previews === 1
+        ? response({ ok: false, reason: 'read_failed' }, false, 502)
+        : response({ ok: true, draft }));
+    }
+    return original(url, options);
+  });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
+  expect(await screen.findByText('The latest reviewer status could not be verified. No reminder was sent.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry preview' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([url, options]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'preview').every(([, options]) => !Object.hasOwn(JSON.parse(options.body), 'template'))).toBe(true);
+});
+
 test('a parent refresh error cannot turn a confirmed send into a failed send', async () => {
   const onSent = jest.fn(() => { throw new Error('refresh failed'); });
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={onSent} />);

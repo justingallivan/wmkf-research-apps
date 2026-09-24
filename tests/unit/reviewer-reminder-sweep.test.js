@@ -114,7 +114,7 @@ function requestConfig(over = {}) {
 function installReads({ request = requestConfig(), pdDisabled = false, reviewerEmail = 'rev@example.org' } = {}) {
   getRecord.mockImplementation(async (set) => {
     if (set === 'akoya_requests') return request;
-    if (set === 'systemusers') return { systemuserid: PD, internalemailaddress: 'pd@keck.org', isdisabled: pdDisabled };
+    if (set === 'systemusers') return { systemuserid: PD, fullname: 'Dr. Program Director', internalemailaddress: 'pd@keck.org', isdisabled: pdDisabled };
     if (set === 'wmkf_potentialreviewerses') return { wmkf_potentialreviewersid: PERSON, wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: reviewerEmail };
     return null;
   });
@@ -158,6 +158,19 @@ describe('sweepRespondReminders', () => {
     expect(loadSenderReminderTemplate).toHaveBeenCalledWith(PD, 'respond', { subject: RESPOND_SUBJECT, body: RESPOND_BODY });
     expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({ subject: 'PD follow-up', body: expect.stringContaining('My message') }));
     expect(loadSenderReminderTemplate.mock.invocationCallOrder[0]).toBeLessThan(mintAndStore.mock.invocationCallOrder[0]);
+  });
+
+  test('loads the PD name for the automatic respond-by notice when signature resolution has no name', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    const result = await sweepRespondReminders();
+    expect(result.sent).toBe(1);
+    expect(getRecord).toHaveBeenCalledWith('systemusers', PD, {
+      select: 'systemuserid,fullname,internalemailaddress,isdisabled',
+    });
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      body: expect.stringContaining('Dr. Program Director at pd@keck.org'),
+    }));
   });
 
   test('preference read failure leaves the automatic marker unclaimed', async () => {
