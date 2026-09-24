@@ -35,7 +35,12 @@ const {
   ensureAlternateKey,
 } = require('../lib/dataverse/schema-apply');
 
-loadEnvLocal();
+// These waves were generated from production metadata and exist only to bring
+// the sandbox to parity.
+const SANDBOX_ONLY_PARITY_WAVES = new Set([
+  '0-prod-parity-foundation',
+  '29-prod-parity-tail',
+]);
 
 function parseArgs(argv) {
   const out = { target: 'sandbox', wave: 1, execute: false, newFirst: false };
@@ -59,6 +64,15 @@ function parseArgs(argv) {
     }
   }
   return out;
+}
+
+function assertWaveExecutionAllowed({ target, wave, execute }) {
+  if (target === 'prod' && execute && SANDBOX_ONLY_PARITY_WAVES.has(wave)) {
+    throw new Error(
+      `Refusing to execute sandbox-only parity wave '${wave}' against production. `
+      + 'These waves may only be executed against the sandbox; omit --execute for a production dry run.',
+    );
+  }
 }
 
 function loadSolutionManifest() {
@@ -151,8 +165,10 @@ async function applySpec(client, spec) {
   throw new Error(`Unknown kind: ${spec.kind}`);
 }
 
-(async () => {
-  const args = parseArgs(process.argv);
+async function main(argv = process.argv) {
+  const args = parseArgs(argv);
+  assertWaveExecutionAllowed(args);
+  loadEnvLocal();
   const resource = resourceUrl(args.target);
   const mode = args.execute ? 'EXECUTE' : 'DRY-RUN';
   console.log(`Target:   ${args.target} (${resource})`);
@@ -202,8 +218,14 @@ async function applySpec(client, spec) {
   if (!args.execute) {
     console.log('This was a dry run. Re-run with --execute to apply.');
   }
-})().catch((e) => {
-  console.error(`\nFATAL: ${e.message}`);
-  if (process.env.DEBUG) console.error(e.stack);
-  process.exit(1);
-});
+}
+
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(`\nFATAL: ${e.message}`);
+    if (process.env.DEBUG) console.error(e.stack);
+    process.exit(1);
+  });
+}
+
+module.exports = { parseArgs, assertWaveExecutionAllowed };

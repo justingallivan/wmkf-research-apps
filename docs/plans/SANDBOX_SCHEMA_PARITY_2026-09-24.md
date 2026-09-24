@@ -87,7 +87,18 @@ writes]
   A sandbox recipe must not rely on those labels or on a sandbox-only value
   existing in production; `scripts/compare-sandbox-schema-parity.js` lists
   them on every run.
+- The schema engine reuses an existing global option set by name without
+  comparing its type or option values. This cannot affect the two parity waves
+  because they were generated from production metadata; before applying any
+  future wave that declares a `globalOptionSet`, confirm that its production
+  definition matches.
 - Forms, views, security roles, flows and data were not copied.
+
+A Codex adversarial round (`gpt-5.6-sol`, Session 539, 2026-09-24) raised the
+production-execution risk for the two sandbox-only waves and the global
+option-set comparison limitation. Issue 1 was fixed mechanically in the CLI;
+issue 2 was accepted as the documented limitation above. Claude checks the
+fix before merge.
 
 ## Replay recipe (sandbox)
 
