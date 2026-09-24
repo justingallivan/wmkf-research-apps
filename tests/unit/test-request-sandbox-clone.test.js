@@ -169,6 +169,8 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain('cliActorId(');
     expect(script).not.toMatch(/cli:\$\{/);
     expect(script).toContain('destinationDataverseHost: new URL(SANDBOX_URL).hostname');
+    // --advance reports a finished run plainly instead of claiming a lease on it.
+    expect(script).toContain("mode: 'NOT_ADVANCED'");
     // --run-inspect must not construct the Dataverse client at all.
     expect(script.indexOf("if (args.runInspect)")).toBeLessThan(script.indexOf('createClient({'));
   });

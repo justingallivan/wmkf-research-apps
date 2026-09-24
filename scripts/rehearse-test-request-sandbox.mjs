@@ -622,6 +622,16 @@ async function runAdvance(client, args, ledgerUrl) {
   const db = pgLedgerDb(ledgerUrl);
   try {
     const ledger = createRunLedger(db);
+    const before = await ledger.getRun(args.advance);
+    if (!before) throw new Error(`No test request run found for ${args.advance}.`);
+    if (before.status !== 'prepared' && before.status !== 'creating' && before.status !== 'needs_attention') {
+      // Nothing to advance: a ready or retiring run has no working step left.
+      console.log(JSON.stringify({
+        mode: 'NOT_ADVANCED', runId: args.advance, status: before.status, currentStep: before.currentStep,
+        destinationRequestNumber: before.destinationRequestNumber ?? null, note: `run is ${before.status}; nothing to advance`,
+      }, null, 2));
+      return;
+    }
     for (let i = 0; i < args.steps; i += 1) {
       const result = await advanceRun({
         runId: args.advance,
