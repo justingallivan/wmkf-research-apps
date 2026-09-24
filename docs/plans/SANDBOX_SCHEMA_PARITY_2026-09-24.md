@@ -78,11 +78,15 @@ writes]
 - Three choice labels differ (production / sandbox): `akoya_program.wmkf_typeofdiscretionarygrant`
   707510001 "Staff Member" / "Employee"; `akoya_request.wmkf_lettertype` 100000000
   "Phase II Incomplete" / "Phase I Incomplete"; `akoya_request.wmkf_researchconceptstatus`
-  100000002 "Completed" / "Done". Not changed.
+  100000002 "Completed" / "Done".
 - The sandbox holds 112 choice values production does not, and sandbox-only
   columns (the Factory's `wmkf_istestrequest` / `wmkf_testcreationrunid`, plus
-  `akoya_request.wmkf_checkincomplete` and `wmkf_socalstaffrating`). Not
-  removed.
+  `akoya_request.wmkf_checkincomplete` and `wmkf_socalstaffrating`).
+- [OWNER DECISION 2026-09-24] The three label differences, the 112
+  sandbox-only choice values and the sandbox-only columns stay as they are.
+  A sandbox recipe must not rely on those labels or on a sandbox-only value
+  existing in production; `scripts/compare-sandbox-schema-parity.js` lists
+  them on every run.
 - Forms, views, security roles, flows and data were not copied.
 
 ## Replay recipe (sandbox)
