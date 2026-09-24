@@ -18,6 +18,9 @@ variables were removed, and the Factory branch's four scoped settings remain. [V
 Vercel deployment inspection] the immutable proof deployment remains Ready as a historical
 Preview artifact. Fresh approvals are needed
 for any further live run, Production Dataverse read, Preview deployment, or alias change.
+**Owner decision (2026-09-23, Session 536):** Chrome and Edge are accepted as working. macOS/iPadOS
+Safari waits until the Test Request Factory can create test requests, then runs in Production on
+a test request. No new real-request approval is needed for that run.
 The detailed matrix, click steps, and receipt are in
 `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`.
 
