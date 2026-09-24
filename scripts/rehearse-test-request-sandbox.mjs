@@ -168,8 +168,11 @@ function parseArgs(argv) {
   if ((parsed.prepare || parsed.reserve) && (!parsed.sourceRequestNumber || !/^\d{1,10}$/.test(parsed.sourceRequestNumber))) {
     throw new Error('--prepare/--reserve require a bounded numeric --source-request-number (with --bundle it must match the bundle source).');
   }
-  if (!parsed.prepare && !parsed.reserve && (parsed.fiscalYear !== null || parsed.meetingDate !== null || parsed.sourceRequestNumber !== null || parsed.bundle !== null || parsed.testLabel !== null)) {
-    throw new Error('--bundle, --source-request-number, --fiscal-year, --meeting-date, and --test-label are valid only with --prepare or --reserve.');
+  if (!parsed.prepare && !parsed.reserve && (parsed.fiscalYear !== null || parsed.meetingDate !== null || parsed.sourceRequestNumber !== null || parsed.testLabel !== null)) {
+    throw new Error('--source-request-number, --fiscal-year, --meeting-date, and --test-label are valid only with --prepare or --reserve.');
+  }
+  if (!parsed.prepare && !parsed.reserve && !parsed.advance && parsed.bundle !== null) {
+    throw new Error('--bundle is valid only with --prepare, --reserve, or --advance.');
   }
   if (parsed.reserve && (!parsed.bundle || !parsed.manifestOut || !parsed.idempotencyKey)) {
     throw new Error('--reserve requires --bundle, --manifest-out, and --idempotency-key.');

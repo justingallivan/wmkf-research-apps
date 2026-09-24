@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { LEDGER_REASON_CODES, LEDGER_STEPS } from '../../lib/services/test-requests/run-ledger.js';
 
 /**
  * Migration 054 (lib/db/migrations/054_test_request_runs.sql) adds CHECK
@@ -229,6 +230,23 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
       .filter((line) => !line.trim().startsWith('--'))
       .join('\n');
     expect(ddlOnly).not.toMatch(/credential|bearer|body_html|bundle_bytes|document_body|access_token/i);
+  });
+
+  it('enforces the JS text grammars in PostgreSQL (Codex round eleven): every grammar-bound column has a CHECK', () => {
+    for (const name of [
+      'test_request_runs_actor_id_shape', 'test_request_runs_idempotency_key_digest', 'test_request_runs_current_step_enum',
+      'test_request_runs_recipe_enum', 'test_request_runs_host_shapes', 'test_request_runs_source_shapes',
+      'test_request_runs_digest_shapes', 'test_request_runs_graph_identity_shapes', 'test_request_runs_fiscal_year_shape',
+      'test_request_runs_test_label_derived', 'test_request_runs_reason_codes',
+      'test_request_run_resources_step_enum', 'test_request_run_resources_error_code',
+    ]) {
+      expect(migration).toContain(`CONSTRAINT ${name}`);
+    }
+    expect(migration).toContain("expected_graph_drive_id ~ '^b![A-Za-z0-9_-]{16,120}$'");
+    expect(migration).toContain("idempotency_key ~ '^[0-9a-f]{64}$'");
+    // The SQL enum lists are generated from the JS exports; both step and reason sets must appear in full.
+    for (const step of LEDGER_STEPS) expect(migration).toContain(`'${step}'`);
+    for (const code of LEDGER_REASON_CODES) expect(migration).toContain(`'${code}'`);
   });
 });
 

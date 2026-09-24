@@ -63,7 +63,9 @@ not perform.
   flat objects only, bounded string lengths, no URLs, line breaks or
   credential-shaped values (recognized token prefixes are rejected
   outright), SHA-256 shape for `*Hash`, digits for `requestNumber`, and
-  exact Microsoft Graph shapes for site, drive and item identifiers. Unknown keys and unsafe values are rejected with
+  exact Microsoft Graph shapes for site, drive and item identifiers. The
+  same grammars are CHECK constraints in migration 054, so a writer that
+  bypasses the JS validators cannot store a URL, token or prose either. Unknown keys and unsafe values are rejected with
   `400 test_request_ledger_unsafe_value`, never redacted, so a Dataverse
   response body, purpose text or Graph download URL cannot land in the
   ledger. `ready` additionally requires `destination_request_number`

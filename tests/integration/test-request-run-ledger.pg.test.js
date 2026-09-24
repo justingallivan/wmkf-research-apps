@@ -335,12 +335,42 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     await db.query(`UPDATE test_request_runs SET status = 'retiring' WHERE run_id = $1::uuid`, [readyRun.runId]);
     await db.query(`UPDATE test_request_runs SET status = 'retired' WHERE run_id = $1::uuid`, [readyRun.runId]);
 
-    await db.query(`UPDATE test_request_runs SET status = 'needs_attention', needs_attention_reason = 'x' WHERE run_id = $1::uuid`, [stuckRun.runId]);
+    await db.query(`UPDATE test_request_runs SET status = 'needs_attention', needs_attention_reason = 'operator_stop' WHERE run_id = $1::uuid`, [stuckRun.runId]);
     await db.query(`UPDATE test_request_runs SET status = 'retiring', needs_attention_reason = NULL WHERE run_id = $1::uuid`, [stuckRun.runId]);
 
     // Still enforced: ready requires completed_at; pre-terminal states forbid it.
     await expect(db.query(`UPDATE test_request_runs SET status = 'ready', completed_at = NULL WHERE run_id = $1::uuid`, [stuckRun.runId])).rejects.toThrow();
     await expect(db.query(`UPDATE test_request_runs SET status = 'creating', completed_at = NOW() WHERE run_id = $1::uuid`, [stuckRun.runId])).rejects.toThrow();
+  });
+
+  it('direct SQL writes that bypass the JS validators are rejected by the CHECK constraints', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan();
+    createdRunIds.push(plan.runId);
+    await ledger.reserveRun({ actorId, idempotencyKey: 'key-sql-check', plan });
+    const attempts = [
+      [`UPDATE test_request_runs SET expected_graph_drive_id = $2 WHERE run_id = $1`, 'https://contoso.sharepoint.com/sites/x'],
+      [`UPDATE test_request_runs SET expected_graph_site_id = $2 WHERE run_id = $1`, 'ghp_0123456789abcdefghijklmnopqrstuvwxyz'],
+      [`UPDATE test_request_runs SET actor_id = $2 WHERE run_id = $1`, 'cli:hunter2'],
+      [`UPDATE test_request_runs SET idempotency_key = $2 WHERE run_id = $1`, 'my-secret-codename'],
+      [`UPDATE test_request_runs SET last_error = $2 WHERE run_id = $1`, 'Authorization: Bearer abc'],
+      [`UPDATE test_request_runs SET test_label = $2 WHERE run_id = $1`, 'Confidential proposal for Acme'],
+      [`UPDATE test_request_runs SET current_step = $2 WHERE run_id = $1`, 'exfiltrate'],
+      [`UPDATE test_request_runs SET source_dataverse_host = $2 WHERE run_id = $1`, 'https://wmkf.crm.dynamics.com/'],
+    ];
+    for (const [sql, value] of attempts) {
+      await expect(db.query(sql, [plan.runId, value])).rejects.toMatchObject({ code: '23514' });
+    }
+    await expect(db.query(
+      `INSERT INTO test_request_run_resources (run_id, sequence, step, resource_kind, system, planned_identity, error)
+       VALUES ($1, 999, 'copy_file', 'sharepoint_file', 'sharepoint', '{}'::jsonb, $2)`,
+      [plan.runId, 'ECONNRESET while uploading Proposal_1003222.pdf'],
+    )).rejects.toMatchObject({ code: '23514' });
+    await expect(db.query(
+      `INSERT INTO test_request_run_resources (run_id, sequence, step, resource_kind, system, planned_identity)
+       VALUES ($1, 999, 'not_a_step', 'sharepoint_file', 'sharepoint', '{}'::jsonb)`,
+      [plan.runId],
+    )).rejects.toMatchObject({ code: '23514' });
   });
 
   it('needs_attention requires a reason: the DB constraint rejects a missing one', async () => {

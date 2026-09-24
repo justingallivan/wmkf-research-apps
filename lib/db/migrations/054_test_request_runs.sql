@@ -91,6 +91,72 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
   ),
   CONSTRAINT test_request_runs_ready_request_number CHECK (
     status <> 'ready' OR (destination_request_number IS NOT NULL AND destination_request_number ~ '^[0-9]{1,10}$')
+  ),
+  CONSTRAINT test_request_runs_actor_id_shape CHECK (
+    actor_id ~ '^(cli:[0-9a-f]{16}|(admin|user):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$'
+  ),
+  CONSTRAINT test_request_runs_idempotency_key_digest CHECK (idempotency_key ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT test_request_runs_current_step_enum CHECK (current_step IN (
+    'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
+    'copy_file', 'observe', 'verify', 'ready'
+  )),
+  CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN ('basic')),
+  CONSTRAINT test_request_runs_host_shapes CHECK (
+    source_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
+    AND destination_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
+  ),
+  CONSTRAINT test_request_runs_source_shapes CHECK (
+    source_request_number ~ '^[0-9]{1,10}$'
+    AND source_revision ~ '^(W/)?"?[0-9A-Za-z-]{1,80}"?$'
+  ),
+  CONSTRAINT test_request_runs_digest_shapes CHECK (
+    bundle_sha256 ~ '^[0-9a-f]{64}$' AND copy_policy_digest ~ '^[0-9a-f]{64}$'
+    AND plan_digest ~ '^[0-9a-f]{64}$' AND create_body_sha256 ~ '^[0-9a-f]{64}$'
+    AND copy_policy_version ~ '^[a-z0-9][a-z0-9.-]{0,59}$'
+  ),
+  CONSTRAINT test_request_runs_graph_identity_shapes CHECK (
+    expected_graph_site_id ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    AND expected_graph_drive_id ~ '^b![A-Za-z0-9_-]{16,120}$'
+  ),
+  CONSTRAINT test_request_runs_fiscal_year_shape CHECK (
+    fiscal_year ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
+  ),
+  CONSTRAINT test_request_runs_test_label_derived CHECK (
+    test_label ~ '^TEST [a-z][a-z0-9_-]{0,39} clone of [0-9]{1,10} run [0-9a-f]{8}$'
+  ),
+  CONSTRAINT test_request_runs_reason_codes CHECK (
+    (needs_attention_reason IS NULL OR regexp_replace(needs_attention_reason, ' [(]http [0-9]{3}[)]$', '') IN (
+      'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
+      'test_request_run_invalid_status', 'test_request_run_invalid_request_number', 'test_request_ledger_unsafe_value',
+      'upstream_http', 'timeout', 'network',
+      'unknown_error', 'lease_unavailable', 'step_failed',
+      'operator_stop', 'preflight_identity_changed', 'manifest_digest_mismatch',
+      'bundle_stale', 'source_fence_failed', 'source_changed',
+      'preallocated_request_present_not_owned', 'preallocated_request_recovered', 'ambiguous_create_outcome',
+      'create_rejected', 'goverify_deactivation_uncertain', 'goverify_restore_unverified',
+      'goverify_restore_failed', 'meeting_date_patch_failed', 'meeting_date_readback_mismatch',
+      'location_preexisting', 'location_readback_mismatch', 'folder_create_failed',
+      'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
+      'file_source_changed', 'file_verification_failed', 'file_copy_failed',
+      'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
+      'preallocated_request_present', 'file_journal_unverified'
+    ))
+    AND (last_error IS NULL OR regexp_replace(last_error, ' [(]http [0-9]{3}[)]$', '') IN (
+      'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
+      'test_request_run_invalid_status', 'test_request_run_invalid_request_number', 'test_request_ledger_unsafe_value',
+      'upstream_http', 'timeout', 'network',
+      'unknown_error', 'lease_unavailable', 'step_failed',
+      'operator_stop', 'preflight_identity_changed', 'manifest_digest_mismatch',
+      'bundle_stale', 'source_fence_failed', 'source_changed',
+      'preallocated_request_present_not_owned', 'preallocated_request_recovered', 'ambiguous_create_outcome',
+      'create_rejected', 'goverify_deactivation_uncertain', 'goverify_restore_unverified',
+      'goverify_restore_failed', 'meeting_date_patch_failed', 'meeting_date_readback_mismatch',
+      'location_preexisting', 'location_readback_mismatch', 'folder_create_failed',
+      'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
+      'file_source_changed', 'file_verification_failed', 'file_copy_failed',
+      'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
+      'preallocated_request_present', 'file_journal_unverified'
+    ))
   )
 );
 
@@ -128,7 +194,29 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  CONSTRAINT test_request_run_resources_run_sequence UNIQUE (run_id, sequence)
+  CONSTRAINT test_request_run_resources_run_sequence UNIQUE (run_id, sequence),
+  CONSTRAINT test_request_run_resources_step_enum CHECK (step IN (
+    'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
+    'copy_file', 'observe', 'verify', 'ready'
+  )),
+  CONSTRAINT test_request_run_resources_error_code CHECK (
+    error IS NULL OR regexp_replace(error, ' [(]http [0-9]{3}[)]$', '') IN (
+      'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
+      'test_request_run_invalid_status', 'test_request_run_invalid_request_number', 'test_request_ledger_unsafe_value',
+      'upstream_http', 'timeout', 'network',
+      'unknown_error', 'lease_unavailable', 'step_failed',
+      'operator_stop', 'preflight_identity_changed', 'manifest_digest_mismatch',
+      'bundle_stale', 'source_fence_failed', 'source_changed',
+      'preallocated_request_present_not_owned', 'preallocated_request_recovered', 'ambiguous_create_outcome',
+      'create_rejected', 'goverify_deactivation_uncertain', 'goverify_restore_unverified',
+      'goverify_restore_failed', 'meeting_date_patch_failed', 'meeting_date_readback_mismatch',
+      'location_preexisting', 'location_readback_mismatch', 'folder_create_failed',
+      'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
+      'file_source_changed', 'file_verification_failed', 'file_copy_failed',
+      'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
+      'preallocated_request_present', 'file_journal_unverified'
+    )
+  )
 );
 
 CREATE INDEX IF NOT EXISTS test_request_run_resources_run_step_idx

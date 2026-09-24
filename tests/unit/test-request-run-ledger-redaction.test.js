@@ -97,6 +97,9 @@ describe('ledger redaction', () => {
       { itemId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
       { itemId: 'x' },
       { driveId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
+      { driveId: 'b!ghp_0123456789abcdefghijklmnopqrstuvwxyz' },
+      { driveId: 'b!github_pat_11AAAAAAA0123456789abcdefghij' },
+      { sourceDriveId: 'b!eyJhbGciOiJIUzI1NiJ9_eyJzdWIiOiIxIn0' },
       { siteId: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig' },
       { itemIds: ['01G4GVMS34H6SGDJZCGNF2NLBTIUMXWRAW', 'sk-abcdefghijklmnopqrstuvwxyz'] },
       { size: -1 }, { size: 'twelve' }, { restored: 'yes' },
@@ -208,6 +211,8 @@ describe('remaining text columns are finite or grammar-bound', () => {
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), sourceDataverseHost: 'https://wmkf.crm.dynamics.com' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphSiteId: 'ghp_0123456789abcdefghijklmnopqrstuvwxyz' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'github_pat_11AAAAAAA0123456789abcdefghij' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'b!github_pat_11AAAAAAA0123456789abcdefghij' } },
+      { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'b!ghp_0123456789abcdefghijklmnopqrstuvwxyz' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphDriveId: 'b!short' } },
       { actorId: cliActorId('x'), idempotencyKey: 'k', plan: { ...validPlan(), expectedGraphSiteId: 'site-1' } },
     ];
