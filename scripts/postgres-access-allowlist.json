@@ -354,11 +354,6 @@
   },
   {
     "file": "lib/services/pre-site-visit/distribution-store.js",
-    "kind": "driver-import",
-    "count": 1
-  },
-  {
-    "file": "lib/services/pre-site-visit/distribution-store.js",
     "kind": "sql-tag",
     "count": 19
   },
