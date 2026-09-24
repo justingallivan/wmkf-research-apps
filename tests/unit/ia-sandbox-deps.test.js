@@ -186,6 +186,12 @@ describe('createIaSandboxDeps — every dependency routes to the bound sandbox h
     }
   }));
 
+  it('getRequest refuses a non-GUID id before any request is sent', ctx(async () => {
+    const deps = createIaSandboxDeps({ resourceUrl: SANDBOX_URL });
+    await expect(deps.getRequest("abc')/$metadata", {})).rejects.toThrow(/valid request GUID/);
+    expect(dataverseUrls()).toHaveLength(0);
+  }));
+
   it('runChangeset writes the $batch to the sandbox host only', ctx(async () => {
     const deps = createIaSandboxDeps({ resourceUrl: SANDBOX_URL });
     const result = await deps.runChangeset([
@@ -391,7 +397,7 @@ describe('createIaSandboxDeps — end-to-end with commitReadyLineage (required b
     expect(result.wmkf_operationstatus).toBe(100000001);
     expect(result._etag).toBe('W/"row-2"');
     const batchCalls = fetch.mock.calls.filter(([u]) => String(u).includes('/$batch'));
-    expect(batchCalls.length).toBeGreaterThan(0);
+    expect(batchCalls).toHaveLength(1);
     for (const [u] of fetch.mock.calls) {
       const href = String(u);
       if (href.includes('login.microsoftonline.com')) continue;
