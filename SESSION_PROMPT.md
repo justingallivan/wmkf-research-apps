@@ -1,4 +1,65 @@
-# Session 541 Prompt: Check active workstreams after the Site Visit contact fix release
+# Session 542 Prompt: Finish slice 6b review (Opus round 2, Fable final, Codex), then the live IA proof
+
+## Session 539 Summary — 2026-09-24 PT (Fable orchestrating; Sonnet builds, Opus reviews, Codex adversarial and rescue; ran concurrently with Sessions 540–541 on other branches)
+
+[VERIFIED via merged PRs, Vercel production deployment, pushed Factory-branch commits, Opus review hand-backs, focused and full Jest runs, gates] Three PRs merged and deployed to production; the two stale Entra redirect URIs removed; slice 6a accepted; slice 6b Stages A and B built, Opus-approved, Fable-reviewed and recorded; Stage C built, through Opus round 1 with its fixes committed, and Opus round 2 returned **needs-changes, tests only** (code correct; two isolating tests missing) just as the session stopped. No Codex review of 6b yet, no live sandbox run, no production write. The Factory branch `codex/test-request-preview-integration` is at `bb625e842` (pushed).
+
+### What Was Completed
+
+1. **Merged and deployed to production**: PR #329 (`1a0530546`, personal email defaults inventory, docs), PR #330 (`185c9f35f`, grantee invite subject default + up to 10 Cc), PR #331 (`e5db13750`, sandbox schema parity). #331 first got a Codex adversarial round (two findings), a Codex-rescue fix reviewed by Claude with mutation checks (`7e360ffd7`: the two parity waves are now mechanically refused for `--target=prod --execute`; name-only global option-set reuse recorded as a documented limitation), and green CI. Production deployment created after the merge and confirmed Ready on `applications.wmkeck.org`.
+2. **Entra cleanup** (owner-authorized tenant write): removed the two redirect URIs for the retired `git-codex-pau-5b4bef` / `git-codex-wor-464bcd` aliases from "WMK: SSO Authentication"; seven remain, including three older deployment-hash callbacks that were outside the directive. Work-queue entry reconciled (`fb50dca63` on main).
+3. **Slice 6a accepted** by the owner; recorded on the Factory branch (`906db4227`). Main merged into the Factory branch (`406420be7`).
+4. **Slice 6b Stage A** (plan items 1–2): `2bf5904a9`, `10e0a5e4f`, `4919e2d37`, `e74225c94`, record `b2afbe919`. Opus round 1 needs-changes (P1 raw read shape, P2 positional deps arg, P2 test gaps), round 2 approve. Fable added a GUID guard on the sandbox `getRequest`.
+5. **Slice 6b Stage B** (items 3–5): `646a1707e` … `09db93e30`, `06e34859b`, record `1499b0fdb`. Opus round 1 needs-changes (four P1: institution empty, SharePoint site/drive unbound, create re-dispatched after a marker, adapter recovery reading the production DAL plus shared `operational_events` residue; two P2), round 2 approve. Fable kept the access-layer gate unchanged, retained the create error cause, pinned the journaled-drive check.
+6. **Slice 6b Stage C** (items 6–7): `936b5e008` … `57935a658`, round-2 fixes `46f4a9457`, `e96c7d6c6`, `91b02249b`, interim record `bb625e842`. Opus round 1 needs-changes (P1 census count always off by two on a real manifest; P1 CLI `--advance` never entered a trusted DAL context; P2 eight untested stop rules; P3s); all fixed with mutations killed. **Opus round 2 verdict (arrived at stop): needs-changes, tests only** — the eTag arm of the twin snapshot-metadata read lost its isolating test (V3 now survives because a later check catches the same eTag change), and each arm of the snapshot bytes-versus-row-hash check survives when disabled alone (V11a row hash, V11b source hash); P3: the verify fixture manifest is not fully validator-shaped (no `target`, `plannedFiles`, `expiresAt`, Graph ids, `exactlyOneCreate`). Opus confirmed the `+2` census cannot be satisfied by two wrong files (stable-id matching) and the script-scoped bypass cannot leak into `--reserve` / `--run-inspect`.
+7. **Owner decisions this session**: bring-findings-first rule lifted for the 6b loops (agents fix inside the loop; disputed or design-changing findings come to the owner); three rounds per loop before Fable takes over; three stages; live proof authorized (production re-export of the 1003222 bundle and one sandbox create, Fable runs it).
+
+### Commits (main)
+- `fb50dca63` — record removal of the two stale Codex-alias Entra redirect URIs
+- `1a0530546`, `185c9f35f`, `e5db13750` — merges of PRs #329, #330, #331
+
+## Next Items
+
+### Verified Open
+
+1. **Close Opus round 2 on Stage C (tests only, round 3 of 3)**: add an isolating test for the eTag arm of the twin snapshot-metadata read (give every later read the same eTag so only that arm can fire, or assert the specific message), one test with `wmkf_contenthash` corrupted and `wmkf_sourcecontenthash` intact (and optionally the mirror), and optionally build the verify fixture with `buildCloneManifest` or assert `validateCloneManifest(..., { allowExpired: true })` on it. Re-run Opus's V3 / V11a / V11b mutations and confirm killed. Small enough for Fable to do directly rather than a Sonnet round. Then Fable final review of `1499b0fdb..HEAD` and update the Stage C paragraph in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` from "pending" to the outcome.
+   Evidence: Opus round-2 hand-back (recorded in the summary above); `git log 1499b0fdb..bb625e842` in `/Users/gallivan/Code/WMKF_Apps-factory`.
+2. **Codex adversarial review of the whole slice 6b** (`b2afbe919^..HEAD` on the Factory branch; `--model gpt-5.6-sol`, run from the Factory worktree with `--base` scoping). Fable adjudicates; iterate until Codex is satisfied (cap 3, then Fable takes over). Author/reviewer rule: Sonnet/Claude-authored → Codex reviews; any Codex-rescue fix → Claude reviews.
+3. **Live proof** (owner-authorized this session; re-confirm at start): re-export the 1003222 bundle (`DATAVERSE_ALLOW_PROD_READS=yes node --env-file=.env.local scripts/export-test-request-source-bundle.mjs --source-request-number=1003222 --out=<path outside the repo>`; six-hour window), `--reserve --recipe=initial_assessment`, then `--advance` through `ready` (the per-machine allow rule in `project-sandbox-rehearsal-bypass-allow-rule.md` covers `--bypass-goverify`). One new sandbox Request; evidence under `docs/plans/evidence/test-request-factory/`. Two things only the live run can verify: `requestDocumentSelect()`'s env-flag optional columns against the sandbox schema, and real Graph behavior. Then owner acceptance of 6b.
+4. Remaining item 6 recipes (synthetic reviewers, site-visit materials, Pre-Site, Pre-RP/Final Writeup) and item 7 — separate slices, unplanned.
+
+### Owner Decision Needed
+
+1. Whether the three older deployment-hash Entra callbacks (`g0buiqhuh`, `7doz4qxsn`, `15rny26o5`) should also go. Evidence: `az ad app show` this session; not part of the directive, so left.
+2. Carried: migration 054's first shared apply (needed at item 7; freezes the file). Preview CSRF origin allowlist (option b) still goes through `/contract-reconcile`; the runbook half landed in PR #327.
+
+### Verify Before Acting
+
+1. The Factory branch is 4+ commits behind main again (Sessions 540–541 landed PR #335 and docs on main). Merge main deliberately before the Codex round or the live run.
+2. Worktrees: `/Users/gallivan/Code/WMKF_Apps-factory` (Factory, clean at `bb625e842`); `WMKF_Apps-codex` and `WMKF_Apps-presentation` belong to other sessions; `WMKF_Apps-parity-review` was removed. Local ledger container `wmkf-ledger-pg` is running (Colima).
+3. Stage C's two live-path fixes (census `+2`, `enterDynamicsBypassForScript` in `runAdvance`) were unit-pinned but never exercised live; treat the first live `--advance` into `seed_initial_assessment` as the real test of the CLI wiring.
+
+### Do Not Reopen Without New Decision
+
+1. 6b design decisions recorded in the three Stage paragraphs: positional `dependencies` argument; `SANDBOX_REHEARSAL` actor policy substituted at the sandbox transport; a stopped run leaves its row Generating; resource planned on the first snapshot create; shared `registryPatchAttemptedAt`; census depth 3; `restoreFileVersion` not forwarded.
+2. Earlier: 6a design, sandbox parity deviations, no-text invariant, dispatch-marker rule, no lease renewal, in-place edits to unapplied 054, synthetic IA fixtures only.
+
+## Key Files Reference
+
+- Design doc (item 6 plan, Stage A/B/C records): `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (Factory branch)
+- IA steps: `lib/services/test-requests/run-runner.js` (`stepSeedInitialAssessment`, `stepSeedInitialAssessmentSnapshot`, `stepVerifyInitialAssessment`), `lib/services/test-requests/ia-sandbox-deps.js`, `lib/services/test-requests/fixtures/initial-assessment-synthetic.js`
+- Production-path seams: `lib/services/initial-assessment/artifact-lineage.js`, `artifact-reader.js`, `lib/services/dynamics/changeset.js`, `lib/services/dynamics/write-core.js`, `lib/dataverse/adapters/request-document.js`, `lib/services/request-document-actor-service.js`
+- CLI: `scripts/rehearse-test-request-sandbox.mjs`
+- Tests: `tests/unit/test-request-run-runner-{seed-initial-assessment,seed-initial-assessment-snapshot,verify-initial-assessment}.test.js`, `tests/unit/ia-sandbox-deps.test.js`, `tests/unit/initial-assessment-lineage-dependencies.test.js`, `tests/integration/test-request-run-runner.pg.test.js`
+
+## Stop-time notes
+
+- Claim-evidence pilot: no eligible plan/design edit for this session key; no observation row.
+- Memory: added `feedback-fixtures-return-raw-transport-shape.md` (router line under Test teeth). Sessions 540–541 wrote their own handoffs above this one's predecessor; this session's number stays 539.
+- Milestone: `DEVELOPMENT_LOG.md` entry not required (PRs #329–#331 are incremental; 6b is unmerged and unproven live).
+- `CLAUDE.md`: no change needed.
+
+## Prior Session 541 Prompt: Check active workstreams after the Site Visit contact fix release
 
 ## Session 540 Summary — 2026-09-24 PT (Codex Site Visit bug fix)
 
