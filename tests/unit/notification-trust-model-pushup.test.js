@@ -1022,14 +1022,14 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
 
     const res = makeRes();
     await sendReviewReminderHandler(
-      { method: 'POST', headers: {}, body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID } },
+      { method: 'POST', headers: {}, body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, kind: 'reviewdue', action: 'preview' } },
       res,
     );
 
     expect(res.body).toMatchObject({ ok: false, reason: 'misconfigured' });
     expectTrustedNotify(seen, {
       type: 'email_default_misconfigured',
-      source: 'reviewer-reminders-review-due-manual',
+      source: 'reviewer-reminders-reviewdue-personal-default',
     });
   });
 

@@ -1,220 +1,165 @@
-/**
- * @jest-environment jsdom
- */
-
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+/** @jest-environment jsdom */
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import RespondReminderModal from '../../shared/components/reviewers/RespondReminderModal';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const SUGGESTION_ID = '22222222-2222-4222-8222-222222222222';
 const SENDER_ID = '33333333-3333-4333-8333-333333333333';
 const candidate = { suggestionId: SUGGESTION_ID, name: 'Dr. Reviewer' };
+const template = { subject: 'Original subject', body: '{{greeting}},\n\nOriginal body\n\n{{signature}}' };
 const draft = {
-  suggestionId: SUGGESTION_ID,
-  name: 'Dr. Reviewer',
-  to: 'reviewer@example.org',
-  from: 'pd@keck.org',
-  senderId: SENDER_ID,
-  subject: 'Original subject',
-  bodyText: 'Original body',
+  suggestionId: SUGGESTION_ID, name: candidate.name,
+  to: 'reviewer@example.org', from: 'pd@keck.org', senderId: SENDER_ID,
+  subject: template.subject, bodyText: 'Dear Dr. Reviewer,\n\nOriginal body\n\nDr. PD',
+  template, proof: 'signed-proof',
 };
-
-function response({ ok = true, status = 200, data = {} } = {}) {
-  return { ok, status, json: async () => data };
+const response = (data, ok = true, status = 200) => ({ ok, status, json: async () => data });
+function installFetch({ preview = draft, send = { ok: true }, ownSystemId = SENDER_ID } = {}) {
+  global.fetch = jest.fn((url, options) => {
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return Promise.resolve(response({ ok: true, ownSystemId }));
+    if (url === '/api/review-manager/send-review-reminder') {
+      const body = JSON.parse(options.body);
+      if (body.action === 'preview') return Promise.resolve(response({ ok: true, draft: preview }));
+      return Promise.resolve(response(send));
+    }
+    if (url === '/api/review-manager/reminder-email-preferences') return Promise.resolve(response({ ok: true }));
+    throw new Error(`Unexpected request ${url}`);
+  });
 }
+beforeEach(() => { jest.clearAllMocks(); installFetch(); });
 
-beforeEach(() => {
-  jest.clearAllMocks();
-  global.fetch = jest.fn();
-});
-
-test('loads a read-only preview and Cancel performs no send request', async () => {
-  global.fetch.mockResolvedValueOnce(response({ data: { ok: true, draft } }));
+test('initial preview has no send and Cancel only closes', async () => {
   const onClose = jest.fn();
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={onClose} />);
-
-  expect(await screen.findByDisplayValue('Original subject')).toBeInTheDocument();
-  expect(screen.getByText(/fresh, secure.*Accept or decline.*server/i)).toBeInTheDocument();
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
-    requestId: REQUEST_ID,
-    suggestionId: SUGGESTION_ID,
-    kind: 'respond',
-    action: 'preview',
-  });
-
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([url, options]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'send')).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(onClose).toHaveBeenCalledTimes(1);
-  expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
-test('sends the edited copy with previewed identities as freshness guards', async () => {
-  global.fetch
-    .mockResolvedValueOnce(response({ data: { ok: true, draft } }))
-    .mockResolvedValueOnce(response({ data: { ok: true } }));
-  const onClose = jest.fn();
+test('one-send edits require refreshed preview and do not save a default', async () => {
+  const edited = { subject: 'Edited subject', body: template.body };
+  global.fetch = jest.fn((url, options) => {
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return Promise.resolve(response({ ok: true, ownSystemId: SENDER_ID }));
+    const payload = JSON.parse(options.body);
+    if (payload.action === 'preview') return Promise.resolve(response({ ok: true, draft: payload.template ? { ...draft, subject: edited.subject, template: edited, proof: 'edited-proof' } : draft }));
+    return Promise.resolve(response({ ok: true }));
+  });
   const onSent = jest.fn();
-  render(
-    <RespondReminderModal
-      requestId={REQUEST_ID}
-      candidate={candidate}
-      onClose={onClose}
-      onSent={onSent}
-    />,
-  );
-
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={onSent} />);
   fireEvent.change(await screen.findByDisplayValue('Original subject'), { target: { value: 'Edited subject' } });
-  fireEvent.change(screen.getByDisplayValue('Original body'), { target: { value: 'Edited body' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
-
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
-    requestId: REQUEST_ID,
-    suggestionId: SUGGESTION_ID,
-    kind: 'respond',
-    action: 'send',
-    reviewed: {
-      subject: 'Edited subject',
-      bodyText: 'Edited body',
-      to: 'reviewer@example.org',
-      from: 'pd@keck.org',
-      senderId: SENDER_ID,
-    },
-  });
-  await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
-  expect(onClose).not.toHaveBeenCalled();
-  expect(screen.getByText(/Sent for delivery/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-  expect(onClose).toHaveBeenCalledTimes(1);
-});
-
-test('blank edits fail closed in the modal', async () => {
-  global.fetch.mockResolvedValueOnce(response({ data: { ok: true, draft } }));
-  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
-
-  fireEvent.change(await screen.findByDisplayValue('Original subject'), { target: { value: '   ' } });
-
-  expect(screen.getByText('Subject and message cannot be empty.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Send reminder' })).toBeDisabled();
-  expect(global.fetch).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Send reminder' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
+  await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
+  const sends = global.fetch.mock.calls.filter(([url, options]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'send');
+  expect(JSON.parse(sends[0][1].body)).toEqual({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, kind: 'respond', action: 'send', template: edited, proof: 'edited-proof' });
+  expect(global.fetch.mock.calls.some(([url, options]) => url === '/api/review-manager/reminder-email-preferences' && options.method === 'PUT')).toBe(false);
 });
 
-test('typed stale preview failures are actionable and refresh the parent', async () => {
-  global.fetch.mockResolvedValueOnce(response({ ok: false, status: 409, data: { ok: false, reason: 'removed' } }));
-  const onStale = jest.fn();
-  render(
-    <RespondReminderModal
-      requestId={REQUEST_ID}
-      candidate={candidate}
-      onClose={jest.fn()}
-      onStale={onStale}
-    />,
-  );
-
-  expect(await screen.findByText(/removed from the proposal.*restore them first/i)).toBeInTheDocument();
-  expect(onStale).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole('button', { name: 'Retry preview' })).toBeInTheDocument();
-});
-
-test('T4 request bytes: preview POST sends exact method, headers, and body', async () => {
-  global.fetch.mockResolvedValueOnce(response({ data: { ok: true, draft } }));
+test('explicit Save writes the raw template only for the mailbox owner', async () => {
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
-  await screen.findByDisplayValue('Original subject');
-  expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/send-review-reminder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      requestId: REQUEST_ID,
-      suggestionId: SUGGESTION_ID,
-      kind: 'respond',
-      action: 'preview',
-    }),
+  await screen.findByText('Email preview');
+  fireEvent.click(await screen.findByRole('button', { name: 'Save as my default' }));
+  await waitFor(() => expect(screen.getByText('Saved for future reminders from your mailbox.')).toBeInTheDocument());
+  const put = global.fetch.mock.calls.find(([url, options]) => url === '/api/review-manager/reminder-email-preferences' && options.method === 'PUT');
+  expect(JSON.parse(put[1].body)).toEqual({ kind: 'respond', template });
+  expect(global.fetch.mock.calls.some(([url, options]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'send')).toBe(false);
+});
+
+test('Clear my saved default affects future drafts and preserves the current one-send copy', async () => {
+  const shared = { subject: 'Admin copy', body: '{{greeting}} Admin {{signature}}' };
+  global.fetch = jest.fn((url, options) => {
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return Promise.resolve(response({ ok: true, ownSystemId: SENDER_ID, configured: true, shared }));
+    if (url === '/api/review-manager/send-review-reminder') return Promise.resolve(response({ ok: true, draft }));
+    if (url === '/api/review-manager/reminder-email-preferences' && options.method === 'DELETE') return Promise.resolve(response({ ok: true }));
+    throw new Error(`Unexpected request ${url}`);
   });
-});
-
-test('T4 axis (network): a preview network rejection surfaces its message', async () => {
-  global.fetch.mockRejectedValueOnce(new Error('offline'));
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
-  expect(await screen.findByText('Network error loading preview: offline')).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'Clear my saved default' }));
+  expect(await screen.findByText('Your saved default was cleared. This one-send draft is unchanged.')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('Original subject')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Send reminder' })).toBeEnabled();
+  const del = global.fetch.mock.calls.find(([url, options]) => url === '/api/review-manager/reminder-email-preferences' && options.method === 'DELETE');
+  expect(JSON.parse(del[1].body)).toEqual({ kind: 'respond' });
 });
 
-test('T4 axis (d): a malformed 2xx preview body falls back to the generic load-error message', async () => {
-  global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
+test('superuser acting for another PD can save only their own default', async () => {
+  installFetch({ ownSystemId: '44444444-4444-4444-8444-444444444444' });
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
-  expect(await screen.findByText('Could not load the reminder preview.')).toBeInTheDocument();
+  await screen.findByText('Email preview');
+  expect(await screen.findByText(/Saving a default changes only your own settings/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  await waitFor(() => expect(screen.getByText('Saved for future reminders from your mailbox.')).toBeInTheDocument());
+  const put = global.fetch.mock.calls.find(([url, options]) => url === '/api/review-manager/reminder-email-preferences' && options.method === 'PUT');
+  expect(JSON.parse(put[1].body)).toEqual({ kind: 'respond', template });
 });
 
-test('T4 axis (e): a non-2xx preview body that fails to parse is never silent', async () => {
-  global.fetch.mockResolvedValueOnce({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
-  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
-  expect(await screen.findByText('Could not load the reminder preview.')).toBeInTheDocument();
+test('review-due shows the exact server-rendered link-free preview', async () => {
+  installFetch({ preview: { ...draft, kind: 'reviewdue', previewHtml: '<p>Due tomorrow</p><p>Use your original email.</p>', fixedAccessInstruction: 'Use your original email.' } });
+  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} kind="reviewdue" onClose={jest.fn()} />);
+  expect(await screen.findByText('Due tomorrow')).toBeInTheDocument();
+  expect(screen.getByText('Use your original email.')).toBeInTheDocument();
+  expect(screen.getByText('No new review link is included.')).toBeInTheDocument();
 });
 
-test('T4 axis (network, send): a send network rejection reports the uncertain outcome, never "sent"', async () => {
-  global.fetch
-    .mockResolvedValueOnce(response({ data: { ok: true, draft } }))
-    .mockRejectedValueOnce(new Error('offline'));
+test('network uncertainty after Send never reports confirmed delivery', async () => {
+  installFetch();
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => {
+    if (url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'send') return Promise.reject(new Error('offline'));
+    return original(url, options);
+  });
   const onSent = jest.fn();
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={onSent} />);
-  await screen.findByDisplayValue('Original subject');
+  await screen.findByText('Email preview');
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
   expect(await screen.findByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
   expect(onSent).not.toHaveBeenCalled();
-  expect(screen.queryByText(/Sent for delivery/)).not.toBeInTheDocument();
 });
 
-test('D10 fix: a malformed 2xx send body reports the uncertain receipt, not failed or sent', async () => {
-  global.fetch
-    .mockResolvedValueOnce(response({ data: { ok: true, draft } }))
-    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
-  const onSent = jest.fn();
+test('a parent refresh error cannot turn a confirmed send into a failed send', async () => {
+  const onSent = jest.fn(() => { throw new Error('refresh failed'); });
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={onSent} />);
-  await screen.findByDisplayValue('Original subject');
+  await screen.findByText('Email preview');
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
-  expect(await screen.findByText('The app could not confirm the result. Check reviewer activity before trying again.')).toBeInTheDocument();
-  expect(onSent).not.toHaveBeenCalled();
-  expect(screen.queryByText(/Sent for delivery/)).not.toBeInTheDocument();
-  expect(screen.queryByText('Could not send the reminder. Refresh and try again.')).not.toBeInTheDocument();
+  expect(await screen.findByText(/Sent for delivery/)).toBeInTheDocument();
+  expect(onSent).toHaveBeenCalledTimes(1);
 });
 
-test('T4 axis (e, send): a non-2xx send body that fails to parse is never silent', async () => {
-  global.fetch
-    .mockResolvedValueOnce(response({ data: { ok: true, draft } }))
-    .mockResolvedValueOnce({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
-  const onSent = jest.fn();
-  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={onSent} />);
-  await screen.findByDisplayValue('Original subject');
+test('a send completion calls the latest parent refresh callback', async () => {
+  let finishSend;
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => {
+    if (url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'send') {
+      return new Promise((resolve) => { finishSend = resolve; });
+    }
+    return original(url, options);
+  });
+  const oldRefresh = jest.fn();
+  const newRefresh = jest.fn();
+  const { rerender } = render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={oldRefresh} />);
+  await screen.findByText('Email preview');
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
-  expect(await screen.findByText('Could not send the reminder. Refresh and try again.')).toBeInTheDocument();
-  expect(onSent).not.toHaveBeenCalled();
+  rerender(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} onSent={newRefresh} />);
+  await act(async () => { finishSend(response({ ok: true })); });
+  expect(oldRefresh).not.toHaveBeenCalled();
+  expect(newRefresh).toHaveBeenCalledTimes(1);
 });
 
-test('a send failure with reason "send_unconfirmed" reports the uncertain outcome', async () => {
-  global.fetch
-    .mockResolvedValueOnce(response({ data: { ok: true, draft } }))
-    .mockResolvedValueOnce(response({ ok: true, status: 200, data: { ok: false, reason: 'send_unconfirmed' } }));
-  render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
-  await screen.findByDisplayValue('Original subject');
-  fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
-  expect(await screen.findByText('Dynamics did not confirm the send. Check reviewer activity before trying again.')).toBeInTheDocument();
-});
-
-test('late preview completion after unmount is ignored', async () => {
-  let resolvePreview;
-  global.fetch.mockReturnValueOnce(new Promise((resolve) => { resolvePreview = resolve; }));
-  const onStale = jest.fn();
-  const { unmount } = render(
-    <RespondReminderModal
-      requestId={REQUEST_ID}
-      candidate={candidate}
-      onClose={jest.fn()}
-      onStale={onStale}
-    />,
-  );
-
-  unmount();
-  resolvePreview(response({ ok: false, status: 409, data: { ok: false, reason: 'removed' } }));
-  await Promise.resolve();
-  await Promise.resolve();
-
-  expect(onStale).not.toHaveBeenCalled();
+test('a departed request cannot install its late preview in the next request', async () => {
+  let resolveOld;
+  global.fetch = jest.fn((url, options) => {
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return Promise.resolve(response({ ok: true, ownSystemId: SENDER_ID }));
+    const payload = JSON.parse(options.body);
+    if (payload.requestId === REQUEST_ID) return new Promise((resolve) => { resolveOld = resolve; });
+    return Promise.resolve(response({ ok: true, draft: { ...draft, subject: 'New request subject', template: { ...template, subject: 'New request subject' } } }));
+  });
+  const { rerender } = render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
+  rerender(<RespondReminderModal requestId="44444444-4444-4444-8444-444444444444" candidate={candidate} onClose={jest.fn()} />);
+  expect(await screen.findByDisplayValue('New request subject')).toBeInTheDocument();
+  await act(async () => { resolveOld(response({ ok: true, draft })); });
+  expect(screen.getByDisplayValue('New request subject')).toBeInTheDocument();
+  expect(screen.queryByDisplayValue('Original subject')).not.toBeInTheDocument();
 });

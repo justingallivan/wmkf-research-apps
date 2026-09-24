@@ -17,6 +17,10 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 }));
 const mintAndStore = jest.fn(async () => ({ url: 'https://reviews.example/external/review/jwt' }));
 jest.mock('../../lib/external/token-lifecycle', () => ({ mintAndStore: (...a) => mintAndStore(...a) }));
+const loadSenderReminderTemplate = jest.fn();
+jest.mock('../../lib/services/reviewer-reminder-personalization', () => ({
+  loadSenderReminderTemplate: (...args) => loadSenderReminderTemplate(...args),
+}));
 const getSettingStrict = jest.fn();
 jest.mock('../../lib/services/settings-service', () => ({
   getSettingStrict: (...a) => getSettingStrict(...a),
@@ -141,9 +145,32 @@ beforeEach(() => {
   mintAndStore.mockResolvedValue({ url: 'https://reviews.example/external/review/jwt' });
   createAndSendEmail.mockResolvedValue({ emailId: 'e-1' });
   updateRecord.mockResolvedValue(undefined);
+  loadSenderReminderTemplate.mockImplementation(async (_senderId, _kind, shared) => ({ ok: true, template: shared }));
 });
 
 describe('sweepRespondReminders', () => {
+  test('uses the assigned PD saved default before its fire-once claim', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    loadSenderReminderTemplate.mockResolvedValueOnce({ ok: true, template: { subject: 'PD follow-up', body: '{{greeting}}\n\nMy message\n\n{{signature}}' } });
+    const result = await sweepRespondReminders();
+    expect(result.sent).toBe(1);
+    expect(loadSenderReminderTemplate).toHaveBeenCalledWith(PD, 'respond', { subject: RESPOND_SUBJECT, body: RESPOND_BODY });
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({ subject: 'PD follow-up', body: expect.stringContaining('My message') }));
+    expect(loadSenderReminderTemplate.mock.invocationCallOrder[0]).toBeLessThan(mintAndStore.mock.invocationCallOrder[0]);
+  });
+
+  test('preference read failure leaves the automatic marker unclaimed', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    loadSenderReminderTemplate.mockResolvedValueOnce({ ok: false, reason: 'preference_unavailable' });
+    const result = await sweepRespondReminders();
+    expect(result).toMatchObject({ eligible: 1, sent: 0, skipped: 1 });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
   test('respond query filters to selected, not-revoked reviewers (T2) with null-safe revoked syntax', async () => {
     queryAllRecords.mockResolvedValue({ records: [] });
     await sweepRespondReminders();
@@ -383,6 +410,29 @@ describe('sweepReviewDueReminders', () => {
       ...over,
     };
   }
+
+  test('review-due automatic send uses PD default and stays link-free', async () => {
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
+    installReads({ request: reviewDueRequest() });
+    loadSenderReminderTemplate.mockResolvedValueOnce({ ok: true, template: { subject: 'PD due note', body: '{{greeting}}\n\nDue {{reviewDueDate}}.\n\n{{signature}}' } });
+    const result = await sweepReviewDueReminders();
+    expect(result.sent).toBe(1);
+    expect(loadSenderReminderTemplate).toHaveBeenCalledWith(PD, 'reviewdue', { subject: REVIEW_DUE_SUBJECT, body: REVIEW_DUE_BODY });
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({ subject: 'PD due note', body: expect.stringContaining('Due') }));
+    expect(createAndSendEmail.mock.calls[0][0].body).not.toContain('/external/review/');
+    expect(loadSenderReminderTemplate.mock.invocationCallOrder[0]).toBeLessThan(updateRecord.mock.invocationCallOrder[0]);
+  });
+
+  test('invalid PD review-due default cannot consume the marker', async () => {
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
+    installReads({ request: reviewDueRequest() });
+    loadSenderReminderTemplate.mockResolvedValueOnce({ ok: false, reason: 'preference_invalid' });
+    const result = await sweepReviewDueReminders();
+    expect(result).toMatchObject({ eligible: 1, sent: 0, skipped: 1 });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
 
   test('eligible: claims wmkf_remindersentat (+count) without rotating token authority, then sends a link-free reminder', async () => {
     queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
