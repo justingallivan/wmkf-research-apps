@@ -1,6 +1,7 @@
 /** @jest-environment node */
 import {
   SOURCE_BUNDLE_KIND,
+  SOURCE_BUNDLE_VERSION,
   buildSourceBundle,
   readSourceBundle,
   summarizeSourceBundle,
@@ -25,7 +26,13 @@ const document = (over = {}) => ({
   library: 'akoya_request',
   folder: '1003222_E43AE6EA/Reviewer Materials',
   name: 'Proposal_1003222.pdf',
+  driveId: 'b!drive-id',
   graphItemId: '01ABC',
+  sharePointSite: {
+    key: 'akoyago-shared',
+    hostname: 'appriver3651007194.sharepoint.com',
+    pathname: '/sites/akoyago',
+  },
   size: 1024,
   mimeType: 'application/pdf',
   eTag: '"{ETAG},1"',
@@ -45,7 +52,7 @@ test('builds a canonical bundle from the clone projection', () => {
   const bundle = build();
   expect(bundle).toMatchObject({
     kind: SOURCE_BUNDLE_KIND,
-    version: 1,
+    version: SOURCE_BUNDLE_VERSION,
     exportedAt: '2026-09-23T12:00:00.000Z',
     source: {
       dataverseHost: 'wmkf.crm.dynamics.com',
@@ -68,12 +75,18 @@ test('round-trips through JSON and readSourceBundle unchanged', () => {
 
 test.each([
   ['wrong kind', (b) => ({ ...b, kind: 'other' }), /not a Test Request source bundle/],
-  ['unsupported version', (b) => ({ ...b, version: 2 }), /Unsupported source bundle version/],
+  ['unsupported v1 bundle', (b) => ({ ...b, version: 1 }), /Unsupported source bundle version: 1/],
   ['bad export time', (b) => ({ ...b, exportedAt: 'nope' }), /export time/],
   ['missing request', (b) => ({ ...b, source: { dataverseHost: 'x' } }), /request is missing/],
   ['bad request GUID', (b) => ({ ...b, source: { ...b.source, request: { ...b.source.request, akoya_requestid: 'x' } } }), /identity is invalid/],
   ['missing revision', (b) => ({ ...b, source: { ...b.source, request: { ...b.source.request, revision: null } } }), /revision is unavailable/],
   ['bad document hash', (b) => ({ ...b, documents: [{ ...b.documents[0], contentHash: 'short' }] }), /contentHash/],
+  ['missing drive identity', (b) => ({ ...b, documents: [{ ...b.documents[0], driveId: null }] }), /driveId/],
+  ['missing SharePoint site identity', (b) => ({ ...b, documents: [{ ...b.documents[0], sharePointSite: null }] }), /sharePointSite/],
+  ['bad SharePoint site path', (b) => ({
+    ...b,
+    documents: [{ ...b.documents[0], sharePointSite: { ...b.documents[0].sharePointSite, pathname: 'sites/akoyago' } }],
+  }), /sharePointSite/],
   ['unknown document kind', (b) => ({ ...b, documents: [{ ...b.documents[0], kind: 'other' }] }), /kind/],
 ])('readSourceBundle rejects %s', (_label, mutate, pattern) => {
   expect(() => readSourceBundle(mutate(JSON.parse(JSON.stringify(build()))))).toThrow(pattern);

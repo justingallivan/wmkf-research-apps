@@ -6,6 +6,7 @@ import {
   buildTestRequestAdminPreview,
   createStrictTestRequestSourceDependencies,
   discoverTestRequestSourceDocuments,
+  hydrateTestRequestSourceDocument,
   loadTestRequestPreviewSource,
 } from '../../lib/services/test-requests/admin-preview-service';
 
@@ -226,6 +227,22 @@ test('strict source export discovery aborts when parent resolution fails', async
   });
 });
 
+test('source hydration carries durable Graph drive and registered site identity', async () => {
+  const deps = dependencies();
+  const inventory = await discoverTestRequestSourceDocuments(source, deps);
+  const hydrated = await hydrateTestRequestSourceDocument(inventory.documents[0], deps);
+
+  expect(hydrated).toMatchObject({
+    driveId: 'drive-1',
+    graphItemId: 'graph-item-1',
+    sharePointSite: {
+      key: 'akoyago-shared',
+      hostname: 'appriver3651007194.sharepoint.com',
+      pathname: '/sites/akoyago',
+    },
+  });
+});
+
 test('re-resolves and hashes the selected file, but strips every executable payload while policy is unapproved', async () => {
   const deps = dependencies();
   const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
@@ -274,6 +291,7 @@ test('re-resolves and hashes the selected file, but strips every executable payl
     name: 'ProjectDescription.pdf',
     folder: 'Phase I',
   });
+  expect(JSON.stringify(result.preview)).not.toContain('drive-1');
   const publicResult = JSON.stringify(result);
   expect(publicResult).not.toContain('etag-1');
   expect(publicResult).not.toContain('contentHash');
