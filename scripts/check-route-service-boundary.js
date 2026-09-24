@@ -16,8 +16,9 @@
  * Postgres access layer migration Stage 1 item 2
  * (docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md) widened the
  * SAME boundary-source recognition to a `pages/api` route reaching Postgres
- * directly -- importing `@vercel/postgres`/`pg` (or a subpath) or anything
- * under `lib/postgres/` -- with a narrowly scoped, SHRINK-ONLY carry-over:
+ * directly -- importing `@vercel/postgres`/`pg`/`@neondatabase/serverless`
+ * (or a subpath of any of those) or anything under `lib/postgres/` -- with a
+ * narrowly scoped, SHRINK-ONLY carry-over:
  * `POSTGRES_CARRYOVER` below lists the routes that were already red under the
  * widened definition when it landed. A route on that list may keep reaching
  * Postgres; an unlisted route reaching Postgres fails as law; a listed route
@@ -113,7 +114,8 @@ function isAdapterSource(value) {
 function isPostgresDriverSource(value) {
   if (typeof value !== 'string') return false;
   return value === '@vercel/postgres' || value.startsWith('@vercel/postgres/')
-    || value === 'pg' || value.startsWith('pg/');
+    || value === 'pg' || value.startsWith('pg/')
+    || value === '@neondatabase/serverless' || value.startsWith('@neondatabase/serverless/');
 }
 
 // Any source resolving under lib/postgres/ (the future access-layer dir),
@@ -206,7 +208,8 @@ function usage() {
     'Default mode is LAW MODE (Route→Service consolidation Stage 7): any',
     'pages/api route importing Dataverse adapters or dynamics-service (outside',
     'the exempt dir) fails the gate -- pure law, no baseline, no ratchet.',
-    'A route importing a Postgres driver (@vercel/postgres, pg) or lib/postgres/',
+    'A route importing a Postgres driver (@vercel/postgres, pg, @neondatabase/serverless)',
+    'or lib/postgres/',
     'also fails UNLESS it is one of the 17 POSTGRES_CARRYOVER entries (shrink-only',
     '-- a listed route that no longer reaches Postgres fails too, as a stale entry).',
     '--report prints a domain + family rollup, the Postgres carry-over count, and',

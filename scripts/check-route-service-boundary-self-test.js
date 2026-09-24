@@ -616,6 +616,13 @@ function runPostgresAssertions() {
     import { Pool } from 'pg';
     export default function handler(req, res) { return new Pool(); }
   `);
+  // RED, unlisted: direct '@neondatabase/serverless' import (Codex round 2:
+  // the ratchet gate names three driver packages -- @vercel/postgres, pg,
+  // @neondatabase/serverless -- this gate must recognize all three).
+  write(tempRoot, 'pages/api/cron/red-postgres-neon.js', `
+    import { neon } from '@neondatabase/serverless';
+    export default function handler(req, res) { return neon('x'); }
+  `);
   // RED, unlisted: direct lib/postgres/* import.
   write(tempRoot, 'pages/api/admin/red-postgres-layer.js', `
     import { getClient } from '../../../lib/postgres/client.js';
@@ -695,6 +702,7 @@ function runPostgresAssertions() {
   const RED = [
     'pages/api/workbench/red-postgres-vercel.js',
     'pages/api/cron/red-postgres-pg.js',
+    'pages/api/cron/red-postgres-neon.js',
     'pages/api/admin/red-postgres-layer.js',
     'pages/api/workbench/red-postgres-wrapper.js',
     'pages/api/admin/red-postgres-and-dataverse.js',
