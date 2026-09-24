@@ -691,12 +691,30 @@ describe('result-token — the stateless preview→run confirm gate', () => {
   });
 
   test('mint → verify round-trips and binds the exact spec', async () => {
-    const { token, expiresInSec } = await mintResultToken(spec(), { trueTotal: 42 });
+    const { token, expiresInSec } = await mintResultToken(
+      spec(),
+      { trueTotal: 42 },
+      { markedIsolation: true },
+    );
     expect(expiresInSec).toBe(3600);
     const v = await verifyResultToken(token);
     expect(v.valid).toBe(true);
     expect(v.spec).toEqual(spec());
     expect(v.meta.trueTotal).toBe(42);
+    expect(v.policy).toEqual({ markedIsolation: true });
+  });
+
+  test('a token without a policy claim is treated as isolation-off', async () => {
+    const legacy = await new SignJWT({ typ: 'dvx-preview', spec: spec(), meta: {} })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime(Math.floor(Date.now() / 1000) + 600)
+      .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+    const verified = await verifyResultToken(legacy);
+    expect(verified).toEqual(expect.objectContaining({
+      valid: true,
+      policy: { markedIsolation: false },
+    }));
   });
 
   test('a tampered token ⇒ invalid_signature (cannot run an unforged spec)', async () => {

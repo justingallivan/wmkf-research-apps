@@ -61,6 +61,15 @@ export default async function handler(req, res) {
     });
   }
 
+  const markedIsolation = testRequestIsolationEnabled();
+  if (verified.policy.markedIsolation !== markedIsolation) {
+    return res.status(409).json({
+      error: 'PREVIEW_POLICY_CHANGED',
+      message: 'Test Request isolation changed after this export was previewed. '
+        + 'Re-preview the export before running it.',
+    });
+  }
+
   const spec = verified.spec;
   // Defence in depth — §2.1 says preview & run run the identical matrix.
   const check = validateQuerySpec(spec);
@@ -74,7 +83,7 @@ export default async function handler(req, res) {
     const resolver = buildResolver(await fetchLiveTaxonomy());
     compiled = compile(spec, {
       resolver,
-      excludeMarkedTestRequests: testRequestIsolationEnabled(),
+      excludeMarkedTestRequests: markedIsolation,
     });
   } catch (err) {
     console.error('[dataverse-export/run] taxonomy/compile failed:', err);

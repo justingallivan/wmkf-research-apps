@@ -187,7 +187,11 @@ export default async function handler(req, res) {
           + 'operational step, never double-counted.',
     };
 
-    const { token, expiresInSec } = await mintResultToken(spec, { trueTotal });
+    const { token, expiresInSec } = await mintResultToken(
+      spec,
+      { trueTotal },
+      { markedIsolation },
+    );
 
     return res.status(200).json({
       trueTotal,

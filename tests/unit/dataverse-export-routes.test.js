@@ -317,6 +317,65 @@ describe('run — the stateless confirm gate', () => {
     expect(res.chunks).toHaveLength(0);
   });
 
+  test('isolation on at preview and off at run → 409 re-preview before SSE or Blob', async () => {
+    const { token } = await mintResultToken(
+      baseSpec(),
+      { trueTotal: 3 },
+      { markedIsolation: true },
+    );
+    const res = mockRes();
+    await runHandler({ method: 'POST', body: { resultToken: token } }, res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual(expect.objectContaining({
+      error: 'PREVIEW_POLICY_CHANGED',
+      message: expect.stringMatching(/Re-preview/),
+    }));
+    expect(fetchLiveTaxonomy).not.toHaveBeenCalled();
+    expect(res.headers['Content-Type']).toBeUndefined();
+    expect(res.chunks).toHaveLength(0);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test('isolation off at preview and on at run → 409 re-preview before SSE or Blob', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    try {
+      const { token } = await mintResultToken(
+        baseSpec(),
+        { trueTotal: 3 },
+        { markedIsolation: false },
+      );
+      const res = mockRes();
+      await runHandler({ method: 'POST', body: { resultToken: token } }, res);
+      expect(res.statusCode).toBe(409);
+      expect(res.body.error).toBe('PREVIEW_POLICY_CHANGED');
+      expect(fetchLiveTaxonomy).not.toHaveBeenCalled();
+      expect(res.headers['Content-Type']).toBeUndefined();
+      expect(res.chunks).toHaveLength(0);
+      expect(put).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.TEST_REQUEST_ISOLATION;
+    }
+  });
+
+  test('matching isolation-on preview policy runs with marked-request exclusion', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    try {
+      const { token } = await mintResultToken(
+        baseSpec(),
+        { trueTotal: 3 },
+        { markedIsolation: true },
+      );
+      const res = mockRes();
+      await runHandler({ method: 'POST', body: { resultToken: token } }, res);
+      expect(fetchXmlAll).toHaveBeenCalled();
+      expect(fetchXmlAll.mock.calls[0][1]).toContain('wmkf_istestrequest');
+      expect(sseEvents(res).find((event) => event.event === 'ready')).toBeTruthy();
+      expect(put).toHaveBeenCalledTimes(1);
+    } finally {
+      delete process.env.TEST_REQUEST_ISOLATION;
+    }
+  });
+
   test('honors the TOKEN spec, never a mismatched body spec (Codex P2 #11)', async () => {
     const tokenSpec = baseSpec({
       filters: [{ axis: 'program', op: 'eq', value: 'TOKEN-PROGRAM-GUID' }],
