@@ -59,6 +59,32 @@ describe('schema-apply option sets and file columns', () => {
     expect(client.posts[1].body['GlobalOptionSet@odata.bind']).toBe(`/GlobalOptionSetDefinitions(${GOS_ID})`);
   });
 
+  test('retries the read-back while a just-created global option set is not yet visible', async () => {
+    jest.useFakeTimers();
+    const client = fakeClient();
+    const realGet = client.get;
+    let misses = 2;
+    client.get = async (p) => {
+      if (p.includes('/GlobalOptionSetDefinitions(') && client.posts.length && misses > 0) {
+        misses -= 1;
+        return { ok: false, status: 404, text: '0x80040217' };
+      }
+      return realGet(p);
+    };
+    const pending = ensureGlobalOptionSet(client, { name: 'wmkf_status' }, OPTIONS);
+    await jest.runAllTimersAsync();
+    await expect(pending).resolves.toBe(GOS_ID);
+    expect(misses).toBe(0);
+    jest.useRealTimers();
+  });
+
+  test('gives up on the read-back after the attempt limit', async () => {
+    const client = fakeClient();
+    client.get = async () => ({ ok: false, status: 404, text: '0x80040217' });
+    await expect(ensureGlobalOptionSet(client, { name: 'wmkf_status' }, OPTIONS, { readBackAttempts: 1 }))
+      .rejects.toThrow(/could not read it back/);
+  });
+
   test('dry run of a missing global option set binds a placeholder id', async () => {
     const client = fakeClient({ dryRun: true });
     const id = await ensureGlobalOptionSet(client, { name: 'wmkf_status' }, OPTIONS);
