@@ -639,6 +639,18 @@ async function runReserve(client, args, ledgerUrl) {
 }
 
 async function runAdvance(client, args, ledgerUrl) {
+  // Every Initial Assessment step's sandbox dependency
+  // (lib/services/test-requests/ia-sandbox-deps.js) calls
+  // assertTrustedDalContext; this CLI is a single-process, single-invocation
+  // script with no concurrent request contexts to leak the bypass into, so
+  // it uses the documented script-only precedent
+  // (scripts/rebaseline-email-defaults.mjs) rather than a route/library-shaped
+  // withDalContext/bypassDynamicsRestrictions scope. Entered once, narrowly,
+  // at the top of this function (not module load) so `--reserve`/`--inspect`
+  // invocations of this same file, which never reach a sandbox-bound
+  // dependency, never carry it.
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+  enterDynamicsBypassForScript('rehearse-test-request-sandbox:advance');
   const manifest = readJson(args.manifest);
   const bundle = readSourceBundle(readJson(args.bundle));
   const { graph, sharePointTarget } = await buildGraphContext();

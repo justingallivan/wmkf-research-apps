@@ -16,6 +16,7 @@
  * @jest-environment node
  */
 
+import crypto from 'node:crypto';
 import { jest } from '@jest/globals';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { assertLedgerReceipt, ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
@@ -101,8 +102,23 @@ const PURPOSE = 'Synthetic purpose';
 const AMOUNT = 5000;
 const REQUEST_TYPE = 100000000;
 
+// Basic-recipe file copy (Stage C round 2, P1-A): a real Basic document in
+// the bundle plus a matching journaled copy_file resource below, so the
+// census/reverifyClone paths exercise a genuine Basic-recipe copy rather than
+// only the two IA-only entries this step adds.
+const BASIC_ITEM_ID = '01DEFGHIJKLMNOPQRSTUVWXYZ234567ABC';
+const BASIC_FILENAME = `ProposalNarrative_${REQUEST_NUMBER}.pdf`;
+const BASIC_FOLDER = `${REQUEST_FOLDER}/AI Materials`;
+const BASIC_FILE_BYTES = Buffer.from('synthetic Basic-recipe proposal narrative bytes for Stage C P1-A');
+const BASIC_FILE_SHA256 = crypto.createHash('sha256').update(BASIC_FILE_BYTES).digest('hex');
+
 // One real v4 bundle (buildSourceBundle) so fenceSource's bundleSourceOf
-// genuinely validates instead of being stubbed.
+// genuinely validates instead of being stubbed. `documents` carries exactly
+// the one Basic file the copy_file resource below journals, so
+// `bundle.documents.length === manifest.invariants.expectedSharePointFiles`
+// -- the invariant the real `validateCloneManifest` enforces (this runner
+// never calls that function, but the fixture stays consistent with it rather
+// than hiding the real per-recipe file-count mismatch P1-A found).
 const bundle = buildSourceBundle({
   sourceRow: {
     akoya_requestid: SOURCE_ID,
@@ -114,7 +130,21 @@ const bundle = buildSourceBundle({
     wmkf_meetingdate: MEETING_DATE,
     versionnumber: 1,
   },
-  documents: [],
+  documents: [{
+    id: 'source-doc-1',
+    kind: 'proposalNarrative',
+    library: 'akoya_request',
+    folder: 'Phase I',
+    name: `ProposalNarrative_${REQUEST_NUMBER}.pdf`,
+    driveId: 'b!sourceDriveIdSample000000000000',
+    graphItemId: '01SOURCEITEMABCDEFGHIJKLMNOPQR234',
+    sharePointSite: { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' },
+    size: BASIC_FILE_BYTES.length,
+    mimeType: 'application/pdf',
+    eTag: '"source-1"',
+    versionId: '1.0',
+    contentHash: BASIC_FILE_SHA256,
+  }],
   dataverseHost: PROD_HOST,
   exportedAt: new Date(),
 });
@@ -138,7 +168,7 @@ function baseManifest(overrides = {}) {
     expectedRequestType: { value: REQUEST_TYPE },
     expectedAppUserId: APP_USER_ID,
     expectedOrganization: { accountid: ORG_ID },
-    invariants: { expectedSharePointFiles: 2 },
+    invariants: { expectedSharePointFiles: 1 },
     ...overrides,
   };
 }
@@ -234,6 +264,7 @@ function fakeGraph(overrides = {}) {
     getSiteId: jest.fn(async () => EXPECTED_SITE_ID),
     getDriveId: jest.fn(async () => EXPECTED_DRIVE_ID),
     listFiles: jest.fn(async () => [
+      { id: BASIC_ITEM_ID, name: BASIC_FILENAME, folder: BASIC_FOLDER, size: BASIC_FILE_BYTES.length },
       { id: iaId, name: 'ia.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment`, size: cachedDocxBytes ? cachedDocxBytes.length : 0 },
       { id: snapId, name: 'snap.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment/Board Milestones`, size: cachedDocxBytes ? cachedDocxBytes.length : 0 },
     ]),
@@ -406,16 +437,35 @@ describe('stepVerifyInitialAssessment', () => {
     return { driveId: EXPECTED_DRIVE_ID, id: snapId, name: 'snap.docx', size: iaBuffer.length, eTag: '"snap-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/snap' };
   }
 
+  function basicMetadata() {
+    return { driveId: EXPECTED_DRIVE_ID, id: BASIC_ITEM_ID, name: BASIC_FILENAME, size: BASIC_FILE_BYTES.length, eTag: '"basic-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/basic' };
+  }
+  /** The one Basic-recipe copy_file resource this run's earlier copy_file step would have journaled (Stage C round 2, P1-A). */
+  function basicFileCopyResource(overrides = {}) {
+    return {
+      resourceId: 4, sequence: 4, step: 'copy_file', resourceKind: 'sharepoint_file', system: 'sharepoint',
+      readback: {
+        index: 0, filename: BASIC_FILENAME, folder: BASIC_FOLDER, library: 'akoya_request',
+        size: BASIC_FILE_BYTES.length, contentHash: BASIC_FILE_SHA256,
+        driveId: EXPECTED_DRIVE_ID, itemId: BASIC_ITEM_ID, eTag: '"basic-1"', versionId: '1.0',
+      },
+      outcome: 'verified',
+      ...overrides,
+    };
+  }
+
   function baseGraph(overrides = {}) {
     return fakeGraph({
       getFileMetadataById: jest.fn(async (driveId, itemId) => {
         if (itemId === iaId) return iaMetadata();
         if (itemId === snapId) return snapshotMetadata();
+        if (itemId === BASIC_ITEM_ID) return basicMetadata();
         return null;
       }),
       downloadFile: jest.fn(async (driveId, itemId) => {
         if (itemId === iaId) return { buffer: iaBuffer };
         if (itemId === snapId) return { buffer: iaBuffer };
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
         return null;
       }),
       ...overrides,
@@ -430,7 +480,7 @@ describe('stepVerifyInitialAssessment', () => {
     const { result, calls } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow()],
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
     });
 
     expect(result.outcome).toBe('ready');
@@ -443,7 +493,7 @@ describe('stepVerifyInitialAssessment', () => {
     const { result } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
-      resources: [baselineResource('f'.repeat(64)), seedResourceRow(), snapshotResourceRow()],
+      resources: [baselineResource('f'.repeat(64)), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
@@ -455,7 +505,7 @@ describe('stepVerifyInitialAssessment', () => {
     const { result } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
-      resources: [seedResourceRow(), snapshotResourceRow()],
+      resources: [seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
@@ -473,7 +523,7 @@ describe('stepVerifyInitialAssessment', () => {
     const { result } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow()],
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
@@ -485,7 +535,7 @@ describe('stepVerifyInitialAssessment', () => {
     const { result } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow()],
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_snapshot_stale');
@@ -507,7 +557,7 @@ describe('stepVerifyInitialAssessment', () => {
     const { result, calls } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow()],
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
@@ -520,7 +570,7 @@ describe('stepVerifyInitialAssessment', () => {
     const { result } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow()],
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');

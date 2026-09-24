@@ -208,4 +208,25 @@ describe('sandbox operator write boundary', () => {
     expect(script).toMatch(/neon\\?\.tech/);
     expect(script).toContain('must not be the shared Production/Preview database');
   });
+
+  test('--advance enters the script-only trusted DAL context before advancing any step (Stage C round 2, P1-B)', () => {
+    // Every Initial Assessment step's sandbox dependency
+    // (lib/services/test-requests/ia-sandbox-deps.js) calls
+    // assertTrustedDalContext; without a trusted context the first such call
+    // throws. This CLI never wraps its calls in bypassDynamicsRestrictions
+    // (a route/library-shaped, callback-scoped mechanism) -- it uses the
+    // documented script-only precedent instead
+    // (scripts/rebaseline-email-defaults.mjs), entered once inside
+    // runAdvance, narrower than module load so --reserve/--inspect
+    // invocations (which never reach a sandbox-bound dependency) never carry it.
+    const runAdvanceStart = script.indexOf('async function runAdvance(');
+    expect(runAdvanceStart).toBeGreaterThan(-1);
+    const enterBypass = script.indexOf("enterDynamicsBypassForScript('rehearse-test-request-sandbox:advance')", runAdvanceStart);
+    expect(enterBypass).toBeGreaterThan(runAdvanceStart);
+    const loopStart = script.indexOf('for (let i = 0; i < args.steps; i += 1) {', runAdvanceStart);
+    expect(loopStart).toBeGreaterThan(enterBypass);
+    // Not entered anywhere else in the file (module load, runReserve, etc.).
+    expect(script.indexOf('enterDynamicsBypassForScript(', enterBypass + 1)).toBe(-1);
+    expect(script.indexOf('enterDynamicsBypassForScript(')).toBe(enterBypass);
+  });
 });

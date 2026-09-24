@@ -869,3 +869,29 @@ describe('stepSeedInitialAssessment — idempotent resume', () => {
     expect(graph.uploadFile).not.toHaveBeenCalled();
   });
 });
+
+describe('stepSeedInitialAssessment — trusted DAL context is required (Stage C round 2, P1-B)', () => {
+  it('fails closed with no trusted Dataverse context when the caller supplies none (no bypassDynamicsRestrictions, no enterDynamicsBypassForScript)', async () => {
+    fetch.mockImplementation((url) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      // A trusted-context failure must stop before any sandbox Dataverse
+      // fetch is even attempted (assertTrustedDalContext runs first inside
+      // every ia-sandbox-deps.js dependency).
+      throw new Error(`unexpected fetch to ${href} -- assertTrustedDalContext should have stopped this step first`);
+    });
+    const run0 = baseRun();
+    const { ledger } = createFakeLedger(run0);
+    const manifest = baseManifest();
+    // Deliberately NOT wrapped in bypassDynamicsRestrictions (or any other
+    // context-establishing helper) -- this is the caller shape a CLI
+    // invocation would have without runAdvance's own
+    // enterDynamicsBypassForScript fix (scripts/rehearse-test-request-sandbox.mjs).
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle: null,
+      deps: { client: fakeClient(), graph: fakeGraph(), sharePointTarget: SHARE_POINT_TARGET },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.errorMessage).toContain('no trusted Dataverse context');
+  });
+});
