@@ -211,6 +211,7 @@ function requestReadback(overrides = {}) {
     akoya_originalgrantamount: null,
     akoya_submissionaccepted: false,
     _akoya_applicantid_value: ORG_ID,
+    '_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue': 'Synthetic University',
     _createdby_value: APP_USER_ID,
     _ownerid_value: APP_USER_ID,
     _wmkf_currentinitialassessment_value: SEED_DOCUMENT_ID,
@@ -743,6 +744,51 @@ describe('stepVerifyInitialAssessment', () => {
   // file plus a consistent rewrite of the row's hash cannot verify.
   const anchoredSeed = () => seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: governedHashToHex(iaHash), sourceVersionId: '1.0' } });
   const anchoredSnapshot = () => snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: governedHashToHex(iaHash), versionId: '1.0' } });
+
+  // Fresh-render anchor (owner decision 2026-09-24): the row's governed hash
+  // must equal a re-render of the synthetic fixture from the destination
+  // Request's own fields, independent of any receipt.
+  it('fresh-render anchor: an Initial Assessment whose row hash, bytes AND receipt all agree but do not equal a fresh synthetic render stops with ia_verification_failed', async () => {
+    const foreignBytes = await renderInitialAssessmentDocx({
+      requestNumber: REQUEST_NUMBER, title: 'Not the synthetic fixture title', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    const foreignHash = await hashGovernedDocxContent(foreignBytes);
+    mockDataverse({ ia: iaRow({ wmkf_contenthash: foreignHash }), snapshot: snapshotRow({ wmkf_sourcecontenthash: foreignHash, wmkf_contenthash: foreignHash }) });
+    const graph = baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
+        if (itemId === iaId || itemId === snapId) return { buffer: foreignBytes };
+        return null;
+      }),
+    });
+    const receiptHash = governedHashToHex(foreignHash);
+    const { result, calls } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [
+        baselineResource(validBaseline()),
+        seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: receiptHash, sourceVersionId: '1.0' } }),
+        snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: receiptHash, versionId: '1.0' } }),
+        basicFileCopyResource(),
+      ],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The Initial Assessment content hash does not match a fresh render of the synthetic fixture.');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+  });
+
+  it('fresh-render anchor: a destination Request whose title changed after seeding stops with ia_verification_failed', async () => {
+    mockDataverse({ request: requestReadback({ akoya_title: 'TEST: renamed after seeding' }) });
+    const { result } = await runStep({
+      deps: { graph: baseGraph() },
+      requestRow: requestReadback({ akoya_title: 'TEST: renamed after seeding' }),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The Initial Assessment content hash does not match a fresh render of the synthetic fixture.');
+  });
 
   it('receipt anchors: a seed receipt that never journaled a content hash stops with ia_pointer_mismatch (anchors are mandatory)', async () => {
     mockDataverse();

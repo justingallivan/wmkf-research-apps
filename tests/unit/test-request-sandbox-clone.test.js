@@ -229,4 +229,12 @@ describe('sandbox operator write boundary', () => {
     expect(script.indexOf('enterDynamicsBypassForScript(', enterBypass + 1)).toBe(-1);
     expect(script.indexOf('enterDynamicsBypassForScript(')).toBe(enterBypass);
   });
+
+  it('--advance takes the ledger maximum 900 s lease for the initial_assessment recipe and 300 s otherwise (owner decision 2026-09-24, no renewal)', () => {
+    const script = fs.readFileSync(path.join(process.cwd(), 'scripts/rehearse-test-request-sandbox.mjs'), 'utf8');
+    const runAdvanceStart = script.indexOf('async function runAdvance(');
+    const lease = script.indexOf("leaseSeconds: manifest.recipe === 'initial_assessment' ? 900 : 300", runAdvanceStart);
+    expect(lease).toBeGreaterThan(runAdvanceStart);
+    expect(script.indexOf('renewLease')).toBe(-1);
+  });
 });

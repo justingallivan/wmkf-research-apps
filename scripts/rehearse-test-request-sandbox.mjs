@@ -674,7 +674,13 @@ async function runAdvance(client, args, ledgerUrl) {
         manifest,
         bundle,
         deps: { client, graph, sharePointTarget },
-        options: { bypassGoverify: args.bypassGoverify, leaseSeconds: 300 },
+        // Owner decision 2026-09-24 (Codex adversarial round 1, F4): the
+        // initial_assessment recipe's IA steps chain many sequential
+        // Dataverse and Graph calls under one lease and the runner never
+        // renews it, so that recipe takes the ledger's maximum (900 s,
+        // run-ledger.js claimLease clamp) instead of the Basic 300 s. No
+        // renewal mechanism; reconsidered only if a live run shows longer phases.
+        options: { bypassGoverify: args.bypassGoverify, leaseSeconds: manifest.recipe === 'initial_assessment' ? 900 : 300 },
       });
       // The ledger never stores message text (only a lowercase code); the
       // full error, if any, is surfaced here and in a private sidecar file
