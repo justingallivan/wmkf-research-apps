@@ -893,16 +893,18 @@ and the folder listing was empty. No bearer URL or token was saved in this recei
 
 [VERIFIED via Chrome and Graph] the second Graph session paused at 0.6 MiB, with initial
 expiry 8:49:47 PM PDT on 2026-09-24; the governed folder listing showed no committed item.
-The saved permit is retained for an after-expiry Resume attempt and exact cleanup. During the
-wait, the shared alias was restored and re-inspected at Ready Factory deployment
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The upload-session expiry row is pending that live
-attempt and its separately approved cleanup.
+After that expiry, Resume displayed the specific `presentation_media_proof_session_expired`
+message while keeping the saved permit. The Graph folder listing was still empty. A fresh
+signed-in GET through the remapped alias loaded the protected proof page. Separate owner
+approval for expired-session cleanup is pending. The alias was restored and re-inspected at
+Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` while awaiting approval.
+The upload-session expiry row still needs authoritative cleanup and a fresh successful upload.
 
 | Browser | Scenario | Recorded or pending evidence | Runner |
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. | Agent (historical PASS) |
 | Desktop Chrome | Reload and same-file reselect Resume | 2026-09-24 PASS: paused at 0.9 MiB, reloaded, reselected the same file, resumed direct Microsoft `202` chunks, committed 100,665,703 bytes, finalized, and cleaned the exact item. | Agent |
-| Desktop Chrome | Upload-session expiry and recovery | PENDING: second session paused at 0.6 MiB, initial expiry 8:49:47 PM PDT; after expiry, expect `410` and retained permit, then owner-approved exact cleanup and a fresh successful session. | Agent |
+| Desktop Chrome | Upload-session expiry and recovery | PENDING CLEANUP/FRESH UPLOAD: second session paused at 0.6 MiB; after its 8:49:47 PM PDT expiry, Resume displayed `presentation_media_proof_session_expired` and retained the permit. Graph folder empty; separate cleanup approval pending. | Agent |
 | Desktop Chrome | Five-minute proof-token expiry recovery | 2026-09-24 PASS: old link refused as `expired` after reload; fresh link from the same item played and accepted End/Home seeks with resolver count one. | Agent |
 | Desktop Edge | 2026-09-23 upload, playback, Download | Colleague reported these actions for 97,777,999 bytes; Graph confirmed the item. Remaining detailed Edge trace is not a Slice 0 blocker under Session 536. | Historical owner colleague; no new Edge run |
 | macOS Safari | Upload, both Watch shapes with long seeking, Download | Deferred to Production on a Factory-created test request; record redacted statuses/ranges and source/download size and SHA-256. | Owner by hand |
@@ -921,7 +923,7 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 | macOS Safari full path | DEFERRED | [VERIFIED via Session 536 owner decision] Production run on a Factory-created test request remains for upload, both Watch shapes with long seeking, Download, and integrity evidence. |
 | iPadOS Safari full path | DEFERRED | [VERIFIED via Session 536 owner decision] Production run on a Factory-created test request remains for the same path plus Files-app integrity and mobile behavior. |
 | Reload and same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] 0.9 MiB pause, reload, reselect, direct Microsoft `202` chunks, 100,665,703-byte commit/finalize, exact ETag-guarded cleanup with Graph 404 and empty folder. |
-| Upload-session expiry recovery | PENDING EXPIRY | [VERIFIED via Chrome] second session paused at 0.6 MiB and initially expires 8:49:47 PM PDT; [VERIFIED via Graph] no committed item at pause. After-expiry `410`, retained permit, cleanup, and fresh upload remain unrecorded. |
+| Upload-session expiry recovery | PENDING CLEANUP/FRESH UPLOAD | [VERIFIED via Chrome] second session paused at 0.6 MiB; after its 8:49:47 PM PDT expiry, Resume displayed the specific expired-session error and retained the permit. [VERIFIED via Graph] folder empty. Exact cleanup and fresh upload still need receipts. |
 | Five-minute proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] expired old link refused after reload; Finish saving minted a fresh link from the same committed item; Watch played and End/Home seeks caused no additional resolver action. |
 | Long-duration seeking | DEFERRED | [VERIFIED via Chrome receipt] current recording is only 67.33 seconds; macOS/iPadOS Production Safari run still needs a >2-minute recording and ten seeks. |
 | Upload and throughput near 2,000,000,000 bytes | DEFERRED | [VERIFIED via Session 536 owner decision] one near-cap iPadOS Production upload on a Factory-created test request remains. |
