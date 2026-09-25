@@ -36,7 +36,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
         FROM jsonb_each(receipt) AS e(key, value)
         CROSS JOIN LATERAL (SELECT e.value #>> '{}' AS v, jsonb_typeof(e.value) AS t) AS s
        WHERE NOT (
-         (e.key IN ('size', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount') AND s.t = 'number')
+         (e.key IN ('size', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount', 'assignmentSequence') AND s.t = 'number')
          OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
          OR (e.key IN ('requestIds', 'locationIds') AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
@@ -57,7 +57,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
              WHEN e.key = 'siteId' THEN s.v ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'library' THEN s.v ~ '^[a-z][a-z0-9_]{1,60}$'
              WHEN e.key IN ('folder', 'relativeUrl') THEN s.v ~ '^([0-9]{1,10}_[0-9A-F]{32}(/(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))?|(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))$'
-             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx|Review_[0-9]{1,2}[.](pdf|docx|doc))$'
+             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx|Review_[1-5][.](pdf|docx|doc))$'
              WHEN e.key = 'mimeType' THEN s.v ~ '^[a-z]+/[a-z0-9.+-]{1,80}$'
              WHEN e.key IN ('eTag', 'eTagBefore', 'eTagAfter') THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
              WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
@@ -313,7 +313,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS test_request_run_resources_one_baseline_idx
 -- Written once, in the same transaction as the run reservation, and never
 -- updated afterwards (no UPDATE statement touches this table anywhere in the
 -- ledger). Every other surface (receipts, needs_attention_reason, inspect
--- output) carries only address_sha256.
+-- output) carries only address_sha256, whose own CHECK (below) requires it
+-- to actually BE the address's SHA-256, not merely hex-shaped -- a writer
+-- that computed it wrong (or forged it) is rejected at the database, not
+-- trusted from the application layer (Opus round 1, P3). A row's `sequence`
+-- doubles as the "row id" a receipt may reference (an `assignmentSequence`
+-- receipt key, run-ledger.js KEY_RULES) once 6c-ii's steps need to.
 CREATE TABLE IF NOT EXISTS test_request_run_reviewer_assignments (
   assignment_id       BIGSERIAL PRIMARY KEY,
   run_id              UUID NOT NULL REFERENCES test_request_runs (run_id),
@@ -337,8 +342,12 @@ CREATE TABLE IF NOT EXISTS test_request_run_reviewer_assignments (
   ),
   CONSTRAINT test_request_run_reviewer_assignments_digest_shape CHECK (
     address_sha256 ~ '^[0-9a-f]{64}$'
+  ),
+  CONSTRAINT test_request_run_reviewer_assignments_digest_matches_address CHECK (
+    address_sha256 = encode(sha256(convert_to(address, 'UTF8')), 'hex')
   )
 );
 
-CREATE INDEX IF NOT EXISTS test_request_run_reviewer_assignments_run_idx
-  ON test_request_run_reviewer_assignments (run_id);
+-- No separate (run_id) index: every UNIQUE constraint above (sequence,
+-- source_person_id, address) already leads with run_id, so Postgres can use
+-- any of their backing btrees for a run_id lookup (Opus round 1, P3).

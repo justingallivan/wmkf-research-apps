@@ -558,10 +558,15 @@ describe('slice 6c-i: new receipt keys and their grammars', () => {
   it('LEDGER_RECEIPT_KEYS contains every new key', () => {
     for (const key of [
       'sourcePersonId', 'destinationPersonId', 'suggestionId', 'addressSha256', 'attestedDigest',
-      'answerCount', 'eTagBefore', 'eTagAfter', 'reviewForm',
+      'answerCount', 'eTagBefore', 'eTagAfter', 'reviewForm', 'assignmentSequence',
     ]) {
       expect(LEDGER_RECEIPT_KEYS).toContain(key);
     }
+  });
+
+  it('P3 (D-R2): assignmentSequence accepts a small integer (the assignment row\'s own `sequence`) and rejects a non-numeric string', () => {
+    expect(assertLedgerReceipt({ assignmentSequence: 1 })).toBeTruthy();
+    expect(() => assertLedgerReceipt({ assignmentSequence: '1' })).toThrow(/Ledger receipt rejected/);
   });
 });
 

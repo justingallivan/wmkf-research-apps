@@ -228,6 +228,22 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     )).rejects.toThrow();
   });
 
+  it('P3: the DB CHECK ties address_sha256 to address -- a mismatched digest is rejected even though both columns are independently well-shaped', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '2') });
+    createdRunIds.push(plan.runId);
+    await ledger.reserveRun({
+      actorId, idempotencyKey: `key-reviews-digest-mismatch-${plan.runId}`, plan,
+      reviewerAssignments: [{ sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'mismatch@example.test' }],
+    });
+    await expect(db.query(
+      `INSERT INTO test_request_run_reviewer_assignments (run_id, sequence, source_person_id, destination_person_id, reused, address, address_sha256)
+       VALUES ($1::uuid, 2, $2::uuid, $3::uuid, false, 'a-second-address@example.test', $4::text)`,
+      // A well-shaped 64-hex digest that is simply the WRONG hash of the address.
+      [plan.runId, crypto.randomUUID(), crypto.randomUUID(), reviewerAddressSha256('someone-else@example.test').addressSha256],
+    )).rejects.toThrow();
+  });
+
   it('claimLease succeeds once; a second claim with the stale version returns null', async () => {
     const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
     const plan = basePlan();
@@ -499,6 +515,58 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       { filename: '1000400 Initial Assessment 0a1b2c3d-9f8e7d6c.pdf' },
       { filename: `1000400 Initial Assessment Board v${FAKE_GITHUB_TOKEN.slice(0, 20)} 0a1b2c3d.docx` },
       { filename: 'Confidential Initial Assessment 0a1b2c3d-9f8e7d6c.docx' },
+    ];
+    for (const receipt of rejected) {
+      expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(false);
+    }
+  });
+
+  it('P2-b: the Reviews recipe folder/filename grammars and receipt keys are accepted/rejected identically by JS and SQL', async () => {
+    const accepted = [
+      // Reviewer_Uploads as a request-folder child (both subfolder compositions
+      // SUBFOLDER supports: <prefix>_<8hex> and bare <8hex>).
+      { folder: `1000400_5D54ABC57F744D23B4BE39599147E674/Reviewer_Uploads/jones_1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      { folder: `1000400_5D54ABC57F744D23B4BE39599147E674/Reviewer_Uploads/1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      // Reviewer_Uploads as a bare subfolder (matches how SUBFOLDER is composed today).
+      { folder: `Reviewer_Uploads/jones_1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      { folder: `Reviewer_Uploads/1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      // A 30-character alphanumeric prefix is the boundary; exactly 30 is accepted.
+      { folder: `Reviewer_Uploads/${'a'.repeat(30)}_1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      { filename: 'Review_1.pdf' },
+      { filename: 'Review_5.docx' },
+      { filename: 'Review_1.doc' },
+      { name: 'Review_1.pdf' },
+      { sourcePersonId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', destinationPersonId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', suggestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+      { addressSha256: 'a'.repeat(64), attestedDigest: 'b'.repeat(64) },
+      { answerCount: 12 },
+      { eTagBefore: '"12345"', eTagAfter: '"12346"' },
+      { reviewForm: 'uploaded' },
+      { reviewForm: 'received_no_file' },
+      { reviewForm: 'unreceived' },
+    ];
+    for (const receipt of accepted) {
+      expect(assertLedgerReceipt(receipt, 'fixture')).toBe(receipt);
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(true);
+    }
+    const rejected = [
+      // A 31-character prefix is one over the {1,30} bound.
+      { folder: `Reviewer_Uploads/${'a'.repeat(31)}_1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      // Uppercase hex in either the 8-hex subfolder id or the 32-hex attempt id.
+      { folder: `Reviewer_Uploads/jones_1A2B3C4D/attempt_${'a'.repeat(32)}` },
+      { folder: `Reviewer_Uploads/jones_1a2b3c4d/attempt_${'A'.repeat(32)}` },
+      // A per-review cap of 5: Review_100 and a non-numbered form are rejected.
+      { filename: 'Review_100.pdf' },
+      { filename: 'Review_1.PDF' },
+      { filename: 'Review_1.docm' },
+      { sourcePersonId: 'not-a-guid' },
+      { addressSha256: 'not-hex' },
+      { attestedDigest: `sk-${FAKE_GITHUB_TOKEN}` },
+      { answerCount: '12' }, // must be a JSON number, not a numeric string
+      { eTagBefore: 'not-an-etag' },
+      { reviewForm: 'in_progress' },
     ];
     for (const receipt of rejected) {
       expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();

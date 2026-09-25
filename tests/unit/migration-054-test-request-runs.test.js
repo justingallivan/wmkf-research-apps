@@ -227,7 +227,7 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
 
   it('uses IF NOT EXISTS for every table and index', () => {
     expect((migration.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(3);
-    expect((migration.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(4);
+    expect((migration.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(3);
   });
 
   it('never stores credentials, bodies, or bundle contents (no such columns declared)', () => {

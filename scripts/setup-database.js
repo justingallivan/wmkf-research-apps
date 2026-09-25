@@ -1231,7 +1231,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
         FROM jsonb_each(receipt) AS e(key, value)
         CROSS JOIN LATERAL (SELECT e.value #>> '{}' AS v, jsonb_typeof(e.value) AS t) AS s
        WHERE NOT (
-         (e.key IN ('size', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount') AND s.t = 'number')
+         (e.key IN ('size', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount', 'assignmentSequence') AND s.t = 'number')
          OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
          OR (e.key IN ('requestIds', 'locationIds') AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
@@ -1252,7 +1252,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
              WHEN e.key = 'siteId' THEN s.v ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'library' THEN s.v ~ '^[a-z][a-z0-9_]{1,60}$'
              WHEN e.key IN ('folder', 'relativeUrl') THEN s.v ~ '^([0-9]{1,10}_[0-9A-F]{32}(/(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))?|(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))$'
-             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx|Review_[0-9]{1,2}[.](pdf|docx|doc))$'
+             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx|Review_[1-5][.](pdf|docx|doc))$'
              WHEN e.key = 'mimeType' THEN s.v ~ '^[a-z]+/[a-z0-9.+-]{1,80}$'
              WHEN e.key IN ('eTag', 'eTagBefore', 'eTagAfter') THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
              WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
@@ -1455,9 +1455,11 @@ $receipt$`,
     CONSTRAINT test_request_run_reviewer_assignments_address_shape CHECK (
       length(address) BETWEEN 1 AND 320 AND address !~ '[[:cntrl:]]' AND address = lower(address)
     ),
-    CONSTRAINT test_request_run_reviewer_assignments_digest_shape CHECK ( address_sha256 ~ '^[0-9a-f]{64}$' )
+    CONSTRAINT test_request_run_reviewer_assignments_digest_shape CHECK ( address_sha256 ~ '^[0-9a-f]{64}$' ),
+    CONSTRAINT test_request_run_reviewer_assignments_digest_matches_address CHECK (
+      address_sha256 = encode(sha256(convert_to(address, 'UTF8')), 'hex')
+    )
   )`,
-  `CREATE INDEX IF NOT EXISTS test_request_run_reviewer_assignments_run_idx ON test_request_run_reviewer_assignments (run_id)`,
 ];
 
 // V54: review bundle PDF retention (plan §11, Step C1). Ten nullable
