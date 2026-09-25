@@ -40,7 +40,6 @@ const document = (over = {}) => ({
   eTag: '"{ETAG},1"',
   versionId: '1.0',
   contentHash: 'a'.repeat(64),
-  suggestionId: null,
   ...over,
 });
 const build = (over = {}) => buildSourceBundle({
@@ -117,6 +116,31 @@ test('builds a canonical bundle from the clone projection', () => {
     },
   });
   expect(bundle.documents).toEqual([document()]);
+});
+
+// P1-1 (Opus round 1, 2026-09-25): pins a v2 bundle's exact byte shape and
+// digest against the PRE-Stage-A module (39f641bac, before the reviewers[]
+// section and the DOCUMENT_FIELDS/suggestionId change). Adding `suggestionId`
+// to DOCUMENT_FIELDS unconditionally (the P1-1 regression) made every
+// document emit `suggestionId: null`, changing this hash from
+// 997d5044...86b8f to f3b08cdd... and breaking `bundleSha256` verification
+// (run-runner.js ~296) for any run reserved before the reviewer-section
+// commit. Golden hash derived 2026-09-25 by loading
+// `git show 39f641bac:lib/services/test-requests/source-bundle.js` (plus its
+// then-unchanged lib/dataverse/core/target-registry.js,
+// lib/services/sharepoint-target-registry.js and
+// lib/services/test-requests/sandbox-clone.js) into a scratch copy, calling
+// its buildSourceBundle with this file's exact `sourceRow()`/`document()`
+// fixtures (host 'wmkf.crm.dynamics.com', exportedAt
+// 2026-09-23T12:00:00Z), and SHA-256-hashing JSON.stringify(bundle). To
+// reproduce: `git show 39f641bac:lib/services/test-requests/source-bundle.js`
+// into a sibling-relative copy and repeat the same computation.
+test('golden digest: a v2 bundle from these fixtures is byte- and digest-identical to 39f641bac', () => {
+  const bundle = build();
+  const json = JSON.stringify(bundle);
+  expect(json).not.toMatch(/"suggestionId"/);
+  const sha256 = require('crypto').createHash('sha256').update(json).digest('hex');
+  expect(sha256).toBe('997d50447a5ef34d53340cbfe925c4102a3ca05d52a85fcb7cdb049993486b8f');
 });
 
 test('round-trips through JSON and readSourceBundle unchanged', () => {
