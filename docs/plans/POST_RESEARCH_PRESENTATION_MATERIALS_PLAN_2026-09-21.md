@@ -1404,7 +1404,7 @@ expired with no exact item; an uncertain transport retains the encrypted permit 
 ### Slice 1 — Additive schema and readiness — SOURCE-BUILT 2026-09-25; NOT APPLIED
 
 **[VERIFIED via source, focused tests, preflight self-test, and migration/fresh-install parity.]**
-Wave 30, migration 054/V55, readiness/access parsing, compatibility-gated Request Document
+Wave 30, migration 055/V56, readiness/access parsing, compatibility-gated Request Document
 projection, Atlas, and runbook updates are built on `codex/feature-request`. No migration or
 Dataverse wave was applied, no environment variable was set, and no route/producer was enabled.
 
@@ -1819,17 +1819,28 @@ open and approval-bound.
 `wmkf_ExternalUrl` URL field and positive Dataverse-sized `wmkf_SlotVersion` fence, with a
 creation-only apply record and read-only typed preflight. The Request Document adapter excludes
 both from its base projection and admits them only behind literal-on schema readiness. Migration
-054 and fresh-install V55 define the materials-only link ledger, ciphertext-only durable Graph
+055 and fresh-install V56 define the materials-only link ledger, ciphertext-only durable Graph
 upload intents, monotonic request/artifact slot fences, and the complete five-scope staging
 allowlist. The separate access parser accepts only `off`, `on`, or one normalized `test:<GUID>`;
 unset/invalid values fail closed. The preflight self-test, type check, scoped lint, and 14
-changed-surface Jest suites (196 tests) pass. Migration-manifest, Atlas, Dataverse access-layer,
+changed-surface Jest suites (197 tests) pass. Migration-manifest, Atlas, Dataverse access-layer,
 Request Document writer, doc-currency, fact-consistency, doc-symbol, status-enum, GUID-boundary,
 secret-scan, scaffolding-token, docs-catalog, and agent-invariant gates pass; every applicable
 self-test passed sequentially. **No schema was applied, no environment flag was changed, no
 producer/route was enabled, and no external write occurred.** The owner also corrected the future
 fixture assumption: the Test Request Factory is unfinished, so bounded Production checks must use
 an individually approved human-created disposable Request.
+
+**2026-09-25 read-only Claude Opus implementation reviews:** two independent completed passes
+reviewed Slice 1 across authorization/lifecycle and schema/merge-safety boundaries. Both found a
+promotion blocker: the initial migration 054/fresh-install V55 identifiers collide with the Test
+Request Factory ledger already present in current `origin/main`. That source collision does not
+mean the Factory is finished or usable. The post-presentation schema is unapplied, so it was safely
+renumbered to migration 055/V56 without touching the Factory branch or merging Factory work into
+this feature branch. The review fixes also compare all four durable indexes across migration/fresh
+install, catalogue the readiness utility, and require base64-shaped ciphertext envelopes for
+sealed link tokens and Graph upload URLs. One additional test-focused Opus session stalled twice
+and returned no report, so it is not counted as a completed review.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof. The remaining decision is whether it survives the measured

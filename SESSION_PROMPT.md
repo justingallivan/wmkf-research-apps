@@ -49,20 +49,31 @@ upload URL, or playback URL is retained in this handoff.
 `wmkf_ExternalUrl` (URL String, 2,000 characters) and `wmkf_SlotVersion` (whole number
 1–2,147,483,647), with an exact read-only typed preflight. The adapter keeps both fields out of
 its base/legacy projection until `POST_PRESENTATION_MATERIALS_SCHEMA_READY` is literal `on`.
-Migration `054_post_presentation_materials.sql` and fresh-install V55 define
+Migration `055_post_presentation_materials.sql` and fresh-install V56 define
 `presentation_material_links`, ciphertext-only durable `presentation_material_uploads`,
 `presentation_material_slot_leases`, and the complete five-scope `portal_upload_staging`
 allowlist. `POST_PRESENTATION_MATERIALS_ACCESS` accepts only `off`, `on`, or one normalized
 `test:<GUID>` and fails closed otherwise; schema readiness alone enables no producer.
 
 **[VERIFIED offline]** the Wave 30 preflight self-test, type check, scoped lint, and 14
-changed-surface Jest suites (196 tests) pass. Migration/fresh-install CHECK bodies are compared
-exactly and the manifest tracks migration 054. Migration-manifest, Atlas, Dataverse access-layer,
+changed-surface Jest suites (197 tests) pass. Migration/fresh-install CHECK bodies and durable
+index contracts are compared exactly and the manifest tracks migration 055. Migration-manifest,
+Atlas, Dataverse access-layer,
 Request Document writer, doc-currency, fact-consistency, doc-symbol, status-enum, GUID-boundary,
 secret-scan, scaffolding-token, docs-catalog, and agent-invariant gates pass; every applicable
 self-test passed sequentially. Atlas/runbook/plan surfaces describe the source-only state. No
 Postgres migration or Dataverse wave was applied, no environment variable was changed, no route
 or producer was enabled, and no external write occurred.
+
+**[VERIFIED via two completed independent read-only Claude Opus implementation reviews,
+2026-09-25.]** Both reviews found that the original `054`/V55 numbering collided with the Test
+Request Factory ledger already present on current `origin/main`; that source collision does not
+imply the Factory is finished or usable. The unapplied feature schema is now renumbered to
+migration `055_post_presentation_materials.sql` / fresh-install V56. Review fixes also pin all
+four durable index definitions in migration/fresh-install parity, catalogue the new readiness
+utility, and require base64-shaped ciphertext envelopes so a raw `http(s)` Graph upload URL
+cannot satisfy the durable column. A third test-focused Opus attempt stalled twice and produced
+no report; it is not counted as a completed review.
 
 **[OWNER CORRECTION 2026-09-25.]** The Test Request Factory is unfinished and is not a
 prerequisite for this feature. Future bounded live checks must use an individually approved,

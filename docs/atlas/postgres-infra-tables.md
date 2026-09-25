@@ -588,7 +588,7 @@ rows stay as audit history (bounded by one live row per request).
 ### Post-presentation material ledgers — SOURCE-BUILT; MIGRATION 054 NOT APPLIED
 
 **[SOURCE-VERIFIED 2026-09-25 on `codex/feature-request`.]** Migration
-`054_post_presentation_materials.sql`, mirrored by fresh-install V55, defines
+`055_post_presentation_materials.sql`, mirrored by fresh-install V56, defines
 three additive tables for the planned post-research-presentation feature. No
 environment has been migrated by this milestone, both rollout controls remain
 off, and no producer or consumer route exists yet.

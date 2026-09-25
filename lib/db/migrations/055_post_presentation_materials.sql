@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS presentation_material_links (
   CONSTRAINT presentation_material_links_digest_shape CHECK (
     token_digest ~ '^[0-9a-f]{64}$'
   ),
+  CONSTRAINT presentation_material_links_ciphertext_shape CHECK (
+    char_length(token_ciphertext) >= 44
+    AND token_ciphertext ~ '^[A-Za-z0-9+/]+={0,2}$'
+  ),
   CONSTRAINT presentation_material_links_revocation_shape CHECK (
     (revoked_at IS NULL AND revoked_by IS NULL AND superseded_by IS NULL)
     OR revoked_at IS NOT NULL
@@ -74,6 +78,13 @@ CREATE TABLE IF NOT EXISTS presentation_material_uploads (
   CONSTRAINT presentation_material_uploads_fingerprint_shape CHECK (
     client_resume_fingerprint ~ '^[0-9a-f]{64}$'
     AND generation_key ~ '^[0-9a-f]{64}$'
+  ),
+  CONSTRAINT presentation_material_uploads_ciphertext_shape CHECK (
+    upload_url_ciphertext IS NULL
+    OR (
+      char_length(upload_url_ciphertext) >= 44
+      AND upload_url_ciphertext ~ '^[A-Za-z0-9+/]+={0,2}$'
+    )
   ),
   CONSTRAINT presentation_material_uploads_state_check CHECK (
     state IN ('initiated', 'uploaded', 'finalizing', 'finalized', 'failed', 'abandoned')

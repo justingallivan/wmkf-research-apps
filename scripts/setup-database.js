@@ -1142,7 +1142,7 @@ const v50Statements = [
 
 // V51: Consultant Feedback slice 2 (mirrors migration 049) — widen the shared
 // portal_upload_staging scope allowlist. Fresh installs include the complete
-// post-presentation transcript scope added by migration 054.
+// post-presentation transcript scope added by migration 055.
 const v51Statements = [
   `ALTER TABLE portal_upload_staging
      DROP CONSTRAINT IF EXISTS portal_upload_staging_scope_check`,
@@ -1266,9 +1266,9 @@ const v54Statements = [
      )`,
 ];
 
-// V55: Post-presentation materials durable schema/readiness foundation.
-// Mirrors migration 054. Runtime authorization remains independently off.
-const v55Statements = [
+// V56: Post-presentation materials durable schema/readiness foundation.
+// Mirrors migration 055. Runtime authorization remains independently off.
+const v56Statements = [
   `CREATE TABLE IF NOT EXISTS presentation_material_links (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL,
@@ -1282,6 +1282,10 @@ const v55Statements = [
     revoked_by UUID,
     superseded_by UUID,
     CONSTRAINT presentation_material_links_digest_shape CHECK (token_digest ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT presentation_material_links_ciphertext_shape CHECK (
+      char_length(token_ciphertext) >= 44
+      AND token_ciphertext ~ '^[A-Za-z0-9+/]+={0,2}$'
+    ),
     CONSTRAINT presentation_material_links_revocation_shape CHECK (
       (revoked_at IS NULL AND revoked_by IS NULL AND superseded_by IS NULL)
       OR revoked_at IS NOT NULL
@@ -1332,6 +1336,13 @@ const v55Statements = [
     CONSTRAINT presentation_material_uploads_fingerprint_shape CHECK (
       client_resume_fingerprint ~ '^[0-9a-f]{64}$'
       AND generation_key ~ '^[0-9a-f]{64}$'
+    ),
+    CONSTRAINT presentation_material_uploads_ciphertext_shape CHECK (
+      upload_url_ciphertext IS NULL
+      OR (
+        char_length(upload_url_ciphertext) >= 44
+        AND upload_url_ciphertext ~ '^[A-Za-z0-9+/]+={0,2}$'
+      )
     ),
     CONSTRAINT presentation_material_uploads_state_check CHECK (
       state IN ('initiated', 'uploaded', 'finalizing', 'finalized', 'failed', 'abandoned')
@@ -2535,19 +2546,19 @@ async function runMigration() {
       }
     }
 
-    // Run V55 schema updates (post-presentation materials; mirrors migration 054)
-    console.log(`\nApplying v55 schema updates - post-presentation materials (${v55Statements.length} statements)...`);
-    for (let i = 0; i < v55Statements.length; i++) {
-      const statement = v55Statements[i];
+    // Run V56 schema updates (post-presentation materials; mirrors migration 055)
+    console.log(`\nApplying v56 schema updates - post-presentation materials (${v56Statements.length} statements)...`);
+    for (let i = 0; i < v56Statements.length; i++) {
+      const statement = v56Statements[i];
       const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
       try {
         await sql.query(statement);
-        console.log(`[v55-${i + 1}/${v55Statements.length}] ✓ ${preview}...`);
+        console.log(`[v56-${i + 1}/${v56Statements.length}] ✓ ${preview}...`);
       } catch (error) {
         if (error.message.includes('already exists')) {
-          console.log(`[v55-${i + 1}/${v55Statements.length}] ○ Already exists: ${preview}...`);
+          console.log(`[v56-${i + 1}/${v56Statements.length}] ○ Already exists: ${preview}...`);
         } else {
-          console.error(`[v55-${i + 1}/${v55Statements.length}] ✗ Error: ${error.message}`);
+          console.error(`[v56-${i + 1}/${v56Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }
@@ -2621,7 +2632,7 @@ async function runMigration() {
     console.log('\nV47 new tables (Cycle Dossier pilot):');
     console.log('  • cycle_dossiers, cycle_dossier_previews, cycle_dossier_entries,');
     console.log('    cycle_dossier_runs, cycle_dossier_control, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
-    console.log('\nV55 new tables (Post-presentation materials):');
+    console.log('\nV56 new tables (Post-presentation materials):');
     console.log('  • presentation_material_links (sealed materials-only external links)');
     console.log('  • presentation_material_uploads (durable browser-direct Graph upload intents)');
     console.log('  • presentation_material_slot_leases (request/artifact mutation fences)');

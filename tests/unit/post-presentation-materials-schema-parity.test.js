@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 const migration = fs.readFileSync(
-  path.join(ROOT, 'lib/db/migrations/054_post_presentation_materials.sql'),
+  path.join(ROOT, 'lib/db/migrations/055_post_presentation_materials.sql'),
   'utf8',
 );
 const setup = fs.readFileSync(path.join(ROOT, 'scripts/setup-database.js'), 'utf8');
@@ -16,11 +16,13 @@ const TABLES = [
 
 const CONSTRAINTS = [
   'presentation_material_links_digest_shape',
+  'presentation_material_links_ciphertext_shape',
   'presentation_material_links_revocation_shape',
   'presentation_material_links_expiry_shape',
   'presentation_material_uploads_artifact_type_check',
   'presentation_material_uploads_size_check',
   'presentation_material_uploads_fingerprint_shape',
+  'presentation_material_uploads_ciphertext_shape',
   'presentation_material_uploads_state_check',
   'presentation_material_uploads_lease_shape',
   'presentation_material_uploads_error_bound',
@@ -30,6 +32,23 @@ const CONSTRAINTS = [
   'presentation_material_slot_leases_lease_shape',
   'presentation_material_slot_leases_fence_check',
 ];
+
+const INDEX_CONTRACTS = [
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_presentation_material_links_live_request
+     ON presentation_material_links (request_id)
+     WHERE revoked_at IS NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_presentation_material_uploads_path
+     ON presentation_material_uploads (library_name, folder_path, physical_filename)`,
+  `CREATE INDEX IF NOT EXISTS idx_presentation_material_uploads_actor_request
+     ON presentation_material_uploads (actor_id, request_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_presentation_material_uploads_review
+     ON presentation_material_uploads (intent_expires_at, state, lease_expires_at)
+     WHERE state <> 'finalized'`,
+];
+
+function normalizeSql(source) {
+  return source.replace(/\s+/g, ' ').trim();
+}
 
 function extractCheckBody(source, constraintName) {
   const marker = `CONSTRAINT ${constraintName} CHECK (`;
@@ -47,18 +66,26 @@ function extractCheckBody(source, constraintName) {
   return source.slice(bodyStart, index - 1).replace(/\s+/g, ' ').trim();
 }
 
-test('migration 054 and fresh install declare the same durable tables and named constraints', () => {
+test('migration 055 and fresh install declare the same durable tables and named constraints', () => {
   for (const source of [migration, setup]) {
     for (const table of TABLES) expect(source).toContain(`CREATE TABLE IF NOT EXISTS ${table}`);
     for (const constraint of CONSTRAINTS) expect(source).toContain(`CONSTRAINT ${constraint}`);
   }
-  expect(setup).toContain('const v55Statements = [');
-  expect(setup).toContain('Applying v55 schema updates - post-presentation materials');
+  expect(setup).toContain('const v56Statements = [');
+  expect(setup).toContain('Applying v56 schema updates - post-presentation materials');
 });
 
-test('migration 054 and fresh install use identical durable CHECK predicates', () => {
+test('migration 055 and fresh install use identical durable CHECK predicates', () => {
   for (const constraint of CONSTRAINTS) {
     expect(extractCheckBody(setup, constraint)).toEqual(extractCheckBody(migration, constraint));
+  }
+});
+
+test('migration 055 and fresh install preserve every durable index contract', () => {
+  for (const source of [migration, setup].map(normalizeSql)) {
+    for (const index of INDEX_CONTRACTS) {
+      expect(source).toContain(normalizeSql(index));
+    }
   }
 });
 
@@ -66,6 +93,8 @@ test('upload intents preserve ciphertext-only URL state and exact candidate iden
   for (const source of [migration, setup]) {
     expect(source).toContain('upload_url_ciphertext TEXT');
     expect(source).not.toMatch(/\bupload_url\s+TEXT\b/);
+    expect(source).toContain('presentation_material_uploads_ciphertext_shape');
+    expect(source).toContain("upload_url_ciphertext ~ '^[A-Za-z0-9+/]+={0,2}$'");
     for (const column of [
       'client_resume_fingerprint',
       'generation_key',
@@ -94,7 +123,7 @@ test('migration and every fresh-install scope constraint contain the complete fi
   expect((setup.match(exact) || []).length).toBeGreaterThanOrEqual(3);
 });
 
-test('migration 054 is tracked by the generated manifest', () => {
+test('migration 055 is tracked by the generated manifest', () => {
   const manifest = fs.readFileSync(path.join(ROOT, 'lib/db/migrations-manifest.json'), 'utf8');
-  expect(manifest).toContain('054_post_presentation_materials.sql');
+  expect(manifest).toContain('055_post_presentation_materials.sql');
 });

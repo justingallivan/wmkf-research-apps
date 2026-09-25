@@ -52,6 +52,6 @@
     "051_reviewer_institution_measurement_events.sql",
     "052_pre_site_distribution_brief_inputs.sql",
     "053_pre_site_distribution_review_bundle.sql",
-    "054_post_presentation_materials.sql"
+    "055_post_presentation_materials.sql"
   ]
 }
