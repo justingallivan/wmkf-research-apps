@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Test Request Factory promoted: ledger-driven runner and the Initial Assessment recipe (Sessions 536–542)
+
+**Milestone:** Disposable, realistic test Requests can now be manufactured from a production source bundle into the Dataverse sandbox through a durable run ledger and a bounded, resumable runner, and the first later-stage recipe seeds a synthetic Initial Assessment plus Board snapshot through the unmodified production lineage functions.
+**Sessions:** 536–542; Fable orchestrating, Sonnet builds, Opus stage reviews, Codex adversarial rounds (eight findings closed), owner decisions, live sandbox proof, owner acceptance.
+**Ship state:**
+- PR #336 merged `b63803951`; production `dpl_F3XxWLs9Kcg8feoXVgzbkmcpHdfJ` Ready on `applications.wmkeck.org`. Migration 054 on `main`, unapplied until build-order item 7.
+- Live proof: sandbox Request 1000342 reached `ready` through eleven journal-before-dispatch steps; two live-only findings fixed (GoVerify bypass bound 60 s; SharePoint property promotion handled by `docx-package-attestation.js`).
+- Recipes remaining: synthetic reviewers/reviews, site-visit materials, Pre-Site, Pre-RP/Final Writeup; then the admin form and production release (item 7).
+**Why it matters:** staff workflows can be exercised end to end on requests that never touch a real applicant, with every sandbox write journaled before dispatch and verified after.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`; `docs/plans/evidence/test-request-factory/ia-recipe-live-proof-2026-09-24.md`; `b63803951`, `d26382155`.
+
 ## September 2026 — Meeting Tracker materials workflow and visual status tracking (Session 529)
 
 **Milestone:** Program coordinators can personalize materials invitations/reminders, save their own defaults, and scan or filter requests by materials status with direct request/review links.

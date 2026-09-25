@@ -1,4 +1,81 @@
-# Session 542 Prompt: Finish slice 6b review (Opus round 2, Fable final, Codex), then the live IA proof
+# Session 543 Prompt: Factory follow-ups, item 6 next recipe, and the two Codex-led threads
+
+## Owner brief: where the Test Request Factory stands (written 2026-09-24 PT, end of Session 542)
+
+**What it is for.** A way to manufacture realistic, disposable test Requests so staff workflows (Workbench, Meeting Tracker, reviewer portal, presentation materials, and later the whole cycle) can be exercised without touching a real applicant. The design lives in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`; its build order is seven items.
+
+**What is built and proven (items 1–6a, and the first recipe of item 6).** A read-only production export of a source Request bundle (Request 1003222); a sandbox clone of that bundle with copied files (the Basic recipe); a durable Postgres run ledger with journal-before-dispatch resource receipts and a bounded, resumable runner driven from one CLI (`--reserve`, `--advance`, `--run-inspect`); a recipe dimension; and the first later-stage recipe, `initial_assessment`, which seeds a synthetic Initial Assessment and its Board snapshot through the unmodified production lineage functions and verifies the result against real Dataverse and Graph. Live proof: sandbox Request 1000342 reached `ready` on 2026-09-24.
+
+**What shipped today.** PR #336 merged to `main` (`b63803951`) and deployed (`dpl_F3XxWLs9Kcg8feoXVgzbkmcpHdfJ`, owning `applications.wmkeck.org`). It ships runner, CLI, recipe, ledger code and the fresh-install mirror. Migration 054 is on `main` but **unapplied**; nothing applies on deploy. Nothing in production data changed.
+
+**What remains.** Item 6's other recipes, one at a time: synthetic reviewers and reviews, site-visit materials and transcripts, Pre-Site seed and render, Pre-RP brief / site-visit start / Final Writeup. Then item 7: the admin creation form, resume/retire operations, the first shared apply of migration 054, and the production release. Each recipe is its own slice with the same cadence (Sonnet builds, Opus reviews, Codex adversarial, Fable final, live proof, owner acceptance).
+
+**Decisions you made today that now bind the design.** Recompute the synthetic fixture's hash in verify (independent anchor); no lease renewal, but a 900 s lease for the IA recipe; attest the whole DOCX package against the fresh render with only SharePoint's property-promotion mutations normalized (in place of a raw byte digest, which SharePoint makes impossible); Fable's self-review accepted for the post-cap code; 6b accepted; merged.
+
+## Session 542 Summary — 2026-09-24 PT (Fable; Codex adversarial rounds 1–3; owner decisions; live proof; promotion)
+
+[VERIFIED via commits on `main`, PR #336 checks, Vercel deployment inspection, sandbox run receipts under `docs/plans/evidence/test-request-factory/`] Slice 6b closed end to end and promoted. Codex on the presentation branch was set up separately and moved on its own (`ebaca0094`).
+
+### What Was Completed
+
+1. **Stage C Opus round 3 (tests only)** closed by Fable: isolating tests for the twin-read eTag arm, versionId arm, both hash arms; validator-shaped verify fixture; Fable final review of Stage C.
+2. **Codex adversarial rounds 1–3** (`gpt-5.6-sol`), eight findings, all closed on the branch: Ready-row recovery journals the full receipt and proves ownership by claim-token digest on every resolved row and the post-create reread (F1, F5, F7); null path read stops instead of re-uploading (F2); verify anchors row hashes/versions to the step receipts, mandatory (F3); fresh-render hash anchor (owner); 900 s IA lease (owner, F4); package attestation (F6, reshaped live); fresh-install receipt mirror (F8). 28 mutations killed across the day.
+3. **Live proof.** Run 1 stopped at `create_request`: the GoVerify deactivation PATCH outran the 15 s bypass bound (server committed ~8 s in); no Request created; the sandbox workflow was re-activated by a one-off PATCH from a scratchpad probe (activation 9.0 s) and the bound raised to 60 s. Run 2: sandbox Request 1000342 through all eleven steps; the first verify attempt exposed SharePoint property promotion (customXml items/props/rels, core.xml, custom.xml, content types, document rels, trash entries; every `word/` part byte-identical), replaced the raw digest with `lib/services/test-requests/docx-package-attestation.js`, re-advanced to `ready`.
+4. **Promotion.** PR #336; one CI fix round (email-guard fixture against PR #335's mandatory recipients; hostname checks for eleven CodeQL substring warnings); merged `b63803951`; production deployment verified as the build of `main`'s head.
+5. **Codex presentation branch** set up on `codex/feature-request` (worktree under `~/.codex/worktrees/feature-request`) with a Chrome recovery-pass brief; Codex has since pushed `ebaca0094`. PR #332 (personal reviewer reminders) untouched, still open.
+6. **Memory:** `project-sharepoint-property-promotion-rewrites-docx.md` (router line under Dataverse/Dynamics).
+
+### Commits (main)
+- `b63803951` — merge of PR #336 (branch commits `aa87c3c1d` … `4c5539ee7`)
+- `18a2c94e6` — SharePoint property-promotion memory
+- `d26382155` — merge and deployment recorded in the design doc
+
+## Next Items
+
+### Verified Open
+
+1. **Item 6, next recipe: synthetic reviewers and reviews.** Evidence: design doc build order line "IA → synthetic reviewers and reviews → …"; owner decisions 3–4 (synthetic reviewers seeded 1:1, real staff-controlled throwaway inboxes). Plan-first with `/contract-reconcile`, then the slice cadence. Unplanned; nothing built.
+2. **Small Factory follow-ups found by the live proof** (any one can be a first task): the seed step's final resource outcome is `dispatched` while every sibling is `verified` (`ia-recipe-live-proof-run-inspect-2026-09-24.json`); the GoVerify stop's run reason collapses to `unknown_error` although the resource error is `goverify_deactivation_uncertain`; "manually recheck the workflow" has no CLI affordance (a read-plus-restore mode or a runbook line).
+3. **Codex-led threads.** PR #332 was `CONFLICTING` with `main` at session start and is Codex's to resolve; the presentation branch's Slice 0 Chrome pass is in progress under Codex (`ebaca0094`). Read their handoffs before touching either.
+
+### Owner Decision Needed
+
+1. Whether the three older deployment-hash Entra callbacks (`g0buiqhuh`, `7doz4qxsn`, `15rny26o5`) should also go (carried).
+2. Carried: Preview CSRF origin allowlist (option b) still goes through `/contract-reconcile`.
+
+### Parked
+
+1. Migration 054's first shared apply: at item 7 (freezes the file). Evidence: design doc item 7 and the `main` merge record.
+
+### Verify Before Acting
+
+1. **Sandbox residue:** Request 1000342 with its Initial Assessment and Board snapshot files; two inactive GoVerify activation children (one predates this session); the workflow itself is active. Cleanup is data-mining scope only (`project-test-residue-cleanup-is-for-data-mining.md`), not a task.
+2. **Worktrees:** `/Users/gallivan/Code/WMKF_Apps-factory` still checked out on the merged branch `codex/test-request-preview-integration` (park or remove; nothing unpushed). The Codex-app worktree for that branch under `~/.codex/worktrees` was removed this session. Local ledger container `wmkf-ledger-pg` holds runs `81800b62…` (needs_attention) and `f8aae6aa…` (ready).
+3. **Production reads need the owner's shell.** The auto-mode classifier blocks `DATAVERSE_ALLOW_PROD_READS=yes` exports even when authorized; the owner ran today's export with the `!` prefix. A machine-local allow rule for the exact export command would remove that step.
+
+### Do Not Reopen Without New Decision
+
+1. 6b design decisions (Stage A–C paragraphs) plus today's: fresh-render hash anchor; no lease renewal with a 900 s IA lease; package attestation normalizing only SharePoint property promotion (customXml items recognized by root element only; a tenant change fails closed); `bytesSha256` journaled as evidence only; 054 edited in place, no forward migration.
+2. Earlier: 6a design, sandbox parity deviations, no-text invariant, dispatch-marker rule, synthetic IA fixtures only.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Design, build order, every stage and review record |
+| `docs/plans/evidence/test-request-factory/ia-recipe-live-proof-2026-09-24.md` | Live proof narrative, receipts, residue |
+| `lib/services/test-requests/run-runner.js` | Runner and all recipe steps |
+| `lib/services/test-requests/docx-package-attestation.js` | SharePoint-normalized package attestation |
+| `lib/services/test-requests/run-ledger.js`, `lib/db/migrations/054_test_request_runs.sql` | Ledger and its unapplied migration |
+| `scripts/rehearse-test-request-sandbox.mjs`, `scripts/export-test-request-source-bundle.mjs` | CLI and production bundle export |
+
+## Stop-time notes
+
+- Claim-evidence pilot: no eligible edit recorded for this session; no observation row.
+- Milestone: `DEVELOPMENT_LOG.md` entry added (Test Request Factory promoted to production).
+- `CLAUDE.md`: no change (no new app, endpoint, schema apply, or convention; scripts are catalogued elsewhere).
+
+## Prior Session 542 Prompt: Finish slice 6b review (Opus round 2, Fable final, Codex), then the live IA proof
 
 ## Session 539 Summary — 2026-09-24 PT (Fable orchestrating; Sonnet builds, Opus reviews, Codex adversarial and rescue; ran concurrently with Sessions 540–541 on other branches)
 
