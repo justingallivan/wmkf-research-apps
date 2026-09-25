@@ -133,6 +133,13 @@ function createFakeLedger(initialRun) {
       calls.push({ op: 'listRunResources', runId });
       return resources.map((row) => ({ ...row }));
     },
+    async listRunReviewerAssignments(runId) {
+      calls.push({ op: 'listRunReviewerAssignments', runId });
+      return [];
+    },
+    async getRunReviewerAssignment() {
+      return null;
+    },
   };
   return { ledger, calls, getRun: () => run, getResources: () => resources };
 }
@@ -499,8 +506,8 @@ describe('slice 6c-i: verify_initial_assessment terminal branch is per-recipe', 
   });
 });
 
-describe('slice 6c-i: reviews-only steps stop cleanly with recipe_step_not_built (6c-ii builds the bodies)', () => {
-  it.each(['seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews'])(
+describe('slice 6c-ii Stage B: copy_review_file/verify_reviews stop cleanly with recipe_step_not_built (Stage C builds the bodies)', () => {
+  it.each(['copy_review_file', 'verify_reviews'])(
     '%s marks the run needs_attention/recipe_step_not_built without calling markReady',
     async (step) => {
       const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'reviews', currentStep: step }));
