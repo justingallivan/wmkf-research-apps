@@ -58,7 +58,7 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'requestId is required and must be a GUID' });
         }
         const result = await getSiteVisitLogistics({ requestId });
-        return res.status(200).json({ success: true, ...result });
+        return res.status(200).json({ success: true, siteVisit: result.siteVisit, materials: result.materials });
       }
 
       if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)
