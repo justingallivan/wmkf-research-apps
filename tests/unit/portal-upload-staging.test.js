@@ -23,6 +23,7 @@ import {
   createPortalUpload,
   externalGranteeActorBinding,
   loadClaimedPortalImage,
+  renewPortalUploadLease,
 } from '../../lib/services/portal-upload-staging';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -125,6 +126,24 @@ test('a live finalizer lease cannot be stolen', async () => {
     resourceId: REQUEST_ID,
     actorBinding: 'grantee:hash',
   })).rejects.toMatchObject({ code: 'finalize_in_progress', httpStatus: 409 });
+});
+
+test('lease renewal requires the still-live exact finalizer lease', async () => {
+  sql.mockResolvedValueOnce({
+    rows: [{ id: STAGING_ID, lease_expires_at: new Date(Date.now() + 300_000) }],
+  });
+  await expect(renewPortalUploadLease({
+    stagingId: STAGING_ID,
+    leaseToken: '33333333-3333-4333-8333-333333333333',
+  })).resolves.toMatchObject({ id: STAGING_ID });
+  expect(sql.mock.calls[0][0].join('')).toContain('lease_expires_at > NOW()');
+  expect(sql.mock.calls[0][0].join('')).toContain('expires_at > NOW()');
+
+  sql.mockResolvedValueOnce({ rows: [] });
+  await expect(renewPortalUploadLease({
+    stagingId: STAGING_ID,
+    leaseToken: 'expired-or-stolen',
+  })).rejects.toMatchObject({ code: 'finalize_lease_lost', httpStatus: 409 });
 });
 
 test('rejected and expired rows return durable terminal outcomes', async () => {
