@@ -364,10 +364,13 @@ function baselineResource(digest) {
     plannedIdentity: { foundationBaselineSha256: digest }, readback: { foundationBaselineSha256: digest }, outcome: 'verified',
   };
 }
+// HEX64 governed hash of the fixture DOCX, set in the describe's beforeAll;
+// the receipts below carry it because every producer path journals it.
+let anchorHashHex = null;
 function seedResourceRow(overrides = {}) {
   return {
     resourceId: 2, sequence: 2, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
-    readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId },
+    readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: anchorHashHex, sourceVersionId: '1.0' },
     outcome: 'advanced',
     ...overrides,
   };
@@ -375,7 +378,7 @@ function seedResourceRow(overrides = {}) {
 function snapshotResourceRow(overrides = {}) {
   return {
     resourceId: 3, sequence: 3, step: 'seed_initial_assessment_snapshot', resourceKind: 'dataverse_request_document', system: 'dataverse',
-    readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId },
+    readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: anchorHashHex, versionId: '1.0' },
     outcome: 'advanced',
     ...overrides,
   };
@@ -399,6 +402,7 @@ describe('stepVerifyInitialAssessment', () => {
   beforeAll(async () => {
     iaBuffer = await docxBytes();
     iaHash = await hashGovernedDocxContent(iaBuffer);
+    anchorHashHex = governedHashToHex(iaHash);
   });
 
   function iaRow(overrides = {}) {
@@ -740,6 +744,19 @@ describe('stepVerifyInitialAssessment', () => {
   const anchoredSeed = () => seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: governedHashToHex(iaHash), sourceVersionId: '1.0' } });
   const anchoredSnapshot = () => snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: governedHashToHex(iaHash), versionId: '1.0' } });
 
+  it('receipt anchors: a seed receipt that never journaled a content hash stops with ia_pointer_mismatch (anchors are mandatory)', async () => {
+    mockDataverse();
+    const { result, calls } = await runStep({
+      deps: { graph: baseGraph() },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, sourceVersionId: '1.0' } }), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toBe('The Initial Assessment content hash does not match the hash the seed step journaled.');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+  });
+
   it('receipt anchors: consistent journaled hashes and versions still reach markReady', async () => {
     mockDataverse();
     const { result, calls } = await runStep({
@@ -773,7 +790,7 @@ describe('stepVerifyInitialAssessment', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
-    expect(result.errorMessage).toBe('The Initial Assessment content hash no longer matches the hash the seed step journaled.');
+    expect(result.errorMessage).toBe('The Initial Assessment content hash does not match the hash the seed step journaled.');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
   });
 
@@ -786,7 +803,7 @@ describe('stepVerifyInitialAssessment', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
-    expect(result.errorMessage).toBe('The Initial Assessment SharePoint version no longer matches the version the seed step journaled.');
+    expect(result.errorMessage).toBe('The Initial Assessment SharePoint version does not match the version the seed step journaled.');
   });
 
   it('receipt anchors: a Board snapshot whose file AND row hashes were replaced consistently after the snapshot step stops with ia_pointer_mismatch', async () => {
@@ -813,7 +830,7 @@ describe('stepVerifyInitialAssessment', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
-    expect(result.errorMessage).toBe('The Board snapshot content hash no longer matches the hash the snapshot step journaled.');
+    expect(result.errorMessage).toBe('The Board snapshot content hash does not match the hash the snapshot step journaled.');
   });
 
   it('receipt anchors: a Board snapshot SharePoint version that differs from the journaled version stops with ia_pointer_mismatch', async () => {
@@ -825,7 +842,7 @@ describe('stepVerifyInitialAssessment', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
-    expect(result.errorMessage).toBe('The Board snapshot SharePoint version no longer matches the version the snapshot step journaled.');
+    expect(result.errorMessage).toBe('The Board snapshot SharePoint version does not match the version the snapshot step journaled.');
   });
 
   // Single-arm isolation of the bytes-versus-row-hash check (Stage C round 2,
@@ -833,11 +850,15 @@ describe('stepVerifyInitialAssessment', () => {
   it('V11a: a snapshot row whose OWN content hash is corrupted while its source content hash and bytes are intact stops with ia_verification_failed', async () => {
     // The earlier `sourcecontenthash === iaRow.wmkf_contenthash` check still
     // passes (source hash intact), so only the row-hash arm can fire.
-    mockDataverse({ snapshot: snapshotRow({ wmkf_contenthash: `${GOVERNED_DOCX_HASH_PREFIX}${'e'.repeat(64)}` }) });
+    const corruptedHash = `${GOVERNED_DOCX_HASH_PREFIX}${Buffer.alloc(32, 0xee).toString('base64url')}`;
+    mockDataverse({ snapshot: snapshotRow({ wmkf_contenthash: corruptedHash }) });
+    // The snapshot receipt journaled the same (wrong) hash, so the receipt
+    // anchor passes and only the bytes-versus-row check can fire.
+    const consistentReceipt = snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: governedHashToHex(corruptedHash), versionId: '1.0' } });
     const { result, calls } = await runStep({
       deps: { graph: baseGraph() },
       requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+      resources: [baselineResource(validBaseline()), seedResourceRow(), consistentReceipt, basicFileCopyResource()],
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
@@ -864,10 +885,13 @@ describe('stepVerifyInitialAssessment', () => {
         return null;
       }),
     });
+    // Receipt journaled the row's own (different) hash, so the receipt anchor
+    // passes and only the source-hash arm of the bytes check can fire.
+    const consistentReceipt = snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: governedHashToHex(differentHash), versionId: '1.0' } });
     const { result, calls } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+      resources: [baselineResource(validBaseline()), seedResourceRow(), consistentReceipt, basicFileCopyResource()],
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
