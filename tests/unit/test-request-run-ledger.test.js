@@ -622,6 +622,12 @@ describe('slice 6c-i: reserveRun reviewer assignments (D-R2)', () => {
     const { db, calls, queueRows } = createFakeDb();
     queueRows([]); // INSERT no-op (already reserved)
     queueRows([runRow({ recipe: 'reviews', plan_digest: REVIEWS_PLAN.planDigest })]); // SELECT existing row
+    // SELECT stored assignments (P1-a): identical to the retry's own input,
+    // so the independent ledger-side check passes.
+    queueRows([{
+      sequence: 1, source_person_id: ASSIGNMENT_A.sourcePersonId.toLowerCase(),
+      address_sha256: reviewerAddressSha256(ASSIGNMENT_A.address).addressSha256,
+    }]);
     const ledger = createRunLedger(db);
 
     const { created } = await ledger.reserveRun({
@@ -630,7 +636,59 @@ describe('slice 6c-i: reserveRun reviewer assignments (D-R2)', () => {
     });
 
     expect(created).toBe(false);
-    expect(calls).toHaveLength(2); // no INSERT INTO test_request_run_reviewer_assignments
+    expect(calls).toHaveLength(3); // INSERT (no-op), SELECT run, SELECT stored assignments -- no INSERT INTO test_request_run_reviewer_assignments
+  });
+
+  it('P1-a: a same-key retry with a DIFFERENT address for the same source reviewer conflicts (ledger-side check, independent of plan_digest)', async () => {
+    const { db, queueRows } = createFakeDb();
+    queueRows([]); // INSERT no-op
+    queueRows([runRow({ recipe: 'reviews', plan_digest: REVIEWS_PLAN.planDigest })]); // SELECT existing row
+    queueRows([{
+      sequence: 1, source_person_id: ASSIGNMENT_A.sourcePersonId.toLowerCase(),
+      address_sha256: reviewerAddressSha256('a-different-address@example.test').addressSha256,
+    }]);
+    const ledger = createRunLedger(db);
+
+    await expect(ledger.reserveRun({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: REVIEWS_PLAN,
+      reviewerAssignments: [ASSIGNMENT_A],
+    })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
+  });
+
+  it('P1-a: a same-key retry with the pairing SWAPPED between two sources conflicts', async () => {
+    const { db, queueRows } = createFakeDb();
+    queueRows([]); // INSERT no-op
+    queueRows([runRow({ recipe: 'reviews', plan_digest: REVIEWS_PLAN.planDigest })]);
+    // Stored: A -> addr(A), B -> addr(B). Retry proposes A -> addr(B), B -> addr(A).
+    queueRows([
+      { sequence: 1, source_person_id: ASSIGNMENT_A.sourcePersonId.toLowerCase(), address_sha256: reviewerAddressSha256(ASSIGNMENT_A.address).addressSha256 },
+      { sequence: 2, source_person_id: ASSIGNMENT_B.sourcePersonId.toLowerCase(), address_sha256: reviewerAddressSha256(ASSIGNMENT_B.address).addressSha256 },
+    ]);
+    const ledger = createRunLedger(db);
+
+    await expect(ledger.reserveRun({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: REVIEWS_PLAN,
+      reviewerAssignments: [
+        { ...ASSIGNMENT_A, address: ASSIGNMENT_B.address },
+        { ...ASSIGNMENT_B, address: ASSIGNMENT_A.address },
+      ],
+    })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
+  });
+
+  it('P1-a: a same-key retry with a DIFFERENT assignment count conflicts', async () => {
+    const { db, queueRows } = createFakeDb();
+    queueRows([]); // INSERT no-op
+    queueRows([runRow({ recipe: 'reviews', plan_digest: REVIEWS_PLAN.planDigest })]);
+    queueRows([{
+      sequence: 1, source_person_id: ASSIGNMENT_A.sourcePersonId.toLowerCase(),
+      address_sha256: reviewerAddressSha256(ASSIGNMENT_A.address).addressSha256,
+    }]);
+    const ledger = createRunLedger(db);
+
+    await expect(ledger.reserveRun({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: REVIEWS_PLAN,
+      reviewerAssignments: [ASSIGNMENT_A, ASSIGNMENT_B],
+    })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
   });
 
   it('refuses a reviews reservation with zero assignments', async () => {
@@ -675,6 +733,15 @@ describe('slice 6c-i: reserveRun reviewer assignments (D-R2)', () => {
       actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: BASE_PLAN,
       reviewerAssignments: [ASSIGNMENT_A],
     })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
+  it('P2-c: refuses reused: true (the cross-run provenance check is not built until 6c-ii)', async () => {
+    const { db } = createFakeDb();
+    const ledger = createRunLedger(db);
+    await expect(ledger.reserveRun({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: REVIEWS_PLAN,
+      reviewerAssignments: [{ ...ASSIGNMENT_A, reused: true }],
+    })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value', message: expect.stringContaining('6c-ii') });
   });
 });
 

@@ -7,7 +7,9 @@
  * injected, so no module mocking is needed to run it offline).
  */
 import { jest } from '@jest/globals';
-import { advanceRun, nextStepFor, RECIPE_STEP_ORDER } from '../../lib/services/test-requests/run-runner.js';
+import {
+  advanceRun, nextStepFor, recipeIncludesStep, recipeLeaseSeconds, RECIPE_STEP_ORDER,
+} from '../../lib/services/test-requests/run-runner.js';
 import { sha256, MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
@@ -512,4 +514,26 @@ describe('slice 6c-i: reviews-only steps stop cleanly with recipe_step_not_built
       expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
     },
   );
+});
+
+describe('P1-b: recipeIncludesStep / recipeLeaseSeconds', () => {
+  it('recipeIncludesStep reports whether a step is in the recipe order', () => {
+    expect(recipeIncludesStep('basic', 'seed_initial_assessment')).toBe(false);
+    expect(recipeIncludesStep('initial_assessment', 'seed_initial_assessment')).toBe(true);
+    expect(recipeIncludesStep('reviews', 'seed_initial_assessment')).toBe(true);
+    expect(recipeIncludesStep('reviews', 'seed_reviewers')).toBe(true);
+    expect(recipeIncludesStep('basic', 'seed_reviewers')).toBe(false);
+  });
+
+  it('recipeIncludesStep fails closed on an unrecognized recipe', () => {
+    expect(() => recipeIncludesStep('nonexistent_recipe', 'fence_source')).toThrow('Unknown Test Request Factory recipe');
+  });
+
+  it.each([
+    ['basic', 300],
+    ['initial_assessment', 900],
+    ['reviews', 900],
+  ])('recipeLeaseSeconds(%s) is %i', (recipe, seconds) => {
+    expect(recipeLeaseSeconds(recipe)).toBe(seconds);
+  });
 });

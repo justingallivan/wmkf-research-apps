@@ -90,7 +90,7 @@ import {
   validateCloneManifest,
   verifyClone,
 } from '../lib/services/test-requests/basic-clone-steps.js';
-import { advanceRun } from '../lib/services/test-requests/run-runner.js';
+import { advanceRun, recipeLeaseSeconds } from '../lib/services/test-requests/run-runner.js';
 import {
   LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
 } from '../lib/services/test-requests/run-ledger.js';
@@ -731,13 +731,17 @@ async function runAdvance(client, args, ledgerUrl) {
         manifest,
         bundle,
         deps: { client, graph, sharePointTarget },
-        // Owner decision 2026-09-24 (Codex adversarial round 1, F4): the
-        // initial_assessment recipe's IA steps chain many sequential
+        // Owner decision 2026-09-24 (Codex adversarial round 1, F4): any
+        // recipe whose step order runs the IA steps chains many sequential
         // Dataverse and Graph calls under one lease and the runner never
-        // renews it, so that recipe takes the ledger's maximum (900 s,
-        // run-ledger.js claimLease clamp) instead of the Basic 300 s. No
-        // renewal mechanism; reconsidered only if a live run shows longer phases.
-        options: { bypassGoverify: args.bypassGoverify, leaseSeconds: manifest.recipe === 'initial_assessment' ? 900 : 300 },
+        // renews it, so it takes the ledger's maximum (900 s, run-ledger.js
+        // claimLease clamp) instead of the Basic 300 s -- derived via
+        // recipeLeaseSeconds (run-runner.js) rather than named per recipe
+        // here, so a future IA-cumulative recipe cannot miss it (slice 6c-i
+        // Opus review, P1-b: `reviews` is cumulative on `initial_assessment`
+        // and needs the same 900 s). No renewal mechanism; reconsidered only
+        // if a live run shows longer phases.
+        options: { bypassGoverify: args.bypassGoverify, leaseSeconds: recipeLeaseSeconds(manifest.recipe ?? 'basic') },
       });
       // The ledger never stores message text (only a lowercase code); the
       // full error, if any, is surfaced here and in a private sidecar file
