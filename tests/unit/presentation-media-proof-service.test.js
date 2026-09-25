@@ -6,11 +6,13 @@ import {
   PROOF_OPERATION,
   beginPresentationMediaProofUpload,
   cleanupPresentationMediaProofUpload,
+  deletePresentationMediaProofItemWithEtag,
   finalizePresentationMediaProofUpload,
   getPresentationMediaProofUploadStatus,
   resolvePresentationMediaProof,
   verifyPresentationMediaProofToken,
 } from '../../lib/services/post-presentation-materials/presentation-media-proof-service';
+import { GraphService } from '../../lib/services/graph-service';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const PROOF_ID = '22222222-2222-4222-8222-222222222222';
@@ -217,13 +219,50 @@ test('finalize rejects a committed item without an MP4 ftyp signature before tok
 });
 
 test('cleanup deletes only the stable item resolved at the exact permit path', async () => {
-  const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
+  const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES, eTag: 'etag-1' };
   const deps = dependencies({ getByPath: jest.fn(async () => item) });
   const started = await begin(deps);
   await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
     .resolves.toEqual({ cleaned: true, cleanupOutcome: 'item_deleted', deletedItem: true });
-  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'item-1');
+  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'item-1', 'etag-1');
   expect(deps.deleteFile).toHaveBeenCalledTimes(1);
+  expect(deps.getByPath).toHaveBeenCalledWith('akoya_request', 'Requests/24-1000/Post Site Visit Materials', `${PROOF_ID}.mp4`, { siteId: 'site-1', driveId: 'drive-1' });
+});
+
+test('cleanup retains its permit if the exact committed item lacks an ETag or conditional deletion fails', async () => {
+  const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
+  const deps = dependencies({ getByPath: jest.fn(async () => item) });
+  const started = await begin(deps);
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ code: 'presentation_media_proof_cleanup_uncertain' });
+  expect(deps.deleteFile).not.toHaveBeenCalled();
+
+  item.eTag = 'etag-1';
+  deps.deleteFile.mockRejectedValueOnce(new Error('Graph 412'));
+  await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toThrow('Graph 412');
+  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'item-1', 'etag-1');
+});
+
+test('conditional proof deletion sends the exact item id and observed ETag to Graph', async () => {
+  const getToken = jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('test-token');
+  const previousFetch = global.fetch;
+  const fetchMock = jest.fn(async () => ({ status: 204 }));
+  global.fetch = fetchMock;
+  try {
+    await expect(deletePresentationMediaProofItemWithEtag('drive-1', 'item-1', 'etag-1'))
+      .resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://graph.microsoft.com/v1.0/drives/drive-1/items/item-1',
+      expect.objectContaining({ method: 'DELETE', headers: { Authorization: 'Bearer test-token', 'If-Match': 'etag-1' } }),
+    );
+    fetchMock.mockResolvedValueOnce({ status: 412 });
+    await expect(deletePresentationMediaProofItemWithEtag('drive-1', 'item-1', 'etag-1'))
+      .rejects.toMatchObject({ httpStatus: 409, code: 'presentation_media_proof_cleanup_uncertain' });
+  } finally {
+    global.fetch = previousFetch;
+    getToken.mockRestore();
+  }
 });
 
 test.each([
@@ -239,7 +278,7 @@ test.each([
 });
 
 test.each(['cancelled', 'gone', 'expired'])('cleanup deletes only an exact partial placeholder after a %s session outcome', async (outcome) => {
-  const partial = { driveId: 'drive-1', id: 'partial-item', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024 };
+  const partial = { driveId: 'drive-1', id: 'partial-item', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024, eTag: 'etag-partial' };
   const deps = dependencies({
     getByPath: jest.fn(async () => partial),
     cancelSession: jest.fn(async () => ({ outcome })),
@@ -247,7 +286,7 @@ test.each(['cancelled', 'gone', 'expired'])('cleanup deletes only an exact parti
   const started = await begin(deps);
   await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
     .resolves.toEqual({ cleaned: true, cleanupOutcome: 'placeholder_deleted', deletedItem: true });
-  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'partial-item');
+  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'partial-item', 'etag-partial');
   expect(deps.deleteFile).toHaveBeenCalledTimes(1);
 });
 
@@ -296,7 +335,7 @@ test('cleanup fails closed on an unknown Microsoft cancellation outcome', async 
 });
 
 test('a cancellation error cannot block deletion of an exact committed item', async () => {
-  const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
+  const item = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES, eTag: 'etag-1' };
   const deps = dependencies({
     cancelSession: jest.fn(async () => { throw new Error('session already closed'); }),
     getByPath: jest.fn(async () => item),
@@ -304,7 +343,7 @@ test('a cancellation error cannot block deletion of an exact committed item', as
   const started = await begin(deps);
   await expect(cleanupPresentationMediaProofUpload({ permit: started.permit, profileId: 'profile-1' }, deps))
     .resolves.toEqual({ cleaned: true, cleanupOutcome: 'item_deleted', deletedItem: true });
-  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'item-1');
+  expect(deps.deleteFile).toHaveBeenCalledWith('drive-1', 'item-1', 'etag-1');
 });
 
 test('tampered permits fail before any upload-session or committed-item lookup', async () => {
