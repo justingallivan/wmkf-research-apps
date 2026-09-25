@@ -21,6 +21,20 @@ const ALLOWLISTED_IMPORTERS = new Set([
   // Stage B seeder (not yet created); pre-allowlisted per the plan's
   // "the pin may list it now" allowance.
   'lib/services/reviewer-engagement/seed-synthetic-review.js',
+  // Stage B built the lookup differently than anticipated: the adapter's
+  // `findSyntheticByEmail` does not take an `options.svc` (it always reads
+  // through the DynamicsService singleton, i.e. process.env.DYNAMICS_URL),
+  // so it cannot actually be bound to the sandbox. `reviews-sandbox-deps.js`
+  // re-implements the SAME predicate (marker true, active, no Contact link,
+  // exact-match) against a sandbox-bound raw read instead of importing the
+  // adapter function -- this text-substring scan flags it only because it
+  // names the identifier for API-shape consistency with the plan
+  // (`deps.findSyntheticByEmail`), not because it imports the adapter.
+  'lib/services/test-requests/reviews-sandbox-deps.js',
+  // The CLI's reservation-time resolution (runReserve/resolveReviewerAssignments)
+  // calls `deps.findSyntheticByEmail(...)` on the sandbox-bound deps object
+  // above -- same non-import reason.
+  'scripts/rehearse-test-request-sandbox.mjs',
 ]);
 const IDENTIFIER = 'findSyntheticByEmail';
 

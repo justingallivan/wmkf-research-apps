@@ -85,6 +85,11 @@ const EXEMPT_FILES = new Set([
   // outside a restriction context like the rest of the exporter script; no
   // entity adapter is used by design (see the module's own doc comment).
   'lib/services/test-requests/source-bundle-reviewers.js',
+  // Test Request Factory `reviews` recipe sandbox deps (6c-ii Stage B): the
+  // same deliberately org-bound sandbox service pattern as ia-sandbox-deps.js
+  // (raw client.js reads/writes bound to one explicit sandbox host, never
+  // process.env.DYNAMICS_URL); no entity adapter can exist for it.
+  'lib/services/test-requests/reviews-sandbox-deps.js',
 ]);
 
 const EXEMPT_DIRS = [

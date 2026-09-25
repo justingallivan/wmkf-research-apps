@@ -55,6 +55,13 @@ const EXEMPT = new Set([
   // alt-key behavior — it sets the address alone, deliberately, to see which orderings 412.
   // Adding a source would change what it measures, and it writes throwaway probe rows.
   'scripts/probe-merge-altkey-ordering.mjs',
+  // Test Request Factory synthetic-reviewer seeder (6c-ii Stage B, D-R1): the
+  // synthetic destination person's `syntheticPersonProjection` deliberately
+  // carries NO `wmkf_emailsource` (nor trust-state JSON nor a Contact link),
+  // "so the row never reads as staff-attested" -- the address's provenance
+  // authority is the run ledger's reviewer-assignment row (D-R2), never this
+  // field, for a factory-created synthetic person.
+  'lib/services/reviewer-engagement/seed-synthetic-review.js',
 ]);
 
 function listFiles(dir) {
