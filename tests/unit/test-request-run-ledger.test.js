@@ -149,6 +149,19 @@ describe('reserveRun', () => {
     expect(run.destinationLocationId).toBe(firstAttemptDestinationLocationId);
   });
 
+  it('Codex adversarial round 1 (defensive, from the declined 055 finding): a basic-recipe retry issues no query against test_request_run_reviewer_assignments at all', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([]); // INSERT no-op (already reserved)
+    queueRows([runRow({ recipe: 'basic' })]); // SELECT existing row
+    const ledger = createRunLedger(db);
+
+    const { created } = await ledger.reserveRun({ actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: BASE_PLAN });
+
+    expect(created).toBe(false);
+    expect(calls).toHaveLength(2); // INSERT (no-op), SELECT run -- nothing else
+    expect(calls.some((call) => call.text.includes('test_request_run_reviewer_assignments'))).toBe(false);
+  });
+
   it('throws a 409 test_request_run_conflict when a differing plan digest reuses the key', async () => {
     const { db, queueRows } = createFakeDb();
     queueRows([]); // INSERT no-op
