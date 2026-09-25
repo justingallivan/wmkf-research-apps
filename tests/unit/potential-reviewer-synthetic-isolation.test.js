@@ -120,6 +120,16 @@ describe('switch ON — (a) exclude marker-true rows unconditionally', () => {
 });
 
 describe('(c) findSyntheticByEmail — factory-only reservation lookup', () => {
+  beforeEach(() => { process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on'; });
+
+  it('throws fail-closed (no carve-out) when the isolation switch is off', async () => {
+    delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+    const query = jest.spyOn(DynamicsService, 'queryRecords');
+    await expect(findSyntheticByEmail('ada@example.edu'))
+      .rejects.toMatchObject({ code: 'synthetic_reviewer_isolation_disabled' });
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it('returns the row only when marker true, active, and no Contact link', async () => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [syntheticRow()] });
     const row = await findSyntheticByEmail('ada@example.edu');
