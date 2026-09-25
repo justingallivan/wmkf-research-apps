@@ -873,9 +873,12 @@ immediately restored to its exact Ready Factory target
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. [VERIFIED via Vercel dashboard] corrective
 Git-linked Preview deployment `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc` is Ready from branch
 `codex/feature-request`, commit `5c5fbcb0bc8265b10de003a9fd1bc3f3e81b725f`.
-[VERIFIED via CLI] the Factory alias remained on `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`
-after redeploy. The new alias target awaits owner approval before another protected POST;
-no upload, expiry recovery, or cleanup has yet been run in this pass.
+[VERIFIED via CLI and signed-in desktop Chrome] after the owner approved the exact new
+target, the shared alias moved to `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc`, the protected proof
+page loaded, and validation-only `{}` POST returned the expected `400` with no Graph session
+or SharePoint write. While upload approval was pending, the alias was restored and re-inspected
+at exact Ready Factory target `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. No upload, expiry
+recovery, or cleanup has yet been run in this pass.
 
 | Browser | Scenario | Expected recorded evidence | Runner |
 |---|---|---|---|

@@ -23,11 +23,14 @@ The alias was immediately restored and re-inspected at exact Ready Factory deplo
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. Under the owner's corrective-deployment approval,
 Git-linked deployment `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc` is Ready from branch
 `codex/feature-request` and commit `5c5fbcb0bc8265b10de003a9fd1bc3f3e81b725f`.
-[VERIFIED via CLI] the shared alias still points to the Factory target. The new alias move
-awaits exact-target owner approval; no MP4 upload or cleanup has occurred. The three recovery
-cells remain NOT RUN live. After an approved alias move, prove protected GET and `{}` POST=400
-before seeking separate upload approval; restore and re-inspect the exact Factory alias after
-any run. The plan's dated Slice 0 matrix has the detailed receipt.
+[VERIFIED via CLI and signed-in desktop Chrome] the owner approved the new exact alias
+target; its protected proof page loaded and validation-only `{}` POST returned the expected
+`400`, before any Graph session or SharePoint write. While exact MP4 upload approval was
+pending, the alias was restored and re-inspected at Ready Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. No MP4 upload or cleanup has occurred. The three
+recovery cells remain NOT RUN live. After upload approval, re-inspect the alias and scoped
+variables, move the alias for the same approved Chrome pass, then seek owner approval for
+cleanup of each exact item or session. The plan's dated Slice 0 matrix has the receipt.
 
 **Latest Slice 0 state (2026-09-23):** [VERIFIED via Git] `codex/feature-request` includes
 the owner-approved `origin/main` merge, offline recovery hardening, and the documented
