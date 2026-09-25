@@ -122,7 +122,7 @@ describe('planBundleFileCopies', () => {
 describe('sandbox rehearsal copy policy and bundle freshness', () => {
   test('is a named executor policy, not the preview read ceilings object, with a stable digest', () => {
     expect(SANDBOX_REHEARSAL_COPY_POLICY).not.toBe(TEST_REQUEST_PREVIEW_READ_LIMITS);
-    expect(SANDBOX_REHEARSAL_COPY_POLICY.version).toBe('sandbox-rehearsal-2026-09-25');
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.version).toBe('sandbox-rehearsal-2026-09-23');
     expect(Object.isFrozen(SANDBOX_REHEARSAL_COPY_POLICY)).toBe(true);
     expect(copyPolicyDigest()).toMatch(/^[0-9a-f]{64}$/);
     expect(copyPolicyDigest({ ...SANDBOX_REHEARSAL_COPY_POLICY, maxFiles: 8 })).not.toBe(copyPolicyDigest());
@@ -131,6 +131,20 @@ describe('sandbox rehearsal copy policy and bundle freshness', () => {
   test('rejects a document the policy does not admit', () => {
     expect(() => planBundleFileCopies(bundle([doc({ size: SANDBOX_REHEARSAL_COPY_POLICY.maxFileBytes + 1 })]))).toThrow(/FILE_SIZE_EXCEEDED/);
     expect(() => planBundleFileCopies(bundle([doc({ mimeType: 'image/png' })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+  });
+
+  // Codex adversarial round 1: a `proposalNarrative` document carrying a
+  // DOCX-shaped MIME type under its ordinary `.pdf`-named destination must
+  // still be refused -- proving the DOCX/msword MIME widening this policy
+  // briefly carried (with no kind<->extension<->MIME binding or magic-byte
+  // check) is fully reverted, not just its version string.
+  test('a proposalNarrative document with a DOCX MIME type under a .pdf destination is refused (Codex round 1 probe)', () => {
+    expect(() => planBundleFileCopies(bundle([doc({
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+    expect(() => planBundleFileCopies(bundle([doc({ mimeType: 'application/msword' })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.allowedMimeTypes).not.toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.allowedMimeTypes).not.toContain('application/msword');
   });
 
   test('accepts a recent export and rejects stale or future-dated bundles', () => {
