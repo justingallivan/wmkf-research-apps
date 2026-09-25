@@ -23,6 +23,7 @@
  */
 
 import { jest } from '@jest/globals';
+import nodeCrypto from 'node:crypto';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { ledgerReasonOrThrow, assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 import { MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
@@ -850,17 +851,31 @@ describe('stepSeedInitialAssessment — SharePoint site/drive binding (P1-B)', (
 
 describe('stepSeedInitialAssessment — idempotent resume', () => {
   // A Ready row exactly as commitReadyLineage leaves it (Codex adversarial
-  // round 1, F1): the recovery path must journal the item, drive, version and
-  // HEX64 content hash from the row, because the snapshot step requires the
-  // receipt's sourceVersionId and the verify step anchors to its contentHash.
+  // round 1, F1; ownership per round 2, F5): the recovery path must prove
+  // the row is THIS run's (claim-token digest journaled before the create
+  // POST matches the row's retained wmkf_claimtoken) and then journal the
+  // item, drive, version and HEX64 content hash from the row, because the
+  // snapshot step requires the receipt's sourceVersionId and the verify step
+  // anchors to its contentHash.
   const READY_GOVERNED_HASH = `${GOVERNED_DOCX_HASH_PREFIX}${Buffer.alloc(32, 0xab).toString('base64url')}`;
   const READY_ITEM_ID = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const READY_CLAIM_TOKEN = 'claim-token-of-this-run';
+  const READY_CLAIM_SHA256 = nodeCrypto.createHash('sha256').update(READY_CLAIM_TOKEN).digest('hex');
   function readyRowFor(generationKey, overrides = {}) {
     return {
       wmkf_requestdocumentid: REQUEST_DOCUMENT_ID, wmkf_operationstatus: 100000001, wmkf_generationkey: generationKey,
+      wmkf_claimtoken: READY_CLAIM_TOKEN,
       wmkf_contenthash: READY_GOVERNED_HASH, wmkf_sharepointitemid: READY_ITEM_ID, wmkf_sharepointdriveid: EXPECTED_DRIVE_ID,
       wmkf_sharepointsiteid: EXPECTED_SITE_ID, wmkf_sharepointversionid: '3.0', '@odata.etag': 'W/"row-1"',
       ...overrides,
+    };
+  }
+  /** The receipt this runner journals BEFORE its create POST (claim digest + attempt marker), optionally with later merges. */
+  function preCreateReceipt(generationKey, extra = {}) {
+    return {
+      resourceId: 1, sequence: 1, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey }, outcome: 'dispatched',
+      readback: { generationKey, claimTokenSha256: READY_CLAIM_SHA256, registryCreateAttemptedAt: new Date().toISOString(), ...extra },
     };
   }
   function mockReadyRow(readyRow) {
@@ -872,11 +887,11 @@ describe('stepSeedInitialAssessment — idempotent resume', () => {
     });
   }
 
-  it('a Ready row at the generation key advances without re-running create/upload, journaling the full receipt the later steps require', async () => {
+  it('a Ready row this run created (claim digest matches) advances without re-running create/upload, journaling the full receipt the later steps require', async () => {
     const { generationKey } = identityFor();
     mockReadyRow(readyRowFor(generationKey));
     const graph = fakeGraph();
-    const { result, calls } = await run({ graph });
+    const { result, calls } = await run({ graph }, [preCreateReceipt(generationKey)]);
 
     expect(result.errorMessage).toBeUndefined();
     expect(result.outcome).toBe('advanced');
@@ -885,7 +900,7 @@ describe('stepSeedInitialAssessment — idempotent resume', () => {
     const readbacks = calls.filter((c) => c.op === 'recordResourceReadback');
     const last = readbacks[readbacks.length - 1].readback;
     expect(last).toMatchObject({
-      requestDocumentId: REQUEST_DOCUMENT_ID, generationKey,
+      requestDocumentId: REQUEST_DOCUMENT_ID, generationKey, claimTokenSha256: READY_CLAIM_SHA256,
       itemId: READY_ITEM_ID, driveId: EXPECTED_DRIVE_ID, siteId: EXPECTED_SITE_ID,
       sourceVersionId: '3.0', contentHash: Buffer.alloc(32, 0xab).toString('hex'),
     });
@@ -895,11 +910,56 @@ describe('stepSeedInitialAssessment — idempotent resume', () => {
     expect(last.contentHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('a Ready row at the generation key with NO receipt from this run is refused with ia_pointer_mismatch, never adopted (round 2, F5)', async () => {
+    const { generationKey } = identityFor();
+    mockReadyRow(readyRowFor(generationKey));
+    const graph = fakeGraph();
+    const { result, calls } = await run({ graph });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/this run never journaled a create; refusing to adopt/);
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+    expect(calls.filter((c) => c.op === 'recordResourceReadback' && c.readback?.requestDocumentId)).toHaveLength(0);
+  });
+
+  it('a Ready row whose retained claim token is not this run\'s (a staff Generate at the same key) is refused with ia_pointer_mismatch (round 2, F5)', async () => {
+    const { generationKey } = identityFor();
+    mockReadyRow(readyRowFor(generationKey, { wmkf_claimtoken: 'somebody-elses-token' }));
+    const graph = fakeGraph();
+    const { result, calls } = await run({ graph }, [preCreateReceipt(generationKey)]);
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/does not carry this run's claim token/);
+    expect(calls.filter((c) => c.op === 'recordResourceReadback' && c.readback?.requestDocumentId)).toHaveLength(0);
+  });
+
+  it('a Ready row whose id differs from the requestDocumentId this run journaled after its create is refused with ia_pointer_mismatch (round 2, F5)', async () => {
+    const { generationKey } = identityFor();
+    mockReadyRow(readyRowFor(generationKey));
+    const graph = fakeGraph();
+    const { result } = await run({ graph }, [preCreateReceipt(generationKey, { requestDocumentId: '55555555-5555-4555-8555-555555555555' })]);
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/requestDocumentId .* does not match the previously journaled requestDocumentId/);
+  });
+
+  it('a Ready row whose content hash differs from an anchor this run already journaled is refused, and the journaled anchor is never overwritten (round 2, F5)', async () => {
+    const { generationKey } = identityFor();
+    mockReadyRow(readyRowFor(generationKey));
+    const graph = fakeGraph();
+    const earlier = 'c'.repeat(64);
+    const { result, getResources } = await run({ graph }, [preCreateReceipt(generationKey, { requestDocumentId: REQUEST_DOCUMENT_ID, contentHash: earlier })]);
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/contentHash .* does not match the previously journaled contentHash/);
+    expect(getResources()[0].readback.contentHash).toBe(earlier);
+  });
+
   it('a Ready row missing its SharePoint version stops with ia_pointer_mismatch instead of advancing into a run the snapshot step cannot continue', async () => {
     const { generationKey } = identityFor();
     mockReadyRow(readyRowFor(generationKey, { wmkf_sharepointversionid: null }));
     const graph = fakeGraph();
-    const { result } = await run({ graph });
+    const { result } = await run({ graph }, [preCreateReceipt(generationKey)]);
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
     expect(result.errorMessage).toMatch(/missing its SharePoint item, drive, version, or content hash/);
@@ -910,15 +970,11 @@ describe('stepSeedInitialAssessment — idempotent resume', () => {
     const { generationKey } = identityFor();
     mockReadyRow(readyRowFor(generationKey));
     const graph = fakeGraph();
-    const journaled = {
-      resourceId: 1, sequence: 1, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
-      plannedIdentity: { generationKey }, outcome: 'dispatched',
-      readback: { generationKey, uploadAttemptedAt: new Date().toISOString(), itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234568', driveId: EXPECTED_DRIVE_ID, siteId: EXPECTED_SITE_ID },
-    };
+    const journaled = preCreateReceipt(generationKey, { uploadAttemptedAt: new Date().toISOString(), itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234568', driveId: EXPECTED_DRIVE_ID, siteId: EXPECTED_SITE_ID });
     const { result, getResources } = await run({ graph }, [journaled]);
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
-    expect(result.errorMessage).toMatch(/does not match the previously journaled item/);
+    expect(result.errorMessage).toMatch(/itemId .* does not match the previously journaled itemId/);
     expect(getResources()[0].readback.itemId).toBe('01ABCDEFGHIJKLMNOPQRSTUVWXYZ234568');
   });
 });
