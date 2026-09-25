@@ -64,8 +64,9 @@ const SUG = '22222222-2222-4222-8222-222222222222';
 const PERSON = 'person-1';
 
 let getReviewers;
+let getWriteupRoster;
 beforeAll(async () => {
-  ({ getReviewers } = await import('../../lib/services/review-manager/reviewers-service'));
+  ({ getReviewers, getWriteupRoster } = await import('../../lib/services/review-manager/reviewers-service'));
 });
 
 beforeEach(() => {
@@ -114,4 +115,22 @@ test('switch ON: emits isSyntheticReviewer=false for an ordinary person', async 
   });
   const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
   expect(out.proposals[0].reviewers[0].isSyntheticReviewer).toBe(false);
+});
+
+// P3 (Opus round 1): the other person projections in this file (the
+// Pre-RP writeup roster, ~606) get the same derived field.
+test('getWriteupRoster: switch ON emits isSyntheticReviewer on its reviewers array', async () => {
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+  queryReviewers.mockResolvedValueOnce({
+    records: [{ wmkf_potentialreviewersid: PERSON, wmkf_name: 'TEST · Ada', wmkf_issyntheticreviewer: true }],
+  });
+  const out = await getWriteupRoster({ requestId: REQ });
+  expect(out.reviewers[0].isSyntheticReviewer).toBe(true);
+  expect(out.reviewers[0]).not.toHaveProperty('wmkf_issyntheticreviewer');
+});
+
+test('getWriteupRoster: switch OFF emits no isSyntheticReviewer key', async () => {
+  queryReviewers.mockResolvedValueOnce({ records: [{ wmkf_potentialreviewersid: PERSON, wmkf_name: 'Ada' }] });
+  const out = await getWriteupRoster({ requestId: REQ });
+  expect(out.reviewers[0]).not.toHaveProperty('isSyntheticReviewer');
 });

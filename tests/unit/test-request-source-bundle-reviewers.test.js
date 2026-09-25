@@ -134,6 +134,23 @@ function build(over = {}) {
   });
 }
 
+describe('P3 (Opus round 1): reviewerUpload is rejected in the top-level documents array', () => {
+  test('a reviewerUpload document at the top level fails the export', () => {
+    expect(() => build({ documents: [reviewFile()] })).toThrow(/belongs under reviewers\[\]\.files/);
+  });
+
+  test('an ordinary top-level document is unaffected', () => {
+    const ordinary = {
+      id: 'inv-1', kind: 'reviewerProposal', library: 'akoya_request',
+      folder: '1003222_E43AE6EA/Reviewer Materials', name: 'Proposal_1003222.pdf',
+      driveId: 'b!drive-id', graphItemId: '01ABC', sharePointSite,
+      size: 1024, mimeType: 'application/pdf', eTag: '"{ETAG},1"', versionId: '1.0', contentHash: 'a'.repeat(64),
+    };
+    const bundle = build({ documents: [ordinary] });
+    expect(bundle.documents).toHaveLength(1);
+  });
+});
+
 describe('projection + strict validator', () => {
   test('projects the allowlisted person/suggestion/answer fields, version 3', () => {
     const bundle = build();
@@ -468,6 +485,52 @@ describe('two-pass consistency fence over reviewer child rows', () => {
   test('rejects a missing suggestion on re-read', () => {
     const hydrated = [reviewerEntry()];
     expect(() => assertReviewerSourceUnchanged(hydrated, [])).toThrow();
+  });
+
+  // P3 (Opus round 1): a hydrator that OMITS an eTag must fail, never
+  // vacuously "match" a likewise-missing eTag on the current-read side (a
+  // null===null comparison proves nothing about drift).
+  test('rejects a hydrated entry with no suggestionEtag, even when the current read also has none', () => {
+    const hydrated = [reviewerEntry({ suggestionEtag: null })];
+    const current = [{
+      suggestionId: SUGGESTION_ID,
+      suggestionEtag: null,
+      personId: PERSON_ID,
+      personEtag: '"{PERSON-ETAG},1"',
+      answers: [{ questionKey: 'impact', eTag: '"{ANSWER-ETAG},1"' }],
+      files: [{ graphItemId: '01REVIEW', eTag: '"{ETAG},1"', versionId: '1.0' }],
+    }];
+    expect(() => assertReviewerSourceUnchanged(hydrated, current)).toThrow(/missing a readable eTag/);
+  });
+
+  test('rejects a current-read answer with no eTag, even when the hydrated side also has none', () => {
+    const hydrated = [reviewerEntry({
+      answers: [{ ...reviewerEntry().answers[0], eTag: undefined }],
+    })];
+    const current = [{
+      suggestionId: SUGGESTION_ID,
+      suggestionEtag: '"{SUG-ETAG},1"',
+      personId: PERSON_ID,
+      personEtag: '"{PERSON-ETAG},1"',
+      answers: [{ questionKey: 'impact', eTag: undefined }],
+      files: [{ graphItemId: '01REVIEW', eTag: '"{ETAG},1"', versionId: '1.0' }],
+    }];
+    expect(() => assertReviewerSourceUnchanged(hydrated, current)).toThrow(/missing a readable eTag/);
+  });
+
+  test('rejects a file with an empty-string eTag', () => {
+    const hydrated = [reviewerEntry({
+      files: [{ ...reviewerEntry().files[0], eTag: '' }],
+    })];
+    const current = [{
+      suggestionId: SUGGESTION_ID,
+      suggestionEtag: '"{SUG-ETAG},1"',
+      personId: PERSON_ID,
+      personEtag: '"{PERSON-ETAG},1"',
+      answers: [{ questionKey: 'impact', eTag: '"{ANSWER-ETAG},1"' }],
+      files: [{ graphItemId: '01REVIEW', eTag: '', versionId: '1.0' }],
+    }];
+    expect(() => assertReviewerSourceUnchanged(hydrated, current)).toThrow(/missing a readable eTag/);
   });
 });
 
