@@ -21,10 +21,10 @@ import { jest } from '@jest/globals';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { assertLedgerReceipt, ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
 import {
-  MANIFEST_V4, sha256, foundationBaselineDigest,
+  MANIFEST_V4, SANDBOX_URL, sha256, foundationBaselineDigest, validateCloneManifest,
 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
-import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
+import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest, planBundleFileCopies } from '../../lib/services/test-requests/bundle-file-copy.js';
 import { SANDBOX_HOSTS, PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 import { _resetInterlockStateForTests } from '../../lib/dataverse/core/interlock.js';
 import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
@@ -134,7 +134,7 @@ const bundle = buildSourceBundle({
     id: 'source-doc-1',
     kind: 'proposalNarrative',
     library: 'akoya_request',
-    folder: 'Phase I',
+    folder: `${REQUEST_NUMBER}_SOURCE/AI Materials`,
     name: `ProposalNarrative_${REQUEST_NUMBER}.pdf`,
     driveId: 'b!sourceDriveIdSample000000000000',
     graphItemId: '01SOURCEITEMABCDEFGHIJKLMNOPQR234',
@@ -149,26 +149,45 @@ const bundle = buildSourceBundle({
   exportedAt: new Date(),
 });
 
+// Validator-shaped (Stage C round 2, P3): every field validateCloneManifest
+// checks is present and consistent, so the fixture cannot drift from what a
+// real prepared manifest looks like (see the fixture self-check test below).
+// The values/createBody ids are the fixed fixture GUIDs rather than
+// buildCloneManifest's random ones because the fake Dataverse routes on them.
+const CREATE_BODY = Object.freeze({
+  akoya_requestid: REQUEST_ID, wmkf_testcreationrunid: RUN_ID,
+  akoya_title: TITLE, akoya_fiscalyear: FISCAL_YEAR, akoya_purpose: PURPOSE, akoya_request: AMOUNT,
+  akoya_requesttype: REQUEST_TYPE,
+});
+const CREATE_BODY_SHA256 = sha256(CREATE_BODY);
+
 function baseManifest(overrides = {}) {
+  const createBody = { ...CREATE_BODY };
+  const plannedFiles = planBundleFileCopies(bundle);
   return {
     kind: MANIFEST_V4, recipe: 'initial_assessment',
+    preparedAt: bundle.exportedAt, expiresAt: bundle.exportedAt,
+    target: SANDBOX_URL,
     values: { requestId: REQUEST_ID, runId: RUN_ID, locationId: LOCATION_ID, meetingDate: MEETING_DATE },
     source: {
       requestId: SOURCE_ID, requestNumber: REQUEST_NUMBER, revision: '1', requestType: REQUEST_TYPE,
-      dataverseHost: PROD_HOST, bundleSha256: sha256(bundle),
+      dataverseHost: PROD_HOST, exportedAt: bundle.exportedAt, bundleSha256: sha256(bundle),
     },
     bundle,
-    createBody: {
-      akoya_requestid: REQUEST_ID, wmkf_testcreationrunid: RUN_ID,
-      akoya_title: TITLE, akoya_fiscalyear: FISCAL_YEAR, akoya_purpose: PURPOSE, akoya_request: AMOUNT,
-      akoya_requesttype: REQUEST_TYPE,
-    },
-    createBodySha256: 'body-hash',
+    plannedFiles,
+    createBody,
+    createBodySha256: CREATE_BODY_SHA256,
     copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
     expectedRequestType: { value: REQUEST_TYPE },
     expectedAppUserId: APP_USER_ID,
     expectedOrganization: { accountid: ORG_ID },
-    invariants: { expectedSharePointFiles: 1 },
+    expectedGraphSiteId: EXPECTED_SITE_ID,
+    expectedGraphDriveId: EXPECTED_DRIVE_ID,
+    invariants: {
+      exactlyOneCreate: true, retryOnAmbiguousCreate: false, retryOnAmbiguousFileUpload: false,
+      deleteOrReset: false, expectedPayments: 0, expectedRegardingEmails: 0, expectedDynamicsLocations: 1,
+      expectedSharePointFiles: plannedFiles.length,
+    },
     ...overrides,
   };
 }
@@ -329,7 +348,7 @@ function baseRun(overrides = {}) {
     runId: RUN_ID, recipe: 'initial_assessment', status: 'creating',
     currentStep: 'verify_initial_assessment', stepIndex: 9, version: 1,
     leaseToken: null, leaseGeneration: 0, lockedUntil: null,
-    createBodySha256: 'body-hash', bundleSha256: sha256(bundle), copyPolicyDigest: copyPolicyDigest(),
+    createBodySha256: CREATE_BODY_SHA256, bundleSha256: sha256(bundle), copyPolicyDigest: copyPolicyDigest(),
     sourceRequestId: SOURCE_ID, sourceRequestNumber: REQUEST_NUMBER, sourceRevision: '1',
     destinationRequestId: REQUEST_ID, destinationLocationId: LOCATION_ID,
     destinationRequestNumber: REQUEST_NUMBER,
@@ -475,6 +494,11 @@ describe('stepVerifyInitialAssessment', () => {
 
   const validBaseline = () => foundationBaselineDigest({ accountid: ORG_ID, versionnumber: 1 }, []);
 
+  it('fixture self-check: the base manifest is validator-shaped (Stage C round 2, P3)', () => {
+    expect(() => validateCloneManifest(baseManifest(), { allowExpired: true })).not.toThrow();
+    expect(baseManifest().invariants.expectedSharePointFiles).toBe(bundle.documents.length);
+  });
+
   it('happy path: reaches markReady exactly once with the correct 2-file census', async () => {
     mockDataverse();
     const graph = baseGraph();
@@ -563,6 +587,37 @@ describe('stepVerifyInitialAssessment', () => {
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+    // Isolating assertions (Stage C round 2, V3): the eTag arm of the twin
+    // read must be what fires -- its own message, and the step must stop
+    // before reverifyClone's third metadata read of the snapshot item, which
+    // would otherwise catch the same eTag change later.
+    expect(result.errorMessage).toBe('The Board snapshot file changed while it was being verified.');
+    expect(call).toBe(2);
+  });
+
+  it('a versionId-only difference between the two retained snapshot metadata reads stops with ia_verification_failed', async () => {
+    mockDataverse();
+    let call = 0;
+    const graph = baseGraph({
+      getFileMetadataById: jest.fn(async (driveId, itemId) => {
+        if (itemId === iaId) return iaMetadata();
+        if (itemId === BASIC_ITEM_ID) return basicMetadata();
+        if (itemId === snapId) {
+          call += 1;
+          return call === 1 ? snapshotMetadata() : { ...snapshotMetadata(), versionId: '2.0' };
+        }
+        return null;
+      }),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The Board snapshot file changed while it was being verified.');
+    expect(call).toBe(2);
   });
 
   it('a request pointer that is not the canonical Initial Assessment row stops with ia_pointer_mismatch', async () => {
@@ -611,6 +666,7 @@ describe('stepVerifyInitialAssessment', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The Board snapshot file changed while it was being verified.');
   });
 
   it('a lastModified-only difference between the two retained snapshot metadata reads stops with ia_verification_failed', async () => {
@@ -634,6 +690,7 @@ describe('stepVerifyInitialAssessment', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The Board snapshot file changed while it was being verified.');
   });
 
   it('a snapshot row whose source content hash no longer matches the current Initial Assessment stops with ia_snapshot_stale', async () => {
@@ -673,6 +730,53 @@ describe('stepVerifyInitialAssessment', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+  });
+
+  // Single-arm isolation of the bytes-versus-row-hash check (Stage C round 2,
+  // V11a / V11b): each of the two arms must be able to fire alone.
+  it('V11a: a snapshot row whose OWN content hash is corrupted while its source content hash and bytes are intact stops with ia_verification_failed', async () => {
+    // The earlier `sourcecontenthash === iaRow.wmkf_contenthash` check still
+    // passes (source hash intact), so only the row-hash arm can fire.
+    mockDataverse({ snapshot: snapshotRow({ wmkf_contenthash: `${GOVERNED_DOCX_HASH_PREFIX}${'e'.repeat(64)}` }) });
+    const { result, calls } = await runStep({
+      deps: { graph: baseGraph() },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The retained Board snapshot bytes do not match its own or its source content hash.');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+  });
+
+  it('V11b: a snapshot whose bytes hash to its OWN content hash but not to its source content hash stops with ia_verification_failed', async () => {
+    // A self-consistent snapshot row (own hash == bytes) that is nonetheless
+    // not a copy of the source Initial Assessment: the source hash still
+    // equals the IA row's hash (so the earlier ia_snapshot_stale check
+    // passes), and only the source-hash arm of the bytes check can fire.
+    const differentSnapshotBytes = await renderInitialAssessmentDocx({
+      requestNumber: REQUEST_NUMBER, title: 'A snapshot that is not the source', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    const differentHash = await hashGovernedDocxContent(differentSnapshotBytes);
+    expect(differentHash).not.toBe(iaHash);
+    mockDataverse({ snapshot: snapshotRow({ wmkf_contenthash: differentHash, wmkf_sourcecontenthash: iaHash }) });
+    const graph = baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === iaId) return { buffer: iaBuffer };
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
+        if (itemId === snapId) return { buffer: differentSnapshotBytes };
+        return null;
+      }),
+    });
+    const { result, calls } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The retained Board snapshot bytes do not match its own or its source content hash.');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
   });
 
   it('an unexpected extra file in the destination folder stops with ia_verification_failed', async () => {
