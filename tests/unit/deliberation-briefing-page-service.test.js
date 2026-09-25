@@ -4,7 +4,11 @@
  *
  * @jest-environment node
  */
-import { buildBriefingContext, resolveBriefingMember } from '../../lib/services/deliberation-briefing/briefing-page-service';
+import {
+  buildBriefingContext,
+  resolveBriefingMediaMember,
+  resolveBriefingMember,
+} from '../../lib/services/deliberation-briefing/briefing-page-service';
 import { PRE_SITE_DISTRIBUTION_CONTRACT } from '../../shared/config/requestDocument.js';
 import { REQUEST_DOCUMENT_ACTOR_POLICY } from '../../lib/services/request-document-actor-service.js';
 import { reviewSetFingerprint } from '../../lib/services/pre-site-visit/review-bundle-service.js';
@@ -362,6 +366,156 @@ test('materials: a file whose actual bytes exceed the cap is refused even when t
     downloadFile: jest.fn(async () => ({ buffer: Buffer.alloc(10), mimeType: 'video/mp4', filename: 'big.mp4', size: 900 * 1024 * 1024 })),
   });
   await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `material:${SLIDES_ID}` }, d)).rejects.toMatchObject({ httpStatus: 404 });
+});
+
+test('post-presentation materials: full briefing uses the shared current winner without leaking Zoom URL', async () => {
+  const older = {
+    wmkf_requestdocumentid: 'abababab-abab-4bab-8bab-abababababab',
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: 100000005,
+    wmkf_operationstatus: 100000001,
+    wmkf_lifecyclestate: 100000000,
+    wmkf_producer: 'meeting-tracker-post-presentation',
+    wmkf_externalurl: 'https://zoom.us/rec/share/older?pwd=x',
+    wmkf_slotversion: 4,
+    createdon: '2026-09-25T13:00:00Z',
+  };
+  const current = {
+    ...older,
+    wmkf_requestdocumentid: RECORDING_ID,
+    wmkf_name: 'Research presentation recording',
+    wmkf_externalurl: 'https://us02web.zoom.us/rec/share/current?pwd=secret',
+    wmkf_slotversion: 5,
+    createdon: '2026-09-25T12:00:00Z',
+  };
+  const d = deps({
+    presentationSchemaReady: jest.fn(() => true),
+    presentationRequestAllowed: jest.fn(() => true),
+    findDocuments: jest.fn(async () => ({ records: [older, current] })),
+    resolveMediaDownloadUrl: jest.fn(),
+  });
+  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
+  expect(context.materials).toEqual([{
+    member: `material:${RECORDING_ID}`,
+    label: 'Recording',
+    filename: 'Research presentation recording',
+    size: null,
+    available: true,
+    inline: false,
+    backing: 'external',
+    media: true,
+  }]);
+  expect(JSON.stringify(context.materials)).not.toContain('zoom.us');
+
+  const resolved = await resolveBriefingMediaMember({
+    requestId: REQUEST_ID,
+    member: `material:${RECORDING_ID}`,
+    mode: 'watch',
+  }, d);
+  expect(resolved).toMatchObject({ kind: 'external', redirectUrl: current.wmkf_externalurl });
+  expect(d.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+  await expect(resolveBriefingMediaMember({
+    requestId: REQUEST_ID,
+    member: `material:${older.wmkf_requestdocumentid}`,
+    mode: 'watch',
+  }, d)).rejects.toMatchObject({ httpStatus: 404 });
+});
+
+test('post-presentation file resolver is non-buffering, mode-constrained, and malware-fail-closed', async () => {
+  const fileRow = {
+    wmkf_requestdocumentid: RECORDING_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: 100000005,
+    wmkf_operationstatus: 100000001,
+    wmkf_lifecyclestate: 100000000,
+    wmkf_producer: 'meeting-tracker-post-presentation',
+    wmkf_externalurl: null,
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'item',
+    wmkf_slotversion: 6,
+    createdon: '2026-09-25T12:00:00Z',
+  };
+  const d = deps({
+    presentationSchemaReady: jest.fn(() => true),
+    presentationRequestAllowed: jest.fn(() => true),
+    findDocuments: jest.fn(async () => ({ records: [fileRow] })),
+    resolveMediaDownloadUrl: jest.fn(async () => ({
+      driveId: 'drive',
+      itemId: 'item',
+      downloadUrl: 'https://microsoft.example/download',
+      filename: 'visit.mp4',
+      mimeType: 'video/mp4',
+      malware: null,
+    })),
+  });
+  const resolved = await resolveBriefingMediaMember({
+    requestId: REQUEST_ID,
+    member: `material:${RECORDING_ID}`,
+    mode: 'watch',
+  }, d);
+  expect(resolved).toMatchObject({ kind: 'file', redirectUrl: 'https://microsoft.example/download' });
+  expect(d.downloadFile).not.toHaveBeenCalled();
+
+  d.resolveMediaDownloadUrl.mockResolvedValueOnce({
+    driveId: 'drive',
+    itemId: 'item',
+    downloadUrl: 'https://microsoft.example/download',
+    filename: 'visit.mp4',
+    mimeType: 'video/mp4',
+    malware: {},
+  });
+  await expect(resolveBriefingMediaMember({
+    requestId: REQUEST_ID,
+    member: `material:${RECORDING_ID}`,
+    mode: 'open',
+  }, d)).rejects.toMatchObject({ httpStatus: 404 });
+
+  d.resolveMediaDownloadUrl.mockResolvedValueOnce({
+    driveId: 'drive',
+    itemId: 'item',
+    downloadUrl: 'https://microsoft.example/download',
+    filename: 'visit.mp4',
+    mimeType: 'text/html',
+    malware: null,
+  });
+  await expect(resolveBriefingMediaMember({
+    requestId: REQUEST_ID,
+    member: `material:${RECORDING_ID}`,
+    mode: 'watch',
+  }, d)).rejects.toMatchObject({ httpStatus: 404 });
+
+  d.resolveMediaDownloadUrl.mockResolvedValueOnce({
+    driveId: 'other-drive',
+    itemId: 'item',
+    downloadUrl: 'https://microsoft.example/download',
+    filename: 'visit.mp4',
+    mimeType: 'video/mp4',
+    malware: null,
+  });
+  await expect(resolveBriefingMediaMember({
+    requestId: REQUEST_ID,
+    member: `material:${RECORDING_ID}`,
+    mode: 'open',
+  }, d)).rejects.toMatchObject({ httpStatus: 404 });
+});
+
+test('post-presentation briefing member is omitted and unresolvable when readiness or request access is off', async () => {
+  const row = {
+    wmkf_requestdocumentid: RECORDING_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: 100000005,
+    wmkf_operationstatus: 100000001,
+    wmkf_lifecyclestate: 100000000,
+    wmkf_producer: 'meeting-tracker-post-presentation',
+    wmkf_externalurl: 'https://zoom.us/rec/share/current?pwd=x',
+    wmkf_slotversion: 1,
+  };
+  const d = deps({ findDocuments: jest.fn(async () => ({ records: [row] })) });
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d)).materials).toEqual([]);
+  await expect(resolveBriefingMediaMember({
+    requestId: REQUEST_ID,
+    member: `material:${RECORDING_ID}`,
+  }, d)).rejects.toMatchObject({ httpStatus: 404 });
 });
 
 test('consultant feedback: the context carries the loader\'s status and items verbatim', async () => {

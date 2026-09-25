@@ -287,23 +287,16 @@ test('cleanup retains its permit if the exact committed item lacks an ETag or co
 });
 
 test('conditional proof deletion sends the exact item id and observed ETag to Graph', async () => {
-  const getToken = jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('test-token');
-  const previousFetch = global.fetch;
-  const fetchMock = jest.fn(async () => ({ status: 204 }));
-  global.fetch = fetchMock;
+  const deleteFileWithEtag = jest.spyOn(GraphService, 'deleteFileWithEtag').mockResolvedValue(204);
   try {
     await expect(deletePresentationMediaProofItemWithEtag('drive-1', 'item-1', 'etag-1'))
       .resolves.toBeUndefined();
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://graph.microsoft.com/v1.0/drives/drive-1/items/item-1',
-      expect.objectContaining({ method: 'DELETE', headers: { Authorization: 'Bearer test-token', 'If-Match': 'etag-1' } }),
-    );
-    fetchMock.mockResolvedValueOnce({ status: 412 });
+    expect(deleteFileWithEtag).toHaveBeenCalledWith('drive-1', 'item-1', 'etag-1');
+    deleteFileWithEtag.mockResolvedValueOnce(412);
     await expect(deletePresentationMediaProofItemWithEtag('drive-1', 'item-1', 'etag-1'))
       .rejects.toMatchObject({ httpStatus: 409, code: 'presentation_media_proof_cleanup_uncertain' });
   } finally {
-    global.fetch = previousFetch;
-    getToken.mockRestore();
+    deleteFileWithEtag.mockRestore();
   }
 });
 
