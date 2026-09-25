@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; Chrome proved the Preview-only Graph transport core path, Edge reported upload/playback/download, and recovery, Safari, integrity, and throughput evidence remain open."
+summary: "Active plan for Meeting Tracker presentation materials; Chrome proved reload/reselect and proof-token recovery, while upload-session expiry and the deferred Production Safari/near-cap run remain open."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -239,9 +239,9 @@ brief, or consultant feedback merely because the media helper is shared.
 one-shot URL response resolved successfully without application byte proxying; the 302 path visibly
 played and video range traffic
 did not increase the application resolver count. Prefer the 302 because it reveals the bearer URL
-only through the redirect chain rather than JSON, subject to the remaining Edge/Safari matrix and
-expiry-recovery tests. The URL is browser-visible in either design, so it is never persisted,
-logged, or placed in the context payload. If the remaining matrix falsifies 302 behavior, retain
+only through the redirect chain rather than JSON, subject to the deferred Production Safari
+matrix and upload-session expiry test. The URL is browser-visible in either design, so it is never
+persisted, logged, or placed in the context payload. If the remaining matrix falsifies 302 behavior, retain
 the one-shot response as the bounded fallback rather than buffering the complete MP4.
 
 If a Microsoft URL expires during playback, the client performs one bounded re-resolution,
@@ -540,8 +540,10 @@ upload after the proof route's CSP admitted only the Microsoft upload and canoni
 SHA-256 fingerprint of file size plus the first and last 1 MiB alongside its encrypted browser
 permit. After reload it requires reselection and checks name, size, modification time, and that
 fingerprint before requesting Graph resume status. An old permit without a fingerprint remains
-available for exact Cleanup but cannot resume. [ASSUMED pending Preview browser runs] These checks
-work across the required Edge/Safari matrix; the production intent remains a separate build.
+available for exact Cleanup but cannot resume. [VERIFIED via signed-in desktop Chrome on 2026-09-24]
+Reload and same-file reselect resumed the paused upload to a full-size commit. Safari remains
+deferred to a Production run on a Factory-created test request; the production intent remains a
+separate build.
 
 After reload, the materials GET makes unfinished intents discoverable. An in-progress intent shows
 Resume; a committed candidate with no registry row shows Finish saving. Only the creating actor
@@ -783,8 +785,9 @@ the local Claude-memory symlink invariant, and 27/27 changed-surface gate comman
 The owner's Windows Edge colleague reported a 93.2 MiB upload, playback, and completed Download;
 [VERIFIED via Microsoft Graph] its exact committed item was 97,777,999 bytes before deletion. No
 Edge byte/hash comparison or detailed pause, resolver, seek, or range evidence was recorded.
-macOS Safari/iPadOS Safari, live reload/reselect and expiry recovery, long-duration seek, and
-near-cap throughput evidence remain open, so Slice 0 is not yet complete.
+[VERIFIED via signed-in desktop Chrome on 2026-09-24] Reload/reselect and proof-token expiry
+recovery subsequently passed. Upload-session expiry recovery, Production macOS/iPadOS Safari,
+long-duration seeking, and near-cap throughput remain open, so Slice 0 is not yet complete.
 
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
 authenticated proof route and minimal harness, but it creates no durable application schema and is
@@ -932,14 +935,24 @@ Before any alias move, re-inspect its current target and presentation/Factory br
 Preview variable names; restore and re-inspect afterward. The 2026-09-23 Edge upload approval
 and cleanup authorization are spent.
 
-**Owner click sequence for macOS Safari and iPadOS Safari.** Do this separately in each browser
-with a newly approved disposable item; Safari on iPad uses the Files app for selection/download.
+**Historical Preview click sequence, superseded by the Session 536 Production decision.**
+The numbered steps below describe the Preview harness and are not instructions for the deferred
+Safari run. [VERIFIED via branch source and Session 536 owner decision] The harness is Preview-only;
+the Production Safari run needs a Production-safe presentation flow and a Factory-created test
+request before the owner can exercise upload, both Watch shapes, long seeking, Download, and the
+near-cap iPadOS upload. Define its exact disposable target and cleanup receipts at that time.
+
+**Owner click sequence for macOS Safari and iPadOS Safari (historical Preview procedure).**
+Do this separately in each browser with a newly approved disposable item; Safari on iPad uses the
+Files app for selection/download.
 [VERIFIED via Applications and Spotlight, 2026-09-23] Edge is not installed on the agent's Mac.
 The owner chose a colleague's Windows Edge device and approved one disposable Edge upload to
-the corrected Request `1003222` target; its live result remains open.
+the corrected Request `1003222` target; its upload, playback, and Download were reported and its
+exact item was deleted after owner approval.
 
-**Owner Edge sequence (Windows).** In Edge, open **⋯ → Help and feedback → About Microsoft Edge**
-and record its version. Press **F12**, open **Network**, enable **Preserve log**, and follow steps
+**Owner Edge sequence (Windows; historical, no further Edge run planned).** In Edge, open
+**⋯ → Help and feedback → About Microsoft Edge** and record its version. Press **F12**, open
+**Network**, enable **Preserve log**, and follow steps
 1, 2, 4, 5, and 6 below with the same approved target and a fresh disposable item. For step 3,
 right-click
 **Open proof page** and select **Copy link**; open Edge's **⋯ → New InPrivate window**,
@@ -1177,7 +1190,8 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 ### Slice 4 — Large MP4 producer
 
 - **PENDING completion of the Slice 0 browser matrix.** Use the proven browser-direct Graph
-  candidate only after Edge/macOS Safari/iPadOS Safari, resume, expiry, and throughput gates pass.
+  candidate only after Chrome upload-session expiry and the deferred Production macOS/iPadOS
+  Safari, long-seek, and near-cap throughput gates pass.
 - If the SharePoint-first-party fallback becomes necessary, replace the upload-session intent
   with a bounded attach intent: server-owned request/folder, creating actor, expected filename/size,
   exact-folder enumeration, independently authorized attach, and stable drive/item validation.
@@ -1343,9 +1357,10 @@ This is Tier 2 cross-store runtime work. Build on a feature branch and promote d
 Release order:
 
 1. **IN PROGRESS:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
-   route-scoped CSP correction. Complete Edge/macOS Safari/iPadOS Safari, resume, expiry, and
-   throughput gates before schema work; keep 302 as the leading resolver and the one-shot URL as
-   the bounded fallback;
+   route-scoped CSP correction, then passed Chrome reload/reselect and proof-token expiry recovery.
+   Complete Chrome upload-session expiry recovery and the deferred Production Safari, long-seek,
+   and near-cap throughput gates before promoting the large-MP4 producer; keep 302 as the leading
+   resolver and the one-shot URL as the bounded fallback;
 2. remove/convert the proof harness and merge the compatibility floor: deploy-safe readers,
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
@@ -1455,7 +1470,8 @@ The subsequent document-only Opus pass identified six further blockers, now inco
   retry, and daily cleanup waits through an explicit three-day finalize grace;
 - the compatibility floor, not a pre-feature runtime, is the rollback minimum once producers run;
 - separate Zoom passcodes without embedded `pwd` are rejected rather than silently discarded;
-- Slice 0 must pass desktop Chrome/Edge plus macOS/iPadOS Safari; and
+- the original Slice 0 review called for desktop Chrome/Edge plus macOS/iPadOS Safari; Session 536
+  superseded that browser assignment, accepting Edge and deferring Safari to Production; and
 - monotonic slot fencing plus renew/revalidate-before-write prevents an expired lease holder from
   becoming the visible winner or superseding an uncaptured row.
 
