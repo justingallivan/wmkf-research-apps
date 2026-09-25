@@ -43,6 +43,32 @@ were removed and a branch-filtered environment listing is empty. Both upload app
 cleanup approvals are spent. Temporary benchmark scripts were removed. No token, preauthenticated
 upload URL, or playback URL is retained in this handoff.
 
+## Session 543 Slice 1 additive schema/readiness — 2026-09-25 PT
+
+**[SOURCE-BUILT; NOT APPLIED OR DEPLOYED.]** Wave 30 defines optional Request Document
+`wmkf_ExternalUrl` (URL String, 2,000 characters) and `wmkf_SlotVersion` (whole number
+1–2,147,483,647), with an exact read-only typed preflight. The adapter keeps both fields out of
+its base/legacy projection until `POST_PRESENTATION_MATERIALS_SCHEMA_READY` is literal `on`.
+Migration `054_post_presentation_materials.sql` and fresh-install V55 define
+`presentation_material_links`, ciphertext-only durable `presentation_material_uploads`,
+`presentation_material_slot_leases`, and the complete five-scope `portal_upload_staging`
+allowlist. `POST_PRESENTATION_MATERIALS_ACCESS` accepts only `off`, `on`, or one normalized
+`test:<GUID>` and fails closed otherwise; schema readiness alone enables no producer.
+
+**[VERIFIED offline]** the Wave 30 preflight self-test, type check, scoped lint, and 14
+changed-surface Jest suites (196 tests) pass. Migration/fresh-install CHECK bodies are compared
+exactly and the manifest tracks migration 054. Migration-manifest, Atlas, Dataverse access-layer,
+Request Document writer, doc-currency, fact-consistency, doc-symbol, status-enum, GUID-boundary,
+secret-scan, scaffolding-token, docs-catalog, and agent-invariant gates pass; every applicable
+self-test passed sequentially. Atlas/runbook/plan surfaces describe the source-only state. No
+Postgres migration or Dataverse wave was applied, no environment variable was changed, no route
+or producer was enabled, and no external write occurred.
+
+**[OWNER CORRECTION 2026-09-25.]** The Test Request Factory is unfinished and is not a
+prerequisite for this feature. Future bounded live checks must use an individually approved,
+human-created disposable Request. Historical Factory deployment/alias receipts below remain
+factual, but every prospective “Factory-created request” instruction is superseded by this rule.
+
 ## Session 543 offline implementation summary — 2026-09-25 PT
 
 **[VERIFIED via Git and source]** Commit `bab770fe6` (`Build resilient browser Graph upload
@@ -76,9 +102,10 @@ exact-cleanup, fingerprint, or no-proxy regression.
 
 **Still open and not claimed:** the representative desktop benchmark is now PASS, but
 Graph-confirmed upload-session expiry remains PARTIAL because this benchmark did not force a live
-terminal expiry. The corrective live expiry run, Production-safe durable flow, Factory-created
-Production test request, desktop macOS Safari long-seek/Download check, and actual near-cap
-Production upload remain deferred. iPadOS is out of scope and no further Edge run is planned.
+terminal expiry. The corrective live expiry run, Production-safe durable flow, individually
+approved human-created Production test Request, desktop macOS Safari long-seek/Download check,
+and actual near-cap Production upload remain deferred. iPadOS is out of scope and no further Edge
+run is planned.
 
 **Concrete approval list before any live step:** obtain a fresh owner approval naming (1) the
 exact disposable Request GUID/number plus governed site/library/folder; (2) the exact MP4,
@@ -117,8 +144,9 @@ default; its retention needs explicit approval before that run. The owner's exis
 permits needed Dataverse reads without separate per-read approval.
 
 **Parked until dependencies exist:** desktop macOS Safari long-seek and near-cap Production
-checks need the production-safe flow and a Factory-created test request. **Do not reopen without
-a new owner decision:** iPadOS support is outside this feature; no further Edge run is planned.
+checks need the production-safe flow and an individually approved human-created test Request;
+the unfinished Factory is not a dependency. **Do not reopen without a new owner decision:**
+iPadOS support is outside this feature; no further Edge run is planned.
 
 **Stop-time advisory:** `report:claim-evidence-pilot -- --current` could not read local state,
 so no pilot observation row was added. This planning-only session shipped no production
@@ -135,7 +163,8 @@ actual near-cap macOS Safari Production gate. No implementation, upload, deploym
 or Production write occurred in this planning session. [VERIFIED via `claude auth status` outside
 the sandbox] the ordinary Claude.ai OAuth session was available. Three read-only
 `claude -p --model opus` passes found a Production isolation blocker and expiry/retry/CSP/release
-sequencing gaps; the revised plan uses an exact Factory test-request access mode and addresses
+sequencing gaps; that revision used an exact Factory test-request access mode (superseded
+2026-09-25 by the owner-approved human-created Request rule) and addresses
 the findings. The final follow-up named two wording fixes—retaining the registry-bound Production
 test item and using a same-Mac/same-network Graph baseline for the Safari gate—and said those
 would make the plan ready for implementation; both were applied. The proposal remains
@@ -207,7 +236,7 @@ sealed initial expiry while Graph's accepted cancellation did not prove live-ses
 **Owner scope update (2026-09-24 PT):** iPadOS support is outside this staff feature's
 release matrix; no office staff will use an iPad for this work. The owner kept the near-cap
 upload check on desktop for the proposed 2 GB cap. The remaining Slice 0 browser run is
-Production macOS Safari on a Factory-created test request: upload, the selected Watch shape, long
+Production macOS Safari on an owner-approved human-created disposable Request: upload, the selected Watch shape, long
 seeking, and Download integrity. [PLANNED] Combine the real near-cap desktop upload with that
 run. Earlier iPadOS assignments below
 are historical and superseded. The plan's dated Slice 0 matrix has the full receipts.
@@ -230,9 +259,11 @@ variables were removed, and the Factory branch's four scoped settings remain. [V
 Vercel deployment inspection] the immutable proof deployment remains Ready as a historical
 Preview artifact. Fresh approvals are needed
 for any further live run, Production Dataverse read, Preview deployment, or alias change.
-**Owner decision (2026-09-23, Session 536):** Chrome and Edge are accepted as working. macOS/iPadOS
-Safari waits until the Test Request Factory can create test requests, then runs in Production on
-a test request. No new real-request approval is needed for that run.
+**Historical owner decision (2026-09-23, Session 536; superseded 2026-09-25):** Chrome and Edge
+were accepted as working. The then-current decision made macOS/iPadOS Safari wait for the Test
+Request Factory and said no new real-request approval was needed. The current rule above replaces
+that fixture and approval assumption: iPadOS is out of scope, and the Production Safari run needs
+a freshly approved human-created disposable Request.
 Recovery checks (reload resume, session/token expiry) move to one agent-run Chrome pass; no
 row waits on Edge. See the plan's matrix note.
 The detailed matrix, click steps, and receipt are in
@@ -245,13 +276,13 @@ live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
 |---|---|---|
 | Chrome core upload, same-page pause/resume, finalize, both Watch modes, seek, Download | PASS | [VERIFIED via signed-in 2026-09-22 Chrome receipt] 100,665,703 bytes, 67.3-second seek, equal source/download SHA-256, exact cleanup; placeholder fix `cdc7574e1`. |
 | Windows Edge upload, playback, Download | PASS for reported actions; full Edge row NOT RUN | [VERIFIED via owner report] those three actions worked. [VERIFIED via Graph] committed item was 97,777,999 bytes. Pause/reload, resolver trace, seek, and download integrity were not recorded. |
-| macOS Safari full path | DEFERRED | [VERIFIED via Session 536 decision] Production run on a Factory-created test request remains. |
+| macOS Safari full path | DEFERRED | [UPDATED by owner 2026-09-25] Production run on an individually approved human-created disposable Request remains; the unfinished Factory is not a dependency. |
 | iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] No iPadOS acceptance run is required for this staff feature. |
 | Reload/same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome and Graph] paused at 0.9 MiB, reload/reselect, direct Microsoft `202` resume to full commit, exact item cleanup and Graph 404. |
 | Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] second session paused at 0.6 MiB; after the *initial sealed* 8:49:47 PM PDT expiry, Resume displayed an expired-session error and retained the permit. Approved Cleanup returned `session_cancelled`, so Graph had not confirmed expiry. [VERIFIED via Graph] fresh third session committed 100,665,703 bytes. [REPORTED by owner] Finish saving created the proof and Cleanup moved the item to recycle bin. [VERIFIED via Graph] exact path not found and folder empty. Correct the initial-expiry guard and retest live status recovery. |
 | Proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] old link refused as expired; fresh link from same committed item played and accepted End/Home seeks with one resolver action. |
 | Long-duration seek | DEFERRED | The 67.33-second recording cannot prove the >2-minute Safari case. |
-| Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via 2026-09-24 owner decision] one desktop Production run remains for the proposed 2 GB cap. [PLANNED] Combine it with macOS Safari on a Factory-created test request. |
+| Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via 2026-09-24 owner decision; fixture corrected 2026-09-25] one desktop Production run remains for the proposed 2 GB cap. [PLANNED] Combine it with macOS Safari on the same approved human-created Request. |
 | Production-sized chunk policy and measured throughput | PASS FOR REPRESENTATIVE CHROME PREVIEW BENCHMARK | [VERIFIED 2026-09-25] the 100,665,703-byte app run used the shared 10 MiB transport, paused at 10.0 MiB Graph-confirmed, resumed, reached a displayed 3.22 Mbps active rate, and took 300.133 seconds begin-to-verification including the pause. The separate same-machine/network direct-Graph Chrome baseline took 337.997 seconds at 2.383 Mbps. Both exact items are Graph-confirmed absent and the folder is empty. This does not close the actual near-cap Production gate. |
 
 **Owner actions:** choose and approve each new disposable request, SharePoint target, and MP4;
@@ -632,7 +663,7 @@ this presentation session does not edit or run that workstream.
 
 1. **Stage 1d accepted** (Factory branch). Six root-review defects fixed (`f06b5d3a8`, `7c8edcf45`, `6f2d56c48`, `008612629`), two Codex re-review findings fixed (`ee9901c59` default cycle from ordinary requests only; `c0cbf0dad` export-preview waterfall step), three more fixed by Codex rescue and reviewed (`6a293fe12` export token binds isolation policy; `744bde88d` Explorer page-local CSV hidden while isolation is on; `53260f1af` no default cycle for all-test programs). Owner decisions: single-request Word/PDF artifacts (incl. Grant Reporting) stay available for test requests; spend alarm counts all spend, dashboard shows test spend as one line; accept without a fourth review round.
 2. **Source-bundle exporter accepted** (Factory branch). `scripts/export-test-request-source-bundle.mjs` + `lib/services/test-requests/source-bundle.js` (bundle v2: production host + registered `akoyago-shared` site enforced, drive/item/site identity, strict SharePoint discovery, post-hash membership fence, root-only archive folder misses with library re-confirmation). Commits `414af81d9`, `ebd6796e4`, `433609a38`, `17085332a`, `4b8ebec7b`, `aba21a5a9`, `57d823b14` (+ doc commits). Live runs on 1003222 (owner authorized prod Dataverse reads this session): GUID `e43ae6ea-698f-f111-8076-6045bd018a07`, revision `W/"98622844"`, December 2026 / 2026-12-11, no purpose text, two recognized documents (`ProposalNarrative_1003222.pdf`, `Proposal_1003222.pdf`); no Phase I or bibliography file matched the recognized names.
-3. **Presentation Slice 0 decisions** (`codex/feature-request`, `6b9f1fd15`, `1fe8777d5`): Chrome and Edge accepted; macOS/iPadOS Safari deferred to a Production run on a Factory-created test request; browser-independent recovery rows move to one agent-run Chrome pass.
+3. **Presentation Slice 0 decisions (historical; fixture superseded 2026-09-25)** (`codex/feature-request`, `6b9f1fd15`, `1fe8777d5`): Chrome and Edge accepted; macOS/iPadOS Safari was deferred to a Production run on a Factory-created test request; browser-independent recovery rows moved to one agent-run Chrome pass. The current rule uses a freshly approved human-created Request and excludes iPadOS.
 4. **Investigation worktree** created for a parallel Claude session: `/Users/gallivan/Code/WMKF_Apps-investigate`, branch `claude/investigation` (no upstream). Another Claude session may be working there; do not touch it.
 
 ## Next Items
@@ -660,7 +691,7 @@ this presentation session does not edit or run that workstream.
 
 1. Stage 1d and the source-bundle exporter are accepted (owner, Session 536); no fourth review round.
 2. Existing requests are never changed by the Factory; test requests visible with TEST badge; reports/exports/cycle totals exclude them; single-request actions stay available.
-3. Safari Slice 0 runs in Production on a Factory test request; no further Edge runs.
+3. **Historical, superseded 2026-09-25:** Safari Slice 0 was assigned to a Factory test request. It now uses a freshly approved human-created disposable Request; no further Edge runs.
 
 ## Key Files Reference
 

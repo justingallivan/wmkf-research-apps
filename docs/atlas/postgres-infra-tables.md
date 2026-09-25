@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-09-14. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-09-25. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -584,6 +584,34 @@ is pinned by the latest `sent` `pre_site_distribution_attempts` row,
 reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
+
+### Post-presentation material ledgers — SOURCE-BUILT; MIGRATION 054 NOT APPLIED
+
+**[SOURCE-VERIFIED 2026-09-25 on `codex/feature-request`.]** Migration
+`054_post_presentation_materials.sql`, mirrored by fresh-install V55, defines
+three additive tables for the planned post-research-presentation feature. No
+environment has been migrated by this milestone, both rollout controls remain
+off, and no producer or consumer route exists yet.
+
+- `presentation_material_links` stores one non-revoked materials-only link per
+  Request: UUID/JTI, unique SHA-256 token digest, sealed token ciphertext,
+  expiry, creator/time, and revocation/supersession evidence. Raw tokens are
+  absent from the schema.
+- `presentation_material_uploads` stores one actor/request/active-Site-Visit
+  bound browser-direct Graph intent before any preauthenticated URL is returned.
+  It records the bounded file fingerprint, code-owned path/generation identity,
+  lifecycle/lease/review-after state, the upload URL only as ciphertext, exact
+  Graph candidate facts, and the finalized Request Document identity. Stored
+  Graph expiry is advisory; it is not deletion authority.
+- `presentation_material_slot_leases` is keyed by Request + Recording,
+  Transcript, or Transcript Summary artifact type and stores a paired
+  token/expiry plus a positive fence capped at 2,147,483,647.
+
+The same migration and every fresh-install definition enumerate the complete
+five-scope `portal_upload_staging` allowlist, adding
+`post_presentation_transcript` without removing the four live scopes. Slice 1
+adds no transcript producer, so existing cleanup behavior cannot acquire new
+deletion authority from the schema alone.
 
 ### `consultant_feedback` — PRODUCTION-LIVE Consultant Feedback slices 1–3 (migrations 048-049 applied; fresh-install v50-v51; 2026-09-14)
 
