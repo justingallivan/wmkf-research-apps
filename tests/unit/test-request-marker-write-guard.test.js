@@ -70,6 +70,9 @@ describe('assertTestRequestMarkerNotWritten', () => {
     ['backslash-separated property URL (Codex 6c-i round 4)', `akoya_requests(${REQUEST_ID})\\wmkf_istestrequest`],
     ['encoded-backslash property URL', `akoya_requests(${REQUEST_ID})%5Cwmkf_istestrequest`],
     ['encoded-slash property URL', `akoya_requests(${REQUEST_ID})%2Fwmkf_testcreationrunid`],
+    ['fragment-suffixed property URL (Codex 6c-i round 7)', `akoya_requests(${REQUEST_ID})/wmkf_istestrequest#ignored`],
+    ['absolute fragment-suffixed person marker URL', `https://example.crm.dynamics.com/api/data/v9.2/wmkf_potentialreviewerses(${REQUEST_ID})/wmkf_issyntheticreviewer#x`],
+    ['fragment before an encoded separator', `akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid#%2F`],
   ])('refuses a %s that names the field in the URL', (_label, url) => {
     expect(() => assertTestRequestMarkerNotWritten(undefined, url))
       .toThrow(expect.objectContaining({ code: 'test_request_marker_immutable' }));
@@ -188,6 +191,8 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
     ['backslash-separated property PUT (Codex 6c-i round 4)', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})\\wmkf_istestrequest`, { value: false })],
     ['encoded-backslash property PUT', (c) => c.raw('PUT', `/wmkf_potentialreviewerses(${REQUEST_ID})%5Cwmkf_issyntheticreviewer`, { value: false })],
     ['encoded-slash property DELETE', (c) => c.delete_(`/akoya_requests(${REQUEST_ID})%2Fwmkf_testcreationrunid`)],
+    ['fragment-suffixed property PUT (Codex 6c-i round 7)', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})/wmkf_istestrequest#ignored`, { value: false })],
+    ['absolute fragment-suffixed person marker PUT', (c) => c.raw('PUT', `https://example.crm.dynamics.com/api/data/v9.2/wmkf_potentialreviewerses(${REQUEST_ID})/wmkf_issyntheticreviewer#x`, { value: false })],
   ])('refuses a %s that names the marker before any fetch', async (_label, send) => {
     const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't' });
     await expect(send(client)).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
