@@ -260,6 +260,15 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
       expect(fetch).not.toHaveBeenCalled();
     });
 
+    test('a dot-segment or backslash path that resolves to another entity set is refused even with the flag set (Fable 6c-i final)', async () => {
+      const client = optedInClient();
+      for (const path of ['/akoya_requests/../accounts', '/akoya_requests/..\\accounts', '/akoya_requests/%2E%2E/accounts', '/accounts#/akoya_requests']) {
+        await expect(client.post(path, { name: 'x', wmkf_istestrequest: true }))
+          .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
     test('an array-nested (collection deep-insert) marker is refused even with the flag set (Codex 6c-i round 2)', async () => {
       const client = optedInClient();
       await expect(client.post('/akoya_requests', { akoya_title: 'x', wmkf_related: [{ wmkf_istestrequest: false }] }))
