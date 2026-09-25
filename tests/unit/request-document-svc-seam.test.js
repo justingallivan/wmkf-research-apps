@@ -56,13 +56,13 @@ function sandboxSvc() {
 describe('request-document.create — svc seam', () => {
   test('with no svc, still targets the production DYNAMICS_URL via DynamicsService', ctx(async () => {
     fetch.mockImplementation((url) => {
-      if (String(url).includes('login.microsoftonline.com')) {
+      if (new URL(String(url)).hostname === 'login.microsoftonline.com') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) });
       }
       return Promise.resolve(okResponse({ wmkf_requestdocumentid: 'x' }));
     });
     await requestDocumentAdapter.create({ wmkf_name: 'x' }, {});
-    const nonAuth = fetch.mock.calls.filter(([u]) => !String(u).includes('login.microsoftonline.com'));
+    const nonAuth = fetch.mock.calls.filter(([u]) => new URL(String(u)).hostname !== 'login.microsoftonline.com');
     expect(nonAuth[0][0]).toContain(PROD_HOST);
   }));
 
@@ -78,13 +78,13 @@ describe('request-document.create — svc seam', () => {
 describe('request-document.update — svc seam', () => {
   test('with no svc, still targets the production DYNAMICS_URL via DynamicsService', ctx(async () => {
     fetch.mockImplementation((url) => {
-      if (String(url).includes('login.microsoftonline.com')) {
+      if (new URL(String(url)).hostname === 'login.microsoftonline.com') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) });
       }
       return Promise.resolve({ ok: true, status: 204, text: () => Promise.resolve('') });
     });
     await requestDocumentAdapter.update('abc-123', { wmkf_name: 'x' }, {});
-    const nonAuth = fetch.mock.calls.filter(([u]) => !String(u).includes('login.microsoftonline.com'));
+    const nonAuth = fetch.mock.calls.filter(([u]) => new URL(String(u)).hostname !== 'login.microsoftonline.com');
     expect(nonAuth[0][0]).toContain(PROD_HOST);
   }));
 

@@ -144,7 +144,7 @@ describe('createIaSandboxDeps — every dependency routes to the bound sandbox h
     fetch.mockImplementation((url) => {
       captured.push(String(url));
       const href = String(url);
-      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
       if (href.includes('/$batch')) return Promise.resolve(multipartResponse([
         { contentId: 1, status: 204 },
       ]));
@@ -155,7 +155,7 @@ describe('createIaSandboxDeps — every dependency routes to the bound sandbox h
   });
 
   function dataverseUrls() {
-    return captured.filter((url) => !url.includes('login.microsoftonline.com'));
+    return captured.filter((url) => new URL(url).hostname !== 'login.microsoftonline.com');
   }
 
   it('findByGenerationKey reads from the sandbox host only', ctx(async () => {
@@ -215,7 +215,7 @@ describe('createIaSandboxDeps — runChangeset atomicity', () => {
   it('an embedded 412 failure rejects the whole changeset with exactly one $batch request', ctx(async () => {
     fetch.mockImplementation((url) => {
       const href = String(url);
-      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
       if (href.includes('/$batch')) return Promise.resolve(multipartResponse([
         { contentId: 1, status: 204 },
         { contentId: 2, status: 412, reason: 'Precondition Failed' },
@@ -240,7 +240,7 @@ describe('createIaSandboxDeps — runChangeset atomicity', () => {
   it('every embedded operation URL inside the $batch body uses the sandbox host, never the production host (Opus mutation: embedded-URL-only host swap)', ctx(async () => {
     fetch.mockImplementation((url) => {
       const href = String(url);
-      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
       if (href.includes('/$batch')) return Promise.resolve(multipartResponse([
         { contentId: 1, status: 204 },
         { contentId: 2, status: 204 },
@@ -277,7 +277,7 @@ describe('createIaSandboxDeps — annotation shape parity with production reads'
   it('maps @odata.etag to _etag and a FormattedValue annotation to its *_formatted field', ctx(async () => {
     fetch.mockImplementation((url) => {
       const href = String(url);
-      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
       if (href.includes('akoya_requests(')) return jsonResponse({
         akoya_requestid: SAMPLE_REQUEST.akoya_requestid,
         akoya_requesttype: 1,
@@ -359,7 +359,7 @@ describe('createIaSandboxDeps — end-to-end with commitReadyLineage (required b
 
     fetch.mockImplementation((url, init) => {
       const href = String(url);
-      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
       if (href.includes('/$batch')) {
         const opCount = (String(init.body).match(/Content-ID: \d+/g) || []).length;
         // Apply the exact mutation THIS changeset performs (no prior-ready
@@ -400,7 +400,7 @@ describe('createIaSandboxDeps — end-to-end with commitReadyLineage (required b
     expect(batchCalls).toHaveLength(1);
     for (const [u] of fetch.mock.calls) {
       const href = String(u);
-      if (href.includes('login.microsoftonline.com')) continue;
+      if (new URL(href).hostname === 'login.microsoftonline.com') continue;
       expect(new URL(href).hostname).toBe(SANDBOX_HOSTS[0]);
     }
   }));

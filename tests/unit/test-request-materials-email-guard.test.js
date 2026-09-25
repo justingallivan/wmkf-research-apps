@@ -51,7 +51,9 @@ test('sendReminderEmail runs after the claim and does no test-request read of it
   assertRequestEmailAllowed.mockClear();
   const deps = { sendEmail: jest.fn(async () => 'email-1') };
   await expect(sendReminderEmail({
-    row: { id: 7, request_id: REQUEST_ID, contacts: [] },
+    // PR #335 (main) made both recipients mandatory inside the sender itself
+    // (requireMaterialRecipients); the guard under test is unchanged.
+    row: { id: 7, request_id: REQUEST_ID, contacts: { pi: { name: 'P', email: 'pi@example.org' }, liaison: { name: 'L', email: 'liaison@example.org' } } },
     prepared: { subject: 's', bodyText: 'b' },
     fromEmail: 'pd@example.org',
     actorId: ACTOR_ID,
