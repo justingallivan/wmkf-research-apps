@@ -225,9 +225,18 @@ describe('sandbox operator write boundary', () => {
     expect(enterBypass).toBeGreaterThan(runAdvanceStart);
     const loopStart = script.indexOf('for (let i = 0; i < args.steps; i += 1) {', runAdvanceStart);
     expect(loopStart).toBeGreaterThan(enterBypass);
-    // Not entered anywhere else in the file (module load, runReserve, etc.).
-    expect(script.indexOf('enterDynamicsBypassForScript(', enterBypass + 1)).toBe(-1);
-    expect(script.indexOf('enterDynamicsBypassForScript(')).toBe(enterBypass);
+    // Not entered anywhere else in the file except runReserve's own
+    // reviews-recipe-only entry (slice 6c-ii Stage B:
+    // resolveReviewerAssignments' sandbox-bound reads/ledger reads also need
+    // a trusted context, entered narrowly inside runReserve, only when
+    // args.recipe === 'reviews', never for basic/initial_assessment).
+    const runReserveStart = script.indexOf('async function runReserve(');
+    expect(runReserveStart).toBeGreaterThan(-1);
+    const enterBypassReserve = script.indexOf("enterDynamicsBypassForScript('rehearse-test-request-sandbox:reserve-reviews')", runReserveStart);
+    expect(enterBypassReserve).toBeGreaterThan(runReserveStart);
+    expect(enterBypassReserve).toBeLessThan(runAdvanceStart);
+    const thirdCall = script.indexOf('enterDynamicsBypassForScript(', enterBypass + 1);
+    expect(thirdCall).toBe(-1);
   });
 
   it('--advance derives its lease duration from recipeLeaseSeconds (owner decision 2026-09-24, no renewal; P1-b: any IA-cumulative recipe must get the 900 s maximum, not just initial_assessment by name)', () => {
