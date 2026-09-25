@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { classifySiteVisitMaterialsStatus } from '../../utils/site-visit-materials-status';
 import { Archive, CalendarX2, CheckCircle2, CircleHelp, Clock3, FileCheck2, MinusCircle, TriangleAlert } from 'lucide-react';
 
@@ -29,10 +28,10 @@ export default function MaterialsStatusPill({ summary, availability, hasSiteVisi
         {status.label}
       </span>
       {status.key === 'not_requested' && !summary && requestMaterialsHref ? (
-        <Link href={requestMaterialsHref} className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Request materials</Link>
+        <a href={requestMaterialsHref} data-full-page-navigation="true" className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Request materials</a>
       ) : detail && <span className="text-gray-600">{detail}</span>}
       {status.key === 'check_files' && hasSiteVisit && requestMaterialsHref && (
-        <Link href={requestMaterialsHref} className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Review materials</Link>
+        <a href={requestMaterialsHref} data-full-page-navigation="true" className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Review materials</a>
       )}
     </div>
   );

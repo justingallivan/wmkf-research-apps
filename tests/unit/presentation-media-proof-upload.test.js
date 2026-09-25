@@ -428,6 +428,90 @@ test('offline waiting does not spend the no-progress fragment budget', async () 
   expect(waitForOnline).toHaveBeenCalledTimes(1);
 });
 
+test('a user pause interrupts offline and retry waits without aborting an active fragment', async () => {
+  const offlinePause = new AbortController();
+  const offlineWait = jest.fn(({ pauseSignal }) => new Promise((resolve) => {
+    pauseSignal.addEventListener('abort', () => resolve('paused'), { once: true });
+  }));
+  const offlinePending = uploadBrowserDirectGraphFile({
+    file: fakeFile(CHUNK),
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory: jest.fn(),
+    authorizeStatus: jest.fn(),
+    isOnline: () => false,
+    waitForOnline: offlineWait,
+    pauseSignal: offlinePause.signal,
+  });
+  await Promise.resolve();
+  offlinePause.abort();
+  await expect(offlinePending).resolves.toMatchObject({ paused: true, reason: 'requested', nextStart: 0 });
+
+  const retryPause = new AbortController();
+  const retrySleep = jest.fn((_ms, _signal, pauseSignal) => new Promise((resolve) => {
+    pauseSignal.addEventListener('abort', () => resolve(false), { once: true });
+  }));
+  const retryPending = uploadBrowserDirectGraphFile({
+    file: fakeFile(CHUNK),
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory: xhrFactoryFor([{ status: 503 }]),
+    authorizeStatus: jest.fn(async () => openStatus(0)),
+    sleep: retrySleep,
+    pauseSignal: retryPause.signal,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(retrySleep).toHaveBeenCalled();
+  retryPause.abort();
+  await expect(retryPending).resolves.toMatchObject({ paused: true, reason: 'requested', nextStart: 0 });
+});
+
+test('in-flight progress keeps confirmed-fragment speed stable and marks stale rates unknown', async () => {
+  jest.useFakeTimers();
+  try {
+    const file = fakeFile(CHUNK * 2);
+    const states = [];
+    let clock = 0;
+    let secondXhr;
+    const xhrFactory = xhrFactoryFor([
+      {
+        status: 202,
+        body: { nextExpectedRanges: [`${CHUNK}-`] },
+        onSend: () => { clock = 1_000; },
+      },
+      {
+        kind: 'stall',
+        onSend: (xhr) => {
+          secondXhr = xhr;
+          clock = 10_000;
+          xhr.upload.onprogress?.({ loaded: CHUNK / 2 });
+        },
+      },
+    ]);
+    const pending = uploadBrowserDirectGraphFile({
+      file,
+      uploadUrl: 'https://upload.example/session',
+      xhrFactory,
+      authorizeStatus: jest.fn(async () => openStatus(CHUNK)),
+      onState: (state) => states.push(state),
+      now: () => clock,
+      rateStaleMs: 5_000,
+      stallTimeoutMs: 20_000,
+      maxNoProgressAttempts: 1,
+    });
+    await jest.advanceTimersByTimeAsync(0);
+    const confirmed = states.find((state) => state.confirmedBytes === CHUNK && state.inFlightBytes === CHUNK);
+    const inFlight = states.find((state) => state.confirmedBytes === CHUNK && state.inFlightBytes > CHUNK);
+    expect(confirmed.mbps).toBeGreaterThan(0);
+    expect(inFlight.mbps).toBeCloseTo(confirmed.mbps);
+
+    await jest.advanceTimersByTimeAsync(5_000);
+    expect(states.at(-1)).toMatchObject({ rateStale: true, mbps: null, etaSeconds: null });
+    secondXhr.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 test('malformed, backward, and beyond-fragment 202 ranges fail closed', async () => {
   const file = fakeFile(CHUNK * 2);
   for (const range of ['bad', '0-', `${CHUNK + 1}-`]) {

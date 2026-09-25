@@ -80,7 +80,7 @@ test('keeps representative public headers and stable metadata DTO keys', async (
   }));
   await expect(GraphService.getFileMetadataById('drive', 'item', { siteId: 'site' })).resolves.toEqual({
     siteId: 'site', driveId: 'drive', id: 'item', name: 'doc.docx', size: 9,
-    webUrl: 'https://sp/doc', eTag: 'etag', versionId: '4.0', lastModified: '2026-09-19T00:00:00Z',
+    webUrl: 'https://sp/doc', eTag: 'etag', cTag: 'ctag', versionId: '4.0', lastModified: '2026-09-19T00:00:00Z',
     mimeType: 'application/msword', parentReference: { driveId: 'drive' },
   });
 });

@@ -50,6 +50,8 @@ test('list row links to the tracker\'s visit editor with the request number and 
   render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null })} cycleCode="D26" programId="p1" />);
   expect(screen.getByRole('link', { name: 'Schedule visit' }))
     .toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003`);
+  expect(screen.getByRole('link', { name: 'Schedule visit' }))
+    .toHaveAttribute('data-full-page-navigation', 'true');
 });
 
 test('list row shows scheduling and missing-link cues when either meeting is missing', () => {
@@ -582,6 +584,7 @@ test('received materials link to review controls only when the visit is availabl
   const { rerender } = render(row());
   expect(screen.getByText('3/3 received; awaiting confirmation.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Review materials' })).toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003`);
+  expect(screen.getByRole('link', { name: 'Review materials' })).toHaveAttribute('data-full-page-navigation', 'true');
   for (const overrides of [{ siteVisit: null }, { materialsAvailability: 'unavailable' }, { materials: { ...materials, state: 'ready' } }]) {
     rerender(row(overrides));
     expect(screen.queryByRole('link', { name: 'Review materials' })).not.toBeInTheDocument();

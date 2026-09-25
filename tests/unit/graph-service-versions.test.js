@@ -203,6 +203,28 @@ it('uses an asserted site/drive pair without re-resolving upload identity', asyn
   expect(global.fetch.mock.calls[0][0]).toContain('/drives/asserted-drive/');
 });
 
+it('exposes cTag separately without weakening the publication-version contract', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(200, {
+    id: 'item/id',
+    name: 'recording.mp4',
+    size: 100,
+    eTag: 'etag',
+    cTag: 'ctag-version',
+    file: { mimeType: 'video/mp4' },
+  }));
+
+  await expect(GraphService.getFileMetadataById(
+    'drive/id', 'item/id', { siteId: 'site/id' },
+  )).resolves.toMatchObject({
+    siteId: 'site/id',
+    driveId: 'drive/id',
+    id: 'item/id',
+    cTag: 'ctag-version',
+    versionId: null,
+  });
+});
+
 it('replaces one stable item by id without using a path conflict behavior', async () => {
   jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
   global.fetch = jest.fn().mockResolvedValue(response(200, {

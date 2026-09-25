@@ -31,6 +31,7 @@ import { classifyDeployment } from './lib/dataverse/core/interlock';
 const SHAREPOINT_CANONICAL_ORIGIN = new URL(SHAREPOINT_CANONICAL_SITE_URL).origin;
 const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
 const PRESENTATION_UPLOAD_PROOF_PATH = '/meeting-tracker/presentation-media-proof';
+const PRESENTATION_UPLOAD_PAGE = /^\/meeting-tracker\/visits\/[^/]+\/?$/;
 const PRESENTATION_PLAYBACK_PROOF_PREFIX = '/external/presentation-media-proof/';
 
 export default withAuth(
@@ -46,6 +47,7 @@ export default withAuth(
     const isLoopbackHttp = req.nextUrl?.protocol === 'http:'
       && ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
     const isPresentationUploadProof = isPreview && pathname === PRESENTATION_UPLOAD_PROOF_PATH;
+    const isPresentationUploadPage = PRESENTATION_UPLOAD_PAGE.test(pathname);
     const playbackProofToken = pathname.startsWith(PRESENTATION_PLAYBACK_PROOF_PREFIX)
       ? pathname.slice(PRESENTATION_PLAYBACK_PROOF_PREFIX.length)
       : '';
@@ -72,9 +74,9 @@ export default withAuth(
     let connectSrc = isDev
       ? `'self' https://*.public.blob.vercel-storage.com https://vercel.com https://*.vercel-insights.com ws://localhost:3000 ws://127.0.0.1:3000`
       : `'self' https://vercel.com https://*.vercel-insights.com`;
-    if (isPresentationUploadProof) {
+    if (isPresentationUploadProof || isPresentationUploadPage) {
       // Graph upload sessions currently resolve to signed *.up.1drv.com URLs;
-      // keep that egress capability confined to this authenticated proof page.
+      // keep that egress capability confined to authenticated upload pages.
       // The canonical tenant origin is included because Microsoft may issue a
       // tenant-hosted session URL for the governed SharePoint drive.
       connectSrc += ` ${GRAPH_UPLOAD_ORIGIN} ${SHAREPOINT_CANONICAL_ORIGIN}`;

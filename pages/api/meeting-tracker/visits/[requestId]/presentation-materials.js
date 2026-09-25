@@ -42,7 +42,10 @@ export default async function handler(req, res) {
   return withDalContext('meeting-tracker-presentation-materials', async () => {
     try {
       const result = req.method === 'GET'
-        ? await getPresentationMaterials({ requestId })
+        ? await getPresentationMaterials({
+          requestId,
+          actingUserSystemId: actorRefFromSession(access.session),
+        })
         : await saveZoomRecording({
           requestId,
           operationId: req.body.operationId,

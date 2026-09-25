@@ -385,10 +385,11 @@ transport dependency and must not revoke or stale a briefing send.
 
 ### 5.5 Durable large-upload intents
 
-**[PLANNED production surface; not created by `bab770fe6`.]** The Preview proof continues to use
-only a session-scoped encrypted browser permit and creates no application table. The production
-producer still requires the durable intent below before any Production upload-session URL is
-issued.
+**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; NOT DEPLOYED, MIGRATED, OR
+ENABLED.]** The Preview proof continues to use only a session-scoped encrypted browser permit and
+creates no application table. The durable production producer now creates the intent below before
+any Graph upload-session URL leaves the server. Migration 055 remains unapplied and the schema,
+access, and destructive-cleanup controls remain unconfigured, so this is not a live capability.
 
 Add `presentation_material_uploads` in the same migration. A row exists before any Graph upload
 URL leaves the server and carries:
@@ -601,8 +602,9 @@ The bounded fallback decision, only if the remaining browser matrix fails, is:
 
 ### 7.2.1 Direct-Graph performance and recovery policy (Preview benchmark passed 2026-09-25; remaining live gates pending)
 
-**[VERIFIED via commit `bab770fe6`, `shared/utils/graph-browser-upload.js`, the Preview proof
-service/harness, and 84 focused tests]** the branch now has one browser-direct transport with a
+**[VERIFIED via commit `bab770fe6`, the current `codex/feature-request` source,
+`shared/utils/graph-browser-upload.js`, the Preview proof and durable-intent adapters, and focused
+tests]** the branch now has one browser-direct transport with a
 code-owned 10 MiB default, strict sequential ranges, status-aware bounded retry, stall/response
 watchdogs, truthful progress/rate/ETA states, pause/offline/reconnect handling, and a same-browser
 lock. The Preview proof uses it and checks live Graph state after the sealed initial expiry.
@@ -684,14 +686,18 @@ logs, measurements, and persisted plaintext.
 
 Performance verification is a release gate with separate evidence levels:
 
-1. **Offline before another live run — PASS at `bab770fe6`:** 84 focused proof tests cover 10 MiB alignment and final remainder, sequential
+1. **Offline before another live run — PASS for the proof at `bab770fe6`; durable producer
+   SOURCE-BUILT/OFFLINE-TESTED 2026-09-25:** proof tests cover 10 MiB alignment and final remainder, sequential
    ranges and final commit, slow continuous progress versus true stall, abort/pause, bounded
    5xx/network and 429 retries, ambiguous commit/416 status reconciliation, terminal 404,
    refreshed expiry after initial expiry, reselect fingerprint, duplicate-tab/device attempts,
    app-route `401`/`403`/`5xx`, cancelled retry timers, and stale Request UI state. Invert the
    former tests that expected an initial-expiry 410 and a 60-second XHR timeout. They exercise the
    XHR path, protected proof resume route, encrypted permit, and exact cleanup semantics rather
-   than only a helper. The durable production intent remains a later Slice 4 implementation.
+   than only a helper. The durable production adapter now adds actor/request/visit-bound intent
+   creation, live-status resume, exact finalize, ciphertext-only session persistence, maintenance,
+   and truthful staff UI. The changed-surface run passed 16 suites / 307 tests, with the focused
+   card suite at 41 tests; no live service was invoked.
 2. **Representative desktop benchmark — PASS 2026-09-25:** on a freshly approved disposable request/target and
    approved MP4, record exact byte count, chunk policy, start/commit timestamps, active transfer
    and wall time, retry/pause count, Graph expiry changes, progress-event cadence/watchdog trips,
@@ -829,9 +835,9 @@ feature and supplies no test Request.
 |---|---|---|
 | `/api/meeting-tracker/visits/[requestId]/presentation-materials` | GET | Current Recording/Transcript/Summary winners, conflicts, supported formats, and the authenticated actor's unfinished intent descriptors; no upload secret. |
 | same | PATCH | Exact action to save/replace a Zoom link; request and actor are server-owned. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript source-built/offline-tested in Slice 3:** begin a bounded private-Blob transcript upload. Slice 4 extends the same route for browser-direct MP4 intent and Graph session creation. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | Independently reauthorize creating actor/request/visit. For an open session, verify file resume fingerprint and return the no-store URL plus `nextExpectedRanges`; for an already committed item return finalize-only state and no URL. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript source-built/offline-tested in Slice 3:** lease-fenced, request-bound finalize/recovery. Slice 4 adds the durable MP4 finalize path. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript and recording source-built/offline-tested:** transcript begins bounded private-Blob staging; recording writes an immutable durable intent before creating a browser-direct Graph session and returns the code-owned 10 MiB contract. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | **Source-built/offline-tested:** independently reauthorize creating actor/request/visit, verify the bounded local-file fingerprint, resolve the exact path, and check live Graph status. Return the no-store URL plus one validated sequential range only while live; for an exact committed item return finalize-only state and no URL. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript and recording source-built/offline-tested:** lease-fenced, request-bound finalize/recovery. MP4 re-resolves the exact stable candidate, validates bounded signature/malware facts, then uses the Recording slot fence and durable replay. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | GET current link; POST exact `ensure` or compare-and-swap `reissue`. |
 | Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection/status for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While readiness is off, return the legacy payload with `presentationMaterialsStatus: 'disabled'`, not a false empty collection; do not 503 the existing logistics read. |
 | `/api/external/presentation/[token]/context` | GET | Rate limit, verify presentation token, return minimal material descriptors. |
@@ -848,8 +854,8 @@ Suggested source ownership:
   REPRESENTATIVE CHROME PREVIEW BENCHMARK PASSED 2026-09-25]** the shared browser byte transport
   consumed by the Preview harness and later production producer;
 - `material-model.js`: backing-mode validation and latest-winner projection;
-- `material-service.js`: staff read, Zoom-link write, transcript finalize;
-- `video-upload-service.js` / `upload-store.js`: Graph intent lifecycle and recovery;
+- `material-service.js`: staff read, Zoom-link write, transcript producer, and durable MP4 mint/status/finalize;
+- `upload-intent-store.js` / `upload-session-crypto.js` / `upload-intent-cleanup.js`: encrypted Graph intent lifecycle, exact cleanup reconciliation, and daily maintenance;
 - `presentation-link-service.js` / `presentation-link-store.js`: 60-day token lifecycle;
 - `presentation-page-service.js`: external context/member resolution;
 - `lib/external/verify-presentation-token.js`: signature/digest/request/revocation checks.
@@ -1516,7 +1522,7 @@ check; it is not inferred from mocks.
 - Add the scope-specific cleanup reconciler with any-lifecycle registry binding proof, plus bound
   Superseded-retention and true-unbound discard tests.
 
-### Slice 4 — Large MP4 producer
+### Slice 4 — Large MP4 producer — SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; NOT DEPLOYED
 
 - Wire the §7.2.1 browser-direct Graph transport module already built and timed with the Preview
   harness in Slice 0 into the durable producer. It accepts a status/reauthorization adapter:
@@ -1538,6 +1544,12 @@ check; it is not inferred from mocks.
 - Wire the cleanup into the existing daily maintenance cron and expose unfinished/finish-saving
   intent states in the staff GET/UI.
 
+**[VERIFIED via source, 16 changed-surface Jest suites / 307 tests, type checking, scoped lint,
+and iterative read-only OAuth Claude Opus review]** these Slice 4 bullets are implemented on the
+feature branch. The implementation preserves fingerprint, actor/request/active-visit
+authorization, exact-item cleanup, and no-full-file-proxy contracts. It does not change the
+remaining approval-bound live gates or imply that migration 055/configuration has been applied.
+
 ### Slice 5 — Internal and external consumers
 
 - Extend the existing `reviewers`-grant Workbench logistics GET with a distinct
@@ -1557,6 +1569,11 @@ check; it is not inferred from mocks.
 - Reconcile canonical docs, Atlas, route matrix, service catalog, and session handoff.
 
 ## 13. Test matrix
+
+**[SLICE 4 OFFLINE RESULT 2026-09-25]** The durable MP4 changed surface passes 16 Jest suites /
+307 tests, including 41 focused staff-card cases. The remaining deployed-browser rows below keep
+their prior evidence level; in particular, the Chrome expiry row is still PARTIAL because no
+Graph-confirmed terminal expiry has been observed.
 
 ### Model and persistence
 
@@ -1654,6 +1671,11 @@ check; it is not inferred from mocks.
 
 ## 14. Durable surfaces and gates
 
+**[SLICE 4 SOURCE RECONCILIATION 2026-09-25]** The route matrix, service catalogue, Atlas,
+credential runbook, maintenance surface, plan, and branch handoff now describe the offline-built
+MP4 lifecycle and separate destructive-cleanup control. Gate outcomes are recorded only after the
+gate and its self-test pass sequentially; this statement is not a deployment or schema claim.
+
 Implementation must update, as applicable:
 
 - one numbered Postgres migration covering both new link/upload tables, the slot-lease table, and
@@ -1718,7 +1740,9 @@ Release order:
    Keep 302 as the
    leading resolver and the one-shot URL as the bounded fallback. The deferred Production Safari,
    long-seek, and near-cap cells remain in the Slice 0 matrix but block general release after
-   the production-safe flow exists, not coding of that flow;
+   the production-safe flow exists, not coding of that flow. **[SOURCE-BUILT/OFFLINE-TESTED
+   2026-09-25]** that durable MP4 flow now exists on `codex/feature-request`, but has not been
+   deployed, migrated, enabled, or live-tested;
 2. now remove/convert the proof harness and merge the compatibility floor: deploy-safe readers,
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
@@ -1938,6 +1962,24 @@ and overall expiry still live. Its remaining real P2 (409 followed by temporaril
 was fixed as retryable `post_presentation_candidate_unavailable`. Three earlier tool-driven Opus
 invocations stalled without reports and are not counted. No Ultrareview or other metered review
 product was used.
+
+**2026-09-25 Slice 4 offline implementation and iterative Opus review:** the durable production
+MP4 flow now reuses the shared 10 MiB browser-direct transport through a separately authorized
+adapter. It writes an actor/request/active-visit-bound intent before issuing a ciphertext-backed
+Graph session, resumes only after fingerprint and live Graph status checks, finalizes only the
+exact stable full-size item through the Recording slot fence, and exposes truthful
+confirmed/in-flight progress, rate, ETA, pause, reconnect, and Finish-saving states. The daily
+reconciler is inspect/refresh/record/alert-only unless both general access and the separate
+destructive-cleanup permission are literal `on`; exact registry bindings always retain bytes.
+Five read-only OAuth Claude Opus rounds reviewed the server lifecycle to a final no-findings
+result. Nine further read-only Opus rounds reviewed the browser/UI integration; findings about
+CSP/navigation, stale state, retry/pause semantics, error guidance, response-contract validation,
+and boundary test evidence were fixed iteratively, and Round 9 returned exactly “No findings.”
+The changed-surface run passed 16 suites / 307 tests (focused card: 41); type checking passed and
+scoped lint had zero errors. Migration, deployment, configuration, Graph-confirmed expiry,
+Production Safari, and near-cap checks remain open and approval-bound. The Test Request Factory is
+still unfinished; a future bounded live gate must use an explicitly approved human-created test
+Request. No Ultrareview or other metered review product was used.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof. The remaining decision is whether it survives the measured

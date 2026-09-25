@@ -70,6 +70,23 @@ test.each([
     .resolves.toEqual({ outcome, status });
 });
 
+test('upload-session status honors a shorter caller-owned timeout', async () => {
+  jest.useFakeTimers();
+  global.fetch.mockImplementation((_url, options) => new Promise((resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), {
+      name: 'AbortError',
+    })));
+  }));
+  const pending = GraphService.getBrowserUploadSessionStatus(
+    'https://upload.example/session-secret',
+    { timeoutMs: 25 },
+  );
+  const rejected = expect(pending).rejects.toMatchObject({ noResponse: true });
+  await jest.advanceTimersByTimeAsync(25);
+  await rejected;
+  jest.useRealTimers();
+});
+
 test('resolves one-shot media and reads only the requested signature range', async () => {
   const metadata = {
     id: 'item-1',

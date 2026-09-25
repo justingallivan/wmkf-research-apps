@@ -298,6 +298,7 @@ it('reads current file metadata by encoded stable drive and item identity', asyn
     size: 125,
     webUrl: 'https://example.sharepoint.com/current',
     eTag: '"current-etag"',
+    cTag: '"current-ctag"',
     versionId: '2.0',
     lastModified: '2026-07-31T01:33:55Z',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

@@ -15,10 +15,12 @@ export const GRAPH_UPLOAD_OFFLINE_WAIT_MS = 120_000;
 export const GRAPH_UPLOAD_MAX_NO_PROGRESS_ATTEMPTS = 3;
 export const GRAPH_UPLOAD_MAX_CONSECUTIVE_THROTTLES = 3;
 export const GRAPH_UPLOAD_MAX_THROTTLE_WAIT_MS = 120_000;
+export const GRAPH_UPLOAD_RATE_STALE_MS = 5_000;
 
 const DEFAULT_BACKOFF_BASE_MS = 1_000;
 const DEFAULT_BACKOFF_CAP_MS = 30_000;
 const DEFAULT_RATE_SAMPLE_MS = 1_000;
+const FINGERPRINT_EDGE_BYTES = 1024 * 1024;
 
 function abortError() {
   const error = new Error('Upload stopped.');
@@ -34,6 +36,25 @@ export class GraphBrowserUploadError extends Error {
     this.status = status;
     this.retryAfterMs = retryAfterMs;
   }
+}
+
+/** Bind a resumed local file to its size and edge bytes without reading the full media file. */
+export async function fingerprintGraphBrowserUploadFile(file, subtle = globalThis.crypto?.subtle) {
+  if (!file || !Number.isInteger(file.size) || file.size <= 0 || !subtle?.digest) {
+    throw new Error('The selected file cannot be verified for resume.');
+  }
+  const edge = Math.min(file.size, FINGERPRINT_EDGE_BYTES);
+  const [first, last] = await Promise.all([
+    file.slice(0, edge).arrayBuffer(),
+    file.slice(file.size - edge, file.size).arrayBuffer(),
+  ]);
+  const prefix = new TextEncoder().encode(`${file.size}:`);
+  const input = new Uint8Array(prefix.byteLength + first.byteLength + last.byteLength);
+  input.set(prefix);
+  input.set(new Uint8Array(first), prefix.byteLength);
+  input.set(new Uint8Array(last), prefix.byteLength + first.byteLength);
+  const digest = new Uint8Array(await subtle.digest('SHA-256', input));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function parseNextExpectedStart(ranges) {
@@ -72,25 +93,40 @@ function retryAfterMs(value, nowMs) {
   return Number.isFinite(at) ? Math.max(0, at - nowMs) : null;
 }
 
-function sleepWithSignal(ms, signal, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout) {
-  if (ms <= 0) return Promise.resolve();
+function sleepWithSignal(ms, signal, pauseSignal, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout) {
+  if (ms <= 0) return Promise.resolve(true);
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(abortError());
-    const timer = setTimeoutImpl(() => {
+    if (pauseSignal?.aborted) return resolve(false);
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeoutImpl(timer);
       signal?.removeEventListener('abort', onAbort);
-      resolve();
+      pauseSignal?.removeEventListener('abort', onPause);
+      resolve(value);
+    };
+    const timer = setTimeoutImpl(() => {
+      finish(true);
     }, ms);
     const onAbort = () => {
+      if (settled) return;
+      settled = true;
       clearTimeoutImpl(timer);
+      pauseSignal?.removeEventListener('abort', onPause);
       reject(abortError());
     };
+    const onPause = () => finish(false);
     signal?.addEventListener('abort', onAbort, { once: true });
+    pauseSignal?.addEventListener('abort', onPause, { once: true });
   });
 }
 
 export function waitForBrowserOnline({
   timeoutMs = GRAPH_UPLOAD_OFFLINE_WAIT_MS,
   signal,
+  pauseSignal,
   windowObject = globalThis.window,
   navigatorObject = globalThis.navigator,
   setTimeoutImpl = setTimeout,
@@ -99,6 +135,7 @@ export function waitForBrowserOnline({
   if (navigatorObject?.onLine !== false) return Promise.resolve(true);
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(abortError());
+    if (pauseSignal?.aborted) return resolve('paused');
     let settled = false;
     const finish = (value) => {
       if (settled) return;
@@ -106,6 +143,7 @@ export function waitForBrowserOnline({
       clearTimeoutImpl(timer);
       windowObject?.removeEventListener?.('online', onOnline);
       signal?.removeEventListener('abort', onAbort);
+      pauseSignal?.removeEventListener('abort', onPause);
       resolve(value);
     };
     const onOnline = () => finish(true);
@@ -116,9 +154,11 @@ export function waitForBrowserOnline({
       windowObject?.removeEventListener?.('online', onOnline);
       reject(abortError());
     };
+    const onPause = () => finish('paused');
     const timer = setTimeoutImpl(() => finish(false), timeoutMs);
     windowObject?.addEventListener?.('online', onOnline, { once: true });
     signal?.addEventListener('abort', onAbort, { once: true });
+    pauseSignal?.addEventListener('abort', onPause, { once: true });
   });
 }
 
@@ -151,6 +191,7 @@ function uploadFragmentWithXhr({
   xhrFactory,
   stallTimeoutMs,
   responseTimeoutMs,
+  rateStaleMs,
   onUploadProgress,
   setTimeoutImpl,
   clearTimeoutImpl,
@@ -162,12 +203,15 @@ function uploadFragmentWithXhr({
     let settled = false;
     let stallTimer = null;
     let responseTimer = null;
+    let rateStaleTimer = null;
     let lastLoaded = 0;
     const clearTimers = () => {
       if (stallTimer !== null) clearTimeoutImpl(stallTimer);
       if (responseTimer !== null) clearTimeoutImpl(responseTimer);
+      if (rateStaleTimer !== null) clearTimeoutImpl(rateStaleTimer);
       stallTimer = null;
       responseTimer = null;
+      rateStaleTimer = null;
     };
     const finish = (callback, value) => {
       if (settled) return;
@@ -198,6 +242,14 @@ function uploadFragmentWithXhr({
         'Microsoft did not confirm the uploaded fragment in time.',
       ), responseTimeoutMs);
     };
+    const resetRateStaleTimer = () => {
+      if (settled) return;
+      if (rateStaleTimer !== null) clearTimeoutImpl(rateStaleTimer);
+      rateStaleTimer = setTimeoutImpl(() => {
+        rateStaleTimer = null;
+        onUploadProgress(lastLoaded, { rateStale: true });
+      }, rateStaleMs);
+    };
     const onSignalAbort = () => xhr.abort();
     xhr.onload = () => finish(resolve, {
       ok: xhr.status >= 200 && xhr.status < 300,
@@ -227,7 +279,8 @@ function uploadFragmentWithXhr({
         if (loaded <= lastLoaded) return;
         lastLoaded = loaded;
         resetStallTimer();
-        onUploadProgress(loaded);
+        resetRateStaleTimer();
+        onUploadProgress(loaded, { rateStale: false });
       };
       xhr.upload.onload = () => {
         if (settled) return;
@@ -242,6 +295,7 @@ function uploadFragmentWithXhr({
       xhr.timeout = 0;
       xhr.setRequestHeader('Content-Range', contentRange);
       resetStallTimer();
+      resetRateStaleTimer();
       xhr.send(body);
     } catch (error) {
       finish(reject, error);
@@ -293,6 +347,7 @@ export async function uploadBrowserDirectGraphFile({
   start = 0,
   chunkBytes = GRAPH_UPLOAD_DEFAULT_CHUNK_BYTES,
   signal,
+  pauseSignal,
   shouldPause = () => false,
   onState = () => {},
   authorizeStatus,
@@ -306,11 +361,12 @@ export async function uploadBrowserDirectGraphFile({
   backoffBaseMs = DEFAULT_BACKOFF_BASE_MS,
   backoffCapMs = DEFAULT_BACKOFF_CAP_MS,
   minimumRateSampleMs = DEFAULT_RATE_SAMPLE_MS,
+  rateStaleMs = GRAPH_UPLOAD_RATE_STALE_MS,
   now = () => Date.now(),
   random = Math.random,
   isOnline = () => globalThis.navigator?.onLine !== false,
   waitForOnline = (options) => waitForBrowserOnline(options),
-  sleep = (ms, sleepSignal) => sleepWithSignal(ms, sleepSignal),
+  sleep = (ms, sleepSignal, waitPauseSignal) => sleepWithSignal(ms, sleepSignal, waitPauseSignal),
   setTimeoutImpl = setTimeout,
   clearTimeoutImpl = clearTimeout,
 }) {
@@ -325,7 +381,8 @@ export async function uploadBrowserDirectGraphFile({
     throw new Error('The upload resume position is invalid.');
   }
   for (const value of [stallTimeoutMs, responseTimeoutMs, offlineWaitMs, maxNoProgressAttempts,
-    maxConsecutiveThrottles, maxThrottleWaitMs, backoffBaseMs, backoffCapMs, minimumRateSampleMs]) {
+    maxConsecutiveThrottles, maxThrottleWaitMs, backoffBaseMs, backoffCapMs, minimumRateSampleMs,
+    rateStaleMs]) {
     if (!Number.isInteger(value) || value <= 0) throw new Error('The upload retry policy is invalid.');
   }
 
@@ -417,7 +474,8 @@ export async function uploadBrowserDirectGraphFile({
     if (shouldPause()) return pauseResult('requested');
     if (!isOnline()) {
       emit('reconnecting', { reason: 'offline', etaSeconds: null });
-      const online = await waitForOnline({ timeoutMs: offlineWaitMs, signal });
+      const online = await waitForOnline({ timeoutMs: offlineWaitMs, signal, pauseSignal });
+      if (online === 'paused' || shouldPause()) return pauseResult('requested');
       if (!online) return pauseResult('offline_timeout');
       emit('reconnecting', { reason: 'online_status_check', etaSeconds: null });
       const live = await reconcile({ reason: 'online', countNoProgress: false });
@@ -440,17 +498,18 @@ export async function uploadBrowserDirectGraphFile({
         xhrFactory,
         stallTimeoutMs,
         responseTimeoutMs,
+        rateStaleMs,
         setTimeoutImpl,
         clearTimeoutImpl,
         now,
-        onUploadProgress: (loaded) => {
+        onUploadProgress: (loaded, { rateStale = false } = {}) => {
           const pausing = shouldPause();
           const metrics = transferMetrics({
             confirmedBytes: offset,
             inFlightBytes: Math.min(offset + loaded, endExclusive),
             totalBytes: file.size,
             rateConfirmedBytes,
-            rateActiveMs: rateActiveMs + Math.max(0, now() - fragmentStart),
+            rateActiveMs,
             minimumRateSampleMs,
           });
           onState({
@@ -458,7 +517,9 @@ export async function uploadBrowserDirectGraphFile({
             ...metrics,
             // Rate and ETA are based only on confirmed bytes; pausing leaves
             // the current in-flight fragment explicitly non-durable.
-            etaSeconds: pausing ? null : metrics.etaSeconds,
+            mbps: rateStale ? null : metrics.mbps,
+            etaSeconds: pausing || rateStale ? null : metrics.etaSeconds,
+            rateStale,
             expiresAt,
           });
         },
@@ -472,7 +533,10 @@ export async function uploadBrowserDirectGraphFile({
       if (!live.progressed) {
         const delay = retryDelay(noProgressAttempts, backoffBaseMs, backoffCapMs, random);
         emit('reconnecting', { reason: 'backoff', retryInMs: delay, etaSeconds: null });
-        await sleep(delay, signal);
+        const waited = pauseSignal
+          ? await sleep(delay, signal, pauseSignal)
+          : await sleep(delay, signal);
+        if (waited === false || shouldPause()) return pauseResult('requested');
       }
       continue;
     }
@@ -525,7 +589,10 @@ export async function uploadBrowserDirectGraphFile({
       emit('reconnecting', { reason: 'throttled', retryInMs: delay, etaSeconds: null });
       // Retry-After governs the next Graph status or PUT request, not just
       // the next fragment PUT.
-      await sleep(delay, signal);
+      const waited = pauseSignal
+        ? await sleep(delay, signal, pauseSignal)
+        : await sleep(delay, signal);
+      if (waited === false || shouldPause()) return pauseResult('requested');
     } else {
       consecutiveThrottles = 0;
     }
@@ -536,7 +603,10 @@ export async function uploadBrowserDirectGraphFile({
     if (!live.progressed && response.status !== 429) {
       const delay = retryDelay(noProgressAttempts, backoffBaseMs, backoffCapMs, random);
       emit('reconnecting', { reason: 'backoff', retryInMs: delay, etaSeconds: null });
-      await sleep(delay, signal);
+      const waited = pauseSignal
+        ? await sleep(delay, signal, pauseSignal)
+        : await sleep(delay, signal);
+      if (waited === false || shouldPause()) return pauseResult('requested');
     }
   }
 

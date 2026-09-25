@@ -5,7 +5,10 @@ import { withDalContext } from '../../../../../../../lib/dataverse/core/context'
 import { isGuid } from '../../../../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../../../../lib/services/service-http-error';
 import { isMeetingTrackerSchemaReady } from '../../../../../../../shared/config/meetingTracker';
-import { finalizeTranscriptUpload } from '../../../../../../../lib/services/post-presentation-materials/material-service';
+import {
+  finalizeMp4Upload,
+  finalizeTranscriptUpload,
+} from '../../../../../../../lib/services/post-presentation-materials/material-service';
 import {
   PORTAL_UPLOAD_SCOPES,
   PortalUploadStagingError,
@@ -75,6 +78,21 @@ export default async function handler(req, res) {
   }
   res.setHeader('Cache-Control', 'private, no-store');
 
+  const actorId = actorRefFromSession(access.session);
+  try {
+    const result = await withDalContext('meeting-tracker-presentation-mp4-finalize', () =>
+      finalizeMp4Upload({ requestId, uploadId: stagingId, actingUserSystemId: actorId }));
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    if (!(error instanceof ServiceHttpError) || error.code !== 'post_presentation_upload_not_found') {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body || { error: error.message, code: error.code });
+      }
+      console.error('[meeting tracker recording upload finalize] failed:', error?.message || error);
+      return res.status(503).json({ error: 'The recording upload could not be finalized.' });
+    }
+  }
+
   let claim;
   try {
     claim = await claimPortalUpload({
@@ -116,7 +134,7 @@ export default async function handler(req, res) {
         requestId,
         stagingId,
         actorProfileId: access.profileId,
-        actingUserSystemId: actorRefFromSession(access.session),
+        actingUserSystemId: actorId,
         file,
       }));
     const body = { success: true, ...result };

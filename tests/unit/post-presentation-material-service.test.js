@@ -7,8 +7,11 @@ jest.mock('../../lib/services/portal-upload-staging.js', () => ({
 }));
 
 import {
+  finalizeMp4Upload,
   finalizeTranscriptUpload,
+  getMp4UploadStatus,
   getPresentationMaterials,
+  mintMp4Upload,
   mintTranscriptUpload,
   saveZoomRecording,
 } from '../../lib/services/post-presentation-materials/material-service.js';
@@ -66,6 +69,51 @@ function transcript(id, fence, overrides = {}) {
   };
 }
 
+function mp4Recording(id, fence, overrides = {}) {
+  return recording(id, fence, {
+    wmkf_externalurl: null,
+    wmkf_generationkey: 'b'.repeat(64),
+    wmkf_inputfingerprint: 'a'.repeat(64),
+    wmkf_sharepointsiteid: 'site',
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'item',
+    wmkf_sharepointversionid: '1.0',
+    wmkf_sharepointetag: 'etag',
+    wmkf_sharepointfolderpath: '1003220/Post Site Visit Materials',
+    wmkf_filename: `1003220-Recording-${OPERATION_ID}.mp4`,
+    wmkf_contenttype: 'video/mp4',
+    wmkf_filesize: 100,
+    ...overrides,
+  });
+}
+
+function mp4Intent(overrides = {}) {
+  return {
+    id: OPERATION_ID,
+    request_id: REQUEST_ID,
+    site_visit_id: VISIT_ID,
+    actor_id: ACTOR_ID,
+    artifact_type: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING,
+    original_display_filename: 'recording.mp4',
+    validated_mime_type: 'video/mp4',
+    declared_size: 100,
+    client_resume_fingerprint: 'a'.repeat(64),
+    library_name: 'akoya_request',
+    folder_path: '1003220/Post Site Visit Materials',
+    physical_filename: `1003220-Recording-${OPERATION_ID}.mp4`,
+    generation_key: 'b'.repeat(64),
+    state: 'initiated',
+    upload_url_ciphertext: 'sealed-upload-url',
+    upload_session_expires_at: '2026-09-25T11:00:00Z',
+    intent_expires_at: '2026-09-28T12:00:00Z',
+    candidate_item_id: null,
+    request_document_id: null,
+    created_at: '2026-09-25T12:00:00Z',
+    updated_at: '2026-09-25T12:00:00Z',
+    ...overrides,
+  };
+}
+
 function deps(overrides = {}) {
   return {
     schemaReady: jest.fn(() => true),
@@ -86,7 +134,7 @@ function deps(overrides = {}) {
     getSharePointBuckets: jest.fn(async () => ([{
       source: 'dynamics', library: 'akoya_request', folder: '1003220',
     }])),
-    ensureFolderPath: jest.fn(async () => ({})),
+    ensureFolderPath: jest.fn(async () => ({ siteId: 'site', driveId: 'drive' })),
     uploadFile: jest.fn(async (_library, _folder, filename, buffer) => ({
       siteId: 'site', driveId: 'drive', id: 'item', name: filename,
       size: buffer.length, versionId: '1.0', eTag: 'etag', webUrl: 'https://example.test/file',
@@ -98,11 +146,36 @@ function deps(overrides = {}) {
     })),
     getFileMetadataByPath: jest.fn(async () => null),
     downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-1.7') })),
+    createBrowserUploadSession: jest.fn(async () => ({
+      siteId: 'site', driveId: 'drive', uploadUrl: 'https://upload.example/session',
+      expiresAt: '2026-09-25T13:00:00Z', nextExpectedRanges: ['0-'],
+    })),
+    getBrowserUploadSessionStatus: jest.fn(async () => ({
+      expiresAt: '2026-09-25T14:00:00Z', nextExpectedRanges: ['10-'],
+    })),
+    readMediaRange: jest.fn(async () => ({
+      mimeType: 'video/mp4', malware: null,
+      bytes: Buffer.concat([Buffer.alloc(4), Buffer.from('ftyp'), Buffer.alloc(24)]),
+    })),
     scanEnabled: jest.fn(() => false),
     scanBytes: jest.fn(async () => ({ scanResult: 'clean' })),
     createPortalUpload: jest.fn(async (args) => ({ stagingId: STAGING_ID, ...args })),
     recordPortalUploadCandidate: jest.fn(async () => ({})),
     renewPortalUploadLease: jest.fn(async () => ({ id: STAGING_ID })),
+    getUploadIntent: jest.fn(async () => null),
+    listUploadIntents: jest.fn(async () => []),
+    insertUploadIntent: jest.fn(async (row) => ({ ...row, state: 'initiated' })),
+    recordUploadSession: jest.fn(async () => ({ id: OPERATION_ID })),
+    refreshUploadSession: jest.fn(async () => ({ id: OPERATION_ID })),
+    markUploadFailed: jest.fn(async () => ({})),
+    markUploadSessionClosed: jest.fn(async () => ({})),
+    recordUploadCandidate: jest.fn(async () => ({ id: OPERATION_ID })),
+    claimUploadIntent: jest.fn(async () => ({ state: 'not_found' })),
+    renewUploadLease: jest.fn(async () => ({ id: OPERATION_ID })),
+    releaseUploadIntent: jest.fn(async () => ({})),
+    completeUploadIntent: jest.fn(async () => ({ id: OPERATION_ID, state: 'finalized' })),
+    sealUploadUrl: jest.fn(() => 'sealed-upload-url'),
+    openUploadUrl: jest.fn(() => 'https://upload.example/session'),
     acquireSlotLease: jest.fn(async () => ({ fence_version: 7 })),
     getSlotLease: jest.fn(async () => null),
     renewSlotLease: jest.fn(async () => ({ fence_version: 7 })),
@@ -110,6 +183,7 @@ function deps(overrides = {}) {
     recordEvent: jest.fn(async () => ({})),
     randomUUID: jest.fn(() => '77777777-7777-4777-8777-777777777777'),
     now: jest.fn(() => new Date('2026-09-25T12:00:00Z')),
+    sleep: jest.fn(async () => {}),
     ...overrides,
   };
 }
@@ -122,6 +196,34 @@ test('GET fails closed on readiness/access and requires exactly one active visit
   await expect(getPresentationMaterials({ requestId: REQUEST_ID }, deps({
     findActiveSiteVisit: jest.fn(async () => ({ records: [] })),
   }))).rejects.toMatchObject({ code: 'post_presentation_site_visit_required' });
+});
+
+test('GET exposes an expired finalizer for recovery but not a live finalizer', async () => {
+  const d = deps({
+    listUploadIntents: jest.fn(async () => ([
+      mp4Intent({
+        state: 'finalizing',
+        lease_expires_at: '2026-09-25T11:59:59Z',
+      }),
+      mp4Intent({
+        id: '99999999-9999-4999-8999-999999999999',
+        state: 'finalizing',
+        lease_expires_at: '2026-09-25T12:05:00Z',
+      }),
+    ])),
+  });
+  const result = await getPresentationMaterials({
+    requestId: REQUEST_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, d);
+  expect(result.uploads).toEqual([
+    expect.objectContaining({ uploadId: OPERATION_ID, state: 'finalizing', canFinalize: true }),
+    expect.objectContaining({
+      uploadId: '99999999-9999-4999-8999-999999999999',
+      state: 'finalizing',
+      canFinalize: false,
+    }),
+  ]);
 });
 
 test('Zoom save derives all governed fields, fences every mutation, and supersedes only the captured predecessor', async () => {
@@ -745,4 +847,392 @@ test('an old transcript retry supersedes only its recovered row and preserves th
   }));
   expect(result.materials[0].artifactId).toBe(NEW_ID);
   expect(result.reconciliationRequired).toBe(false);
+});
+
+test('MP4 begin persists the actor/request/visit/file intent before exposing a Graph session URL', async () => {
+  const d = deps();
+  const result = await mintMp4Upload({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    filename: 'recording.mp4',
+    contentType: 'video/mp4',
+    size: 100,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d);
+  expect(d.insertUploadIntent).toHaveBeenCalledWith(expect.objectContaining({
+    id: OPERATION_ID,
+    requestId: REQUEST_ID,
+    siteVisitId: VISIT_ID,
+    actorId: ACTOR_ID,
+    artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING,
+    declaredSize: 100,
+    clientResumeFingerprint: 'a'.repeat(64),
+    physicalFilename: `1003220-Recording-${OPERATION_ID}.mp4`,
+  }));
+  expect(d.insertUploadIntent.mock.invocationCallOrder[0])
+    .toBeLessThan(d.createBrowserUploadSession.mock.invocationCallOrder[0]);
+  expect(d.recordUploadSession).toHaveBeenCalledWith(expect.objectContaining({
+    uploadId: OPERATION_ID,
+    uploadUrlCiphertext: 'sealed-upload-url',
+    expiresAt: '2026-09-25T13:00:00.000Z',
+    intentExpiresAt: '2026-09-28T13:00:00.000Z',
+  }));
+  expect(result).toMatchObject({
+    uploadId: OPERATION_ID,
+    uploadUrl: 'https://upload.example/session',
+    nextExpectedRanges: ['0-'],
+    chunkBytes: 10 * 1024 * 1024,
+  });
+});
+
+test('MP4 begin reports a failed session-creation replay as terminal instead of resumable', async () => {
+  const d = deps({
+    getUploadIntent: jest.fn(async () => mp4Intent({
+      state: 'failed',
+      upload_url_ciphertext: null,
+    })),
+  });
+  await expect(mintMp4Upload({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    filename: 'recording.mp4',
+    contentType: 'video/mp4',
+    size: 100,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d)).rejects.toMatchObject({
+    code: 'post_presentation_upload_failed',
+    httpStatus: 409,
+    body: expect.objectContaining({ retryable: false }),
+  });
+  expect(d.createBrowserUploadSession).not.toHaveBeenCalled();
+});
+
+test('MP4 resume ignores sealed initial expiry, checks live Graph status, and refreshes review-after', async () => {
+  const d = deps({ getUploadIntent: jest.fn(async () => mp4Intent()) });
+  const result = await getMp4UploadStatus({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d);
+  expect(d.getBrowserUploadSessionStatus).toHaveBeenCalledWith('https://upload.example/session');
+  expect(d.refreshUploadSession).toHaveBeenCalledWith({
+    uploadId: OPERATION_ID,
+    requestId: REQUEST_ID,
+    actorId: ACTOR_ID,
+    expiresAt: '2026-09-25T14:00:00.000Z',
+    intentExpiresAt: '2026-09-28T14:00:00.000Z',
+  });
+  expect(result).toMatchObject({
+    complete: false,
+    uploadUrl: 'https://upload.example/session',
+    nextExpectedRanges: ['10-'],
+  });
+});
+
+test('MP4 resume rejects a different edge fingerprint before Graph or path access', async () => {
+  const d = deps({ getUploadIntent: jest.fn(async () => mp4Intent()) });
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'c'.repeat(64),
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_resume_fingerprint_mismatch' });
+  expect(d.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(d.getBrowserUploadSessionStatus).not.toHaveBeenCalled();
+});
+
+test('MP4 resume exposes Finish saving when the exact full-size item is stable', async () => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0', webUrl: 'https://example.test/item',
+    lastModified: '2026-09-25T12:30:00Z',
+  };
+  const d = deps({
+    getUploadIntent: jest.fn(async () => mp4Intent()),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => ({ ...pathItem })),
+  });
+  const result = await getMp4UploadStatus({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d);
+  expect(result).toMatchObject({ complete: true, canFinalize: true, uploadId: OPERATION_ID });
+  expect(d.recordUploadCandidate).toHaveBeenCalledWith(expect.objectContaining({
+    uploadId: OPERATION_ID,
+    candidate: expect.objectContaining({ driveId: 'drive', itemId: 'item', size: 100 }),
+    leaseToken: null,
+  }));
+  expect(d.getBrowserUploadSessionStatus).not.toHaveBeenCalled();
+});
+
+test('MP4 status refuses to overwrite an active finalizer candidate', async () => {
+  const d = deps({
+    getUploadIntent: jest.fn(async () => mp4Intent({
+      state: 'finalizing',
+      lease_token: 'live-finalizer',
+      lease_expires_at: '2026-09-25T12:05:00Z',
+    })),
+  });
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d)).rejects.toMatchObject({
+    code: 'post_presentation_finalize_in_progress',
+    body: expect.objectContaining({ retryable: true }),
+  });
+  expect(d.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(d.recordUploadCandidate).not.toHaveBeenCalled();
+});
+
+test('MP4 status recovers an expired finalizer when the exact item is stable', async () => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0', webUrl: 'https://example.test/item',
+  };
+  const d = deps({
+    getUploadIntent: jest.fn(async () => mp4Intent({
+      state: 'finalizing',
+      lease_token: 'expired-finalizer',
+      lease_expires_at: '2026-09-25T11:59:59Z',
+    })),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => ({ ...pathItem })),
+  });
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d)).resolves.toMatchObject({ complete: true, canFinalize: true });
+  expect(d.recordUploadCandidate).toHaveBeenCalledWith(expect.objectContaining({
+    uploadId: OPERATION_ID,
+    leaseToken: null,
+  }));
+});
+
+test('MP4 stability uses cTag locally when the stable read has no publication version', async () => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', cTag: 'ctag-version', versionId: 'ctag-version',
+    webUrl: 'https://example.test/item',
+  };
+  const d = deps({
+    getUploadIntent: jest.fn(async () => mp4Intent()),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => ({
+      ...pathItem,
+      versionId: null,
+      cTag: 'ctag-version',
+    })),
+  });
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d)).resolves.toMatchObject({ complete: true, canFinalize: true });
+  expect(d.recordUploadCandidate).toHaveBeenCalledWith(expect.objectContaining({
+    candidate: expect.objectContaining({ versionId: 'ctag-version' }),
+  }));
+});
+
+test('Graph-confirmed MP4 session expiry is persisted as terminal only after exact-item rechecks', async () => {
+  const gone = Object.assign(new Error('gone'), { status: 410 });
+  const d = deps({
+    getUploadIntent: jest.fn(async () => mp4Intent()),
+    getBrowserUploadSessionStatus: jest.fn(async () => { throw gone; }),
+  });
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_session_expired', httpStatus: 410 });
+  expect(d.getFileMetadataByPath).toHaveBeenCalledTimes(3);
+  expect(d.sleep).toHaveBeenNthCalledWith(1, 2_000);
+  expect(d.sleep).toHaveBeenNthCalledWith(2, 8_000);
+  expect(d.markUploadSessionClosed).toHaveBeenCalledWith(expect.objectContaining({
+    uploadId: OPERATION_ID,
+    lastError: 'session_expired',
+  }));
+});
+
+test('MP4 finalize validates the bounded signature and records the candidate before Dataverse', async () => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0', webUrl: 'https://example.test/item',
+    lastModified: '2026-09-25T12:30:00Z',
+  };
+  const claimed = mp4Intent({ state: 'finalizing', lease_token: 'intent-lease' });
+  const d = deps({
+    claimUploadIntent: jest.fn(async () => ({ state: 'claimed', row: claimed, leaseToken: 'intent-lease' })),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => ({ ...pathItem })),
+    findDocuments: jest.fn()
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [] }),
+  });
+  const result = await finalizeMp4Upload({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, d);
+  expect(d.readMediaRange).toHaveBeenCalledWith('drive', 'item', { start: 0, end: 31 });
+  expect(d.recordUploadCandidate.mock.invocationCallOrder[0])
+    .toBeLessThan(d.createDocument.mock.invocationCallOrder[0]);
+  expect(d.acquireSlotLease).toHaveBeenCalledWith(expect.objectContaining({
+    requestId: REQUEST_ID,
+    artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING,
+    leaseToken: OPERATION_ID,
+  }));
+  expect(d.createDocument).toHaveBeenCalledWith(expect.objectContaining({
+    wmkf_contenttype: 'video/mp4',
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'item',
+    wmkf_filesize: 100,
+  }), expect.objectContaining({ actorPolicy: 'required' }));
+  expect(d.completeUploadIntent).toHaveBeenCalledWith({
+    uploadId: OPERATION_ID,
+    leaseToken: 'intent-lease',
+    requestDocumentId: NEW_ID,
+  });
+  expect(result).toMatchObject({ uploadId: OPERATION_ID, requestDocumentId: NEW_ID });
+});
+
+test('MP4 finalize refuses an incomplete placeholder before Request Document creation', async () => {
+  const d = deps({
+    claimUploadIntent: jest.fn(async () => ({
+      state: 'claimed', row: mp4Intent({ state: 'finalizing' }), leaseToken: 'intent-lease',
+    })),
+    getFileMetadataByPath: jest.fn(async () => ({
+      siteId: 'site', driveId: 'drive', id: 'partial',
+      name: `1003220-Recording-${OPERATION_ID}.mp4`, size: 50,
+    })),
+  });
+  await expect(finalizeMp4Upload({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_incomplete' });
+  expect(d.createDocument).not.toHaveBeenCalled();
+  expect(d.releaseUploadIntent).toHaveBeenCalledWith(expect.objectContaining({
+    uploadId: OPERATION_ID,
+    leaseToken: 'intent-lease',
+  }));
+});
+
+test('an old MP4 retry supersedes only its recovered row and preserves the newer winner', async () => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0', webUrl: 'https://example.test/item',
+  };
+  const recovered = mp4Recording(OLD_ID, 7);
+  const newer = mp4Recording(NEW_ID, 8, {
+    wmkf_generationkey: 'c'.repeat(64),
+    wmkf_sharepointitemid: 'newer-item',
+  });
+  const d = deps({
+    claimUploadIntent: jest.fn(async () => ({
+      state: 'claimed', row: mp4Intent({ state: 'finalizing' }), leaseToken: 'intent-lease',
+    })),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => ({ ...pathItem })),
+    acquireSlotLease: jest.fn(async () => ({ fence_version: 9 })),
+    renewSlotLease: jest.fn(async () => ({ fence_version: 9 })),
+    findDocumentByGenerationKey: jest.fn(async () => ({ records: [recovered] })),
+    findDocuments: jest.fn(async () => ({ records: [recovered, newer] })),
+  });
+  const result = await finalizeMp4Upload({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, d);
+  expect(d.createDocument).not.toHaveBeenCalled();
+  expect(d.updateDocument).toHaveBeenCalledTimes(1);
+  expect(d.updateDocument).toHaveBeenCalledWith(OLD_ID, expect.objectContaining({
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+  }), expect.any(Object));
+  expect(d.completeUploadIntent).toHaveBeenCalledWith(expect.objectContaining({ requestDocumentId: OLD_ID }));
+  expect(result).toMatchObject({ replayed: true, requestDocumentId: OLD_ID });
+  expect(result.materials[0].artifactId).toBe(NEW_ID);
+});
+
+test('an old MP4 retry records reconciliation if its intent lease is lost after the registry mutation', async () => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0', webUrl: 'https://example.test/item',
+  };
+  const recovered = mp4Recording(OLD_ID, 7);
+  const newer = mp4Recording(NEW_ID, 8, {
+    wmkf_generationkey: 'c'.repeat(64),
+    wmkf_sharepointitemid: 'newer-item',
+  });
+  const d = deps({
+    claimUploadIntent: jest.fn(async () => ({
+      state: 'claimed', row: mp4Intent({ state: 'finalizing' }), leaseToken: 'intent-lease',
+    })),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => ({ ...pathItem })),
+    acquireSlotLease: jest.fn(async () => ({ fence_version: 9 })),
+    renewSlotLease: jest.fn(async () => ({ fence_version: 9 })),
+    renewUploadLease: jest.fn()
+      .mockResolvedValueOnce({ id: OPERATION_ID })
+      .mockResolvedValueOnce({ id: OPERATION_ID })
+      .mockResolvedValueOnce({ id: OPERATION_ID })
+      .mockResolvedValueOnce({ id: OPERATION_ID })
+      .mockResolvedValueOnce(null),
+    findDocumentByGenerationKey: jest.fn(async () => ({ records: [recovered] })),
+    findDocuments: jest.fn(async () => ({ records: [recovered, newer] })),
+  });
+  await expect(finalizeMp4Upload({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_lease_lost' });
+  expect(d.updateDocument).toHaveBeenCalledWith(OLD_ID, expect.any(Object), expect.any(Object));
+  expect(d.completeUploadIntent).not.toHaveBeenCalled();
+  expect(d.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'post_presentation_material_reconciliation_required',
+    stage: 'stale-retry-finalize',
+    entityRefs: expect.objectContaining({ requestDocumentId: OLD_ID }),
+  }));
+});
+
+test('MP4 predecessor failure finalizes the winner and reports reconciliation', async () => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0', webUrl: 'https://example.test/item',
+  };
+  const old = mp4Recording(OLD_ID, 6, { wmkf_generationkey: 'old'.padEnd(64, '0') });
+  const current = mp4Recording(NEW_ID, 7);
+  const d = deps({
+    claimUploadIntent: jest.fn(async () => ({
+      state: 'claimed', row: mp4Intent({ state: 'finalizing' }), leaseToken: 'intent-lease',
+    })),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => ({ ...pathItem })),
+    findDocuments: jest.fn()
+      .mockResolvedValueOnce({ records: [old] })
+      .mockResolvedValueOnce({ records: [old, current] }),
+    updateDocument: jest.fn(async () => { throw new Error('Dataverse unavailable'); }),
+  });
+  await expect(finalizeMp4Upload({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, d)).resolves.toMatchObject({
+    requestDocumentId: NEW_ID,
+    reconciliationRequired: true,
+  });
+  expect(d.completeUploadIntent).toHaveBeenCalled();
+  expect(d.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    stage: 'predecessor-supersede',
+  }));
 });

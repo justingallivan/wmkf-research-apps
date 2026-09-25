@@ -190,6 +190,26 @@ describe('proxy CSP function', () => {
     expect(production.headers.get('Content-Security-Policy')).not.toContain('sharepoint.com');
   });
 
+  test('the exact production Meeting Tracker visit page can connect to Microsoft upload origins', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    const requestId = '11111111-1111-4111-8111-111111111111';
+    const upload = proxyFn(makeReq({}, `https://applications.example/meeting-tracker/visits/${requestId}`));
+    const connectSrc = upload.headers.get('Content-Security-Policy')
+      .split('; ').find(d => d.startsWith('connect-src'));
+    expect(connectSrc).toContain('https://*.up.1drv.com');
+    expect(connectSrc).toContain('https://appriver3651007194.sharepoint.com');
+
+    for (const url of [
+      `https://applications.example/meeting-tracker/visits/${requestId}/extra`,
+      'https://applications.example/meeting-tracker/visits/',
+      'https://applications.example/meeting-tracker',
+    ]) {
+      const sibling = proxyFn(makeReq({}, url));
+      expect(sibling.headers.get('Content-Security-Policy')).not.toContain('up.1drv.com');
+    }
+  });
+
   test('presentation playback proof alone can load media from the canonical SharePoint tenant', () => {
     process.env.NODE_ENV = 'production';
     process.env.VERCEL_ENV = 'preview';

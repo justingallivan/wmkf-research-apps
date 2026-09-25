@@ -9,8 +9,11 @@ jest.mock('../../shared/config/meetingTracker', () => ({
   isMeetingTrackerSchemaReady: jest.fn(() => true),
 }));
 jest.mock('../../lib/services/post-presentation-materials/material-service', () => ({
+  finalizeMp4Upload: jest.fn(),
   finalizeTranscriptUpload: jest.fn(),
+  getMp4UploadStatus: jest.fn(),
   getPresentationMaterials: jest.fn(),
+  mintMp4Upload: jest.fn(),
   mintTranscriptUpload: jest.fn(),
   saveZoomRecording: jest.fn(),
 }));
@@ -46,7 +49,10 @@ jest.mock('../../lib/services/deliberation-briefing/briefing-page-service', () =
 import { requireAppAccess } from '../../lib/utils/auth';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import {
+  finalizeMp4Upload,
   finalizeTranscriptUpload,
+  getMp4UploadStatus,
+  mintMp4Upload,
   mintTranscriptUpload,
   saveZoomRecording,
 } from '../../lib/services/post-presentation-materials/material-service';
@@ -63,6 +69,7 @@ import { resolveBriefingMediaMember } from '../../lib/services/deliberation-brie
 import presentationMaterialsHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-materials';
 import presentationUploadsHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-uploads';
 import presentationUploadFinalizeHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize';
+import presentationUploadResumeHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume';
 import briefingOpenHandler from '../../pages/api/external/briefing/[token]/open';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -85,6 +92,11 @@ function response() {
 beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ profileId: 42, session: { user: { dynamicsSystemuserId: ACTOR_ID } } });
+  finalizeMp4Upload.mockRejectedValue(new ServiceHttpError('not found', {
+    httpStatus: 404,
+    code: 'post_presentation_upload_not_found',
+    body: { error: 'not found', code: 'post_presentation_upload_not_found' },
+  }));
 });
 
 test('Meeting Tracker Zoom PATCH enforces exact body and passes only path request plus session actor', async () => {
@@ -183,6 +195,82 @@ test('transcript mint accepts only the exact contract and derives both actors fr
   });
   expect(res.statusCode).toBe(200);
   expect(res.headers['Cache-Control']).toBe('private, no-store');
+});
+
+test('recording mint accepts only the durable MP4 contract and derives the actor from the session', async () => {
+  const rejected = response();
+  await presentationUploadsHandler({
+    method: 'POST',
+    query: { requestId: REQUEST_ID },
+    body: {
+      artifactType: 'recording', operationId: OPERATION_ID, filename: 'a.mp4',
+      contentType: 'video/mp4', size: 100, resumeFingerprint: 'a'.repeat(64), actor: ACTOR_ID,
+    },
+  }, rejected);
+  expect(rejected.statusCode).toBe(400);
+  expect(mintMp4Upload).not.toHaveBeenCalled();
+
+  mintMp4Upload.mockResolvedValue({ uploadId: OPERATION_ID, uploadUrl: 'https://upload.example/session' });
+  const res = response();
+  await presentationUploadsHandler({
+    method: 'POST',
+    query: { requestId: REQUEST_ID },
+    body: {
+      artifactType: 'recording', operationId: OPERATION_ID, filename: 'a.mp4',
+      contentType: 'video/mp4', size: 100, resumeFingerprint: 'a'.repeat(64),
+    },
+  }, res);
+  expect(mintMp4Upload).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    filename: 'a.mp4',
+    contentType: 'video/mp4',
+    size: 100,
+    resumeFingerprint: 'a'.repeat(64),
+  });
+  expect(res.statusCode).toBe(200);
+  expect(res.headers['Cache-Control']).toBe('private, no-store');
+});
+
+test('recording resume accepts only the fingerprint and independently reauthorizes the session actor', async () => {
+  getMp4UploadStatus.mockResolvedValue({ uploadId: UPLOAD_ID, nextExpectedRanges: ['10-'] });
+  const rejected = response();
+  await presentationUploadResumeHandler({
+    method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID },
+    body: { resumeFingerprint: 'a'.repeat(64), uploadUrl: 'injected' },
+  }, rejected);
+  expect(rejected.statusCode).toBe(400);
+  expect(getMp4UploadStatus).not.toHaveBeenCalled();
+
+  const res = response();
+  await presentationUploadResumeHandler({
+    method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID },
+    body: { resumeFingerprint: 'a'.repeat(64) },
+  }, res);
+  expect(getMp4UploadStatus).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    uploadId: UPLOAD_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'a'.repeat(64),
+  });
+  expect(res.statusCode).toBe(200);
+  expect(res.headers['Cache-Control']).toBe('private, no-store');
+});
+
+test('recording finalize wins dispatch when the durable intent exists and accepts no authority body', async () => {
+  finalizeMp4Upload.mockResolvedValue({ uploadId: UPLOAD_ID, requestDocumentId: 'doc' });
+  const res = response();
+  await presentationUploadFinalizeHandler({
+    method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID }, body: {},
+  }, res);
+  expect(finalizeMp4Upload).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    uploadId: UPLOAD_ID,
+    actingUserSystemId: ACTOR_ID,
+  });
+  expect(claimPortalUpload).not.toHaveBeenCalled();
+  expect(res.statusCode).toBe(200);
 });
 
 test('transcript finalize claims the full ownership tuple, passes the recorded candidate, and completes durably', async () => {

@@ -585,15 +585,15 @@ reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
 
-### Post-presentation material ledgers — SOURCE-BUILT; MIGRATION 054 NOT APPLIED
+### Post-presentation material ledgers — SOURCE-BUILT; MIGRATION 055 NOT APPLIED
 
 **[SOURCE-VERIFIED 2026-09-25 on `codex/feature-request`.]** Migration
 `055_post_presentation_materials.sql`, mirrored by fresh-install V56, defines
 three additive tables for the post-research-presentation feature. No
-environment has been migrated by this milestone, both rollout controls remain
-off, and no producer or consumer route is deployed or enabled. Slice 3's
-transcript producer routes are source-built and offline-tested only on
-`codex/feature-request`.
+environment has been migrated by this milestone, the rollout and destructive-cleanup controls
+remain off/unconfigured, and no producer or consumer route is deployed or enabled. Slice 3's
+transcript producer and Slice 4's browser-direct MP4 intent/status/finalize routes are
+source-built and offline-tested only on `codex/feature-request`.
 
 - `presentation_material_links` stores one non-revoked materials-only link per
   Request: UUID/JTI, unique SHA-256 token digest, sealed token ciphertext,
@@ -604,7 +604,10 @@ transcript producer routes are source-built and offline-tested only on
   It records the bounded file fingerprint, code-owned path/generation identity,
   lifecycle/lease/review-after state, the upload URL only as ciphertext, exact
   Graph candidate facts, and the finalized Request Document identity. Stored
-  Graph expiry is advisory; it is not deletion authority.
+  Graph expiry is advisory; independently authorized resume refreshes it from
+  live Graph state and it is not deletion authority. Daily maintenance claims
+  eligible rows and, unless both general access and the separate destructive
+  cleanup permission are literal `on`, remains inspect/refresh/record/alert-only.
 - `presentation_material_slot_leases` is keyed by Request + Recording,
   Transcript, or Transcript Summary artifact type and stores a paired
   token/expiry plus a positive fence capped at 2,147,483,647.
