@@ -1,5 +1,55 @@
 # Session 543 Prompt: Presentation upload performance (branch-local)
 
+## Session 543 offline implementation summary — 2026-09-25 PT
+
+**[VERIFIED via Git and source]** Commit `bab770fe6` (`Build resilient browser Graph upload
+transport`) is committed on `codex/feature-request`. It adds
+`shared/utils/graph-browser-upload.js` and moves the Preview proof onto one browser-direct Graph
+transport with a code-owned 10 MiB default, strict sequential ranges, independently authorized
+status reconciliation for ambiguous outcomes, bounded jitter/backoff and `Retry-After`, 120-second
+upload-inactivity and 180-second response watchdogs, two-minute offline wait, same-browser Web
+Lock, graceful pause-after-fragment, and explicit Uploading/Pausing/Reconnecting/Paused states.
+Graph-confirmed bytes own durable progress. XHR bytes are separately in flight, and Mbps/ETA count
+only uniquely confirmed ranges attributable to this browser, not cross-device status jumps.
+
+**[VERIFIED via source and focused tests]** the Preview service now gives its encrypted,
+profile-bound permit an absolute 72-hour lifetime from mint, treats the sealed initial Graph
+expiry as advisory, checks exact item identity plus live Graph status, and performs bounded exact
+item visibility reads after terminal 404/410 outcomes. Fingerprint, authenticated status,
+server-owned path, exact-item cleanup, and browser → Graph (never full-file application proxy)
+contracts remain. A page-lifecycle abort cancels local XHR/timers and preserves the permit; the
+next manual Resume performs live authorized reconciliation. No immediate-abort UI is claimed.
+
+**[VERIFIED offline]** seven proof suites pass (84 tests); scoped ESLint, `check:types`, and
+`git diff --check` pass. The default `npm run build` reaches Next compilation but Turbopack rejects
+this worktree's external `node_modules` symlink. `npx next build --webpack` passes with the existing
+dynamic-dependency warnings. Twenty-seven changed-surface gate commands passed sequentially:
+six route/boundary/writer gates with their self-tests, seven documentation/security gates with
+their self-tests, and `check:docs-catalog`. A fresh read-only adversarial review found and drove fixes for strict
+initial ranges, throttle-cap timing, monotonic stall detection, cross-device rate attribution,
+async stale-state guards, paused ETA, refreshed expiry display, reconnect copy, pause enablement,
+timer cleanup, and final-range rate accounting; it found no remaining authorization,
+exact-cleanup, fingerprint, or no-proxy regression.
+
+**Still open and not claimed:** no revised code has been deployed or live-benchmarked.
+Graph-confirmed upload-session expiry remains PARTIAL; prior 100 MB receipts contain no timing.
+The representative desktop benchmark, corrective live expiry run, Production-safe durable flow,
+Factory-created test request, desktop macOS Safari long-seek/Download check, and actual near-cap
+Production upload remain deferred. iPadOS is out of scope and no further Edge run is planned.
+
+**Concrete approval list before any live step:** obtain a fresh owner approval naming (1) the
+exact disposable Request GUID/number plus governed site/library/folder; (2) the exact MP4,
+byte count, hash, and permitted upload count; (3) the immutable branch commit/deployment; (4) any
+Preview deployment and temporary shared-alias move, including the exact Factory rollback target;
+(5) the separate same-machine direct-Graph baseline session/item and its exact cleanup; (6) each
+Preview proof SharePoint upload and later exact-item cleanup; (7) every Dataverse or Production
+write; and (8) the Production near-cap item's default registry-bound retention. Any later
+Production deletion needs a separately reviewed teardown, zero-binding proof, exact IDs/ETag, and
+fresh approval. Needed Dataverse reads remain owner-permitted, but writes require consultation.
+Spent Request/upload/cleanup approvals are not reusable.
+
+The sections below are historical handoff context and retain their then-current claims.
+
 ## Session 542 presentation branch summary — 2026-09-24/25 PT
 
 **[VERIFIED via Git]** Commit `f9088d1a8` (`Plan direct Graph upload performance and desktop

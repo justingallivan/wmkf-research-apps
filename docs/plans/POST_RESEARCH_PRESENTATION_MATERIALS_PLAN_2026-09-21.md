@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; Chrome reload and proof-token recovery passed, while Graph-confirmed session expiry needs a corrective retest. A production-sized direct Graph policy and measured desktop throughput gate precede release; Safari and near-cap Production checks remain."
+summary: "Active plan for Meeting Tracker presentation materials; the shared 10 MiB direct-Graph transport is offline-implemented, while its timed desktop benchmark, Graph-confirmed expiry retest, Safari, and near-cap Production gates remain."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -42,7 +42,7 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
 | Production test isolation | Schema readiness is environment-wide and is not a feature rollout guard. Add a separate exact-on, server-enforced presentation access mode: `off`, `test:<Factory request GUID>`, or `on`. Keep Production `off` until the Factory request exists; use `test:<GUID>` for the bounded Safari/near-cap run and switch to `on` only after the release gates pass. |
 | Supported browser scope | Staff desktop browsers are the release target. The owner removed iPadOS support and its browser/device acceptance rows on 2026-09-24; no iPadOS run blocks this feature. Keep the near-cap upload check on desktop for the proposed 2 GB cap. |
 | Existing full briefing | Preserve D19/D28: the existing distributed briefing remains a superset and continues to include research-presentation materials. Add audience-specific non-buffering Watch/Download resolution for Zoom and large SharePoint recordings. The new copied link is an additional materials-only option. |
-| Transport proof | **CHROME CORE PATH PASSED 2026-09-22; EDGE PARTIAL PATH REPORTED 2026-09-23; CHROME RELOAD/RESELECT AND PROOF-TOKEN RECOVERY PASSED 2026-09-24.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. The session-expiry UI refusal/cleanup was observed, but the refusal used the sealed initial timestamp while Graph later confirmed cancellation; Graph-confirmed expiry remains unverified. The Windows Edge colleague reported upload, playback, and Download for a 97,777,999-byte MP4; the exact item was deleted after owner approval. Owner accepted Chrome and Edge as working and deferred desktop macOS Safari to a Production run on a Factory-created test request (2026-09-23, Session 536). Long-duration seeking and a desktop near-cap upload remain required before release; iPadOS was removed from scope by the owner on 2026-09-24. |
+| Transport proof | **CHROME CORE PATH PASSED 2026-09-22; EDGE PARTIAL PATH REPORTED 2026-09-23; CHROME RELOAD/RESELECT AND PROOF-TOKEN RECOVERY PASSED 2026-09-24; PERFORMANCE TRANSPORT OFFLINE-IMPLEMENTED 2026-09-25.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. Commit `bab770fe6` replaces the proof's 320 KiB/60-second loop with the shared 10 MiB, status-aware, stall-aware transport and removes the sealed-initial-expiry refusal in source and focused tests; it is not deployed or live-benchmarked. The earlier session-expiry UI refusal/cleanup used the sealed initial timestamp while Graph later confirmed cancellation, so Graph-confirmed expiry remains unverified. The Windows Edge colleague reported upload, playback, and Download for a 97,777,999-byte MP4; the exact item was deleted after owner approval. Owner accepted Chrome and Edge as working and deferred desktop macOS Safari to a Production run on a Factory-created test request (2026-09-23, Session 536). Long-duration seeking and a desktop near-cap upload remain required before release; iPadOS was removed from scope by the owner on 2026-09-24. |
 | Distribution | No new email composer or automatic distribution for the materials-only link. Meeting Tracker provides Copy link for staff to share through their chosen channel; the existing deliberation email continues distributing the full briefing link. |
 
 ## 2. Verified current state
@@ -382,6 +382,11 @@ transport dependency and must not revoke or stale a briefing send.
 
 ### 5.5 Durable large-upload intents
 
+**[PLANNED production surface; not created by `bab770fe6`.]** The Preview proof continues to use
+only a session-scoped encrypted browser permit and creates no application table. The production
+producer still requires the durable intent below before any Production upload-session URL is
+issued.
+
 Add `presentation_material_uploads` in the same migration. A row exists before any Graph upload
 URL leaves the server and carries:
 
@@ -590,13 +595,15 @@ The bounded fallback decision, only if the remaining browser matrix fails, is:
 3. **Rejected:** proxying the complete MP4 through a Vercel Function request or creating a
    permanent SharePoint Anyone link.
 
-### 7.2.1 Direct-Graph performance and recovery policy (2026-09-24 steering; planned)
+### 7.2.1 Direct-Graph performance and recovery policy (offline-implemented 2026-09-25; live gates pending)
 
-**[VERIFIED via `presentation-media-proof-service.js`,
-`shared/utils/presentation-media-proof-upload.js`, and the 2026-09-22/24 receipts]** the
-Preview-only proof currently sends 320 KiB fragments sequentially, has a fixed 60-second
-per-fragment XHR timeout, and has no automatic fragment retry. Its 100,665,703-byte correctness
-and recovery receipts contain no elapsed upload time or effective throughput. **[PLANNED]**
+**[VERIFIED via commit `bab770fe6`, `shared/utils/graph-browser-upload.js`, the Preview proof
+service/harness, and 84 focused tests]** the branch now has one browser-direct transport with a
+code-owned 10 MiB default, strict sequential ranges, status-aware bounded retry, stall/response
+watchdogs, truthful progress/rate/ETA states, pause/offline/reconnect handling, and a same-browser
+lock. The Preview proof uses it and checks live Graph state after the sealed initial expiry. This
+is source-built and offline-tested only: its prior 100,665,703-byte correctness/recovery receipts
+contain no elapsed upload time or effective throughput, and no revised code has been deployed.
 Keep browser → preauthenticated Microsoft Graph → governed SharePoint as the MP4 byte route.
 The transcript's private Blob staging remains a separate small-file route; routing MP4s through
 it would add a complete second byte transfer and another recovery/cleanup surface. Converge the
@@ -606,14 +613,14 @@ byte route.
 Microsoft's [upload-session contract](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0)
 requires sequential ranges, each nonfinal fragment a multiple of 320 KiB, and each request below
 60 MiB. It recommends 5–10 MiB and identifies 10 MiB as optimal for stable high-speed links.
-**[PLANNED]** Use a code-owned 10 MiB default (32 alignment units); consider a code-owned 5 MiB
+**[VERIFIED via source and focused tests]** Use a code-owned 10 MiB default (32 alignment units); consider a code-owned 5 MiB
 alternative (16 units) only if measured slow/unstable-link evidence justifies it. Neither is an
 Admin or environment setting. The final remainder may be smaller. At 2,000,000,000 bytes this
 reduces the nominal sequential PUT count from 6,104 at 320 KiB to 191 at 10 MiB; this is a
 request-count calculation, not a measured throughput claim. Keep the file cap exactly
 2,000,000,000 bytes and the bounded first/last-1-MiB SHA-256 resume fingerprint.
 
-The implementation and tests must preserve these failure contracts:
+The shared transport and its tests preserve these failure contracts:
 
 | Condition | Planned behavior |
 |---|---|
@@ -623,16 +630,15 @@ The implementation and tests must preserve these failure contracts:
 | `429` | Follow Graph's [throttling guidance](https://learn.microsoft.com/en-us/graph/throttling): expose the response's `Retry-After` through the browser XHR wrapper and honor a valid value before the next status/PUT request; otherwise use capped exponential backoff. Cap automatic throttling at three consecutive 429s or two minutes of total wait, whichever comes first. Then pause and require a fresh authorized status check for manual Resume; never spin indefinitely. |
 | `404`/`410` session after an ambiguous or final PUT | A closed session may mean a successful commit. Check the exact full-size item immediately and twice more after 2 and 10 seconds to allow SharePoint visibility. If still absent, mark the session closed but the item outcome unresolved; retain the intent/candidate for later status and registry-safe cleanup. Never auto-start a replacement or delete on this signal alone. Other 4xx or malformed/ambiguous ranges fail closed and retain the intent. |
 | Application resume/status route returns `401`/`403`, `5xx`, or is unreachable | Preserve the intent and Graph offset. Ask staff to sign in again for `401`/`403`; show Retry later for transient app/Dataverse failures. These are not Graph fragment failures and do not consume the fragment retry budget. Never bypass server reauthorization with a cached upload URL. |
-| Pause, reload, same-file reselect, or request switch | Show Pausing while a 10 MiB fragment finishes; an immediate abort enters status reconciliation because commit is uncertain. Reauthorize and fingerprint-check before resume; cancel pending backoff/watchdog timers and suppress stale progress/errors/PUTs for a different Request. Do not discard a recoverable intent or claim that committed bytes must restart. |
+| Pause, reload, same-file reselect, or request switch | Show Pausing while a 10 MiB fragment finishes. The shipped control is graceful pause-after-fragment, not immediate abort. A lifecycle abort cancels XHR/timers and retains the permit; the next manual Resume performs the fresh authorized status reconciliation because commit is uncertain. Reauthorize and fingerprint-check before resume, and suppress stale progress/errors/PUTs for a different Request. Do not discard a recoverable intent or claim that committed bytes must restart. |
 
-**[VERIFIED via `presentation-media-proof-service.js::getPresentationMediaProofUploadStatus`]**
-the proof seals the *initial* Graph expiry into its permit and currently returns 410 once that
-timestamp passes, before querying Graph status. Microsoft's
+**[VERIFIED via `presentation-media-proof-service.js::getPresentationMediaProofUploadStatus`
+and focused tests]** the proof still seals the *initial* Graph expiry as advisory evidence, but
+no longer returns 410 merely because that timestamp passed. It checks the exact full-size item,
+then Graph's live status, with exact-item rechecks after terminal 404/410 outcomes. Microsoft's
 [upload-session contract](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0)
-says each successful fragment extends expiry. **[PLANNED]** Remove that false terminal test:
-check for an exact full-size committed item, then query Graph's live status and apply the
-bounded post-commit visibility check above. A transient/uncertain status retains the permit.
-The disposable proof permit uses an absolute 72-hour lifetime from mint, independent of the
+says each successful fragment extends expiry. A transient/uncertain status retains the permit.
+The disposable proof permit now uses an absolute 72-hour lifetime from mint, independent of the
 initial Graph expiry; after that, any unresolved exact item needs an operator-approved cleanup
 path rather than an unguarded browser deletion. This lifetime bounds proof access and covers
 the planned desktop run plus cleanup grace. The durable production intent stores the last *server-observed* Graph
@@ -640,7 +646,7 @@ expiry as advisory; the browser may display refreshed expiry from `202` response
 extend server authority by submitting its own timestamp. No per-fragment application callback is
 required. Maintenance checks live Graph and exact item state before terminal cleanup.
 
-**[PLANNED]** Replace the fixed 60-second whole-fragment XHR timeout with a resettable
+**[VERIFIED via source and simulated slow/stall tests]** The fixed 60-second whole-fragment XHR timeout is replaced with a resettable
 upload-inactivity watchdog (provisional 120 seconds), plus a provisional 180-second wait for
 Graph's response after the browser reports the fragment sent. The initial supported-link
 assumption is at least 1 Mbps upstream; a 10 MiB fragment at that rate takes about 84 seconds
@@ -652,8 +658,10 @@ enters status reconciliation and never discards the intent. Clear timers on comp
 unmount, and Request change. Validate thresholds and Safari progress-event cadence in simulated
 slow-link tests and the real desktop gate; revise them from evidence, not an Admin setting.
 
-**[PLANNED]** The staff UI distinguishes Graph-confirmed bytes from in-flight bytes and shows
-smoothed effective Mbps and an ETA only after a meaningful sample. When the browser is offline,
+**[VERIFIED via source, focused UI tests, and adversarial review]** The staff UI distinguishes
+Graph-confirmed bytes from in-flight bytes and shows effective Mbps and an ETA only after a
+meaningful uniquely confirmed sample attributable to this browser; status-reconciled
+cross-device bytes advance the progress bar but do not inflate local rate. When the browser is offline,
 wait up to two minutes for an `online` event without spending a Graph attempt, then offer manual
 Resume if connectivity does not return. It labels waiting for a retry
 as Reconnecting, intentional stop as Paused, and an expired session as needing a new upload.
@@ -666,14 +674,14 @@ logs, measurements, and persisted plaintext.
 
 Performance verification is a release gate with separate evidence levels:
 
-1. **Offline before another live run:** test 10 MiB alignment and final remainder, sequential
+1. **Offline before another live run — PASS at `bab770fe6`:** 84 focused proof tests cover 10 MiB alignment and final remainder, sequential
    ranges and final commit, slow continuous progress versus true stall, abort/pause, bounded
    5xx/network and 429 retries, ambiguous commit/416 status reconciliation, terminal 404,
    refreshed expiry after initial expiry, reselect fingerprint, duplicate-tab/device attempts,
    app-route `401`/`403`/`5xx`, cancelled retry timers, and stale Request UI state. Invert the
-   existing tests that expect an initial-expiry 410 and a 60-second XHR timeout. Test the real
-   browser XHR path; the injected `fetchImpl` branch has no XHR watchdog.
-   Exercise the protected resume route and durable-intent cleanup semantics, not only a helper.
+   former tests that expected an initial-expiry 410 and a 60-second XHR timeout. They exercise the
+   XHR path, protected proof resume route, encrypted permit, and exact cleanup semantics rather
+   than only a helper. The durable production intent remains a later Slice 4 implementation.
 2. **Representative desktop benchmark:** on a freshly approved disposable request/target and
    approved MP4, record exact byte count, chunk policy, start/commit timestamps, active transfer
    and wall time, retry/pause count, Graph expiry changes, progress-event cadence/watchdog trips,
@@ -793,6 +801,8 @@ session/redirect helpers, and token verification remain separately testable.
 
 Suggested source ownership:
 
+- `shared/utils/graph-browser-upload.js`: **[SOURCE-BUILT/OFFLINE-TESTED at `bab770fe6`]** the
+  shared browser byte transport consumed by the Preview harness and later production producer;
 - `material-model.js`: backing-mode validation and latest-winner projection;
 - `material-service.js`: staff read, Zoom-link write, transcript finalize;
 - `video-upload-service.js` / `upload-store.js`: Graph intent lifecycle and recovery;
@@ -916,8 +926,8 @@ Upload-specific rules:
 
 ### Slice 0 — Deployed-Preview browser proof
 
-**Implementation status (2026-09-23): CHROME CORE PATH PASSED; EDGE UPLOAD/PLAYBACK/DOWNLOAD
-REPORTED; OFFLINE RECOVERY HARDENING PUSHED AT `26b368604`; SLICE REMAINS OPEN.** [VERIFIED via focused unit/contract tests] the isolated
+**Implementation status (2026-09-25): CHROME CORE PATH PASSED; EDGE UPLOAD/PLAYBACK/DOWNLOAD
+REPORTED; SHARED PERFORMANCE TRANSPORT OFFLINE-IMPLEMENTED AT `bab770fe6`; SLICE REMAINS OPEN.** [VERIFIED via focused unit/contract tests] the isolated
 feature branch contains the Preview-only staff harness, browser-direct Graph upload session,
 encrypted staff permit, five-minute encrypted-subject proof token, fail-closed resolver limiter,
 302/one-shot playback comparison, scoped CSP, and exact-item cleanup. [VERIFIED via signed-in
@@ -946,6 +956,14 @@ Reload/reselect and proof-token expiry recovery passed. The upload-session expir
 the local initial-timestamp refusal and cancellation, not Graph-confirmed expiry; it needs a
 corrective retest after §7.2.1. Production desktop macOS Safari, long-duration seeking, and
 near-cap throughput remain open, so Slice 0 is not yet complete.
+
+[VERIFIED via commit `bab770fe6`, 84 focused proof tests, scoped ESLint, type checking, and a
+local webpack production build] the Preview harness now consumes the shared 10 MiB browser
+transport described in §7.2.1, and its status service no longer refuses solely on the initial
+Graph expiry. This is offline evidence only. The default Turbopack build remains incompatible
+with this worktree's external `node_modules` symlink; the webpack build passed with the existing
+dynamic-dependency warnings. No deployment, alias move, upload, Dataverse write, SharePoint
+write, or cleanup occurred for this milestone.
 
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
 authenticated proof route and minimal harness, but it creates no durable application schema and is
@@ -1086,7 +1104,7 @@ exact deletion. No bearer URL or token was saved.
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. | Agent (historical PASS) |
 | Desktop Chrome | Reload and same-file reselect Resume | 2026-09-24 PASS: paused at 0.9 MiB, reloaded, reselected the same file, resumed direct Microsoft `202` chunks, committed 100,665,703 bytes, finalized, and cleaned the exact item. | Agent |
-| Desktop Chrome | Upload-session expiry and recovery | PARTIAL: after the sealed initial expiry, Resume refused and retained its permit; approved Cleanup returned `session_cancelled` with no item. This proves the local refusal/cleanup path, but a 2xx Graph cancellation means Graph-confirmed expiry was not observed. Correct the initial-expiry test in §7.2.1 and retest live status/terminal recovery. The third fresh session did commit 100,665,703 bytes and was cleaned exactly. | Agent, with owner final UI clicks after browser auto-review block |
+| Desktop Chrome | Upload-session expiry and recovery | PARTIAL: after the sealed initial expiry, Resume refused and retained its permit; approved Cleanup returned `session_cancelled` with no item. This proves the old local refusal/cleanup path, but a 2xx Graph cancellation means Graph-confirmed expiry was not observed. Commit `bab770fe6` corrected the initial-expiry predicate offline; retest live status/terminal recovery before changing this row. The third fresh session did commit 100,665,703 bytes and was cleaned exactly. | Agent, with owner final UI clicks after browser auto-review block |
 | Desktop Chrome | Five-minute proof-token expiry recovery | 2026-09-24 PASS: old link refused as `expired` after reload; fresh link from the same item played and accepted End/Home seeks with resolver count one. | Agent |
 | Desktop Edge | 2026-09-23 upload, playback, Download | Colleague reported these actions for 97,777,999 bytes; Graph confirmed the item. Remaining detailed Edge trace is not a Slice 0 blocker under Session 536. | Historical owner colleague; no new Edge run |
 | macOS Safari | Upload, selected Production Watch shape with long seeking, Download | Deferred to Production on a Factory-created test request; record redacted statuses/ranges and source/download size and SHA-256. Test a fallback Watch shape only if it ships. | Owner by hand |
@@ -1104,11 +1122,11 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 | macOS Safari full path | DEFERRED | [VERIFIED via Session 536 owner decision] Production run on a Factory-created test request remains for upload, selected Watch shape with long seeking, Download, and integrity evidence. |
 | iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] Staff will not use iPadOS for this work; its upload, playback, Files-app, and backgrounding checks are removed from the acceptance matrix. |
 | Reload and same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] 0.9 MiB pause, reload, reselect, direct Microsoft `202` chunks, 100,665,703-byte commit/finalize, exact ETag-guarded cleanup with Graph 404 and empty folder. |
-| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. Correct the false terminal predicate, then retest live expiry recovery. |
+| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. [VERIFIED offline at `bab770fe6`] the false terminal predicate is corrected; live expiry recovery still requires a fresh approval and retest. |
 | Five-minute proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] expired old link refused after reload; Finish saving minted a fresh link from the same committed item; Watch played and End/Home seeks caused no additional resolver action. |
 | Long-duration seeking | DEFERRED | [VERIFIED via Chrome receipt] current recording is only 67.33 seconds; desktop macOS Safari Production run still needs a >2-minute recording and ten seeks. |
 | Upload and throughput near 2,000,000,000 bytes | DEFERRED | [VERIFIED via 2026-09-24 owner decision] one near-cap desktop Production upload remains to test the proposed 2 GB cap. [PLANNED] Run it with the macOS Safari check on a Factory-created test request. |
-| Production-sized chunk policy and measured throughput | PLANNED | [VERIFIED via source] the Preview proof still uses 320 KiB/60-second fragments, and prior 100 MB receipts do not contain timing. Implement and test §7.2.1, then record a representative timed desktop run before claiming a speed improvement. This row does not substitute for the near-cap Production gate. |
+| Production-sized chunk policy and measured throughput | OFFLINE IMPLEMENTED; LIVE MEASUREMENT PLANNED | [VERIFIED via `bab770fe6` and focused tests] the Preview proof uses the shared code-owned 10 MiB transport with stall-aware timeouts, bounded status reconciliation, and truthful progress/rate/ETA. Prior 100 MB receipts contain no timing, so no speed improvement is claimed. Record the separately approved representative desktop run before changing this row to measured PASS. This row does not substitute for the near-cap Production gate. |
 
 **Owner actions:** approve each new disposable request and governed SharePoint target, each
 Preview deployment, each temporary shared-alias change, each upload, and each exact cleanup
@@ -1570,10 +1588,11 @@ Release order:
 
 1. **IN PROGRESS:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
    route-scoped CSP correction. Chrome reload/reselect and proof-token recovery passed on
-   2026-09-24; Graph-confirmed session expiry needs a corrective retest. Build and offline-test
-   the §7.2.1 transport as one browser module shared by the Preview benchmark harness and the
-   later production producer. Obtain a separately approved, timed desktop benchmark using that
-   module and retest the expiry row after correcting the initial-timestamp guard. Keep 302 as the
+   2026-09-24; Graph-confirmed session expiry needs a corrective retest. Commit `bab770fe6`
+   built and offline-tested the §7.2.1 transport as one browser module used by the Preview
+   benchmark harness and intended for the later production producer. Obtain a separately approved,
+   timed desktop benchmark using that module and retest the expiry row through live Graph status.
+   Keep 302 as the
    leading resolver and the one-shot URL as the bounded fallback. The deferred Production Safari,
    long-seek, and near-cap cells remain in the Slice 0 matrix but block general release after
    the production-safe flow exists, not coding of that flow;
@@ -1723,6 +1742,18 @@ and the Safari speed threshold must use a same-Mac/same-network direct-Graph bas
 now explicit in §7.2.1, the Slice 0 pass criteria, the test matrix, and §15. The reviewer stated
 those two edits were sufficient to make the plan ready for implementation; live acceptance is
 still a separate gate.
+
+**2026-09-25 offline implementation and read-only adversarial review:** commit `bab770fe6`
+implemented the shared transport and corrected Preview status/permit behavior without live
+activity. The fresh review found strict-range, Retry-After-cap, monotonic-stall, cross-device
+rate, stale-async, paused-ETA, refreshed-expiry, reconnect-copy, pause-enablement, timer-cleanup,
+and final-fragment rate-accounting gaps; each was fixed and covered by focused tests before the
+runtime commit. The one deliberately narrowed contract is immediate abort: the staff control
+finishes the current fragment before pausing, while page-lifecycle abort cancels local work,
+retains the encrypted permit, and relies on manual Resume for the next authorized status check.
+The reviewer found no remaining authorization, exact-item cleanup, fingerprint, or full-file
+proxy regression. This closes only the offline item in §7.2.1; the timed benchmark,
+Graph-confirmed expiry retest, Safari, and near-cap Production gates remain open and approval-bound.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof. The remaining decision is whether it survives the measured
