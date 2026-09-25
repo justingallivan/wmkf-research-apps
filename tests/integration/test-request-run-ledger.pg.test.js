@@ -2,7 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { assertLedgerReceipt, cliActorId, createRunLedger, idempotencyKeyDigest } from '../../lib/services/test-requests/run-ledger.js';
+import {
+  assertLedgerReceipt, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
+} from '../../lib/services/test-requests/run-ledger.js';
 import { pgLedgerDb } from '../../lib/services/test-requests/run-ledger-db.js';
 
 // A GitHub-token-shaped fixture assembled at runtime so no token-shaped
@@ -33,7 +35,8 @@ const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_requ
 async function assertLedgerSchemaCurrent(db, migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
-    `SELECT conname FROM pg_constraint WHERE conrelid IN ('test_request_runs'::regclass, 'test_request_run_resources'::regclass)`,
+    `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
+       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments')`,
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
@@ -43,7 +46,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const liveBody = normalize(fn.rows[0]?.prosrc);
   if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
   if (missing.length) {
-    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
+    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_reviewer_assignments, test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
   }
 }
 
@@ -95,6 +98,10 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
 
   afterAll(async () => {
     if (createdRunIds.length) {
+      await db.query(
+        `DELETE FROM test_request_run_reviewer_assignments WHERE run_id = ANY($1::uuid[])`,
+        [createdRunIds],
+      );
       await db.query(
         `DELETE FROM test_request_run_resources WHERE run_id = ANY($1::uuid[])`,
         [createdRunIds],
@@ -177,6 +184,48 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     // The stored row is unchanged: still the first (basic) reservation.
     const stillBasic = await ledger.getRun(firstRun.runId);
     expect(stillBasic.recipe).toBe('basic');
+  });
+
+  it('slice 6c-i: reserves a reviews run with real reviewer assignment rows, and inspect never reads back the plaintext address', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '0') });
+    createdRunIds.push(plan.runId);
+    const reviewerAssignments = [
+      { sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'Reviewer.One@Example.Test' },
+      { sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'reviewer.two@example.test' },
+    ];
+
+    const { run, created } = await ledger.reserveRun({ actorId, idempotencyKey: `key-reviews-${plan.runId}`, plan, reviewerAssignments });
+    expect(created).toBe(true);
+    expect(run.recipe).toBe('reviews');
+
+    const assignments = await ledger.listRunReviewerAssignments(run.runId);
+    expect(assignments).toHaveLength(2);
+    expect(assignments.map((a) => a.sequence)).toEqual([1, 2]);
+    expect(assignments[0].addressSha256).toBe(reviewerAddressSha256('reviewer.one@example.test').addressSha256);
+    for (const assignment of assignments) {
+      expect(assignment).not.toHaveProperty('address');
+    }
+
+    // A same-key retry never re-inserts (immutable, no update path).
+    const retry = await ledger.reserveRun({ actorId, idempotencyKey: `key-reviews-${plan.runId}`, plan, reviewerAssignments });
+    expect(retry.created).toBe(false);
+    expect(await ledger.listRunReviewerAssignments(run.runId)).toHaveLength(2);
+  });
+
+  it('slice 6c-i: the DB UNIQUE constraint on (run, address) rejects a direct duplicate insert bypassing the JS validator', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '1') });
+    createdRunIds.push(plan.runId);
+    await ledger.reserveRun({
+      actorId, idempotencyKey: `key-reviews-dup-${plan.runId}`, plan,
+      reviewerAssignments: [{ sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'dup@example.test' }],
+    });
+    await expect(db.query(
+      `INSERT INTO test_request_run_reviewer_assignments (run_id, sequence, source_person_id, destination_person_id, reused, address, address_sha256)
+       VALUES ($1::uuid, 2, $2::uuid, $3::uuid, false, 'dup@example.test', $4::text)`,
+      [plan.runId, crypto.randomUUID(), crypto.randomUUID(), reviewerAddressSha256('dup@example.test').addressSha256],
+    )).rejects.toThrow();
   });
 
   it('claimLease succeeds once; a second claim with the stale version returns null', async () => {

@@ -41,7 +41,8 @@ const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_requ
 async function assertLedgerSchemaCurrent(db, migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
-    `SELECT conname FROM pg_constraint WHERE conrelid IN ('test_request_runs'::regclass, 'test_request_run_resources'::regclass)`,
+    `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
+       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments')`,
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
@@ -51,7 +52,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const liveBody = normalize(fn.rows[0]?.prosrc);
   if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
   if (missing.length) {
-    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
+    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_reviewer_assignments, test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
   }
 }
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
