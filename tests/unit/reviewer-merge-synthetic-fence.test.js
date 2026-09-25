@@ -116,3 +116,48 @@ describe('executeMerge refuses zero-writes for a synthetic keeper or loser', () 
     assertZeroWrites(deps);
   });
 });
+
+// M7 (Opus round 1): executeMerge's re-check must be ISOLATED from
+// planMerge's own `blocked` predicate -- a defect in planMerge's block-
+// predicate wiring alone (simulated here by stubbing planMerge itself,
+// injected via `deps.planMerge`, purely a test seam -- production never
+// overrides it) must not let a synthetic keeper/loser through.
+describe('executeMerge re-check is independent of planMerge\'s blocked flag (M7)', () => {
+  function stubbedPlan({ keeperIsSynthetic = false, loserIsSynthetic = false } = {}) {
+    return {
+      blocked: false,
+      reasons: [],
+      keeper: { id: KEEPER, name: 'Avery Quinn', email: 'avery.quinn@example.org', identityStatus: null, etag: 'W/"keeper"', isSynthetic: keeperIsSynthetic },
+      loser: { id: LOSER, name: 'Avery Quill', email: null, identityStatus: null, statecode: 0, etag: 'W/"loser"', isSynthetic: loserIsSynthetic },
+      fields: [],
+      repoint: [],
+      collisions: [],
+      slotRepoints: [],
+    };
+  }
+
+  test('a stubbed planMerge reporting blocked:false but keeper.isSynthetic:true is still refused with zero writes', async () => {
+    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser });
+    deps.planMerge = jest.fn(async () => stubbedPlan({ keeperIsSynthetic: true }));
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: {} }, deps))
+      .rejects.toMatchObject({ status: 409 });
+    assertZeroWrites(deps);
+    expect(deps.planMerge).toHaveBeenCalledTimes(1);
+  });
+
+  test('a stubbed planMerge reporting blocked:false but loser.isSynthetic:true is still refused with zero writes', async () => {
+    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser });
+    deps.planMerge = jest.fn(async () => stubbedPlan({ loserIsSynthetic: true }));
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: {} }, deps))
+      .rejects.toMatchObject({ status: 409 });
+    assertZeroWrites(deps);
+    expect(deps.planMerge).toHaveBeenCalledTimes(1);
+  });
+
+  test('sanity: the stub is otherwise trusted (neither synthetic) and the merge proceeds past the fence', async () => {
+    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser });
+    deps.planMerge = jest.fn(async () => stubbedPlan());
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: {} }, deps))
+      .resolves.toMatchObject({ keeperId: KEEPER, loserId: LOSER });
+  });
+});

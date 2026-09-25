@@ -210,6 +210,28 @@ describe('projection + strict validator', () => {
     expect(() => build({ reviewers: [entry] })).toThrow(/personIsSynthetic must be true/);
   });
 
+  // M3 (Opus round 1): only the strict boolean `true` is accepted -- neither
+  // `undefined` (an omitted marker, e.g. production without wave30) nor the
+  // string `'true'` (a stringified/serialization-drifted value) may unlock
+  // exporting a real address.
+  test('rejects a real address when personIsSynthetic is undefined', () => {
+    const base = reviewerEntry();
+    const entry = reviewerEntry({
+      personIsSynthetic: undefined,
+      person: { ...base.person, wmkf_emailaddress: 'real@example.edu' },
+    });
+    expect(() => build({ reviewers: [entry] })).toThrow(/personIsSynthetic must be true/);
+  });
+
+  test('rejects a real address when personIsSynthetic is the string \'true\'', () => {
+    const base = reviewerEntry();
+    const entry = reviewerEntry({
+      personIsSynthetic: 'true',
+      person: { ...base.person, wmkf_emailaddress: 'real@example.edu' },
+    });
+    expect(() => build({ reviewers: [entry] })).toThrow(/personIsSynthetic must be true/);
+  });
+
   test('exports the address only when personIsSynthetic is true', () => {
     const base = reviewerEntry();
     const entry = reviewerEntry({

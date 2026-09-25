@@ -17,6 +17,7 @@ import {
   searchByName,
   upsertByEmail,
   findSyntheticByEmail,
+  isPersonSynthetic,
 } from '../../lib/dataverse/adapters/potential-reviewer.js';
 
 const SYNTHETIC_ID = '33333333-3333-4333-8333-333333333333';
@@ -103,11 +104,27 @@ describe('switch ON — (a) exclude marker-true rows unconditionally', () => {
   });
 
   it('searchByName excludes a marker-true row that WOULD match on name, agreeing OData + JS post-filter', async () => {
+    // M2 mutation-kill (Opus round 1): the row's OWN name (not the "TEST · "
+    // seeder-convention prefix, which the fence must not rely on) is the
+    // exact query name, so it ranks FIRST on name score; only the JS
+    // post-filter drops it. The prior fixture used the prefixed name, which
+    // `rankNameRows` scored away on its own -- so removing the post-filter
+    // still passed. This fixture fails without the post-filter.
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
-      records: [syntheticRow({ wmkf_firstname: 'Ada', wmkf_lastname: 'Lovelace' })],
+      records: [syntheticRow({ wmkf_name: 'Ada Lovelace', wmkf_firstname: 'Ada', wmkf_lastname: 'Lovelace' })],
     });
     const result = await searchByName('Ada Lovelace');
     expect(result).toEqual([]);
+  });
+
+  it('searchByName selects and filters on the marker (ON-mode assertion)', async () => {
+    const spy = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    await searchByName('Ada Lovelace');
+    expect(spy.mock.calls.length).toBeGreaterThan(0);
+    for (const [, options] of spy.mock.calls) {
+      expect(options.select).toMatch(/wmkf_issyntheticreviewer/);
+      expect(options.filter).toMatch(/wmkf_issyntheticreviewer/);
+    }
   });
 
   it('the OData filter and select both name the marker so both paths agree', async () => {
@@ -187,5 +204,37 @@ describe('(d) upsertByEmail reuse refuses a synthetic target unconditionally', (
     );
     expect(result.id).toBe(ORDINARY_ID);
     expect(result.created).toBe(false);
+  });
+});
+
+describe('isPersonSynthetic — M8: fails closed on every read failure', () => {
+  beforeEach(() => { process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on'; });
+
+  it('rethrows a transient (500) error rather than treating it as "not synthetic"', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(
+      Object.assign(new Error('upstream timeout'), { status: 500 }),
+    );
+    await expect(isPersonSynthetic(SYNTHETIC_ID)).rejects.toThrow('upstream timeout');
+  });
+
+  it('rethrows a missing-column 400 rather than treating it as "not synthetic"', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(
+      Object.assign(new Error("Could not find a property named 'wmkf_issyntheticreviewer'."), { status: 400 }),
+    );
+    await expect(isPersonSynthetic(SYNTHETIC_ID)).rejects.toThrow(/wmkf_issyntheticreviewer/);
+  });
+
+  it('rethrows a 404 (person missing) -- also refuses binding rather than passing as "not synthetic"', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(
+      Object.assign(new Error('Does Not Exist'), {
+        serviceName: 'dataverse', status: 404, dataverseCode: '0x80040217',
+      }),
+    );
+    await expect(isPersonSynthetic(SYNTHETIC_ID)).rejects.toThrow('Does Not Exist');
+  });
+
+  it('returns true/false normally when the read succeeds', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue(syntheticRow());
+    expect(await isPersonSynthetic(SYNTHETIC_ID)).toBe(true);
   });
 });
