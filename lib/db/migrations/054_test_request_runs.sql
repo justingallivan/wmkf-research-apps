@@ -36,7 +36,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
         FROM jsonb_each(receipt) AS e(key, value)
         CROSS JOIN LATERAL (SELECT e.value #>> '{}' AS v, jsonb_typeof(e.value) AS t) AS s
        WHERE NOT (
-         (e.key IN ('size', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber') AND s.t = 'number')
+         (e.key IN ('size', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount') AND s.t = 'number')
          OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
          OR (e.key IN ('requestIds', 'locationIds') AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
@@ -50,20 +50,21 @@ LANGUAGE sql IMMUTABLE AS $receipt$
            AND s.v !~ '(://|[[:cntrl:]])'
            AND s.v !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
            AND CASE
-             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
              WHEN e.key IN ('itemId', 'folderItemId', 'graphItemId', 'sourceGraphItemId') THEN s.v ~ '^01[A-Z2-7]{32}$'
              WHEN e.key IN ('driveId', 'sourceDriveId') THEN s.v ~ '^b![A-Za-z0-9_-]{16,120}$'
              WHEN e.key = 'siteId' THEN s.v ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'library' THEN s.v ~ '^[a-z][a-z0-9_]{1,60}$'
-             WHEN e.key IN ('folder', 'relativeUrl') THEN s.v ~ '^([0-9]{1,10}_[0-9A-F]{32}(/(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?))?|(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?))$'
-             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx)$'
+             WHEN e.key IN ('folder', 'relativeUrl') THEN s.v ~ '^([0-9]{1,10}_[0-9A-F]{32}(/(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))?|(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))$'
+             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx|Review_[0-9]{1,2}[.](pdf|docx|doc))$'
              WHEN e.key = 'mimeType' THEN s.v ~ '^[a-z]+/[a-z0-9.+-]{1,80}$'
-             WHEN e.key = 'eTag' THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
+             WHEN e.key IN ('eTag', 'eTagBefore', 'eTagAfter') THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
              WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
              WHEN e.key IN ('versionNumber', 'versionNumberBefore', 'versionNumberAfter') THEN s.v ~ '^[0-9]{1,20}$'
-             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'bytesSha256') THEN s.v ~ '^[0-9a-f]{64}$'
+             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'bytesSha256', 'addressSha256', 'attestedDigest') THEN s.v ~ '^[0-9a-f]{64}$'
              WHEN e.key IN ('outcome', 'kind') THEN s.v ~ '^[a-z][a-z0-9_-]{0,39}$'
+             WHEN e.key = 'reviewForm' THEN s.v ~ '^(uploaded|received_no_file|unreceived)$'
              WHEN e.key = 'field' THEN s.v ~ '^[a-z][a-z0-9_]{0,63}$'
              WHEN e.key IN ('expectedValue', 'actualValue', 'valueBefore', 'valueAfter', 'fiscalYear', 'meetingDate') THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
              WHEN e.key ~ '^[a-z][A-Za-z0-9]{0,40}At$' AND e.key !~* 'body|content|purpose|token|secret|download|narrative|bytes|title|text|note|message' THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
@@ -153,9 +154,10 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
   CONSTRAINT test_request_runs_current_step_enum CHECK (current_step IN (
     'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
     'copy_file', 'observe', 'verify', 'ready',
-    'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment'
+    'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+    'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews'
   )),
-  CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN ('basic', 'initial_assessment')),
+  CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN ('basic', 'initial_assessment', 'reviews')),
   CONSTRAINT test_request_runs_host_shapes CHECK (
     source_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
     AND destination_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
@@ -198,7 +200,10 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
       'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
       'preallocated_request_present', 'file_journal_unverified',
       'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
-      'recipe_step_not_built'
+      'recipe_step_not_built',
+      'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+      'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed'
     ))
     AND (last_error IS NULL OR regexp_replace(last_error, ' [(]http [0-9]{3}[)]$', '') IN (
       'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
@@ -216,7 +221,10 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
       'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
       'preallocated_request_present', 'file_journal_unverified',
       'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
-      'recipe_step_not_built'
+      'recipe_step_not_built',
+      'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+      'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed'
     ))
   )
 );
@@ -236,7 +244,8 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
                       'dataverse_request', 'dataverse_request_patch',
                       'sharepoint_folder', 'dataverse_document_location',
                       'sharepoint_file', 'workflow_bypass', 'dataverse_request_document',
-                      'foundation_baseline'
+                      'foundation_baseline',
+                      'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set'
                     )),
   system            TEXT NOT NULL CHECK (system IN ('dataverse', 'sharepoint')),
 
@@ -260,7 +269,8 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
   CONSTRAINT test_request_run_resources_step_enum CHECK (step IN (
     'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
     'copy_file', 'observe', 'verify', 'ready',
-    'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment'
+    'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+    'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews'
   )),
   CONSTRAINT test_request_run_resources_error_code CHECK (
     error IS NULL OR regexp_replace(error, ' [(]http [0-9]{3}[)]$', '') IN (
@@ -279,7 +289,10 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
       'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
       'preallocated_request_present', 'file_journal_unverified',
       'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
-      'recipe_step_not_built'
+      'recipe_step_not_built',
+      'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+      'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed'
     )
   )
 );
@@ -291,3 +304,41 @@ CREATE INDEX IF NOT EXISTS test_request_run_resources_run_step_idx
 -- can never record a replacement.
 CREATE UNIQUE INDEX IF NOT EXISTS test_request_run_resources_one_baseline_idx
   ON test_request_run_resources (run_id) WHERE resource_kind = 'foundation_baseline';
+
+-- Reviews recipe (slice 6c-i, owner decision D-R2): one row per reviewer
+-- assignment reserved for a `reviews` run. `address` is the ONE sanctioned
+-- plain-text exception to the ledger's no-text invariant -- decision 4 makes
+-- the per-run address assignment the recipient-confinement authority, and
+-- staff-controlled throwaway addresses are not credentials or purpose text.
+-- Written once, in the same transaction as the run reservation, and never
+-- updated afterwards (no UPDATE statement touches this table anywhere in the
+-- ledger). Every other surface (receipts, needs_attention_reason, inspect
+-- output) carries only address_sha256.
+CREATE TABLE IF NOT EXISTS test_request_run_reviewer_assignments (
+  assignment_id       BIGSERIAL PRIMARY KEY,
+  run_id              UUID NOT NULL REFERENCES test_request_runs (run_id),
+  sequence            INTEGER NOT NULL,
+
+  source_person_id      UUID NOT NULL,
+  destination_person_id UUID NOT NULL,
+  reused                BOOLEAN NOT NULL,
+  address                TEXT NOT NULL,
+  address_sha256         TEXT NOT NULL,
+
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT test_request_run_reviewer_assignments_run_sequence UNIQUE (run_id, sequence),
+  CONSTRAINT test_request_run_reviewer_assignments_run_source UNIQUE (run_id, source_person_id),
+  CONSTRAINT test_request_run_reviewer_assignments_run_address UNIQUE (run_id, address),
+  CONSTRAINT test_request_run_reviewer_assignments_address_shape CHECK (
+    length(address) BETWEEN 1 AND 320
+    AND address !~ '[[:cntrl:]]'
+    AND address = lower(address)
+  ),
+  CONSTRAINT test_request_run_reviewer_assignments_digest_shape CHECK (
+    address_sha256 ~ '^[0-9a-f]{64}$'
+  )
+);
+
+CREATE INDEX IF NOT EXISTS test_request_run_reviewer_assignments_run_idx
+  ON test_request_run_reviewer_assignments (run_id);

@@ -122,10 +122,10 @@ describe('planBundleFileCopies', () => {
 describe('sandbox rehearsal copy policy and bundle freshness', () => {
   test('is a named executor policy, not the preview read ceilings object, with a stable digest', () => {
     expect(SANDBOX_REHEARSAL_COPY_POLICY).not.toBe(TEST_REQUEST_PREVIEW_READ_LIMITS);
-    expect(SANDBOX_REHEARSAL_COPY_POLICY.version).toBe('sandbox-rehearsal-2026-09-23');
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.version).toBe('sandbox-rehearsal-2026-09-25');
     expect(Object.isFrozen(SANDBOX_REHEARSAL_COPY_POLICY)).toBe(true);
     expect(copyPolicyDigest()).toMatch(/^[0-9a-f]{64}$/);
-    expect(copyPolicyDigest({ ...SANDBOX_REHEARSAL_COPY_POLICY, maxFiles: 8 })).not.toBe(copyPolicyDigest());
+    expect(copyPolicyDigest({ ...SANDBOX_REHEARSAL_COPY_POLICY, maxFiles: 58 })).not.toBe(copyPolicyDigest());
   });
 
   test('rejects a document the policy does not admit', () => {

@@ -53,6 +53,8 @@ function isValidResourceKind(kind) {
   return [
     'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
     'dataverse_document_location', 'sharepoint_file', 'workflow_bypass',
+    'dataverse_request_document', 'foundation_baseline',
+    'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set',
   ].includes(kind);
 }
 
@@ -149,6 +151,8 @@ describe('migration 054 CHECK constraints (pure-JS mirror)', () => {
     it.each([
       'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
       'dataverse_document_location', 'sharepoint_file', 'workflow_bypass',
+      'dataverse_request_document', 'foundation_baseline',
+      'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set',
     ])('accepts %s', (kind) => {
       expect(isValidResourceKind(kind)).toBe(true);
     });
@@ -219,9 +223,9 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
     }
   });
 
-  it('uses IF NOT EXISTS for both tables and both indexes', () => {
-    expect((migration.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(2);
-    expect((migration.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(3);
+  it('uses IF NOT EXISTS for every table and index', () => {
+    expect((migration.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(3);
+    expect((migration.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(4);
   });
 
   it('never stores credentials, bodies, or bundle contents (no such columns declared)', () => {
@@ -322,6 +326,7 @@ describe('migrations manifest lists 054 last and its setup-database.js mirror ma
     expect(migrationTables.map((t) => t.tableName)).toEqual([
       'test_request_runs',
       'test_request_run_resources',
+      'test_request_run_reviewer_assignments',
     ]);
 
     // Isolate the v55Statements array text in setup-database.js so we don't
@@ -335,6 +340,7 @@ describe('migrations manifest lists 054 last and its setup-database.js mirror ma
     expect(setupTables.map((t) => t.tableName)).toEqual([
       'test_request_runs',
       'test_request_run_resources',
+      'test_request_run_reviewer_assignments',
     ]);
 
     for (let i = 0; i < migrationTables.length; i++) {

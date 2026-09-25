@@ -175,7 +175,7 @@ describe('remaining text columns are finite or grammar-bound', () => {
     recipe: 'basic', destinationEnvironment: 'sandbox', sourceDataverseHost: 'wmkf.crm.dynamics.com',
     destinationDataverseHost: 'orgd9e66399.crm.dynamics.com', sourceRequestNumber: '1003222', sourceRevision: 'W/"98622844"',
     bundleSha256: 'a'.repeat(64), copyPolicyDigest: 'b'.repeat(64), planDigest: 'c'.repeat(64), createBodySha256: 'd'.repeat(64),
-    copyPolicyVersion: 'sandbox-rehearsal-2026-09-23', bundleExportedAt: '2026-09-24T03:58:33.103Z',
+    copyPolicyVersion: 'sandbox-rehearsal-2026-09-25', bundleExportedAt: '2026-09-24T03:58:33.103Z',
     expectedGraphSiteId: 'appriver3651007194.sharepoint.com,48930e19-0000-4000-8000-000000000000,11111111-1111-4111-8111-111111111111', expectedGraphDriveId: 'b!GQ6TSC-650adweD3-KAAAAAAAAAAAA',
     fiscalYear: 'December 2026', meetingDate: '2026-12-11', testLabel: 'Codex sandbox request factory rehearsal 2026-09-24 05d56f5d',
   });
@@ -197,6 +197,7 @@ describe('remaining text columns are finite or grammar-bound', () => {
     expect(LEDGER_STEPS).toEqual([
       'fence_source', 'create_request', 'correct_meeting_date', 'provision_location', 'copy_file', 'observe', 'verify', 'ready',
       'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+      'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
     ]);
   });
 
