@@ -596,6 +596,25 @@ describe('slice 6c-i: reviewerAddressSha256', () => {
     expect(() => reviewerAddressSha256('not-an-email')).toThrow(/Ledger receipt rejected/);
     expect(() => reviewerAddressSha256('ghp_1234567890123456789012345678901234')).toThrow(/Ledger receipt rejected/);
   });
+
+  // Codex 6c-i round 6: the address is lowercased BEFORE the exclusion check,
+  // so mixed-case credential shapes and URLs must still be refused -- the same
+  // set migration 054's address_shape CHECK refuses (JS/SQL parity).
+  it.each([
+    ['a URL carrying an @', 'https://example.test/x@y.z'],
+    ['a protocol-relative URL', '//example.test/x@y.z'],
+    ['an AWS key shape (mixed case)', 'AKIAABCDEFGHIJKLMNOP@example.test'],
+    ['a Bearer_ shape (mixed case)', 'Bearer_abcdefgh@example.test'],
+    ['a JWT shape (mixed case)', 'eyJabcdefgh@example.test'],
+    ['a Google key shape (mixed case)', 'AIzaSyabc@example.test'],
+    ['an sk- token shape', 'sk-abcdefghijklmnop@example.test'],
+  ])('rejects %s', (_label, address) => {
+    expect(() => reviewerAddressSha256(address)).toThrow(/Ledger receipt rejected/);
+  });
+
+  it('accepts an ordinary throwaway address that merely CONTAINS letters of a credential prefix', () => {
+    expect(reviewerAddressSha256('skip.baker@example.test').address).toBe('skip.baker@example.test');
+  });
 });
 
 describe('slice 6c-i: reserveRun reviewer assignments (D-R2)', () => {
