@@ -79,6 +79,12 @@ const EXEMPT_FILES = new Set([
   // write path as the production singleton. No entity adapter can exist for
   // a deliberately org-bound service.
   'lib/services/test-requests/ia-sandbox-deps.js',
+  // Test Request Factory bundle-v3 reviewer exporter deps (6c-ii Stage A,
+  // Opus round 2 P3): raw client.get(path) reads (suggestion/answer/person)
+  // for the read-only, production-only source-bundle export, which runs
+  // outside a restriction context like the rest of the exporter script; no
+  // entity adapter is used by design (see the module's own doc comment).
+  'lib/services/test-requests/source-bundle-reviewers.js',
 ]);
 
 const EXEMPT_DIRS = [

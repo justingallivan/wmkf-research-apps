@@ -1,16 +1,22 @@
 /**
  * @jest-environment node
  *
- * P2-5 (Opus round 1): the real reviewer dependency triad
- * (createReviewerSourceDependencies) wired for exportTestRequestSourceBundle.
- * Fake Dataverse (client.get) and Graph transports only -- never live.
+ * The real reviewer dependency triad (createReviewerSourceDependencies) wired
+ * for exportTestRequestSourceBundle. Fake Dataverse (client.get) and Graph
+ * transports only -- never live. Covers Opus round 1 P2-5 and round 2's
+ * P2-A (GUID validation), P2-B (request/person ownership), P2-C's marker
+ * flag (markerColumnPresent, no isolation-switch read), and the P3 file
+ * checks (primary-filename presence, before/after re-verify, metadata-only
+ * second pass).
  */
 import { createReviewerSourceDependencies } from '../../lib/services/test-requests/source-bundle-reviewers.js';
 import { exportTestRequestSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 
 const REQUEST_ID = 'e43ae6ea-698f-f111-8076-6045bd018a07';
+const OTHER_REQUEST_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const SUGGESTION_ID = 'c3f00000-1111-2222-3333-444455556666';
 const PERSON_ID = 'd4f00000-1111-2222-3333-444455556666';
+const OTHER_PERSON_ID = 'ffffffff-1111-4fff-8fff-ffffffffffff';
 
 function ok(body) { return { ok: true, status: 200, body }; }
 
@@ -40,6 +46,7 @@ function makeFakeClient({ suggestionListRows, suggestionRow, personRow, answerRo
 function makeFakeGraph({ files = [] } = {}) {
   const fileBytes = new Map(files.map((f) => [f.id, f.buffer]));
   return {
+    downloadCount: 0,
     async getDriveId() { return 'b!drive-id'; },
     async listFiles() { return files.map(({ buffer, ...rest }) => rest); },
     async getFileMetadataById(driveId, itemId) {
@@ -47,6 +54,7 @@ function makeFakeGraph({ files = [] } = {}) {
       return { id: file.id, name: file.name, size: file.buffer.length, mimeType: file.mimeType, eTag: file.eTag, versionId: file.versionId };
     },
     async downloadFile(driveId, itemId) {
+      this.downloadCount += 1;
       const buffer = fileBytes.get(itemId);
       return { filename: files.find((f) => f.id === itemId).name, size: buffer.length, buffer };
     },
@@ -130,17 +138,29 @@ const REVIEW_FILE = {
   eTag: '"{ETAG},1"', versionId: '1.0', buffer: Buffer.from('review file bytes'),
 };
 
-afterEach(() => { delete process.env.SYNTHETIC_REVIEWER_ISOLATION; });
+const ENTRY = { suggestionId: SUGGESTION_ID, personId: PERSON_ID, requestId: REQUEST_ID };
+
+describe('createReviewerSourceDependencies — markerColumnPresent is required (P2-C forward hazard)', () => {
+  test('throws when markerColumnPresent is omitted', () => {
+    expect(() => createReviewerSourceDependencies({ client: makeFakeClient(), graph: makeFakeGraph() }))
+      .toThrow(/markerColumnPresent/);
+  });
+
+  test('throws when markerColumnPresent is not a boolean', () => {
+    expect(() => createReviewerSourceDependencies({ client: makeFakeClient(), graph: makeFakeGraph(), markerColumnPresent: 'true' }))
+      .toThrow(/markerColumnPresent/);
+  });
+});
 
 describe('discoverReviewers', () => {
-  test('returns the (suggestionId, personId) pairs for the request', async () => {
+  test('returns (suggestionId, personId, requestId) triples for the request', async () => {
     const client = makeFakeClient({
       suggestionListRows: [{ wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_potentialreviewer_value: PERSON_ID }],
     });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph() });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
     const result = await deps.discoverReviewers({ akoya_requestid: REQUEST_ID });
     expect(result.errors).toEqual([]);
-    expect(result.reviewers).toEqual([{ suggestionId: SUGGESTION_ID, personId: PERSON_ID }]);
+    expect(result.reviewers).toEqual([{ suggestionId: SUGGESTION_ID, personId: PERSON_ID, requestId: REQUEST_ID }]);
   });
 
   test('refuses a continuation link (bounded read) rather than silently paging', async () => {
@@ -148,48 +168,137 @@ describe('discoverReviewers', () => {
       suggestionListRows: [{ wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_potentialreviewer_value: PERSON_ID }],
       suggestionListNextLink: true,
     });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph() });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
     await expect(deps.discoverReviewers({ akoya_requestid: REQUEST_ID })).rejects.toThrow(/bounded read limit/);
+  });
+
+  // P2-B: the discover query's request scope. Asserting the exact filter
+  // string is the discriminating test -- Opus's N5 mutation (dropping the
+  // `_wmkf_request_value eq <id>` scope) passed all 9 round-1 tests because
+  // the fake client's routing ignored the filter content entirely.
+  test('scopes the query to the exact request id (mutation N5)', async () => {
+    const client = makeFakeClient({ suggestionListRows: [] });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await deps.discoverReviewers({ akoya_requestid: REQUEST_ID });
+    const listCall = client.calls.find((c) => c.startsWith('/wmkf_appreviewersuggestions?'));
+    expect(listCall).toBeDefined();
+    const decoded = decodeURIComponent(listCall).replace(/\+/g, ' ');
+    expect(decoded).toContain(`_wmkf_request_value eq ${REQUEST_ID}`);
+  });
+
+  // P2-A: GUID validation at every interpolation site.
+  test('refuses a non-GUID source.akoya_requestid', async () => {
+    const client = makeFakeClient({ suggestionListRows: [] });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.discoverReviewers({ akoya_requestid: 'not-a-guid' }))
+      .rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+
+  test('refuses a discovered suggestion with no (or a malformed) person id -- clearly, not a 400', async () => {
+    const client = makeFakeClient({
+      suggestionListRows: [{ wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_potentialreviewer_value: null }],
+    });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.discoverReviewers({ akoya_requestid: REQUEST_ID }))
+      .rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+
+  test('refuses a discovered row with a malformed suggestion id', async () => {
+    const client = makeFakeClient({
+      suggestionListRows: [{ wmkf_appreviewersuggestionid: 'not-a-guid', _wmkf_potentialreviewer_value: PERSON_ID }],
+    });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.discoverReviewers({ akoya_requestid: REQUEST_ID }))
+      .rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+});
+
+describe('P2-A: GUID validation at hydration entry points', () => {
+  test('hydrateReviewer refuses a malformed suggestionId', async () => {
+    const client = makeFakeClient({});
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.hydrateReviewer({ suggestionId: 'bad', personId: PERSON_ID, requestId: REQUEST_ID }))
+      .rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+
+  test('hydrateReviewer refuses a malformed personId', async () => {
+    const client = makeFakeClient({});
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.hydrateReviewer({ suggestionId: SUGGESTION_ID, personId: 'bad', requestId: REQUEST_ID }))
+      .rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+
+  test('readCurrentReviewerIdentity refuses a malformed requestId', async () => {
+    const client = makeFakeClient({});
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.readCurrentReviewerIdentity({ suggestionId: SUGGESTION_ID, personId: PERSON_ID, requestId: 'bad' }))
+      .rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+});
+
+describe('P2-B: ownership check on every read, both passes', () => {
+  test('hydrateReviewer refuses a suggestion belonging to a different request', async () => {
+    const client = makeFakeClient({ suggestionRow: baseSuggestionRow({ _wmkf_request_value: OTHER_REQUEST_ID }) });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.hydrateReviewer(ENTRY)).rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+
+  test('hydrateReviewer refuses a suggestion belonging to a different person', async () => {
+    const client = makeFakeClient({ suggestionRow: baseSuggestionRow({ _wmkf_potentialreviewer_value: OTHER_PERSON_ID }) });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.hydrateReviewer(ENTRY)).rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+
+  test('readCurrentReviewerIdentity refuses a suggestion belonging to a different request (second pass ownership)', async () => {
+    const client = makeFakeClient({ suggestionRow: baseSuggestionRow({ _wmkf_request_value: OTHER_REQUEST_ID }) });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.readCurrentReviewerIdentity(ENTRY)).rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
+  });
+
+  test('readCurrentReviewerIdentity refuses a suggestion belonging to a different person (second pass ownership)', async () => {
+    const client = makeFakeClient({ suggestionRow: baseSuggestionRow({ _wmkf_potentialreviewer_value: OTHER_PERSON_ID }) });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    await expect(deps.readCurrentReviewerIdentity(ENTRY)).rejects.toMatchObject({ code: 'reviewer_source_invalid_identity' });
   });
 });
 
 describe('hydrateReviewer', () => {
-  test('with the switch OFF: no marker in the person select, personIsSynthetic false, no address exported', async () => {
+  test('markerColumnPresent=false: no marker in the person select, personIsSynthetic false, no address exported', async () => {
     const client = makeFakeClient({ suggestionRow: baseSuggestionRow(), personRow: basePersonRow(), answerRows: [baseAnswerRow()] });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }) });
-    const hydrated = await deps.hydrateReviewer({ suggestionId: SUGGESTION_ID, personId: PERSON_ID });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }), markerColumnPresent: false });
+    const hydrated = await deps.hydrateReviewer(ENTRY);
     expect(hydrated.personIsSynthetic).toBe(false);
     expect(hydrated.person.wmkf_emailaddress).toBeNull();
     const personCall = client.calls.find((c) => c.includes('wmkf_potentialreviewerses'));
     expect(personCall).not.toMatch(/wmkf_issyntheticreviewer/);
   });
 
-  test('with the switch ON and marker true: address exported, reviewForm uploaded, files hydrated', async () => {
-    process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+  test('markerColumnPresent=true and marker true: address exported, reviewForm uploaded, files hydrated', async () => {
     const client = makeFakeClient({
       suggestionRow: baseSuggestionRow(),
       personRow: basePersonRow({ wmkf_issyntheticreviewer: true }),
       answerRows: [baseAnswerRow()],
     });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }) });
-    const hydrated = await deps.hydrateReviewer({ suggestionId: SUGGESTION_ID, personId: PERSON_ID });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }), markerColumnPresent: true });
+    const hydrated = await deps.hydrateReviewer(ENTRY);
     expect(hydrated.personIsSynthetic).toBe(true);
     expect(hydrated.person.wmkf_emailaddress).toBe('ada@example.edu');
     expect(hydrated.reviewForm).toBe('uploaded');
     expect(hydrated.files).toHaveLength(1);
     expect(hydrated.files[0].suggestionId).toBe(SUGGESTION_ID);
     expect(hydrated.files[0].contentHash).toMatch(/^[0-9a-f]{64}$/);
+    const personCall = client.calls.find((c) => c.includes('wmkf_potentialreviewerses'));
+    expect(decodeURIComponent(personCall)).toMatch(/wmkf_issyntheticreviewer/);
   });
 
-  test('with the switch ON and marker false: no address exported even though the switch is on', async () => {
-    process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+  test('markerColumnPresent=true and marker false: no address exported even though the column is present', async () => {
     const client = makeFakeClient({
       suggestionRow: baseSuggestionRow(),
       personRow: basePersonRow({ wmkf_issyntheticreviewer: false }),
       answerRows: [baseAnswerRow()],
     });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }) });
-    const hydrated = await deps.hydrateReviewer({ suggestionId: SUGGESTION_ID, personId: PERSON_ID });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }), markerColumnPresent: true });
+    const hydrated = await deps.hydrateReviewer(ENTRY);
     expect(hydrated.personIsSynthetic).toBe(false);
     expect(hydrated.person.wmkf_emailaddress).toBeNull();
   });
@@ -200,18 +309,45 @@ describe('hydrateReviewer', () => {
       personRow: basePersonRow(),
       answerRows: [],
     });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph() });
-    const hydrated = await deps.hydrateReviewer({ suggestionId: SUGGESTION_ID, personId: PERSON_ID });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
+    const hydrated = await deps.hydrateReviewer(ENTRY);
     expect(hydrated.reviewForm).toBe('unreceived');
     expect(hydrated.files).toEqual([]);
+  });
+
+  // P3: the primary filename must actually be among the listed files.
+  test('refuses when wmkf_reviewfilename is not among the listed files', async () => {
+    const client = makeFakeClient({
+      suggestionRow: baseSuggestionRow({ wmkf_reviewfilename: 'not-the-real-file.pdf' }),
+      personRow: basePersonRow(),
+      answerRows: [],
+    });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }), markerColumnPresent: false });
+    await expect(deps.hydrateReviewer(ENTRY)).rejects.toThrow(/does not contain the primary filename/);
+  });
+
+  // P3: before/after re-verify mirrors hydrateSelectedDocument.
+  test('refuses when the file changes between the pre-download read and the post-download re-read', async () => {
+    const graph = makeFakeGraph({ files: [REVIEW_FILE] });
+    let call = 0;
+    const realGetMeta = graph.getFileMetadataById.bind(graph);
+    graph.getFileMetadataById = async (driveId, itemId) => {
+      call += 1;
+      const meta = await realGetMeta(driveId, itemId);
+      // Second call (the post-download re-read) reports a changed eTag.
+      return call === 2 ? { ...meta, eTag: '"{ETAG},2"' } : meta;
+    };
+    const client = makeFakeClient({ suggestionRow: baseSuggestionRow(), personRow: basePersonRow(), answerRows: [] });
+    const deps = createReviewerSourceDependencies({ client, graph, markerColumnPresent: false });
+    await expect(deps.hydrateReviewer(ENTRY)).rejects.toThrow(/changed while its bytes were being verified/);
   });
 });
 
 describe('readCurrentReviewerIdentity', () => {
   test('returns the identity subset matching hydratedReviewerIdentity\'s shape', async () => {
     const client = makeFakeClient({ suggestionRow: baseSuggestionRow(), personRow: basePersonRow(), answerRows: [baseAnswerRow()] });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }) });
-    const identity = await deps.readCurrentReviewerIdentity({ suggestionId: SUGGESTION_ID, personId: PERSON_ID });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }), markerColumnPresent: false });
+    const identity = await deps.readCurrentReviewerIdentity(ENTRY);
     expect(identity).toEqual({
       suggestionId: SUGGESTION_ID,
       suggestionEtag: 'W/"sug-1"',
@@ -220,6 +356,16 @@ describe('readCurrentReviewerIdentity', () => {
       answers: [{ questionKey: 'impact', eTag: 'W/"answer-1"' }],
       files: [{ graphItemId: '01REVIEW', eTag: '"{ETAG},1"', versionId: '1.0' }],
     });
+  });
+
+  // P3: the second pass must never download bytes.
+  test('never calls downloadFile, even for an uploaded review', async () => {
+    const client = makeFakeClient({ suggestionRow: baseSuggestionRow(), personRow: basePersonRow(), answerRows: [] });
+    const graph = makeFakeGraph({ files: [REVIEW_FILE] });
+    const downloadFile = jest.spyOn(graph, 'downloadFile');
+    const deps = createReviewerSourceDependencies({ client, graph, markerColumnPresent: false });
+    await deps.readCurrentReviewerIdentity(ENTRY);
+    expect(downloadFile).not.toHaveBeenCalled();
   });
 });
 
@@ -238,14 +384,16 @@ describe('end-to-end through exportTestRequestSourceBundle', () => {
     };
   }
 
-  test('produces a v3 bundle with the reviewer wired for real (fake transports)', async () => {
+  test('produces a v3 bundle with the reviewer wired for real (fake transports), file downloaded exactly once', async () => {
     const client = makeFakeClient({
       suggestionListRows: [{ wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_potentialreviewer_value: PERSON_ID }],
       suggestionRow: baseSuggestionRow(),
       personRow: basePersonRow(),
       answerRows: [baseAnswerRow()],
     });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph({ files: [REVIEW_FILE] }) });
+    const graph = makeFakeGraph({ files: [REVIEW_FILE] });
+    const downloadFile = jest.spyOn(graph, 'downloadFile');
+    const deps = createReviewerSourceDependencies({ client, graph, markerColumnPresent: false });
     const bundle = await exportTestRequestSourceBundle(
       { sourceRequestNumber: '1003222', dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date('2026-09-23T12:00:00Z') },
       { ...documentDeps(), ...deps },
@@ -253,11 +401,14 @@ describe('end-to-end through exportTestRequestSourceBundle', () => {
     expect(bundle.version).toBe(3);
     expect(bundle.reviewers).toHaveLength(1);
     expect(bundle.reviewers[0].suggestionId).toBe(SUGGESTION_ID);
+    // hydrateReviewer downloads once; readCurrentReviewerIdentity (the
+    // fence's second pass) must not download again.
+    expect(downloadFile).toHaveBeenCalledTimes(1);
   });
 
   test('a request with zero suggestions still gets a v3 bundle with an EMPTY reviewers array', async () => {
     const client = makeFakeClient({ suggestionListRows: [] });
-    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph() });
+    const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
     const bundle = await exportTestRequestSourceBundle(
       { sourceRequestNumber: '1003222', dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date('2026-09-23T12:00:00Z') },
       { ...documentDeps(), ...deps },
