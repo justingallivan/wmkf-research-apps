@@ -33,6 +33,7 @@ import {
   exportTestRequestSourceBundle,
   summarizeSourceBundle,
 } from '../lib/services/test-requests/source-bundle.js';
+import { createReviewerSourceDependencies } from '../lib/services/test-requests/source-bundle-reviewers.js';
 
 const require = createRequire(import.meta.url);
 const { getAccessToken, createClient } = require('../lib/dataverse/client.js');
@@ -119,6 +120,14 @@ async function main() {
   const resourceUrl = `https://${hostname}`;
   const client = createClient({ resourceUrl, token: await getAccessToken(resourceUrl) });
 
+  // P2-5 (Opus round 1): the reviewer dependency triad is always wired, so a
+  // request with zero suggestions still produces a bundle v3 with an empty
+  // `reviewers` array (not a v2 bundle) -- see source-bundle-reviewers.js's
+  // doc comment for the reasoning. `reviews` reservation still requires the
+  // section (any version), so this is never a behavior a caller must branch
+  // on.
+  const reviewerDeps = createReviewerSourceDependencies({ client, graph: SOURCE_BUNDLE_DEPENDENCIES });
+
   const bundle = await withDalContext('export-test-request-source-bundle', () => (
     exportTestRequestSourceBundle({
       sourceRequestNumber: args.sourceRequestNumber,
@@ -132,6 +141,9 @@ async function main() {
       getDriveId: SOURCE_BUNDLE_DEPENDENCIES.getDriveId,
       getFileMetadataById: SOURCE_BUNDLE_DEPENDENCIES.getFileMetadataById,
       readSourceRevision: (requestId) => readSourceRevision(client, requestId),
+      discoverReviewers: reviewerDeps.discoverReviewers,
+      hydrateReviewer: reviewerDeps.hydrateReviewer,
+      readCurrentReviewerIdentity: reviewerDeps.readCurrentReviewerIdentity,
     })
   ));
   fs.mkdirSync(path.dirname(args.out), { recursive: true });
