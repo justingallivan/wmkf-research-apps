@@ -75,6 +75,61 @@ utility, and require base64-shaped ciphertext envelopes so a raw `http(s)` Graph
 cannot satisfy the durable column. A third test-focused Opus attempt stalled twice and produced
 no report; it is not counted as a completed review.
 
+## Session 543 Slice 2 shared model and Zoom producer — 2026-09-25 PT
+
+**[SOURCE-BUILT/OFFLINE-TESTED at `c9f3920d5`; NOT APPLIED, DEPLOYED, OR ENABLED.]** After merging current
+`origin/main` at `0e19f4293` in merge commit `c20775c80`, this branch adds the shared
+post-presentation backing validator and fence-first winner projector; a five-minute Postgres
+request/type lease whose same retry token preserves its fence even after release; the
+Meeting Tracker `presentation-materials` GET/PATCH route and actor-required Zoom producer; a
+distinct Workbench logistics presentation projection; and the full-briefing no-store 302 media
+resolver with a dedicated fail-closed token/IP limiter. The existing bounded briefing document
+route remains intact. Neither media bytes nor Zoom/Microsoft URLs enter context JSON or
+application persistence through the new resolver.
+
+**[VERIFIED offline]** eleven focused suites pass 196 tests covering URL allowlists,
+external/file/both/neither backing, deterministic tie-breaking, lease SQL, generation replay,
+newer-winner replay, stale-holder refusal, exact predecessor updates, explicit actor attribution,
+readiness/access suppression, D19/D28 positive inclusion, no-buffer Graph resolution, malware
+refusal, route allowlists, limiter failure injection, the Graph public-facade boundary, and exact
+ETag-guarded proof cleanup. `check:types`, scoped ESLint, `git diff --check`, and a local
+`npx next build --webpack` production build pass; the build emitted only the repository's existing
+dynamic-dependency warnings. The API route, route lifecycle/auth, route/service boundary,
+Dynamics-context boundary, Dataverse access
+layer, Request Document writer, and trust-boundary GUID gates all pass, each followed by its
+self-test; the route and GUID gates cover all 231 route files. The durable-document sweep found
+no additional live restatement outside the plan, handoff, route matrix, route count, and service
+catalog surfaces updated by this milestone. Documentation/security gates are recorded after the
+final wording below.
+
+**[VERIFIED via two completed read-only Claude Opus implementation reviews, 2026-09-25.]** The
+first review found that a live same-operation holder could reacquire its lease and admit a second
+create; acquisition now preserves the retry fence only after expiry/release, while a live holder
+must renew. It also drove the 2,000-character URL bound, HTTP-plus-HTTPS occurrence count,
+nonempty embedded `pwd`, removal of the unreviewed Zoom detail path, and best-effort reconciliation
+event handling. The second review found no high/critical issue; its defense-in-depth concerns are
+now explicit exact drive/item/HTTPS checks plus Recording-only and MIME/extension validation at
+the briefing resolver. Two broader/test-focused attempts exhausted their turns or stalled without
+a completed report and are not counted. No paid or metered review product was used.
+
+**[VERIFIED Mode A durable-fact sweep.]** Scope was the Slice 2 source-built state and its Graph
+facade/route-count consequences; live external state was excluded because this milestone was
+explicitly offline. Claims: 9 → VERIFIED 5 (implementation, producer→Dataverse/lease persistence,
+Workbench/briefing consumers, bounded tests/gates, no live effects), PARTIAL 1 (Graph-confirmed
+session expiry), PLANNED 3 (schema/access activation, deployment, Safari/near-cap acceptance),
+ASSUMED/UNKNOWN 0. Five in-scope durable surfaces were classified: two already AGREE and three
+STALE (this handoff's interim count/pending wording, the Graph facade method count, and generated
+canonical counts); all three were structurally corrected, leaving zero live stale claims in this
+scope. `check:fact-consistency`, `check:doc-currency`, `check:doc-symbol-refs`,
+`check:canonical-pointers`, `check:secret-scan`, and `check:scaffolding-tokens` pass with each
+self-test sequentially; `check:docs-catalog` and `check:agent-invariants` also pass.
+
+**[VERIFIED no-live-effects.]** No migration or Dataverse schema was applied, no readiness/access
+flag changed, no deployment/alias moved, no SharePoint item or upload session was created, and no
+Production/Dataverse write occurred. The Factory remains unfinished and is not a dependency;
+future live validation still requires a fresh concrete approval list and an individually approved
+human-created Request.
+
 **[OWNER CORRECTION 2026-09-25.]** The Test Request Factory is unfinished and is not a
 prerequisite for this feature. Future bounded live checks must use an individually approved,
 human-created disposable Request. Historical Factory deployment/alias receipts below remain

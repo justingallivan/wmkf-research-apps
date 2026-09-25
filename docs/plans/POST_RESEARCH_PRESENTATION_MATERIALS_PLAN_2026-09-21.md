@@ -1428,6 +1428,38 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 
 ### Slice 2 — Shared material model and Zoom producer
 
+**Implementation status (2026-09-25): SOURCE-BUILT/OFFLINE-TESTED AT `c9f3920d5` ON
+`codex/feature-request`; NOT APPLIED, DEPLOYED, OR ENABLED.** The branch now contains the shared
+external/file backing validator, the deterministic fence-first singleton projector, the named
+five-minute slot lease, the Meeting Tracker GET/PATCH Zoom producer, the distinct Workbench
+projection, and the full-briefing non-buffering media-open route. The Zoom writer accepts only a
+path-bound request, one retry UUID, and bounded paste text; it derives the actor, producer,
+artifact/lifecycle states, cycle, generation key, URL fingerprint, and fence server-side. Exact
+retries reproject the live winner, including when a newer operation has already won. No schema,
+migration, flag, environment, Dataverse, SharePoint, deployment, or alias mutation occurred.
+
+**[VERIFIED via 11 focused suites / 196 tests and cross-layer inspection.]** Backing tests cover
+external/file/both/neither and Recording-only external URLs; Zoom tests cover one eligible
+zoom.us URL, embedded `pwd`, multi-URL, userinfo, non-HTTPS, `zoom.com`, suffix confusion,
+unreviewed paths, and separate passcodes. Lease/service tests cover monotonic/idempotent SQL,
+renew/release fences, generation replay, newer-winner replay, create-to-supersede lease loss,
+explicit predecessor IDs, required actor policy, and post-write reconciliation. Full-briefing
+tests prove current-only Zoom and file members, no context URL leakage, no byte buffering,
+malware refusal, readiness/access suppression, and a fail-closed dedicated resolver limiter.
+The existing bounded briefing document route and legacy logistics `materials` array remain
+unchanged; Workbench reports `presentationMaterialsStatus: 'disabled'` while rollout is off.
+Scoped lint, type checking, diff hygiene, a local webpack production build (with only existing
+dynamic-dependency warnings), and the API-route, route-lifecycle/auth,
+route/service-boundary, Dynamics-context, Dataverse-access, Request Document writer, and
+trust-boundary GUID gates pass with each applicable self-test run sequentially. The public Graph
+facade now owns exact-item ETag-guarded deletion; the Preview proof no longer imports Graph
+transport internals. Fact consistency, doc currency, doc symbol references, canonical pointers,
+secret scan, and scaffolding-token gates pass with each self-test run sequentially; the docs
+catalog and agent-invariant gates pass as well.
+
+The bullets below remain the normative Slice 2 contract; later Slice 3/4 producers must reuse
+the same model and slot-lease store rather than create a second winner rule.
+
 - Add backing-mode validator and latest-only projector.
 - Add Meeting Tracker GET/PATCH service/routes and Zoom URL producer.
 - Acquire the named Recording slot lease/fence in the Zoom PATCH, revalidate before each explicit
@@ -1841,6 +1873,21 @@ this feature branch. The review fixes also compare all four durable indexes acro
 install, catalogue the readiness utility, and require base64-shaped ciphertext envelopes for
 sealed link tokens and Graph upload URLs. One additional test-focused Opus session stalled twice
 and returned no report, so it is not counted as a completed review.
+
+**2026-09-25 Slice 2 read-only Claude Opus implementation reviews:** two completed passes reviewed
+the shared model, Zoom writer/lease, briefing resolver, and focused tests. The first found a real
+duplicate-create race: a live same-operation holder could reacquire the lease. Acquisition now
+permits same-token fence recovery only after expiry/release; a live holder renews instead. Its
+other accepted fixes enforce the 2,000-character external URL bound, count both HTTP and HTTPS
+URL occurrences, require a nonempty embedded `pwd`, remove the unreviewed Zoom detail path, and
+make reconciliation-event persistence best effort. The second pass found no high/critical issue;
+defense-in-depth follow-up made exact drive/item identity, HTTPS/no-userinfo redirects,
+Recording-only external resolution, and MIME-plus-extension checks explicit at the briefing
+resolver. The reviewer concerns about actor attribution and empty SharePoint fields were checked
+against source and refuted: the writer uses the required session-derived actor and the external
+backing contract requires every SharePoint identity/content field empty. Two broader/test-focused
+attempts stalled or exhausted their turns without a completed report and are not counted. No paid
+or metered review product was used.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof. The remaining decision is whether it survives the measured
