@@ -319,6 +319,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS test_request_run_resources_one_baseline_idx
 -- trusted from the application layer (Opus round 1, P3). A row's `sequence`
 -- doubles as the "row id" a receipt may reference (an `assignmentSequence`
 -- receipt key, run-ledger.js KEY_RULES) once 6c-ii's steps need to.
+-- address_shape mirrors run-ledger.js reviewerAddressSha256 (Codex 6c-i round 5):
+-- the one plain-text column admits only a lowercase, credential-free email shape,
+-- so a direct or version-skewed writer cannot persist prose, URLs or secrets here.
 CREATE TABLE IF NOT EXISTS test_request_run_reviewer_assignments (
   assignment_id       BIGSERIAL PRIMARY KEY,
   run_id              UUID NOT NULL REFERENCES test_request_runs (run_id),
@@ -337,8 +340,10 @@ CREATE TABLE IF NOT EXISTS test_request_run_reviewer_assignments (
   CONSTRAINT test_request_run_reviewer_assignments_run_address UNIQUE (run_id, address),
   CONSTRAINT test_request_run_reviewer_assignments_address_shape CHECK (
     length(address) BETWEEN 1 AND 320
-    AND address !~ '[[:cntrl:]]'
+    AND address !~ '[[:cntrl:][:space:]]'
     AND address = lower(address)
+    AND address ~ '^[^[:space:]@]{1,64}@[^[:space:]@]{1,255}[.][^[:space:]@]{1,24}$'
+    AND address !~* '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|akia[0-9a-z]{16}|eyj[a-z0-9_-]{8}|glpat-|aiza|bearer_|https?://|//)'
   ),
   CONSTRAINT test_request_run_reviewer_assignments_digest_shape CHECK (
     address_sha256 ~ '^[0-9a-f]{64}$'

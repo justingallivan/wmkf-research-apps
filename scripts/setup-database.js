@@ -1453,7 +1453,9 @@ $receipt$`,
     CONSTRAINT test_request_run_reviewer_assignments_run_source UNIQUE (run_id, source_person_id),
     CONSTRAINT test_request_run_reviewer_assignments_run_address UNIQUE (run_id, address),
     CONSTRAINT test_request_run_reviewer_assignments_address_shape CHECK (
-      length(address) BETWEEN 1 AND 320 AND address !~ '[[:cntrl:]]' AND address = lower(address)
+      length(address) BETWEEN 1 AND 320 AND address !~ '[[:cntrl:][:space:]]' AND address = lower(address)
+      AND address ~ '^[^[:space:]@]{1,64}@[^[:space:]@]{1,255}[.][^[:space:]@]{1,24}$'
+      AND address !~* '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|akia[0-9a-z]{16}|eyj[a-z0-9_-]{8}|glpat-|aiza|bearer_|https?://|//)'
     ),
     CONSTRAINT test_request_run_reviewer_assignments_digest_shape CHECK ( address_sha256 ~ '^[0-9a-f]{64}$' ),
     CONSTRAINT test_request_run_reviewer_assignments_digest_matches_address CHECK (

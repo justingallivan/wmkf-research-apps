@@ -228,6 +228,25 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     )).rejects.toThrow();
   });
 
+  it('Codex 6c-i round 5: the DB address CHECK rejects direct inserts of prose, URLs and credential-shaped values', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '2') });
+    createdRunIds.push(plan.runId);
+    await ledger.reserveRun({
+      actorId, idempotencyKey: `key-reviews-addr-shape-${plan.runId}`, plan,
+      reviewerAssignments: [{ sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'ok@example.test' }],
+    });
+    const sha = (v) => crypto.createHash('sha256').update(v).digest('hex');
+    const bad = ['confidential prose about a reviewer', 'https://example.test/x@y.z', 'sk-abcdefghijklmnop@example.test', 'not-an-address', 'a b@example.test'];
+    for (const [i, address] of bad.entries()) {
+      await expect(db.query(
+        `INSERT INTO test_request_run_reviewer_assignments (run_id, sequence, source_person_id, destination_person_id, reused, address, address_sha256)
+         VALUES ($1::uuid, $2, $3::uuid, $4::uuid, false, $5::text, $6::text)`,
+        [plan.runId, i + 2, crypto.randomUUID(), crypto.randomUUID(), address, sha(address)],
+      )).rejects.toThrow(/address_shape/);
+    }
+  });
+
   it('P3: the DB CHECK ties address_sha256 to address -- a mismatched digest is rejected even though both columns are independently well-shaped', async () => {
     const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
     const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '2') });
