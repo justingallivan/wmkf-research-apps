@@ -40,6 +40,7 @@ const document = (over = {}) => ({
   eTag: '"{ETAG},1"',
   versionId: '1.0',
   contentHash: 'a'.repeat(64),
+  suggestionId: null,
   ...over,
 });
 const build = (over = {}) => buildSourceBundle({
@@ -99,7 +100,10 @@ test('builds a canonical bundle from the clone projection', () => {
   const bundle = build();
   expect(bundle).toMatchObject({
     kind: SOURCE_BUNDLE_KIND,
-    version: SOURCE_BUNDLE_VERSION,
+    // No reviewer section supplied here -> version 2, even though the
+    // module's SOURCE_BUNDLE_VERSION constant (the version a bundle WITH a
+    // reviewers[] section gets) is now 3 (6c-ii Stage A, bundle v3).
+    version: 2,
     exportedAt: '2026-09-23T12:00:00.000Z',
     source: {
       dataverseHost: 'wmkf.crm.dynamics.com',

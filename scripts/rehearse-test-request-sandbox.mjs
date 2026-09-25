@@ -50,7 +50,11 @@ import {
   reserveRehearsalReceipt,
   updateRehearsalReceipt,
 } from '../lib/services/test-requests/rehearsal-receipt.js';
-import { readSourceBundle, summarizeSourceBundle } from '../lib/services/test-requests/source-bundle.js';
+import {
+  readSourceBundle,
+  summarizeSourceBundle,
+  assertBundleHasReviewerSectionForRecipe,
+} from '../lib/services/test-requests/source-bundle.js';
 import {
   assertBundleFresh,
   copyBundleFiles,
@@ -603,6 +607,7 @@ async function runReserve(client, args, ledgerUrl) {
   const { graph, sharePointTarget } = await buildGraphContext();
   const preflight = await runPreflight(client, graph, sharePointTarget);
   const bundle = readSourceBundle(readJson(args.bundle));
+  assertBundleHasReviewerSectionForRecipe(args.recipe, bundle);
   const source = bundle.source.request;
   if (source.akoya_requestnum !== args.sourceRequestNumber) {
     throw new Error(`Bundle source is Request ${source.akoya_requestnum}; --source-request-number attests ${args.sourceRequestNumber}. Refusing.`);
