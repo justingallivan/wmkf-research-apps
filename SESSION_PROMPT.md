@@ -1,5 +1,48 @@
 # Session 543 Prompt: Presentation upload performance (branch-local)
 
+## Session 543 representative Chrome benchmark — 2026-09-25 PT
+
+**[VERIFIED via Git, Vercel CLI, signed-in Google Chrome, immutable deployment logs, and
+Microsoft Graph]** `codex/feature-request` commit `cc97dccd7` was redeployed as Ready Preview
+deployment `dpl_FX7HvZZWTvvVchDytB3rRqCtEYoX`. With the owner's explicit approval, the shared
+alias temporarily moved from Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and the
+three branch-scoped Preview settings `NEXTAUTH_URL`, `SHAREPOINT_SITE_URL`, and
+`DATAVERSE_ALLOW_PROD_READS` were temporarily added only for `codex/feature-request`. The target
+was owner-selected Request `1003220` / GUID `4bfb6e40-678f-f111-8076-7ced8d3d15a6`, folder
+`akoya_request/1003220_4BFB6E40678FF11180767CED8D3D15A6/Post Site Visit Materials/`, using
+`Gallivan_Peleg Intro.mp4` (100,665,703 bytes; SHA-256
+`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`). No Dataverse write
+occurred.
+
+**[VERIFIED baseline]** a separate actual Google Chrome upload sent the file browser-direct to a
+second Graph session with ten sequential 10 MiB-or-smaller ranges. Nine `202` responses advanced
+the exact expected offset and the final response was `201`; no retry or pause occurred. It ran
+09:02:38.368–09:08:16.366 PDT: 337.997 seconds and 2.383 decimal Mbps. Graph read-back matched
+100,665,703 bytes. The first exact cleanup correctly failed closed with `412` after SharePoint
+changed the item's ETag; a fresh stable-ID read supplied the current ETag, deletion succeeded,
+and Graph confirmed item `01G4GVMSZVL54J6EWVVRGZ7MMA2OSIJOFB` absent.
+
+**[VERIFIED application run]** Vercel logged the begin request at 09:11:12.912 PDT and the
+complete verification request at 09:16:13.045 PDT: 300.133 seconds wall time including one
+deliberate pause. Chrome showed Pausing while the first range remained in flight, then Paused at
+exactly 10.0 MiB Graph-confirmed and 0 bytes in flight. Resume continued from that boundary.
+Confirmed and in-flight bytes remained distinct; the displayed ETA decreased to zero and the
+final post-resume active rate was 3.22 decimal Mbps. Displayed Graph expiry advanced from
+09:26:19 to 09:26:43 and 09:30:56 PDT. No reconnect, retry, or watchdog state surfaced.
+Microsoft and the application verified the full committed file, and Finish saving minted the
+five-minute playback proof. Exact app item `01G4GVMS7LYCLMCV7HI5GL427ZLUYRYSV2` was deleted
+with its fresh ETag; Graph confirmed it absent and the governed folder empty. The app's active
+rate was about 35% above the immediately preceding baseline and its pause-inclusive wall rate was
+about 2.683 Mbps. Treat this as evidence of no apparent app penalty in this one run, not a
+generalized acceleration. A 2,000,000,000-byte transfer at 3.22 Mbps is about 82.8 minutes
+active (**ESTIMATE**), not near-cap PASS.
+
+**[VERIFIED restoration]** the shared alias is back on exact Ready Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; all three temporary `codex/feature-request` Preview settings
+were removed and a branch-filtered environment listing is empty. Both upload approvals and both
+cleanup approvals are spent. Temporary benchmark scripts were removed. No token, preauthenticated
+upload URL, or playback URL is retained in this handoff.
+
 ## Session 543 offline implementation summary — 2026-09-25 PT
 
 **[VERIFIED via Git and source]** Commit `bab770fe6` (`Build resilient browser Graph upload
@@ -31,10 +74,10 @@ async stale-state guards, paused ETA, refreshed expiry display, reconnect copy, 
 timer cleanup, and final-range rate accounting; it found no remaining authorization,
 exact-cleanup, fingerprint, or no-proxy regression.
 
-**Still open and not claimed:** no revised code has been deployed or live-benchmarked.
-Graph-confirmed upload-session expiry remains PARTIAL; prior 100 MB receipts contain no timing.
-The representative desktop benchmark, corrective live expiry run, Production-safe durable flow,
-Factory-created test request, desktop macOS Safari long-seek/Download check, and actual near-cap
+**Still open and not claimed:** the representative desktop benchmark is now PASS, but
+Graph-confirmed upload-session expiry remains PARTIAL because this benchmark did not force a live
+terminal expiry. The corrective live expiry run, Production-safe durable flow, Factory-created
+Production test request, desktop macOS Safari long-seek/Download check, and actual near-cap
 Production upload remain deferred. iPadOS is out of scope and no further Edge run is planned.
 
 **Concrete approval list before any live step:** obtain a fresh owner approval naming (1) the
@@ -195,7 +238,7 @@ row waits on Edge. See the plan's matrix note.
 The detailed matrix, click steps, and receipt are in
 `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`.
 
-**Current Slice 0 handoff cells (2026-09-24 scope):** no current unresolved FAIL is recorded. The earlier Chrome CSP and
+**Current Slice 0 handoff cells (updated 2026-09-25):** no current unresolved FAIL is recorded. The earlier Chrome CSP and
 live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
 
 | Browser or scenario | Status | Evidence or limit |
@@ -209,14 +252,15 @@ live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
 | Proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] old link refused as expired; fresh link from same committed item played and accepted End/Home seeks with one resolver action. |
 | Long-duration seek | DEFERRED | The 67.33-second recording cannot prove the >2-minute Safari case. |
 | Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via 2026-09-24 owner decision] one desktop Production run remains for the proposed 2 GB cap. [PLANNED] Combine it with macOS Safari on a Factory-created test request. |
-| Production-sized chunk policy and measured throughput | PLANNED | The 320 KiB/60-second proof has no timed receipt. Implement §7.2.1 offline, benchmark the shared production browser module on a newly approved disposable target, then run the actual Production near-cap desktop gate. |
+| Production-sized chunk policy and measured throughput | PASS FOR REPRESENTATIVE CHROME PREVIEW BENCHMARK | [VERIFIED 2026-09-25] the 100,665,703-byte app run used the shared 10 MiB transport, paused at 10.0 MiB Graph-confirmed, resumed, reached a displayed 3.22 Mbps active rate, and took 300.133 seconds begin-to-verification including the pause. The separate same-machine/network direct-Graph Chrome baseline took 337.997 seconds at 2.383 Mbps. Both exact items are Graph-confirmed absent and the folder is empty. This does not close the actual near-cap Production gate. |
 
 **Owner actions:** choose and approve each new disposable request, SharePoint target, and MP4;
 approve each Preview deployment and temporary shared-alias move separately. The owner's
 2026-09-24 override permits Dataverse reads when needed; consult before writes. Run desktop
 macOS Safari by hand; no Edge or iPadOS follow-up is planned. Re-inspect
 the alias target and branch-scoped Preview variable names before any move, then restore and
-re-inspect. The prior Edge upload and cleanup approvals are spent.
+re-inspect. The prior Edge upload/cleanup approvals and both 2026-09-25 benchmark
+upload/cleanup approvals are spent.
 
 [VERIFIED via Git and branch-only push] This checkout is `codex/feature-request`.
 The owner-approved `origin/main` merge is `1d455ba9a`; the offline Slice 0 hardening is
