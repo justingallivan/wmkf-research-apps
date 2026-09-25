@@ -64,6 +64,9 @@ describe('assertTestRequestMarkerNotWritten', () => {
     ['property-level PUT', `akoya_requests(${REQUEST_ID})/wmkf_istestrequest`],
     ['property-level DELETE with $value', `akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid/$value`],
     ['absolute property URL', `https://example.crm.dynamics.com/api/data/v9.2/akoya_requests(${REQUEST_ID})/wmkf_istestrequest`],
+    ['percent-encoded property URL (Codex 6c-i round 3)', `wmkf_potentialreviewerses(${REQUEST_ID})/%77mkf_issyntheticreviewer`],
+    ['fully percent-encoded property URL', `akoya_requests(${REQUEST_ID})/%77%6D%6B%66_istestrequest`],
+    ['malformed percent-encoding (fails closed)', `akoya_requests(${REQUEST_ID})/%ZZmkf_istestrequest`],
   ])('refuses a %s that names the field in the URL', (_label, url) => {
     expect(() => assertTestRequestMarkerNotWritten(undefined, url))
       .toThrow(expect.objectContaining({ code: 'test_request_marker_immutable' }));
@@ -177,6 +180,8 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
     ['nested deep insert', (c) => c.post('/accounts', { name: 'x', akoya_request: { wmkf_istestrequest: true } })],
     ['property-level DELETE', (c) => c.delete_(`/akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid`)],
     ['post (synthetic-reviewer person marker)', (c) => c.post('/wmkf_potentialreviewerses', { wmkf_issyntheticreviewer: true })],
+    ['percent-encoded property PUT (Codex 6c-i round 3)', (c) => c.raw('PUT', `/wmkf_potentialreviewerses(${REQUEST_ID})/%77mkf_issyntheticreviewer`, { value: false })],
+    ['malformed percent-encoded property PUT (fails closed)', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})/%ZZmkf_istestrequest`, { value: false })],
   ])('refuses a %s that names the marker before any fetch', async (_label, send) => {
     const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't' });
     await expect(send(client)).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
