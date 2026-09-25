@@ -165,7 +165,9 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
   });
 
   test('keeps its marker field list identical to the service guard', () => {
-    expect([...TEST_REQUEST_MARKER_FIELDS].sort()).toEqual(['wmkf_istestrequest', 'wmkf_testcreationrunid']);
+    expect([...TEST_REQUEST_MARKER_FIELDS].sort()).toEqual([
+      'wmkf_issyntheticreviewer', 'wmkf_istestrequest', 'wmkf_testcreationrunid',
+    ]);
   });
 
   test.each([
@@ -174,6 +176,7 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
     ['raw PUT', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})/wmkf_istestrequest`, { value: true })],
     ['nested deep insert', (c) => c.post('/accounts', { name: 'x', akoya_request: { wmkf_istestrequest: true } })],
     ['property-level DELETE', (c) => c.delete_(`/akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid`)],
+    ['post (synthetic-reviewer person marker)', (c) => c.post('/wmkf_potentialreviewers', { wmkf_issyntheticreviewer: true })],
   ])('refuses a %s that names the marker before any fetch', async (_label, send) => {
     const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't' });
     await expect(send(client)).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
@@ -183,6 +186,12 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
   test('lets the factory CLI write the marker when it opts in', async () => {
     const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't', allowTestRequestMarkerWrites: true });
     await client.post('/akoya_requests', { wmkf_istestrequest: true });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('lets the factory CLI write the synthetic-reviewer person marker when it opts in (D-R1: the person create goes through this same raw client)', async () => {
+    const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't', allowTestRequestMarkerWrites: true });
+    await client.post('/wmkf_potentialreviewers', { wmkf_issyntheticreviewer: true });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

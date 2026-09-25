@@ -1,0 +1,18 @@
+{
+  "name": "wmkf_potentialreviewer-synthetic-reviewer-marker",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_potentialreviewers",
+  "_comment": "Isolated additive synthetic-reviewer marker (Test Request Factory, D-R1, owner decision 2026-09-25; decision-11 pattern). Creation-only schema apply; MUST carry no Power Automate trigger. Preflight existing attributes and target permissions before apply. Do not mix unrelated drifted relationships into this wave. Applied to the sandbox before the Reviews recipe's live proof and to production before the recipe's production release (platform-owner consult is the owner's action, recorded in the design doc, not this file).",
+  "attributes": [
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_IsSyntheticReviewer",
+      "displayName": "Synthetic Test Reviewer",
+      "description": "Server-owned isolation marker on a potential reviewer person row. Ordinary rows default false; the Reviews recipe's seeder writes true in the initial person INSERT and never on any other row. No client may change this marker after create.",
+      "default": false,
+      "trueLabel": "Synthetic reviewer",
+      "falseLabel": "Ordinary reviewer",
+      "requiredLevel": "None"
+    }
+  ]
+}
