@@ -1,4 +1,22 @@
-# Presentation branch continuation — 2026-09-23
+# Presentation branch continuation — 2026-09-24
+
+**Performance planning handoff (2026-09-24 PT):** [VERIFIED via branch source and the owner's
+performance steering brief] the Preview proof uses 320 KiB sequential Graph fragments, a fixed
+60-second XHR timeout, and no automatic fragment retry. Its earlier 100 MB receipts prove
+correctness/recovery, not throughput. [PLANNED in
+`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md` §7.2.1] retain browser-direct
+Graph for MP4, use a code-owned 10 MiB default, status-aware bounded retry and live expiry,
+stall-aware timeouts, truthful throughput/ETA UI, a timed desktop benchmark, and the owner's
+actual near-cap macOS Safari Production gate. No implementation, upload, deployment, alias move,
+or Production write occurred in this planning session. [VERIFIED via `claude auth status` outside
+the sandbox] the ordinary Claude.ai OAuth session was available. Three read-only
+`claude -p --model opus` passes found a Production isolation blocker and expiry/retry/CSP/release
+sequencing gaps; the revised plan uses an exact Factory test-request access mode and addresses
+the findings. The final follow-up named two wording fixes—retaining the registry-bound Production
+test item and using a same-Mac/same-network Graph baseline for the Safari gate—and said those
+would make the plan ready for implementation; both were applied. The proposal remains
+**PLANNED**, not shipped. The older handoff below records
+historical browser runs.
 
 **Chrome recovery continuation (2026-09-24 PT):** [VERIFIED via Git] this worktree remains on
 `codex/feature-request`, clean before these documentation edits, with the `origin/main` merge
@@ -59,11 +77,13 @@ Cleanup moved it to the recycle bin. [VERIFIED via Graph] exact-path lookup retu
 and the governed folder listing was empty. [VERIFIED via Vercel CLI] the alias was restored and
 re-inspected at the Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the three
 temporary Preview variables scoped only to `codex/feature-request` were removed, and the
-Factory branch's four scoped variable names remained. All three Chrome recovery cells are
-PASS. **Owner scope update (2026-09-24 PT):** iPadOS support is outside this staff feature's
+Factory branch's four scoped variable names remained. Reload/reselect and proof-token recovery
+are PASS; upload-session expiry is PARTIAL after review because the old proof refused at its
+sealed initial expiry while Graph's accepted cancellation did not prove live-session expiry.
+**Owner scope update (2026-09-24 PT):** iPadOS support is outside this staff feature's
 release matrix; no office staff will use an iPad for this work. The owner kept the near-cap
 upload check on desktop for the proposed 2 GB cap. The remaining Slice 0 browser run is
-Production macOS Safari on a Factory-created test request: upload, both Watch shapes, long
+Production macOS Safari on a Factory-created test request: upload, the selected Watch shape, long
 seeking, and Download integrity. [PLANNED] Combine the real near-cap desktop upload with that
 run. Earlier iPadOS assignments below
 are historical and superseded. The plan's dated Slice 0 matrix has the full receipts.
@@ -104,10 +124,11 @@ live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
 | macOS Safari full path | DEFERRED | [VERIFIED via Session 536 decision] Production run on a Factory-created test request remains. |
 | iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] No iPadOS acceptance run is required for this staff feature. |
 | Reload/same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome and Graph] paused at 0.9 MiB, reload/reselect, direct Microsoft `202` resume to full commit, exact item cleanup and Graph 404. |
-| Upload-session expiry recovery | PASS | [VERIFIED via Chrome] second session paused at 0.6 MiB; after 8:49:47 PM PDT expiry, Resume displayed the specific expired-session error and retained the permit. Approved Cleanup returned `session_cancelled` and no item. [VERIFIED via Graph] fresh third session committed 100,665,703 bytes. [REPORTED by owner] Finish saving created the proof and Cleanup moved the item to recycle bin. [VERIFIED via Graph] exact path not found and folder empty. |
+| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] second session paused at 0.6 MiB; after the *initial sealed* 8:49:47 PM PDT expiry, Resume displayed an expired-session error and retained the permit. Approved Cleanup returned `session_cancelled`, so Graph had not confirmed expiry. [VERIFIED via Graph] fresh third session committed 100,665,703 bytes. [REPORTED by owner] Finish saving created the proof and Cleanup moved the item to recycle bin. [VERIFIED via Graph] exact path not found and folder empty. Correct the initial-expiry guard and retest live status recovery. |
 | Proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] old link refused as expired; fresh link from same committed item played and accepted End/Home seeks with one resolver action. |
 | Long-duration seek | DEFERRED | The 67.33-second recording cannot prove the >2-minute Safari case. |
 | Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via 2026-09-24 owner decision] one desktop Production run remains for the proposed 2 GB cap. [PLANNED] Combine it with macOS Safari on a Factory-created test request. |
+| Production-sized chunk policy and measured throughput | PLANNED | The 320 KiB/60-second proof has no timed receipt. Implement §7.2.1 offline, benchmark the shared production browser module on a newly approved disposable target, then run the actual Production near-cap desktop gate. |
 
 **Owner actions:** choose and approve each new disposable request, SharePoint target, and MP4;
 approve each Preview deployment and temporary shared-alias move separately. The owner's
