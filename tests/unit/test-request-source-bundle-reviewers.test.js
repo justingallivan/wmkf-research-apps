@@ -188,6 +188,10 @@ describe('projection + strict validator', () => {
     ['wmkf_externaltokenhash', { suggestion: { wmkf_externaltokenhash: 'abc' } }],
     ['_wmkf_honorariumrequest_value', { suggestion: { _wmkf_honorariumrequest_value: 'req-1' } }],
     ['wmkf_honorariumrequest', { suggestion: { wmkf_honorariumrequest: 'req-1' } }],
+    // P2-1 (Opus round 1, adjudication 3): wmkf_summarybloburl is a real URL
+    // field (entity-registry.js:188); the guessed wmkf_proposalurl /
+    // wmkf_proposalpassword names were dropped (not real fields).
+    ['wmkf_summarybloburl', { suggestion: { wmkf_summarybloburl: 'https://blob.example/summary.txt' } }],
   ])('rejects a bundle carrying the forbidden field %s', (_name, rawOverride) => {
     const base = reviewerEntry();
     const entry = reviewerEntry({
@@ -254,11 +258,15 @@ describe('classifyReviewerForm', () => {
     )).toBe(REVIEW_FORM.RECEIVED_NO_FILE);
   });
 
-  test('a complete legacy pointer pair is received_no_file', () => {
-    expect(classifyReviewerForm(
+  // P2-2 (Opus round 1): the plan requires an UNRECOGNIZED pointer state to
+  // fail the export. `legacy` (a pre-request-level-Reviews-folder retained
+  // file, review-file-provenance.js:35) is not a form Stage A/B/C models, so
+  // it must fail closed, not be silently downgraded to received_no_file.
+  test('a complete legacy-provenance pointer pair fails the export', () => {
+    expect(() => classifyReviewerForm(
       { folder: 'x', filename: 'y', reviewReceivedAt: '2026-01-01' },
       classify('legacy'),
-    )).toBe(REVIEW_FORM.RECEIVED_NO_FILE);
+    )).toThrow(/unrecognized provenance/);
   });
 
   test('no pointers with a received stamp is received_no_file', () => {
@@ -287,6 +295,45 @@ describe('classifyReviewerForm', () => {
       { folder: 'x', filename: 'y', reviewReceivedAt: null },
       classify('something-unknown'),
     )).toThrow(/unrecognized provenance/);
+  });
+
+  // P2-2: the classifier dependency defaults to the REAL shared helper (no
+  // stub in production code paths); these fixtures use real folder paths
+  // through the real classifyReviewFileProvenance, not a stub.
+  describe('with the real classifyReviewFileProvenance (no stub, default parameter)', () => {
+    test('a request-level Reviews folder (filer-generated) is received_no_file, file not exported', () => {
+      const form = classifyReviewerForm({
+        folder: `1003222_E43AE6EA/smith_${'a'.repeat(32)}/Reviews`,
+        filename: 'Review.docx',
+        reviewReceivedAt: '2026-01-10T00:00:00Z',
+      });
+      expect(form).toBe(REVIEW_FORM.RECEIVED_NO_FILE);
+    });
+
+    test('a Reviewer_Uploads/.../attempt_<32hex> folder is uploaded', () => {
+      const form = classifyReviewerForm({
+        folder: `1003222_E43AE6EA/Reviewer_Uploads/smith_1a2b3c4d/attempt_${'a'.repeat(32)}`,
+        filename: 'review.pdf',
+        reviewReceivedAt: '2026-01-10T00:00:00Z',
+      });
+      expect(form).toBe(REVIEW_FORM.UPLOADED);
+    });
+
+    test('a legacy (unrecognized) real path fails the export', () => {
+      expect(() => classifyReviewerForm({
+        folder: '1003222_E43AE6EA/Reviewer_Uploads/Generated/notactuallyhex',
+        filename: 'Review.docx',
+        reviewReceivedAt: '2026-01-10T00:00:00Z',
+      })).toThrow(/unrecognized provenance/);
+    });
+
+    test('a partial pointer pair fails the export (real classifier never consulted)', () => {
+      expect(() => classifyReviewerForm({
+        folder: `1003222_E43AE6EA/Reviewer_Uploads/smith_1a2b3c4d/attempt_${'a'.repeat(32)}`,
+        filename: null,
+        reviewReceivedAt: null,
+      })).toThrow(/partial file pointer pair/);
+    });
   });
 });
 
