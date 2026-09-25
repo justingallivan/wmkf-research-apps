@@ -24,6 +24,8 @@
 
 import { jest } from '@jest/globals';
 import nodeCrypto from 'node:crypto';
+/** sha256 of the 'claim-11111111' token the resume fixtures below carry on their Generating rows: the digest this run journaled before its create POST. */
+const CLAIM_11111111_SHA256 = nodeCrypto.createHash('sha256').update('claim-11111111').digest('hex');
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { ledgerReasonOrThrow, assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 import { MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
@@ -600,6 +602,7 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
       resourceId: 1, runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
       readback: {
         generationKey, requestDocumentId: REQUEST_DOCUMENT_ID,
+        claimTokenSha256: CLAIM_11111111_SHA256, registryCreateAttemptedAt: new Date().toISOString(),
         uploadAttemptedAt: new Date().toISOString(),
         itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', driveId: 'b!driveIdSample1234567890', siteId: 'contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222',
       },
@@ -663,6 +666,7 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
       resourceId: 1, runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
       readback: {
         generationKey, requestDocumentId: REQUEST_DOCUMENT_ID,
+        claimTokenSha256: CLAIM_11111111_SHA256, registryCreateAttemptedAt: new Date().toISOString(),
         uploadAttemptedAt: new Date().toISOString(),
         itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', driveId: 'b!driveIdOther9876543210', siteId: 'contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222',
       },
@@ -712,6 +716,7 @@ describe('stepSeedInitialAssessment — dispatch-marker resume rule', () => {
       resourceId: 1, runId: RUN_ID, leaseToken: claimed.leaseToken, leaseGeneration: claimed.leaseGeneration,
       readback: {
         generationKey, requestDocumentId: REQUEST_DOCUMENT_ID, uploadAttemptedAt: new Date().toISOString(),
+        claimTokenSha256: CLAIM_11111111_SHA256, registryCreateAttemptedAt: new Date().toISOString(),
         itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', driveId: 'b!driveIdSample1234567890', siteId: 'contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222',
       },
       outcome: 'dispatched',
@@ -856,6 +861,82 @@ describe('stepSeedInitialAssessment — SharePoint site/drive binding (P1-B)', (
 });
 
 describe('stepSeedInitialAssessment — idempotent resume', () => {
+  // Ownership of ANY row at the generation key (Codex adversarial round 3,
+  // F7): a foreign Generating row (a staff Generate in progress on the
+  // sandbox request) must never be resumed, patched or uploaded to.
+  function generatingRowFor(generationKey, claimToken) {
+    return {
+      wmkf_requestdocumentid: REQUEST_DOCUMENT_ID, wmkf_artifacttype: 100000000, wmkf_operationstatus: 100000000, wmkf_lifecyclestate: 100000000,
+      wmkf_generationkey: generationKey, wmkf_claimtoken: claimToken,
+      wmkf_sharepointfolderpath: `9009009_${REQUEST_ID.replace(/-/g, '').toUpperCase()}/Artifacts/Initial Assessment`,
+      wmkf_filename: '9009009 Initial Assessment aaaaaaaa-bbbbbbbb.docx', wmkf_contenthash: null,
+      _wmkf_request_value: REQUEST_ID, '@odata.etag': 'W/"row-1"', modifiedon: new Date().toISOString(),
+    };
+  }
+  function mockGeneratingRowNoWrites(row) {
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method && init.method !== 'GET') throw new Error(`no write may reach Dataverse for a foreign row: ${init.method} ${href}`);
+      if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [row] });
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+  }
+
+  it('a foreign Generating row at the generation key with NO receipt from this run is refused with ia_pointer_mismatch, never patched or uploaded to (round 3, F7)', async () => {
+    const { generationKey } = identityFor();
+    mockGeneratingRowNoWrites(generatingRowFor(generationKey, 'staff-generate-token'));
+    const graph = fakeGraph();
+    const { result, calls } = await run({ graph });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/this run never journaled a create; refusing to adopt/);
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+    expect(calls.filter((c) => c.op === 'recordResourceReadback' && c.readback?.requestDocumentId)).toHaveLength(0);
+  });
+
+  it('a foreign Generating row whose claim token is not the one this run journaled before its create is refused with ia_pointer_mismatch (round 3, F7)', async () => {
+    const { generationKey } = identityFor();
+    mockGeneratingRowNoWrites(generatingRowFor(generationKey, 'staff-generate-token'));
+    const graph = fakeGraph();
+    const { result, calls } = await run({ graph }, [{
+      resourceId: 1, sequence: 1, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey }, outcome: 'dispatched',
+      readback: { generationKey, claimTokenSha256: CLAIM_11111111_SHA256, registryCreateAttemptedAt: new Date().toISOString() },
+    }]);
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/does not carry this run's claim token/);
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+    expect(calls.filter((c) => c.op === 'recordResourceReadback' && c.readback?.claimTokenSha256 !== CLAIM_11111111_SHA256)).toHaveLength(0);
+  });
+
+  it('a create race: the POST fails and the reread finds someone else\'s row at the key -- refused with ia_pointer_mismatch, not adopted (round 3, F7)', async () => {
+    const { generationKey } = identityFor();
+    let postCount = 0;
+    fetch.mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.includes('login.microsoftonline.com')) return tokenResponse();
+      if (init?.method === 'POST' && href.includes('wmkf_requestdocuments')) {
+        postCount += 1;
+        return Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('Something unexpected happened'), json: () => Promise.resolve({}) });
+      }
+      if (init?.method && init.method !== 'GET') throw new Error(`no further write may reach Dataverse: ${init.method} ${href}`);
+      if (href.includes('wmkf_requestdocuments')) {
+        return jsonResponse({ value: postCount === 0 ? [] : [generatingRowFor(generationKey, 'someone-elses-token')] });
+      }
+      throw new Error(`unexpected fetch to ${href}`);
+    });
+    const graph = fakeGraph();
+    const { result, calls } = await run({ graph });
+    expect(postCount).toBe(1);
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/does not carry this run's claim token/);
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+    expect(calls.filter((c) => c.op === 'recordResourceReadback' && c.readback?.requestDocumentId)).toHaveLength(0);
+  });
+
   // A Ready row exactly as commitReadyLineage leaves it (Codex adversarial
   // round 1, F1; ownership per round 2, F5): the recovery path must prove
   // the row is THIS run's (claim-token digest journaled before the create
