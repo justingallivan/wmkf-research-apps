@@ -70,7 +70,9 @@ the tracked seeds. No email was sent.
   failure can make an existing personal override appear absent. The explicit
   Save action is still required to change that override; see the feature
   execution plan's residuals.
-- [ ] Inventory suite-wide email flows and record each gap against this requirement.
+- [x] Inventory suite-wide email flows and record each gap against this requirement.
+  See `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md` (source-only
+  inventory; follow-up slices remain proposed).
 - [ ] Extend the capability consistently in bounded, reviewed follow-ups.
 
 The separate Test Request Factory platform status is tracked in

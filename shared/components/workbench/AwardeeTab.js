@@ -7,8 +7,9 @@
  *   - website HTML (b):   GET  /api/workbench/grantee-deliverables/website-html?requestId=
  *   - cycle export (c):   GET  /api/workbench/grantee-deliverables/cycle-export?cycleCode=
  *
- * Flow: Generate (or load) the style-guide abstract → confirm the two recipients
- * (PI in To, liaison in Cc; both pre-filled, editable) → preview/edit the email →
+ * Flow: Generate (or load) the style-guide abstract → confirm recipients
+ * (PI in To, liaison in Cc; both pre-filled, editable, with additional Cc addresses
+ * allowed) → preview/edit the email →
  * Send. Research-only scope (the workflow is only run on research grants).
  * Action-driven: no dedicated state-read endpoint — "Generate abstract" reuses an
  * existing one without a paid call, so it doubles as a load.
@@ -201,9 +202,12 @@ export default function AwardeeTab({ requestId, context }) {
   const abstractSaveSeqRef = useRef(0);
 
   const { preferences, currentProfile } = useProfile();
-  // The logged-in PD's saved custom body (Option A: sender's pref, client-side).
-  // Trim only to decide ABSENCE; use the raw value as the template so intentional
-  // leading/trailing whitespace in a custom body survives.
+  // The logged-in PD's independent subject/body preferences. Trim only to
+  // decide ABSENCE; keep the raw templates so intentional whitespace survives.
+  const savedSubjectRaw = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_SUBJECT] || '';
+  const hasSavedSubject = savedSubjectRaw.trim().length > 0;
+  const adminDefaultSubject = emailDefaults.subject || '';
+  const baseSubjectTemplate = hasSavedSubject ? savedSubjectRaw : adminDefaultSubject;
   const savedBodyRaw = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';
   const hasSavedBody = savedBodyRaw.trim().length > 0;
   const adminDefaultBody = emailDefaults.body || '';
@@ -221,6 +225,13 @@ export default function AwardeeTab({ requestId, context }) {
   const handleSubjectChange = (e) => {
     subjectDirtyRef.current = true;
     setSubject(e.target.value);
+  };
+
+  const resetSubjectToFoundationDefault = () => {
+    // This choice applies to the current draft only; it never deletes the saved
+    // personal subject in Profile Settings.
+    subjectDirtyRef.current = true;
+    setSubject(fillInviteSubject(adminDefaultSubject, { title: awardTitle }));
   };
 
   // Restore the Foundation default for THIS send (local only — does not change the
@@ -422,8 +433,8 @@ export default function AwardeeTab({ requestId, context }) {
     setDirty(false);
     setTemplateMode('auto');
     subjectDirtyRef.current = false;
-    setSubject(fillInviteSubject(emailDefaults.subject || '', { title: awardTitle }));
-  }, [currentProfile?.id, emailDefaults.subject, awardTitle]);
+    setSubject(fillInviteSubject(baseSubjectTemplate, { title: awardTitle }));
+  }, [currentProfile?.id, baseSubjectTemplate, awardTitle]);
 
   // Derive the body from the chosen template + recipients UNLESS the PD has taken
   // ownership by typing. `dirty` is in the deps so the render after an identity reset
@@ -437,8 +448,8 @@ export default function AwardeeTab({ requestId, context }) {
 
   useEffect(() => {
     if (subjectDirtyRef.current) return;
-    setSubject(fillInviteSubject(emailDefaults.subject || '', { title: awardTitle }));
-  }, [emailDefaults.subject, awardTitle]);
+    setSubject(fillInviteSubject(baseSubjectTemplate, { title: awardTitle }));
+  }, [baseSubjectTemplate, awardTitle]);
 
   async function generate(regenerate = false) {
     setGenerating(true); setError(null); setAbstractMsg(null);
@@ -796,10 +807,11 @@ export default function AwardeeTab({ requestId, context }) {
   const replaceCaptionOverLimit = replaceCaption.length > MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH;
   const replaceHasChange = Boolean(replaceFile) || (replaceCaptionChanged && replaceCaption.trim() !== '');
   const effectiveBaseBody = hasSavedBody ? savedBodyRaw : adminDefaultBody;
+  const effectiveBaseSubject = hasSavedSubject ? savedSubjectRaw : adminDefaultSubject;
   const emailDefaultsUnavailable = emailDefaults.loaded && emailDefaults.unavailable;
   const emailDefaultsNotConfigured = emailDefaults.loaded
     && !emailDefaults.unavailable
-    && ((emailDefaults.subject || '').trim() === '' || effectiveBaseBody.trim() === '');
+    && (effectiveBaseSubject.trim() === '' || effectiveBaseBody.trim() === '');
   const emailTextReady = subject.trim() !== '' && body.trim() !== '';
   // Re-sends are allowed by the service (non-downgrade, and the original invite
   // date is deliberately kept), so the button stays enabled once Invited — but it
@@ -823,10 +835,16 @@ export default function AwardeeTab({ requestId, context }) {
   const sendClosed = status !== null
     && !Number.isNaN(status)
     && status >= GRANTEE_DELIVERABLE_STATUS.SUBMITTED;
+  const ccAddresses = ccEmail.trim() ? ccEmail.split(',').map((email) => email.trim()) : [];
+  const ccAddressKeys = ccAddresses.map((email) => email.toLowerCase());
+  const ccAddressesValid = ccAddresses.length <= 10
+    && ccAddresses.every(isEmail)
+    && new Set(ccAddressKeys).size === ccAddresses.length
+    && !ccAddressKeys.includes(toEmail.trim().toLowerCase());
   const canSend = invitableStatus
     && hasAbstract
     && isEmail(toEmail)
-    && (!ccEmail || isEmail(ccEmail))
+    && ccAddressesValid
     && !sending
     && emailDefaults.loaded
     && !emailDefaultsUnavailable
@@ -1196,10 +1214,12 @@ export default function AwardeeTab({ requestId, context }) {
             Always review automated emails to {recipients.pi.name || 'this PI'} before sending (future messages only)
           </label>
         )}
-        <label className="block text-sm">Cc (liaison)
+        <label className="block text-sm">Cc (liaison and others)
           <input aria-label="Cc email" value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} className="w-full border rounded p-1" />
           {recipients?.liaison?.name && <span className="text-xs text-gray-500"> {recipients.liaison.name}</span>}
         </label>
+        <p className="text-xs text-gray-500">To copy an assistant as well as the liaison, add their email after a comma (up to 10 Cc addresses).</p>
+        {!ccAddressesValid && <p className="text-xs text-red-700">Enter up to 10 distinct Cc addresses, different from To, separated by commas.</p>}
         {vipContactIds !== null && recipients?.liaison?.contactId && (
           <label className="flex items-center gap-2 text-xs text-gray-600">
             <input
@@ -1212,9 +1232,17 @@ export default function AwardeeTab({ requestId, context }) {
             Always review automated emails to {recipients.liaison.name || 'this liaison'} before sending (future messages only)
           </label>
         )}
-        <label className="block text-sm">Subject
-          <input aria-label="Subject" value={subject} onChange={handleSubjectChange} className="w-full border rounded p-1" />
-        </label>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-sm">
+            <label htmlFor="grantee-invite-subject">Subject</label>
+            {hasSavedSubject && (
+              <button type="button" onClick={resetSubjectToFoundationDefault} className="text-xs text-blue-700 underline">
+                Use shared subject for this email
+              </button>
+            )}
+          </div>
+          <input id="grantee-invite-subject" aria-label="Subject" value={subject} onChange={handleSubjectChange} className="w-full border rounded p-1" />
+        </div>
         <div className="space-y-1">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-800">Email body — edit before sending</span>
@@ -1231,6 +1259,7 @@ export default function AwardeeTab({ requestId, context }) {
         <p className="text-xs text-gray-500">
           A secure magic-link and your saved email signature are added automatically — don’t include a signature here.
           {hasSavedBody && templateMode === 'auto' && !dirty ? ' Starting from your saved custom body (edit it in Profile Settings).' : ''}
+          {hasSavedSubject ? ' Your saved subject is managed in Profile Settings; edits here apply only to this email.' : ''}
         </p>
         {emailDefaultsUnavailable && (
           <p className="text-sm text-red-700">

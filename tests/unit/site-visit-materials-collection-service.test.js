@@ -63,6 +63,7 @@ function deps(overrides = {}) {
     getLatestCollection: jest.fn(async () => stored),
     insertCollection: jest.fn(async (row) => { stored = { id: row.id, request_id: row.requestId, site_visit_activity_id: row.siteVisitActivityId, status: 'open', due_at: row.dueAt, closes_at: row.closesAt, checklist: row.checklist, contacts: row.contacts, jti: row.jti, token_digest: row.tokenDigest, token_ciphertext: row.tokenCiphertext, created_by: row.createdBy, reminder_count: 0, created_at: NOW }; return stored; }),
     recordInvitation: jest.fn(async (id, emailId) => { stored = { ...stored, invited_at: NOW, invitation_email_id: emailId }; return stored; }),
+    updateContacts: jest.fn(async (id, expected, contacts) => { stored = { ...stored, contacts }; return stored; }),
     claimManualReminder: jest.fn(async (id) => { if (stored.status && stored.status !== 'open') return null; stored = { ...stored, last_reminder_at: NOW, reminder_count: stored.reminder_count + 1 }; return stored; }),
     attachReminderEmailId: jest.fn(async (id, emailId) => { stored = { ...stored, last_reminder_email_id: emailId }; return stored; }),
     updateChecklist: jest.fn(async (id, checklist) => { stored = { ...stored, checklist }; return stored; }),
@@ -147,7 +148,7 @@ test('create refusals: no visit, already open, no recipient email, not schedulab
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, deps({ getOpenCollection: jest.fn(async () => ({ id: 'x' })) })))
     .rejects.toMatchObject({ code: 'site_visit_materials_exists' });
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, deps({ resolveRecipients: jest.fn(async () => ({ pi: { email: null }, liaison: { email: null } })) })))
-    .rejects.toMatchObject({ code: 'site_visit_materials_no_recipients' });
+    .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required' });
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_triagestatus: 100000001, akoya_requeststatus: 1 })) })))
     .rejects.toMatchObject({ code: 'site_visit_materials_request_not_schedulable' });
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: 'nope', fromEmail: 'pc@wmkeck.org' }, deps()))
@@ -222,7 +223,7 @@ test('manual reminder claims before sending (S507): claim order, 409 on a lost c
 
   await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
   expect(order).toEqual(['claim', 'send', 'attach']);
-  expect(d.claimManualReminder).toHaveBeenCalledWith(d.__stored().id, NOW);
+  expect(d.claimManualReminder).toHaveBeenCalledWith(d.__stored().id, NOW, d.__stored().contacts, d.__stored().contacts);
 
   // Claim lost (e.g. the cron claimed moments earlier): 409, never sends, never attaches.
   d.claimManualReminder.mockImplementation(async () => null);

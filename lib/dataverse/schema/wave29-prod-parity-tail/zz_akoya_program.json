@@ -1,0 +1,14 @@
+{
+  "name": "akoya_program-prod-parity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_program",
+  "_comment": "Production-parity tail (Session 538): generated from read-only production metadata. Columns production has that no schema file created on this table (wmkf_heldat was added by scripts/add-reviewer-suggestion-heldat-column.mjs). Runs after every other wave.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_Code",
+      "displayName": "Code",
+      "maxLength": 100
+    }
+  ]
+}

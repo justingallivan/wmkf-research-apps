@@ -21,6 +21,8 @@
 - Environment / deployment / Vercel env+logs / require(esm) hazard: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-verify-deploy-is-the-merge-build.md; project-vercel-node22-no-require-esm.md; project-preview-rehearsal-venue-limits.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
+- Sandbox rehearsal --bypass-goverify per-machine allow rule: project-sandbox-rehearsal-bypass-allow-rule.md
+- Local containers / ledger Postgres: project-local-docker-is-colima.md
 
 ## Working Norms
 - Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md
@@ -29,8 +31,8 @@
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-apply-measurement-artifacts-in-both-directions.md; feedback-briefs-are-snapshots-not-ship-state.md
-- Review posture: feedback-read-the-implementation-not-the-callers-docblock.md; feedback-weigh-the-risks-you-name.md; feedback-corrections-decay-unless-mechanized.md; feedback-consistency-over-preview-rationale.md
-- Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md; feedback-mocked-sql-hides-parameter-typing.md
+- Review posture: feedback-read-the-implementation-not-the-callers-docblock.md; feedback-weigh-the-risks-you-name.md; feedback-corrections-decay-unless-mechanized.md; feedback-consistency-over-preview-rationale.md; feedback-reviewer-differs-from-author.md
+- Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md; feedback-mocked-sql-hides-parameter-typing.md; feedback-fixtures-return-raw-transport-shape.md
 - Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md
 - Legacy labels / interim trims on surfaces with a decided target: feedback-skip-legacy-fixes-that-the-target-state-removes.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md

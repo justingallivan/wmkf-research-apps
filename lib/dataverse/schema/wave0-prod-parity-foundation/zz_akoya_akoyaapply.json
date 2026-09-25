@@ -1,0 +1,25 @@
+{
+  "name": "akoya_akoyaapply-prod-parity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_akoyaapply",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "attributes": [],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_grantcycle_akoya_akoyaapply",
+      "referencedEntity": "wmkf_grantcycle",
+      "lookupSchemaName": "wmkf_GrantCycle",
+      "lookupDisplayName": "Grant Cycle",
+      "menuBehavior": "UseCollectionName",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "Restrict",
+        "Merge": "NoCascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    }
+  ]
+}

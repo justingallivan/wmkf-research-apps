@@ -1,0 +1,139 @@
+{
+  "name": "wmkf_ai_prompt",
+  "kind": "new-entity",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "schemaName": "wmkf_ai_prompt",
+  "displayName": "AI Prompt",
+  "displayCollectionName": "AI Prompts",
+  "ownershipType": "UserOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_ai_PromptName",
+    "displayName": "Prompt Name",
+    "maxLength": 850,
+    "requiredLevel": "None"
+  },
+  "attributes": [
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_ai_IsCurrent",
+      "displayName": "Current",
+      "requiredLevel": "ApplicationRequired",
+      "trueLabel": "Yes",
+      "falseLabel": "No"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ai_LastTestDateTime",
+      "displayName": "Last Test DateTime",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_ai_MaxTokens",
+      "displayName": "Max Tokens",
+      "requiredLevel": "ApplicationRequired",
+      "minValue": -2147483648,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ai_Model",
+      "displayName": "AI Model",
+      "requiredLevel": "ApplicationRequired",
+      "maxLength": 100
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_Notes",
+      "displayName": "Notes",
+      "maxLength": 1000000
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ai_PreflightPassedDateTime",
+      "displayName": "Preflight Passed DateTime",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_PromptBody",
+      "displayName": "Prompt Body",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_PromptOutputSchema",
+      "displayName": "Output Schema",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ai_PromptStatus",
+      "displayName": "Prompt Status",
+      "requiredLevel": "ApplicationRequired",
+      "globalOptionSet": {
+        "name": "wmkf_wmkf_promptstatus",
+        "displayName": "wmkf_Prompt Status"
+      },
+      "options": [
+        {
+          "value": 682090000,
+          "label": "Draft"
+        },
+        {
+          "value": 682090001,
+          "label": "Published"
+        },
+        {
+          "value": 682090002,
+          "label": "Retired"
+        }
+      ]
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_PromptVariables",
+      "displayName": "Variables",
+      "maxLength": 1000000
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ai_PublishedDateTime",
+      "displayName": "Published On",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_ai_RollbackFrom",
+      "displayName": "Rollback from Version",
+      "minValue": -2147483648,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_SystemPrompt",
+      "displayName": "System Prompt",
+      "maxLength": 1000000
+    },
+    {
+      "type": "Decimal",
+      "schemaName": "wmkf_ai_Temperature",
+      "displayName": "Temperature",
+      "requiredLevel": "ApplicationRequired",
+      "precision": 2,
+      "minValue": -100000000000,
+      "maxValue": 100000000000
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_PromptVersion",
+      "displayName": "Prompt Version ",
+      "requiredLevel": "ApplicationRequired",
+      "minValue": -2147483648,
+      "maxValue": 2147483647
+    }
+  ]
+}

@@ -112,6 +112,411 @@ this presentation session does not edit or run that workstream.
 ---
 
 # Session 535 Prompt: Sandbox Basic clone reviewed; select live source
+---
+
+# Incoming main checkout handoff (Session 542)
+
+# Session 542 Prompt: Finish slice 6b review (Opus round 2, Fable final, Codex), then the live IA proof
+
+## Session 539 Summary — 2026-09-24 PT (Fable orchestrating; Sonnet builds, Opus reviews, Codex adversarial and rescue; ran concurrently with Sessions 540–541 on other branches)
+
+[VERIFIED via merged PRs, Vercel production deployment, pushed Factory-branch commits, Opus review hand-backs, focused and full Jest runs, gates] Three PRs merged and deployed to production; the two stale Entra redirect URIs removed; slice 6a accepted; slice 6b Stages A and B built, Opus-approved, Fable-reviewed and recorded; Stage C built, through Opus round 1 with its fixes committed, and Opus round 2 returned **needs-changes, tests only** (code correct; two isolating tests missing) just as the session stopped. No Codex review of 6b yet, no live sandbox run, no production write. The Factory branch `codex/test-request-preview-integration` is at `bb625e842` (pushed).
+
+### What Was Completed
+
+1. **Merged and deployed to production**: PR #329 (`1a0530546`, personal email defaults inventory, docs), PR #330 (`185c9f35f`, grantee invite subject default + up to 10 Cc), PR #331 (`e5db13750`, sandbox schema parity). #331 first got a Codex adversarial round (two findings), a Codex-rescue fix reviewed by Claude with mutation checks (`7e360ffd7`: the two parity waves are now mechanically refused for `--target=prod --execute`; name-only global option-set reuse recorded as a documented limitation), and green CI. Production deployment created after the merge and confirmed Ready on `applications.wmkeck.org`.
+2. **Entra cleanup** (owner-authorized tenant write): removed the two redirect URIs for the retired `git-codex-pau-5b4bef` / `git-codex-wor-464bcd` aliases from "WMK: SSO Authentication"; seven remain, including three older deployment-hash callbacks that were outside the directive. Work-queue entry reconciled (`fb50dca63` on main).
+3. **Slice 6a accepted** by the owner; recorded on the Factory branch (`906db4227`). Main merged into the Factory branch (`406420be7`).
+4. **Slice 6b Stage A** (plan items 1–2): `2bf5904a9`, `10e0a5e4f`, `4919e2d37`, `e74225c94`, record `b2afbe919`. Opus round 1 needs-changes (P1 raw read shape, P2 positional deps arg, P2 test gaps), round 2 approve. Fable added a GUID guard on the sandbox `getRequest`.
+5. **Slice 6b Stage B** (items 3–5): `646a1707e` … `09db93e30`, `06e34859b`, record `1499b0fdb`. Opus round 1 needs-changes (four P1: institution empty, SharePoint site/drive unbound, create re-dispatched after a marker, adapter recovery reading the production DAL plus shared `operational_events` residue; two P2), round 2 approve. Fable kept the access-layer gate unchanged, retained the create error cause, pinned the journaled-drive check.
+6. **Slice 6b Stage C** (items 6–7): `936b5e008` … `57935a658`, round-2 fixes `46f4a9457`, `e96c7d6c6`, `91b02249b`, interim record `bb625e842`. Opus round 1 needs-changes (P1 census count always off by two on a real manifest; P1 CLI `--advance` never entered a trusted DAL context; P2 eight untested stop rules; P3s); all fixed with mutations killed. **Opus round 2 verdict (arrived at stop): needs-changes, tests only** — the eTag arm of the twin snapshot-metadata read lost its isolating test (V3 now survives because a later check catches the same eTag change), and each arm of the snapshot bytes-versus-row-hash check survives when disabled alone (V11a row hash, V11b source hash); P3: the verify fixture manifest is not fully validator-shaped (no `target`, `plannedFiles`, `expiresAt`, Graph ids, `exactlyOneCreate`). Opus confirmed the `+2` census cannot be satisfied by two wrong files (stable-id matching) and the script-scoped bypass cannot leak into `--reserve` / `--run-inspect`.
+7. **Owner decisions this session**: bring-findings-first rule lifted for the 6b loops (agents fix inside the loop; disputed or design-changing findings come to the owner); three rounds per loop before Fable takes over; three stages; live proof authorized (production re-export of the 1003222 bundle and one sandbox create, Fable runs it).
+
+### Commits (main)
+- `fb50dca63` — record removal of the two stale Codex-alias Entra redirect URIs
+- `1a0530546`, `185c9f35f`, `e5db13750` — merges of PRs #329, #330, #331
+
+## Next Items
+
+### Verified Open
+
+1. **Close Opus round 2 on Stage C (tests only, round 3 of 3)**: add an isolating test for the eTag arm of the twin snapshot-metadata read (give every later read the same eTag so only that arm can fire, or assert the specific message), one test with `wmkf_contenthash` corrupted and `wmkf_sourcecontenthash` intact (and optionally the mirror), and optionally build the verify fixture with `buildCloneManifest` or assert `validateCloneManifest(..., { allowExpired: true })` on it. Re-run Opus's V3 / V11a / V11b mutations and confirm killed. Small enough for Fable to do directly rather than a Sonnet round. Then Fable final review of `1499b0fdb..HEAD` and update the Stage C paragraph in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` from "pending" to the outcome.
+   Evidence: Opus round-2 hand-back (recorded in the summary above); `git log 1499b0fdb..bb625e842` in `/Users/gallivan/Code/WMKF_Apps-factory`.
+2. **Codex adversarial review of the whole slice 6b** (`b2afbe919^..HEAD` on the Factory branch; `--model gpt-5.6-sol`, run from the Factory worktree with `--base` scoping). Fable adjudicates; iterate until Codex is satisfied (cap 3, then Fable takes over). Author/reviewer rule: Sonnet/Claude-authored → Codex reviews; any Codex-rescue fix → Claude reviews.
+3. **Live proof** (owner-authorized this session; re-confirm at start): re-export the 1003222 bundle (`DATAVERSE_ALLOW_PROD_READS=yes node --env-file=.env.local scripts/export-test-request-source-bundle.mjs --source-request-number=1003222 --out=<path outside the repo>`; six-hour window), `--reserve --recipe=initial_assessment`, then `--advance` through `ready` (the per-machine allow rule in `project-sandbox-rehearsal-bypass-allow-rule.md` covers `--bypass-goverify`). One new sandbox Request; evidence under `docs/plans/evidence/test-request-factory/`. Two things only the live run can verify: `requestDocumentSelect()`'s env-flag optional columns against the sandbox schema, and real Graph behavior. Then owner acceptance of 6b.
+4. Remaining item 6 recipes (synthetic reviewers, site-visit materials, Pre-Site, Pre-RP/Final Writeup) and item 7 — separate slices, unplanned.
+
+### Owner Decision Needed
+
+1. Whether the three older deployment-hash Entra callbacks (`g0buiqhuh`, `7doz4qxsn`, `15rny26o5`) should also go. Evidence: `az ad app show` this session; not part of the directive, so left.
+2. Carried: migration 054's first shared apply (needed at item 7; freezes the file). Preview CSRF origin allowlist (option b) still goes through `/contract-reconcile`; the runbook half landed in PR #327.
+
+### Verify Before Acting
+
+1. The Factory branch is 4+ commits behind main again (Sessions 540–541 landed PR #335 and docs on main). Merge main deliberately before the Codex round or the live run.
+2. Worktrees: `/Users/gallivan/Code/WMKF_Apps-factory` (Factory, clean at `bb625e842`); `WMKF_Apps-codex` and `WMKF_Apps-presentation` belong to other sessions; `WMKF_Apps-parity-review` was removed. Local ledger container `wmkf-ledger-pg` is running (Colima).
+3. Stage C's two live-path fixes (census `+2`, `enterDynamicsBypassForScript` in `runAdvance`) were unit-pinned but never exercised live; treat the first live `--advance` into `seed_initial_assessment` as the real test of the CLI wiring.
+
+### Do Not Reopen Without New Decision
+
+1. 6b design decisions recorded in the three Stage paragraphs: positional `dependencies` argument; `SANDBOX_REHEARSAL` actor policy substituted at the sandbox transport; a stopped run leaves its row Generating; resource planned on the first snapshot create; shared `registryPatchAttemptedAt`; census depth 3; `restoreFileVersion` not forwarded.
+2. Earlier: 6a design, sandbox parity deviations, no-text invariant, dispatch-marker rule, no lease renewal, in-place edits to unapplied 054, synthetic IA fixtures only.
+
+## Key Files Reference
+
+- Design doc (item 6 plan, Stage A/B/C records): `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (Factory branch)
+- IA steps: `lib/services/test-requests/run-runner.js` (`stepSeedInitialAssessment`, `stepSeedInitialAssessmentSnapshot`, `stepVerifyInitialAssessment`), `lib/services/test-requests/ia-sandbox-deps.js`, `lib/services/test-requests/fixtures/initial-assessment-synthetic.js`
+- Production-path seams: `lib/services/initial-assessment/artifact-lineage.js`, `artifact-reader.js`, `lib/services/dynamics/changeset.js`, `lib/services/dynamics/write-core.js`, `lib/dataverse/adapters/request-document.js`, `lib/services/request-document-actor-service.js`
+- CLI: `scripts/rehearse-test-request-sandbox.mjs`
+- Tests: `tests/unit/test-request-run-runner-{seed-initial-assessment,seed-initial-assessment-snapshot,verify-initial-assessment}.test.js`, `tests/unit/ia-sandbox-deps.test.js`, `tests/unit/initial-assessment-lineage-dependencies.test.js`, `tests/integration/test-request-run-runner.pg.test.js`
+
+## Stop-time notes
+
+- Claim-evidence pilot: no eligible plan/design edit for this session key; no observation row.
+- Memory: added `feedback-fixtures-return-raw-transport-shape.md` (router line under Test teeth). Sessions 540–541 wrote their own handoffs above this one's predecessor; this session's number stays 539.
+- Milestone: `DEVELOPMENT_LOG.md` entry not required (PRs #329–#331 are incremental; 6b is unmerged and unproven live).
+- `CLAUDE.md`: no change needed.
+
+## Prior Session 541 Prompt: Check active workstreams after the Site Visit contact fix release
+
+## Session 540 Summary — 2026-09-24 PT (Codex Site Visit bug fix)
+
+[VERIFIED via PR #335, merge `407ca908d`, Vercel deployment `dpl_F9nTp3Rd5fkUUtsWHvRwdE6pN4KG`, staff Preview screenshots, and the owner's signed-in Production confirmation] Request 1003222 exposed a materials email preview blocked by a blank Request Primary Contact even though the applicant Account had an Org Primary Contact. The fix is merged and live. The owner confirmed the Production Meeting Tracker opens. No email was sent during rehearsal or release verification; the request's materials are all received, so its reminder path cannot currently be exercised without changing data.
+
+### What Was Completed
+
+1. **Required materials recipients.** The Request Project Leader remains the PI. When Request Primary Contact is blank, the liaison resolves from the applicant Account's Org Primary Contact; both roles need usable email addresses. Manual preview reads current contacts without writing, and Send revalidates the reviewed envelope before refreshing the collection snapshot. The automatic sweep keeps its saved-contact policy and is unscheduled by the prior owner decision. A shared PI/liaison email receives one copy.
+2. **Site Visit calendar attendees.** A new visit prefills distinct applicant contacts. A saved visit preserves its recorded attendees and offers missing contacts as explicit Add suggestions. These contact reads are scoped to the Meeting Tracker visit GET; Workbench logistics keeps its previous response shape.
+3. **Review and release.** Two ordinary OAuth Claude Opus reviews completed. Staff Preview rehearsal on Request 1003222 rendered an invitation to Franklin Cat, resolved the liaison name, enabled Send, and showed Franklin as an Add suggestion while the existing attendee remained unchanged. PR #335 merged; Production deployed Ready. The owner later confirmed the signed-in Production Meeting Tracker opens. The release note and PR body record the evidence and limits.
+4. **Preview cleanup.** The temporary stable Preview alias was restored to its prior deployment; the four branch-scoped rehearsal Config values were removed. No Preview Send, Add, or Save was used.
+
+### Commits
+
+- `be089e398`, `a4d42798f`, `353f66e8a`, `7b009f4e6`, `46fe89607` — recipient fix, attendee suggestions, review corrections, and GET scoping
+- `407ca908d` — merge PR #335 to `main`
+- `f9cf1e8c2`, `34e63c682`, `6051f0d23` — production release record and staff smoke confirmation
+
+## Next Items
+
+### Verified Open
+
+1. **No remaining implementation item for this bug fix.** Evidence: PR #335 is merged; the Production deployment checked before this handoff was Ready on `applications.wmkeck.org`; staff confirmed the page opens. A production email transport rehearsal was outside the agreed inspection-only test.
+
+### Owner Decision Needed
+
+1. **None for this release.**
+
+### Parked
+
+1. **Live reminder-send proof on an incomplete collection.** Request 1003222 now has all required files, so its “nothing to remind about” guard applies. Use a naturally eligible or separately authorized test request if this proof is later needed; do not delete received files just to recreate the earlier state.
+
+### Verify Before Acting
+
+1. **Other workstreams have independent owners and moving branches.** PR #332 was open at head `b6c9dd079` at this handoff; the Factory branch `codex/test-request-preview-integration` was at `1499b0fdb`. Read their current handoffs, PR state, and worktree status before touching them. The prior Session 539 list is historical, not an automatic worklist.
+2. **The IRS BMF parser test is shipped, but a fresh live IRS import remains unproven.** The previous handoff records the operational limit; a dry run writes staging. Verify the target and authorization before any import.
+
+### Do Not Reopen Without New Evidence
+
+1. **The Site Visit contact fallback and attendee suggestion fix is shipped.** PR #335 and `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.12 carry its contract. A future report should be diagnosed from its current contact and document state rather than assuming Request 1003222 still has a missing file.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/site-visit/applicant-contacts.js` | Server-owned PI and liaison resolution |
+| `lib/services/site-visit-materials/collection-service.js` | Manual materials preview and send contact checks |
+| `lib/services/site-visit/logistics-service.js` | Applicant attendee suggestions for Meeting Tracker |
+| `shared/components/meeting-tracker/SiteVisitEditor.js` | New-visit prefill and saved-visit Add suggestions |
+| `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.12 | Release contract and staff rehearsal record |
+
+## Testing and Stop-time Notes
+
+- Focused Site Visit suites passed 115 tests; relevant gates/self-tests, lint, types, and build passed before merge. PR #335 CI passed. After the release-note commits, the `main` Tests and E2E workflows passed on `34e63c682`; local doc gates passed on the final note. The latest deployment verified before this handoff commit, `dpl_F9nTp3Rd5fkUUtsWHvRwdE6pN4KG`, was Ready and owned `applications.wmkeck.org`.
+- `report:claim-evidence-pilot -- --current` returned “local state could not be read”; no observation row was added.
+- `CLAUDE.md` needs no change: no new app, endpoint, schema, script, configuration, or convention was introduced. No `DEVELOPMENT_LOG.md` milestone entry is required: this corrected the existing Site Visit materials and Meeting Tracker workflows already recorded in the milestone log; it was not a separate cutover or declared incident.
+
+## Prior Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
+
+# Session 540 Prompt: Continue active workstreams after the IRS BMF test closeout
+
+## Session 539 Summary — 2026-09-24 PT (Codex independent queue slice; concurrent sessions continued)
+
+[VERIFIED via PRs #333/#334, `main` merge commits `374a2e51e`/`542da4d1e`, GitHub checks, and local gates] A bounded IRS BMF importer regression test and its canonical work-queue correction merged to `main`. The test uses a local CSV fixture; this session ran no live IRS download or database import. The other active Factory and personal-email worktrees were not edited. `main` auto-deploys; Production deployment/readiness for these two merges was not independently checked.
+
+### What Was Completed
+
+1. **IRS BMF parser regression coverage.** PR #333 merged `374a2e51e` (source commit `b09d395b2`). `tests/unit/irs-bmf-import-parser.test.js` calls the existing CSV-to-Postgres COPY stream helper and covers a BOM, quoted commas/newlines, escaping, EIN normalization, and malformed-row skips. The helper is exported for this direct test; import behavior was not otherwise changed. The focused test, lint, types, and GitHub checks passed.
+2. **Queue fact correction.** PR #334 merged `542da4d1e` (source commit `fbd1ce64e`). `docs/CURRENT_WORK_QUEUE.md` now records that the parser test exists while a fresh live IRS-file re-run remains unverified. The doc-currency, fact-consistency, doc-symbol-refs, and docs-catalog gates passed; the paired self-tests passed.
+3. **Concurrent-work status checked read-only at handoff.** PRs #329, #330, and #331 are merged. Factory slice 6a is owner-accepted [VERIFIED via `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` on `codex/test-request-preview-integration`]; slice 6b has new branch commits and belongs to that workstream. PR #332 remains open on `codex/personal-email-reviewer-reminders` [VERIFIED via GitHub]. These are other sessions' work.
+
+### Commits
+
+- `b09d395b2` — Test IRS BMF CSV stream import with parser fixture
+- `374a2e51e` — Merge PR #333
+- `fbd1ce64e` — Update IRS BMF test status in work queue
+- `542da4d1e` — Merge PR #334
+
+## Next Items
+
+### Verified Open
+
+1. **Factory slice 6b is in progress in its own worktree.** Evidence: Factory design doc's slice 6a acceptance record and branch commits `2bf5904a9`/`10e0a5e4f` at this handoff. The active Factory session owns the next build and review; check its newer handoff before acting.
+2. **Personal reviewer-reminder defaults remain under review.** Evidence: PR #332 is open at head `ac8f9bc05` and the owner’s Codex worktree is on that branch. Leave its files to that owner; recheck PR state before any follow-up.
+
+### Owner Decision Needed
+
+1. **No new owner decision from this IRS BMF test slice.** The other workstreams retain their own decision gates and handoffs.
+
+### Verify Before Acting
+
+1. **Live IRS-file import remains unproven by this test.** The fixture covers parsing and COPY text, not a fresh IRS download, Postgres staging, or atomic swap. Establish the intended target and authorization before running an import or dry run; `refresh()` writes staging even when `dryRun` is true.
+2. **Production deployment for PRs #333/#334 was not independently checked.** Both merged to auto-deploying `main`; verify Vercel Ready state if operational evidence is needed.
+3. **Concurrent branch state changes quickly.** Check the Factory branch, PR #332, worktree ownership, and `git status` before taking any of their tasks. Historical Session 538 next items naming PRs #329–#331 as open are superseded by the merged PR states above.
+
+### Do Not Reopen Without New Evidence
+
+1. **The missing IRS importer unit test is closed.** PR #333 supplies it and PR #334 corrected the current queue claim. A live IRS-file run is a separate operational proof, not a missing parser-test fix.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/irs-bmf-service.js` | CSV parser and COPY-stream importer |
+| `tests/unit/irs-bmf-import-parser.test.js` | Fixture-driven parser regression test |
+| `docs/CURRENT_WORK_QUEUE.md` | Current queue status and remaining live-file caveat |
+
+## Testing and Stop-time Notes
+
+- Focused IRS test, ESLint on touched source/test, TypeScript check, and PR #333 GitHub checks passed.
+- PR #334 GitHub checks and doc-currency, fact-consistency, doc-symbol-refs, docs-catalog gates passed; relevant self-tests passed sequentially.
+- `report:claim-evidence-pilot -- --current` was attempted both inside and outside the sandbox; it returned “local state could not be read.” No observation row was added because eligibility could not be determined.
+- `CLAUDE.md` needs no change: no app, endpoint, schema, script, configuration, or convention changed. No DEVELOPMENT_LOG milestone entry is required: this session shipped test coverage and documentation, not a new Production capability or cutover.
+
+## Prior Session 539 Prompt: Build IA recipe slice 6b (after owner accepts 6a)
+
+# Session 539 Prompt: Build IA recipe slice 6b (after owner accepts 6a)
+
+## Session 538 Summary — 2026-09-24 PT (Claude root; Sonnet build agent, Codex review/rescue; owner drives a separate Codex session)
+
+[VERIFIED via pushed commits, PR list, 544 focused tests including live suites against a local throwaway PostgreSQL 16, gates, mutation checks, and Codex adversarial reviews] The owner accepted Factory build-order item 5. The sandbox was brought to production `wmkf_` schema parity from this repository (PR #331, open), which unblocked item 6. The Initial Assessment recipe plan was approved by Codex after five rounds, and slice 6a was built and approved by Codex (round 3); owner acceptance of 6a is pending. The owner handed the personal-email-defaults work to their own Codex session (PRs #329, #330 open). Nothing was deployed; no production write occurred. Production reads were definitions-only (table/column/choice metadata), owner-authorized.
+
+### What Was Completed
+
+1. **Red gate fixed on `main`**: `check:doc-symbol-refs` (`f1178bfda`).
+2. **Item 5 accepted by the owner**; recorded on the Factory branch (`4a52f3127`).
+3. **Sandbox schema parity (PR #331, branch `claude/sandbox-schema-parity`, 8 commits)**: waves `wave0-prod-parity-foundation` and `wave29-prod-parity-tail` generated from production metadata; `schema-apply.js` gained global option sets, multiselect and file columns with metadata-lag retries; `apply-dataverse-schema.js --new-first`; `scripts/compare-sandbox-schema-parity.js` and `scripts/apply-sandbox-choice-parity.js`; record `docs/plans/SANDBOX_SCHEMA_PARITY_2026-09-24.md`. Every wave applied to the sandbox, 54 choice values inserted. Result: every production `wmkf_` table, column and choice value exists in the sandbox except the rollup helpers; 0 type differences over 1,023 shared columns. Owner decisions: leave the 3 label differences and 112 sandbox-only values; land by PR.
+4. **Factory docs**: item 6 blocker marked resolved (`4a52f3127`); IA recipe plan (`9de3114b7` … `4fb87095b`, Codex plan rounds 1–4 needs-attention, round 5 approve).
+5. **Slice 6a built** (`86c8549dc`, `a13b7b885`, `178d56d00`, `38c2a34f6`, record `4dd526dca`): recipe `initial_assessment`, recipe bound into plan digest and pre-lease check, per-recipe step order, `foundation_baseline` resource (digest at insert, one per run, repeated verify compares), IA folder/filename grammar in JS and SQL, legacy `--execute` refuses non-basic manifests, pre-existing red `check:secret-scan` on the Factory branch fixed. Codex 6a rounds: 1 and 2 needs-attention (all fixed; round 2's fix built by Codex rescue, reviewed by Claude), 3 approve.
+6. **Codex worktree** `/Users/gallivan/Code/WMKF_Apps-codex` set up for the owner's personal-email work; brief `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_CODEX_BRIEF_2026-09-24.md` (on that branch). Temporary production-read allow rule removed from `.claude/settings.local.json`.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Accept slice 6a** (Factory branch, record paragraph "Slice 6a built" in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`).
+2. **Review/merge PR #331** (sandbox schema parity; changes schema tooling that can also target production, additively).
+3. **Owner's Codex PRs #329 (inventory) and #330 (grantee invite subject)**: the owner drives these in Codex; review/merge on their say.
+4. Carried: migration 054 first shared apply needs explicit authorization (freezes the file). Old Preview aliases / Entra callbacks retire-or-keep (destructive; grep callers first).
+
+### Verified Open
+
+1. **Slice 6b, IA step bodies** (after 6a acceptance). Plan: the approved paragraph "Build-order item 6, Initial Assessment recipe — plan" in the Factory design doc (items 1–7 of slice 6b): default-preserving dependency seams on `commitReadyLineage` / `resolveCanonicalInitialAssessment` / `executeChangeset`; one sandbox-host-bound service (`ia-sandbox-deps.js`, register the seam in `scripts/check-request-document-writers.js`); synthetic fixture; journal-before-dispatch wrappers around every mutating dependency including the board snapshot's; persist `wmkf_contenthash` before upload; terminal verifier repeats Basic safety checks, compares against the `foundation_baseline`, hashes the snapshot bytes. Then Claude review, Codex adversarial review, and one live sandbox run (re-export the 1003222 bundle immediately before — production read, authorized for this task; one new sandbox Request, up to two creates authorized).
+2. Remaining item 6 recipes after IA (synthetic reviewers, site-visit materials, Pre-Site, Pre-RP/Final Writeup) and item 7.
+
+### Verify Before Acting
+
+1. Local ledger: Docker runs through Colima (`colima start`); container `wmkf-ledger-pg` was recreated this session (memory `project-local-docker-is-colima.md`). Drop the three ledger objects before live suites when 054 changes; run suites `--runInBand`.
+2. Factory worktree `/Users/gallivan/Code/WMKF_Apps-factory` is at the branch head (`4dd526dca`); the branch is 132 ahead / 3 behind `main` (main's later commits are docs/memory only).
+3. Owner rule this session: bring every review finding to the owner before fixing it (memory `feedback-reviewer-differs-from-author.md`); reviewer must differ from author.
+4. `/Users/gallivan/Code/WMKF_Apps-codex` belongs to the owner's Codex session; `/Users/gallivan/Code/WMKF_Apps-investigate` may belong to another session. Do not touch either.
+
+### Do Not Reopen Without New Decision
+
+1. IA recipe plan (Codex-approved round 5) and slice 6a design: keep `basic` token, baseline-at-insert, one baseline per run, legacy `--execute` basic-only.
+2. Sandbox parity deviations (rollup/formula columns plain, Akoya vendor tables excluded, sandbox-only values and labels kept).
+3. Earlier: no-text invariant, dispatch-marker rule, no lease renewal, in-place edits to unapplied 054; synthetic IA fixtures only.
+
+## Key Files Reference
+
+- Factory design doc: `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (Factory branch)
+- Ledger/runner: `lib/services/test-requests/run-ledger.js`, `run-runner.js`, `basic-clone-steps.js`, `lib/db/migrations/054_test_request_runs.sql`, `scripts/setup-database.js`, `scripts/rehearse-test-request-sandbox.mjs`
+- IA services for 6b: `lib/services/initial-assessment/{artifact-service,artifact-lineage,artifact-reader,controls-service}.js`, `lib/services/dynamics/changeset.js`
+- Sandbox parity: `docs/plans/SANDBOX_SCHEMA_PARITY_2026-09-24.md`, `lib/dataverse/schema-apply.js`, `scripts/apply-dataverse-schema.js` (PR #331)
+
+## Stop-time notes
+
+- Claim-evidence pilot: report showed no eligible plan/design edit for this session key; no observation row.
+- Memory: added `feedback-reviewer-differs-from-author.md`, `project-local-docker-is-colima.md`; router updated (7,320 bytes, gate green).
+- Milestone: none required (nothing shipped to production; PR #331 and 6a are unmerged).
+
+## Prior Session 538 Prompt: Accept build-order item 5; unblock item 6 with a sandbox solution import
+
+## Session 537 Summary — 2026-09-23/24 PT (Fable orchestrating; Sonnet builds, Opus reviews, Codex adversarial)
+
+[VERIFIED via pushed Factory-branch commits, 472 focused unit tests, 24 live tests against a throwaway local PostgreSQL 16 container, gates, mutation checks, fifteen Codex adversarial rounds, and two owner-authorized live sandbox creates] Build-order item 4 (sandbox Basic clone from the production source bundle with journaled file copy) was proven live and **accepted by the owner**; build-order item 5 (durable run ledger, slice 5a, and bounded resumable runner + CLI, slice 5b) was built, proven live as sandbox Request 1000341, and **approved by Codex in round fifteen with no findings**; it awaits owner acceptance. Build-order item 6 is **blocked** on a sandbox schema gap (owner action). All product work is on `codex/test-request-preview-integration` (now `2f591a67c`, 120 ahead / 0 behind `origin/main` after merging main at `29d3b1418`). Nothing was deployed; no production write occurred; production reads were limited to the authorized Request 1003222 bundle. `main` received only the memory commits `85f51a17b`, `f0582b646` and this handoff.
+
+### What Was Completed
+
+1. **Item 4 closed** (`8a82db600` … `3c8caf0d1`): `lib/services/test-requests/bundle-file-copy.js` (journal-before-write, item id journaled inside the PUT via the new additive `onItemCreated` hook in `lib/services/graph/writes.js` and `GraphService.uploadFile`, exact-item recovery, end-of-run re-verification by stable id) and the v4 bundle manifest in `scripts/rehearse-test-request-sandbox.mjs`. Live proof Request 1000340 (owner-run), receipt at `docs/plans/evidence/test-request-factory/bundle-clone-receipt-2026-09-24.json`.
+2. **Item 5a ledger** (`4f004e854` … `9ac9ccb3f`, then `804b1100a`, `094757de5`, `347552b1e`, `db3afe72a`, `6cffa26fb`): migration `lib/db/migrations/054_test_request_runs.sql` (+ `scripts/setup-database.js` V55 mirror, manifest entry), `lib/services/test-requests/run-ledger.js` and `run-ledger-db.js`, Atlas page `docs/atlas/postgres-test-request-runs.md`. Invariant reached through the Codex rounds: **no caller-typed or upstream text can persist in any column**, enforced in JavaScript (per-key receipt grammars, finite reason/step/kind/outcome sets, hashed idempotency keys, digested `cli:` actors, derived label, exact Graph id shapes, credential markers rejected anywhere in a value) and in PostgreSQL (CHECKs on every text column plus the IMMUTABLE function `test_request_receipt_ok(jsonb)` on the three receipt columns; identical regex text in both files, pinned by unit parity and live tests). Readbacks merge rather than replace. Lease model: version + lease token + generation + `locked_until`, every mutating WHERE re-checks; `markNeedsAttention` records `last_error` in the same fenced UPDATE. Required CI job `ledger-postgres` (PostgreSQL 16 service) runs both live suites.
+3. **Item 5b runner + CLI** (`13a04712a`, hardened in `347552b1e`, `db3afe72a`, `f2ba2d772`): `lib/services/test-requests/basic-clone-steps.js` (step bodies extracted from `--execute`), `lib/services/test-requests/run-runner.js` (`advanceRun`, exactly one step per call, journal before dispatch, dispatch-marker rule: an attempted POST/location POST/upload with no readable result stops the run, never re-dispatches), and CLI modes `--reserve` / `--advance [--steps=N] [--bypass-goverify]` / `--run-inspect` gated on `TEST_REQUEST_LEDGER_URL` (refuses unset, neon.tech, or any shared `POSTGRES_URL*`/`DATABASE_URL`). Opus review found and fixed twelve defects with nine live-ledger tests and four mutation checks; root added the stale-bundle stop, wider URL guard, location system label, CI wiring, and a plain report for a finished run. **Live proof:** run `3f83c1e2` → sandbox Request 1000341, two copied documents, `ready`, across four separate CLI invocations; evidence `docs/plans/evidence/test-request-factory/ledger-run-1000341-2026-09-24.json`.
+4. **Codex adversarial rounds 1–15** on the ledger/runner, each recorded in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (item 5 paragraphs). Round fifteen: approve, no material findings.
+5. **Item 6 reconnaissance and blocker** (`d935ece9f`): a read-only sandbox metadata probe shows the sandbox has no `wmkf_requestdocument` entity, no `wmkf_currentinitialassessment` / `wmkf_ai_fieldprimer` request columns, and none of the review, AI-run or other application-added entities (`docs/plans/evidence/test-request-factory/sandbox-schema-gap-2026-09-24.md`). The IA recipe's write path, identity, path/filename, hash, lineage commit and gate implications are recorded in the design doc for when the schema lands.
+6. **Per-machine allow rule** verified: the `.claude/settings.local.json` rule in memory `project-sandbox-rehearsal-bypass-allow-rule.md` cleared the classifier for reserve/advance/bypass; re-add it on another machine.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Accept build-order item 5** (ledger + runner + CLI) on the Factory branch. Evidence: design doc item 5 paragraphs, Codex round fifteen approve, live Request 1000341, CI job `ledger-postgres`. Migration 054 is applied to no shared database; its first shared apply needs your authorization (and freezes the file; later changes go in new numbered migrations).
+2. **Import the application solution into the sandbox** so later-stage recipes (item 6: IA → synthetic reviewers → materials → Pre-Site → Pre-RP/Final Writeup) can be proven live. Exact gap list: `docs/plans/evidence/test-request-factory/sandbox-schema-gap-2026-09-24.md`. Nothing in this repo can do this.
+3. **Sandbox create budget:** four permanent sandbox Requests exist from the Factory (1000338, 1000339, 1000340, 1000341); this session used one of the five you authorized for the autonomous run.
+4. Carried: old Preview aliases / Entra callbacks retire-or-keep (`docs/CURRENT_WORK_QUEUE.md`; destructive, grep callers first).
+
+### Verified Open (after the decisions above)
+
+1. **Item 6, IA recipe** once the sandbox schema exists: follow the recorded decomposition (recipe token, steps `seed_initial_assessment` / `seed_initial_assessment_snapshot`, resource kind `dataverse_request_document`, receipt keys for generation key and claim id, IA folder/filename grammar families, new reason codes) — every one of those is an enum/grammar edit in `run-ledger.js` **and** the matching SQL list in migration 054 + `setup-database.js` (the SQL lists were generated from the JS exports; keep them in step, the unit test pins both). Synthetic fixtures only (owner decision: no production reads beyond 1003222). Sandbox CLI steps write through the sandbox client under the ledger journal; the production form (item 7) must route through `requestDocumentAdapter` with a registered seam in `scripts/check-request-document-writers.js`; never write the immutable origin fields.
+2. **Item 7** (Admin creation form, resume/retire operations, production release) — hard stops: production marker schema apply then `TEST_REQUEST_ISOLATION=on`; merging the Factory branch to main.
+3. Known runner limits recorded in the design doc (not defects): same-key `--reserve` retry after a lost reserve response is a 409 (recover via `--run-inspect`); a GoVerify refusal has no operator-clear action (restore by hand, start a new run); superseded `planned`/`dispatched` rows remain after recoveries; `observe` is one 60-second call inside the 300-second lease.
+
+### Verify Before Acting
+
+1. Local throwaway ledger: docker container `wmkf-ledger-pg` (`postgres://postgres:ledger@127.0.0.1:5433/ledger`) was stopped at session end; start it (or any local PostgreSQL 16) and export `TEST_REQUEST_LEDGER_TEST_URL` to run the live suites. When migration 054 changes, drop `test_request_run_resources`, `test_request_runs` and `test_request_receipt_ok(jsonb)` first — the suites fail loudly on a stale schema by design.
+2. The 1003222 bundle in this session's scratchpad expires six hours after its 03:58Z export; re-export (owner-authorized production read) before any new clone.
+3. Codex must run with `--model gpt-5.6-sol` from the Factory worktree; runs take 5–10 minutes; the companion's `--base HEAD~N` scopes the diff.
+4. A Sonnet reconnaissance agent and an Opus review agent from this session are finished; the investigation worktree `/Users/gallivan/Code/WMKF_Apps-investigate` may still belong to another session; do not touch it.
+
+### Do Not Reopen Without New Decision
+
+1. Items 4 and 5 review history: fifteen Codex rounds are recorded; do not re-litigate the no-text invariant, the dispatch-marker rule, the no-lease-renewal decision, or in-place edits to unapplied migration 054.
+2. IA recipe uses synthetic fixtures only; no reviewer throwaway inboxes for now (owner, Session 537).
+3. Stage 1d, the exporter, and item 4 are accepted; existing requests are never changed by the Factory.
+
+## Key Files Reference
+
+- Design doc (build order, item 5 paragraphs, item 6 blocker): `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (Factory branch)
+- Ledger: `lib/db/migrations/054_test_request_runs.sql`, `lib/services/test-requests/run-ledger.js`, `run-ledger-db.js`, `docs/atlas/postgres-test-request-runs.md`
+- Runner/CLI: `lib/services/test-requests/run-runner.js`, `basic-clone-steps.js`, `bundle-file-copy.js`, `scripts/rehearse-test-request-sandbox.mjs`
+- Tests: `tests/unit/test-request-run-ledger*.test.js`, `tests/unit/migration-054-test-request-runs.test.js`, `tests/unit/test-request-run-runner.test.js`, `tests/unit/test-request-basic-clone-steps.test.js`, `tests/integration/test-request-run-ledger.pg.test.js`, `tests/integration/test-request-run-runner.pg.test.js`; CI job `ledger-postgres` in `.github/workflows/test.yml`
+- Evidence: `docs/plans/evidence/test-request-factory/` (bundle clone receipt 1000340, ledger run 1000341, sandbox schema gap)
+
+## Stop-time notes
+
+- Claim-evidence pilot report: no eligible plan/design edit recorded for this session key; no observation row added.
+- Memory: `project-sandbox-rehearsal-bypass-allow-rule.md` updated (rule verified). No router change.
+
+## Prior Session 537 Prompt: Sandbox Basic clone from the source bundle
+
+## Session 536 Summary — 2026-09-23 PT (Claude root; Codex rescue builds, Claude reviews)
+
+[VERIFIED via pushed branch commits, full Jest runs, gates, mutation checks, Codex adversarial reviews and owner-authorized production reads] Test Request Factory Stage 1d was fixed and **accepted by the owner**; the read-only production source-bundle exporter (build-order item 4, first half) was built, hardened through three Codex review rounds, run live on Request 1003222, and **accepted by the owner**. No commit landed on `main` this session except this handoff; all product work is on `codex/test-request-preview-integration` (now `57d823b14`, 26 commits this session, 19 behind / 89 ahead of main). Nothing was deployed and no production write occurred.
+
+### What Was Completed
+
+1. **Stage 1d accepted** (Factory branch). Six root-review defects fixed (`f06b5d3a8`, `7c8edcf45`, `6f2d56c48`, `008612629`), two Codex re-review findings fixed (`ee9901c59` default cycle from ordinary requests only; `c0cbf0dad` export-preview waterfall step), three more fixed by Codex rescue and reviewed (`6a293fe12` export token binds isolation policy; `744bde88d` Explorer page-local CSV hidden while isolation is on; `53260f1af` no default cycle for all-test programs). Owner decisions: single-request Word/PDF artifacts (incl. Grant Reporting) stay available for test requests; spend alarm counts all spend, dashboard shows test spend as one line; accept without a fourth review round.
+2. **Source-bundle exporter accepted** (Factory branch). `scripts/export-test-request-source-bundle.mjs` + `lib/services/test-requests/source-bundle.js` (bundle v2: production host + registered `akoyago-shared` site enforced, drive/item/site identity, strict SharePoint discovery, post-hash membership fence, root-only archive folder misses with library re-confirmation). Commits `414af81d9`, `ebd6796e4`, `433609a38`, `17085332a`, `4b8ebec7b`, `aba21a5a9`, `57d823b14` (+ doc commits). Live runs on 1003222 (owner authorized prod Dataverse reads this session): GUID `e43ae6ea-698f-f111-8076-6045bd018a07`, revision `W/"98622844"`, December 2026 / 2026-12-11, no purpose text, two recognized documents (`ProposalNarrative_1003222.pdf`, `Proposal_1003222.pdf`); no Phase I or bibliography file matched the recognized names.
+3. **Presentation Slice 0 decisions** (`codex/feature-request`, `6b9f1fd15`, `1fe8777d5`): Chrome and Edge accepted; macOS/iPadOS Safari deferred to a Production run on a Factory-created test request; browser-independent recovery rows move to one agent-run Chrome pass.
+4. **Investigation worktree** created for a parallel Claude session: `/Users/gallivan/Code/WMKF_Apps-investigate`, branch `claude/investigation` (no upstream). Another Claude session may be working there; do not touch it.
+
+## Next Items
+
+### Verified Open
+
+1. **Sandbox Basic clone from the bundle, with create-only file copy** (build-order item 4, second half).
+   Evidence: Factory branch design doc `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (source-bundle paragraph and build order item 4), `lib/services/test-requests/source-bundle.js` header (consumer obligations), `scripts/rehearse-test-request-sandbox.mjs`.
+   Teach the rehearsal to read a v2 bundle instead of a sandbox source Request; each file copy is journaled in the receipt before the write, create-only with conflict refusal, re-resolves the drive on the registered site and re-verifies eTag + SHA-256, and recovers an ambiguous outcome by exact item. Re-export the bundle first (the Session 536 file lives in that session's scratchpad): `DATAVERSE_ALLOW_PROD_READS=yes node --env-file=/Users/gallivan/Code/WMKF_Apps/.env.local scripts/export-test-request-source-bundle.mjs --source-request-number=1003222 --out=<new absolute path outside the repo>` — needs fresh owner authorization for the production read. Codex adversarial review before acceptance.
+2. **After item 1:** durable run ledger/runner, later-stage recipes, Admin form (design build order items 5–7).
+
+### Owner Decision Needed
+
+1. **Old Preview aliases / Entra callbacks** (`git-codex-pau-5b4bef`, `git-codex-wor-464bcd`): retire or keep. Evidence: `docs/CURRENT_WORK_QUEUE.md`. Retirement is destructive — grep live callers first.
+2. **1003222 has only two recognized documents.** If Phase I PDFs were expected, their names differ from the factory's recognized filenames; decide whether that is acceptable for the first clone or pick another source.
+
+### Verify Before Acting
+
+1. Production marker schema apply and `TEST_REQUEST_ISOLATION=on` each need explicit owner authorization; the switch stays off until the apply succeeds.
+2. The Factory branch is 19 commits behind main; merge main deliberately before integration.
+3. Codex rescue's sandbox cannot write the Factory worktree's git metadata (`index.lock: Operation not permitted`) — expect to commit its changes yourself after review. Codex must run with `--model gpt-5.6-sol`; the default `gpt-6-sol` fails on ChatGPT auth.
+4. Two early presentation fragment-probe upload sessions have unknown state; do not infer cleanup.
+
+### Do Not Reopen Without New Decision
+
+1. Stage 1d and the source-bundle exporter are accepted (owner, Session 536); no fourth review round.
+2. Existing requests are never changed by the Factory; test requests visible with TEST badge; reports/exports/cycle totals exclude them; single-request actions stay available.
+3. Safari Slice 0 runs in Production on a Factory test request; no further Edge runs.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| Factory branch `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Stage 1d fix record, source-bundle contract, build order |
+| Factory branch `lib/services/test-requests/source-bundle.js` | Bundle v2 build/read/export orchestration |
+| Factory branch `scripts/export-test-request-source-bundle.mjs` | Read-only production exporter CLI |
+| Factory branch `scripts/rehearse-test-request-sandbox.mjs` | Sandbox clone rehearsal to extend next |
+| Factory worktree | `/Users/gallivan/.codex/worktrees/test-request-preview-integration/WMKF_Apps` |
+
+## Stop-time notes
+
+No DEVELOPMENT_LOG milestone: nothing shipped to production; Stage 1d and the exporter are branch-local. Claim-evidence pilot: no eligible plan/design edit recorded for this session key, so no observation row.
+
+## Prior Session 536 Prompt: Fix six Stage 1d defects; decide presentation Slice 0
+
+## Session 535 Summary — 2026-09-23 PT (Claude root; Codex builds/reviews)
+
+[VERIFIED via local Git, pushed branches, full Jest runs, gates and Codex adversarial reviews] Claude took over the Test Request Factory build and completed Stage 1 isolation slices 1a–1c; Stage 1d is built but has six open defects. Two Codex PRs were refreshed, merged and deployed. The presentation-media proof branch was handed from Codex to Claude.
+
+### What Was Completed
+
+1. **Test Request Factory Stage 1 (branch `codex/test-request-preview-integration`, worktree `/Users/gallivan/Code/WMKF_Apps-factory`, pushed at `48e75a8be`).**
+   - 1a marker read contract and always-on marker write guard: accepted.
+   - 1b email / Contact / payment hard blocks: accepted after two correction rounds plus Codex-rescue fixes (`dd7181e39`, `9a0a740ab`, `94d9a3ada`).
+   - 1c scheduled jobs: every cron route classified in `tests/unit/test-request-scheduled-job-census.test.js`; guarded jobs skip test requests before claims/mints/provider calls/writes/sends; accepted (`00166d5e1`, `2e01698e3`, `a69545697`). Owner decisions: AI review panels run on test requests; cycle dossiers exclude them.
+   - 1d visibility (TEST badge, report/export/total exclusion) built by Codex rescue (`4c0a9e86f`, `ca0e0142a`, `4b0c53246`); root review and Codex adversarial review found six defects, recorded in `9d040a7a3` / `48e75a8be`. Owner decision: admin usage dashboard excludes test spend from totals but shows it as one separate line; the spend-check alarm must count all spend.
+   - Everything read-side is gated by `TEST_REQUEST_ISOLATION` (literal `on`); production still lacks the marker columns.
+2. **PR #326 (safe download filenames + Pre-RP census) and PR #327 (Preview alias CSRF runbook)** refreshed, verified and merged; #326 deployed to Production (`3cf98bea7`, served by `dpl_EvZzX5pEFncDbircBUsmsexUQeCp`); #327 merged (`98f2ab371`). A signed-in filename-header spot check was not run.
+3. **Presentation-media proof (`codex/feature-request`, new worktree `/Users/gallivan/Code/WMKF_Apps-presentation`)** handed to Claude at `44b5b798f`; branch and shared Preview alias target (`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`) re-verified. Chrome passed; Windows Edge partial; macOS/iPadOS Safari and live reload/expiry/long-seek/2 GB runs not run.
+4. Main doc commits pushed early in the session (`250e9ebeb`, `9e4f43b2e`, `76b0ff87e`, `d2720d781`).
+
+## Next Items
+
+### Verified Open
+
+1. **Fix six Stage 1d defects, then rerun Codex adversarial review from base `a69545697`.**
+   Evidence: "Stage 1d root review" paragraph in the branch's `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`; branch `SESSION_PROMPT.md` item 0.
+   (1) spend-check alarm must count all spend; admin dashboard shows test spend as one line; (2) Dynamics Explorer Search must not throw on an unclassified hit; (3) Workbench cycle discovery must include test requests; (4) `aggregateMeetingDateCycles` emits a second entity-level FetchXML filter (invalid); (5) Grant Reporting exclusion trusts an optional unbound `requestGuid` — classify whether it is a single-request action first; (6) spend classification reads one request at a time and silently drops unreadable spend.
+2. **After Stage 1:** source-bundle export from production Request 1003222 (read-only, owner-authorized scope), sandbox Basic clone, run ledger/runner, later-stage recipes, Admin form.
+
+### Owner Decision Needed
+
+1. **Presentation Slice 0:** continue or park. Continuing needs a newly approved disposable request + SharePoint target; owner runs macOS/iPadOS Safari by hand. Evidence: `codex/feature-request` plan `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md` and its `SESSION_PROMPT.md` entry.
+2. **Stage 1d single-request artifacts:** whether single-request Word/PDF artifacts count as "reports" (Codex kept them available). Evidence: branch design doc Stage 1d open question.
+3. **Old Preview aliases / Entra callbacks** (`git-codex-pau-5b4bef`, `git-codex-wor-464bcd`): retire or keep. Evidence: `docs/CURRENT_WORK_QUEUE.md`.
+
+### Verify Before Acting
+
+1. Production marker schema apply and `TEST_REQUEST_ISOLATION=on` each need explicit owner authorization; the switch stays off until the apply succeeds.
+2. Two early presentation fragment-probe upload sessions have unknown state (URLs not retained); do not infer cleanup.
+3. The Factory branch is 18+ commits behind main; merge main deliberately before any integration.
+
+### Do Not Reopen Without New Decision
+
+1. Existing requests are never changed by the Factory; `No`/false and null markers are equivalent; test requests visible with TEST badge; reports/exports/cycle totals exclude them.
+2. Codex model stays `gpt-5.6-sol` (gpt-6-sol refused on ChatGPT auth).
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| Factory branch `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Stage 1 decisions, 1a–1d records, open defects |
+| Factory branch `lib/services/test-requests/{isolation,request-test-state,spend-isolation}.js` | Isolation policy, per-run lookup, spend filter |
+| Factory branch `tests/unit/test-request-{scheduled-job,visibility,email-sender}-census.test.js` | Mechanized census tests |
+| Presentation branch `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md` | Slice 0 matrix and live-run rules |
+
+## Stop-time notes
+
+No DEVELOPMENT_LOG milestone: PR #326 is a contained header-hardening release; Factory and presentation work remain branch-local. Claim-evidence pilot: no eligible plan/design edit recorded for this session key, so no observation row.
+
+## Prior Session 535 Prompt: Sandbox Basic clone reviewed; select live source
 
 ## Session 534 Summary — 2026-09-22/23 PT
 

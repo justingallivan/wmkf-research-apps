@@ -13,7 +13,7 @@ function row(overrides = {}) {
   return {
     id: 'c1', request_id: R1, status: 'open', due_at: '2026-10-05T19:00:00Z', closes_at: '2026-10-14T19:00:00Z',
     checklist: SITE_VISIT_MATERIALS_CHECKLIST.map((item) => ({ ...item, waived: false })),
-    contacts: { pi: { role: 'pi', name: 'Pat', email: 'pi@example.edu' } }, invited_at: '2026-09-20T00:00:00Z',
+    contacts: { pi: { role: 'pi', name: 'Pat', email: 'pi@example.edu' }, liaison: { role: 'liaison', name: 'Lee', email: 'lee@example.edu' } }, invited_at: '2026-09-20T00:00:00Z',
     reminder_count: 0, created_by: PC, token_ciphertext: 'sealed', ...overrides,
   };
 }
