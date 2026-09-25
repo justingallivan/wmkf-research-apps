@@ -55,6 +55,11 @@ const EXEMPT = new Set([
   // alt-key behavior — it sets the address alone, deliberately, to see which orderings 412.
   // Adding a source would change what it measures, and it writes throwaway probe rows.
   'scripts/probe-merge-altkey-ordering.mjs',
+  // Test Request Factory bundle v3 exporter (6c-ii Stage A): a READ-side redaction, not a
+  // write payload -- `{ ...personRow, wmkf_emailaddress: null }` blanks a real reviewer's
+  // address before it enters the private bundle. Nothing here is sent to Dataverse; the
+  // exporter is read-only by construction (registered production host, DATAVERSE_ALLOW_PROD_READS).
+  'lib/services/test-requests/source-bundle-reviewers.js',
   // Test Request Factory synthetic-reviewer seeder (6c-ii Stage B, D-R1): the
   // synthetic destination person's `syntheticPersonProjection` deliberately
   // carries NO `wmkf_emailsource` (nor trust-state JSON nor a Contact link),
