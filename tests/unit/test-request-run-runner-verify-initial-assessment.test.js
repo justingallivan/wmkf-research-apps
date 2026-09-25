@@ -432,6 +432,7 @@ describe('stepVerifyInitialAssessment', () => {
       wmkf_sharepointdriveid: EXPECTED_DRIVE_ID,
       wmkf_sharepointitemid: snapId,
       wmkf_sharepointsiteid: EXPECTED_SITE_ID,
+      wmkf_sharepointversionid: '1.0',
       wmkf_sourceversionid: '1.0',
       wmkf_sourcecontenthash: iaHash,
       wmkf_contenthash: iaHash,
@@ -730,6 +731,101 @@ describe('stepVerifyInitialAssessment', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+  });
+
+  // Receipt anchors (Codex adversarial round 1, F3): the rows' content
+  // hashes and SharePoint versions must equal what the seed and snapshot
+  // steps journaled when they committed, so an in-place replacement of a
+  // file plus a consistent rewrite of the row's hash cannot verify.
+  const anchoredSeed = () => seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: governedHashToHex(iaHash), sourceVersionId: '1.0' } });
+  const anchoredSnapshot = () => snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: governedHashToHex(iaHash), versionId: '1.0' } });
+
+  it('receipt anchors: consistent journaled hashes and versions still reach markReady', async () => {
+    mockDataverse();
+    const { result, calls } = await runStep({
+      deps: { graph: baseGraph() },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), anchoredSeed(), anchoredSnapshot(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('ready');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  it('receipt anchors: an Initial Assessment whose file AND row hash were both replaced consistently after the seed step stops with ia_pointer_mismatch', async () => {
+    const replacedBytes = await renderInitialAssessmentDocx({
+      requestNumber: REQUEST_NUMBER, title: 'A replaced Initial Assessment', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    const replacedHash = await hashGovernedDocxContent(replacedBytes);
+    // Row and bytes agree with each other (every bytes-vs-row check passes);
+    // only the seed receipt's journaled hash disagrees.
+    mockDataverse({ ia: iaRow({ wmkf_contenthash: replacedHash }), snapshot: snapshotRow({ wmkf_sourcecontenthash: replacedHash, wmkf_contenthash: replacedHash }) });
+    const graph = baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
+        if (itemId === iaId || itemId === snapId) return { buffer: replacedBytes };
+        return null;
+      }),
+    });
+    const { result, calls } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), anchoredSeed(), anchoredSnapshot(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toBe('The Initial Assessment content hash no longer matches the hash the seed step journaled.');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+  });
+
+  it('receipt anchors: an Initial Assessment SharePoint version that differs from the journaled source version stops with ia_pointer_mismatch', async () => {
+    mockDataverse({ ia: iaRow({ wmkf_sharepointversionid: '2.0' }) });
+    const { result } = await runStep({
+      deps: { graph: baseGraph() },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), anchoredSeed(), anchoredSnapshot(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toBe('The Initial Assessment SharePoint version no longer matches the version the seed step journaled.');
+  });
+
+  it('receipt anchors: a Board snapshot whose file AND row hashes were replaced consistently after the snapshot step stops with ia_pointer_mismatch', async () => {
+    const replacedBytes = await renderInitialAssessmentDocx({
+      requestNumber: REQUEST_NUMBER, title: 'A replaced Board snapshot', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    const replacedHash = await hashGovernedDocxContent(replacedBytes);
+    // The snapshot row's own hash matches its bytes; its source hash still
+    // matches the IA (so the ia_snapshot_stale check passes); only the
+    // snapshot receipt's journaled hash disagrees.
+    mockDataverse({ snapshot: snapshotRow({ wmkf_contenthash: replacedHash }) });
+    const graph = baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
+        if (itemId === iaId) return { buffer: iaBuffer };
+        if (itemId === snapId) return { buffer: replacedBytes };
+        return null;
+      }),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), anchoredSeed(), anchoredSnapshot(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toBe('The Board snapshot content hash no longer matches the hash the snapshot step journaled.');
+  });
+
+  it('receipt anchors: a Board snapshot SharePoint version that differs from the journaled version stops with ia_pointer_mismatch', async () => {
+    mockDataverse({ snapshot: snapshotRow({ wmkf_sharepointversionid: '2.0' }) });
+    const { result } = await runStep({
+      deps: { graph: baseGraph() },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), anchoredSeed(), anchoredSnapshot(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toBe('The Board snapshot SharePoint version no longer matches the version the snapshot step journaled.');
   });
 
   // Single-arm isolation of the bytes-versus-row-hash check (Stage C round 2,

@@ -624,4 +624,41 @@ describe('stepSeedInitialAssessmentSnapshot', () => {
     const snapshotResource = getResources().find((r) => r.step === 'seed_initial_assessment_snapshot');
     expect(snapshotResource.readback.itemId).toBe(journaledItemId); // never overwritten by the wrong id
   });
+
+  it('resuming with a journaled item id stops with ia_upload_ambiguous if the path read returns NOTHING, never re-uploading (Codex adversarial round 1, F2)', async () => {
+    const identityRow = seedRow(governedHash);
+    const discoverState = { seed: identityRow, request: requestRow() };
+    mockDataverse(discoverState);
+    const discover = await runStep({ deps: { graph: fakeGraph() }, resources: [seedResourceRow()] });
+    expect(discover.result.outcome).toBe('advanced');
+    const generationKey = discoverState.snapshot.wmkf_generationkey;
+    const claimToken = discoverState.snapshot.wmkf_claimtoken;
+    const journaledItemId = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    const state = {
+      seed: identityRow,
+      snapshot: { ...discoverState.snapshot, wmkf_operationstatus: 100000000, wmkf_claimtoken: claimToken, modifiedon: new Date(Date.now() - 20 * 60 * 1000).toISOString() },
+      request: requestRow(),
+    };
+    fetch.mockClear();
+    mockDataverse(state);
+    // The path no longer resolves (moved, renamed, deleted, or an
+    // inconsistent read). The unmodified production function would treat
+    // null as "not uploaded yet" and PUT a second file.
+    const graph = fakeGraph({ getFileMetadataByPath: jest.fn(async () => null) });
+    const { result, getResources } = await runStep({
+      deps: { graph },
+      resources: [seedResourceRow(), {
+        resourceId: 2, sequence: 2, step: 'seed_initial_assessment_snapshot', resourceKind: 'dataverse_request_document', system: 'dataverse',
+        plannedIdentity: { generationKey, folder: 'Artifacts/Initial Assessment/Board Milestones' },
+        readback: { generationKey, uploadAttemptedAt: new Date().toISOString(), itemId: journaledItemId, driveId: EXPECTED_DRIVE_ID, siteId: EXPECTED_SITE_ID },
+        outcome: 'dispatched',
+      }],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_upload_ambiguous');
+    expect(result.errorMessage).toMatch(/no longer resolves to the previously journaled item/);
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+    const snapshotResource = getResources().find((r) => r.step === 'seed_initial_assessment_snapshot');
+    expect(snapshotResource.readback.itemId).toBe(journaledItemId);
+  });
 });

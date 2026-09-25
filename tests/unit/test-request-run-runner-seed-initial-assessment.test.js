@@ -200,12 +200,12 @@ function fakeGraph(overrides = {}) {
 }
 
 /** Recording fake ledger matching run-ledger.js's shape (mirrors test-request-run-runner.test.js's). */
-function createFakeLedger(initialRun) {
+function createFakeLedger(initialRun, initialResources = []) {
   const calls = [];
   let run = { ...initialRun };
-  const resources = [];
-  let nextSequence = 1;
-  let nextResourceId = 1;
+  const resources = initialResources.map((r) => ({ ...r }));
+  let nextSequence = resources.length + 1;
+  let nextResourceId = resources.length + 1;
   function fenceOk(leaseToken, leaseGeneration, expectedVersion) {
     return run.leaseToken === leaseToken && run.leaseGeneration === leaseGeneration
       && (expectedVersion === undefined || run.version === expectedVersion) && run.lockedUntil !== null;
@@ -308,9 +308,9 @@ function identityFor() {
   });
 }
 
-async function run(deps) {
+async function run(deps, initialResources = []) {
   const run0 = baseRun();
-  const { ledger, calls, getResources } = createFakeLedger(run0);
+  const { ledger, calls, getResources } = createFakeLedger(run0, initialResources);
   const manifest = baseManifest();
   const result = await bypassDynamicsRestrictions('test:seed-initial-assessment', () => advanceRun({
     runId: RUN_ID, ledger, manifest, bundle: null,
@@ -849,24 +849,77 @@ describe('stepSeedInitialAssessment — SharePoint site/drive binding (P1-B)', (
 });
 
 describe('stepSeedInitialAssessment — idempotent resume', () => {
-  it('a Ready row at the generation key advances without re-running create/upload', async () => {
-    const { generationKey } = identityFor();
-    const readyRow = {
+  // A Ready row exactly as commitReadyLineage leaves it (Codex adversarial
+  // round 1, F1): the recovery path must journal the item, drive, version and
+  // HEX64 content hash from the row, because the snapshot step requires the
+  // receipt's sourceVersionId and the verify step anchors to its contentHash.
+  const READY_GOVERNED_HASH = `${GOVERNED_DOCX_HASH_PREFIX}${Buffer.alloc(32, 0xab).toString('base64url')}`;
+  const READY_ITEM_ID = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  function readyRowFor(generationKey, overrides = {}) {
+    return {
       wmkf_requestdocumentid: REQUEST_DOCUMENT_ID, wmkf_operationstatus: 100000001, wmkf_generationkey: generationKey,
-      wmkf_contenthash: 'a'.repeat(64), '@odata.etag': 'W/"row-1"',
+      wmkf_contenthash: READY_GOVERNED_HASH, wmkf_sharepointitemid: READY_ITEM_ID, wmkf_sharepointdriveid: EXPECTED_DRIVE_ID,
+      wmkf_sharepointsiteid: EXPECTED_SITE_ID, wmkf_sharepointversionid: '3.0', '@odata.etag': 'W/"row-1"',
+      ...overrides,
     };
+  }
+  function mockReadyRow(readyRow) {
     fetch.mockImplementation((url) => {
       const href = String(url);
       if (href.includes('login.microsoftonline.com')) return tokenResponse();
       if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [readyRow] });
       throw new Error(`unexpected fetch to ${href}`);
     });
-    const graph = fakeGraph();
-    const { result } = await run({ graph });
+  }
 
+  it('a Ready row at the generation key advances without re-running create/upload, journaling the full receipt the later steps require', async () => {
+    const { generationKey } = identityFor();
+    mockReadyRow(readyRowFor(generationKey));
+    const graph = fakeGraph();
+    const { result, calls } = await run({ graph });
+
+    expect(result.errorMessage).toBeUndefined();
     expect(result.outcome).toBe('advanced');
     expect(graph.ensureFolderPath).not.toHaveBeenCalled();
     expect(graph.uploadFile).not.toHaveBeenCalled();
+    const readbacks = calls.filter((c) => c.op === 'recordResourceReadback');
+    const last = readbacks[readbacks.length - 1].readback;
+    expect(last).toMatchObject({
+      requestDocumentId: REQUEST_DOCUMENT_ID, generationKey,
+      itemId: READY_ITEM_ID, driveId: EXPECTED_DRIVE_ID, siteId: EXPECTED_SITE_ID,
+      sourceVersionId: '3.0', contentHash: Buffer.alloc(32, 0xab).toString('hex'),
+    });
+    // The two fields the snapshot step and the verify step key on must be
+    // present -- their absence is exactly the stranded-run failure F1 found.
+    expect(last.sourceVersionId).toBe('3.0');
+    expect(last.contentHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('a Ready row missing its SharePoint version stops with ia_pointer_mismatch instead of advancing into a run the snapshot step cannot continue', async () => {
+    const { generationKey } = identityFor();
+    mockReadyRow(readyRowFor(generationKey, { wmkf_sharepointversionid: null }));
+    const graph = fakeGraph();
+    const { result } = await run({ graph });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/missing its SharePoint item, drive, version, or content hash/);
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('a Ready row whose item differs from the item this run already journaled stops with ia_pointer_mismatch', async () => {
+    const { generationKey } = identityFor();
+    mockReadyRow(readyRowFor(generationKey));
+    const graph = fakeGraph();
+    const journaled = {
+      resourceId: 1, sequence: 1, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey }, outcome: 'dispatched',
+      readback: { generationKey, uploadAttemptedAt: new Date().toISOString(), itemId: '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234568', driveId: EXPECTED_DRIVE_ID, siteId: EXPECTED_SITE_ID },
+    };
+    const { result, getResources } = await run({ graph }, [journaled]);
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+    expect(result.errorMessage).toMatch(/does not match the previously journaled item/);
+    expect(getResources()[0].readback.itemId).toBe('01ABCDEFGHIJKLMNOPQRSTUVWXYZ234568');
   });
 });
 
