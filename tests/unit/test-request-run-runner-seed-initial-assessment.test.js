@@ -389,6 +389,12 @@ describe('stepSeedInitialAssessment — happy path', () => {
     expect(last.readback.contentHash).toBe(
       Buffer.from(rehashedFromUpload.slice(GOVERNED_DOCX_HASH_PREFIX.length), 'base64url').toString('hex'),
     );
+    // F6 (owner decision 2026-09-24): the raw SHA-256 of the exact uploaded
+    // bytes is journaled in the SAME merge as uploadAttemptedAt, i.e. before
+    // the PUT was dispatched, and equals the buffer uploadFile received.
+    const uploadMarker = readbacks.find((r) => r.readback.uploadAttemptedAt);
+    expect(uploadMarker.readback.bytesSha256).toBe(nodeCrypto.createHash('sha256').update(uploadedBuffer).digest('hex'));
+    expect(last.readback.bytesSha256).toBe(uploadMarker.readback.bytesSha256);
     // Attempt markers were journaled in order before each mutation -- each
     // merge() call resends the FULL current receipt (the copy_file
     // convention above), so the marker introduced by a given call is the

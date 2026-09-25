@@ -26,6 +26,7 @@
  */
 
 import { jest } from '@jest/globals';
+import nodeCrypto from 'node:crypto';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { assertLedgerReceipt, ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
 import { MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
@@ -391,6 +392,13 @@ describe('stepSeedInitialAssessmentSnapshot', () => {
     const last = readbacks[readbacks.length - 1];
     expect(last.readback).toMatchObject({ requestDocumentId: SNAPSHOT_DOCUMENT_ID });
     expect(last.readback.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    // F6 (owner decision 2026-09-24): the raw SHA-256 of the exact bytes
+    // handed to uploadFile is journaled in the same merge as
+    // uploadAttemptedAt (before the PUT) and survives to the final receipt.
+    const uploadedBuffer = graph.uploadFile.mock.calls[0][3];
+    const uploadMarker = readbacks.find((r) => r.readback.uploadAttemptedAt);
+    expect(uploadMarker.readback.bytesSha256).toBe(nodeCrypto.createHash('sha256').update(uploadedBuffer).digest('hex'));
+    expect(last.readback.bytesSha256).toBe(uploadMarker.readback.bytesSha256);
   });
 
   it('an upload attempted with no journaled item stops with ia_upload_ambiguous before the function is ever called', async () => {

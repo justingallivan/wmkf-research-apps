@@ -444,7 +444,7 @@ describe('slice 6a: new receipt keys and their grammars', () => {
   });
 
   it('LEDGER_RECEIPT_KEYS contains every new key', () => {
-    for (const key of ['requestDocumentId', 'sourceVersionId', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256']) {
+    for (const key of ['requestDocumentId', 'sourceVersionId', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'bytesSha256']) {
       expect(LEDGER_RECEIPT_KEYS).toContain(key);
     }
   });

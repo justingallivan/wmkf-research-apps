@@ -368,10 +368,13 @@ function baselineResource(digest) {
 // HEX64 governed hash of the fixture DOCX, set in the describe's beforeAll;
 // the receipts below carry it because every producer path journals it.
 let anchorHashHex = null;
+// Raw SHA-256 of the fixture DOCX bytes (the `bytesSha256` receipt key the
+// seed and snapshot steps journal before their PUTs), set in beforeAll.
+let anchorBytesSha256 = null;
 function seedResourceRow(overrides = {}) {
   return {
     resourceId: 2, sequence: 2, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', system: 'dataverse',
-    readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: anchorHashHex, sourceVersionId: '1.0' },
+    readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: anchorHashHex, sourceVersionId: '1.0', bytesSha256: anchorBytesSha256 },
     outcome: 'advanced',
     ...overrides,
   };
@@ -379,7 +382,7 @@ function seedResourceRow(overrides = {}) {
 function snapshotResourceRow(overrides = {}) {
   return {
     resourceId: 3, sequence: 3, step: 'seed_initial_assessment_snapshot', resourceKind: 'dataverse_request_document', system: 'dataverse',
-    readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: anchorHashHex, versionId: '1.0' },
+    readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: anchorHashHex, versionId: '1.0', bytesSha256: anchorBytesSha256 },
     outcome: 'advanced',
     ...overrides,
   };
@@ -404,6 +407,7 @@ describe('stepVerifyInitialAssessment', () => {
     iaBuffer = await docxBytes();
     iaHash = await hashGovernedDocxContent(iaBuffer);
     anchorHashHex = governedHashToHex(iaHash);
+    anchorBytesSha256 = crypto.createHash('sha256').update(iaBuffer).digest('hex');
   });
 
   function iaRow(overrides = {}) {
@@ -742,8 +746,75 @@ describe('stepVerifyInitialAssessment', () => {
   // hashes and SharePoint versions must equal what the seed and snapshot
   // steps journaled when they committed, so an in-place replacement of a
   // file plus a consistent rewrite of the row's hash cannot verify.
-  const anchoredSeed = () => seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: governedHashToHex(iaHash), sourceVersionId: '1.0' } });
-  const anchoredSnapshot = () => snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: governedHashToHex(iaHash), versionId: '1.0' } });
+  const anchoredSeed = () => seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: governedHashToHex(iaHash), sourceVersionId: '1.0', bytesSha256: anchorBytesSha256 } });
+  const anchoredSnapshot = () => snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: governedHashToHex(iaHash), versionId: '1.0', bytesSha256: anchorBytesSha256 } });
+
+  // Complete-package anchor (owner decision 2026-09-24, Codex round 2 F6):
+  // the downloaded bytes must be byte-identical to what the step uploaded.
+  // A second render of the same fixture has the SAME governed hash but
+  // different bytes, so it passes every governed-hash check (fresh render,
+  // row, receipt, snapshot source) and only this anchor can catch it --
+  // exactly the shape of a package with a foreign hidden part.
+  it('bytes anchor: a package with the same governed hash but different bytes than the seed step uploaded stops with ia_verification_failed', async () => {
+    const rerendered = await renderInitialAssessmentDocx({
+      requestNumber: REQUEST_NUMBER, title: TITLE, institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    expect(Buffer.compare(rerendered, iaBuffer)).not.toBe(0);
+    expect(await hashGovernedDocxContent(rerendered)).toBe(iaHash);
+    mockDataverse();
+    const graph = baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
+        if (itemId === iaId) return { buffer: rerendered };
+        if (itemId === snapId) return { buffer: iaBuffer };
+        return null;
+      }),
+    });
+    const { result, calls } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The downloaded Initial Assessment bytes are not the bytes the seed step uploaded.');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+  });
+
+  it('bytes anchor: a retained snapshot with the same governed hash but different bytes than the snapshot step uploaded stops with ia_verification_failed', async () => {
+    const rerendered = await renderInitialAssessmentDocx({
+      requestNumber: REQUEST_NUMBER, title: TITLE, institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    mockDataverse();
+    const graph = baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
+        if (itemId === iaId) return { buffer: iaBuffer };
+        if (itemId === snapId) return { buffer: rerendered };
+        return null;
+      }),
+    });
+    const { result } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The retained Board snapshot bytes are not the bytes the snapshot step uploaded.');
+  });
+
+  it('bytes anchor: a seed receipt that never journaled bytesSha256 stops with ia_verification_failed (mandatory)', async () => {
+    mockDataverse();
+    const { result } = await runStep({
+      deps: { graph: baseGraph() },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: anchorHashHex, sourceVersionId: '1.0' } }), snapshotResourceRow(), basicFileCopyResource()],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toBe('The downloaded Initial Assessment bytes are not the bytes the seed step uploaded.');
+  });
 
   // Fresh-render anchor (owner decision 2026-09-24): the row's governed hash
   // must equal a re-render of the synthetic fixture from the destination
