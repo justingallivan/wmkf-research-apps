@@ -772,13 +772,97 @@ describe('slice 6c-i: reserveRun reviewer assignments (D-R2)', () => {
     })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
   });
 
-  it('P2-c: refuses reused: true (the cross-run provenance check is not built until 6c-ii)', async () => {
+  // Slice 6c-ii Stage B: the cross-run provenance check (and the projection
+  // comparison) is now performed by the CLI's reservation-time resolution
+  // BEFORE reserveRun is ever called (rehearse-test-request-sandbox.mjs
+  // resolveReviewerAssignments) -- the ledger itself just stores the boolean
+  // the CLI already resolved, requiring destinationPersonId to be a GUID.
+  it('accepts reused: true, writing it through unchanged', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([{ run_id: REVIEWS_PLAN.runId }]);
+    queueRows([runRow({ recipe: 'reviews', plan_digest: REVIEWS_PLAN.planDigest })]);
+    queueRows([]);
+    const ledger = createRunLedger(db);
+
+    const { created } = await ledger.reserveRun({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: REVIEWS_PLAN,
+      reviewerAssignments: [{ ...ASSIGNMENT_A, reused: true }],
+    });
+
+    expect(created).toBe(true);
+    expect(calls[2].params[4]).toBe(true); // reused column
+  });
+
+  it('still refuses a non-boolean reused value', async () => {
     const { db } = createFakeDb();
     const ledger = createRunLedger(db);
     await expect(ledger.reserveRun({
       actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: REVIEWS_PLAN,
-      reviewerAssignments: [{ ...ASSIGNMENT_A, reused: true }],
-    })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value', message: expect.stringContaining('6c-ii') });
+      reviewerAssignments: [{ ...ASSIGNMENT_A, reused: 'true' }],
+    })).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+});
+
+describe('slice 6c-ii Stage B: listAssignmentsByDestinationPerson (cross-run provenance authority)', () => {
+  const DESTINATION_ID = '88888888-8888-4888-8888-888888888881';
+
+  it('returns every distinct source person GUID ever assigned to the destination, across runs', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([
+      { source_person_id: '77777777-7777-4777-8777-777777777771' },
+    ]);
+    const ledger = createRunLedger(db);
+    const sources = await ledger.listAssignmentsByDestinationPerson(DESTINATION_ID);
+    expect(sources).toEqual(['77777777-7777-4777-8777-777777777771']);
+    expect(calls[0].text).toContain('SELECT DISTINCT source_person_id');
+    expect(calls[0].params).toEqual([DESTINATION_ID.toLowerCase()]);
+  });
+
+  it('returns an empty array when the destination has never been assigned', async () => {
+    const { db, queueRows } = createFakeDb();
+    queueRows([]);
+    const ledger = createRunLedger(db);
+    expect(await ledger.listAssignmentsByDestinationPerson(DESTINATION_ID)).toEqual([]);
+  });
+
+  it('refuses a non-GUID destinationPersonId before any SQL', async () => {
+    const { db, calls } = createFakeDb();
+    const ledger = createRunLedger(db);
+    await expect(ledger.listAssignmentsByDestinationPerson('not-a-guid')).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('slice 6c-ii Stage B: getRunReviewerAssignment (runner-internal plaintext-address read)', () => {
+  const RUN_ID = '11111111-1111-4111-8111-111111111111';
+  const SOURCE_PERSON_ID = '77777777-7777-4777-8777-777777777771';
+  const DESTINATION_PERSON_ID = '88888888-8888-4888-8888-888888888881';
+
+  it('returns the plaintext address (unlike listRunReviewerAssignments)', async () => {
+    const { db, queueRows } = createFakeDb();
+    queueRows([{
+      sequence: 1, source_person_id: SOURCE_PERSON_ID, destination_person_id: DESTINATION_PERSON_ID,
+      reused: false, address: 'reviewer.one@example.test',
+      address_sha256: reviewerAddressSha256('reviewer.one@example.test').addressSha256,
+    }]);
+    const ledger = createRunLedger(db);
+    const row = await ledger.getRunReviewerAssignment(RUN_ID, 1);
+    expect(row.address).toBe('reviewer.one@example.test');
+    expect(row.sourcePersonId).toBe(SOURCE_PERSON_ID);
+  });
+
+  it('returns null when no row exists at that sequence', async () => {
+    const { db, queueRows } = createFakeDb();
+    queueRows([]);
+    const ledger = createRunLedger(db);
+    expect(await ledger.getRunReviewerAssignment(RUN_ID, 99)).toBeNull();
+  });
+
+  it('refuses a non-positive-integer sequence before any SQL', async () => {
+    const { db, calls } = createFakeDb();
+    const ledger = createRunLedger(db);
+    await expect(ledger.getRunReviewerAssignment(RUN_ID, 0)).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    expect(calls).toHaveLength(0);
   });
 });
 
