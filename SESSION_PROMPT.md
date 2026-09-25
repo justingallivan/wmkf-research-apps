@@ -1,4 +1,35 @@
-# Presentation branch continuation — 2026-09-24
+# Session 543 Prompt: Presentation upload performance (branch-local)
+
+## Session 542 presentation branch summary — 2026-09-24/25 PT
+
+**[VERIFIED via Git]** Commit `f9088d1a8` (`Plan direct Graph upload performance and desktop
+release gate`) is pushed to `origin/codex/feature-request`; the worktree was clean before this
+closeout update.
+It changed only this handoff and
+`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`. Four documentation gates
+and their self-tests, plus `check:docs-catalog`, passed. No runtime code or live service changed.
+The read-only Claude Opus review and its two follow-ups are recorded in the plan's §17.
+
+**Verified open:** [VERIFIED via `presentation-media-proof-service.js` and
+`presentation-media-proof-upload.js`] the proof still uses 320 KiB fragments, a fixed 60-second
+XHR timeout, and the initial-expiry refusal. Implement and offline-test the reviewed §7.2.1
+shared browser transport and correct the expiry classification before another live benchmark.
+After the durable producer exists, test its authenticated upload-session expiry recovery in
+Preview; the current Chrome expiry matrix row is PARTIAL, not Graph-confirmed PASS.
+
+**Owner decision needed before live work:** approve each fresh disposable request/target, MP4,
+Preview deployment or alias move, direct-Graph baseline item and exact cleanup, and any
+Production test write. The planned near-cap Production item is registry-bound and retained by
+default; its retention needs explicit approval before that run. The owner's existing override
+permits needed Dataverse reads without separate per-read approval.
+
+**Parked until dependencies exist:** desktop macOS Safari long-seek and near-cap Production
+checks need the production-safe flow and a Factory-created test request. **Do not reopen without
+a new owner decision:** iPadOS support is outside this feature; no further Edge run is planned.
+
+**Stop-time advisory:** `report:claim-evidence-pilot -- --current` could not read local state,
+so no pilot observation row was added. This planning-only session shipped no production
+capability or strategic pivot, so no `DEVELOPMENT_LOG.md` milestone entry is required.
 
 **Performance planning handoff (2026-09-24 PT):** [VERIFIED via branch source and the owner's
 performance steering brief] the Preview proof uses 320 KiB sequential Graph fragments, a fixed
