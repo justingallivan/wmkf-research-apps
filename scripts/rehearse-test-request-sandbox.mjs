@@ -36,6 +36,7 @@
  *     process.
  */
 
+import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -90,7 +91,9 @@ import {
   verifyClone,
 } from '../lib/services/test-requests/basic-clone-steps.js';
 import { advanceRun } from '../lib/services/test-requests/run-runner.js';
-import { LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest } from '../lib/services/test-requests/run-ledger.js';
+import {
+  LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
+} from '../lib/services/test-requests/run-ledger.js';
 import { pgLedgerDb } from '../lib/services/test-requests/run-ledger-db.js';
 
 const require = createRequire(import.meta.url);
@@ -125,6 +128,7 @@ function parseArgs(argv) {
     testLabel: null,
     reserve: false,
     recipe: 'basic',
+    reviewerAddress: [],
     manifestOut: null,
     idempotencyKey: null,
     actor: null,
@@ -146,6 +150,7 @@ function parseArgs(argv) {
     else if (arg === '--bypass-goverify') parsed.bypassGoverify = true;
     else if (arg === '--reserve') parsed.reserve = true;
     else if (arg.startsWith('--recipe=')) parsed.recipe = arg.slice('--recipe='.length);
+    else if (arg.startsWith('--reviewer-address=')) parsed.reviewerAddress.push(arg.slice('--reviewer-address='.length));
     else if (arg.startsWith('--manifest-out=')) parsed.manifestOut = arg.slice('--manifest-out='.length);
     else if (arg.startsWith('--idempotency-key=')) parsed.idempotencyKey = arg.slice('--idempotency-key='.length);
     else if (arg.startsWith('--actor=')) parsed.actor = arg.slice('--actor='.length);
@@ -187,12 +192,52 @@ function parseArgs(argv) {
   if (!LEDGER_RECIPES.includes(parsed.recipe)) {
     throw new Error(`--recipe must be one of: ${LEDGER_RECIPES.join(', ')}.`);
   }
+  // --reviewer-address is valid only with --reserve --recipe=reviews (D-R2/decision 4);
+  // the reviews recipe requires at least one, since a run with zero
+  // assignments is refused by the ledger.
+  if (parsed.reviewerAddress.length > 0 && (!parsed.reserve || parsed.recipe !== 'reviews')) {
+    throw new Error('--reviewer-address is valid only with --reserve --recipe=reviews.');
+  }
+  if (parsed.reserve && parsed.recipe === 'reviews' && parsed.reviewerAddress.length === 0) {
+    throw new Error('--reserve --recipe=reviews requires at least one --reviewer-address=<sourcePersonGuid>=<address>.');
+  }
   if (parsed.reserve) {
     parsed.actorId = resolveActorId(parsed.actor);
     try {
       idempotencyKeyDigest(parsed.idempotencyKey);
     } catch {
       throw new Error('--idempotency-key must be 1-200 printable ASCII characters (no spaces); the ledger stores only its SHA-256.');
+    }
+    if (parsed.recipe === 'reviews') {
+      const SOURCE_PERSON_GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const parsedFlags = parsed.reviewerAddress.map((raw) => {
+        const eq = raw.indexOf('=');
+        if (eq < 1) throw new Error('--reviewer-address must be <sourcePersonGuid>=<address>.');
+        const sourcePersonId = raw.slice(0, eq);
+        const address = raw.slice(eq + 1);
+        if (!SOURCE_PERSON_GUID.test(sourcePersonId)) throw new Error(`--reviewer-address: ${sourcePersonId} is not a GUID.`);
+        // reviewerAddressSha256 normalizes and validates the address shape;
+        // resolveActorId-style fail-fast before any Dataverse read.
+        reviewerAddressSha256(address);
+        return { sourcePersonId: sourcePersonId.toLowerCase(), address };
+      });
+      // Canonical order (sorted by source GUID) so the digest and the
+      // assignment `sequence` never depend on the flags' order on the
+      // command line -- a same-key retry with the flags reordered is still
+      // the same reservation.
+      parsedFlags.sort((a, b) => (a.sourcePersonId < b.sourcePersonId ? -1 : a.sourcePersonId > b.sourcePersonId ? 1 : 0));
+      const seen = new Set();
+      for (const { sourcePersonId } of parsedFlags) {
+        if (seen.has(sourcePersonId)) throw new Error(`--reviewer-address names ${sourcePersonId} more than once.`);
+        seen.add(sourcePersonId);
+      }
+      // Resolving an address to an EXISTING synthetic person is 6c-ii (it
+      // needs the exporter's bundle v3 and the synthetic-only lookup); here
+      // every assignment is a fresh, preallocated destination GUID with
+      // reused: false.
+      parsed.reviewerAssignments = parsedFlags.map(({ sourcePersonId, address }) => ({
+        sourcePersonId, destinationPersonId: crypto.randomUUID(), reused: false, address,
+      }));
     }
   }
   for (const runId of [parsed.advance, parsed.runInspect].filter(Boolean)) {
@@ -219,8 +264,9 @@ function printHelp() {
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
   console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
-  console.log('Reserve a ledger-driven bundle run: ... --reserve --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number> --manifest-out=/absolute/new-manifest.json --idempotency-key=<key> [--actor=<id>] [--recipe=basic|initial_assessment]');
-  console.log('  --recipe: basic (default) or initial_assessment; a same idempotency key reserved under a different recipe is a conflict, not a return of the first run.');
+  console.log('Reserve a ledger-driven bundle run: ... --reserve --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number> --manifest-out=/absolute/new-manifest.json --idempotency-key=<key> [--actor=<id>] [--recipe=basic|initial_assessment|reviews]');
+  console.log('  --recipe: basic (default), initial_assessment, or reviews; a same idempotency key reserved under a different recipe is a conflict, not a return of the first run.');
+  console.log('  --reviewer-address=<sourcePersonGuid>=<address> (repeatable): valid only with --reserve --recipe=reviews, required at least once for it. Each names one source reviewer and the throwaway address its synthetic reviewer will use; resolving the address to an EXISTING synthetic person is not built until 6c-ii -- every reservation here preallocates a fresh destination GUID (reused: false). Reservation refuses zero assignments, a malformed address, or two assignments naming the same source reviewer or the same (case-insensitive) address.');
   console.log('  --idempotency-key: 1-200 printable ASCII characters, no spaces; the ledger stores only its SHA-256.');
   console.log('  --actor: admin:<guid> or user:<guid>, or an OS username; a username (default: the current OS user) is stored only as cli:<16 hex digest>.');
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
@@ -570,9 +616,14 @@ async function runReserve(client, args, ledgerUrl) {
   if (!isBundleManifest(manifest)) throw new Error('The bounded ledger-driven runner only supports bundle (v4) manifests.');
 
   const { actorId } = args;
+  const reviewerAssignments = manifest.recipe === 'reviews' ? (args.reviewerAssignments ?? []) : [];
   // The plan digest binds the ledger-relevant identities/hashes, never
   // purpose text or the create body itself. Recipe is included so a same-key
-  // retry naming a different recipe conflicts instead of returning the first run.
+  // retry naming a different recipe conflicts instead of returning the first
+  // run. For `reviews`, the address digests (sorted, order-independent) and
+  // the assignment count are bound too (6c-i build notes), so a same-key
+  // retry naming different addresses conflicts instead of silently reusing
+  // the first reservation's assignments.
   const planDigest = sha256({
     runId: manifest.values.runId,
     recipe: manifest.recipe,
@@ -583,6 +634,10 @@ async function runReserve(client, args, ledgerUrl) {
     bundleSha256: manifest.source.bundleSha256,
     copyPolicyDigest: manifest.copyPolicy.digest,
     createBodySha256: manifest.createBodySha256,
+    ...(manifest.recipe === 'reviews' ? {
+      reviewerAddressDigests: reviewerAssignments.map((a) => reviewerAddressSha256(a.address).addressSha256).sort(),
+      reviewerAssignmentCount: reviewerAssignments.length,
+    } : {}),
   });
   const plan = {
     runId: manifest.values.runId,
@@ -618,7 +673,9 @@ async function runReserve(client, args, ledgerUrl) {
     const ledger = createRunLedger(db);
     let reserved;
     try {
-      reserved = await ledger.reserveRun({ actorId, idempotencyKey: args.idempotencyKey, plan });
+      reserved = await ledger.reserveRun({
+        actorId, idempotencyKey: args.idempotencyKey, plan, reviewerAssignments,
+      });
     } catch (error) {
       error.message += ` (the manifest at ${args.manifestOut} was NOT reserved; delete it)`;
       throw error;
@@ -711,7 +768,10 @@ async function runRunInspect(runInspect, ledgerUrl) {
     const run = await ledger.getRun(runInspect);
     if (!run) throw new Error(`No test request run found for ${runInspect}.`);
     const resources = await ledger.listRunResources(runInspect);
-    console.log(JSON.stringify({ mode: 'READ_ONLY_RUN_INSPECT', run, resources }, null, 2));
+    // Never the plaintext address, only its digest (D-R2): listRunReviewerAssignments
+    // never selects the `address` column, so there is nothing to redact here.
+    const reviewerAssignments = run.recipe === 'reviews' ? await ledger.listRunReviewerAssignments(runInspect) : [];
+    console.log(JSON.stringify({ mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments }, null, 2));
   } finally {
     await db.end();
   }
