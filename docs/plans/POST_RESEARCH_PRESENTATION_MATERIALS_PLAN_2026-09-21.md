@@ -800,7 +800,9 @@ predecessor-supersede contract as MP4 finalization. The cleanup reconciler treat
 generation plus drive/item registry match as bound, even when Superseded; only a proven zero-match
 candidate may be deleted by exact identity.
 
-Proposed first-slice transcript cap: 25 MB. This is code-owned and independently tested.
+Slice 3's code-owned transcript cap is exactly 25 MiB and is independently tested. The
+approval-bound live scanner-cap proof remains pending; reduce the cap before deployment or
+enablement if that proof fails.
 
 ## 8. Services and routes
 
@@ -827,9 +829,9 @@ feature and supplies no test Request.
 |---|---|---|
 | `/api/meeting-tracker/visits/[requestId]/presentation-materials` | GET | Current Recording/Transcript/Summary winners, conflicts, supported formats, and the authenticated actor's unfinished intent descriptors; no upload secret. |
 | same | PATCH | Exact action to save/replace a Zoom link; request and actor are server-owned. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | Begin MP4 or bounded transcript upload; returns the appropriate staging/upload contract. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript source-built/offline-tested in Slice 3:** begin a bounded private-Blob transcript upload. Slice 4 extends the same route for browser-direct MP4 intent and Graph session creation. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | Independently reauthorize creating actor/request/visit. For an open session, verify file resume fingerprint and return the no-store URL plus `nextExpectedRanges`; for an already committed item return finalize-only state and no URL. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | Lease-fenced, request-bound finalize/recovery. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript source-built/offline-tested in Slice 3:** lease-fenced, request-bound finalize/recovery. Slice 4 adds the durable MP4 finalize path. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | GET current link; POST exact `ensure` or compare-and-swap `reissue`. |
 | Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection/status for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While readiness is off, return the legacy payload with `presentationMaterialsStatus: 'disabled'`, not a false empty collection; do not 503 the existing logistics read. |
 | `/api/external/presentation/[token]/context` | GET | Rate limit, verify presentation token, return minimal material descriptors. |
@@ -1390,8 +1392,9 @@ may supply sanctioned evidence that the Graph malware facet becomes non-null for
 without that evidence, keep the facet check as defense in depth and do not claim it proves a
 synchronous scan. The first-slice size cap is resolved at 2,000,000,000 bytes.
 
-Also send a sanctioned 25 MB clean transcript through the configured scanner in Preview and
-record success; if the scanner cannot accept the proposed cap, reduce the cap before Slice 3.
+Also send a sanctioned 25 MiB clean transcript through the configured scanner in Preview and
+record success; if the scanner cannot accept the code-owned cap, reduce the cap before deploying
+or enabling the transcript producer.
 
 Run this harness only from the Preview application deployment and only with an owner-sanctioned
 disposable request. Before every run, explicitly record the configured Dataverse and SharePoint
@@ -1474,6 +1477,38 @@ the same model and slot-lease store rather than create a second winner rule.
   `/api/external/briefing/[token]/document` route remains for bounded files.
 
 ### Slice 3 — Transcript producer
+
+**Implementation status (2026-09-25): SOURCE-BUILT/OFFLINE-TESTED AT `20bdab526` ON
+`codex/feature-request`; NOT APPLIED, DEPLOYED, OR ENABLED.** The Meeting Tracker now has
+separate transcript mint/finalize routes over the shared private Blob staging ledger. Both
+independently reauthorize the session actor/profile, request-scoped rollout, and exactly one
+active request-bound Site Visit. The code-owned cap is exactly 25 MiB with exact VTT/TXT/PDF/DOCX
+extension/MIME pairs, a `WEBVTT` header, PDF/DOCX signatures, explicit no-magic TXT semantics,
+and fail-closed scanner handling when scanning is enabled. The staging ID is the public retry
+identity; each finalize claim's distinct lease token owns the Transcript slot fence.
+
+The producer records one exact Graph candidate before Dataverse, adopts only a deterministic-path
+409 item whose stable identity and downloaded SHA-256 match, renews the live staging claim before
+candidate persistence and Request Document creation, generation-recovers lost responses, and
+supersedes only explicit predecessors while both leases remain current. A retry of an older
+operation supersedes only its own recovered row and reprojects the newer winner. Cleanup uses an
+unfiltered generation lookup, retains every exact any-lifecycle registry binding, and deletes a
+proven zero-row orphan only after identity/size/receipt-or-SHA verification and an ETag-guarded
+exact-item delete. Ambiguity, mismatch, lookup failure, changed bytes, or failed conditional
+delete retains the item and its ledger authority.
+
+**[VERIFIED offline]** Fifteen expanded changed-surface suites pass 198 tests; scoped ESLint,
+`check:types`, `git diff --check`, and `npx next build --webpack` pass (the build emitted only the
+repository's existing dynamic-dependency warnings). API-route, route-lifecycle/auth,
+route/service-boundary, Dynamics-context, Dataverse-access, Request Document writer, and
+trust-boundary GUID gates pass with each self-test sequentially. After the durable-state sweep,
+the Atlas, fact-consistency, doc-currency, doc-symbol-ref, canonical-pointer,
+build-claim-freshness, secret-scan, and scaffolding-token gates and their self-tests pass; the
+docs catalog and agent invariants pass as well. No
+Postgres/Dataverse schema was applied, no flag or environment setting changed, no deployment or
+alias moved, and no SharePoint, Dataverse, or Production write occurred. Live confirmation that
+the configured malware scanner accepts the full 25 MiB cap remains an approval-bound release
+check; it is not inferred from mocks.
 
 - Extend private staging validation for transcript formats.
 - Add actor/request/type-bound transcript staging/finalize.
@@ -1888,6 +1923,21 @@ against source and refuted: the writer uses the required session-derived actor a
 backing contract requires every SharePoint identity/content field empty. Two broader/test-focused
 attempts stalled or exhausted their turns without a completed report and are not counted. No paid
 or metered review product was used.
+
+**2026-09-25 Slice 3 iterative read-only Claude Opus implementation reviews:** four completed
+rounds (the first split into service and route/cleanup subpasses) reviewed the transcript producer,
+staging ledger, routes, cleanup, and focused tests through the ordinary OAuth Opus CLI. Accepted
+findings drove deterministic-path lost-response adoption; authoritative local byte hashes;
+receipt-drift SHA fallback; explicit actor policy on predecessor writes; stale-retry self-only
+supersede; staging-completion replay; best-effort settlement; staging-lease renewal; per-claim slot
+tokens; lifecycle-unfiltered registry proof; changed-item retention; ETag-guarded exact deletion;
+and transient path-visibility classification. The final round's proposed cleanup/live-finalizer
+race was refuted against the omitted base SQL and then pinned by test: cleanup excludes a live
+`finalizing` lease, claim requires overall expiry in the future, and renewal requires both claim
+and overall expiry still live. Its remaining real P2 (409 followed by temporarily invisible path)
+was fixed as retryable `post_presentation_candidate_unavailable`. Three earlier tool-driven Opus
+invocations stalled without reports and are not counted. No Ultrareview or other metered review
+product was used.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof. The remaining decision is whether it survives the measured

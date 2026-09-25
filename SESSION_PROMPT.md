@@ -97,7 +97,7 @@ ETag-guarded proof cleanup. `check:types`, scoped ESLint, `git diff --check`, an
 dynamic-dependency warnings. The API route, route lifecycle/auth, route/service boundary,
 Dynamics-context boundary, Dataverse access
 layer, Request Document writer, and trust-boundary GUID gates all pass, each followed by its
-self-test; the route and GUID gates cover all 231 route files. The durable-document sweep found
+self-test; the route and GUID gates covered all 231 route files at that milestone. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-09-25 --> The durable-document sweep found
 no additional live restatement outside the plan, handoff, route matrix, route count, and service
 catalog surfaces updated by this milestone. Documentation/security gates are recorded after the
 final wording below.
@@ -129,6 +129,39 @@ flag changed, no deployment/alias moved, no SharePoint item or upload session wa
 Production/Dataverse write occurred. The Factory remains unfinished and is not a dependency;
 future live validation still requires a fresh concrete approval list and an individually approved
 human-created Request.
+
+## Session 543 Slice 3 governed transcript producer — 2026-09-25 PT
+
+**[SOURCE-BUILT/OFFLINE-TESTED at `20bdab526`; NOT APPLIED, DEPLOYED, OR ENABLED.]** The branch now
+contains actor/request/transcript-bound private staging and finalize routes with a code-owned
+25 MiB cap; exact VTT/TXT/PDF/DOCX validation; scanner refusal; candidate-before-Dataverse
+recovery; staging and material-slot lease fences; required actor attribution; deterministic-path
+lost-response adoption only after byte-hash proof; current-winner projection; and scope-specific
+orphan reconciliation. The staging ID is the client retry identity, while each finalize claim's
+own lease token owns the Transcript slot. Cleanup retains any exact registry match regardless of
+lifecycle and deletes a zero-row orphan only after unchanged identity/bytes proof using an
+ETag-guarded exact-item delete.
+
+**[VERIFIED offline]** Fifteen expanded changed-surface suites pass 198 tests; scoped ESLint, type checking,
+diff hygiene, and a local webpack production build pass. The API-route, route lifecycle/auth,
+route/service boundary, Dynamics-context, Dataverse-access, Request Document writer, and
+trust-boundary GUID gates and self-tests pass sequentially. After the durable-state sweep, the
+Atlas, fact-consistency, doc-currency, doc-symbol-ref, canonical-pointer, build-claim-freshness,
+secret-scan, and scaffolding-token gates and their self-tests pass; the docs catalog and agent
+invariants pass as well. Four completed iterative read-only
+Claude Opus review rounds drove fixes for crash recovery, hash/receipt drift, explicit actor
+updates, stale retries, staging completion/settlement, claim/slot races, conservative cleanup,
+and transient 409 path visibility. The final proposed live-finalizer cleanup race was checked
+against source and refuted by the existing live-lease exclusion plus the new overall-expiry
+renewal guard, then pinned by test. Three earlier stalled invocations produced no report and are
+not counted; no metered review product was used.
+
+**[VERIFIED no-live-effects.]** This milestone created no Blob or SharePoint upload, Dataverse or
+Postgres write, migration/schema application, environment change, deployment, or alias move.
+The live scanner-cap proof remains pending. Next offline milestone is Slice 4: wire the already
+built shared browser-direct Graph transport into the durable MP4 intent/finalize producer. The
+Factory remains unfinished and irrelevant to fixture creation; any future live check needs a
+fresh concrete approval list and an individually approved human-created Request.
 
 **[OWNER CORRECTION 2026-09-25.]** The Test Request Factory is unfinished and is not a
 prerequisite for this feature. Future bounded live checks must use an individually approved,

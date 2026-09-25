@@ -271,7 +271,10 @@ schema readback and the readiness flip are complete.
 - The applicant-materials collection (Codex plan). The deliberation briefing page itself is
   built separately (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`); the tracker only reads its live link.
 - Distribution email and logistics copy edits (owner: "noting for later").
-- Recording / transcript producers.
+- Post-presentation recording/transcript product behavior remains governed by
+  `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`, outside
+  this tracker plan's original slices. Its transcript producer is source-built
+  and offline-tested only; it is not deployed or enabled.
 - A PC role. D4 stands until evidence says otherwise.
 - J27 differences (the auto-generation trigger and the narrative source path; register J27-082).
 
