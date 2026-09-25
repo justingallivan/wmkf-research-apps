@@ -244,6 +244,15 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
       expect(fetch).not.toHaveBeenCalled();
     });
 
+    test('an array-nested (collection deep-insert) marker is refused even with the flag set (Codex 6c-i round 2)', async () => {
+      const client = optedInClient();
+      await expect(client.post('/akoya_requests', { akoya_title: 'x', wmkf_related: [{ wmkf_istestrequest: false }] }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      await expect(client.post('/akoya_requests', { akoya_title: 'x', wmkf_istestrequest: true, wmkf_related: [{ ok: 1 }, { wmkf_testcreationrunid: RUN_ID }] }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
     test('the REAL create_request body (compileTestRequestDraft output) is allowed through the flag', async () => {
       // Mirrors basic-clone-steps.js compileBody -> policy.js compileTestRequestDraft's
       // createBody exactly: a flat POST body to /akoya_requests carrying both
