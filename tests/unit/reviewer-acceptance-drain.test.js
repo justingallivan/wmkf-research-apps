@@ -10,6 +10,7 @@ import { REVIEW_STATUS_MAP } from '../../shared/config/reviewerLifecycle';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+const LIVE_REQUEST_ID = '22222222-2222-4222-8222-222222222223';
 const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
 
 function acceptedSuggestion(overrides = {}) {
@@ -706,5 +707,78 @@ describe('drainReviewerAcceptanceJobs', () => {
       leaseLostJobIds: [77],
     });
     expect(d.jobs.recordReviewerAcceptanceJobFailure).not.toHaveBeenCalled();
+  });
+});
+
+describe('processReviewerAcceptanceJob — Test Request isolation (Stage 1b)', () => {
+  function followUps(d) {
+    return [d.ensureHonorarium, d.ensureAcceptedContact, d.captureOrcid, d.captureIdentity,
+      d.syncNameTitle, d.autoLinkAccount, d.sendAcceptanceEmail];
+  }
+
+  it('cancels every follow-up (Contact, identity, honorarium/BILL, email) for a test request', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'synthetic', reason: 'marker_and_run_valid' })) };
+    const result = await processReviewerAcceptanceJob(job(), d);
+    expect(result).toMatchObject({ status: 'cancelled', reason: 'test_request_followup_skipped' });
+    expect(d.jobs.cancelReviewerAcceptanceJob).toHaveBeenCalledWith(
+      expect.anything(), 'test_request_followup_skipped', expect.any(Object),
+    );
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+  });
+
+  it('uses the live suggestion request relationship instead of the stale job payload', async () => {
+    const d = {
+      ...deps(acceptedSuggestion({ _wmkf_request_value: LIVE_REQUEST_ID })),
+      isolationEnabled: () => true,
+      resolveTestState: jest.fn(async (requestId) => ({
+        kind: requestId === LIVE_REQUEST_ID ? 'synthetic' : 'ordinary',
+        reason: 'fixture',
+      })),
+    };
+
+    const result = await processReviewerAcceptanceJob(job(), d);
+
+    expect(d.resolveTestState).toHaveBeenCalledWith(LIVE_REQUEST_ID);
+    expect(result).toMatchObject({ status: 'cancelled', reason: 'test_request_followup_skipped' });
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+  });
+
+  it('reports lease loss when test-request cancellation no-ops under a stale token', async () => {
+    const d = {
+      ...deps(),
+      isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'synthetic', reason: 'marker_and_run_valid' })),
+    };
+    d.jobs.cancelReviewerAcceptanceJob.mockResolvedValueOnce(null);
+
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({
+      code: 'reviewer_acceptance_lease_lost',
+      retryable: true,
+    });
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+  });
+
+  it('retries, rather than cancels, when the request marker cannot be read', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'unknown', reason: 'read_failed' })) };
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({ retryable: true });
+    expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+  });
+
+  it('runs the normal follow-up for an ordinary request with the switch on', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'ordinary', reason: 'marker_null_and_run_null' })) };
+    await processReviewerAcceptanceJob(job(), d);
+    expect(d.ensureHonorarium).toHaveBeenCalled();
+    expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('does not read the marker while the switch is off', async () => {
+    const d = { ...deps(), isolationEnabled: () => false, resolveTestState: jest.fn() };
+    await processReviewerAcceptanceJob(job(), d);
+    expect(d.resolveTestState).not.toHaveBeenCalled();
+    expect(d.ensureHonorarium).toHaveBeenCalled();
   });
 });

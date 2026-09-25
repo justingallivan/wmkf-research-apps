@@ -3,7 +3,7 @@
 /**
  * Guard the Wave 24 Request Document explicit-actor write contract.
  *
- * - exactly nine runtime create seams are registered;
+ * - exactly ten runtime create seams are registered (the WRITERS table is the count);
  * - each create declares its approved actor policy beside the call;
  * - raw Request Document createRecord calls remain centralized in the adapter;
  * - immutable origin fields are not written by arbitrary services/changesets.
@@ -15,6 +15,14 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const WRITERS = Object.freeze([
   ['lib/services/initial-assessment/artifact-service.js', 'requestDocumentAdapter.create(', 'ALLOW_UNATTRIBUTED'],
+  // This seam's REQUIRED policy is this file's OWN production call, unchanged
+  // -- but on the Test Request Factory sandbox rehearsal path ONLY (never a
+  // real production caller), the sandbox transport
+  // (lib/services/test-requests/ia-sandbox-deps.js `sandboxCreateDocument`)
+  // substitutes SANDBOX_REHEARSAL for whatever `actorPolicy` this call
+  // passes, because the rehearsal run never has a staff actor to resolve.
+  // That substitution happens one layer below this call site, so it does not
+  // change the text this gate scans and does not need a second WRITERS row.
   ['lib/services/initial-assessment/controls-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/pre-site-visit/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/pre-site-visit/reopen-service.js', 'dependencies.createDocument(', 'REQUIRED'],
@@ -23,6 +31,7 @@ const WRITERS = Object.freeze([
   ['lib/services/site-visit-materials/contributor-service.js', 'dependencies.createDocument(', 'EXTERNAL_CONTRIBUTOR'],
   ['lib/services/consultant-feedback-attachment-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/pre-rp-brief/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
+  ['lib/services/test-requests/run-runner.js', 'dependencies.createDocument(', 'SANDBOX_REHEARSAL'],
 ]);
 
 const ALLOWED_ORIGIN_FIELD_FILES = new Set([

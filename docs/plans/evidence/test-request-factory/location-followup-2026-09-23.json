@@ -1,0 +1,41 @@
+{
+  "checkedByUtc": "2026-09-23T02:11:50Z",
+  "mode": "READ_ONLY_DATAVERSE_AND_GRAPH_FOLLOWUP",
+  "scope": "Exact Request and regarding-location GETs, location creator and parent GETs, exact Graph folder list, and refreshed visible workflow/plugin-step census; no writes or flow execution",
+  "productionReference": {
+    "requestNumber": "1002788",
+    "requestCreatedOn": "2026-03-09T17:21:46Z",
+    "locationCount": 1,
+    "locationCreatedOn": "2026-03-09T17:23:08Z",
+    "locationCreatedBy": "# BCO akoyaGO Integration",
+    "locationCreatorIsApplicationUser": true,
+    "parentLibrary": "akoya_request",
+    "graphFolderRead": "ok",
+    "graphRootItemCount": 1
+  },
+  "sandboxRehearsal": {
+    "requestNumber": "1000338",
+    "requestCreatedOn": "2026-09-21T22:08:03Z",
+    "locationCount": 1,
+    "locationCreatedOn": "2026-09-22T18:51:10Z",
+    "locationCreatedBy": "Justin Gallivan",
+    "locationCreatorIsApplicationUser": false,
+    "relativeUrl": "1000338_46FF3EA989334F5D91A93EE8AC54DAD5",
+    "parentLibrary": "akoya_request",
+    "graphFolderRead": "ok",
+    "graphRootItemCount": 0,
+    "meetingDateStill": "2024-12-13T00:00:00Z",
+    "testMarkerAndRunStillMatch": true
+  },
+  "refreshedVisiblePluginSteps": {
+    "productionAsyncEntityCreatedOnRequestCreate": true,
+    "sandboxAsyncEntityCreatedOnRequestCreate": false,
+    "bothStepCollectionsCompleteHttp200": true
+  },
+  "limits": [
+    "The original attempt-window receipt accurately found no location then; this later observation does not identify what created the location.",
+    "A staff-user creator and approximately 20-hour delay do not prove which UI, workflow, or plugin caused location/folder creation.",
+    "The production-only AsyncEntityCreated registration is a candidate to investigate, not proven to be the provisioner.",
+    "The empty sandbox folder proves physical presence, not a document-bearing fixture or automatic create behavior."
+  ]
+}

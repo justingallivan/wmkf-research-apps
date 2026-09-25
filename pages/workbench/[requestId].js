@@ -22,6 +22,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
+import TestRequestBadge from '../../shared/components/TestRequestBadge';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
@@ -189,9 +190,12 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {visibleContext?.requestNumber ? `Request #${visibleContext.requestNumber}` : (requestNumber ? `Request #${requestNumber}` : 'Request Workbench')}
-        </h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {visibleContext?.requestNumber ? `Request #${visibleContext.requestNumber}` : (requestNumber ? `Request #${requestNumber}` : 'Request Workbench')}
+          </h1>
+          <TestRequestBadge isTestRequest={visibleContext?.isTestRequest} />
+        </div>
         {visibleContext?.title && <p className="text-gray-600 mt-1">{visibleContext.title}</p>}
         {visibleContext && (
           <p className="text-sm text-gray-500 mt-1">

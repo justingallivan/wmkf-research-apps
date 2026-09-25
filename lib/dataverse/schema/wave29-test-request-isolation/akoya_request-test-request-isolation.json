@@ -1,0 +1,26 @@
+{
+  "name": "akoya_request-test-request-isolation",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Isolated additive test-request marker/run fields. Creation-only schema apply; MUST carry no Power Automate trigger. Preflight existing attributes and target permissions before apply. Do not mix reminder/triage fields or unrelated drifted relationships into this wave.",
+  "attributes": [
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_IsTestRequest",
+      "displayName": "Synthetic Test Request",
+      "description": "Server-owned isolation marker. Ordinary rows default false; the factory writes true in the initial request INSERT. No client may change this marker after create.",
+      "default": false,
+      "trueLabel": "Test request",
+      "falseLabel": "Ordinary request",
+      "requiredLevel": "None"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_TestCreationRunId",
+      "displayName": "Test Creation Run ID",
+      "description": "Server-owned UUID correlation to the factory operation ledger. Written with the marker in the initial INSERT; no alternate key or browser-supplied value.",
+      "maxLength": 36,
+      "requiredLevel": "None"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "checkedAtUtc": "2026-09-23T02:48:13Z",
+  "mode": "READ_ONLY_RULE_METADATA_PLUS_ONE_GUARDED_SANDBOX_PATCH",
+  "sandboxRule": {
+    "name": "WMKF_Set Meeting Date",
+    "workflowId": "d31f4f65-1fff-ee11-a1fd-00224802b03a",
+    "category": 2,
+    "mode": 1,
+    "scope": 4,
+    "statecode": 1,
+    "xamlContainsDecemberBranch": "akoya_fiscalyear contains December -> wmkf_meetingdate 2024-12-13T00:00:00Z",
+    "xamlContainsJuneBranch": "akoya_fiscalyear contains June -> wmkf_meetingdate 2024-06-07T00:00:00Z",
+    "xamlSetsMeetingDate": true,
+    "clientdataContainsSameDateAssignments": true
+  },
+  "productionRuleNameQuery": {
+    "target": "https://wmkf.crm.dynamics.com",
+    "exactNameMatches": 0,
+    "scopeLimit": "Application-user-visible workflow definitions filtered by this exact name; not a tenant-wide proof that no other rule writes the date"
+  },
+  "sandboxPatch": {
+    "requestNumber": "1000339",
+    "requestId": "63dab4af-178f-4bbc-b24d-3ccbaf74cbfc",
+    "runId": "06dadd69-c5d7-4159-b690-2cc8e5a61af9",
+    "preconditions": "Exact synthetic marker/run, Foundation applicant, app-suite creator/owner, reminder flags false, null request status, old date and ETag, zero payment/email rows",
+    "fieldWritten": "wmkf_meetingdate",
+    "old": "2024-12-13T00:00:00Z",
+    "requested": "2099-12-01",
+    "httpStatus": 204,
+    "readback": "2099-12-01T00:00:00Z",
+    "markerAndOwnerPreserved": true,
+    "paymentRows": 0,
+    "regardingEmailRows": 0,
+    "readOnlyFollowup": "Date still 2099-12-01; one location; zero payment and regarding-email rows",
+    "retried": false
+  },
+  "limits": [
+    "The exact rule content and matching observed date strongly identify the rewrite, but no execution trace for that rule was captured.",
+    "The one-field corrective PATCH is proven on this retained sandbox Request; the updated full rehearsal script has not created a third Request.",
+    "This does not establish production meeting-date behavior or production synthetic-request isolation."
+  ]
+}

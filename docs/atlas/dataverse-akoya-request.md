@@ -28,6 +28,19 @@ after two HTTP 400 / `0x80040216` attempts, which left the view unchanged and
 did not call `PublishXml`. This is platform configuration metadata, not
 application-owned request state.
 
+**Related automation metadata entities:** `workflows` and
+`sdkmessageprocessingsteps` are read-only inputs to
+`scripts/probe-test-request-platform.js`. [VERIFIED via complete bounded
+Production/sandbox metadata census 2026-09-20 and the controlled sandbox
+rehearsals 2026-09-21] They inventory visible classic/cloud process definitions
+and registered request/location plug-in steps; they are not runtime application
+state. Runtime application code does not write them. The bounded rehearsal
+operator temporarily changed only the sandbox GoVerify workflow definition's
+state around one authorized Request POST and restored it. The first create
+rolled back in GoVerify; the bypassed create produced Request 1000338 and a
+server number, but no document location while sandbox background processing was
+disabled. See `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`.
+
 ## Key fields (live, sample-probed 2026-05-07)
 
 Identity / status:

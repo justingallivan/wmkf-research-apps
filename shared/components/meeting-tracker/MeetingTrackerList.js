@@ -7,6 +7,7 @@ import ToolbarSelect from '../ToolbarSelect';
 import ScopeSegment from '../workbench/ScopeSegment';
 import MaterialsStatusPill from './MaterialsStatusPill';
 import { classifySiteVisitMaterialsStatus, MATERIALS_STATUS_FILTERS } from '../../utils/site-visit-materials-status';
+import TestRequestBadge from '../TestRequestBadge';
 
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -46,6 +47,7 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
         <div className="min-w-0 w-full sm:w-auto sm:flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-900">#{proposal.requestNumber}</h2>
+            <TestRequestBadge isTestRequest={proposal.isTestRequest} />
             {proposal.needsScheduling && (
               <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Needs scheduling</span>
             )}

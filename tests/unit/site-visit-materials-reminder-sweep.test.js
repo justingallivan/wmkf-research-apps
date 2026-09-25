@@ -181,3 +181,37 @@ test('a send failure after the claim is counted and logged, not retried, and oth
   expect(d.attachEmailId).toHaveBeenCalledWith('c2', 'email-2');
   log.mockRestore();
 });
+
+describe('Test Request isolation (Stage 1b)', () => {
+  test('skips a test request row before any read, preparation, claim or send', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'synthetic', reason: 'marker_and_run_valid' })) };
+    const result = await sweepMaterialsReminders({}, d);
+    expect(result.skippedTestRequest).toBeGreaterThan(0);
+    expect(d.getRequest).not.toHaveBeenCalled();
+    expect(d.claim).not.toHaveBeenCalled();
+    expect(d.sendReminder).not.toHaveBeenCalled();
+  });
+
+  test('an unreadable marker skips the row for this run and reports it', async () => {
+    const d = { ...deps(), isolationEnabled: () => true,
+      resolveTestState: jest.fn(async () => ({ kind: 'unknown', reason: 'read_failed' })) };
+    const result = await sweepMaterialsReminders({}, d);
+    expect(d.claim).not.toHaveBeenCalled();
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ error: 'request could not be confirmed as ordinary' }),
+    ]));
+  });
+
+  test('skipped test collections never take up the batch (Stage 1c): the ordinary row behind them is sent', async () => {
+    const TEST_REQUEST = 'cccccccc-0000-4000-8000-000000000003';
+    const testRows = Array.from({ length: 3 }, (_, i) => row({ id: `t${i}`, request_id: TEST_REQUEST }));
+    const d = { ...deps(), isolationEnabled: () => true,
+      listDue: jest.fn(async () => [...testRows, row()]),
+      resolveTestState: jest.fn(async (id) => (id === TEST_REQUEST
+        ? { kind: 'synthetic', reason: 'x' } : { kind: 'ordinary', reason: 'x' })) };
+    const result = await sweepMaterialsReminders({ maxBatch: 1 }, d);
+    expect(result).toMatchObject({ skippedTestRequest: 3, scanned: 1, sent: 1 });
+    expect(d.claim).toHaveBeenCalledTimes(1);
+  });
+});

@@ -98,3 +98,13 @@ test('rejects a malformed fingerprint before SQL', async () => {
   })).rejects.toThrow(/SHA-256/);
   expect(sql).not.toHaveBeenCalled();
 });
+
+test('release requeues under the lease and gives back the attempt the claim counted (Stage 1c)', async () => {
+  sql.mockResolvedValueOnce({ rows: [{ id: 3, status: 'queued' }] });
+  const row = await store.releaseReviewSynthesisJob({ id: 3, lease_token: LEASE, attempts: 2 });
+  expect(row.status).toBe('queued');
+  expect(sqlText()).toMatch(/status = 'queued'/);
+  expect(sqlText()).toMatch(/attempts = GREATEST\(attempts - 1, 0\)/);
+  expect(sqlText()).toMatch(/lease_token = \?\s*RETURNING/);
+  expect(sql.mock.calls[0].slice(1)).toContain(LEASE);
+});

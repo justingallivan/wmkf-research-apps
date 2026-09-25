@@ -7,10 +7,12 @@
  *
  * Cycle default: the dashboard cycle list's `defaultCycleCode` (the working
  * cycle = the upcoming board meeting, per lib/utils/cycle-code.js) when the
- * URL carries no cycle; the resolved cycle is written back into the URL so
- * the address is always shareable. A well-formed `?cycleCode=` is honored
- * even when the program's list omits it (a Final writeups or Awardees cycle
- * need not have pending requests) and is rendered as an extra option.
+ * URL carries no cycle and the program has ordinary requests. If its cycles
+ * contain only Test Requests, staff pick a cycle explicitly. A resolved cycle
+ * is written back into the URL so the address is always shareable. A
+ * well-formed `?cycleCode=` is honored even when the program's list omits it
+ * (a Final writeups or Awardees cycle need not have pending requests) and is
+ * rendered as an extra option.
  *
  * Data: /api/workbench/dashboard (no cycleCode = cycle list for a program).
  */
@@ -111,7 +113,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         setCycles(body.cycles || []);
         setPrograms(Array.isArray(body.programs) ? body.programs : []);
         setResolvedProgramId(body.programId || '');
-        setDefaultCycleCode(body.defaultCycleCode || (body.cycles || [])[0]?.code || null);
+        setDefaultCycleCode(body.defaultCycleCode || null);
         setLoadedProgramKey(requestedProgramId);
       } catch (e) {
         if (cyclesLoadRef.current === token) setCyclesError(e.message);
@@ -206,6 +208,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           disabled={!cyclesReady || cycleOptions.length === 0}
           onChange={(e) => navigate({ cycleCode: e.target.value, uncycled: false }, { push: true })}
         >
+          {cyclesReady && !cycleCode && <option value="">Select a cycle…</option>}
           {cycleOptions.map((c) => (
             <option key={c.code} value={c.code}>{c.label || c.code}</option>
           ))}
@@ -253,7 +256,11 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         </div>
       )}
 
-      {location.view === 'requests' ? (
+      {cyclesReady && !cycleCode ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600" role="status">
+          Select a grant cycle to view this workspace.
+        </div>
+      ) : location.view === 'requests' ? (
         <RequestListPanel
           key={programId}
           programId={programId}

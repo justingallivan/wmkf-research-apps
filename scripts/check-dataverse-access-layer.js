@@ -71,6 +71,14 @@ const EXEMPT_FILES = new Set([
   // lib/services/dynamics-explorer/chat-session.js (exempt dir); its one raw
   // call is a resolveLogicalName metadata lookup (S329 tail 3).
   'lib/services/dynamics-explorer-taxonomy.js',
+  // Test Request Factory sandbox lineage-commit deps (slice 6b, Stage A item
+  // 2, docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md): the ONE place
+  // that builds a sandbox-bound (never process.env.DYNAMICS_URL) svc for
+  // executeChangeset, reusing dynamics/write-core.js's _withCallerId/
+  // _writeFetch so the sandbox transport shares the same interlock-checked
+  // write path as the production singleton. No entity adapter can exist for
+  // a deliberately org-bound service.
+  'lib/services/test-requests/ia-sandbox-deps.js',
 ]);
 
 const EXEMPT_DIRS = [

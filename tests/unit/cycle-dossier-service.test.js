@@ -114,6 +114,19 @@ test('roster is scoped server-side to the Workbench default program with no call
   }));
 });
 
+test('with TEST_REQUEST_ISOLATION=on the roster excludes test requests (cycle-wide report, Stage 1c)', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  try {
+    store.createDossierPreview.mockResolvedValue({ id: PREVIEW, expires_at: '2026-09-07T01:00:00Z', dossier_id: 'dossier-1' });
+    await previewCycleDossier(7, { selectedRequestIds: [ID], generateRequestIds: [] });
+    expect(requests.queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
+      filter: expect.stringMatching(/and \(\(wmkf_istestrequest eq false or wmkf_istestrequest eq null\) and wmkf_testcreationrunid eq null\)$/),
+    }));
+  } finally {
+    delete process.env.TEST_REQUEST_ISOLATION;
+  }
+});
+
 test('preview returns the selected and generated DTOs and saves the selection', async () => {
   store.listDossierEntries.mockResolvedValue([{ request_id: ID, id: 'entry-existing', revision: 6, request_revision: 1, created_at: '2026-09-07T00:00:00Z', created_by: 9 }]);
   store.createDossierPreview.mockResolvedValue({ id: PREVIEW, expires_at: '2026-09-07T01:00:00Z', dossier_id: 'dossier-1' });

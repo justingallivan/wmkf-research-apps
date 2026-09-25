@@ -22,8 +22,11 @@ const record = (over = {}) => ({
 });
 
 beforeEach(() => {
+  delete process.env.TEST_REQUEST_ISOLATION;
   grantRequestAdapter.queryAllRequests.mockReset();
 });
+
+afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
 
 describe('queryProposals', () => {
   it('builds the historical filter/select/orderby and projects the DTO', async () => {
@@ -56,6 +59,20 @@ describe('queryProposals', () => {
     expect(r.proposals.map((p) => p.requestId)).toEqual(['r1']);
     expect(r.totalCount).toBe(1);
     expect(r.program).toBe('SE');
+  });
+
+  it('Stage 1d badges test rows but excludes them from the cycle total', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    grantRequestAdapter.queryAllRequests.mockResolvedValueOnce({
+      records: [record({
+        wmkf_istestrequest: true,
+        wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
+      })],
+    });
+    const result = await queryProposals({ cycleCode: 'D25' });
+    expect(grantRequestAdapter.queryAllRequests.mock.calls[0][0].select).toContain('wmkf_istestrequest');
+    expect(result.proposals[0].isTestRequest).toBe(true);
+    expect(result.totalCount).toBe(0);
   });
 
   it('unknown program code leaves the set unfiltered (historical behavior)', async () => {

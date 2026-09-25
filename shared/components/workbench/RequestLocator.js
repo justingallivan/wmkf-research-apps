@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ToolbarSelect, { COMPACT_CONTROL_HEIGHT_CLASS, COMPACT_CONTROL_FOCUS_CLASS } from '../ToolbarSelect';
+import TestRequestBadge from '../TestRequestBadge';
 
 // Prior caches include other programs and off-cycle filters; do not restore them.
 const STORAGE_KEY = 'wmkf-workbench-request-locator-program-v4';
@@ -569,6 +570,7 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                           <span className="font-semibold text-gray-900">#{result.requestNumber || 'Unknown'}</span>
+                          <TestRequestBadge isTestRequest={result.isTestRequest} />
                           {result.cycleLabel && <span>{result.cycleLabel}</span>}
                           {result.program && <span>· {result.program}</span>}
                         </div>

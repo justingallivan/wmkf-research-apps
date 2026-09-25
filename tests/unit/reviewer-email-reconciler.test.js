@@ -40,6 +40,14 @@ jest.mock('../../lib/services/alert-service', () => ({
   },
 }));
 
+// Stage 1c: the per-run test-state lookup is replaced so each test chooses a
+// request's state; the lookup itself is covered in test-request-state.test.js.
+const mockRequestTestState = jest.fn(async () => ({ kind: 'ordinary', reason: 'test' }));
+jest.mock('../../lib/services/test-requests/request-test-state', () => ({
+  ...jest.requireActual('../../lib/services/test-requests/request-test-state'),
+  createRequestTestStateLookup: () => (requestId) => mockRequestTestState(requestId),
+}));
+
 const rosterStore = require('../../lib/services/reviewer-roster-store');
 const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
@@ -77,6 +85,7 @@ function seed(candidate, sug = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRequestTestState.mockImplementation(async () => ({ kind: 'ordinary', reason: 'test' }));
   AlertService.getOpenAutoResolveKeysByType.mockResolvedValue([ALERT_KEY(SUG)]);
   potentialReviewerAdapter.getForEmailReconcile.mockResolvedValue({}); // person has no email
   potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ none: true });
@@ -429,3 +438,44 @@ test('the emitted autoResolveKey is EXACTLY the key retraction matches on', asyn
   await reconcileReviewerEmails({});
   expect(AlertService.autoResolve).toHaveBeenCalledWith(emitted);
 });
+
+describe('Test Request isolation (Stage 1c)', () => {
+  test.each([
+    ['a test request', 'synthetic', 'skippedTestRequest'],
+    ['an unreadable marker', 'unknown', 'testStateUnknown'],
+  ])('%s: no address write, repoint, alert or retraction', async (_label, kind, counter) => {
+    mockRequestTestState.mockImplementation(async () => ({ kind, reason: 'x' }));
+    seed(vettedCandidate());
+    const r = await reconcileReviewerEmails({});
+    expect(mockRequestTestState).toHaveBeenCalledWith(REQ);
+    expect(r[counter]).toBe(1);
+    expect(r.scanned).toBe(0);
+    expect(rosterStore.findReconcilableCandidates).toHaveBeenLastCalledWith(expect.any(Number), { excludeRequestIds: [REQ] });
+    expect(r.written).toEqual([]);
+    expect(suggestionAdapter.getForEmailReconcile).not.toHaveBeenCalled();
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+    expect(suggestionAdapter.repointToPotentialReviewer).not.toHaveBeenCalled();
+    expect(NotificationService.notify).not.toHaveBeenCalled();
+    expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  });
+});
+
+test('Stage 1c: test-request rows never take up the batch; the next page of ordinary rows is processed', async () => {
+  const TEST_REQ = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  mockRequestTestState.mockImplementation(async (id) => (
+    id === TEST_REQ ? { kind: 'synthetic', reason: 'x' } : { kind: 'ordinary', reason: 'x' }
+  ));
+  // Newest-first page is all test-request rows until that request is excluded.
+  rosterStore.findReconcilableCandidates.mockImplementation(async (limit, { excludeRequestIds = [] } = {}) => (
+    excludeRequestIds.includes(TEST_REQ)
+      ? [{ requestId: REQ, candidate: vettedCandidate() }]
+      : Array.from({ length: limit }, () => ({ requestId: TEST_REQ, candidate: vettedCandidate() }))
+  ));
+  suggestionAdapter.getForEmailReconcile.mockResolvedValue({
+    _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: PERSON, wmkf_selected: true,
+  });
+  const r = await reconcileReviewerEmails({ maxBatch: 2 });
+  expect(r.skippedTestRequest).toBe(1);
+  expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'ava.mercer@example.org' }]);
+});
+

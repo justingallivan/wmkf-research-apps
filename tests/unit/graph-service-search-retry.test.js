@@ -93,6 +93,14 @@ afterEach(() => {
 });
 
 describe('GraphService.searchFiles throttle handling', () => {
+  test('rejects an unregistered SharePoint site before requesting a token', async () => {
+    process.env.SHAREPOINT_SITE_URL = 'https://appriver3651007194.sharepoint.com/sites/unreviewed';
+    global.fetch = jest.fn();
+
+    await expect(GraphService.searchFiles('budget')).rejects.toMatchObject({ status: 400 });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   test('a 429 followed by success returns results after one retry and logs nothing', async () => {
     const calls = routeFetch([throttled(), searchOk()]);
     const results = await runWithTimers(GraphService.searchFiles('budget'));

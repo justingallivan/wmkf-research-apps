@@ -369,9 +369,12 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
     );
     expect(blocks[8].data.message).toMatch(/^Blocked:/);
     expect(Object.keys(blocks[9].data).sort()).toEqual(['content']);
-    expect(Object.keys(blocks[10].data).sort()).toEqual(['outcome', 'requestId', 'rounds', 'suggestFeedback']);
+    expect(Object.keys(blocks[10].data).sort()).toEqual(
+      ['outcome', 'requestId', 'rounds', 'suggestFeedback', 'testRequestIsolation'],
+    );
     expect(blocks[10].data.requestId).toBe(requestId);
     expect(blocks[10].data.outcome).toBe('completed');
+    expect(blocks[10].data.testRequestIsolation).toBe(false);
 
     // document_links, export_progress, and file_ready must actually have fired
     // for both list_documents and search_documents emitters and the export path

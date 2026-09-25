@@ -244,3 +244,37 @@ describe('sweepStaleInvites', () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('Test Request isolation (Stage 1c)', () => {
+  afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
+
+  function markerRead(marker) {
+    readSpy.mockImplementation(async (entitySet) => {
+      if (entitySet === 'akoya_requests') {
+        if (marker instanceof Error) throw marker;
+        return marker;
+      }
+      return pending();
+    });
+  }
+
+  it.each([
+    ['a test request', { wmkf_istestrequest: true, wmkf_testcreationrunid: OTHER_ID }, 'skippedTestRequest'],
+    ['an unreadable marker', new Error('timeout'), 'testStateUnknown'],
+  ])('never expires an invitation on %s', async (_label, marker, counter) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    markerRead(marker);
+    const result = await sweepStaleInvites();
+    expect(result).toMatchObject({ eligible: 0, swept: 0, [counter]: 1 });
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('still expires an invitation on a verified ordinary request', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    markerRead({ wmkf_istestrequest: null, wmkf_testcreationrunid: null });
+    const result = await sweepStaleInvites();
+    expect(result).toMatchObject({ eligible: 1, swept: 1 });
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+  });
+});
+

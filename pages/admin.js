@@ -17,6 +17,7 @@ import DataverseFieldInfoButton, {
   appSystemSettingPattern,
 } from '../shared/components/admin/DataverseFieldInfoButton';
 import AdminOverviewSection from '../shared/components/admin/AdminOverviewSection';
+import TestRequestPreviewSection from '../shared/components/admin/TestRequestPreviewSection';
 import {
   AdminEditorPanel,
   AdminViewNavigation,
@@ -1127,6 +1128,19 @@ function UsageSection() {
               {stats.reviewPanel.unknownCount > 0 && (
                 <div className="text-xs text-red-700 mb-3">
                   Cost total withheld: {stats.reviewPanel.unknownCount} attempt(s) with unknown outcome are not counted toward the figure above.
+                </div>
+              )}
+              {stats.reviewPanel.isolation?.available === true && (
+                <div className="text-xs text-gray-600 mb-3">
+                  Test requests (not included above): {stats.reviewPanel.isolation.testSpend.attemptCount} attempt(s),{' '}
+                  {stats.reviewPanel.isolation.testSpend.unknownCount > 0
+                    ? 'cost withheld'
+                    : formatCost(stats.reviewPanel.isolation.testSpend.knownCostCents)}
+                </div>
+              )}
+              {stats.reviewPanel.isolation?.available === false && (
+                <div className="text-xs text-amber-700 mb-3">
+                  Test-request spend could not be separated, so the figures above include it.
                 </div>
               )}
               {stats.reviewPanel.byState?.length > 0 && (
@@ -3407,6 +3421,19 @@ export function AiWorkspace({ view }) {
   }
 }
 
+function TestRequestsWorkspace() {
+  return (
+    <AdminEditorPanel
+      id="test-request-preview"
+      title="Basic Request clone preview"
+      description="Resolve one sandbox Request, choose proposal files, and inspect the server-controlled field and filename plan. This panel has no create or copy action."
+      scope="Sandbox data · Shared files · Read-only"
+    >
+      <TestRequestPreviewSection />
+    </AdminEditorPanel>
+  );
+}
+
 export function PeopleWorkspace({ view }) {
   switch (view) {
     case 'app-access':
@@ -3474,6 +3501,8 @@ function WorkspaceContent({ workspace, view }) {
       return <OperationsWorkspace view={view} />;
     case 'workflows':
       return <WorkflowsWorkspace view={view} />;
+    case 'test-requests':
+      return <TestRequestsWorkspace />;
     case 'ai':
       return <AiWorkspace view={view} />;
     case 'people':

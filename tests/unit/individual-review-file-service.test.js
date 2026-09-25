@@ -77,6 +77,14 @@ jest.mock('../../lib/services/operational-event-service', () => ({
   default: { recordEvent: (...args) => recordEvent(...args) },
 }));
 
+// Stage 1c: the per-run test-state lookup is replaced so each test chooses a
+// request's state; the lookup itself is covered in test-request-state.test.js.
+const mockRequestTestState = jest.fn(async () => ({ kind: 'ordinary', reason: 'test' }));
+jest.mock('../../lib/services/test-requests/request-test-state', () => ({
+  ...jest.requireActual('../../lib/services/test-requests/request-test-state'),
+  createRequestTestStateLookup: () => (requestId) => mockRequestTestState(requestId),
+}));
+
 const {
   buildGeneratedReviewPath,
   ensureIndividualReviewFile,
@@ -146,6 +154,7 @@ function oldPointer(overrides = {}) {
 const OLD_ENV = process.env;
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRequestTestState.mockImplementation(async () => ({ kind: 'ordinary', reason: 'test' }));
   process.env = {
     ...OLD_ENV,
     VERCEL_ENV: 'production',
@@ -907,3 +916,25 @@ test('ineligible scanned rows do not consume the mutation attempt cap or starve 
   expect(result.results.map((row) => row.status)).toEqual(['not_structured', 'created']);
   expect(graph.uploadFile).toHaveBeenCalledTimes(1);
 });
+
+test('Stage 1c: rows on test requests are excluded before answer reads, inspection or filing', async () => {
+  const TEST_REQUEST_ID = '55555555-5555-4555-8555-555555555555';
+  mockRequestTestState.mockImplementation(async (requestId) => (
+    requestId === TEST_REQUEST_ID ? { kind: 'synthetic', reason: 'x' } : { kind: 'unknown', reason: 'read_failed' }
+  ));
+  suggestion.findReviewDocxFilingCandidates.mockResolvedValue({
+    records: [
+      { wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_request_value: TEST_REQUEST_ID },
+      { wmkf_appreviewersuggestionid: SECOND_SUGGESTION_ID, _wmkf_request_value: REQUEST_ID },
+    ],
+    capped: false,
+  });
+
+  const result = await sweepMissingIndividualReviewFiles({ scanCap: 10, attemptCap: 1 });
+
+  expect(result).toMatchObject({ candidateCount: 0, scanned: 0, skippedTestRequest: 1, testStateUnknown: 1 });
+  expect(fetchAnswersBySuggestion).not.toHaveBeenCalled();
+  expect(suggestion.getByIdWithSelect).not.toHaveBeenCalled();
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+});
+
