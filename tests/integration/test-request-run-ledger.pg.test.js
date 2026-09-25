@@ -557,7 +557,10 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       // Uppercase hex in either the 8-hex subfolder id or the 32-hex attempt id.
       { folder: `Reviewer_Uploads/jones_1A2B3C4D/attempt_${'a'.repeat(32)}` },
       { folder: `Reviewer_Uploads/jones_1a2b3c4d/attempt_${'A'.repeat(32)}` },
-      // A per-review cap of 5: Review_100 and a non-numbered form are rejected.
+      // A per-review cap of 5 (Review_[1-5]): 0, 6 and 100 are rejected, so a
+      // looser Review_[0-9]{1,2} SQL rule cannot pass these fixtures (Opus round 2).
+      { filename: 'Review_0.pdf' },
+      { filename: 'Review_6.docx' },
       { filename: 'Review_100.pdf' },
       { filename: 'Review_1.PDF' },
       { filename: 'Review_1.docm' },
