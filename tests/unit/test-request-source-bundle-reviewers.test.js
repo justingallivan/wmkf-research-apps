@@ -437,6 +437,31 @@ describe('assertBundleHasReviewerSectionForRecipe', () => {
 });
 
 describe('two-pass consistency fence over reviewer child rows', () => {
+  test('passes when the re-read set is unchanged but returned in a different order (Opus 6c-ii Stage A round 3)', () => {
+    const entry = reviewerEntry();
+    entry.answers = [
+      { ...entry.answers[0], wmkf_questionkey: 'alpha', eTag: '"{A-ETAG},1"' },
+      { ...entry.answers[0], wmkf_questionkey: 'zeta', eTag: '"{Z-ETAG},1"' },
+    ];
+    entry.files = [
+      { ...entry.files[0], graphItemId: '01AAA', eTag: '"{FA},1"', versionId: '1.0' },
+      { ...entry.files[0], graphItemId: '01ZZZ', eTag: '"{FZ},1"', versionId: '2.0' },
+    ];
+    const current = [{
+      suggestionId: SUGGESTION_ID,
+      suggestionEtag: '"{SUG-ETAG},1"',
+      personId: PERSON_ID,
+      personEtag: '"{PERSON-ETAG},1"',
+      // Reverse of the hydrated order on both arrays.
+      answers: [{ questionKey: 'zeta', eTag: '"{Z-ETAG},1"' }, { questionKey: 'alpha', eTag: '"{A-ETAG},1"' }],
+      files: [{ graphItemId: '01ZZZ', eTag: '"{FZ},1"', versionId: '2.0' }, { graphItemId: '01AAA', eTag: '"{FA},1"', versionId: '1.0' }],
+    }];
+    expect(() => assertReviewerSourceUnchanged([entry], current)).not.toThrow();
+    // And a real change inside the reordered set is still caught.
+    current[0].answers[1].eTag = '"{A-ETAG},2"';
+    expect(() => assertReviewerSourceUnchanged([entry], current)).toThrow(/reviewer_source_changed|Reviewer source/);
+  });
+
   test('passes when the re-read set is unchanged', () => {
     const hydrated = [reviewerEntry()];
     const current = [{
