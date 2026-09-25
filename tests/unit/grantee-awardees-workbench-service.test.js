@@ -26,10 +26,21 @@ import { listGranteeAwardees, listGranteeAwardeeCycles } from '../../lib/service
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 
 beforeEach(() => {
+  delete process.env.TEST_REQUEST_ISOLATION;
   jest.clearAllMocks();
   resolveByEmail.mockResolvedValue({ systemuserid: 'pd-me', fullName: 'Justin Gallivan' });
   queryAllRequests.mockResolvedValue({ records: [], totalCount: 0, capped: false });
   getDeliverableForRequest.mockResolvedValue(null);
+});
+
+afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
+
+test('Stage 1d: awardee report filters name marker fields only when enabled', async () => {
+  await listGranteeAwardeeCycles();
+  expect(queryAllRequests.mock.calls[0][0].filter).not.toContain('wmkf_istestrequest');
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  await listGranteeAwardeeCycles();
+  expect(queryAllRequests.mock.calls[1][0].filter).toContain('wmkf_istestrequest');
 });
 
 test('mine-scope with unresolvable PD returns the flagged empty list without querying', async () => {

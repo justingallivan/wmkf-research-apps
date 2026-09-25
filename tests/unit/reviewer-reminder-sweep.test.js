@@ -54,6 +54,14 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
   };
 });
 
+// Stage 1c: the per-run test-state lookup is replaced so each test chooses a
+// request's state; the lookup itself is covered in test-request-state.test.js.
+const mockRequestTestState = jest.fn(async () => ({ kind: 'ordinary', reason: 'test' }));
+jest.mock('../../lib/services/test-requests/request-test-state', () => ({
+  ...jest.requireActual('../../lib/services/test-requests/request-test-state'),
+  createRequestTestStateLookup: () => (requestId) => mockRequestTestState(requestId),
+}));
+
 const {
   sendOneReminder,
   sweepRespondReminders,
@@ -130,6 +138,7 @@ function respondCandidate(over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRequestTestState.mockImplementation(async () => ({ kind: 'ordinary', reason: 'test' }));
   getSettingStrict.mockImplementation(async (key) => {
     if (key === RESPOND_SUBJECT_KEY) return { found: true, value: RESPOND_SUBJECT };
     if (key === RESPOND_BODY_KEY) return { found: true, value: RESPOND_BODY };
@@ -675,4 +684,34 @@ test('unknown reminder kind fails before any marker or token write', async () =>
   expect(updateRecord).not.toHaveBeenCalled();
   expect(mintAndStore).not.toHaveBeenCalled();
   expect(createAndSendEmail).not.toHaveBeenCalled();
+});
+
+describe('Test Request isolation (Stage 1c)', () => {
+  const reviewDueRow = {
+    wmkf_appreviewersuggestionid: SUG,
+    _wmkf_potentialreviewer_value: PERSON,
+    _wmkf_request_value: REQ,
+    wmkf_remindercount: 0,
+    wmkf_externaltokenhash: 'stored-token-hash',
+    wmkf_externaltokenexpires: new Date(Date.now() + 120 * DAY).toISOString(),
+    wmkf_externaltokenrevoked: false,
+    _etag: 'W/"200"',
+  };
+
+  test.each([
+    ['respond reminders, test request', sweepRespondReminders, () => respondCandidate(), 'synthetic', 'skippedTestRequest'],
+    ['respond reminders, unreadable marker', sweepRespondReminders, () => respondCandidate(), 'unknown', 'testStateUnknown'],
+    ['review-due reminders, test request', sweepReviewDueReminders, () => reviewDueRow, 'synthetic', 'skippedTestRequest'],
+  ])('%s: skipped before any request read, token mint, claim or send', async (_label, sweep, row, kind, counter) => {
+    mockRequestTestState.mockImplementation(async () => ({ kind, reason: 'x' }));
+    queryAllRecords.mockResolvedValue({ records: [row()] });
+    installReads();
+    const r = await sweep();
+    expect(mockRequestTestState).toHaveBeenCalledWith(REQ);
+    expect(r[counter]).toBe(1);
+    expect(getRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
 });

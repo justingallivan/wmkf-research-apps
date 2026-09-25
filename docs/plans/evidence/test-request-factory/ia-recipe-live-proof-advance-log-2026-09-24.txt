@@ -1,0 +1,114 @@
+[dataverse-interlock] active: mode=on deployment=local target=sandbox caller=dataverse/client.call
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "fence_source",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": null,
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "create_request",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "correct_meeting_date",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "provision_location",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "copy_file",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "copy_file",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "observe",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "verify",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+(node:26972) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "seed_initial_assessment",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "seed_initial_assessment_snapshot",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}
+[dataverse-interlock] active: mode=on deployment=local target=sandbox caller=dataverse/client.call
+(node:27433) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "verify_initial_assessment",
+  "outcome": "needs_attention",
+  "status": "needs_attention",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": "The downloaded Initial Assessment bytes are not the bytes the seed step uploaded."
+}
+[dataverse-interlock] active: mode=on deployment=local target=sandbox caller=dataverse/client.call
+(node:31271) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+{
+  "mode": "ADVANCED",
+  "runId": "f8aae6aa-5921-4281-8a74-7bb8ccebe9a9",
+  "step": "verify_initial_assessment",
+  "outcome": "ready",
+  "status": "ready",
+  "destinationRequestNumber": "1000342",
+  "errorMessage": null
+}

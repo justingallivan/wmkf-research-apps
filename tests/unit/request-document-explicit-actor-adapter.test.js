@@ -161,6 +161,55 @@ test('external-contributor lost-response create records no missing-actor event',
   expect(OperationalEventService.recordEvent).not.toHaveBeenCalled();
 });
 
+test('sandbox-rehearsal create binds no actor, reads no systemuser, and records no missing-actor event', async () => {
+  await create({
+    'wmkf_Request@odata.bind': '/akoya_requests(11111111-1111-4111-8111-111111111111)',
+    wmkf_generationkey: 'generation-key',
+    wmkf_producer: 'request-workbench',
+  }, {
+    actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.SANDBOX_REHEARSAL,
+    actorContext: { operation: 'test-request-factory-seed-initial-assessment' },
+  });
+  const payload = DynamicsService.createRecord.mock.calls[0][1];
+  expect(payload).not.toHaveProperty('wmkf_InitiatedBy@odata.bind');
+  expect(payload).not.toHaveProperty('wmkf_initiatedat');
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  expect(OperationalEventService.recordEvent).not.toHaveBeenCalled();
+});
+
+test('sandbox-rehearsal lost-response create performs zero module-level reads and zero missing-actor events (Round 2 P1-D)', async () => {
+  DynamicsService.createRecord.mockRejectedValueOnce(new Error('response lost'));
+  await expect(create({
+    wmkf_generationkey: 'generation-key',
+    wmkf_producer: 'request-workbench',
+  }, {
+    actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.SANDBOX_REHEARSAL,
+    actorContext: { operation: 'test-request-factory-seed-initial-assessment' },
+  })).rejects.toThrow('response lost');
+  // Unlike ALLOW_UNATTRIBUTED's lost-response recovery (above), a sandbox
+  // rehearsal create must never fall back to the module-level (production-
+  // bound) findByGenerationKey/queryRecords read, and must never record an
+  // operational event.
+  expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  expect(OperationalEventService.recordEvent).not.toHaveBeenCalled();
+});
+
+test('the production ALLOW_UNATTRIBUTED path is unchanged by SANDBOX_REHEARSAL (pin)', async () => {
+  await create({
+    'wmkf_Request@odata.bind': '/akoya_requests(11111111-1111-4111-8111-111111111111)',
+    wmkf_generationkey: 'generation-key',
+    wmkf_producer: 'test-producer',
+  }, {
+    actingUserSystemId: null,
+    actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED,
+    actorContext: { operation: 'test', requestNumber: '1000001' },
+  });
+  expect(OperationalEventService.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'request_document_actor_not_captured',
+    requestNumber: '1000001',
+  }));
+});
+
 test('update rejects immutable explicit origin fields before transport', async () => {
   await expect(update('id', { wmkf_initiatedat: '2026-08-31T20:00:00Z' }))
     .rejects.toThrow(/immutable/);

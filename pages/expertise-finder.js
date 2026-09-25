@@ -7,6 +7,7 @@ import RosterContactField from '../shared/components/expertise-finder/RosterCont
 import { conventionalCycles, resolveWorkingCycle, cycleCodeToLabel } from '../lib/utils/cycle-code.js';
 import { buildRosterSubmitPayload } from '../shared/utils/roster-contact-link.js';
 import { requestEnvelope } from '../shared/utils/api-request';
+import TestRequestBadge from '../shared/components/TestRequestBadge';
 
 // ─── Tab Component ───
 
@@ -921,7 +922,9 @@ function BatchTab() {
 
                     return (
                       <tr key={p.requestId} className="group">
-                        <td className="px-4 py-3 text-gray-900 font-medium whitespace-nowrap">{p.requestNumber}</td>
+                        <td className="px-4 py-3 text-gray-900 font-medium whitespace-nowrap">
+                          {p.requestNumber} <TestRequestBadge isTestRequest={p.isTestRequest} className="ml-1" />
+                        </td>
                         <td className="px-4 py-3 text-gray-700 max-w-xs truncate">{p.title}</td>
                         <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{p.pi}</td>
                         <td className="px-4 py-3 whitespace-nowrap">

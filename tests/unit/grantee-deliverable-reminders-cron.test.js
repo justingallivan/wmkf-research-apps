@@ -150,6 +150,7 @@ beforeEach(() => {
 
 afterEach(() => {
   Date.now.mockRestore();
+  delete process.env.TEST_REQUEST_ISOLATION;
 });
 
 test('selection scans all Invited rows with an invite date', async () => {
@@ -396,6 +397,8 @@ test('200 summary envelope pinned exactly', async () => {
     skippedNoPd: 0,
     skippedNoRecipient: 0,
     skippedMisconfigured: 0,
+    skippedTestRequest: 0,
+    testStateUnknown: 0,
     claimFailed: 0,
     sendFailed: 0,
     scheduled: 1,
@@ -408,5 +411,63 @@ test('200 summary envelope pinned exactly', async () => {
     capped: false,
     deferred: 0,
     failures: [],
+  });
+});
+
+describe('Test Request isolation', () => {
+  const REQ = '11111111-1111-4111-8111-111111111111';
+  const RUN = '22222222-2222-4222-8222-222222222222';
+  const markers = { test: { wmkf_istestrequest: true, wmkf_testcreationrunid: RUN }, ordinary: { wmkf_istestrequest: null, wmkf_testcreationrunid: null } };
+
+  function withRequest(marker) {
+    DynamicsService.queryAllRecords.mockResolvedValue({
+      records: [{ ...deliv(1), _wmkf_request_value: REQ }], totalCount: 1, capped: false,
+    });
+    DynamicsService.getRecord.mockImplementation((entitySet, id, opts) => {
+      if (entitySet === 'akoya_requests') {
+        if (String(opts?.select).includes('wmkf_istestrequest')) {
+          return marker instanceof Error ? Promise.reject(marker) : Promise.resolve(marker);
+        }
+        return Promise.resolve(requestRow(1));
+      }
+      if (entitySet === 'contacts') return Promise.resolve(contactRow(id));
+      if (entitySet === 'systemusers') return Promise.resolve(pdRow(id));
+      return Promise.reject(new Error(`unexpected ${entitySet}`));
+    });
+  }
+
+  test('a test request is skipped before any recipient read or ledger write', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    withRequest(markers.test);
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.skippedTestRequest).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+    expect(DynamicsService.getRecord.mock.calls.filter(([set]) => set === 'contacts')).toHaveLength(0);
+  });
+
+  test('an unreadable marker skips this run and is reported', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    withRequest(new Error('timeout'));
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.testStateUnknown).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test('a verified ordinary request is scheduled as before', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    withRequest(markers.ordinary);
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.scheduled).toBe(1);
+  });
+
+  test('the switch off reads no marker', async () => {
+    withRequest(markers.test);
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.scheduled).toBe(1);
+    expect(DynamicsService.getRecord.mock.calls.some(([, , o]) => String(o?.select).includes('wmkf_istestrequest'))).toBe(false);
   });
 });

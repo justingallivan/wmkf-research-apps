@@ -17,6 +17,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { compile, validateQuerySpec } from '../../../lib/services/dataverse-export/compiler';
 import { fetchXmlAggregateCount } from '../../../lib/services/dataverse-export/fetch-client';
+import { testRequestIsolationEnabled } from '../../../lib/services/test-requests/isolation.js';
 import { mintResultToken } from '../../../lib/services/dataverse-export/result-token';
 import { fetchLiveTaxonomy, buildResolver } from '../../../lib/services/dataverse-export/live-taxonomy';
 
@@ -79,7 +80,9 @@ export default async function handler(req, res) {
     const tax = await fetchLiveTaxonomy();
     const resolver = buildResolver(tax);
 
-    const compiled = compile(spec, { resolver });
+    const markedIsolation = testRequestIsolationEnabled();
+    const compileOptions = { resolver, excludeMarkedTestRequests: markedIsolation };
+    const compiled = compile(spec, compileOptions);
 
     // FAIL-LOUD: excludeOperational requested but a label did not resolve ⇒
     // refuse (never mint a token that /run would execute with operational
@@ -109,43 +112,55 @@ export default async function handler(req, res) {
     // surprising-but-correct number must never be misread):
     //   matched      = user filters + eraScope ONLY (no operational/test)
     //   afterOp      = + operational exclusion (as the user set it)
+    //   afterMarked  = + marked Test Request exclusion (only while
+    //                  TEST_REQUEST_ISOLATION is on; deployment-owned)
     //   exported     = + test-record exclusion = trueTotal (full spec)
-    // Attribution is SEQUENTIAL (operational, then test — the compiler's
-    // own order); a row that is BOTH operational and a test record is
-    // counted at the operational step (removed first), never doubled.
+    // Attribution is SEQUENTIAL (operational, marked, then legacy test); a
+    // row matching more than one is counted at the first step that removes
+    // it, never doubled.
+    const unmarkedOptions = { resolver, excludeMarkedTestRequests: false };
     const matchedCompiled = compile(
       { ...spec, excludeOperational: false, excludeTestRecords: false },
-      { resolver });
+      unmarkedOptions);
     const afterOpCompiled = compile(
-      { ...spec, excludeTestRecords: false }, { resolver });
+      { ...spec, excludeTestRecords: false }, unmarkedOptions);
+    // Appended last so the positional count order is unchanged while off.
+    const afterMarkedCount = () => (markedIsolation
+      ? [countOf(compile({ ...spec, excludeTestRecords: false }, compileOptions))]
+      : []);
 
-    let trueTotal, matched, afterOperational, eraSplit;
+    let trueTotal, matched, afterOperational, afterMarked, eraSplit;
     if (eraScoped) {
-      [trueTotal, matched, afterOperational] = await Promise.all([
+      [trueTotal, matched, afterOperational, afterMarked] = await Promise.all([
         countOf(compiled), countOf(matchedCompiled), countOf(afterOpCompiled),
+        ...afterMarkedCount(),
       ]);
       eraSplit = { scope: spec.eraScope, count: trueTotal, otherEraOutOfScope: true };
     } else {
       let migrated, native;
-      [trueTotal, matched, afterOperational, migrated, native] = await Promise.all([
+      [trueTotal, matched, afterOperational, migrated, native, afterMarked] = await Promise.all([
         countOf(compiled), countOf(matchedCompiled), countOf(afterOpCompiled),
-        countOf(compile({ ...spec, eraScope: 'migrated' }, { resolver })),
-        countOf(compile({ ...spec, eraScope: 'native' }, { resolver })),
+        countOf(compile({ ...spec, eraScope: 'migrated' }, compileOptions)),
+        countOf(compile({ ...spec, eraScope: 'native' }, compileOptions)),
+        ...afterMarkedCount(),
       ]);
       eraSplit = { migrated, native, reconciles: migrated + native === trueTotal };
     }
+    if (!markedIsolation) afterMarked = afterOperational;
 
     // FAIL LOUD on a broken count invariant — exclusions only ever ADD
     // filter conditions, so the waterfall MUST be monotone non-increasing:
-    // matched ≥ afterOperational ≥ trueTotal. A violation means a compiler
+    // matched ≥ afterOperational ≥ afterMarked ≥ trueTotal. A violation means a compiler
     // / count-order / Dataverse regression; clamping it to 0 would emit a
     // plausible-wrong composition (the exact failure this tool exists to
     // prevent — Codex S161 P2). Surfaces via the existing catch → 502.
-    if (![matched, afterOperational, trueTotal].every(Number.isFinite)
-        || !(matched >= afterOperational && afterOperational >= trueTotal)) {
+    if (![matched, afterOperational, afterMarked, trueTotal].every(Number.isFinite)
+        || !(matched >= afterOperational && afterOperational >= afterMarked
+          && afterMarked >= trueTotal)) {
       const e = new Error(
         `count invariant violated (matched=${matched} `
-        + `afterOperational=${afterOperational} exported=${trueTotal})`);
+        + `afterOperational=${afterOperational} afterMarked=${afterMarked} `
+        + `exported=${trueTotal})`);
       e.name = 'CountInvariantError';
       throw e;
     }
@@ -154,17 +169,29 @@ export default async function handler(req, res) {
       matched,
       excludedOperational: spec.excludeOperational
         ? matched - afterOperational : 0,
+      ...(markedIsolation ? {
+        excludedMarkedTestRequests: afterOperational - afterMarked,
+        markedTestRequestsApplied: true,
+      } : {}),
       excludedTestRecords: spec.excludeTestRecords
-        ? afterOperational - trueTotal : 0,
+        ? afterMarked - trueTotal : 0,
       exported: trueTotal,
       operationalApplied: !!spec.excludeOperational,
       testRecordsApplied: !!spec.excludeTestRecords,
-      sequencing: 'Sequential attribution (operational, then test records — '
-        + 'the compiler order). A row that is both is counted at the '
-        + 'operational step, never double-counted.',
+      sequencing: markedIsolation
+        ? 'Sequential attribution (operational, then marked Test Requests, '
+          + 'then Foundation-applicant test records). A row matching more than '
+          + 'one is counted at the first step, never double-counted.'
+        : 'Sequential attribution (operational, then test records — '
+          + 'the compiler order). A row that is both is counted at the '
+          + 'operational step, never double-counted.',
     };
 
-    const { token, expiresInSec } = await mintResultToken(spec, { trueTotal });
+    const { token, expiresInSec } = await mintResultToken(
+      spec,
+      { trueTotal },
+      { markedIsolation },
+    );
 
     return res.status(200).json({
       trueTotal,

@@ -24,6 +24,7 @@ import {
   visitExpected,
 } from '../../utils/deliberation-stage';
 import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
+import TestRequestBadge from '../TestRequestBadge';
 
 const NOT_SCHEDULED_VISIT = Object.freeze({ status: 'not-scheduled', startIso: null });
 
@@ -82,6 +83,7 @@ function DeliberationCard({ artifact, stageLabels }) {
             {artifact.requestNumber ? `#${artifact.requestNumber}` : artifact.requestId}
             {artifact.title ? ` — ${artifact.title}` : ''}
           </Link>
+          <TestRequestBadge isTestRequest={artifact.isTestRequest} className="ml-2" />
           {artifact.institution && <p className="text-sm text-gray-600 mt-1">{artifact.institution}</p>}
           {artifact.programDirector && <p className="text-xs text-gray-500 mt-1">PD: {artifact.programDirector}</p>}
           {keyed && (

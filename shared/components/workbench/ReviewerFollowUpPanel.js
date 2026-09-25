@@ -22,6 +22,7 @@ import ReviewerManagePanel from '../reviewers/ReviewerManagePanel';
 import EmailTemplatesModal from '../reviewers/EmailTemplatesModal';
 import ScopeSegment from './ScopeSegment';
 import ViewFilterInput from './ViewFilterInput';
+import TestRequestBadge from '../TestRequestBadge';
 import {
   filterReviewerFollowUpProposals,
   isOpenReviewer,
@@ -60,6 +61,7 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
               >
                 #{proposal.requestNumber || '—'}
               </Link>
+              <TestRequestBadge isTestRequest={proposal.workbench?.isTestRequest} />
               <h2 className="min-w-0 text-base font-semibold text-gray-900 sm:text-lg">
                 {proposal.proposalTitle || 'Untitled request'}
               </h2>
@@ -255,7 +257,7 @@ export default function ReviewerFollowUpPanel({
     search: searchInput,
   }), [proposals, searchInput, reviewersView]);
   const summary = useMemo(() => summarizeReviewerFollowUp(
-    proposals.filter((proposal) => !proposal.workbench?.setAside),
+    proposals.filter((proposal) => !proposal.workbench?.setAside && proposal.workbench?.isTestRequest !== true),
   ), [proposals]);
 
   return (

@@ -55,12 +55,15 @@ import { resolveWorkbenchProgramScope, buildProgramScopeFilter } from '../../lib
 const PD = { systemuserid: 'pd-1', fullName: 'Dr. PD One' };
 
 beforeEach(() => {
+  delete process.env.TEST_REQUEST_ISOLATION;
   jest.clearAllMocks();
   resolveByEmail.mockResolvedValue(PD);
   getUserRole.mockResolvedValue('read_only');
   queryAllRequests.mockResolvedValue({ records: [], capped: false });
   fetchReviewerRollup.mockResolvedValue({});
 });
+
+afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
 
 // Fixed "today" so the calendar-based default is deterministic: 2026-09-08.
 const TODAY = new Date('2026-09-08T12:00:00Z');
@@ -107,6 +110,57 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
     filter: "wmkf_meetingdate ne null and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000 or wmkf_triagestatus eq 100000001)",
     orderby: 'wmkf_meetingdate desc',
   });
+});
+
+test('Stage 1d: cycle discovery keeps test requests but leaves them out of counts', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  const testRow = {
+    akoya_requestid: 'r-test', wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-1',
+    wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
+  };
+  const ordinaryRow = {
+    akoya_requestid: 'r-1', wmkf_meetingdate: '2027-06-11', _wmkf_programdirector_value: 'pd-1',
+    wmkf_istestrequest: null, wmkf_testcreationrunid: null,
+  };
+  queryAllRequests.mockResolvedValue({ records: [testRow, ordinaryRow], capped: false });
+  const body = await loadDashboard(args());
+  const call = queryAllRequests.mock.calls[0][0];
+  expect(call.filter).not.toContain('wmkf_istestrequest');
+  expect(call.select).toContain('wmkf_istestrequest,wmkf_testcreationrunid');
+  expect(body.cycles.map((c) => [c.code, c.count, c.myCount])).toEqual([['J27', 1, 1], ['D26', 0, 0]]);
+  // The earlier test-only D26 must not displace the ordinary J27 as the default.
+  expect(body.defaultCycleCode).toBe('J27');
+});
+
+test('Stage 1d: an all-test program lists its cycles without choosing a default', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  const run = '22222222-2222-4222-8222-222222222222';
+  queryAllRequests.mockResolvedValue({
+    capped: false,
+    records: [
+      { akoya_requestid: 'r-t1', wmkf_meetingdate: '2026-06-04', wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+      { akoya_requestid: 'r-t2', wmkf_meetingdate: '2026-12-11', wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+    ],
+  });
+  const body = await loadDashboard(args());
+  expect(body.cycles.map((cycle) => [cycle.code, cycle.count, cycle.myCount]))
+    .toEqual([['D26', 0, 0], ['J26', 0, 0]]);
+  expect(body.defaultCycleCode).toBeNull();
+  expect(body.lastDecidedCycleCode).toBeNull();
+});
+
+test('Stage 1d: a later test request in a mixed cycle does not move its rollover day', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  const run = '22222222-2222-4222-8222-222222222222';
+  queryAllRequests.mockResolvedValue({
+    capped: false,
+    records: [
+      { akoya_requestid: 'r-1', wmkf_meetingdate: '2026-12-04', wmkf_istestrequest: null, wmkf_testcreationrunid: null },
+      { akoya_requestid: 'r-t', wmkf_meetingdate: '2026-12-18', wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+    ],
+  });
+  const body = await loadDashboard(args());
+  expect(body.cycles).toEqual([expect.objectContaining({ code: 'D26', meetingDate: '2026-12-04', count: 1 })]);
 });
 
 test('cycle-list mode: the default cycle is the same for every caller regardless of assignments or visibility', async () => {
@@ -210,4 +264,20 @@ test('proposal mode: canonical session actor is case-insensitive and missing act
     .resolves.toMatchObject({ proposals: [{ canManage: true, isMine: true }] });
   await expect(loadDashboard(args({ cycleCode: 'D26', scope: 'all', callerSystemId: null })))
     .resolves.toMatchObject({ proposals: [{ canManage: false, isMine: true }] });
+});
+
+test('Stage 1d: on mode badges test rows but excludes them from rollup totals', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  queryAllRequests.mockResolvedValue({
+    records: [{
+      akoya_requestid: 'r-test', akoya_requestnum: '1009999', wmkf_meetingdate: '2026-12-11',
+      wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
+    }],
+  });
+  const body = await loadDashboard(args({ cycleCode: 'D26', scope: 'all' }));
+  expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
+    select: expect.stringContaining('wmkf_istestrequest,wmkf_testcreationrunid'),
+  }));
+  expect(body.proposals).toEqual([expect.objectContaining({ isTestRequest: true })]);
+  expect(body.rollup).toEqual({ total: 0, stages: { find: 0, invite: 0, awaiting: 0, review: 0, done: 0 } });
 });

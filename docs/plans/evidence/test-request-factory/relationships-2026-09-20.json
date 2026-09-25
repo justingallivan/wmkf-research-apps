@@ -1,0 +1,30 @@
+{
+  "checkedAt": "2026-09-20T00:15:06.878Z",
+  "mode": "METADATA_GET_ONLY",
+  "targets": [
+    {
+      "hostname": "wmkf.crm.dynamics.com",
+      "status": 200,
+      "relationships": [
+        {
+          "MetadataId": "8658b954-5e85-ee11-8179-000d3a341e8f",
+          "ReferencedEntity": "account",
+          "ReferencingAttribute": "akoya_applicantid",
+          "ReferencingEntityNavigationPropertyName": "akoya_applicantid"
+        }
+      ]
+    },
+    {
+      "hostname": "orgd9e66399.crm.dynamics.com",
+      "status": 200,
+      "relationships": [
+        {
+          "MetadataId": "8658b954-5e85-ee11-8179-000d3a341e8f",
+          "ReferencedEntity": "account",
+          "ReferencingAttribute": "akoya_applicantid",
+          "ReferencingEntityNavigationPropertyName": "akoya_applicantid"
+        }
+      ]
+    }
+  ]
+}

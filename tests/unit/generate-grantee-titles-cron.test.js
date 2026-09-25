@@ -70,6 +70,24 @@ test('predicate filters on cycle + Invited + research programs + empty descripti
   expect(filter).toContain('_akoya_programid_value eq prog-a');        // research only
 });
 
+test('with TEST_REQUEST_ISOLATION=on the query excludes test requests (Stage 1c)', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  try {
+    DynamicsService.queryAllRecords.mockResolvedValue({ records: [], capped: false });
+    await handler(req(), makeRes());
+    const { filter } = DynamicsService.queryAllRecords.mock.calls[0][1];
+    expect(filter).toContain('(wmkf_istestrequest eq false or wmkf_istestrequest eq null) and wmkf_testcreationrunid eq null');
+  } finally {
+    delete process.env.TEST_REQUEST_ISOLATION;
+  }
+});
+
+test('with the switch off the query does not name the marker columns', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [], capped: false });
+  await handler(req(), makeRes());
+  expect(DynamicsService.queryAllRecords.mock.calls[0][1].filter).not.toContain('wmkf_istestrequest');
+});
+
 test('rejects an unauthenticated call before any query', async () => {
   verifyCronSecret.mockReturnValue(false);
   await handler(req(), makeRes());

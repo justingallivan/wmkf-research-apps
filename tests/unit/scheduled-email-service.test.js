@@ -389,3 +389,162 @@ test('reviewer VIP flag SQL keys on potential_reviewer_id, never contact_id', ()
   expect(section).toContain('potential_reviewer_id');
   expect(section).not.toContain('contact_id');
 });
+
+describe('Test Request isolation (Stage 1b)', () => {
+  function isolated(kind) {
+    return {
+      ...dependencies(),
+      isolationEnabled: () => true,
+      getMessage: jest.fn(async () => message()),
+      resolveTestState: jest.fn(async () => ({ kind, reason: 'x' })),
+    };
+  }
+
+  test('a test request row is stopped before any claim, mint, recovery or send', async () => {
+    const deps = isolated('synthetic');
+    const result = await deliverScheduledEmail(message().id, {}, deps);
+    expect(result.stopped).toBe(true);
+    expect(deps.resolveTestState).toHaveBeenCalledWith(message().request_id);
+    expect(deps.cancelForSource).toHaveBeenCalledWith(message().id, 'test_request');
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled();
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an already accepted test-request activity is receipted and finalized without resend', async () => {
+    const pending = message({
+      status: 'sending',
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: '2026-08-25T00:00:00.000Z',
+    });
+    const deps = {
+      ...isolated('synthetic'),
+      getMessage: jest.fn(async () => pending),
+    };
+    deps.getEmailActivity.mockResolvedValue({
+      activityid: pending.dynamics_email_id,
+      statuscode: 6,
+      statecode: 1,
+      senton: '2026-08-25T00:00:01.000Z',
+    });
+
+    const result = await deliverScheduledEmail(pending.id, {}, deps);
+
+    expect(result.sent).toBe(true);
+    expect(deps.recordSent).toHaveBeenCalledWith(pending, expect.objectContaining({ statuscode: 6 }));
+    expect(deps.recordFinalized).toHaveBeenCalledWith(pending.id);
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an unreadable pre-claim activity performs no write and never resends', async () => {
+    const pending = message({
+      status: 'sending',
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: '2026-08-25T00:00:00.000Z',
+    });
+    const deps = {
+      ...isolated('synthetic'),
+      getMessage: jest.fn(async () => pending),
+    };
+    deps.getEmailActivity.mockRejectedValue(new Error('Dataverse activity read failed'));
+
+    await expect(deliverScheduledEmail(pending.id, {}, deps)).rejects.toMatchObject({
+      code: 'scheduled_email_activity_state_unknown',
+    });
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.recordSent).not.toHaveBeenCalled();
+    expect(deps.recordFinalized).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an unaccepted activity with a recorded send intent stays untouched for later reconciliation', async () => {
+    const pending = message({
+      status: 'sending',
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: '2026-08-25T00:00:00.000Z',
+    });
+    const deps = {
+      ...isolated('synthetic'),
+      getMessage: jest.fn(async () => pending),
+    };
+    deps.getEmailActivity.mockResolvedValue({
+      activityid: pending.dynamics_email_id,
+      statuscode: 1,
+      statecode: 0,
+    });
+
+    await expect(deliverScheduledEmail(pending.id, {}, deps)).rejects.toMatchObject({
+      code: 'scheduled_email_activity_state_unknown',
+    });
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.recordSent).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a readable draft activity with no send intent uses the one pre-claim cancel write', async () => {
+    const pending = message({
+      status: 'sending',
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: null,
+    });
+    const stopped = { ...pending, status: 'stopped', stopped_at: '2026-08-25T00:00:00.000Z' };
+    const deps = {
+      ...isolated('synthetic'),
+      getMessage: jest.fn(async () => pending),
+    };
+    deps.cancelForSource.mockResolvedValue(stopped);
+    deps.getEmailActivity.mockResolvedValue({
+      activityid: pending.dynamics_email_id,
+      statuscode: 1,
+      statecode: 0,
+    });
+
+    const result = await deliverScheduledEmail(pending.id, {}, deps);
+
+    expect(result.stopped).toBe(true);
+    expect(deps.cancelForSource).toHaveBeenCalledTimes(1);
+    expect(deps.cancelForSource).toHaveBeenCalledWith(pending.id, 'test_request');
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.recordSent).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an unreadable marker throws with no durable write, so a later run retries', async () => {
+    const deps = isolated('unknown');
+    await expect(deliverScheduledEmail(message().id, {}, deps)).rejects.toMatchObject({ code: 'test_request_state_unknown' });
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.recordFailure).not.toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled();
+  });
+
+  test('a verified ordinary row is claimed after the check', async () => {
+    const deps = isolated('ordinary');
+    await deliverScheduledEmail(message().id, {}, deps);
+    expect(deps.claimSend).toHaveBeenCalled();
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+  });
+
+  test('send-now by the owning PD matches the stored GUID case-insensitively', async () => {
+    const deps = isolated('ordinary');
+    const owner = message().pd_systemuser_id;
+    expect(owner).toMatch(/[a-f]/);
+    await deliverScheduledEmail(message().id, { force: true, pdSystemUserId: owner.toUpperCase() }, deps);
+    expect(deps.claimSend).toHaveBeenCalled();
+  });
+
+  test('send-now by a PD who does not own the row does not stop it', async () => {
+    const deps = isolated('synthetic');
+    const result = await deliverScheduledEmail(message().id, { force: true, pdSystemUserId: 'someone-else' }, deps);
+    expect(result).toEqual({ skipped: true });
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
+  });
+});

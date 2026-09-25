@@ -123,3 +123,34 @@ test('non-downgrade: re-send while Invited sends but never writes status; empty 
   expect(patchDeliverable).not.toHaveBeenCalled();
   expect(createAndSendEmail.mock.calls[0][0].cc).toBeUndefined();
 });
+
+describe('Test Request isolation (Stage 1b)', () => {
+  afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
+
+  test('a test request is refused before any deliverable write, mint or send', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    getById.mockImplementation(async (_id, { select } = {}) => (
+      Array.isArray(select) && select.includes('wmkf_istestrequest')
+        ? { wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' }
+        : { akoya_requestid: GUID, akoya_requestnum: '1002794' }
+    ));
+    const err = await sendGranteeInvite(args()).catch((e) => e);
+    expect(err).toBeInstanceOf(ServiceHttpError);
+    expect(err).toMatchObject({ httpStatus: 409, code: 'test_request_email_denied' });
+    expect(ensureDeliverableForRequest).not.toHaveBeenCalled();
+    expect(mintForRequest).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an ordinary legacy-null request still sends with the switch on', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    getById.mockImplementation(async (_id, { select } = {}) => (
+      Array.isArray(select) && select.includes('wmkf_istestrequest')
+        ? { wmkf_istestrequest: null, wmkf_testcreationrunid: null }
+        : { akoya_requestid: GUID, akoya_requestnum: '1002794' }
+    ));
+    await sendGranteeInvite(args());
+    expect(mintForRequest).toHaveBeenCalled();
+    expect(createAndSendEmail).toHaveBeenCalled();
+  });
+});

@@ -47,7 +47,7 @@ test('site resolution uses the canonical site, caches it, and reset/TTL cause a 
 
 test('site URL parsing rejects invalid URLs and hosts before token/fetch work', async () => {
   process.env.SHAREPOINT_SITE_URL = 'not a url';
-  await expect(GraphService.getSiteId()).rejects.toMatchObject({ status: 500, isTransient: false });
+  await expect(GraphService.getSiteId()).rejects.toMatchObject({ status: 400, isTransient: false });
   expect(GraphService.getAccessToken).not.toHaveBeenCalled();
   process.env.SHAREPOINT_SITE_URL = 'https://evil.example/sites/akoyaGO';
   await expect(GraphService.getSiteId()).rejects.toMatchObject({ status: 400, isTransient: false });

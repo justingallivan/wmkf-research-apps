@@ -200,4 +200,20 @@ describe('sendAcceptanceConfirmationEmail — failure paths', () => {
     await expect(sendAcceptanceConfirmationEmail({ suggestion: {}, request, reviewer }))
       .rejects.toThrow('acceptance confirmation sender email missing');
   });
+
+  test('with Test Request isolation on, a confirmation that cannot name its request is refused', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    process.env.NOTIFICATION_EMAIL_FROM = 'noreply@example.org';
+    const send = jest.spyOn(DynamicsService, 'createAndSendEmail').mockResolvedValue({ emailId: 'e' });
+    try {
+      await expect(sendAcceptanceConfirmationEmail({
+        suggestion: {},
+        request: null,
+        reviewer: { wmkf_emailaddress: 'jane@reviewer.org' },
+      })).rejects.toThrow('acceptance confirmation request missing');
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.TEST_REQUEST_ISOLATION;
+    }
+  });
 });

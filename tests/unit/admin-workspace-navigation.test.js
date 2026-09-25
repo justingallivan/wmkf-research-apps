@@ -17,11 +17,12 @@ jest.mock('next/link', () => ({
   default: ({ href, children, scroll: _scroll, ...props }) => <a href={href} {...props}>{children}</a>,
 }));
 
-test('exposes the five confirmed admin workspaces in the confirmed order', () => {
+test('exposes the confirmed admin workspaces in the confirmed order', () => {
   expect(ADMIN_WORKSPACES.map((workspace) => workspace.key)).toEqual([
     'overview',
     'operations',
     'workflows',
+    'test-requests',
     'ai',
     'people',
   ]);

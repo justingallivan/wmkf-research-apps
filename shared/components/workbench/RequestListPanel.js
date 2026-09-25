@@ -18,6 +18,7 @@ import ReviewerStatusIndicator from './ReviewerStatusIndicator';
 import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import ScopeSegment from './ScopeSegment';
 import { TRIAGE_STATUS } from '../../config/triageStatus';
+import TestRequestBadge from '../TestRequestBadge';
 
 // `done` means the request has enough completed reviews (REVIEWERS_NEEDED in
 // lib/services/reviewer-rollup.js), not that every accepted reviewer has
@@ -341,6 +342,7 @@ export default function RequestListPanel({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-gray-900">#{p.requestNumber}</span>
+                        <TestRequestBadge isTestRequest={p.isTestRequest} />
                         {p.cycleLabel && <span className="text-xs text-gray-500">{p.cycleLabel}</span>}
                         {p.grantProgram && <span className="text-xs text-gray-500">· {p.grantProgram}</span>}
                         {p.advancing && (

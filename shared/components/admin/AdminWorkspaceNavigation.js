@@ -43,6 +43,14 @@ export const ADMIN_WORKSPACES = Object.freeze([
     ],
   },
   {
+    key: 'test-requests',
+    label: 'Test Requests',
+    title: 'Test Request preparation',
+    description: 'Inspect a sandbox Request and prepare a non-writing clone preview before any separately authorized create.',
+    defaultView: 'preview',
+    views: [{ key: 'preview', label: 'Preview' }],
+  },
+  {
     key: 'ai',
     label: 'AI',
     title: 'AI administration',
@@ -96,8 +104,8 @@ export function adminHref(workspaceKey, viewKey) {
 
 export function AdminWorkspaceNavigation({ activeWorkspace }) {
   return (
-    <nav aria-label="Admin workspaces" className="border-b border-gray-200">
-      <div className="flex min-w-max gap-6 overflow-x-auto">
+    <nav aria-label="Admin workspaces" className="overflow-x-auto border-b border-gray-200">
+      <div className="flex min-w-max gap-6">
         {ADMIN_WORKSPACES.map((workspace) => {
           const active = workspace.key === activeWorkspace;
           return (

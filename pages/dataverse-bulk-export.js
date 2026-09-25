@@ -888,6 +888,14 @@ function DataverseBulkExport() {
                         <span>operational rows INCLUDED (toggle off)</span><span>—</span>
                       </div>
                     )}
+                    {preview.composition.markedTestRequestsApplied && (
+                      <div className="flex justify-between text-amber-700">
+                        <span>− excluded as marked Test Requests</span>
+                        <span className="font-semibold">
+                          −{fmt(preview.composition.excludedMarkedTestRequests)}
+                        </span>
+                      </div>
+                    )}
                     {preview.composition.testRecordsApplied ? (
                       <div className="flex justify-between text-amber-700">
                         <span>− excluded as test records (Foundation-applicant, native)</span>
