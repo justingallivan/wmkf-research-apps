@@ -60,10 +60,15 @@ and the governed folder listing was empty. [VERIFIED via Vercel CLI] the alias w
 re-inspected at the Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the three
 temporary Preview variables scoped only to `codex/feature-request` were removed, and the
 Factory branch's four scoped variable names remained. All three Chrome recovery cells are
-PASS. The deferred Production macOS/iPadOS Safari and near-cap run remains; the plan's dated
-Slice 0 matrix has the full receipts.
+PASS. **Owner scope update (2026-09-24 PT):** iPadOS support is outside this staff feature's
+release matrix; no office staff will use an iPad for this work. The owner kept the near-cap
+upload check on desktop for the proposed 2 GB cap. The remaining Slice 0 browser run is
+Production macOS Safari on a Factory-created test request: upload, both Watch shapes, long
+seeking, and Download integrity. [PLANNED] Combine the real near-cap desktop upload with that
+run. Earlier iPadOS assignments below
+are historical and superseded. The plan's dated Slice 0 matrix has the full receipts.
 
-**Latest Slice 0 state (2026-09-23):** [VERIFIED via Git] `codex/feature-request` includes
+**Historical Slice 0 state (2026-09-23; superseded by the scope update above):** [VERIFIED via Git] `codex/feature-request` includes
 the owner-approved `origin/main` merge, offline recovery hardening, and the documented
 Preview authentication URI workaround. [VERIFIED via Vercel] the
 owner-triggered immutable Preview deployment `dpl_4R14xsX2jYHHgHYSzvuRjUDQUhM1` was Ready
@@ -89,7 +94,7 @@ row waits on Edge. See the plan's matrix note.
 The detailed matrix, click steps, and receipt are in
 `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`.
 
-**Slice 0 handoff cells:** no current unresolved FAIL is recorded. The earlier Chrome CSP and
+**Current Slice 0 handoff cells (2026-09-24 scope):** no current unresolved FAIL is recorded. The earlier Chrome CSP and
 live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
 
 | Browser or scenario | Status | Evidence or limit |
@@ -97,16 +102,17 @@ live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
 | Chrome core upload, same-page pause/resume, finalize, both Watch modes, seek, Download | PASS | [VERIFIED via signed-in 2026-09-22 Chrome receipt] 100,665,703 bytes, 67.3-second seek, equal source/download SHA-256, exact cleanup; placeholder fix `cdc7574e1`. |
 | Windows Edge upload, playback, Download | PASS for reported actions; full Edge row NOT RUN | [VERIFIED via owner report] those three actions worked. [VERIFIED via Graph] committed item was 97,777,999 bytes. Pause/reload, resolver trace, seek, and download integrity were not recorded. |
 | macOS Safari full path | DEFERRED | [VERIFIED via Session 536 decision] Production run on a Factory-created test request remains. |
-| iPadOS Safari full path | DEFERRED | [VERIFIED via Session 536 decision] Production run on a Factory-created test request remains. |
+| iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] No iPadOS acceptance run is required for this staff feature. |
 | Reload/same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome and Graph] paused at 0.9 MiB, reload/reselect, direct Microsoft `202` resume to full commit, exact item cleanup and Graph 404. |
 | Upload-session expiry recovery | PASS | [VERIFIED via Chrome] second session paused at 0.6 MiB; after 8:49:47 PM PDT expiry, Resume displayed the specific expired-session error and retained the permit. Approved Cleanup returned `session_cancelled` and no item. [VERIFIED via Graph] fresh third session committed 100,665,703 bytes. [REPORTED by owner] Finish saving created the proof and Cleanup moved the item to recycle bin. [VERIFIED via Graph] exact path not found and folder empty. |
 | Proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] old link refused as expired; fresh link from same committed item played and accepted End/Home seeks with one resolver action. |
 | Long-duration seek | DEFERRED | The 67.33-second recording cannot prove the >2-minute Safari case. |
-| Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via Session 536 decision] one iPadOS Production run remains. |
+| Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via 2026-09-24 owner decision] one desktop Production run remains for the proposed 2 GB cap. [PLANNED] Combine it with macOS Safari on a Factory-created test request. |
 
 **Owner actions:** choose and approve each new disposable request, SharePoint target, and MP4;
-approve each Production Dataverse read, Preview deployment, and temporary shared-alias move
-separately. Run macOS and iPadOS Safari by hand; arrange the Windows Edge follow-up. Re-inspect
+approve each Preview deployment and temporary shared-alias move separately. The owner's
+2026-09-24 override permits Dataverse reads when needed; consult before writes. Run desktop
+macOS Safari by hand; no Edge or iPadOS follow-up is planned. Re-inspect
 the alias target and branch-scoped Preview variable names before any move, then restore and
 re-inspect. The prior Edge upload and cleanup approvals are spent.
 
@@ -117,8 +123,8 @@ was edited and no Preview deployment occurred. The four named overlap surfaces w
 source. The Preview-only proof now has offline-tested bounded edge-byte SHA-256 reselect checks,
 expired-session permit retention and exact terminal-placeholder cleanup, proof-token reissue guidance, one automatic
 playback re-resolution with position restore, and a three-attempt transient Microsoft signature-
-range retry policy. The branch plan has the remaining Edge/macOS Safari/iPadOS Safari and near-cap
-matrix with exact owner steps. [VERIFIED via local commands] 11 focused suites / 132 tests,
+range retry policy. At that time, the branch plan listed Edge/macOS Safari/iPadOS Safari and
+near-cap rows with owner steps. [VERIFIED via local commands] 11 focused suites / 132 tests,
 scoped ESLint, Next.js build, 66/67 startup gate commands initially and 67/67 after repairing/rerunning the local memory-link invariant,
 and 27/27 changed-surface gate commands passed. No live browser cell has been closed by these
 offline tests.
@@ -132,7 +138,7 @@ record. This branch merge and offline work do not authorize a Preview deployment
 Production Dataverse read, new SharePoint upload, or cleanup deletion. Obtain a separate owner
 approval for each live run and each exact cleanup.
 
-Next: the owner corrected the next candidate to Request `1003222` and will select the MP4 when
+Historical next step (2026-09-23): the owner corrected the candidate to Request `1003222` and planned to select the MP4 when
 ready. [VERIFIED via approved interlock-checked Production Dataverse reads, 2026-09-23]
 one GET for the mistakenly supplied `1003332` returned zero rows; a newly approved bounded
 three-GET lookup resolved `1003222` to GUID `e43ae6ea-698f-f111-8076-6045bd018a07` and
@@ -154,8 +160,9 @@ Spotlight 2026-09-23] Edge is not installed on this Mac; the owner's colleague h
 Tracker access and the MP4 on Windows Edge and will run that matrix cell after a shareable
 staff harness link is available. That live evidence is still open.
 Re-inspect immediately before an
-alias change and after restoration. Never set `DATAVERSE_ALLOW_PROD_READS` as this agent. The
-owner runs macOS/iPadOS Safari by hand, and the owner's colleague runs Edge, using the plan.
+alias change and after restoration. At that time the agent was told not to set
+`DATAVERSE_ALLOW_PROD_READS`; macOS/iPadOS Safari and another Edge run were planned. The
+2026-09-24 owner decisions at the top of this handoff supersede those runner assignments.
 
 [VERIFIED via `docs/AUTHENTICATION_SETUP.md` Step 2.4 and `lib/utils/auth.js`]
 Alias-hosted signed-in POSTs need a branch-scoped Preview `NEXTAUTH_URL` equal to
