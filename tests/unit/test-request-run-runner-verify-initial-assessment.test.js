@@ -18,6 +18,7 @@
 
 import crypto from 'node:crypto';
 import { jest } from '@jest/globals';
+import JSZip from 'jszip';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { assertLedgerReceipt, ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
 import {
@@ -749,71 +750,85 @@ describe('stepVerifyInitialAssessment', () => {
   const anchoredSeed = () => seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: governedHashToHex(iaHash), sourceVersionId: '1.0', bytesSha256: anchorBytesSha256 } });
   const anchoredSnapshot = () => snapshotResourceRow({ readback: { requestDocumentId: SNAPSHOT_DOCUMENT_ID, itemId: snapId, contentHash: governedHashToHex(iaHash), versionId: '1.0', bytesSha256: anchorBytesSha256 } });
 
-  // Complete-package anchor (owner decision 2026-09-24, Codex round 2 F6):
-  // the downloaded bytes must be byte-identical to what the step uploaded.
-  // A second render of the same fixture has the SAME governed hash but
-  // different bytes, so it passes every governed-hash check (fresh render,
-  // row, receipt, snapshot source) and only this anchor can catch it --
-  // exactly the shape of a package with a foreign hidden part.
-  it('bytes anchor: a package with the same governed hash but different bytes than the seed step uploaded stops with ia_verification_failed', async () => {
+  // Complete-package attestation (owner decision 2026-09-24, Codex round 2
+  // F6, reshaped by the first live run): the downloaded package must equal
+  // the fresh render part by part except SharePoint's characterized property
+  // promotion. Cases: (a) a second render (only docProps/core.xml differs)
+  // verifies; (b) SharePoint-shaped promotion verifies; (c) Codex's attack,
+  // a foreign customXml payload with the same governed hash, is refused.
+  async function withParts(bytes, mutate) {
+    const zip = await JSZip.loadAsync(bytes);
+    await mutate(zip);
+    return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  }
+  const SP_SCHEMA = '<?xml version="1.0" encoding="utf-8"?><ct:contentTypeSchema ct:_="" ma:_="" ma:contentTypeName="Document" xmlns:ct="http://schemas.microsoft.com/office/2006/metadata/contentType" xmlns:ma="http://schemas.microsoft.com/office/2006/metadata/properties/metaAttributes"></ct:contentTypeSchema>';
+  const SP_PROPS = '<?xml version="1.0" encoding="UTF-8" standalone="no"?><ds:datastoreItem ds:itemID="{6B761DE0-9541-4BAA-A2C3-622F827B4A03}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"/>';
+  const SP_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps" Target="itemProps1.xml"/></Relationships>';
+  async function sharePointPromoted(bytes) {
+    return withParts(bytes, async (zip) => {
+      zip.file('customXml/item1.xml', SP_SCHEMA);
+      zip.file('customXml/itemProps1.xml', SP_PROPS);
+      zip.file('customXml/_rels/item1.xml.rels', SP_RELS);
+      zip.file('[trash]/0000.dat', Buffer.alloc(16, 0));
+      zip.file('docProps/custom.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"><property name="ContentTypeId"/></Properties>');
+      const rels = await zip.file('word/_rels/document.xml.rels').async('string');
+      zip.file('word/_rels/document.xml.rels', rels.replace('</Relationships>', '<Relationship Id="rId99" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/></Relationships>'));
+      const ct = await zip.file('[Content_Types].xml').async('string');
+      zip.file('[Content_Types].xml', ct.replace('</Types>', '<Override PartName="/customXml/itemProps1.xml" ContentType="application/vnd.openxmlformats-officedocument.customXmlProperties+xml"/></Types>'));
+    });
+  }
+  function downloadsWith(iaBytes, snapshotBytes) {
+    return baseGraph({
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
+        if (itemId === iaId) return { buffer: iaBytes };
+        if (itemId === snapId) return { buffer: snapshotBytes };
+        return null;
+      }),
+    });
+  }
+  const anchoredResources = () => [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()];
+
+  it('package attestation: a second render of the fixture (only docProps/core.xml differs) still reaches markReady', async () => {
     const rerendered = await renderInitialAssessmentDocx({
       requestNumber: REQUEST_NUMBER, title: TITLE, institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
     });
     expect(Buffer.compare(rerendered, iaBuffer)).not.toBe(0);
-    expect(await hashGovernedDocxContent(rerendered)).toBe(iaHash);
     mockDataverse();
-    const graph = baseGraph({
-      downloadFile: jest.fn(async (driveId, itemId) => {
-        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
-        if (itemId === iaId) return { buffer: rerendered };
-        if (itemId === snapId) return { buffer: iaBuffer };
-        return null;
-      }),
-    });
-    const { result, calls } = await runStep({
-      deps: { graph },
-      requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
-    });
+    const { result, calls } = await runStep({ deps: { graph: downloadsWith(rerendered, rerendered) }, requestRow: requestReadback(), resources: anchoredResources() });
+    expect(result.errorMessage).toBeUndefined();
+    expect(result.outcome).toBe('ready');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  it('package attestation: SharePoint property promotion (customXml items, props, rels, custom.xml, trash, content types) still reaches markReady', async () => {
+    const promoted = await sharePointPromoted(iaBuffer);
+    expect(await hashGovernedDocxContent(promoted)).toBe(iaHash);
+    mockDataverse();
+    const { result, calls } = await runStep({ deps: { graph: downloadsWith(promoted, promoted) }, requestRow: requestReadback(), resources: anchoredResources() });
+    expect(result.errorMessage).toBeUndefined();
+    expect(result.outcome).toBe('ready');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  it('package attestation: a foreign customXml payload with the SAME governed hash (Codex round 2 F6) stops with ia_verification_failed', async () => {
+    const attacked = await withParts(iaBuffer, async (zip) => { zip.file('customXml/item7.xml', '<?xml version="1.0"?><payload xmlns="urn:foreign">hidden</payload>'); });
+    expect(await hashGovernedDocxContent(attacked)).toBe(iaHash);
+    mockDataverse();
+    const { result, calls } = await runStep({ deps: { graph: downloadsWith(attacked, iaBuffer) }, requestRow: requestReadback(), resources: anchoredResources() });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
-    expect(result.errorMessage).toBe('The downloaded Initial Assessment bytes are not the bytes the seed step uploaded.');
+    expect(result.errorMessage).toMatch(/^The downloaded Initial Assessment package differs from the synthetic render beyond SharePoint property promotion: customXml part customXml\/item7\.xml is not a SharePoint property-promotion item/);
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
   });
 
-  it('bytes anchor: a retained snapshot with the same governed hash but different bytes than the snapshot step uploaded stops with ia_verification_failed', async () => {
-    const rerendered = await renderInitialAssessmentDocx({
-      requestNumber: REQUEST_NUMBER, title: TITLE, institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
-    });
+  it('package attestation: a foreign part outside customXml on the retained snapshot stops with ia_verification_failed', async () => {
+    const attacked = await withParts(iaBuffer, async (zip) => { zip.file('hidden/payload.bin', Buffer.alloc(64, 7)); });
     mockDataverse();
-    const graph = baseGraph({
-      downloadFile: jest.fn(async (driveId, itemId) => {
-        if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
-        if (itemId === iaId) return { buffer: iaBuffer };
-        if (itemId === snapId) return { buffer: rerendered };
-        return null;
-      }),
-    });
-    const { result } = await runStep({
-      deps: { graph },
-      requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
-    });
+    const { result } = await runStep({ deps: { graph: downloadsWith(iaBuffer, attacked) }, requestRow: requestReadback(), resources: anchoredResources() });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
-    expect(result.errorMessage).toBe('The retained Board snapshot bytes are not the bytes the snapshot step uploaded.');
-  });
-
-  it('bytes anchor: a seed receipt that never journaled bytesSha256 stops with ia_verification_failed (mandatory)', async () => {
-    mockDataverse();
-    const { result } = await runStep({
-      deps: { graph: baseGraph() },
-      requestRow: requestReadback(),
-      resources: [baselineResource(validBaseline()), seedResourceRow({ readback: { requestDocumentId: SEED_DOCUMENT_ID, itemId: iaId, contentHash: anchorHashHex, sourceVersionId: '1.0' } }), snapshotResourceRow(), basicFileCopyResource()],
-    });
-    expect(result.outcome).toBe('needs_attention');
-    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
-    expect(result.errorMessage).toBe('The downloaded Initial Assessment bytes are not the bytes the seed step uploaded.');
+    expect(result.errorMessage).toMatch(/^The retained Board snapshot package differs .*unexpected part hidden\/payload\.bin/);
   });
 
   // Fresh-render anchor (owner decision 2026-09-24): the row's governed hash
