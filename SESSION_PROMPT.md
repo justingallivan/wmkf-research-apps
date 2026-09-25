@@ -25,12 +25,28 @@ Git-linked deployment `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc` is Ready from branch
 `codex/feature-request` and commit `5c5fbcb0bc8265b10de003a9fd1bc3f3e81b725f`.
 [VERIFIED via CLI and signed-in desktop Chrome] the owner approved the new exact alias
 target; its protected proof page loaded and validation-only `{}` POST returned the expected
-`400`, before any Graph session or SharePoint write. While exact MP4 upload approval was
-pending, the alias was restored and re-inspected at Ready Factory deployment
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. No MP4 upload or cleanup has occurred. The three
-recovery cells remain NOT RUN live. After upload approval, re-inspect the alias and scoped
-variables, move the alias for the same approved Chrome pass, then seek owner approval for
-cleanup of each exact item or session. The plan's dated Slice 0 matrix has the receipt.
+`400` before upload. The owner approved up to three bounded uploads of the selected MP4 to
+Request `1003220`. The first session paused at 0.9 MiB, survived reload and same-file
+reselection, resumed via direct Microsoft `202` chunks, and committed all 100,665,703 bytes.
+Finish saving minted a five-minute token. The 302 Watch played the 67.33-second video without
+media error. The old link refused as `expired` after 8:31:43 PM PDT; Finish saving minted a
+fresh link from the same committed item, whose Watch played and accepted End/Home seeks with
+one application resolver action. [VERIFIED via Graph] exact item
+`b9bf5fd4-3e89-4357-ba53-8b44cb759209.mp4`, ID
+`01G4GVMS3EB2O3Z4YXRZDIKF77SV5YM5XB`, measured 100,665,703 bytes. The owner separately
+approved cleanup of that exact item. The app returned `item_deleted`, and Graph exact-path
+GET returned 404 with an empty folder listing. Thus reload/reselect and proof-token expiry
+cells are PASS.
+
+[VERIFIED via Chrome] the second session paused at 0.6 MiB and initially expires at
+8:49:47 PM PDT on 2026-09-24. [VERIFIED via Graph] no committed item was visible at pause.
+The saved permit remains in the staff Chrome tab. The shared alias was restored and
+re-inspected at Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` during the
+wait. At expiry, re-inspect scoped variables/alias, remap the approved Git-linked deployment,
+reselect the MP4 and attempt Resume; expect `410` with the permit retained. Request separate
+owner approval for exact session/item cleanup after inspecting Graph, then begin a fresh
+session under the already approved upload allowance. The upload-session expiry cell is
+PENDING EXPIRY. The plan's dated Slice 0 matrix has the full receipt.
 
 **Latest Slice 0 state (2026-09-23):** [VERIFIED via Git] `codex/feature-request` includes
 the owner-approved `origin/main` merge, offline recovery hardening, and the documented
@@ -65,12 +81,13 @@ live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
 |---|---|---|
 | Chrome core upload, same-page pause/resume, finalize, both Watch modes, seek, Download | PASS | [VERIFIED via signed-in 2026-09-22 Chrome receipt] 100,665,703 bytes, 67.3-second seek, equal source/download SHA-256, exact cleanup; placeholder fix `cdc7574e1`. |
 | Windows Edge upload, playback, Download | PASS for reported actions; full Edge row NOT RUN | [VERIFIED via owner report] those three actions worked. [VERIFIED via Graph] committed item was 97,777,999 bytes. Pause/reload, resolver trace, seek, and download integrity were not recorded. |
-| macOS Safari full path | NOT RUN | [ASSUMED from no owner execution receipt] owner manual run remains. |
-| iPadOS Safari full path | NOT RUN | [ASSUMED from no owner execution receipt] owner manual run remains. |
-| Reload/same-file reselect resume | NOT RUN live | [VERIFIED via tests at `26b368604`] offline handling exists; [ASSUMED from no browser receipt] live result unknown. |
-| Upload-session and proof-token expiry recovery | NOT RUN live | [VERIFIED via tests at `26b368604`] offline handling exists; [ASSUMED from no browser receipt] live result unknown. |
-| Long-duration seek | NOT RUN | [VERIFIED via Chrome receipt] 67.3 seconds is the only recorded seek. |
-| Near-2,000,000,000-byte upload and throughput | NOT RUN | [ASSUMED from no near-cap receipt] no measured live run. |
+| macOS Safari full path | DEFERRED | [VERIFIED via Session 536 decision] Production run on a Factory-created test request remains. |
+| iPadOS Safari full path | DEFERRED | [VERIFIED via Session 536 decision] Production run on a Factory-created test request remains. |
+| Reload/same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome and Graph] paused at 0.9 MiB, reload/reselect, direct Microsoft `202` resume to full commit, exact item cleanup and Graph 404. |
+| Upload-session expiry recovery | PENDING EXPIRY | [VERIFIED via Chrome] second session paused at 0.6 MiB with expiry 8:49:47 PM PDT; after-expiry Resume, cleanup, and fresh session remain. |
+| Proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] old link refused as expired; fresh link from same committed item played and accepted End/Home seeks with one resolver action. |
+| Long-duration seek | DEFERRED | The 67.33-second recording cannot prove the >2-minute Safari case. |
+| Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via Session 536 decision] one iPadOS Production run remains. |
 
 **Owner actions:** choose and approve each new disposable request, SharePoint target, and MP4;
 approve each Production Dataverse read, Preview deployment, and temporary shared-alias move

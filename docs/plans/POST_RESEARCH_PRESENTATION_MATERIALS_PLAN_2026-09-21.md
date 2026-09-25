@@ -875,22 +875,38 @@ Git-linked Preview deployment `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc` is Ready from b
 `codex/feature-request`, commit `5c5fbcb0bc8265b10de003a9fd1bc3f3e81b725f`.
 [VERIFIED via CLI and signed-in desktop Chrome] after the owner approved the exact new
 target, the shared alias moved to `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc`, the protected proof
-page loaded, and validation-only `{}` POST returned the expected `400` with no Graph session
-or SharePoint write. While upload approval was pending, the alias was restored and re-inspected
-at exact Ready Factory target `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. No upload, expiry
-recovery, or cleanup has yet been run in this pass.
+page loaded, and validation-only `{}` POST returned the expected `400` before upload. The
+owner then approved up to three bounded uploads of the selected MP4 to Request `1003220`.
+The first Graph session paused at 0.9 MiB, survived page reload and same-file reselection,
+resumed with direct Microsoft `202` chunk responses, and committed all 100,665,703 bytes.
+Finish saving minted a five-minute token; the 302 Watch played the 67.33-second video without
+media error. After the token expired at 8:31:43 PM PDT, reloading the old link returned
+`expired`; Finish saving minted a new link from the same committed item. Its Watch played and
+accepted End/Home seeks with one application resolver action. [VERIFIED via Graph] the item was
+`b9bf5fd4-3e89-4357-ba53-8b44cb759209.mp4`, ID
+`01G4GVMS3EB2O3Z4YXRZDIKF77SV5YM5XB`, size 100,665,703 bytes. With separate exact-item
+owner approval, `Cleanup exact item` returned `item_deleted`; exact-path GET returned 404
+and the folder listing was empty. No bearer URL or token was saved in this receipt.
 
-| Browser | Scenario | Expected recorded evidence | Runner |
+[VERIFIED via Chrome and Graph] the second Graph session paused at 0.6 MiB, with initial
+expiry 8:49:47 PM PDT on 2026-09-24; the governed folder listing showed no committed item.
+The saved permit is retained for an after-expiry Resume attempt and exact cleanup. During the
+wait, the shared alias was restored and re-inspected at Ready Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The upload-session expiry row is pending that live
+attempt and its separately approved cleanup.
+
+| Browser | Scenario | Recorded or pending evidence | Runner |
 |---|---|---|---|
-| Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. New recovery code remains untested live. | Agent (receipt already recorded) |
-| Desktop Edge | >50 MiB upload, pause/reload/reselect/Resume, finalize, both Watch shapes, ten seeks over a recording >2 minutes, Download | **Partial 2026-09-23:** colleague reported 93.2 MiB upload, playback, and completed Download; Graph confirmed the 97,777,999-byte committed item. Direct PUT/range trace, pause/reload/reselect, both Watch shapes, ten seeks, and source/download size plus SHA-256 match remain unrecorded. | Owner's Windows Edge colleague, after new owner live-run approval |
-| macOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts and source/download byte plus SHA-256 match; note any autoplay permission prompt or playback error. | Owner by hand |
-| iPadOS Safari | Same full path as Edge, including reload/reselect and long seek | Same redacted statuses/origins/counts where Web Inspector is available, plus Files-app downloaded byte count/hash compared on a trusted computer; note any mobile-specific failure. | Owner by hand |
-| Edge, then one Safari | Let a paused upload session expire; attempt Resume; cleanup only after owner confirmation; start a fresh proof | 410 `presentation_media_proof_session_expired`, retained permit, exact cleanup outcome (including `placeholder_deleted` only after confirmed terminal session), new session and successful finalize; no old partial item promoted. | Owner's Edge colleague, then owner on Safari |
-| Edge, then one Safari | Let a five-minute proof token expire; reload old link; mint a new link with Finish saving from the committed item | Old context/open refuses (401); fresh link plays and seeks; exact item identity remains stable. | Owner's Edge colleague, then owner on Safari |
-| Desktop Edge | Upload a real MP4 near 2,000,000,000 bytes (record exact size); run long-duration seeking and Download | Session expiry, elapsed upload time, measured bytes/second, projected 2,000,000,000-byte completion before expiry with margin, seek positions, direct Microsoft 206 ranges, and size/SHA-256 match. | Owner's Edge colleague with sanctioned media and approval |
+| Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. | Agent (historical PASS) |
+| Desktop Chrome | Reload and same-file reselect Resume | 2026-09-24 PASS: paused at 0.9 MiB, reloaded, reselected the same file, resumed direct Microsoft `202` chunks, committed 100,665,703 bytes, finalized, and cleaned the exact item. | Agent |
+| Desktop Chrome | Upload-session expiry and recovery | PENDING: second session paused at 0.6 MiB, initial expiry 8:49:47 PM PDT; after expiry, expect `410` and retained permit, then owner-approved exact cleanup and a fresh successful session. | Agent |
+| Desktop Chrome | Five-minute proof-token expiry recovery | 2026-09-24 PASS: old link refused as `expired` after reload; fresh link from the same item played and accepted End/Home seeks with resolver count one. | Agent |
+| Desktop Edge | 2026-09-23 upload, playback, Download | Colleague reported these actions for 97,777,999 bytes; Graph confirmed the item. Remaining detailed Edge trace is not a Slice 0 blocker under Session 536. | Historical owner colleague; no new Edge run |
+| macOS Safari | Upload, both Watch shapes with long seeking, Download | Deferred to Production on a Factory-created test request; record redacted statuses/ranges and source/download size and SHA-256. | Owner by hand |
+| iPadOS Safari | Upload, both Watch shapes with long seeking, Download | Deferred to Production on a Factory-created test request; record Files-app download size/hash and mobile behavior. | Owner by hand |
+| iPadOS Safari | One real near-cap MP4 upload | Deferred to the same Production Factory test-request run; record exact size, expiry, throughput, seeking, Download integrity, and backgrounding/memory behavior. | Owner by hand |
 
-**Slice 0 cell status at handoff (2026-09-23).** PASS means the stated evidence was recorded;
+**Slice 0 cell status (2026-09-24).** PASS means the stated evidence was recorded;
 it does not close a broader browser row. No current cell has a recorded unresolved FAIL.
 The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990bf` and
 `cdc7574e1`, respectively.
@@ -899,12 +915,13 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 |---|---|---|
 | Chrome core upload, same-page pause/resume, finalize, both Watch modes, seek, Download | PASS | [VERIFIED via signed-in 2026-09-22 Chrome receipt] 100,665,703-byte MP4, 302 and one-shot Watch, 67.3-second seek, equal source/download SHA-256, exact cleanup; current-hardening fix `cdc7574e1`. |
 | Windows Edge upload, playback, Download | PASS for these reported actions; full Edge row NOT RUN | [VERIFIED via owner report] colleague reported 93.2 MB upload, playback, and Download. [VERIFIED via Graph] committed item was 97,777,999 bytes. No pause/reload, resolver trace, seek, or download hash/size comparison was recorded. |
-| macOS Safari full path | NOT RUN | [ASSUMED from no owner execution receipt] owner performs this by hand after a new approved target, Preview deploy, and any alias change. |
-| iPadOS Safari full path | NOT RUN | [ASSUMED from no owner execution receipt] owner performs this by hand after separate live-run approval. |
-| Reload and same-file reselect resume | NOT RUN live | [VERIFIED via source/tests at `26b368604`] fingerprint and resume handling passed offline; [ASSUMED from no browser receipt] live Edge/Safari behavior remains unproved. |
-| Upload-session and five-minute proof-token expiry recovery | NOT RUN live | [VERIFIED via source/tests at `26b368604`] recovery handling passed offline; [ASSUMED from no browser receipt] both live expiry cases remain unproved. |
-| Long-duration seeking | NOT RUN | [VERIFIED via Chrome receipt] only a 67.3-second seek is recorded; [ASSUMED from no long-recording receipt] the required long-duration case remains open. |
-| Upload and throughput near 2,000,000,000 bytes | NOT RUN | [ASSUMED from no near-cap receipt] no sanctioned near-cap MP4 or measured throughput was recorded. |
+| macOS Safari full path | DEFERRED | [VERIFIED via Session 536 owner decision] Production run on a Factory-created test request remains for upload, both Watch shapes with long seeking, Download, and integrity evidence. |
+| iPadOS Safari full path | DEFERRED | [VERIFIED via Session 536 owner decision] Production run on a Factory-created test request remains for the same path plus Files-app integrity and mobile behavior. |
+| Reload and same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] 0.9 MiB pause, reload, reselect, direct Microsoft `202` chunks, 100,665,703-byte commit/finalize, exact ETag-guarded cleanup with Graph 404 and empty folder. |
+| Upload-session expiry recovery | PENDING EXPIRY | [VERIFIED via Chrome] second session paused at 0.6 MiB and initially expires 8:49:47 PM PDT; [VERIFIED via Graph] no committed item at pause. After-expiry `410`, retained permit, cleanup, and fresh upload remain unrecorded. |
+| Five-minute proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] expired old link refused after reload; Finish saving minted a fresh link from the same committed item; Watch played and End/Home seeks caused no additional resolver action. |
+| Long-duration seeking | DEFERRED | [VERIFIED via Chrome receipt] current recording is only 67.33 seconds; macOS/iPadOS Production Safari run still needs a >2-minute recording and ten seeks. |
+| Upload and throughput near 2,000,000,000 bytes | DEFERRED | [VERIFIED via Session 536 owner decision] one near-cap iPadOS Production upload on a Factory-created test request remains. |
 
 **Owner actions:** approve each new disposable request and governed SharePoint target, each
 Preview deployment, each temporary shared-alias change, each upload, and each exact cleanup
