@@ -38,7 +38,7 @@ describe('attestDocxPackageAgainstRender', () => {
       zip.file('customXml/item1.xml', SP_SCHEMA); zip.file('customXml/item2.xml', SP_FORMS); zip.file('customXml/item3.xml', SP_DM);
       for (const n of [1, 2, 3]) { zip.file(`customXml/itemProps${n}.xml`, SP_PROPS); zip.file(`customXml/_rels/item${n}.xml.rels`, SP_RELS.replace('itemProps1', `itemProps${n}`)); }
       zip.file('[trash]/0000.dat', Buffer.alloc(8)); zip.file('[trash]/0001.dat', Buffer.alloc(8));
-      zip.file('docProps/custom.xml', '<Properties/>'); zip.file('docProps/core.xml', '<cp:coreProperties/>'); zip.file('docProps/app.xml', '<Properties/>');
+      zip.file('docProps/custom.xml', '<Properties/>'); zip.file('docProps/core.xml', '<cp:coreProperties/>');
       const rels = await zip.file('word/_rels/document.xml.rels').async('string');
       zip.file('word/_rels/document.xml.rels', rels.replace('</Relationships>', '<Relationship Id="rId50" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/></Relationships>'));
       const ct = await zip.file('[Content_Types].xml').async('string');
@@ -69,4 +69,5 @@ describe('attestDocxPackageAgainstRender', () => {
   it('rejects a changed word/ part', () => rejects(async (zip) => { const d = await zip.file('word/document.xml').async('string'); zip.file('word/document.xml', d.replace('</w:body>', '<w:p/></w:body>')); }, /part word\/document\.xml differs from the render/));
   it('rejects a foreign part anywhere else', () => rejects(async (zip) => { zip.file('word/media/hidden.bin', Buffer.alloc(4)); }, /unexpected part word\/media\/hidden\.bin/));
   it('rejects a missing word/ part', () => rejects(async (zip) => { zip.remove('word/styles.xml'); }, /part word\/styles\.xml is missing/));
+  it('rejects a changed docProps/app.xml (SharePoint promotion leaves it untouched)', () => rejects(async (zip) => { zip.file('docProps/app.xml', '<Properties/>'); }, /part docProps\/app\.xml differs from the render/));
 });
