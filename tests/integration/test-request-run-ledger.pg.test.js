@@ -2,7 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { assertLedgerReceipt, cliActorId, createRunLedger, idempotencyKeyDigest } from '../../lib/services/test-requests/run-ledger.js';
+import {
+  assertLedgerReceipt, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
+} from '../../lib/services/test-requests/run-ledger.js';
 import { pgLedgerDb } from '../../lib/services/test-requests/run-ledger-db.js';
 
 // A GitHub-token-shaped fixture assembled at runtime so no token-shaped
@@ -33,7 +35,8 @@ const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_requ
 async function assertLedgerSchemaCurrent(db, migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
-    `SELECT conname FROM pg_constraint WHERE conrelid IN ('test_request_runs'::regclass, 'test_request_run_resources'::regclass)`,
+    `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
+       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments')`,
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
@@ -43,7 +46,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const liveBody = normalize(fn.rows[0]?.prosrc);
   if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
   if (missing.length) {
-    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
+    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_reviewer_assignments, test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
   }
 }
 
@@ -95,6 +98,10 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
 
   afterAll(async () => {
     if (createdRunIds.length) {
+      await db.query(
+        `DELETE FROM test_request_run_reviewer_assignments WHERE run_id = ANY($1::uuid[])`,
+        [createdRunIds],
+      );
       await db.query(
         `DELETE FROM test_request_run_resources WHERE run_id = ANY($1::uuid[])`,
         [createdRunIds],
@@ -177,6 +184,83 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     // The stored row is unchanged: still the first (basic) reservation.
     const stillBasic = await ledger.getRun(firstRun.runId);
     expect(stillBasic.recipe).toBe('basic');
+  });
+
+  it('slice 6c-i: reserves a reviews run with real reviewer assignment rows, and inspect never reads back the plaintext address', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '0') });
+    createdRunIds.push(plan.runId);
+    const reviewerAssignments = [
+      { sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'Reviewer.One@Example.Test' },
+      { sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'reviewer.two@example.test' },
+    ];
+
+    const { run, created } = await ledger.reserveRun({ actorId, idempotencyKey: `key-reviews-${plan.runId}`, plan, reviewerAssignments });
+    expect(created).toBe(true);
+    expect(run.recipe).toBe('reviews');
+
+    const assignments = await ledger.listRunReviewerAssignments(run.runId);
+    expect(assignments).toHaveLength(2);
+    expect(assignments.map((a) => a.sequence)).toEqual([1, 2]);
+    expect(assignments[0].addressSha256).toBe(reviewerAddressSha256('reviewer.one@example.test').addressSha256);
+    for (const assignment of assignments) {
+      expect(assignment).not.toHaveProperty('address');
+    }
+
+    // A same-key retry never re-inserts (immutable, no update path).
+    const retry = await ledger.reserveRun({ actorId, idempotencyKey: `key-reviews-${plan.runId}`, plan, reviewerAssignments });
+    expect(retry.created).toBe(false);
+    expect(await ledger.listRunReviewerAssignments(run.runId)).toHaveLength(2);
+  });
+
+  it('slice 6c-i: the DB UNIQUE constraint on (run, address) rejects a direct duplicate insert bypassing the JS validator', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '1') });
+    createdRunIds.push(plan.runId);
+    await ledger.reserveRun({
+      actorId, idempotencyKey: `key-reviews-dup-${plan.runId}`, plan,
+      reviewerAssignments: [{ sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'dup@example.test' }],
+    });
+    await expect(db.query(
+      `INSERT INTO test_request_run_reviewer_assignments (run_id, sequence, source_person_id, destination_person_id, reused, address, address_sha256)
+       VALUES ($1::uuid, 2, $2::uuid, $3::uuid, false, 'dup@example.test', $4::text)`,
+      [plan.runId, crypto.randomUUID(), crypto.randomUUID(), reviewerAddressSha256('dup@example.test').addressSha256],
+    )).rejects.toThrow();
+  });
+
+  it('Codex 6c-i round 5: the DB address CHECK rejects direct inserts of prose, URLs and credential-shaped values', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '2') });
+    createdRunIds.push(plan.runId);
+    await ledger.reserveRun({
+      actorId, idempotencyKey: `key-reviews-addr-shape-${plan.runId}`, plan,
+      reviewerAssignments: [{ sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'ok@example.test' }],
+    });
+    const sha = (v) => crypto.createHash('sha256').update(v).digest('hex');
+    const bad = ['confidential prose about a reviewer', 'https://example.test/x@y.z', 'sk-abcdefghijklmnop@example.test', 'not-an-address', 'a b@example.test'];
+    for (const [i, address] of bad.entries()) {
+      await expect(db.query(
+        `INSERT INTO test_request_run_reviewer_assignments (run_id, sequence, source_person_id, destination_person_id, reused, address, address_sha256)
+         VALUES ($1::uuid, $2, $3::uuid, $4::uuid, false, $5::text, $6::text)`,
+        [plan.runId, i + 2, crypto.randomUUID(), crypto.randomUUID(), address, sha(address)],
+      )).rejects.toThrow(/address_shape/);
+    }
+  });
+
+  it('P3: the DB CHECK ties address_sha256 to address -- a mismatched digest is rejected even though both columns are independently well-shaped', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '2') });
+    createdRunIds.push(plan.runId);
+    await ledger.reserveRun({
+      actorId, idempotencyKey: `key-reviews-digest-mismatch-${plan.runId}`, plan,
+      reviewerAssignments: [{ sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'mismatch@example.test' }],
+    });
+    await expect(db.query(
+      `INSERT INTO test_request_run_reviewer_assignments (run_id, sequence, source_person_id, destination_person_id, reused, address, address_sha256)
+       VALUES ($1::uuid, 2, $2::uuid, $3::uuid, false, 'a-second-address@example.test', $4::text)`,
+      // A well-shaped 64-hex digest that is simply the WRONG hash of the address.
+      [plan.runId, crypto.randomUUID(), crypto.randomUUID(), reviewerAddressSha256('someone-else@example.test').addressSha256],
+    )).rejects.toThrow();
   });
 
   it('claimLease succeeds once; a second claim with the stale version returns null', async () => {
@@ -450,6 +534,61 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       { filename: '1000400 Initial Assessment 0a1b2c3d-9f8e7d6c.pdf' },
       { filename: `1000400 Initial Assessment Board v${FAKE_GITHUB_TOKEN.slice(0, 20)} 0a1b2c3d.docx` },
       { filename: 'Confidential Initial Assessment 0a1b2c3d-9f8e7d6c.docx' },
+    ];
+    for (const receipt of rejected) {
+      expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(false);
+    }
+  });
+
+  it('P2-b: the Reviews recipe folder/filename grammars and receipt keys are accepted/rejected identically by JS and SQL', async () => {
+    const accepted = [
+      // Reviewer_Uploads as a request-folder child (both subfolder compositions
+      // SUBFOLDER supports: <prefix>_<8hex> and bare <8hex>).
+      { folder: `1000400_5D54ABC57F744D23B4BE39599147E674/Reviewer_Uploads/jones_1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      { folder: `1000400_5D54ABC57F744D23B4BE39599147E674/Reviewer_Uploads/1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      // Reviewer_Uploads as a bare subfolder (matches how SUBFOLDER is composed today).
+      { folder: `Reviewer_Uploads/jones_1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      { folder: `Reviewer_Uploads/1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      // A 30-character alphanumeric prefix is the boundary; exactly 30 is accepted.
+      { folder: `Reviewer_Uploads/${'a'.repeat(30)}_1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      { filename: 'Review_1.pdf' },
+      { filename: 'Review_5.docx' },
+      { filename: 'Review_1.doc' },
+      { name: 'Review_1.pdf' },
+      { sourcePersonId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', destinationPersonId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', suggestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+      { addressSha256: 'a'.repeat(64), attestedDigest: 'b'.repeat(64) },
+      { answerCount: 12 },
+      { eTagBefore: '"12345"', eTagAfter: '"12346"' },
+      { reviewForm: 'uploaded' },
+      { reviewForm: 'received_no_file' },
+      { reviewForm: 'unreceived' },
+    ];
+    for (const receipt of accepted) {
+      expect(assertLedgerReceipt(receipt, 'fixture')).toBe(receipt);
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(true);
+    }
+    const rejected = [
+      // A 31-character prefix is one over the {1,30} bound.
+      { folder: `Reviewer_Uploads/${'a'.repeat(31)}_1a2b3c4d/attempt_${'a'.repeat(32)}` },
+      // Uppercase hex in either the 8-hex subfolder id or the 32-hex attempt id.
+      { folder: `Reviewer_Uploads/jones_1A2B3C4D/attempt_${'a'.repeat(32)}` },
+      { folder: `Reviewer_Uploads/jones_1a2b3c4d/attempt_${'A'.repeat(32)}` },
+      // A per-review cap of 5 (Review_[1-5]): 0, 6 and 100 are rejected, so a
+      // looser Review_[0-9]{1,2} SQL rule cannot pass these fixtures (Opus round 2).
+      { filename: 'Review_0.pdf' },
+      { filename: 'Review_6.docx' },
+      { filename: 'Review_100.pdf' },
+      { filename: 'Review_1.PDF' },
+      { filename: 'Review_1.docm' },
+      { sourcePersonId: 'not-a-guid' },
+      { addressSha256: 'not-hex' },
+      { attestedDigest: `sk-${FAKE_GITHUB_TOKEN}` },
+      { answerCount: '12' }, // must be a JSON number, not a numeric string
+      { eTagBefore: 'not-an-etag' },
+      { reviewForm: 'in_progress' },
     ];
     for (const receipt of rejected) {
       expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();

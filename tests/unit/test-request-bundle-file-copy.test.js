@@ -133,6 +133,20 @@ describe('sandbox rehearsal copy policy and bundle freshness', () => {
     expect(() => planBundleFileCopies(bundle([doc({ mimeType: 'image/png' })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
   });
 
+  // Codex adversarial round 1: a `proposalNarrative` document carrying a
+  // DOCX-shaped MIME type under its ordinary `.pdf`-named destination must
+  // still be refused -- proving the DOCX/msword MIME widening this policy
+  // briefly carried (with no kind<->extension<->MIME binding or magic-byte
+  // check) is fully reverted, not just its version string.
+  test('a proposalNarrative document with a DOCX MIME type under a .pdf destination is refused (Codex round 1 probe)', () => {
+    expect(() => planBundleFileCopies(bundle([doc({
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+    expect(() => planBundleFileCopies(bundle([doc({ mimeType: 'application/msword' })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.allowedMimeTypes).not.toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.allowedMimeTypes).not.toContain('application/msword');
+  });
+
   test('accepts a recent export and rejects stale or future-dated bundles', () => {
     const now = Date.parse('2026-09-24T04:00:00Z');
     expect(assertBundleFresh({ exportedAt: '2026-09-24T03:30:00Z' }, now)).toBe(Date.parse('2026-09-24T03:30:00Z') + BUNDLE_MAX_AGE_MS);

@@ -6,14 +6,14 @@ status: active
 summary: "Durable operation ledger for admin-driven test request clone runs; unapplied to any live database."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-09-23
+last_verified: 2026-09-25
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
   - lib/db/migrations/054_test_request_runs.sql
 ---
 
-# Atlas: `test_request_runs` / `test_request_run_resources` (Postgres)
+# Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` (Postgres)
 
 **[VERIFIED via source, 2026-09-23]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
@@ -106,6 +106,48 @@ not perform.
   second source of truth for either — `destination_request_number` is a
   server-assigned readback recorded for display/lookup convenience, not a
   value the ledger originates.
+
+## `test_request_run_reviewer_assignments` (slice 6c-i, D-R2 owner decision, 2026-09-25)
+
+**[VERIFIED via lib/db/migrations/054_test_request_runs.sql and lib/services/test-requests/run-ledger.js, 2026-09-25]**
+A third table, added in place to the same unapplied migration 054 (and its
+`scripts/setup-database.js` V55 mirror): one row per reviewer assignment
+reserved for a `reviews` recipe run (`run_id`, `sequence`,
+`source_person_id`, `destination_person_id`, `reused`, `address`,
+`address_sha256`, `created_at`). `sequence` is unique per run;
+`source_person_id` and `address` are each unique per run.
+
+- **The one sanctioned exception:** `address` is plain text — the ONE
+  column in this ledger that is not a finite grammar or a digest. Decision 4
+  makes the per-run address assignment the recipient-confinement authority,
+  and D-R2 accepted this exception rather than dropping the address
+  entirely; every other surface (JSONB receipts, `needs_attention_reason`,
+  `--run-inspect` output) carries only `address_sha256`.
+- **Writer:** `createRunLedger(db).reserveRun` writes every assignment row
+  in the same transaction as the run reservation, only on the very first
+  reservation of a given `(actor_id, idempotency_key)` (`created === true`);
+  there is no UPDATE path anywhere in run-ledger.js, so a row is immutable
+  once written. `assertReviewerAssignments` (private to run-ledger.js)
+  validates before any SQL: non-empty for `reviews`, none for any other
+  recipe, no two assignments sharing a source reviewer or a normalized
+  (trim+lowercase) address. The CLI's `--reserve --recipe=reviews
+  --reviewer-address=<sourcePersonGuid>=<address>` (repeatable) is the only
+  caller today; it preallocates a fresh destination GUID per assignment
+  (`reused: false`) and binds the sorted address digests plus the assignment
+  count into the reservation's `plan_digest`, so a same-key retry naming
+  different addresses conflicts (`409 test_request_run_conflict`) instead of
+  silently reusing the first reservation's assignments.
+- **Reader:** `listRunReviewerAssignments(runId)`, used by
+  `--run-inspect`. Its SELECT list never names the `address` column, only
+  `address_sha256` — the redaction contract is structural (nothing to scrub)
+  rather than a post-hoc scrub of a fetched value.
+- **Resolving an address to an existing synthetic person** (the `reused:
+  true` reuse path, provenance checks, and the seeder that actually creates
+  the Dataverse rows) is 6c-ii, not built yet; this slice is the
+  ledger/runner/CLI/migration dimension only. The four Reviews-only ledger
+  steps (`seed_reviewers`, `copy_review_file`, `seed_review_answers`,
+  `verify_reviews`) stop cleanly with `needs_attention` /
+  `recipe_step_not_built` until then.
 
 ## Limits
 

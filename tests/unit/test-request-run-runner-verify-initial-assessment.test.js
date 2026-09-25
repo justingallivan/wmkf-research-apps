@@ -331,6 +331,19 @@ function createFakeLedger(initialRun, initialResources = []) {
       run = { ...run, status: 'ready', leaseToken: null, lockedUntil: null, version: run.version + 1 };
       return { ...run };
     },
+    // Reached only by the `reviews` recipe (slice 6c-i): verify_initial_assessment
+    // advances instead of marking ready, since it is not that recipe's final step.
+    async advanceStep({
+      leaseToken, leaseGeneration, expectedVersion, nextStep, nextStepIndex, status, destinationRequestNumber,
+    }) {
+      calls.push({ op: 'advanceStep', nextStep, nextStepIndex, status, destinationRequestNumber });
+      if (!fenceOk(leaseToken, leaseGeneration, expectedVersion)) return null;
+      run = {
+        ...run, currentStep: nextStep, stepIndex: nextStepIndex, status: status ?? run.status,
+        destinationRequestNumber: destinationRequestNumber ?? run.destinationRequestNumber, version: run.version + 1,
+      };
+      return { ...run };
+    },
     async markNeedsAttention({ leaseToken, leaseGeneration, expectedVersion, reason, error = null }) {
       if (!fenceOk(leaseToken, leaseGeneration, expectedVersion)) return null;
       const storedReason = ledgerReasonOrThrow(reason);
@@ -389,8 +402,10 @@ function snapshotResourceRow(overrides = {}) {
   };
 }
 
-async function runStep({ deps = {}, resources, requestRow, manifestOverrides = {} } = {}) {
-  const run0 = baseRun();
+async function runStep({
+  deps = {}, resources, requestRow, manifestOverrides = {}, runOverrides = {},
+} = {}) {
+  const run0 = baseRun(runOverrides);
   const { ledger, calls } = createFakeLedger(run0, resources);
   const manifest = baseManifest(manifestOverrides);
   const result = await bypassDynamicsRestrictions('test:verify-initial-assessment', () => advanceRun({
@@ -521,6 +536,28 @@ describe('stepVerifyInitialAssessment', () => {
 
     expect(result.outcome).toBe('ready');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  // Slice 6c-i: `reviews` is cumulative on `initial_assessment`, so this same
+  // step body must ADVANCE (never markReady) for that recipe -- pinning the
+  // per-recipe terminal branch (mutation target: "IA verify marking ready on
+  // reviews" would make this assert markReady called once instead).
+  it('reviews recipe: the same verification passes but ADVANCES to seed_reviewers instead of marking ready', async () => {
+    mockDataverse();
+    const graph = baseGraph();
+    const { result, calls } = await runStep({
+      deps: { graph },
+      requestRow: requestReadback(),
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
+      manifestOverrides: { recipe: 'reviews' },
+      runOverrides: { recipe: 'reviews' },
+    });
+
+    expect(result.outcome).toBe('advanced');
+    expect(result.run.currentStep).toBe('seed_reviewers');
+    expect(result.run.status).not.toBe('ready');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+    expect(calls.filter((c) => c.op === 'advanceStep')).toHaveLength(1);
   });
 
   it('a Foundation/Contact baseline mismatch stops with ia_verification_failed', async () => {

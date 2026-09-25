@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { LEDGER_REASON_CODES, LEDGER_RECEIPT_KEYS, LEDGER_STEPS } from '../../lib/services/test-requests/run-ledger.js';
+import {
+  LEDGER_RECIPES, LEDGER_REASON_CODES, LEDGER_RECEIPT_KEYS, LEDGER_RESOURCE_KINDS, LEDGER_STEPS,
+} from '../../lib/services/test-requests/run-ledger.js';
 
 /**
  * Migration 054 (lib/db/migrations/054_test_request_runs.sql) adds CHECK
@@ -53,6 +55,8 @@ function isValidResourceKind(kind) {
   return [
     'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
     'dataverse_document_location', 'sharepoint_file', 'workflow_bypass',
+    'dataverse_request_document', 'foundation_baseline',
+    'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set',
   ].includes(kind);
 }
 
@@ -149,6 +153,8 @@ describe('migration 054 CHECK constraints (pure-JS mirror)', () => {
     it.each([
       'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
       'dataverse_document_location', 'sharepoint_file', 'workflow_bypass',
+      'dataverse_request_document', 'foundation_baseline',
+      'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set',
     ])('accepts %s', (kind) => {
       expect(isValidResourceKind(kind)).toBe(true);
     });
@@ -219,8 +225,8 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
     }
   });
 
-  it('uses IF NOT EXISTS for both tables and both indexes', () => {
-    expect((migration.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(2);
+  it('uses IF NOT EXISTS for every table and index', () => {
+    expect((migration.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(3);
     expect((migration.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(3);
   });
 
@@ -322,6 +328,7 @@ describe('migrations manifest lists 054 last and its setup-database.js mirror ma
     expect(migrationTables.map((t) => t.tableName)).toEqual([
       'test_request_runs',
       'test_request_run_resources',
+      'test_request_run_reviewer_assignments',
     ]);
 
     // Isolate the v55Statements array text in setup-database.js so we don't
@@ -335,10 +342,99 @@ describe('migrations manifest lists 054 last and its setup-database.js mirror ma
     expect(setupTables.map((t) => t.tableName)).toEqual([
       'test_request_runs',
       'test_request_run_resources',
+      'test_request_run_reviewer_assignments',
     ]);
 
     for (let i = 0; i < migrationTables.length; i++) {
       expect(setupTables[i].body).toBe(migrationTables[i].body);
     }
   });
+});
+
+describe('P2-a (Opus round 1): each SQL CHECK is verified against its OWN parsed IN (...) list, not a hand-copied JS array', () => {
+  function findBalanced(text, openIndex) {
+    let depth = 0;
+    for (let i = openIndex; i < text.length; i += 1) {
+      if (text[i] === '(') depth += 1;
+      else if (text[i] === ')') {
+        depth -= 1;
+        if (depth === 0) return text.slice(openIndex, i + 1);
+      }
+    }
+    throw new Error(`unbalanced parens starting at ${openIndex}`);
+  }
+
+  /** Extract the string literals inside the Nth (default all) `IN (...)` list found after `marker` (which must itself end with the list's opening paren, e.g. "...CHECK (current_step IN ("). */
+  function extractInLists(sql, marker, { count = 1 } = {}) {
+    const markerIndex = sql.indexOf(marker);
+    if (markerIndex === -1) throw new Error(`marker not found: ${JSON.stringify(marker)}`);
+    // The CHECK's own outer parens bound the search so a constraint with two
+    // IN (...) lists (test_request_runs_reason_codes) doesn't accidentally
+    // pick up a later, unrelated constraint's list. Every marker used with
+    // this function contains "CHECK (" literally, so its absolute position
+    // in `sql` locates the CHECK's opening paren directly.
+    const checkTextIndex = markerIndex + marker.indexOf('CHECK (');
+    const outer = findBalanced(sql, sql.indexOf('(', checkTextIndex));
+    const inOccurrences = [...outer.matchAll(/\bIN\s*\(/g)];
+    if (inOccurrences.length < count) throw new Error(`expected at least ${count} IN(...) list(s) near ${JSON.stringify(marker)}, found ${inOccurrences.length}`);
+    const lists = inOccurrences.slice(0, count).map((m) => {
+      const openParenIndex = m.index + m[0].length - 1;
+      const balanced = findBalanced(outer, openParenIndex);
+      return [...balanced.matchAll(/'([^']*)'/g)].map((mm) => mm[1]);
+    });
+    return count === 1 ? lists[0] : lists;
+  }
+
+  /** resource_kind's CHECK is inline (no CONSTRAINT name), so it is anchored directly on the column+IN text rather than a constraint name. */
+  function extractInlineInList(sql, marker) {
+    const idx = sql.indexOf(marker);
+    if (idx === -1) throw new Error(`marker not found: ${JSON.stringify(marker)}`);
+    const openParenIndex = idx + marker.length - 1;
+    const balanced = findBalanced(sql, openParenIndex);
+    return [...balanced.matchAll(/'([^']*)'/g)].map((m) => m[1]);
+  }
+
+  function sorted(list) {
+    return [...list].sort();
+  }
+
+  for (const [label, filePath] of [
+    ['054 migration', 'lib/db/migrations/054_test_request_runs.sql'],
+    ['setup-database.js mirror', 'scripts/setup-database.js'],
+  ]) {
+    describe(label, () => {
+      const sql = fs.readFileSync(path.join(process.cwd(), filePath), 'utf8');
+
+      it('test_request_runs_current_step_enum equals LEDGER_STEPS exactly', () => {
+        const list = extractInLists(sql, 'CONSTRAINT test_request_runs_current_step_enum CHECK (current_step IN (');
+        expect(sorted(list)).toEqual(sorted(LEDGER_STEPS));
+      });
+
+      it('test_request_run_resources_step_enum equals LEDGER_STEPS exactly', () => {
+        const list = extractInLists(sql, 'CONSTRAINT test_request_run_resources_step_enum CHECK (step IN (');
+        expect(sorted(list)).toEqual(sorted(LEDGER_STEPS));
+      });
+
+      it('test_request_runs_recipe_enum equals LEDGER_RECIPES exactly', () => {
+        const list = extractInLists(sql, 'CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN (');
+        expect(sorted(list)).toEqual(sorted(LEDGER_RECIPES));
+      });
+
+      it('the inline resource_kind CHECK equals LEDGER_RESOURCE_KINDS exactly', () => {
+        const list = extractInlineInList(sql, 'resource_kind IN (');
+        expect(sorted(list)).toEqual(sorted(LEDGER_RESOURCE_KINDS));
+      });
+
+      it('test_request_runs_reason_codes (both needs_attention_reason and last_error lists) equal LEDGER_REASON_CODES exactly', () => {
+        const [needsAttentionList, lastErrorList] = extractInLists(sql, 'CONSTRAINT test_request_runs_reason_codes CHECK (', { count: 2 });
+        expect(sorted(needsAttentionList)).toEqual(sorted(LEDGER_REASON_CODES));
+        expect(sorted(lastErrorList)).toEqual(sorted(LEDGER_REASON_CODES));
+      });
+
+      it('test_request_run_resources_error_code equals LEDGER_REASON_CODES exactly', () => {
+        const list = extractInLists(sql, 'CONSTRAINT test_request_run_resources_error_code CHECK (');
+        expect(sorted(list)).toEqual(sorted(LEDGER_REASON_CODES));
+      });
+    });
+  }
 });

@@ -7,7 +7,9 @@
  * injected, so no module mocking is needed to run it offline).
  */
 import { jest } from '@jest/globals';
-import { advanceRun, nextStepFor, RECIPE_STEP_ORDER } from '../../lib/services/test-requests/run-runner.js';
+import {
+  advanceRun, nextStepFor, recipeIncludesStep, recipeLeaseSeconds, RECIPE_STEP_ORDER,
+} from '../../lib/services/test-requests/run-runner.js';
 import { sha256, MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
@@ -461,3 +463,77 @@ describe('slice 6a: manifest/run recipe binding', () => {
 // now have their own dedicated coverage:
 // test-request-run-runner-seed-initial-assessment-snapshot.test.js and
 // test-request-run-runner-verify-initial-assessment.test.js.
+
+describe('slice 6c-i: reviews recipe step order (cumulative on initial_assessment)', () => {
+  test('reviews is the initial_assessment order plus the four Reviews-only steps; verify_reviews is the final step', () => {
+    expect(RECIPE_STEP_ORDER.reviews).toEqual([
+      'fence_source', 'create_request', 'correct_meeting_date', 'provision_location', 'copy_file', 'observe', 'verify',
+      'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+      'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
+    ]);
+    const transitions = [
+      ['verify_initial_assessment', 'seed_reviewers', 10],
+      ['seed_reviewers', 'copy_review_file', 11],
+      ['copy_review_file', 'seed_review_answers', 12],
+      ['seed_review_answers', 'verify_reviews', 13],
+    ];
+    for (const [from, to, index] of transitions) {
+      expect(nextStepFor('reviews', from)).toEqual({ step: to, index });
+    }
+    expect(nextStepFor('reviews', 'verify_reviews')).toBeNull();
+  });
+});
+
+describe('slice 6c-i: verify_initial_assessment terminal branch is per-recipe', () => {
+  // The full behavioral test (markReady vs. advance, driven through a real
+  // stepVerifyInitialAssessment happy path) lives in
+  // test-request-run-runner-verify-initial-assessment.test.js. This pins the
+  // `nextStepFor` fact that terminal branch is keyed on: the two recipes
+  // disagree at the shared step name.
+  test('initial_assessment: verify_initial_assessment has no next step (must markReady)', () => {
+    expect(nextStepFor('initial_assessment', 'verify_initial_assessment')).toBeNull();
+  });
+
+  test('reviews: verify_initial_assessment advances to seed_reviewers (must NOT markReady)', () => {
+    expect(nextStepFor('reviews', 'verify_initial_assessment')).toEqual({ step: 'seed_reviewers', index: 10 });
+  });
+});
+
+describe('slice 6c-i: reviews-only steps stop cleanly with recipe_step_not_built (6c-ii builds the bodies)', () => {
+  it.each(['seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews'])(
+    '%s marks the run needs_attention/recipe_step_not_built without calling markReady',
+    async (step) => {
+      const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'reviews', currentStep: step }));
+      const manifest = baseManifest({ recipe: 'reviews' });
+      const result = await advanceRun({
+        runId: RUN_ID, ledger, manifest, bundle: null,
+        deps: { client: {}, graph: {}, sharePointTarget: () => ({}) },
+      });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('recipe_step_not_built');
+      expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+    },
+  );
+});
+
+describe('P1-b: recipeIncludesStep / recipeLeaseSeconds', () => {
+  it('recipeIncludesStep reports whether a step is in the recipe order', () => {
+    expect(recipeIncludesStep('basic', 'seed_initial_assessment')).toBe(false);
+    expect(recipeIncludesStep('initial_assessment', 'seed_initial_assessment')).toBe(true);
+    expect(recipeIncludesStep('reviews', 'seed_initial_assessment')).toBe(true);
+    expect(recipeIncludesStep('reviews', 'seed_reviewers')).toBe(true);
+    expect(recipeIncludesStep('basic', 'seed_reviewers')).toBe(false);
+  });
+
+  it('recipeIncludesStep fails closed on an unrecognized recipe', () => {
+    expect(() => recipeIncludesStep('nonexistent_recipe', 'fence_source')).toThrow('Unknown Test Request Factory recipe');
+  });
+
+  it.each([
+    ['basic', 300],
+    ['initial_assessment', 900],
+    ['reviews', 900],
+  ])('recipeLeaseSeconds(%s) is %i', (recipe, seconds) => {
+    expect(recipeLeaseSeconds(recipe)).toBe(seconds);
+  });
+});
