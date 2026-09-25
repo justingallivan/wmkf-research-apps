@@ -1,5 +1,34 @@
 # Presentation branch continuation — 2026-09-23
 
+**Chrome recovery continuation (2026-09-24 PT):** [VERIFIED via Git] this worktree remains on
+`codex/feature-request`, clean before these documentation edits, with the `origin/main` merge
+`0bd45cecd` and the ETag-guarded proof cleanup implementation `5c5fbcb0b` pushed. The
+changed-surface tests/gates passed; local Turbopack build was blocked by this worktree's
+external `node_modules` symlink, while a local Webpack build and remote Vercel build passed.
+[VERIFIED via signed-in Production lookup] the owner's Request `1003220` is the test copy at
+GUID `4bfb6e40-678f-f111-8076-7ced8d3d15a6`, with governed SharePoint folder
+`akoya_request/1003220_4BFB6E40678FF11180767CED8D3D15A6/Post Site Visit Materials/`
+on `https://appriver3651007194.sharepoint.com/sites/akoyaGO`. [VERIFIED via local hash]
+the owner-selected `Gallivan_Peleg Intro.mp4` is 100,665,703 bytes, SHA-256
+`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`.
+The owner explicitly overrode the plan's per-read rule: Dataverse reads may be done as needed;
+consult the owner before writes. The owner approved branch-scoped Preview `NEXTAUTH_URL` and
+`SHAREPOINT_SITE_URL`, asked the agent to correct `DATAVERSE_ALLOW_PROD_READS=yes` via Vercel
+CLI, and approved a Preview deployment and one temporary alias move. [VERIFIED via Vercel
+CLI/dashboard] all three variables are scoped only to `codex/feature-request`; Factory's four
+scoped variable names remain. The first Ready CLI deployment
+`dpl_6gN8m1kFsLCQBVkojEAEarkVyGdB` passed the signed-in GET but returned `403` to the
+validation-only `{}` POST after the alias moved, before any Graph session or SharePoint write.
+The alias was immediately restored and re-inspected at exact Ready Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. Under the owner's corrective-deployment approval,
+Git-linked deployment `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc` is Ready from branch
+`codex/feature-request` and commit `5c5fbcb0bc8265b10de003a9fd1bc3f3e81b725f`.
+[VERIFIED via CLI] the shared alias still points to the Factory target. The new alias move
+awaits exact-target owner approval; no MP4 upload or cleanup has occurred. The three recovery
+cells remain NOT RUN live. After an approved alias move, prove protected GET and `{}` POST=400
+before seeking separate upload approval; restore and re-inspect the exact Factory alias after
+any run. The plan's dated Slice 0 matrix has the detailed receipt.
+
 **Latest Slice 0 state (2026-09-23):** [VERIFIED via Git] `codex/feature-request` includes
 the owner-approved `origin/main` merge, offline recovery hardening, and the documented
 Preview authentication URI workaround. [VERIFIED via Vercel] the

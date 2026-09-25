@@ -839,8 +839,10 @@ variables are removed, and the Factory branch's four scoped variable names remai
 `docs/AUTHENTICATION_SETUP.md` Step 2.4 before another signed-in proof: with separate
 owner approval, set **Preview scoped only to `codex/feature-request`** `NEXTAUTH_URL` to the exact
 origin `https://wmkfresearchapps-preview.vercel.app` (no trailing slash), and set the approved
-SharePoint site target for this branch. The owner alone sets any branch-scoped
-`DATAVERSE_ALLOW_PROD_READS=yes`; a fresh authorization is required for those Production reads.
+SharePoint site target for this branch. For the 2026-09-24 Chrome pass, the owner explicitly authorized Dataverse reads when needed and
+authorized the agent to correct `DATAVERSE_ALLOW_PROD_READS=yes` via Vercel CLI in Preview scope
+only for `codex/feature-request`; consult the owner before writes. This decision supersedes the
+older per-read and owner-only-setting instructions for this pass.
 Create a new immutable Preview deployment after those settings exist, attest its branch, commit,
 ID, and Preview class, and ask separately before temporarily moving the shared alias. Use the
 alias for browser traffic; an immutable-host signed-in POST has a different Origin while the
@@ -852,6 +854,28 @@ the approved presentation-branch settings, and redeploy the active branch if nee
 deployments use normal Preview `VERCEL_URL` derivation. Do not edit the Factory branch settings.
 
 **Owner decision (2026-09-23, Session 536):** Chrome and Edge are accepted as working; no further Edge runs are planned. macOS and iPadOS Safari are deferred until the Test Request Factory can create test requests, and will then run in Production against a test request instead of a newly approved real request. Follow-up owner decision (same session): the recovery rows below (reload/reselect resume, upload-session expiry, proof-token expiry) are browser-independent server/Graph logic and move to a single agent-run desktop Chrome pass when presentation work resumes. The Production Safari run covers upload, both Watch shapes with long seeking, and Download on macOS and iPadOS, with one large (near-cap) upload on iPadOS for backgrounding/memory behavior. No row waits on Edge; the Edge runner assignments in the table below are superseded.
+
+**Chrome recovery pass preflight (2026-09-24 PT).** [VERIFIED via signed-in Production
+Grant Reporting read and the document picker] the owner-selected test copy Request `1003220`
+has GUID `4bfb6e40-678f-f111-8076-7ced8d3d15a6` and governed target
+`https://appriver3651007194.sharepoint.com/sites/akoyaGO`, library/folder
+`akoya_request/1003220_4BFB6E40678FF11180767CED8D3D15A6/Post Site Visit Materials/`.
+[VERIFIED via local `stat` and SHA-256] the owner-selected `Gallivan_Peleg Intro.mp4` is
+100,665,703 bytes with SHA-256
+`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`.
+[VERIFIED via Vercel CLI and dashboard] Preview variables `NEXTAUTH_URL`,
+`SHAREPOINT_SITE_URL`, and `DATAVERSE_ALLOW_PROD_READS` are scoped only to
+`codex/feature-request`; the Factory branch's four scoped variable names remain.
+The first Ready CLI Preview deployment, `dpl_6gN8m1kFsLCQBVkojEAEarkVyGdB`, accepted a
+signed-in protected GET through the temporarily moved alias but returned origin-guard `403`
+for validation-only `{}` POST, before any Graph session or SharePoint write. The alias was
+immediately restored to its exact Ready Factory target
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. [VERIFIED via Vercel dashboard] corrective
+Git-linked Preview deployment `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc` is Ready from branch
+`codex/feature-request`, commit `5c5fbcb0bc8265b10de003a9fd1bc3f3e81b725f`.
+[VERIFIED via CLI] the Factory alias remained on `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`
+after redeploy. The new alias target awaits owner approval before another protected POST;
+no upload, expiry recovery, or cleanup has yet been run in this pass.
 
 | Browser | Scenario | Expected recorded evidence | Runner |
 |---|---|---|---|
@@ -880,8 +904,10 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 | Upload and throughput near 2,000,000,000 bytes | NOT RUN | [ASSUMED from no near-cap receipt] no sanctioned near-cap MP4 or measured throughput was recorded. |
 
 **Owner actions:** approve each new disposable request and governed SharePoint target, each
-Production Dataverse read, each Preview deployment, and each temporary shared-alias change
-separately. The owner runs macOS/iPadOS Safari by hand and arranges the Windows Edge follow-up.
+Preview deployment, each temporary shared-alias change, each upload, and each exact cleanup
+separately. The owner's 2026-09-24 override permits needed Dataverse reads; consult the owner
+before writes. The owner runs macOS/iPadOS Safari by hand in the deferred Production Factory
+test-request run. No Windows Edge follow-up is planned.
 Before any alias move, re-inspect its current target and presentation/Factory branch-scoped
 Preview variable names; restore and re-inspect afterward. The 2026-09-23 Edge upload approval
 and cleanup authorization are spent.
