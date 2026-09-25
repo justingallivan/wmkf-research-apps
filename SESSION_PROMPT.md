@@ -43,13 +43,25 @@ cells are PASS.
 presentation deployment, and Resume displayed the specific `presentation_media_proof_session_expired`
 message while retaining the saved permit. [VERIFIED via Graph] the governed folder listing
 remained empty. A fresh signed-in GET through the alias loaded the protected proof page.
-Separate owner approval for this expired-session cleanup is pending. The shared alias was
-restored and re-inspected at Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`
-while awaiting approval; the permit remains in the staff Chrome tab. After approval, remap
-the already approved presentation deployment, click Cleanup, require an authoritative terminal
-outcome, then begin a third fresh upload under the existing up-to-three-session allowance.
-The upload-session expiry cell is PENDING CLEANUP AND FRESH UPLOAD. The plan's dated Slice 0
-matrix has the full receipt.
+The owner approved this expired-session cleanup. [VERIFIED via Chrome] Cleanup returned
+`session_cancelled` and cleared the permit; [VERIFIED via Graph] the folder remained empty.
+The shared alias was restored and re-inspected at Ready Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` while awaiting approval, then remapped to the approved
+presentation deployment. Under the existing up-to-three-session allowance, a third fresh
+upload used the same verified MP4. [VERIFIED via Graph] its exact item
+`75649f0c-dfae-4aa7-9887-980fa9efc4e1.mp4`, ID
+`01G4GVMSZEWMUR6P2R2RDIHYOWMYJ5ET3H`, reached 100,665,703 bytes with ETag
+`"{1F29B324-513F-46D4-83E1-D66613D24F67},3"`. Automatic approval review rejected
+browser inspection of the active/completed proof tab as potentially disruptive and barred
+another browser-origin workaround. [REPORTED by owner] Finish saving displayed “Playback proof
+created”; the owner authorized deletion of the committed third item and reported that the app's
+Cleanup moved it to the recycle bin. [VERIFIED via Graph] exact-path lookup returned not found
+and the governed folder listing was empty. [VERIFIED via Vercel CLI] the alias was restored and
+re-inspected at the Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the three
+temporary Preview variables scoped only to `codex/feature-request` were removed, and the
+Factory branch's four scoped variable names remained. All three Chrome recovery cells are
+PASS. The deferred Production macOS/iPadOS Safari and near-cap run remains; the plan's dated
+Slice 0 matrix has the full receipts.
 
 **Latest Slice 0 state (2026-09-23):** [VERIFIED via Git] `codex/feature-request` includes
 the owner-approved `origin/main` merge, offline recovery hardening, and the documented
@@ -87,7 +99,7 @@ live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
 | macOS Safari full path | DEFERRED | [VERIFIED via Session 536 decision] Production run on a Factory-created test request remains. |
 | iPadOS Safari full path | DEFERRED | [VERIFIED via Session 536 decision] Production run on a Factory-created test request remains. |
 | Reload/same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome and Graph] paused at 0.9 MiB, reload/reselect, direct Microsoft `202` resume to full commit, exact item cleanup and Graph 404. |
-| Upload-session expiry recovery | PENDING CLEANUP/FRESH UPLOAD | [VERIFIED via Chrome] second session paused at 0.6 MiB; after 8:49:47 PM PDT expiry, Resume displayed the specific expired-session error and retained the permit. [VERIFIED via Graph] folder empty. Cleanup approval and fresh session remain. |
+| Upload-session expiry recovery | PASS | [VERIFIED via Chrome] second session paused at 0.6 MiB; after 8:49:47 PM PDT expiry, Resume displayed the specific expired-session error and retained the permit. Approved Cleanup returned `session_cancelled` and no item. [VERIFIED via Graph] fresh third session committed 100,665,703 bytes. [REPORTED by owner] Finish saving created the proof and Cleanup moved the item to recycle bin. [VERIFIED via Graph] exact path not found and folder empty. |
 | Proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] old link refused as expired; fresh link from same committed item played and accepted End/Home seeks with one resolver action. |
 | Long-duration seek | DEFERRED | The 67.33-second recording cannot prove the >2-minute Safari case. |
 | Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via Session 536 decision] one iPadOS Production run remains. |

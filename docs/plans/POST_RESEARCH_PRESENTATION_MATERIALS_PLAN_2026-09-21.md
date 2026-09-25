@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; Chrome proved reload/reselect and proof-token recovery, while upload-session expiry and the deferred Production Safari/near-cap run remain open."
+summary: "Active plan for Meeting Tracker presentation materials; all three Chrome recovery rows passed, while the deferred Production Safari, long-seek, and near-cap run remains open."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -40,7 +40,7 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
 | SharePoint video delivery | Offer Watch and Download without proxying the complete file through the application. |
 | First-slice MP4 cap | 2,000,000,000 bytes (about 1.86 GiB), so the exact byte count fits the existing Dataverse `wmkf_FileSize` integer. Raising the cap requires a reviewed larger-size schema field. |
 | Existing full briefing | Preserve D19/D28: the existing distributed briefing remains a superset and continues to include research-presentation materials. Add audience-specific non-buffering Watch/Download resolution for Zoom and large SharePoint recordings. The new copied link is an additional materials-only option. |
-| Transport proof | **CHROME CORE PATH PASSED 2026-09-22; EDGE PARTIAL PATH REPORTED 2026-09-23.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. The Windows Edge colleague reported upload, playback, and Download for a 97,777,999-byte MP4; the exact item was deleted after owner approval. Owner accepted Chrome and Edge as working and deferred macOS/iPadOS Safari to a Production run on a Factory-created test request (2026-09-23, Session 536); reload/reselect resume, expiry recovery, and long-duration/near-cap evidence remain required before Slice 0 is complete. |
+| Transport proof | **CHROME CORE PATH PASSED 2026-09-22; EDGE PARTIAL PATH REPORTED 2026-09-23; THREE CHROME RECOVERY ROWS PASSED 2026-09-24.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. The Windows Edge colleague reported upload, playback, and Download for a 97,777,999-byte MP4; the exact item was deleted after owner approval. Owner accepted Chrome and Edge as working and deferred macOS/iPadOS Safari to a Production run on a Factory-created test request (2026-09-23, Session 536). Long-duration/near-cap and Production Safari evidence remain required before Slice 0 is complete. |
 | Distribution | No new email composer or automatic distribution for the materials-only link. Meeting Tracker provides Copy link for staff to share through their chosen channel; the existing deliberation email continues distributing the full briefing link. |
 
 ## 2. Verified current state
@@ -240,7 +240,7 @@ one-shot URL response resolved successfully without application byte proxying; t
 played and video range traffic
 did not increase the application resolver count. Prefer the 302 because it reveals the bearer URL
 only through the redirect chain rather than JSON, subject to the deferred Production Safari
-matrix and upload-session expiry test. The URL is browser-visible in either design, so it is never
+matrix. The URL is browser-visible in either design, so it is never
 persisted, logged, or placed in the context payload. If the remaining matrix falsifies 302 behavior, retain
 the one-shot response as the bounded fallback rather than buffering the complete MP4.
 
@@ -785,9 +785,10 @@ the local Claude-memory symlink invariant, and 27/27 changed-surface gate comman
 The owner's Windows Edge colleague reported a 93.2 MiB upload, playback, and completed Download;
 [VERIFIED via Microsoft Graph] its exact committed item was 97,777,999 bytes before deletion. No
 Edge byte/hash comparison or detailed pause, resolver, seek, or range evidence was recorded.
-[VERIFIED via signed-in desktop Chrome on 2026-09-24] Reload/reselect and proof-token expiry
-recovery subsequently passed. Upload-session expiry recovery, Production macOS/iPadOS Safari,
-long-duration seeking, and near-cap throughput remain open, so Slice 0 is not yet complete.
+[VERIFIED via signed-in desktop Chrome, owner UI report, and Graph on 2026-09-24]
+Reload/reselect, upload-session expiry recovery, and proof-token expiry recovery subsequently
+passed. Production macOS/iPadOS Safari, long-duration seeking, and near-cap throughput remain
+open, so Slice 0 is not yet complete.
 
 This is a disposable transport spike, not the production feature. It may add a Preview-only,
 authenticated proof route and minimal harness, but it creates no durable application schema and is
@@ -895,16 +896,31 @@ and the folder listing was empty. No bearer URL or token was saved in this recei
 expiry 8:49:47 PM PDT on 2026-09-24; the governed folder listing showed no committed item.
 After that expiry, Resume displayed the specific `presentation_media_proof_session_expired`
 message while keeping the saved permit. The Graph folder listing was still empty. A fresh
-signed-in GET through the remapped alias loaded the protected proof page. Separate owner
-approval for expired-session cleanup is pending. The alias was restored and re-inspected at
-Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` while awaiting approval.
-The upload-session expiry row still needs authoritative cleanup and a fresh successful upload.
+signed-in GET through the remapped alias loaded the protected proof page. The owner approved
+expired-session cleanup; [VERIFIED via Chrome] the app returned `session_cancelled` and cleared
+the permit, and [VERIFIED via Graph] the folder remained empty. The alias was restored and
+re-inspected at Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` while awaiting
+approval, then remapped to the approved presentation deployment. A third fresh session uploaded
+the same 100,665,703-byte MP4. [VERIFIED via Graph] exact item
+`75649f0c-dfae-4aa7-9887-980fa9efc4e1.mp4`, ID `01G4GVMSZEWMUR6P2R2RDIHYOWMYJ5ET3H`,
+had full size and ETag `"{1F29B324-513F-46D4-83E1-D66613D24F67},3"`. Automatic approval
+review blocked further agent browser inspection as potentially disruptive to the tab's permit.
+[REPORTED by owner] Finish saving displayed “Playback proof created,” and the owner-authorized
+Cleanup moved the exact third item to the SharePoint recycle bin.
+[VERIFIED via Graph] its exact path returned not found and the governed folder listing was empty.
+[VERIFIED via Vercel CLI] the shared alias was restored and re-inspected at the exact Ready
+Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the three temporary variables scoped
+only to `codex/feature-request` were removed, and the Factory branch's four scoped variable
+names remained. The Chrome upload-session expiry recovery row is PASS. Automatic approval review
+blocked agent browser inspection after the fresh Graph commit, so the owner supplied the final
+Finish saving and Cleanup UI receipts; Graph independently verified the committed size and
+exact deletion. No bearer URL or token was saved.
 
 | Browser | Scenario | Recorded or pending evidence | Runner |
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. | Agent (historical PASS) |
 | Desktop Chrome | Reload and same-file reselect Resume | 2026-09-24 PASS: paused at 0.9 MiB, reloaded, reselected the same file, resumed direct Microsoft `202` chunks, committed 100,665,703 bytes, finalized, and cleaned the exact item. | Agent |
-| Desktop Chrome | Upload-session expiry and recovery | PENDING CLEANUP/FRESH UPLOAD: second session paused at 0.6 MiB; after its 8:49:47 PM PDT expiry, Resume displayed `presentation_media_proof_session_expired` and retained the permit. Graph folder empty; separate cleanup approval pending. | Agent |
+| Desktop Chrome | Upload-session expiry and recovery | PASS: second session expired after a 0.6 MiB pause, Resume refused and retained its permit, then approved Cleanup returned `session_cancelled` with no item. Third fresh session committed the full 100,665,703-byte MP4; owner reported “Playback proof created” and exact-item Cleanup. Graph confirmed full size, exact-path 404, and empty folder. | Agent, with owner final UI clicks after browser auto-review block |
 | Desktop Chrome | Five-minute proof-token expiry recovery | 2026-09-24 PASS: old link refused as `expired` after reload; fresh link from the same item played and accepted End/Home seeks with resolver count one. | Agent |
 | Desktop Edge | 2026-09-23 upload, playback, Download | Colleague reported these actions for 97,777,999 bytes; Graph confirmed the item. Remaining detailed Edge trace is not a Slice 0 blocker under Session 536. | Historical owner colleague; no new Edge run |
 | macOS Safari | Upload, both Watch shapes with long seeking, Download | Deferred to Production on a Factory-created test request; record redacted statuses/ranges and source/download size and SHA-256. | Owner by hand |
@@ -923,7 +939,7 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 | macOS Safari full path | DEFERRED | [VERIFIED via Session 536 owner decision] Production run on a Factory-created test request remains for upload, both Watch shapes with long seeking, Download, and integrity evidence. |
 | iPadOS Safari full path | DEFERRED | [VERIFIED via Session 536 owner decision] Production run on a Factory-created test request remains for the same path plus Files-app integrity and mobile behavior. |
 | Reload and same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] 0.9 MiB pause, reload, reselect, direct Microsoft `202` chunks, 100,665,703-byte commit/finalize, exact ETag-guarded cleanup with Graph 404 and empty folder. |
-| Upload-session expiry recovery | PENDING CLEANUP/FRESH UPLOAD | [VERIFIED via Chrome] second session paused at 0.6 MiB; after its 8:49:47 PM PDT expiry, Resume displayed the specific expired-session error and retained the permit. [VERIFIED via Graph] folder empty. Exact cleanup and fresh upload still need receipts. |
+| Upload-session expiry recovery | PASS | [VERIFIED via Chrome] after the second session expired at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled`. [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. Agent browser inspection was auto-review blocked for the final two clicks. |
 | Five-minute proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] expired old link refused after reload; Finish saving minted a fresh link from the same committed item; Watch played and End/Home seeks caused no additional resolver action. |
 | Long-duration seeking | DEFERRED | [VERIFIED via Chrome receipt] current recording is only 67.33 seconds; macOS/iPadOS Production Safari run still needs a >2-minute recording and ten seeks. |
 | Upload and throughput near 2,000,000,000 bytes | DEFERRED | [VERIFIED via Session 536 owner decision] one near-cap iPadOS Production upload on a Factory-created test request remains. |
@@ -1192,8 +1208,8 @@ Tier 2: owner applies migration/wave and later flips the readiness flag.
 ### Slice 4 — Large MP4 producer
 
 - **PENDING completion of the Slice 0 browser matrix.** Use the proven browser-direct Graph
-  candidate only after Chrome upload-session expiry and the deferred Production macOS/iPadOS
-  Safari, long-seek, and near-cap throughput gates pass.
+  candidate for promotion only after the deferred Production macOS/iPadOS Safari, long-seek,
+  and near-cap throughput gates pass. The three Chrome recovery gates passed on 2026-09-24.
 - If the SharePoint-first-party fallback becomes necessary, replace the upload-session intent
   with a bounded attach intent: server-owned request/folder, creating actor, expected filename/size,
   exact-folder enumeration, independently authorized attach, and stable drive/item validation.
@@ -1359,10 +1375,10 @@ This is Tier 2 cross-store runtime work. Build on a feature branch and promote d
 Release order:
 
 1. **IN PROGRESS:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
-   route-scoped CSP correction, then passed Chrome reload/reselect and proof-token expiry recovery.
-   Complete Chrome upload-session expiry recovery and the deferred Production Safari, long-seek,
-   and near-cap throughput gates before promoting the large-MP4 producer; keep 302 as the leading
-   resolver and the one-shot URL as the bounded fallback;
+   route-scoped CSP correction. All three Chrome recovery checks passed on 2026-09-24. Complete
+   the deferred Production Safari, long-seek, and near-cap throughput gates before promoting the
+   large-MP4 producer; keep 302 as the leading resolver and the one-shot URL as the bounded
+   fallback;
 2. remove/convert the proof harness and merge the compatibility floor: deploy-safe readers,
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
