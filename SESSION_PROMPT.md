@@ -1,3 +1,66 @@
+# Session 544 Prompt: Durable browser-direct presentation uploads (branch-local)
+
+## Offline Slice 4 milestone — 2026-09-25 PT
+
+**[VERIFIED via Git]** Work remained in
+`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on
+`codex/feature-request`. The turn began at local/origin `1f1fb7f22`; historical handoff
+`c628d7367` was already contained. Commit `7fe2d8faf` now implements the durable MP4 milestone.
+The main checkout, Factory branch, and `main` were not edited or pushed.
+
+**[SOURCE-BUILT/OFFLINE-TESTED; NOT DEPLOYED, MIGRATED, CONFIGURED, OR LIVE-PROVED]** The Meeting
+Tracker now uses the shared browser-direct Graph transport for durable Recording intents: a
+code-owned 10 MiB default, strict sequential Graph-confirmed ranges, status-aware bounded retry,
+stall/response watchdogs, truthful confirmed/in-flight progress, sampled throughput/ETA, graceful
+pause, offline/reconnect recovery, and same-browser locking. Begin persists immutable
+actor/request/active-visit/file/path/generation identity before returning the ciphertext-backed
+Graph session. Resume independently reauthorizes, rechecks the bounded file fingerprint and live
+Graph state, and never treats stored initial expiry as terminal. Finalize re-resolves one exact
+stable full-size item, reads only the bounded MP4 signature range, uses the Recording slot fence,
+and durably records replay/reconciliation outcomes without proxying media bytes through the app.
+The staff card exposes unfinished, Resume, and Finish-saving states and suppresses stale state on
+Request navigation. Route-scoped CSP and full-page navigation preserve direct Microsoft access.
+
+The daily intent reconciler is inspect/refresh/record/alert-only by default. Destructive behavior
+requires both general access `on` and the separate literal
+`POST_PRESENTATION_MATERIALS_CLEANUP=on`; neither is configured or approved live. It deletes only
+one exact stable unbound candidate after a zero-row generation-key proof, retains any exact
+registry binding in every lifecycle, and preserves bytes on ambiguity, mismatch, or uncertain
+transport. No SharePoint upload/deletion, Dataverse write, deployment, alias move, or environment
+change occurred in this milestone.
+
+**[VERIFIED tests and gates]** The focused card suite passes 41 tests. The changed surface passes
+16 suites / 307 tests. `npm run check:types` passes. Scoped ESLint reports zero errors and one
+pre-existing `react-hooks/set-state-in-effect` warning in `SiteVisitEditor.js:163`. The following
+gate/self-test pairs passed sequentially: API routes, Atlas, doc currency, fact consistency,
+canonical pointers, doc symbol references, build-claim freshness, GUID trust boundary, Dataverse
+access layer, Dynamics context boundary, route lifecycle auth, route/service boundary, Request
+Document writers, secret scan, scaffolding tokens, and status-enum parity. Migration-manifest,
+docs-catalog, and agent-invariant gates also pass. Canonical counts were regenerated to 234 API
+route files and 145 `requireAppAccess` endpoints. The default Turbopack build cannot follow this
+worktree's intentional external `node_modules` symlink; `npx next build --webpack` completed the
+production build successfully with only the repository's existing dynamic-import warnings.
+
+**[VERIFIED iterative review]** Five read-only OAuth Claude Opus rounds reviewed the server-side
+intent/finalize/cleanup lifecycle to a final no-findings result. Nine more read-only Opus rounds
+reviewed the browser/UI integration. Findings were fixed iteratively—including navigation/CSP,
+stale state, status timeout, retry/pause copy, finalize guidance, contract validation, and exact
+timer boundaries—and Round 9 returned exactly `No findings.` Browser review resume UUID:
+`a5929117-c293-4ee6-8915-ebb57254e624`. No Ultrareview or other metered product was used.
+
+## Remaining release work
+
+- Migration 055 and Wave 30 are still unapplied; schema readiness, rollout access, and destructive
+  cleanup remain off/unconfigured.
+- The historical Chrome upload-session expiry row remains **PARTIAL** because the live run did not
+  prove Graph-confirmed terminal expiry. Do not upgrade that claim from offline tests.
+- Desktop macOS Safari, long-seek, and near-cap Production checks remain deferred until the
+  production-safe flow is deliberately deployed and an owner-approved human-created test Request
+  is selected. The Test Request Factory is unfinished; do not wait for it or claim it exists.
+- Before any live benchmark, deployment, alias move, SharePoint upload/deletion, Production write,
+  Dataverse write, or environment change, present a fresh concrete approval list. Do not reuse the
+  spent Request 1003220 approvals. Do not attempt iPadOS or another Edge run.
+
 # Session 543 Prompt: Presentation upload performance (branch-local)
 
 ## Session 543 representative Chrome benchmark — 2026-09-25 PT
