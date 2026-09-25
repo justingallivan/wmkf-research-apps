@@ -1,18 +1,11 @@
-/** Browser-only sequential Graph upload loop used by the Preview proof page. */
+/** Preview-proof file identity helpers plus compatibility transport exports. */
 
-export function nextExpectedStart(ranges, fallback = 0) {
-  const first = Array.isArray(ranges) ? ranges[0] : null;
-  const match = typeof first === 'string' ? first.match(/^(\d+)-/) : null;
-  return match ? Number(match[1]) : fallback;
-}
-
-function abortError() {
-  const error = new Error('Upload stopped.');
-  error.name = 'AbortError';
-  return error;
-}
-
-const DEFAULT_FRAGMENT_TIMEOUT_MS = 60_000;
+export {
+  GRAPH_UPLOAD_DEFAULT_CHUNK_BYTES,
+  nextExpectedStart,
+  uploadBrowserDirectGraphFile as uploadPresentationMediaProofFile,
+  withGraphBrowserUploadLock,
+} from './graph-browser-upload';
 
 const FINGERPRINT_EDGE_BYTES = 1024 * 1024;
 
@@ -33,113 +26,4 @@ export async function fingerprintPresentationMediaProofFile(file, subtle = globa
   input.set(new Uint8Array(last), prefix.byteLength + first.byteLength);
   const digest = new Uint8Array(await subtle.digest('SHA-256', input));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-
-function uploadFragmentWithXhr({
-  uploadUrl,
-  contentRange,
-  body,
-  signal,
-  xhrFactory,
-  timeoutMs,
-  onUploadProgress,
-}) {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(abortError());
-    const xhr = xhrFactory();
-    let settled = false;
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      signal?.removeEventListener('abort', onSignalAbort);
-      callback(value);
-    };
-    const onSignalAbort = () => xhr.abort();
-    xhr.onload = () => finish(resolve, {
-      ok: xhr.status >= 200 && xhr.status < 300,
-      status: xhr.status,
-      json: async () => JSON.parse(xhr.responseText || '{}'),
-    });
-    xhr.onerror = () => finish(reject, new Error('Microsoft upload connection failed before a response.'));
-    xhr.onabort = () => finish(reject, abortError());
-    xhr.ontimeout = () => finish(reject, new Error('Microsoft upload fragment timed out.'));
-    if (xhr.upload) {
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) onUploadProgress(event.loaded, event.total);
-      };
-    }
-    signal?.addEventListener('abort', onSignalAbort, { once: true });
-    try {
-      xhr.open('PUT', uploadUrl, true);
-      xhr.timeout = timeoutMs;
-      xhr.setRequestHeader('Content-Range', contentRange);
-      xhr.send(body);
-    } catch (error) {
-      finish(reject, error);
-    }
-  });
-}
-
-export async function uploadPresentationMediaProofFile({
-  file,
-  uploadUrl,
-  start = 0,
-  chunkBytes,
-  signal,
-  shouldPause = () => false,
-  onProgress = () => {},
-  fetchImpl,
-  xhrFactory = () => new XMLHttpRequest(),
-  fragmentTimeoutMs = DEFAULT_FRAGMENT_TIMEOUT_MS,
-}) {
-  if (!file || !Number.isInteger(file.size) || file.size <= 0) throw new Error('A file is required.');
-  if (!uploadUrl || !Number.isInteger(chunkBytes) || chunkBytes <= 0 || chunkBytes % (320 * 1024) !== 0) {
-    throw new Error('The upload session contract is invalid.');
-  }
-  if (!Number.isInteger(start) || start < 0 || start > file.size) {
-    throw new Error('The upload resume position is invalid.');
-  }
-  if (!Number.isInteger(fragmentTimeoutMs) || fragmentTimeoutMs <= 0) {
-    throw new Error('The upload fragment timeout is invalid.');
-  }
-  let offset = start;
-  while (offset < file.size) {
-    if (shouldPause()) return { complete: false, paused: true, nextStart: offset };
-    const endExclusive = Math.min(offset + chunkBytes, file.size);
-    const contentRange = `bytes ${offset}-${endExclusive - 1}/${file.size}`;
-    const fragment = file.slice(offset, endExclusive);
-    const response = fetchImpl
-      ? await fetchImpl(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Range': contentRange },
-        body: fragment,
-        signal,
-      })
-      : await uploadFragmentWithXhr({
-        uploadUrl,
-        contentRange,
-        body: fragment,
-        signal,
-        xhrFactory,
-        timeoutMs: fragmentTimeoutMs,
-        onUploadProgress: (loaded) => onProgress({
-          uploaded: Math.min(offset + loaded, endExclusive),
-          total: file.size,
-        }),
-      });
-    if (!response.ok) throw new Error(`Microsoft rejected upload fragment ${response.status}.`);
-    if (response.status === 200 || response.status === 201) {
-      onProgress({ uploaded: file.size, total: file.size });
-      return { complete: true, paused: false, nextStart: file.size };
-    }
-    const body = await response.json();
-    const next = nextExpectedStart(body.nextExpectedRanges, Number.NaN);
-    if (!Number.isInteger(next) || next <= offset || next > file.size) {
-      throw new Error('Microsoft returned an invalid next upload range.');
-    }
-    offset = next;
-    onProgress({ uploaded: offset, total: file.size });
-  }
-  return { complete: true, paused: false, nextStart: file.size };
 }

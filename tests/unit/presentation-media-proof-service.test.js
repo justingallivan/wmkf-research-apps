@@ -50,6 +50,7 @@ function dependencies(overrides = {}) {
     verify: jest.fn(),
     now: jest.fn(() => new Date(NOW)),
     randomUUID: jest.fn(() => PROOF_ID),
+    sleep: jest.fn(async () => {}),
     secret: jest.fn(() => SECRET),
     ...overrides,
   };
@@ -86,7 +87,8 @@ test('begin derives an exact disposable server path and returns an opaque staff-
     `${PROOF_ID}.mp4`,
     { conflictBehavior: 'fail', siteId: 'site-1', driveId: 'drive-1' },
   );
-  expect(result.chunkBytes).toBe(320 * 1024);
+  expect(result.chunkBytes).toBe(10 * 1024 * 1024);
+  expect(result.lockKey).toBe(PROOF_ID);
   expect(result.uploadUrl).toBe('https://upload.example/session-secret');
   expect(result.permit).not.toContain('session-secret');
 
@@ -95,7 +97,7 @@ test('begin derives an exact disposable server path and returns an opaque staff-
   expect(deps.getSessionStatus).not.toHaveBeenCalled();
 });
 
-test('status can resume a live session, while the cleanup permit survives session expiry', async () => {
+test('status checks live Graph after the sealed initial expiry and keeps cleanup authority', async () => {
   const deps = dependencies();
   const result = await begin(deps);
   await expect(getPresentationMediaProofUploadStatus({ permit: result.permit, profileId: 'profile-1' }, deps))
@@ -103,10 +105,22 @@ test('status can resume a live session, while the cleanup permit survives sessio
 
   deps.now.mockReturnValue(new Date(Date.parse(SESSION_EXPIRY) + 1));
   await expect(getPresentationMediaProofUploadStatus({ permit: result.permit, profileId: 'profile-1' }, deps))
-    .rejects.toMatchObject({ httpStatus: 410, code: 'presentation_media_proof_session_expired' });
+    .resolves.toMatchObject({ complete: false, uploadUrl: 'https://upload.example/session-secret', nextExpectedRanges: ['10485760-'] });
+  expect(deps.getSessionStatus).toHaveBeenCalledTimes(2);
   await expect(cleanupPresentationMediaProofUpload({ permit: result.permit, profileId: 'profile-1' }, deps))
     .resolves.toEqual({ cleaned: true, cleanupOutcome: 'session_cancelled', deletedItem: false });
   expect(deps.cancelSession).toHaveBeenCalledWith('https://upload.example/session-secret');
+});
+
+test('the proof permit expires 72 hours from mint, independently of Graph session expiry', async () => {
+  const deps = dependencies();
+  const result = await begin(deps);
+  deps.now.mockReturnValue(new Date(NOW + (72 * 60 * 60 * 1000) - 1));
+  await expect(getPresentationMediaProofUploadStatus({ permit: result.permit, profileId: 'profile-1' }, deps))
+    .resolves.toMatchObject({ complete: false });
+  deps.now.mockReturnValue(new Date(NOW + (72 * 60 * 60 * 1000)));
+  await expect(getPresentationMediaProofUploadStatus({ permit: result.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 401, code: 'presentation_media_proof_permit_invalid' });
 });
 
 test('status recognizes only the exact full-size path item as committed', async () => {
@@ -138,7 +152,7 @@ test('status treats a same-path partial SharePoint placeholder as resumable whil
   expect(deps.getSessionStatus).toHaveBeenCalledWith('https://upload.example/session-secret');
 });
 
-test('status never treats a partial placeholder as resumable after Microsoft reports the session gone', async () => {
+test('status marks a 404 session closure unresolved after bounded exact-item visibility checks', async () => {
   const partial = {
     driveId: 'drive-1', id: 'partial-item', name: `${PROOF_ID}.mp4`, size: 10 * 1024 * 1024,
   };
@@ -150,7 +164,35 @@ test('status never treats a partial placeholder as resumable after Microsoft rep
   const started = await begin(deps);
 
   await expect(getPresentationMediaProofUploadStatus({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .rejects.toMatchObject({ httpStatus: 409, code: 'presentation_media_proof_session_closed' });
+  expect(deps.sleep.mock.calls.map(([ms]) => ms)).toEqual([2_000, 8_000]);
+  expect(deps.getByPath).toHaveBeenCalledTimes(3);
+});
+
+test('status reports expiry only after a live 410 and bounded exact-item visibility checks', async () => {
+  const sessionError = Object.assign(new Error('expired'), { status: 410 });
+  const deps = dependencies({ getSessionStatus: jest.fn(async () => { throw sessionError; }) });
+  const started = await begin(deps);
+  await expect(getPresentationMediaProofUploadStatus({ permit: started.permit, profileId: 'profile-1' }, deps))
     .rejects.toMatchObject({ httpStatus: 410, code: 'presentation_media_proof_session_expired' });
+  expect(deps.sleep.mock.calls.map(([ms]) => ms)).toEqual([2_000, 8_000]);
+  expect(deps.getByPath).toHaveBeenCalledTimes(3);
+});
+
+test('a closed session becomes finalizable when the exact full-size item appears during bounded visibility checks', async () => {
+  const committed = { driveId: 'drive-1', id: 'item-1', name: `${PROOF_ID}.mp4`, size: PROOF_MIN_BYTES };
+  const sessionError = Object.assign(new Error('gone'), { status: 404 });
+  const deps = dependencies({
+    getSessionStatus: jest.fn(async () => { throw sessionError; }),
+    getByPath: jest.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(committed),
+  });
+  const started = await begin(deps);
+  await expect(getPresentationMediaProofUploadStatus({ permit: started.permit, profileId: 'profile-1' }, deps))
+    .resolves.toMatchObject({ complete: true, canFinalize: true });
+  expect(deps.sleep.mock.calls.map(([ms]) => ms)).toEqual([2_000, 8_000]);
 });
 
 test.each([

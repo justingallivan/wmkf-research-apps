@@ -1,12 +1,14 @@
 /** @jest-environment node */
 
+import { fingerprintPresentationMediaProofFile } from '../../shared/utils/presentation-media-proof-upload';
 import {
-  fingerprintPresentationMediaProofFile,
+  GRAPH_UPLOAD_DEFAULT_CHUNK_BYTES,
   nextExpectedStart,
-  uploadPresentationMediaProofFile,
-} from '../../shared/utils/presentation-media-proof-upload';
+  uploadBrowserDirectGraphFile,
+  withGraphBrowserUploadLock,
+} from '../../shared/utils/graph-browser-upload';
 
-const CHUNK = 320 * 1024;
+const CHUNK = GRAPH_UPLOAD_DEFAULT_CHUNK_BYTES;
 
 function fakeFile(size) {
   return {
@@ -15,171 +17,446 @@ function fakeFile(size) {
   };
 }
 
-function response(status, body = {}) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: jest.fn(async () => body),
-  };
-}
-
-test('parses the first resumable range and falls back when absent', () => {
-  expect(nextExpectedStart(['655360-'], 7)).toBe(655360);
-  expect(nextExpectedStart([], 7)).toBe(7);
-  expect(nextExpectedStart(['bad'], 7)).toBe(7);
-});
-
-test('uploads sequential 320 KiB-aligned fragments directly to the supplied URL', async () => {
-  const file = fakeFile(CHUNK * 2 + 17);
-  const fetchImpl = jest.fn()
-    .mockResolvedValueOnce(response(202, { nextExpectedRanges: [`${CHUNK}-`] }))
-    .mockResolvedValueOnce(response(202, { nextExpectedRanges: [`${CHUNK * 2}-`] }))
-    .mockResolvedValueOnce(response(201, { id: 'item' }));
-  const progress = jest.fn();
-
-  await expect(uploadPresentationMediaProofFile({
-    file,
-    uploadUrl: 'https://upload.example/session',
-    chunkBytes: CHUNK,
-    fetchImpl,
-    onProgress: progress,
-  })).resolves.toEqual({ complete: true, paused: false, nextStart: file.size });
-
-  expect(fetchImpl).toHaveBeenCalledTimes(3);
-  expect(fetchImpl.mock.calls.map(([, init]) => init.headers['Content-Range'])).toEqual([
-    `bytes 0-${CHUNK - 1}/${file.size}`,
-    `bytes ${CHUNK}-${CHUNK * 2 - 1}/${file.size}`,
-    `bytes ${CHUNK * 2}-${file.size - 1}/${file.size}`,
-  ]);
-  expect(fetchImpl.mock.calls.every(([url]) => url === 'https://upload.example/session')).toBe(true);
-  expect(progress).toHaveBeenLastCalledWith({ uploaded: file.size, total: file.size });
-});
-
-test('uses XMLHttpRequest in the browser so the user agent supplies Content-Length', async () => {
-  const file = fakeFile(CHUNK + 7);
-  const requests = [];
-  const responses = [
-    { status: 202, body: { nextExpectedRanges: [`${CHUNK}-`] } },
-    { status: 201, body: { id: 'item' } },
-  ];
-  const xhrFactory = jest.fn(() => {
-    const responseValue = responses.shift();
+function xhrFactoryFor(steps, requests = []) {
+  return jest.fn(() => {
+    const step = steps.shift();
     const xhr = {
       status: 0,
       responseText: '',
+      timeout: null,
       headers: {},
       upload: {},
       open: jest.fn((method, url, async) => { requests.push({ xhr, method, url, async }); }),
       setRequestHeader: jest.fn((name, value) => { xhr.headers[name] = value; }),
+      getResponseHeader: jest.fn((name) => (name === 'Retry-After' ? step?.retryAfter : null)),
+      abort: jest.fn(() => xhr.onabort?.()),
       send: jest.fn((body) => {
         xhr.body = body;
-        xhr.upload.onprogress({ lengthComputable: true, loaded: body.size / 2, total: body.size });
-        xhr.status = responseValue.status;
-        xhr.responseText = JSON.stringify(responseValue.body);
+        step?.onSend?.(xhr, body);
+        if (step?.kind === 'stall') return;
+        if (step?.kind === 'network') return queueMicrotask(() => xhr.onerror());
+        for (const loaded of step?.progress || [body.size]) {
+          xhr.upload.onprogress?.({ loaded, total: body.size, lengthComputable: true });
+        }
+        xhr.upload.onload?.();
+        if (step?.kind === 'response-stall') return;
+        xhr.status = step.status;
+        xhr.responseText = JSON.stringify(step.body || {});
         queueMicrotask(() => xhr.onload());
       }),
-      abort: jest.fn(() => xhr.onabort()),
     };
     return xhr;
   });
+}
 
-  await expect(uploadPresentationMediaProofFile({
+function openStatus(offset, overrides = {}) {
+  return {
+    complete: false,
+    uploadUrl: 'https://upload.example/session',
+    nextExpectedRanges: [`${offset}-`],
+    expiresAt: '2026-09-25T20:00:00.000Z',
+    ...overrides,
+  };
+}
+
+test('the code-owned default is 10 MiB and the parser accepts only sequential range syntax', () => {
+  expect(CHUNK).toBe(10 * 1024 * 1024);
+  expect(CHUNK % (320 * 1024)).toBe(0);
+  expect(nextExpectedStart(['655360-'])).toBe(655360);
+  expect(nextExpectedStart(['655360-700000'])).toBe(655360);
+  expect(() => nextExpectedStart([])).toThrow(expect.objectContaining({ code: 'graph_upload_range_invalid' }));
+  expect(() => nextExpectedStart(['bad'])).toThrow(expect.objectContaining({ code: 'graph_upload_range_invalid' }));
+});
+
+test('uploads sequential 10 MiB ranges, allows only the final remainder, and verifies final commit through status', async () => {
+  const file = fakeFile(CHUNK * 2 + 17);
+  const requests = [];
+  const xhrFactory = xhrFactoryFor([
+    { status: 202, body: { nextExpectedRanges: [`${CHUNK}-`], expirationDateTime: '2026-09-25T18:00:00.000Z' } },
+    { status: 202, body: { nextExpectedRanges: [`${CHUNK * 2}-`], expirationDateTime: '2026-09-25T19:00:00.000Z' } },
+    { status: 201, body: { id: 'item-1' } },
+  ], requests);
+  const authorizeStatus = jest.fn(async () => ({ complete: true }));
+  const states = [];
+  let clock = 0;
+
+  await expect(uploadBrowserDirectGraphFile({
     file,
     uploadUrl: 'https://upload.example/session',
-    chunkBytes: CHUNK,
     xhrFactory,
-  })).resolves.toEqual({ complete: true, paused: false, nextStart: file.size });
+    authorizeStatus,
+    onState: (state) => states.push(state),
+    now: () => { clock += 1_000; return clock; },
+  })).resolves.toMatchObject({ complete: true, nextStart: file.size });
 
-  expect(requests).toHaveLength(2);
-  expect(requests.map(({ method, url, async }) => ({ method, url, async }))).toEqual([
-    { method: 'PUT', url: 'https://upload.example/session', async: true },
-    { method: 'PUT', url: 'https://upload.example/session', async: true },
+  expect(requests.map(({ xhr }) => xhr.headers['Content-Range'])).toEqual([
+    `bytes 0-${CHUNK - 1}/${file.size}`,
+    `bytes ${CHUNK}-${CHUNK * 2 - 1}/${file.size}`,
+    `bytes ${CHUNK * 2}-${file.size - 1}/${file.size}`,
   ]);
+  expect(requests.map(({ xhr }) => xhr.body.size)).toEqual([CHUNK, CHUNK, 17]);
+  expect(requests.every(({ xhr }) => xhr.timeout === 0)).toBe(true);
+  expect(authorizeStatus).toHaveBeenCalledWith(expect.objectContaining({ reason: 'final_commit', status: 201 }));
+  expect(states.at(-1)).toMatchObject({ phase: 'complete', confirmedBytes: file.size, percent: 100, etaSeconds: 0 });
+});
+
+test('XHR progress is in-flight only; a 202 range makes bytes confirmed and produces rate/ETA after a meaningful sample', async () => {
+  const file = fakeFile(CHUNK * 2);
+  const states = [];
+  let pause = false;
+  const xhrFactory = xhrFactoryFor([
+    {
+      status: 202,
+      progress: [CHUNK / 2],
+      body: { nextExpectedRanges: [`${CHUNK}-`], expirationDateTime: '2026-09-25T18:00:00.000Z' },
+      onSend: () => { pause = true; },
+    },
+  ]);
+  let clock = 0;
+  const result = await uploadBrowserDirectGraphFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory,
+    authorizeStatus: jest.fn(),
+    shouldPause: () => pause,
+    onState: (state) => states.push(state),
+    now: () => { clock += 1_000; return clock; },
+  });
+
+  const inFlight = states.find((state) => state.inFlightBytes === CHUNK / 2);
+  expect(inFlight).toMatchObject({ phase: 'pausing', confirmedBytes: 0, percent: 0, etaSeconds: null });
+  expect(states.some((state) => state.confirmedBytes === CHUNK && state.mbps > 0 && state.etaSeconds > 0)).toBe(true);
+  expect(result).toMatchObject({ complete: false, paused: true, reason: 'requested', nextStart: CHUNK });
+});
+
+test('a network ambiguity reauthorizes before retry and accepts Graph-confirmed cross-device progress', async () => {
+  const file = fakeFile(CHUNK * 2);
+  const requests = [];
+  const states = [];
+  let clock = 0;
+  const xhrFactory = xhrFactoryFor([
+    { kind: 'network', onSend: () => { clock = 1_000; } },
+    { status: 201, onSend: () => { clock = 3_000; } },
+  ], requests);
+  const authorizeStatus = jest.fn()
+    .mockResolvedValueOnce(openStatus(CHUNK))
+    .mockResolvedValueOnce({ complete: true });
+
+  await expect(uploadBrowserDirectGraphFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory,
+    authorizeStatus,
+    sleep: jest.fn(async () => {}),
+    onState: (state) => states.push(state),
+    now: () => clock,
+  })).resolves.toMatchObject({ complete: true });
+
   expect(requests.map(({ xhr }) => xhr.headers['Content-Range'])).toEqual([
     `bytes 0-${CHUNK - 1}/${file.size}`,
     `bytes ${CHUNK}-${file.size - 1}/${file.size}`,
   ]);
-  expect(requests.map(({ xhr }) => xhr.body)).toEqual([
-    { start: 0, end: CHUNK, size: CHUNK },
-    { start: CHUNK, end: file.size, size: 7 },
-  ]);
-  expect(requests.every(({ xhr }) => xhr.timeout === 60_000)).toBe(true);
+  expect(authorizeStatus.mock.calls[0][0]).toMatchObject({ reason: 'graph_upload_network_error', confirmedBytes: 0 });
+  expect(states.at(-1).confirmedBytes).toBe(file.size);
+  expect(states.at(-1).mbps).toBeCloseTo((8 * CHUNK) / 2_000 / 1_000);
 });
 
-test('reports in-fragment XHR progress and rejects a timed-out fragment', async () => {
+test('three ambiguous attempts without Graph-confirmed progress pause instead of spinning', async () => {
   const file = fakeFile(CHUNK);
-  const progress = jest.fn();
-  const progressXhr = {
-    status: 202,
-    responseText: JSON.stringify({ nextExpectedRanges: [`${CHUNK}-`] }),
-    upload: {},
-    open: jest.fn(),
-    setRequestHeader: jest.fn(),
-    send: jest.fn(function send(body) {
-      this.upload.onprogress({ lengthComputable: true, loaded: body.size / 2, total: body.size });
-      this.status = 201;
-      this.responseText = '{}';
-      queueMicrotask(() => this.onload());
-    }),
-    abort: jest.fn(),
-  };
-  await uploadPresentationMediaProofFile({
-    file,
-    uploadUrl: 'https://upload.example/session',
-    chunkBytes: CHUNK,
-    xhrFactory: () => progressXhr,
-    onProgress: progress,
-    fragmentTimeoutMs: 1234,
-  });
-  expect(progressXhr.timeout).toBe(1234);
-  expect(progress).toHaveBeenCalledWith({ uploaded: CHUNK / 2, total: CHUNK });
-  expect(progress).toHaveBeenLastCalledWith({ uploaded: CHUNK, total: CHUNK });
+  const requests = [];
+  const xhrFactory = xhrFactoryFor([
+    { status: 503 }, { status: 503 }, { status: 503 },
+  ], requests);
+  const authorizeStatus = jest.fn(async () => openStatus(0));
+  const sleep = jest.fn(async () => {});
 
-  const timeoutXhr = {
-    upload: {},
-    open: jest.fn(),
-    setRequestHeader: jest.fn(),
-    send: jest.fn(function send() { queueMicrotask(() => this.ontimeout()); }),
-    abort: jest.fn(),
-  };
-  await expect(uploadPresentationMediaProofFile({
+  await expect(uploadBrowserDirectGraphFile({
     file,
     uploadUrl: 'https://upload.example/session',
-    chunkBytes: CHUNK,
-    xhrFactory: () => timeoutXhr,
-  })).rejects.toThrow('fragment timed out');
+    xhrFactory,
+    authorizeStatus,
+    sleep,
+    random: () => 0.5,
+  })).resolves.toMatchObject({ complete: false, paused: true, reason: 'retry_exhausted', nextStart: 0 });
+  expect(requests).toHaveLength(3);
+  expect(authorizeStatus).toHaveBeenCalledTimes(3);
+  expect(sleep).toHaveBeenCalledTimes(2);
 });
 
-test('pauses only at a committed chunk boundary and rejects invalid progress', async () => {
+test('416 reconciles status before continuing and never starts a replacement upload', async () => {
   const file = fakeFile(CHUNK * 2);
-  let pause = false;
-  const fetchImpl = jest.fn(async () => {
-    pause = true;
-    return response(202, { nextExpectedRanges: [`${CHUNK}-`] });
+  const requests = [];
+  const xhrFactory = xhrFactoryFor([
+    { status: 416 },
+    { status: 201 },
+  ], requests);
+  const authorizeStatus = jest.fn()
+    .mockResolvedValueOnce(openStatus(CHUNK))
+    .mockResolvedValueOnce({ complete: true });
+  await expect(uploadBrowserDirectGraphFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory,
+    authorizeStatus,
+  })).resolves.toMatchObject({ complete: true });
+  expect(authorizeStatus.mock.calls[0][0]).toMatchObject({ reason: 'http_416', status: 416 });
+  expect(requests[1].xhr.headers['Content-Range']).toBe(`bytes ${CHUNK}-${file.size - 1}/${file.size}`);
+});
+
+test('an application status-check failure stops automatic retry without spending more fragment attempts', async () => {
+  const file = fakeFile(CHUNK);
+  const requests = [];
+  const xhrFactory = xhrFactoryFor([{ status: 503 }], requests);
+  const appError = Object.assign(new Error('Application temporarily unavailable.'), { status: 503 });
+  const authorizeStatus = jest.fn(async () => { throw appError; });
+  await expect(uploadBrowserDirectGraphFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory,
+    authorizeStatus,
+  })).rejects.toBe(appError);
+  expect(requests).toHaveLength(1);
+});
+
+test('429 honors Retry-After before status and resets bounded retry state after confirmed progress', async () => {
+  const file = fakeFile(CHUNK * 2);
+  const requests = [];
+  const xhrFactory = xhrFactoryFor([
+    { status: 429, retryAfter: '2' },
+    { status: 202, body: { nextExpectedRanges: [`${CHUNK}-`] } },
+    { status: 201 },
+  ], requests);
+  const authorizeStatus = jest.fn()
+    .mockResolvedValueOnce(openStatus(0))
+    .mockResolvedValueOnce({ complete: true });
+  const sleep = jest.fn(async () => {});
+
+  await uploadBrowserDirectGraphFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory,
+    authorizeStatus,
+    sleep,
   });
-  await expect(uploadPresentationMediaProofFile({
-    file,
-    uploadUrl: 'https://upload.example/session',
-    chunkBytes: CHUNK,
-    fetchImpl,
-    shouldPause: () => pause,
-  })).resolves.toEqual({ complete: false, paused: true, nextStart: CHUNK });
-  expect(fetchImpl).toHaveBeenCalledTimes(1);
+  expect(sleep).toHaveBeenCalledWith(2_000, undefined);
+  expect(requests).toHaveLength(3);
+});
 
-  await expect(uploadPresentationMediaProofFile({
+test('the third consecutive 429 pauses and requires a fresh manual Resume status check', async () => {
+  const file = fakeFile(CHUNK);
+  const xhrFactory = xhrFactoryFor([
+    { status: 429, retryAfter: '1' },
+    { status: 429, retryAfter: '1' },
+    { status: 429, retryAfter: '1' },
+  ]);
+  const authorizeStatus = jest.fn(async () => openStatus(0));
+  const sleep = jest.fn(async () => {});
+  await expect(uploadBrowserDirectGraphFile({
     file,
     uploadUrl: 'https://upload.example/session',
-    chunkBytes: CHUNK,
-    fetchImpl: jest.fn(async () => response(202, { nextExpectedRanges: ['0-'] })),
-  })).rejects.toThrow('invalid next upload range');
+    xhrFactory,
+    authorizeStatus,
+    sleep,
+    maxNoProgressAttempts: 10,
+  })).resolves.toMatchObject({ complete: false, paused: true, reason: 'throttled' });
+  expect(authorizeStatus).toHaveBeenCalledTimes(2);
+  expect(sleep).toHaveBeenCalledTimes(2);
+});
 
-  await expect(uploadPresentationMediaProofFile({
+test('aborting during retry backoff cancels the timer and preserves the resumable outcome', async () => {
+  jest.useFakeTimers();
+  try {
+    const controller = new AbortController();
+    const pending = uploadBrowserDirectGraphFile({
+      file: fakeFile(CHUNK),
+      uploadUrl: 'https://upload.example/session',
+      xhrFactory: xhrFactoryFor([{ status: 503 }]),
+      authorizeStatus: jest.fn(async () => openStatus(0)),
+      signal: controller.signal,
+      random: () => 0.5,
+    });
+    await jest.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(jest.getTimerCount()).toBe(0);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('continuous XHR progress avoids the inactivity watchdog while a true stall reconciles through status', async () => {
+  jest.useFakeTimers();
+  try {
+    const file = fakeFile(CHUNK);
+    const healthyFactory = jest.fn(() => {
+      const xhr = {
+        status: 0, responseText: '', upload: {}, open: jest.fn(), setRequestHeader: jest.fn(),
+        getResponseHeader: jest.fn(), abort: jest.fn(() => xhr.onabort?.()),
+        send: jest.fn((body) => {
+          setTimeout(() => xhr.upload.onprogress({ loaded: body.size / 2 }), 5);
+          setTimeout(() => xhr.upload.onprogress({ loaded: body.size }), 10);
+          setTimeout(() => xhr.upload.onload(), 12);
+          setTimeout(() => { xhr.status = 201; xhr.onload(); }, 15);
+        }),
+      };
+      return xhr;
+    });
+    const healthy = uploadBrowserDirectGraphFile({
+      file,
+      uploadUrl: 'https://upload.example/session',
+      xhrFactory: healthyFactory,
+      authorizeStatus: jest.fn(async () => ({ complete: true })),
+      stallTimeoutMs: 8,
+      responseTimeoutMs: 8,
+    });
+    await jest.advanceTimersByTimeAsync(20);
+    await expect(healthy).resolves.toMatchObject({ complete: true });
+
+    const stalledFactory = xhrFactoryFor([{ kind: 'stall' }]);
+    const stalled = uploadBrowserDirectGraphFile({
+      file,
+      uploadUrl: 'https://upload.example/session',
+      xhrFactory: stalledFactory,
+      authorizeStatus: jest.fn(async () => openStatus(0)),
+      stallTimeoutMs: 8,
+      responseTimeoutMs: 8,
+      maxNoProgressAttempts: 1,
+    });
+    await jest.advanceTimersByTimeAsync(10);
+    await expect(stalled).resolves.toMatchObject({ complete: false, paused: true, reason: 'retry_exhausted' });
+
+    const responseStalledFactory = xhrFactoryFor([{ kind: 'response-stall', status: 0 }]);
+    const responseStalled = uploadBrowserDirectGraphFile({
+      file,
+      uploadUrl: 'https://upload.example/session',
+      xhrFactory: responseStalledFactory,
+      authorizeStatus: jest.fn(async () => openStatus(0)),
+      stallTimeoutMs: 8,
+      responseTimeoutMs: 8,
+      maxNoProgressAttempts: 1,
+    });
+    await jest.advanceTimersByTimeAsync(10);
+    await expect(responseStalled).resolves.toMatchObject({ complete: false, paused: true, reason: 'retry_exhausted' });
+
+    const duplicateProgressFactory = jest.fn(() => {
+      const xhr = {
+        status: 0, responseText: '', upload: {}, open: jest.fn(), setRequestHeader: jest.fn(),
+        getResponseHeader: jest.fn(), abort: jest.fn(() => {
+          xhr.upload.onprogress?.({ loaded: 2 });
+          xhr.upload.onload?.();
+          xhr.onabort?.();
+        }),
+        send: jest.fn(() => {
+          setTimeout(() => xhr.upload.onprogress({ loaded: 1 }), 1);
+          setTimeout(() => xhr.upload.onprogress({ loaded: 1 }), 5);
+          setTimeout(() => xhr.upload.onprogress({ loaded: 0 }), 7);
+        }),
+      };
+      return xhr;
+    });
+    const duplicateProgressStall = uploadBrowserDirectGraphFile({
+      file,
+      uploadUrl: 'https://upload.example/session',
+      xhrFactory: duplicateProgressFactory,
+      authorizeStatus: jest.fn(async () => openStatus(0)),
+      stallTimeoutMs: 8,
+      responseTimeoutMs: 8,
+      maxNoProgressAttempts: 1,
+    });
+    await jest.advanceTimersByTimeAsync(10);
+    await expect(duplicateProgressStall).resolves.toMatchObject({
+      complete: false, paused: true, reason: 'retry_exhausted',
+    });
+    expect(jest.getTimerCount()).toBe(0);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('a 202 that reaches the declared size still requires exact-item verification', async () => {
+  const file = fakeFile(CHUNK);
+  const xhrFactory = xhrFactoryFor([{ status: 202, body: { nextExpectedRanges: [`${CHUNK}-`] } }]);
+  const authorizeStatus = jest.fn(async () => ({ complete: true }));
+  await expect(uploadBrowserDirectGraphFile({
     file,
     uploadUrl: 'https://upload.example/session',
-    start: CHUNK * 3,
-    chunkBytes: CHUNK,
-    fetchImpl,
-  })).rejects.toThrow('resume position is invalid');
+    xhrFactory,
+    authorizeStatus,
+  })).resolves.toMatchObject({ complete: true, nextStart: file.size });
+  expect(authorizeStatus).toHaveBeenCalledWith(expect.objectContaining({ reason: 'all_ranges_reported' }));
+});
+
+test('a contradictory final response cannot double-count one logical range in throughput', async () => {
+  const file = fakeFile(CHUNK);
+  let clock = 0;
+  const states = [];
+  const xhrFactory = xhrFactoryFor([
+    { status: 201, onSend: () => { clock = 1_000; } },
+    { status: 201, onSend: () => { clock = 3_000; } },
+  ]);
+  const authorizeStatus = jest.fn()
+    .mockResolvedValueOnce(openStatus(0))
+    .mockResolvedValueOnce({ complete: true });
+  await uploadBrowserDirectGraphFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory,
+    authorizeStatus,
+    onState: (state) => states.push(state),
+    now: () => clock,
+  });
+  expect(states.at(-1).mbps).toBeCloseTo((8 * CHUNK) / 2_000 / 1_000);
+});
+
+test('offline waiting does not spend the no-progress fragment budget', async () => {
+  const file = fakeFile(CHUNK);
+  let online = false;
+  const waitForOnline = jest.fn(async () => { online = true; return true; });
+  const authorizeStatus = jest.fn()
+    .mockResolvedValueOnce(openStatus(0))
+    .mockResolvedValueOnce({ complete: true });
+  const xhrFactory = xhrFactoryFor([{ status: 201 }]);
+  await expect(uploadBrowserDirectGraphFile({
+    file,
+    uploadUrl: 'https://upload.example/session',
+    xhrFactory,
+    authorizeStatus,
+    isOnline: () => online,
+    waitForOnline,
+    maxNoProgressAttempts: 1,
+  })).resolves.toMatchObject({ complete: true });
+  expect(waitForOnline).toHaveBeenCalledTimes(1);
+});
+
+test('malformed, backward, and beyond-fragment 202 ranges fail closed', async () => {
+  const file = fakeFile(CHUNK * 2);
+  for (const range of ['bad', '0-', `${CHUNK + 1}-`]) {
+    const xhrFactory = xhrFactoryFor([{ status: 202, body: { nextExpectedRanges: [range] } }]);
+    await expect(uploadBrowserDirectGraphFile({
+      file,
+      uploadUrl: 'https://upload.example/session',
+      xhrFactory,
+      authorizeStatus: jest.fn(),
+    })).rejects.toMatchObject({ code: 'graph_upload_range_invalid' });
+  }
+});
+
+test('same-browser lock refuses a second tab and never runs its PUT task', async () => {
+  const task = jest.fn();
+  const locks = { request: jest.fn(async (_name, options, callback) => {
+    expect(options).toEqual({ mode: 'exclusive', ifAvailable: true });
+    return callback(null);
+  }) };
+  await expect(withGraphBrowserUploadLock('intent-1', task, locks))
+    .rejects.toMatchObject({ code: 'graph_upload_lock_unavailable' });
+  expect(task).not.toHaveBeenCalled();
+});
+
+test('same-browser locking fails closed when the Web Locks API is unavailable', async () => {
+  const task = jest.fn();
+  await expect(withGraphBrowserUploadLock('intent-1', task, null))
+    .rejects.toMatchObject({ code: 'graph_upload_lock_unsupported' });
+  expect(task).not.toHaveBeenCalled();
 });
 
 test('resume fingerprint binds size and both file edges without reading middle bytes', async () => {
@@ -192,12 +469,10 @@ test('resume fingerprint binds size and both file edges without reading middle b
   });
   const original = await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle);
   bytes[0] = 1;
-  const firstChanged = await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle);
-  expect(firstChanged).not.toBe(original);
+  expect(await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle)).not.toBe(original);
   bytes[0] = 0;
   bytes[size - 1] = 1;
-  const lastChanged = await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle);
-  expect(lastChanged).not.toBe(original);
+  expect(await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle)).not.toBe(original);
   bytes[size - 1] = 0;
   bytes[1_500_000] = 1;
   expect(await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle)).toBe(original);
