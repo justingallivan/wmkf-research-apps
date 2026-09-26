@@ -216,7 +216,7 @@ describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
     createReviewsSandboxDeps.mockReturnValue({
       createPerson,
       createSuggestion,
-      getPersonById: jest.fn(),
+      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
       getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
     });
     client.get = jest.fn(async () => ({ ok: true, status: 200, body: { akoya_requestnum: '1000', akoya_title: 'x', wmkf_meetingdate: '2026-12-01' }, text: '' }));
@@ -320,7 +320,7 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
         wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane', wmkf_lastname: 'Reviewer',
         wmkf_emailaddress: 'throwaway@example.test',
         wmkf_areaofexpertise: 'Genomics', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
-        wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University',
+        wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
         wmkf_issyntheticreviewer: true, statecode: 0, _wmkf_contact_value: null,
       })),
       createSuggestion: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
@@ -383,13 +383,54 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('reviewer_person_projection_drift');
   });
+
+  it('a lease_lost is reported when the lease is lost before the person resource can be completed', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const { ledger } = createFakeLedger(run, { assignments });
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson: jest.fn(),
+      getPersonById: jest.fn(async () => ({
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: 'Genomics',
+        wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor', wmkf_primarydepartment: 'Biology',
+        wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
+        wmkf_issyntheticreviewer: true, statecode: 0, _wmkf_contact_value: null,
+      })),
+      createSuggestion: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
+      getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
+    });
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+    // Steal the lease right after the person resource is journaled recovered,
+    // simulating a concurrent worker taking over between the person and
+    // suggestion phases of the same --advance call.
+    const originalRecordResourceReadback = ledger.recordResourceReadback;
+    let stolen = false;
+    ledger.recordResourceReadback = async (args) => {
+      const result = await originalRecordResourceReadback(args);
+      if (!stolen && args.outcome === 'recovered') {
+        stolen = true;
+        const current = await ledger.getRun(RUN_ID);
+        await ledger.releaseLease({ runId: RUN_ID, leaseToken: current.leaseToken, leaseGeneration: current.leaseGeneration });
+      }
+      return result;
+    };
+
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('lease_lost');
+  });
 });
 
 describe('stepSeedReviewAnswers', () => {
   async function seededLedger(assignments, { reviewForm = 'uploaded', answers } = {}) {
     const bundle = bundleWithOneReviewer({ reviewer: { reviewForm, ...(answers !== undefined ? { answers } : {}) } });
     const { run, manifest } = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 });
-    const { ledger } = createFakeLedger(run, { assignments });
+    const { ledger, calls } = createFakeLedger(run, { assignments });
     // Pre-seed the seed_reviewers suggestion resource as already verified.
     const resource = await ledger.journalPlannedResource({
       step: 'seed_reviewers', resourceKind: 'dataverse_reviewer_suggestion', system: 'dataverse',
@@ -397,7 +438,7 @@ describe('stepSeedReviewAnswers', () => {
     });
     await ledger.recordResourceReadback({ resourceId: resource.resourceId, readback: { suggestionId: SUGGESTION_A }, outcome: 'verified' });
     return {
-      ledger, bundle, run, manifest,
+      ledger, bundle, run, manifest, calls,
     };
   }
 
@@ -496,5 +537,286 @@ describe('stepSeedReviewAnswers', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('reviewer_answers_ambiguous');
+  });
+
+  it('P2-1: a changeset resume with the marker set and wmkf_reviewreceivedat null ends reviewer_answers_ambiguous, runChangeset never called', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const { ledger, bundle } = await seededLedger(assignments);
+    // Pre-seed the answers resource with a dispatched-but-unconfirmed changeset attempt.
+    const resources = await ledger.listRunResources();
+    const answerResource = resources.find((r) => r.resourceKind === 'dataverse_review_answer_set');
+    await ledger.journalPlannedResource({
+      step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+      plannedIdentity: { assignmentSequence: 1, suggestionId: SUGGESTION_A, reviewForm: 'uploaded', answerCount: 1 },
+    });
+    // Replace with a resource carrying the attempt marker (simulating a crash after dispatch, before readback).
+    const preResources = await ledger.listRunResources();
+    const planned = preResources[preResources.length - 1];
+    await ledger.recordResourceReadback({
+      resourceId: planned.resourceId, readback: { changesetAttemptedAt: '2026-01-01T00:00:00Z', eTagBefore: 'W/"1"' }, outcome: 'dispatched',
+    });
+    const runChangeset = jest.fn();
+    const getSuggestionById = jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, wmkf_reviewreceivedat: null, _etag: 'W/"2"' }));
+    createReviewsSandboxDeps.mockReturnValue({ runChangeset, getSuggestionById });
+
+    const manifestForRun = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 }).manifest;
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest: manifestForRun, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviewer_answers_ambiguous');
+    expect(runChangeset).not.toHaveBeenCalled();
+  });
+
+  it('a lease_lost is reported when the lease is lost before the answers resource can be completed', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const { ledger, bundle } = await seededLedger(assignments);
+    const runChangeset = jest.fn(async () => ({ ok: true }));
+    const getSuggestionById = jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' }));
+    createReviewsSandboxDeps.mockReturnValue({ runChangeset, getSuggestionById });
+    // Steal the lease between claim and completion by claiming it a second
+    // time out from under the run (simulated: bump the run's lease directly).
+    const originalRecordResourceReadback = ledger.recordResourceReadback;
+    let stolen = false;
+    ledger.recordResourceReadback = async (args) => {
+      if (!stolen && args.readback && 'answerCount' in (args.readback || {})) {
+        stolen = true;
+        await ledger.releaseLease({ runId: RUN_ID, leaseToken: (await ledger.getRun(RUN_ID)).leaseToken, leaseGeneration: (await ledger.getRun(RUN_ID)).leaseGeneration });
+      }
+      return originalRecordResourceReadback(args);
+    };
+    const manifestForRun = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 }).manifest;
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest: manifestForRun, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('lease_lost');
+  });
+});
+
+describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on one shared call log', () => {
+  it('person: recordResourceReadback(personCreateAttemptedAt, dispatched) precedes createPerson', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger, calls } = createFakeLedger(run, { assignments });
+    const createPerson = jest.fn(async () => {
+      calls.push({ op: 'createPerson' });
+      return { wmkf_potentialreviewersid: DEST_PERSON_A };
+    });
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson,
+      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
+      createSuggestion: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
+      getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
+    });
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+
+    await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    const markerIndex = calls.findIndex((c) => c.op === 'recordResourceReadback' && c.readback?.personCreateAttemptedAt && c.outcome === 'dispatched');
+    const createIndex = calls.findIndex((c) => c.op === 'createPerson');
+    expect(markerIndex).toBeGreaterThanOrEqual(0);
+    expect(createIndex).toBeGreaterThan(markerIndex);
+  });
+
+  it('mutation guard: deleting personCreateAttemptedAt from the marker readback is caught (dispatched marker must carry it)', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger, calls } = createFakeLedger(run, { assignments });
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A })),
+      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
+      createSuggestion: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
+      getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
+    });
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+    await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    const markerCall = calls.find((c) => c.op === 'recordResourceReadback' && c.readback?.personCreateAttemptedAt);
+    expect(markerCall).toBeDefined();
+    expect(markerCall.outcome).toBe('dispatched');
+  });
+
+  it('suggestion: recordResourceReadback(suggestionCreateAttemptedAt, dispatched) precedes createSuggestion', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger, calls } = createFakeLedger(run, { assignments });
+    const createSuggestion = jest.fn(async () => {
+      calls.push({ op: 'createSuggestion' });
+      return { wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' };
+    });
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson: jest.fn(),
+      getPersonById: jest.fn(async () => ({
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: 'Genomics',
+        wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor', wmkf_primarydepartment: 'Biology',
+        wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
+        wmkf_issyntheticreviewer: true, statecode: 0, _wmkf_contact_value: null,
+      })),
+      createSuggestion,
+      getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
+    });
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+
+    await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    const markerIndex = calls.findIndex((c) => c.op === 'recordResourceReadback' && c.readback?.suggestionCreateAttemptedAt && c.outcome === 'dispatched');
+    const createIndex = calls.findIndex((c) => c.op === 'createSuggestion');
+    expect(markerIndex).toBeGreaterThanOrEqual(0);
+    expect(createIndex).toBeGreaterThan(markerIndex);
+  });
+
+  it('changeset: recordResourceReadback(changesetAttemptedAt, dispatched) precedes runChangeset', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer({ reviewer: { reviewForm: 'received_no_file', answers: [], files: [] } });
+    const { run, manifest } = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 });
+    const { ledger, calls } = createFakeLedger(run, { assignments });
+    const resource = await ledger.journalPlannedResource({
+      step: 'seed_reviewers', resourceKind: 'dataverse_reviewer_suggestion', system: 'dataverse',
+      plannedIdentity: { assignmentSequence: 1, suggestionId: SUGGESTION_A, destinationPersonId: DEST_PERSON_A },
+    });
+    await ledger.recordResourceReadback({ resourceId: resource.resourceId, readback: { suggestionId: SUGGESTION_A }, outcome: 'verified' });
+    const runChangeset = jest.fn(async () => {
+      calls.push({ op: 'runChangeset' });
+      return { ok: true };
+    });
+    createReviewsSandboxDeps.mockReturnValue({
+      runChangeset, getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
+    });
+    await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    const markerIndex = calls.findIndex((c) => c.op === 'recordResourceReadback' && c.readback?.changesetAttemptedAt && c.outcome === 'dispatched');
+    const dispatchIndex = calls.findIndex((c) => c.op === 'runChangeset');
+    expect(markerIndex).toBeGreaterThanOrEqual(0);
+    expect(dispatchIndex).toBeGreaterThan(markerIndex);
+  });
+});
+
+describe('P2-1: suggestion ambiguous-recovery covers both the owned and not-owned outcomes', () => {
+  it('owned path: create throws, the row exists and IS owned -> recovers to verified without re-dispatch', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger } = createFakeLedger(run, { assignments });
+    const createSuggestion = jest.fn(async () => { throw new Error('transient network blip'); });
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson: jest.fn(),
+      getPersonById: jest.fn(async () => ({
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: 'Genomics',
+        wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor', wmkf_primarydepartment: 'Biology',
+        wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
+        wmkf_issyntheticreviewer: true, statecode: 0, _wmkf_contact_value: null,
+      })),
+      createSuggestion,
+      getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
+    });
+    // reused: true for this assignment so createPerson is never reached; use
+    // a reused assignment instead to isolate the suggestion path.
+    assignments[0].reused = true;
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(createSuggestion).toHaveBeenCalledTimes(1);
+    const suggestionResource = result.resources.find((r) => r.resourceKind === 'dataverse_reviewer_suggestion');
+    expect(suggestionResource.outcome).toBe('verified');
+    expect(result.outcome).toBe('advanced');
+  });
+
+  it('not-owned path: create throws, the row exists but is bound to a DIFFERENT person -> reviewer_suggestion_present_not_owned', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger } = createFakeLedger(run, { assignments });
+    const createSuggestion = jest.fn(async () => { throw new Error('transient network blip'); });
+    createReviewsSandboxDeps.mockReturnValue({
+      getPersonById: jest.fn(async () => ({
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: 'Genomics',
+        wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor', wmkf_primarydepartment: 'Biology',
+        wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
+        wmkf_issyntheticreviewer: true, statecode: 0, _wmkf_contact_value: null,
+      })),
+      createSuggestion,
+      // Row exists but bound to a DIFFERENT person than destinationPersonId.
+      getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: '00000000-0000-4000-8000-000000000000', _wmkf_request_value: REQUEST_ID })),
+    });
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviewer_suggestion_present_not_owned');
+  });
+
+  it('resume after reviewer_person_conflict re-reports reviewer_person_conflict, never ambiguous_create_outcome', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger } = createFakeLedger(run, { assignments });
+    // Pre-seed a person resource already marked rejected/reviewer_person_conflict
+    // (simulating a prior --advance that hit the alternate-key conflict).
+    const preResource = await ledger.journalPlannedResource({
+      step: 'seed_reviewers', resourceKind: 'dataverse_potential_reviewer', system: 'dataverse',
+      plannedIdentity: { assignmentSequence: 1, destinationPersonId: DEST_PERSON_A, sourcePersonId: SOURCE_PERSON_A, addressSha256: 'a'.repeat(64) },
+    });
+    await ledger.recordResourceReadback({ resourceId: preResource.resourceId, readback: { personCreateAttemptedAt: '2026-01-01T00:00:00Z' }, outcome: 'dispatched' });
+    await ledger.recordResourceFailure({ resourceId: preResource.resourceId, outcome: 'rejected', error: Object.assign(new Error('conflict'), { code: 'reviewer_person_conflict' }) });
+    const getPersonById = jest.fn(); // must never be consulted on resume of a rejected resource
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson: jest.fn(), getPersonById, createSuggestion: jest.fn(), getSuggestionById: jest.fn(),
+    });
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviewer_person_conflict');
+    expect(getPersonById).not.toHaveBeenCalled();
   });
 });
