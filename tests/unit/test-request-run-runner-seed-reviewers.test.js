@@ -14,10 +14,21 @@
 jest.mock('../../lib/services/test-requests/reviews-sandbox-deps.js', () => ({
   createReviewsSandboxDeps: jest.fn(),
 }));
+// Opus round 2, P2: seed-synthetic-review.js's buildCompletionWrite is a real
+// (pure) function called directly by run-runner.js, not injected through
+// deps -- module-mocked here (real implementation by default, via
+// jest.requireActual) so a single test can force it to throw exactly once,
+// proving the changeset attempt marker is never written when the (pure)
+// build itself fails.
+jest.mock('../../lib/services/reviewer-engagement/seed-synthetic-review.js', () => {
+  const actual = jest.requireActual('../../lib/services/reviewer-engagement/seed-synthetic-review.js');
+  return { ...actual, buildCompletionWrite: jest.fn(actual.buildCompletionWrite) };
+});
 
 const { advanceRun } = require('../../lib/services/test-requests/run-runner.js');
 const { MANIFEST_V4, sha256 } = require('../../lib/services/test-requests/basic-clone-steps.js');
 const { createReviewsSandboxDeps } = require('../../lib/services/test-requests/reviews-sandbox-deps.js');
+const { buildCompletionWrite } = require('../../lib/services/reviewer-engagement/seed-synthetic-review.js');
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -599,6 +610,44 @@ describe('stepSeedReviewAnswers', () => {
     });
     expect(result.outcome).toBe('lease_lost');
   });
+
+  it('Opus round 2, P2: buildCompletionWrite throwing (malformed answer JSON) before the changeset marker leaves no marker; the next --advance dispatches once', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const { ledger, bundle, manifest } = await seededLedger(assignments);
+    const runChangeset = jest.fn(async () => ({ ok: true }));
+    const getSuggestionById = jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' }));
+    createReviewsSandboxDeps.mockReturnValue({ runChangeset, getSuggestionById });
+    // Simulate the real failure mode (a malformed wmkf_answervalues JSON
+    // string in the bundle: seed-synthetic-review.js#parseBundleJsonField
+    // throws) without needing to actually corrupt the fixture -- the pure
+    // build is module-mocked to throw exactly once, then falls back to the
+    // real implementation.
+    buildCompletionWrite.mockImplementationOnce(() => {
+      throw new Error('seed-synthetic-review: bundle wmkf_answervalues is not valid JSON.');
+    });
+
+    const first = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(first.outcome).toBe('needs_attention');
+    expect(runChangeset).not.toHaveBeenCalled();
+    const resourcesAfterFailure = await ledger.listRunResources(RUN_ID);
+    const answerResourceAfterFailure = resourcesAfterFailure.find((r) => r.resourceKind === 'dataverse_review_answer_set');
+    expect(answerResourceAfterFailure?.readback?.changesetAttemptedAt).toBeUndefined();
+
+    const second = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(second.outcome).toBe('advanced');
+    expect(runChangeset).toHaveBeenCalledTimes(1);
+    const answerResource = second.resources.find((r) => r.resourceKind === 'dataverse_review_answer_set');
+    expect(answerResource.outcome).toBe('verified');
+  });
 });
 
 describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on one shared call log', () => {
@@ -818,5 +867,109 @@ describe('P2-1: suggestion ambiguous-recovery covers both the owned and not-owne
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('reviewer_person_conflict');
     expect(getPersonById).not.toHaveBeenCalled();
+  });
+});
+
+describe('Opus round 2, P2: destinationGrantCycleCode throwing before the suggestion marker leaves no marker', () => {
+  it('seed_reviewers: a transient Request-read failure on the first --advance never journals suggestionCreateAttemptedAt; the next --advance dispatches once and ends verified', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger } = createFakeLedger(run, { assignments });
+    const createSuggestion = jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' }));
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A })),
+      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
+      createSuggestion,
+      getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
+    });
+    // First --advance: the destination Request read (destinationGrantCycleCode,
+    // via client.get) fails transiently. The person create/verify has already
+    // committed by the time this throws (person resolution runs first).
+    client.get = jest.fn(async () => { throw new Error('transient Dataverse read failure'); });
+
+    const first = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(first.outcome).toBe('needs_attention');
+    expect(createSuggestion).not.toHaveBeenCalled();
+    const resourcesAfterFailure = await ledger.listRunResources(RUN_ID);
+    const suggestionResourceAfterFailure = resourcesAfterFailure.find((r) => r.resourceKind === 'dataverse_reviewer_suggestion');
+    expect(suggestionResourceAfterFailure?.readback?.suggestionCreateAttemptedAt).toBeUndefined();
+
+    // Second --advance, same ledger/resources: the read now succeeds.
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+    const second = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(second.outcome).toBe('advanced');
+    expect(createSuggestion).toHaveBeenCalledTimes(1);
+    const suggestionResource = second.resources.find((r) => r.resourceKind === 'dataverse_reviewer_suggestion');
+    expect(suggestionResource.outcome).toBe('verified');
+  });
+});
+
+describe('Opus round 2, P3: the person read-back before verified is proven, not assumed', () => {
+  it('createPerson succeeds but the read-back row is missing -> ambiguous_create_outcome, never verified', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger } = createFakeLedger(run, { assignments });
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A })),
+      // The create "succeeded" but the row cannot be read back at all.
+      getPersonById: jest.fn(async () => null),
+      createSuggestion: jest.fn(),
+      getSuggestionById: jest.fn(),
+    });
+
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ambiguous_create_outcome');
+    const resources = await ledger.listRunResources(RUN_ID);
+    const personResource = resources.find((r) => r.resourceKind === 'dataverse_potential_reviewer');
+    expect(personResource.outcome).toBe('ambiguous');
+    expect(personResource.outcome).not.toBe('verified');
+  });
+
+  it('createPerson succeeds but the read-back row has the marker false -> ambiguous_create_outcome, never verified', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger } = createFakeLedger(run, { assignments });
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A })),
+      // The row exists at the preallocated GUID, but is not marked synthetic --
+      // e.g. a real reviewer already occupies this id, or the write silently
+      // failed to set the marker. Either way, never trust it as verified.
+      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: false })),
+      createSuggestion: jest.fn(),
+      getSuggestionById: jest.fn(),
+    });
+
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ambiguous_create_outcome');
+    const resources = await ledger.listRunResources(RUN_ID);
+    const personResource = resources.find((r) => r.resourceKind === 'dataverse_potential_reviewer');
+    expect(personResource.outcome).toBe('ambiguous');
+    expect(personResource.outcome).not.toBe('verified');
   });
 });
