@@ -67,18 +67,21 @@ dashboard; cycle scoping is in Production since 2026-09-06 (merge `842c9f13`, de
 
 **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Wave 22 defines explicit group/leadership transition actor/time fields, and `FINAL_WRITEUP_SCHEMA_READY` conditionally extends the adapter projection. The owner-authorized apply/readback reported 4 exact / 0 absent / 0 divergent; Production readiness is now literal `on` in Ready deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ` on `ebb147bb`. The Slice 1 service and route create/reclaim one deterministic Final row over the exact same SharePoint drive/item, then atomically move the source lifecycle to Final, ready the Final row in Review, store the explicit group-review actor/time, retain `wmkf_CurrentPreSiteVisit`, and set `wmkf_CurrentFinalWriteup`. Authorized Request `1002788` proved this contract: current Final row `b6d6220b-f0a4-f111-b8dd-70a8a59cded0` points to source/current Pre-Site row `7b059a2f-19a3-f111-b8dd-000d3a5bbe46`; both reference the same SharePoint item/version/hash/size and the Final row records Justin Gallivan at `2026-08-31T03:57:20Z`. No Graph copy/upload occurred.
 
-**[SOURCE-BUILT 2026-09-25 on `codex/feature-request`; NOT APPLIED OR DEPLOYED.]**
-Wave 30 additively defines optional `wmkf_ExternalUrl` (URL String, 2,000
+**[SOURCE-BUILT 2026-09-25 on `codex/feature-request`; APPLIED TO SANDBOX DATAVERSE ONLY; NOT
+DEPLOYED OR APPLIED TO PRODUCTION.]** Wave 30 additively defines optional `wmkf_ExternalUrl` (URL String, 2,000
 characters) and `wmkf_SlotVersion` (whole number 1–2,147,483,647) for the
 post-presentation materials contract. The creation-only wave has a read-only
 typed preflight. `requestDocumentSelect()` includes the two fields only when
 `POST_PRESENTATION_MATERIALS_SCHEMA_READY` is literal `on`; the exported base
 projection and every unset/invalid configuration retain the pre-wave shape.
 The separate `POST_PRESENTATION_MATERIALS_ACCESS` control defaults to `off` and
-is not implied by schema readiness. Migration 055 and this Dataverse wave remain
-offline source only. The Zoom, transcript, and durable browser-direct MP4
-producers plus Slice 5 staff and external consumers are source-built and
-offline-tested on the branch but are not deployed or enabled.
+is not implied by schema readiness. Exact sandbox readback confirmed both Wave 30 fields; the
+durable MP4 producer then finalized retained Request Document
+`0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` for sandbox Request `1000334` through a local runtime and
+disposable local Postgres store. Migration 055 is not applied to a shared Preview/Production
+database, the wave is not applied to Production Dataverse, and the branch is not deployed or
+enabled. Zoom, transcript, and Slice 5 staff/external consumers remain source-built and
+offline-tested only.
 
 **[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]** Slice 4 adds the second governed transition on the same Final row, `advanceToLeadershipReview` (`lib/services/final-writeup/transition-service.js`, route `pages/api/workbench/final-writeup/leadership-review.js`): lifecycle `REVIEW` → `FINAL`, explicit `wmkf_LeadershipReviewStartedBy`/`wmkf_LeadershipReviewStartedAt`, and the row's own SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash`) refreshed to the verified current version, committed in one changeset with a request-ETag re-bind of `wmkf_CurrentFinalWriteup`. **The milestone triple and `wmkf_MilestoneCreatedBy` are not written** by this transition (owner D2, 2026-09-07): that actor field means the Pre-Site → Site Visit handoff person. A Final Writeup row in lifecycle `FINAL` is therefore "leadership review" only with the complete, well-formed leadership checkpoint, enforced by one shared predicate (`lib/services/final-writeup/leadership-checkpoint.js`) in the transition status, acknowledgement, and dashboard readers, so a half-written row is a reconciliation failure on every surface; the source Pre-Site row's `FINAL` lifecycle keeps its earlier meaning (handoff receipt). No backward action exists. **Owner-run reversal** for a mistaken transition: set the Final row's `wmkf_lifecyclestate` back to `100000001` (Review) and clear `wmkf_leadershipreviewstartedat` and `wmkf_LeadershipReviewStartedBy`; the observation fields may stay. Known pre-existing gap: group-review activation stamps `wmkf_milestonecreatedat` on the Final row without a milestone actor, which the explicit-actor census reports under its Site Visit kind; a separate Tier 0 census fix is owner-decided (plan §10 D6).
 

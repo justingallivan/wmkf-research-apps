@@ -1,3 +1,69 @@
+# Session 547 Prompt: Durable presentation-media Chrome acceptance (branch-local)
+
+## Local-runtime / sandbox-data acceptance — 2026-09-25 PT
+
+**[VERIFIED via Git/source, sandbox Dataverse readback, disposable local PostgreSQL 16,
+signed-in desktop Chrome, Microsoft Graph, and exact registry readback]** Work remained in
+`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on `codex/feature-request`; the main
+checkout, Factory branch, and `main` were not edited or pushed. The turn began at local/origin
+`01bae42c4`; historical handoff `c628d7367` remains contained. No branch deployment, Preview
+alias move, Production Dataverse/Postgres write, Production environment change, or deletion
+occurred.
+
+With the owner's explicit approvals, Wave 30 was applied to sandbox Dataverse and exact readback
+confirmed `wmkf_requestdocument.wmkf_ExternalUrl` and `wmkf_SlotVersion`. Human-created sandbox
+Request `1000334` / `4236c2b3-b053-f111-bec7-6045bd015cb0` was set to Advancing, one active Site
+Visit `38bf47c0-c1aa-46fc-b9d0-167aa76ad962` was created, and its meeting date was separately
+approved and changed to the canonical D26 test date `2026-12-11`. The application ran locally
+against disposable PostgreSQL 16 container `wmkf-presentation-1000334-20260925`; the shared Vercel
+Postgres database did not receive migration 055. These approved sandbox records,
+the container, and the local-only adapter file are retained; cleanup/deletion was not approved.
+
+**[VERIFIED Chrome result]** The production Meeting Tracker producer selected
+`Gallivan_Peleg Intro.mp4` (100,665,703 bytes; SHA-256
+`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`), paused after the first
+fragment at exactly 10 MiB Graph-confirmed and zero bytes in flight, and showed unknown ETA while
+paused. The first Resume found a real integration defect: live Graph returned bounded remaining
+range `10485760-100665702`, while the server accepted only open-ended `start-`. The corrected
+server accepts exactly one open-ended range or one bounded range whose end is exactly declared
+size minus one; malformed, ambiguous, wrong-end, backward, and out-of-file ranges still fail
+closed. After restart, Resume continued from 10 MiB; confirmed/in-flight bytes stayed distinct,
+the displayed post-resume rate was about 3.30–3.35 Mbps with a decreasing ETA, and finalize
+succeeded. No retry, reconnect, watchdog, or Graph-confirmed terminal-expiry state was exercised.
+
+The retained intent is `e7236795-42d8-4018-8ee8-cdc66b953e9b`. Exact SharePoint item
+`01G4GVMS7QSHYRKNIEVNAKQG2A5XLZAEYM` / physical filename
+`1000334-Recording-e7236795-42d8-4018-8ee8-cdc66b953e9b.mp4` is 100,665,703 bytes and its remote
+SHA-256 exactly matches the local file. Ready Request Document
+`0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` binds the exact item at slot version 1. Graph's current
+eTag advanced from the registry-time `,2` to `,3`, while stable item ID, byte count, SHA-256, and
+SharePoint version `1.0` remained equal; treat this as observed metadata advancement, not content
+drift. The item and registry row are intentionally retained.
+
+**[VERIFIED code/test/review]** Four focused Jest suites pass 121 tests; `npm run check:types`,
+scoped ESLint, `git diff --check`, and `npm run build -- --webpack` pass. The build reports only
+the repository's existing configuration/dynamic-dependency warnings. Two iterative read-only OAuth
+Claude Opus reviews covered the bounded-range correction. The first requested explicit open-ended
+and below/above-end fixtures; they were added. The second found no actionable issue. No
+Ultrareview or other metered product was used. The temporary `next.config.js` local adapter hook
+was removed and is not part of the branch diff. Atlas, documentation-currency, documentation-
+symbol, fact-consistency, and build-claim-freshness gates each pass with their self-tests run
+sequentially; docs-catalog and agent-invariant gates also pass.
+
+## Remaining release work
+
+- Chrome's upload-session expiry row remains **PARTIAL** because this run resumed a live session;
+  it did not establish Graph-confirmed terminal expiry. Do not upgrade that row from tests or the
+  earlier sealed-timestamp refusal.
+- The sandbox Dataverse wave is applied, but migration 055 is not applied to the actual Preview
+  database and this branch is not deployed or enabled there. Preview/Production rollout still
+  requires a fresh concrete approval list.
+- Desktop macOS Safari, long-seek, Download integrity, and near-cap Production remain deferred.
+  Use an individually approved human-created Request; the Test Request Factory is unfinished and
+  is not a dependency. Do not attempt iPadOS or another Edge run.
+- Do not delete the retained Request `1000334` Site Visit, Request Document, SharePoint item,
+  local acceptance database/container, or adapter file without a separate exact cleanup approval.
+
 # Session 546 Prompt: Preview proof retirement (branch-local)
 
 ## Offline Slice 6 release hardening — 2026-09-25 PT

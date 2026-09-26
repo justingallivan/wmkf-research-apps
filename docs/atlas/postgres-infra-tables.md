@@ -589,9 +589,11 @@ rows stay as audit history (bounded by one live row per request).
 
 **[SOURCE-VERIFIED 2026-09-25 on `codex/feature-request`.]** Migration
 `055_post_presentation_materials.sql`, mirrored by fresh-install V56, defines
-three additive tables for the post-research-presentation feature. No
-environment has been migrated by this milestone, the rollout and destructive-cleanup controls
-remain off/unconfigured, and no producer or consumer route is deployed or enabled. Slice 3's
+three additive tables for the post-research-presentation feature. It was applied only to the
+disposable local PostgreSQL 16 database used for the 2026-09-25 sandbox-data Chrome acceptance;
+no shared Preview or Production database has been migrated. Shared-environment rollout and
+destructive-cleanup controls remain off/unconfigured, and no producer or consumer route is
+deployed or enabled. Slice 3's
 transcript producer, Slice 4's browser-direct MP4 intent/status/finalize routes, and Slice 5's
 independent 60-day link lifecycle plus token-verified materials-only consumer are source-built
 and offline-tested only on `codex/feature-request`.
@@ -621,8 +623,10 @@ The same migration and every fresh-install definition enumerate the complete
 five-scope `portal_upload_staging` allowlist, adding
 `post_presentation_transcript` without removing the four live scopes. Slice 3's
 source-built cleanup reconciler recognizes the transcript candidate shape, but
-the unapplied schema and disabled rollout controls provide no live producer or
-new deletion authority.
+the schema remains unapplied in shared Preview/Production databases and disabled rollout controls
+provide no deployed producer or new deletion authority. The local acceptance finalized intent
+`e7236795-42d8-4018-8ee8-cdc66b953e9b` and retained its registry-bound SharePoint item; that
+disposable database/container is test evidence, not a deployed state store.
 
 ### `consultant_feedback` — PRODUCTION-LIVE Consultant Feedback slices 1–3 (migrations 048-049 applied; fresh-install v50-v51; 2026-09-14)
 

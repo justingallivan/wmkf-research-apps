@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the production-safe offline flow is built, the Preview proof harness is retired, schema/readiness remain unapplied, and Graph-confirmed expiry, Safari, and near-cap Production gates remain."
+summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow is built and passed a retained local-runtime/sandbox-data Chrome acceptance, the Preview proof harness is retired, Preview/Production rollout remains unapplied, and Graph-confirmed expiry, Safari, and near-cap Production gates remain."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -122,6 +122,18 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
   advancing `nextExpectedRanges`, and the CORS preflight returned `200` with an allow-origin
   response. Together with the corrected browser proof, this confirms Graph transport and identifies
   the application CSP as the original browser failure.
+- **[VERIFIED 2026-09-25 via sandbox Dataverse readback, a disposable local PostgreSQL 16 store,
+  signed-in desktop Chrome, Microsoft Graph, and exact Dataverse registry readback]** Wave 30's
+  `wmkf_ExternalUrl` and `wmkf_SlotVersion` fields exist in the sandbox organization. With the
+  owner's explicit approvals, human-created sandbox Request `1000334` and its active Site Visit
+  were used through the production Meeting Tracker producer running locally; no application
+  deployment or shared Preview database/configuration change occurred. Chrome paused at exactly
+  10 MiB Graph-confirmed with zero bytes in flight, resumed from Graph's live bounded
+  `10485760-100665702` range, showed separately truthful confirmed/in-flight progress and a
+  post-resume rate around 3.30–3.35 Mbps, and finalized the exact 100,665,703-byte item. The
+  retained SharePoint item's SHA-256 equals the approved local MP4's SHA-256, and its stable item
+  ID is bound to Ready Request Document `0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6`. This run did not
+  prove Graph-confirmed terminal session expiry, Safari, or a near-cap Production transfer.
 
 ## 3. Invariant table
 
@@ -385,11 +397,13 @@ transport dependency and must not revoke or stale a briefing send.
 
 ### 5.5 Durable large-upload intents
 
-**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; NOT DEPLOYED, MIGRATED, OR
-ENABLED.]** The Preview proof continues to use only a session-scoped encrypted browser permit and
-creates no application table. The durable production producer now creates the intent below before
-any Graph upload-session URL leaves the server. Migration 055 remains unapplied and the schema,
-access, and destructive-cleanup controls remain unconfigured, so this is not a live capability.
+**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; LOCAL DISPOSABLE-POSTGRES /
+SANDBOX-DATAVERSE CHROME ACCEPTANCE PASSED; NOT DEPLOYED OR ENABLED IN PREVIEW/PRODUCTION.]** The
+retired Preview proof created no application table. The durable production producer creates the
+intent below before any Graph upload-session URL leaves the server. Migration 055 was applied only
+to the disposable local acceptance database and Wave 30 only to sandbox Dataverse; the shared
+Preview/Production databases, runtime deployments, access flags, and destructive-cleanup controls
+remain unapplied or off, so this is not a released capability.
 
 Add `presentation_material_uploads` in the same migration. A row exists before any Graph upload
 URL leaves the server and carries:
@@ -600,7 +614,7 @@ The bounded fallback decision, only if the remaining browser matrix fails, is:
 3. **Rejected:** proxying the complete MP4 through a Vercel Function request or creating a
    permanent SharePoint Anyone link.
 
-### 7.2.1 Direct-Graph performance and recovery policy (Preview benchmark passed 2026-09-25; remaining live gates pending)
+### 7.2.1 Direct-Graph performance and recovery policy (Preview benchmark and local/sandbox durable-producer acceptance passed 2026-09-25; remaining live gates pending)
 
 **[VERIFIED via commit `bab770fe6`, the current `codex/feature-request` source,
 `shared/utils/graph-browser-upload.js`, the durable-intent adapter, and focused tests]** the branch
@@ -617,6 +631,14 @@ transport's 10 MiB chunk policy, boundary pause/resume, committed-versus-in-flig
 verification, short-lived playback-proof mint, and exact cleanup. It does not exercise a live
 retry, reconnect, watchdog, or Graph-confirmed terminal expiry; those remain covered only by
 offline tests until their named live gates run.
+**[VERIFIED via signed-in desktop Chrome, the local production producer, sandbox Dataverse, a
+disposable local PostgreSQL 16 store, and Microsoft Graph on 2026-09-25]** the subsequent durable-
+producer acceptance paused at the first 10 MiB boundary, reconciled live Graph status, resumed,
+and finalized the same approved 100,665,703-byte MP4. That run exposed Graph's live bounded range
+form (`10485760-100665702`); the server now accepts exactly one `start-` range or one
+`start-(declared size - 1)` range and still rejects ambiguity, backward/out-of-file starts, and
+wrong bounded ends. Two iterative read-only OAuth Claude Opus rounds reviewed the correction; the
+second returned no actionable findings. This evidence does not promote the terminal-expiry row.
 Keep browser → preauthenticated Microsoft Graph → governed SharePoint as the MP4 byte route.
 The transcript's private Blob staging remains a separate small-file route; routing MP4s through
 it would add a complete second byte transfer and another recovery/cleanup surface. Converge the
@@ -742,6 +764,24 @@ Performance verification is a release gate with separate evidence levels:
    as no apparent app penalty in this run, not a repeatable acceleration. At 3.22 Mbps,
    2,000,000,000 bytes would take about 82.8 minutes of active transfer (**ESTIMATE**); the actual
    near-cap Safari Production row remains open.
+
+   **[VERIFIED durable-producer acceptance receipt]** The owner approved sandbox Request `1000334`
+   / GUID `4236c2b3-b053-f111-bec7-6045bd015cb0`, its active Site Visit
+   `38bf47c0-c1aa-46fc-b9d0-167aa76ad962`, the exact MP4, and retaining the created records and
+   item. The app ran locally against a disposable PostgreSQL 16 database and sandbox Dataverse;
+   neither the branch nor a Preview alias was deployed. Intent
+   `e7236795-42d8-4018-8ee8-cdc66b953e9b` paused at exactly 10 MiB confirmed, then resumed from
+   live Graph range `10485760-100665702`; the UI showed confirmed and in-flight bytes separately,
+   unknown ETA while paused, and roughly 3.30–3.35 Mbps with a decreasing ETA after resume. The
+   exact retained item `01G4GVMS7QSHYRKNIEVNAKQG2A5XLZAEYM`, physical filename
+   `1000334-Recording-e7236795-42d8-4018-8ee8-cdc66b953e9b.mp4`, is 100,665,703 bytes and has the
+   same SHA-256 as the local source:
+   `951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`. Ready Request Document
+   `0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` binds that exact drive/item at slot version 1. Graph's
+   current item eTag advanced from the registry-time `,2` to `,3` while stable ID, size, content
+   hash, and SharePoint version `1.0` remained equal; record this as observed metadata advancement,
+   not evidence of content drift. No deletion was requested or performed. The run exercised
+   pause/resume/finalize but not retry, reconnect, watchdog, or Graph-confirmed terminal expiry.
 3. **Actual near-cap desktop Production gate:** after the production-safe flow exists and the owner
    approves an exact human-created disposable Request, run a real MP4 close to the
    2,000,000,000-byte cap in macOS Safari, record
@@ -839,7 +879,7 @@ feature and supplies no test Request.
 | `/api/meeting-tracker/visits/[requestId]/presentation-materials` | GET | Current Recording/Transcript/Summary winners, conflicts, supported formats, and the authenticated actor's unfinished intent descriptors; no upload secret. |
 | same | PATCH | Exact action to save/replace a Zoom link; request and actor are server-owned. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript and recording source-built/offline-tested:** transcript begins bounded private-Blob staging; recording writes an immutable durable intent before creating a browser-direct Graph session and returns the code-owned 10 MiB contract. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | **Source-built/offline-tested:** independently reauthorize creating actor/request/visit, verify the bounded local-file fingerprint, resolve the exact path, and check live Graph status. Return the no-store URL plus one validated sequential range only while live; for an exact committed item return finalize-only state and no URL. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | **Source-built/offline-tested and local/sandbox Chrome-tested:** independently reauthorize creating actor/request/visit, verify the bounded local-file fingerprint, resolve the exact path, and check live Graph status. Return the no-store URL plus one validated sequential open-ended or exact-to-file-end range only while live; for an exact committed item return finalize-only state and no URL. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript and recording source-built/offline-tested:** lease-fenced, request-bound finalize/recovery. MP4 re-resolves the exact stable candidate, validates bounded signature/malware facts, then uses the Recording slot fence and durable replay. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | **Source-built/offline-tested:** GET current link; POST exact `ensure` or compare-and-swap `reissue`, behind both Meeting Tracker and post-presentation readiness/access checks. |
 | Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection/status for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While readiness is off, return the legacy payload with `presentationMaterialsStatus: 'disabled'`, not a false empty collection; do not 503 the existing logistics read. |
@@ -1163,7 +1203,7 @@ exact deletion. No bearer URL or token was saved.
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. | Agent (historical PASS) |
 | Desktop Chrome | Reload and same-file reselect Resume | 2026-09-24 PASS: paused at 0.9 MiB, reloaded, reselected the same file, resumed direct Microsoft `202` chunks, committed 100,665,703 bytes, finalized, and cleaned the exact item. | Agent |
-| Desktop Chrome | Upload-session expiry and recovery | PARTIAL: after the sealed initial expiry, Resume refused and retained its permit; approved Cleanup returned `session_cancelled` with no item. This proves the old local refusal/cleanup path, but a 2xx Graph cancellation means Graph-confirmed expiry was not observed. Commit `bab770fe6` corrected the initial-expiry predicate offline. Retest live status/terminal recovery through the durable producer's authenticated resume route during the bounded Preview acceptance on a freshly approved human-created sandbox Request; the retired harness is not the test surface. The third historical session did commit 100,665,703 bytes and was cleaned exactly. | Agent, with owner final UI clicks after browser auto-review block |
+| Desktop Chrome | Upload-session expiry and recovery | PARTIAL: after the sealed initial expiry, Resume refused and retained its permit; approved Cleanup returned `session_cancelled` with no item. This proves the old local refusal/cleanup path, but a 2xx Graph cancellation means Graph-confirmed expiry was not observed. Commit `bab770fe6` corrected the initial-expiry predicate offline. The 2026-09-25 durable-producer run on sandbox Request `1000334` then proved authenticated live-status resume from Graph's bounded remaining range, but the session was still live. Retest only terminal expiry/recovery through the durable producer; the retired harness is not the test surface. The third historical session did commit 100,665,703 bytes and was cleaned exactly. | Agent, with owner final UI clicks after browser auto-review block |
 | Desktop Chrome | Five-minute proof-token expiry recovery | 2026-09-24 PASS: old link refused as `expired` after reload; fresh link from the same item played and accepted End/Home seeks with resolver count one. | Agent |
 | Desktop Edge | 2026-09-23 upload, playback, Download | Colleague reported these actions for 97,777,999 bytes; Graph confirmed the item. Remaining detailed Edge trace is not a Slice 0 blocker under Session 536. | Historical owner colleague; no new Edge run |
 | macOS Safari | Upload, selected Production Watch shape with long seeking, Download | Deferred to Production on an owner-approved human-created disposable Request; record redacted statuses/ranges and source/download size and SHA-256. Test a fallback Watch shape only if it ships. | Owner by hand |
@@ -1181,7 +1221,7 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 | macOS Safari full path | DEFERRED | [UPDATED by owner 2026-09-25] Production run on an owner-approved human-created disposable Request remains for upload, selected Watch shape with long seeking, Download, and integrity evidence; the unfinished Factory is not a prerequisite. |
 | iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] Staff will not use iPadOS for this work; its upload, playback, Files-app, and backgrounding checks are removed from the acceptance matrix. |
 | Reload and same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] 0.9 MiB pause, reload, reselect, direct Microsoft `202` chunks, 100,665,703-byte commit/finalize, exact ETag-guarded cleanup with Graph 404 and empty folder. |
-| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. [VERIFIED offline at `bab770fe6`] the false terminal predicate is corrected; live expiry recovery still requires fresh approval and a retest through the durable producer's authenticated resume route during bounded Preview acceptance on a freshly approved human-created sandbox Request; the retired harness is not restored. |
+| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. [VERIFIED offline at `bab770fe6`] the false terminal predicate is corrected. [VERIFIED 2026-09-25 via local/sandbox durable-producer Chrome acceptance] authenticated live-status resume worked from Graph's bounded remaining range, but Graph had not expired the session. Terminal expiry/recovery still needs a separately approved wait/retest through the durable producer; the retired harness is not restored. |
 | Five-minute proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] expired old link refused after reload; Finish saving minted a fresh link from the same committed item; Watch played and End/Home seeks caused no additional resolver action. |
 | Long-duration seeking | DEFERRED | [VERIFIED via Chrome receipt] current recording is only 67.33 seconds; desktop macOS Safari Production run still needs a >2-minute recording and ten seeks. |
 | Upload and throughput near 2,000,000,000 bytes | DEFERRED | [VERIFIED via 2026-09-24 owner decision; fixture corrected 2026-09-25] one near-cap desktop Production upload remains to test the proposed 2 GB cap. [PLANNED] Run it with the macOS Safari check on the exact owner-approved human-created disposable Request. |
@@ -1418,12 +1458,15 @@ deleted the exact committed item to the recycle bin or confirmed that the upload
 cancelled, gone, or expired with no exact item; uncertain transport retained the encrypted permit
 for retry.
 
-### Slice 1 — Additive schema and readiness — SOURCE-BUILT 2026-09-25; NOT APPLIED
+### Slice 1 — Additive schema and readiness — SOURCE-BUILT 2026-09-25; SANDBOX WAVE APPLIED; SHARED PREVIEW/PRODUCTION STORES NOT APPLIED
 
-**[VERIFIED via source, focused tests, preflight self-test, and migration/fresh-install parity.]**
-Wave 30, migration 055/V56, readiness/access parsing, compatibility-gated Request Document
-projection, Atlas, and runbook updates are built on `codex/feature-request`. No migration or
-Dataverse wave was applied, no environment variable was set, and no route/producer was enabled.
+**[VERIFIED via source, focused tests, preflight self-test, migration/fresh-install parity, and
+sandbox readback.]** Wave 30, migration 055/V56, readiness/access parsing, compatibility-gated
+Request Document projection, Atlas, and runbook updates are built on `codex/feature-request`.
+Wave 30 was applied to sandbox Dataverse and both fields were read back with their exact types;
+migration 055 was applied only to the disposable local acceptance database. No shared Preview or
+Production Postgres migration, deployment, environment change, or general producer enablement
+occurred.
 
 - Dataverse wave adds `wmkf_ExternalUrl` and `wmkf_SlotVersion` to Request Document plus exact
   preflight.
@@ -1530,7 +1573,7 @@ check; it is not inferred from mocks.
 - Add the scope-specific cleanup reconciler with any-lifecycle registry binding proof, plus bound
   Superseded-retention and true-unbound discard tests.
 
-### Slice 4 — Large MP4 producer — SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; NOT DEPLOYED
+### Slice 4 — Large MP4 producer — SOURCE-BUILT/OFFLINE-TESTED AND LOCAL/SANDBOX CHROME-ACCEPTED 2026-09-25; NOT DEPLOYED
 
 - The §7.2.1 browser-direct Graph transport module originally timed with the retired Preview
   harness is now wired into the durable producer. It accepts a status/reauthorization adapter:
@@ -1556,7 +1599,14 @@ check; it is not inferred from mocks.
 and iterative read-only OAuth Claude Opus review]** these Slice 4 bullets are implemented on the
 feature branch. The implementation preserves fingerprint, actor/request/active-visit
 authorization, exact-item cleanup, and no-full-file-proxy contracts. It does not change the
-remaining approval-bound live gates or imply that migration 055/configuration has been applied.
+remaining approval-bound live gates or imply that migration 055/configuration has been applied to
+the shared Preview or Production environments.
+
+**[VERIFIED via the retained Request `1000334` acceptance receipt in §7.2.1]** the durable producer
+also passed one signed-in Chrome pause/resume/finalize run using sandbox Dataverse and a disposable
+local Postgres store. The run found and corrected the live bounded-Graph-range incompatibility;
+focused tests now retain open-ended and exact-to-file-end forms and reject wrong ends. It did not
+deploy this branch or close expiry, Safari, reconnect/retry/watchdog, or near-cap rows.
 
 ### Slice 5 — Internal and external consumers
 
@@ -1593,6 +1643,12 @@ Production write was performed for this slice.
 - Reconcile canonical docs, Atlas, route matrix, service catalog, and session handoff.
 
 ## 13. Test matrix
+
+**[DURABLE-PRODUCER CHROME ACCEPTANCE 2026-09-25]** Request `1000334` passed the retained local-
+runtime/sandbox-data 100,665,703-byte MP4 pause/resume/finalize path. Exact size/SHA and registry
+binding passed. The live bounded `nextExpectedRanges` form found during resume is now covered by
+the changed-surface suites. Graph-confirmed terminal expiry remains PARTIAL; Safari, reconnect,
+retry/watchdog, and near-cap Production remain open.
 
 **[SLICE 4 OFFLINE RESULT 2026-09-25]** The durable MP4 changed surface passes 16 Jest suites /
 307 tests, including 41 focused staff-card cases. The remaining deployed-browser rows below keep
@@ -1769,14 +1825,16 @@ This is Tier 2 cross-store runtime work. Build on a feature branch and promote d
 
 Release order:
 
-1. **HISTORICAL PROOF COMPLETE; ACCEPTANCE PARTIAL:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
+1. **HISTORICAL PROOF COMPLETE; DURABLE-PRODUCER SANDBOX CHROME ACCEPTANCE PASSED; ACCEPTANCE STILL PARTIAL:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
    route-scoped CSP correction. Chrome reload/reselect and proof-token recovery passed on
    2026-09-24; Graph-confirmed session expiry needs a corrective retest. Commit `bab770fe6`
    built and offline-tested the §7.2.1 transport as one browser module used by the Preview
    benchmark harness and intended for the later production producer. The separately approved
-   representative Chrome benchmark passed on 2026-09-25. Retest the expiry row through the durable
-   producer's authenticated resume route during bounded Preview acceptance on a freshly approved
-   human-created sandbox Request; do not restore the retired harness.
+   representative Chrome benchmark passed on 2026-09-25. The durable producer subsequently passed
+   a retained local-runtime/sandbox-data Chrome pause/resume/finalize run on freshly approved
+   human-created Request `1000334`, including live Graph status reconciliation. Retest only the
+   still-open Graph-confirmed terminal-expiry row through the durable producer; do not restore the
+   retired harness.
    Keep 302 as the
    leading resolver and the one-shot URL as the bounded fallback. The deferred Production Safari,
    long-seek, and near-cap cells remain in the Slice 0 matrix but block general release after
@@ -1787,9 +1845,10 @@ Release order:
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
    `EXTERNAL_LINK_SECRET` separately in Preview and Production;
-3. for Preview, owner applies the Postgres migration to the Preview-connected database and the
-   Dataverse wave to the sandbox organization, then runs exact schema/readback preflights while
-   readiness remains off;
+3. **PARTIAL:** Wave 30 is applied and read back in sandbox Dataverse. The owner still applies the
+   Postgres migration to the actual Preview-connected database and runs the cross-store preflights
+   while readiness remains off. The disposable local PostgreSQL acceptance store does not satisfy
+   this Preview migration step;
 4. deploy the compatible producer runtime to Preview, run the prior-runtime-tolerance fixtures,
    then owner sets
    `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` only in Preview and enables the separate
@@ -2047,6 +2106,24 @@ test pins the retired runtime files and proof-only exceptions absent; `proxy.tes
 separately pins the positive production upload/media CSP scopes and their negative siblings.
 Historical benchmark receipts remain in this plan. No deployment, environment/schema change,
 alias move, SharePoint action, or Production/Dataverse write occurred.
+
+**2026-09-25 durable-producer Chrome acceptance and bounded-range correction:** after the owner
+approved exact sandbox writes and the retained upload, Wave 30 was applied to sandbox Dataverse
+and migration 055 to a disposable local PostgreSQL 16 store only. The local production producer
+paused at 10 MiB, then Graph returned a live bounded remaining range
+`10485760-100665702`. The server's prior open-ended-only parser caused a truthful resumable 502;
+no candidate or registry row had been created. The correction accepts one open-ended range or one
+range ending exactly at declared size minus one, preserving all other strict sequential checks.
+After restart, Chrome resumed, finalized, and registered the exact retained 100,665,703-byte MP4;
+remote/local SHA-256 and registry binding match. Two iterative read-only OAuth Claude Opus rounds
+reviewed the correction. The first requested explicit open-ended and below/above-end fixtures;
+after those were added, the second found no actionable issue. Four focused suites pass 121 tests,
+types/scoped lint/webpack build pass, and no paid or metered reviewer was used. Atlas,
+documentation-currency, documentation-symbol, fact-consistency, and build-claim-freshness gates
+pass with their self-tests run sequentially; docs-catalog and agent-invariant gates also pass.
+This is a live sandbox acceptance of the durable producer, not a deployment or release.
+Graph-confirmed terminal expiry, Safari, reconnect/retry/watchdog, and near-cap Production remain
+open.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof. The remaining decision is whether it survives the measured
