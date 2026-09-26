@@ -1,4 +1,4 @@
-# Session 550 Prompt: Shared schema applied; bounded Preview Safari gate ready (branch-local)
+# Session 550 Prompt: Shared schema applied; bounded Preview Safari gate passed and closed (branch-local)
 
 ## Authorized rollout progress — 2026-09-25/26 PT
 
@@ -64,18 +64,22 @@ source and retained Graph item. This closes the bounded Preview macOS Safari Wat
 Download-integrity row. It does not claim a greater-than-two-minute seek or a Production runtime
 deployment.
 
+**[VERIFIED cleanup via Vercel alias/environment readback]** Under the owner's exact approval,
+branch-scoped Preview `POST_PRESENTATION_MATERIALS_ACCESS` was reset to literal `off`, then pulled
+to a temporary file and read back as `off`; the temporary file was deleted. The registered
+`wmkfresearchapps-preview.vercel.app` alias was restored and re-inspected at exact prior Factory
+deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, Ready. Migration 054/055 schema, link row
+`c7cc8602-59c5-43d1-b703-e5dec26d0eba`, the retained recording, and all Request Documents remain
+untouched. No deletion or Production runtime configuration/deployment change occurred.
+
 ## Immediate continuation
 
-- The bounded acceptance target is human-created sandbox Request `1000334` /
-  `4236c2b3-b053-f111-bec7-6045bd015cb0` and its retained slot-version-3 recording. Do not upload
-  or delete anything. Do not change or deploy Production runtime configuration.
 - The bounded Safari media gate is complete. Remaining technical evidence is Graph-confirmed
   terminal upload-session expiry/recovery; live retry/reconnect/watchdog states remain
   offline-tested only. Do not restore the retired proof harness.
-- The alias remains on corrected feature deployment `dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr`.
-  Restoring it to exact prior Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` and turning
-  branch presentation access off require an explicit cleanup approval. Leave the live link row and
-  retained file untouched unless separately authorized.
+- Preview cleanup is complete. The alias is back on the Factory deployment and this branch's
+  presentation access is off. Leave the live link row, retained recording, schema, and Request
+  Documents untouched unless separately authorized.
 
 # Session 549 Prompt: Disabled-state Preview deployment and shared-DB stop (branch-local)
 

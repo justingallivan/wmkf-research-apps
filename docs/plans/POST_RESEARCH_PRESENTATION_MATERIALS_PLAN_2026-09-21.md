@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow and shared schema are built, migration 055 is live in shared Neon, bounded branch Preview and macOS Safari Watch/available-seek/Download integrity passed, the code-owned 10 MiB policy is accepted, and Graph-confirmed upload-session expiry plus Production promotion remain."
+summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow and shared schema are built, migration 055 is live in shared Neon, bounded branch Preview and macOS Safari Watch/available-seek/Download integrity passed and were closed safely, the code-owned 10 MiB policy is accepted, and Graph-confirmed upload-session expiry plus Production promotion remain."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -410,15 +410,15 @@ transport dependency and must not revoke or stale a briefing send.
 ### 5.5 Durable large-upload intents
 
 **[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; SHARED SCHEMA LIVE
-2026-09-26; BOUNDED BRANCH PREVIEW ACTIVE.]** The
+2026-09-26; BOUNDED BRANCH PREVIEW ACCEPTED AND CLOSED.]** The
 retired Preview proof created no application table. The durable production producer creates the
 intent below before any Graph upload-session URL leaves the server. Under explicit owner approval,
 migration 055 is now tracked in the shared Preview/Production Neon database; exact readback found
 the empty presentation tables and expected constraints. Wave 30 remains sandbox-only. Only this
-branch's Preview configuration is schema-ready and limited to the approved sandbox Request; the
-registered-alias deployment is verified and one materials link is live for that Request.
-Production runtime configuration and destructive cleanup remain off, so this is not a generally
-released capability.
+branch's registered-alias deployment was verified and one materials link remains retained for the
+approved sandbox Request. After acceptance, the alias was restored to the prior Factory deployment
+and branch presentation access reset to `off`. Production runtime configuration and destructive
+cleanup remain off, so this is not a generally released capability.
 
 Add `presentation_material_uploads` in the same migration. A row exists before any Graph upload
 URL leaves the server and carries:
@@ -1890,12 +1890,12 @@ Release order:
 3. **COMPLETE 2026-09-26:** Wave 30 is applied/read back in sandbox Dataverse, and owner-approved
    migrations 054/055 are tracked in the shared Neon database with exact empty-schema readback and
    a canonical-runner idempotence pass;
-4. **BOUNDED PREVIEW ACTIVE 2026-09-26:** the compatible producer/consumer runtime is on the
-   registered Preview alias. Branch-scoped `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and
-   `POST_PRESENTATION_MATERIALS_ACCESS=test:<approved request GUID>` are set for the bounded Preview
-   acceptance with a file over 50 MB, including reload/resume, a live upload-session expiry and
-   recovery through the durable producer's authenticated resume route, and separate short-lived
-   playback-URL expiry recovery;
+4. **BOUNDED PREVIEW ACCEPTED/CLOSED 2026-09-26:** the compatible producer/consumer runtime passed
+   registered-alias Chrome readiness/link issuance and macOS Safari Watch/available-seek/Download
+   integrity on the approved Request. Cleanup restored the alias to the exact prior Factory
+   deployment and reset branch presentation access to `off`. Graph-confirmed terminal upload-
+   session expiry/recovery remains open through the durable producer; the retired harness stays
+   retired;
 5. for Production, separately confirm the target registry/interlock classifies the production
    Dataverse organization, owner applies the same Postgres migration to the Production-connected
    database and the Dataverse wave to the production organization, and runs exact preflights with
@@ -2237,3 +2237,10 @@ completed. Local file readback found exactly 100,665,703 bytes and SHA-256
 retained Graph item. This closes the bounded Preview Safari media/integrity row without claiming a
 greater-than-two-minute seek or Production deployment. No upload, deletion, email/recipient
 action, Production deployment, or Production runtime configuration change occurred.
+
+**2026-09-26 bounded Preview cleanup:** under the owner's exact approval, branch-scoped Preview
+`POST_PRESENTATION_MATERIALS_ACCESS` was reset and read back as literal `off`, and the registered
+Preview alias was restored/re-inspected at exact prior Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The temporary environment readback file was removed. The live
+materials link row, retained recording, Request Documents, and migrations 054/055 schema remain
+untouched. No deletion or Production runtime configuration/deployment change occurred.
