@@ -24,7 +24,7 @@
 
 ### Owner Decision Needed
 
-1. **DECIDED 2026-09-26 (S544) — reviewer addresses are never minted.** The owner supplies a default base inbox in the local-only `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS`; a reviewer with no `--reviewer-address` flag and no synthetic bundle address gets the base plus-tagged per source reviewer (`defaultReviewerAddressFor`). Built on branch `claude/factory-default-reviewer-address`.
+1. **DECIDED 2026-09-26 (S544) — reviewer addresses are never minted.** The owner supplies a default base inbox in the local-only `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS`; a reviewer with no `--reviewer-address` flag and no synthetic bundle address gets the base plus-tagged per source reviewer (`defaultReviewerAddressFor`). Merged (PR #343, `9b6fea389`) and live-checked: sandbox Request 1000346 `ready`, reuse confirmed (`docs/plans/evidence/test-request-factory/default-reviewer-address-live-check-2026-09-26.md`). New residue: 1000346 and three plus-tagged persons; local-ledger runs `ddc0b4f9…` (prepared) and `be486c6d…`/`fe84d2fb…` (needs_attention, advanced without `--bypass-goverify`).
    Evidence: design doc 6c-ii record, closing note; `scripts/rehearse-test-request-sandbox.mjs` `resolveReviewerAssignments`.
 2. **6d (reviewer email exception)**: own slice, own plan review; not started.
 
