@@ -17,6 +17,7 @@ import path from 'node:path';
 import {
   resolveReviewerAssignments,
   defaultReviewerAddressFor,
+  applyDefaultReviewerAddress,
   assertSyntheticReviewerIsolationOnForReviews,
   runReserve,
   runAdvance,
@@ -225,6 +226,36 @@ describe('default reviewer address (owner decision 2026-09-26: no minting, plus-
     expect(() => defaultReviewerAddressFor('owner+x@example.test', SOURCE_A)).toThrow(/already carry a plus tag/);
     expect(() => defaultReviewerAddressFor(`${'a'.repeat(52)}@example.test`, SOURCE_A)).toThrow(/too long for a plus tag/);
     expect(defaultReviewerAddressFor(`${'a'.repeat(51)}@example.test`, SOURCE_A)).toHaveLength(51 + 13 + 13);
+  });
+
+  describe('applyDefaultReviewerAddress (runs after loadEnvLocal in main)', () => {
+    const reviewsArgs = (reviewerAddress = []) => ({
+      reserve: true, recipe: 'reviews', reviewerAddress, defaultReviewerAddress: null,
+    });
+
+    it('takes the base from the supplied env, not a value captured earlier', () => {
+      const args = reviewsArgs();
+      applyDefaultReviewerAddress(args, { TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS: BASE });
+      expect(args.defaultReviewerAddress).toBe(BASE);
+    });
+
+    it('refuses a flagless reviews reservation with no default', () => {
+      expect(() => applyDefaultReviewerAddress(reviewsArgs(), {})).toThrow(/requires at least one --reviewer-address/);
+    });
+
+    it('accepts flags alone, and refuses a malformed base even when flags are present', () => {
+      const args = reviewsArgs(['x']);
+      applyDefaultReviewerAddress(args, {});
+      expect(args.defaultReviewerAddress).toBeNull();
+      expect(() => applyDefaultReviewerAddress(reviewsArgs(['x']), { TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS: 'a+b@example.test' }))
+        .toThrow(/already carry a plus tag/);
+    });
+
+    it('ignores the env for any other mode or recipe', () => {
+      const args = { reserve: true, recipe: 'basic', reviewerAddress: [], defaultReviewerAddress: null };
+      applyDefaultReviewerAddress(args, { TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS: 'a+b@example.test' });
+      expect(args.defaultReviewerAddress).toBeNull();
+    });
   });
 
   it('gives each flagless real reviewer a distinct default and leaves flagged reviewers alone', async () => {

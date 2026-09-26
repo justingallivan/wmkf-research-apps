@@ -146,6 +146,23 @@ export function defaultReviewerAddressFor(base, sourcePersonId) {
   return address;
 }
 
+/**
+ * Owner decision 2026-09-26 (S544): no minted addresses; a reviewer with no
+ * flag gets the owner-supplied default base inbox, plus-tagged per source
+ * reviewer. Called by main() AFTER loadEnvLocal() (the value normally lives in
+ * .env.local) and before any Dataverse read, so a bad value fails fast.
+ */
+export function applyDefaultReviewerAddress(args, env = process.env) {
+  if (!args.reserve || args.recipe !== 'reviews') return;
+  const base = env[DEFAULT_REVIEWER_ADDRESS_ENV];
+  if (base) {
+    defaultReviewerAddressFor(base, '00000000-0000-4000-8000-000000000000');
+    args.defaultReviewerAddress = base;
+  } else if (args.reviewerAddress.length === 0) {
+    throw new Error(`--reserve --recipe=reviews requires at least one --reviewer-address=<sourcePersonGuid>=<address> or ${DEFAULT_REVIEWER_ADDRESS_ENV}.`);
+  }
+}
+
 function resolveActorId(actor) {
   if (actor == null) return cliActorId(os.userInfo().username);
   if (PRINCIPAL_ACTOR.test(actor)) return actor.toLowerCase();
@@ -238,18 +255,6 @@ function parseArgs(argv) {
   // assignments is refused by the ledger.
   if (parsed.reviewerAddress.length > 0 && (!parsed.reserve || parsed.recipe !== 'reviews')) {
     throw new Error('--reviewer-address is valid only with --reserve --recipe=reviews.');
-  }
-  // Owner decision 2026-09-26 (S544): no minted addresses; a reviewer with no
-  // flag gets the owner-supplied default base inbox, plus-tagged per source
-  // reviewer. Read here so a bad value fails before any Dataverse read.
-  if (parsed.reserve && parsed.recipe === 'reviews') {
-    const base = process.env[DEFAULT_REVIEWER_ADDRESS_ENV];
-    if (base) {
-      defaultReviewerAddressFor(base, '00000000-0000-4000-8000-000000000000');
-      parsed.defaultReviewerAddress = base;
-    } else if (parsed.reviewerAddress.length === 0) {
-      throw new Error(`--reserve --recipe=reviews requires at least one --reviewer-address=<sourcePersonGuid>=<address> or ${DEFAULT_REVIEWER_ADDRESS_ENV}.`);
-    }
   }
   if (parsed.reserve) {
     parsed.actorId = resolveActorId(parsed.actor);
@@ -1037,6 +1042,7 @@ async function main() {
   }
 
   loadEnvLocal();
+  applyDefaultReviewerAddress(args);
 
   if (args.runInspect) {
     const ledgerUrl = requireLedgerUrl();
