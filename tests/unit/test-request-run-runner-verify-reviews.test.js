@@ -665,6 +665,37 @@ describe('stepVerifyReviews', () => {
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
   });
 
+  it.each([
+    ['wmkf_externaltokenrevoked false (the platform default on create) reaches ready', { wmkf_externaltokenrevoked: false }, 'ready'],
+    ['wmkf_externaltokenrevoked true refuses ready', { wmkf_externaltokenrevoked: true }, 'needs_attention'],
+    ['wmkf_externaltokenissued set refuses ready', { wmkf_externaltokenissued: '2026-09-26T00:00:00Z' }, 'needs_attention'],
+  ])('no-live-access fields (live proof 2026-09-26): %s', async (_label, overrides, expected) => {
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false, ...overrides } }),
+      answers: [],
+    });
+    const { result } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), reviewFileResource(),
+      ],
+      deps: { graph: fakeGraph({ includeReview: true }) },
+    });
+    expect(result.outcome).toBe(expected);
+    if (expected === 'needs_attention') expect(result.errorMessage).toMatch(/carries a non-null wmkf_externaltoken/);
+  });
+
   it('a destination person whose platform-derived name lacks the synthetic prefix refuses ready', async () => {
     const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
     const bundleReviewer = bundle.reviewers[0];
