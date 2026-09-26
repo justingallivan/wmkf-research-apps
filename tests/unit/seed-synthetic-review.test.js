@@ -4,6 +4,7 @@
  * tests only -- no I/O.
  */
 import {
+  isSyntheticNameDerived,
   syntheticPersonProjection,
   SYNTHETIC_PERSON_PROJECTION_FIELDS,
   SUGGESTION_CREATE_ALLOWLIST,
@@ -56,11 +57,10 @@ function bundleReviewer(overrides = {}) {
 }
 
 describe('syntheticPersonProjection', () => {
-  it('prefixes the name, copies expertise/affiliation fields verbatim with null preserved, sets the marker true, derives the organizationname shadow', () => {
+  it('prefixes the first name (the platform derives wmkf_name), copies expertise/affiliation fields verbatim with null preserved, sets the marker true, derives the organizationname shadow', () => {
     const projection = syntheticPersonProjection(bundleReviewer(), 'throwaway@example.test');
     expect(projection).toEqual({
-      wmkf_name: 'TEST · Jane Reviewer',
-      wmkf_firstname: 'Jane',
+      wmkf_firstname: 'TEST · Jane',
       wmkf_lastname: 'Reviewer',
       wmkf_emailaddress: 'throwaway@example.test',
       wmkf_issyntheticreviewer: true,
@@ -78,7 +78,10 @@ describe('syntheticPersonProjection', () => {
       person: { wmkf_name: 'X', wmkf_firstname: null, wmkf_lastname: null, wmkf_areaofexpertise: null, wmkf_primaryaffiliation: null, wmkf_academicrank: null, wmkf_primarydepartment: null, wmkf_maininstitution: null },
     });
     const projection = syntheticPersonProjection(reviewer, 'a@example.test');
-    expect(projection.wmkf_firstname).toBeNull();
+    // The prefix is the marker's legible twin and is always written, even
+    // when the source has no first name; wmkf_name is never projected.
+    expect(projection.wmkf_firstname).toBe('TEST · ');
+    expect(projection).not.toHaveProperty('wmkf_name');
     expect(projection.wmkf_areaofexpertise).toBeNull();
     expect(projection.wmkf_maininstitution).toBeNull();
     expect(projection.wmkf_organizationname).toBeNull();
@@ -221,5 +224,18 @@ describe('buildCompletionWrite', () => {
   it('throws on malformed JSON in a bundle answer field rather than silently dropping it', () => {
     const reviewer = bundleReviewer({ answers: [{ ...bundleReviewer().answers[0], wmkf_answervalues: '{not json' }] });
     expect(() => buildCompletionWrite(reviewer, { suggestionId: SUGGESTION_ID, ifMatch: 'W/"1"' })).toThrow(/not valid JSON/);
+  });
+});
+
+describe('isSyntheticNameDerived (live proof 2026-09-26: Dataverse derives wmkf_name from first/last)', () => {
+  it.each([
+    [' TEST · Martha Cat ', true],
+    ['TEST · Martha Cat', true],
+    [' Martha Cat ', false],
+    ['', false],
+    [null, false],
+    ['Martha TEST · Cat', false],
+  ])('%p -> %p', (name, expected) => {
+    expect(isSyntheticNameDerived({ wmkf_name: name })).toBe(expected);
   });
 });

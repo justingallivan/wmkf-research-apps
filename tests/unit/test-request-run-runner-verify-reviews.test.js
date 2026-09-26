@@ -557,7 +557,7 @@ function personRow(bundleReviewer, overrides = {}) {
   const p = bundleReviewer.person;
   return {
     wmkf_potentialreviewersid: DEST_PERSON_A,
-    wmkf_name: `TEST · ${p.wmkf_name}`, wmkf_firstname: p.wmkf_firstname, wmkf_lastname: p.wmkf_lastname,
+    wmkf_name: ` TEST · ${p.wmkf_firstname} ${p.wmkf_lastname} `, wmkf_firstname: `TEST · ${p.wmkf_firstname}`, wmkf_lastname: p.wmkf_lastname,
     wmkf_emailaddress: ASSIGNMENT.address, wmkf_issyntheticreviewer: true,
     wmkf_areaofexpertise: p.wmkf_areaofexpertise, wmkf_primaryaffiliation: p.wmkf_primaryaffiliation,
     wmkf_academicrank: p.wmkf_academicrank, wmkf_primarydepartment: p.wmkf_primarydepartment, wmkf_maininstitution: p.wmkf_maininstitution,
@@ -663,6 +663,34 @@ describe('stepVerifyReviews', () => {
     });
     expect(result.outcome).toBe('ready');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  it('a destination person whose platform-derived name lacks the synthetic prefix refuses ready', async () => {
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer, { wmkf_name: ' Jane Reviewer ' }),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    const { result, calls } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), reviewFileResource(),
+      ],
+      deps: { graph: fakeGraph({ includeReview: true }) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.errorMessage).toMatch(/derived name does not carry the synthetic prefix/);
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
   });
 
   it('an inactive destination person (statecode 1) refuses ready even when every projected field matches', async () => {

@@ -237,7 +237,7 @@ beforeEach(() => {
 function ownedSyntheticRow(over = {}) {
   return {
     wmkf_potentialreviewersid: DEST_PERSON_A,
-    wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane', wmkf_lastname: 'Reviewer',
+    wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane', wmkf_lastname: 'Reviewer',
     wmkf_emailaddress: 'throwaway@example.test',
     wmkf_areaofexpertise: 'Genomics', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
     wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
@@ -358,6 +358,10 @@ describe('stepSeedReviewers: create readback ownership (Codex slice round 3)', (
     ['Contact-linked', ownedSyntheticRow({ _wmkf_contact_value: '11111111-1111-4111-8111-111111111111' }), 'reviewer_person_not_synthetic'],
     ['inactive', ownedSyntheticRow({ statecode: 1 }), 'reviewer_person_not_synthetic'],
     ['projection drift', ownedSyntheticRow({ wmkf_areaofexpertise: 'DRIFTED' }), 'reviewer_person_projection_drift'],
+    // Live proof 2026-09-26: the platform derives wmkf_name from first/last,
+    // so a row whose derived name lacks the prefix was not created from the
+    // projection (or the derivation changed) -- refused.
+    ['derived name without the synthetic prefix', ownedSyntheticRow({ wmkf_name: ' Jane Reviewer ' }), 'reviewer_person_projection_drift'],
   ];
 
   it.each(badRows)('after a successful POST, a %s row at the preallocated GUID is refused, the resource stays dispatched, no suggestion is created', async (_label, row, code) => {
@@ -447,7 +451,7 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
       createPerson,
       getPersonById: jest.fn(async () => ({
         wmkf_potentialreviewersid: DEST_PERSON_A,
-        wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane', wmkf_lastname: 'Reviewer',
+        wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane', wmkf_lastname: 'Reviewer',
         wmkf_emailaddress: 'throwaway@example.test',
         wmkf_areaofexpertise: 'Genomics', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
         wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
@@ -497,7 +501,7 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
     createReviewsSandboxDeps.mockReturnValue({
       createPerson: jest.fn(),
       getPersonById: jest.fn(async () => ({
-        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane',
         wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test',
         wmkf_areaofexpertise: 'DRIFTED FIELD', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
         wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University',
@@ -523,7 +527,7 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
     createReviewsSandboxDeps.mockReturnValue({
       createPerson: jest.fn(),
       getPersonById: jest.fn(async () => ({
-        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane',
         wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: 'Genomics',
         wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor', wmkf_primarydepartment: 'Biology',
         wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
@@ -973,7 +977,7 @@ describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on o
     createReviewsSandboxDeps.mockReturnValue({
       createPerson: jest.fn(),
       getPersonById: jest.fn(async () => ({
-        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane',
         wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: 'Genomics',
         wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor', wmkf_primarydepartment: 'Biology',
         wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
@@ -1038,7 +1042,7 @@ describe('P2-1: suggestion ambiguous-recovery covers both the owned and not-owne
     createReviewsSandboxDeps.mockReturnValue({
       createPerson: jest.fn(),
       getPersonById: jest.fn(async () => ({
-        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane',
         wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: 'Genomics',
         wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor', wmkf_primarydepartment: 'Biology',
         wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
@@ -1073,7 +1077,7 @@ describe('P2-1: suggestion ambiguous-recovery covers both the owned and not-owne
     const createSuggestion = jest.fn(async () => { throw new Error('transient network blip'); });
     createReviewsSandboxDeps.mockReturnValue({
       getPersonById: jest.fn(async () => ({
-        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+        wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane',
         wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: 'Genomics',
         wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor', wmkf_primarydepartment: 'Biology',
         wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
