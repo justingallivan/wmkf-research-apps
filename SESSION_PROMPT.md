@@ -15,8 +15,9 @@
 ### What Was Completed
 
 1. **Research Presentation Materials card** on the Workbench Staff Deliberations tab
-   (`shared/components/workbench/ResearchPresentationMaterialsCard.js`). It is always shown, after the
-   distribution panel and Briefing page link card. Its status line reads: Presentation not scheduled /
+   (`shared/components/workbench/ResearchPresentationMaterialsCard.js`). It is always shown: once the
+   brief is shared it sits between the Briefing page link card and Email history (owner request after
+   the local check; `PreSiteDistributionPanel` `beforeHistory` slot); before that it follows the writeup cards. Its status line reads: Presentation not scheduled /
    Presentation scheduled · materials not requested / requested / ready. A closed collection reads
    "materials request closed"; a failed read reads "could not be loaded". Rows for Slides and
    Participant bios link to every file in the request's `Site Visit - Slides` /
@@ -45,8 +46,8 @@
 
 ### Verified Open
 
-1. **Owner check on Request 1002903.** Open Staff Deliberations on the branch Preview (or
-   `npm run dev` in the owner's own shell) and confirm both rows link the uploaded files.
+1. **Owner check on Request 1002903 — DONE (local dev, 2026-09-25).** The owner confirmed the card
+   works and asked for it above Email history, which was then built. Re-check the new placement.
    [ASSUMED] The files sit in folders named exactly `Site Visit - Slides` /
    `Site Visit - Participant Bios` under the request's active `akoya_request` folder. If a row reads
    "Not received yet", the folder name or location differs; check it in AkoyaGo before changing code.
@@ -72,8 +73,8 @@
 1. **Merge overlap with Codex Slice 5.** Codex will wire `useSiteVisitContext` and add a section to
    `StaffDeliberationsTab.js`, and already edits `lib/services/site-visit/logistics-service.js` and
    `pages/api/workbench/site-visit/logistics.js` (this branch does not). This branch changed
-   the hook's failure settle (`{ unavailable: true }`, directory decoupled) and mounted the card after
-   the distribution-panel block. Whoever merges second reconciles those two files.
+   the hook's failure settle (`{ unavailable: true }`, directory decoupled), mounted the card in the
+   tab, and added a `beforeHistory` slot to `PreSiteDistributionPanel.js`. Whoever merges second reconciles those two files.
 2. **Residual risk (§16.13):** the Workbench materials summary is fail-open `null`, so a failed summary
    read shows "materials not requested" for a scheduled presentation.
 3. **Agent wiki:** the write hook flagged `docs/agent-wiki/topics/security-auth.md` for the new route. It

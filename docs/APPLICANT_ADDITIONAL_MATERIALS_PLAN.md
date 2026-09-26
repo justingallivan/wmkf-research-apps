@@ -798,7 +798,9 @@ received-item match, and the briefing page) never see them. The owner asked for 
 them in the Workbench without opening AkoyaGo.
 
 - **Card:** `shared/components/workbench/ResearchPresentationMaterialsCard.js`, always shown on
-  the Staff Deliberations tab after the distribution panel. Its status line reads: Presentation
+  the Staff Deliberations tab. Once the brief is shared it sits between the Briefing page link card
+  and Email history (owner, 2026-09-25; `PreSiteDistributionPanel` `beforeHistory` slot); before
+  that it follows the writeup cards. Its status line reads: Presentation
   not scheduled, Presentation scheduled · materials not requested / requested / ready. A closed
   collection reads "materials request closed". A failed Site Visit read reads "could not be
   loaded", never "not scheduled". `useSiteVisitContext` now settles a failed logistics read as

@@ -72,6 +72,7 @@ jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
             {lockError && <p role="alert">{`mock-error: ${lockError}`}</p>}
           </>
         )}
+        {props.record && <div data-testid="mock-panel-before-history">{props.beforeHistory}</div>}
       </div>
     );
   }
@@ -1313,6 +1314,22 @@ test('the Research Presentation Materials card is always mounted with the visit 
   await waitFor(() => expect(lastMaterialsCardProps.materialsSummary).toEqual(materials));
   expect(lastMaterialsCardProps.requestId).toBe(REQUEST_ID);
   expect(lastMaterialsCardProps.siteVisitContext).toBe(siteVisitContextFeed);
+});
+
+test('once the brief is shared the materials card renders inside the panel, above Email history', async () => {
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  const slot = await screen.findByTestId('mock-panel-before-history');
+  expect(slot).toContainElement(screen.getByTestId('mock-materials-card'));
+  expect(screen.getAllByTestId('mock-materials-card')).toHaveLength(1);
+});
+
+test('before the brief is shared the materials card renders on its own, once', async () => {
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await screen.findByText(/Distribution panel: hidden/);
+  expect(screen.queryByTestId('mock-panel-before-history')).not.toBeInTheDocument();
+  expect(screen.getAllByTestId('mock-materials-card')).toHaveLength(1);
 });
 
 // ── T2 (client-request-layer Stage 2, plan §5) gap-fill: per-call-site
