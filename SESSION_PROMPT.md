@@ -35,31 +35,30 @@
    fact-consistency fix in the Factory doc is left to the Factory session.
 5. **Verification:** full Jest suite 1,104 suites / 16,553 tests passed; new suites for the service
    (5 tests), the card (13), and hook directory-failure cases; one mutation killed (directory
-   coupling). Every gate is green except `check:fact-consistency` (below). No visual pass was run:
-   local dev here reads production Dataverse, so it was not started.
+   coupling). Every gate is green; `check:fact-consistency` went red on the new route count until the
+   Factory session added the historical marker (`e7480e7bf`). The owner then checked the card in local dev
+   (production reads) on Request 1002903.
 
 ### Commits (`claude/ui-work`, pushed)
 - `3c8e06915` — Add Research Presentation Materials card to Staff Deliberations
 - `4e79ba433` — Keep the Site Visit when only the recipient directory fails
+- `5acff7af4` — Place the Research Presentation Materials card above Email history
+- `98cc433ad` — merge of PR #338 (production `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk`)
+- `b7e52f3ac` / `5f2d9a05d` — release docs and milestone entry; merge of PR #339
 
 ## Next Items (UI worktree)
 
 ### Verified Open
 
-1. **Owner check on Request 1002903 — DONE (local dev, 2026-09-25).** The owner confirmed the card
-   works and asked for it above Email history, which was then built. Re-check the new placement.
-   [ASSUMED] The files sit in folders named exactly `Site Visit - Slides` /
-   `Site Visit - Participant Bios` under the request's active `akoya_request` folder. If a row reads
-   "Not received yet", the folder name or location differs; check it in AkoyaGo before changing code.
-   [ASSUMED] Preview reads the same Dataverse/SharePoint as production; confirm on the Preview.
-2. **Promotion — DONE.** PR #338 merged `98cc433ad` (the owner ran the merge); production
-   `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` Ready on `applications.wmkeck.org` and verified as the merge build.
-   These post-merge doc updates are on `claude/ui-work` and need a small docs PR (Tier 0) to reach `main`.
-3. **`check:fact-consistency` is red on this branch** for one line only:
-   `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md:198` (a historical route-file count one below the live value).
-   The fix is a `<!-- fact-consistency:ignore fact=api-route-file-count reason=historical -->` marker on that
-   line. **Owner decision:** the Factory session adds it; this worktree does not touch that file.
-   **Now red on `main` as well** (the route merged in PR #338).
+1. **DONE — owner check on Request 1002903** (local dev, 2026-09-25): both rows linked the files; the
+   card was then moved above Email history at the owner's request. For another request: if a row
+   reads "Not received yet" despite files in AkoyaGo, the folder name or location differs from
+   `Site Visit - Slides` / `Site Visit - Participant Bios` under the active `akoya_request` folder.
+   Check that before changing code.
+2. **DONE — promotion.** PR #338 merged `98cc433ad`; production `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` was
+   verified as the merge build. The release docs merged via PR #339 (`5f2d9a05d`).
+3. **DONE — `check:fact-consistency`.** The Factory session marked the Stage 1d record historical
+   (`e7480e7bf`); the gate and its self-test pass on `main` (route files 227).
 
 ### Owner Decision Needed
 
