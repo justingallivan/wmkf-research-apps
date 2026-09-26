@@ -1,3 +1,55 @@
+# Session 549 Prompt: Disabled-state Preview deployment and shared-DB stop (branch-local)
+
+## Approved Preview preflight/deploy — 2026-09-25 PT
+
+**[VERIFIED via Git and Vercel CLI/API]** Work remained in
+`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on `codex/feature-request`; local and
+origin began at `a1ad6145819f2b993c51330d23a6e6ff48bcbb1a`. The main checkout, Factory branch,
+`main`, shared Preview alias, and Production deployment were not changed. Immutable Preview
+deployment `dpl_BTKYAuCZSefymnUPcahBtGpQgWZf` is Ready at
+`https://wmkfresearchapps-h2tcnfzkf-justin-gallivans-projects.vercel.app`; Vercel metadata attests
+Preview context, branch `codex/feature-request`, and commit `a1ad6145819f2b993c51330d23a6e6ff48bcbb1a`.
+Its remote canonical Turbopack build passed. The local canonical build hit the known worktree-only
+external-`node_modules` symlink panic; the documented `npx next build --webpack` fallback passed
+with only existing warnings. A protected deployment GET reached the application sign-in page, and
+the public disabled-state presentation-context smoke returned fail-closed `404 not_found` with
+`private, no-store`.
+Atlas, fact-consistency, build-claim-freshness, and memory-router gates each passed with their
+self-tests run sequentially; docs-catalog and agent-invariant gates also passed. No runtime code
+changed in this deployment/configuration turn, so no new Opus code-review claim is made.
+
+**[VERIFIED via branch-scoped Vercel inventory and masked pull comparison]** Preview settings scoped
+only to `codex/feature-request` now use the same sandbox Dataverse target and approved SharePoint
+site as the existing test-request Preview branch, with `DATAVERSE_DAL_ENFORCEMENT=on` and
+`MEETING_TRACKER_SCHEMA_READY=on`. Presentation rollout is deliberately pinned off:
+`POST_PRESENTATION_MATERIALS_SCHEMA_READY=off` and `POST_PRESENTATION_MATERIALS_ACCESS=off`.
+The Factory branch's settings were read but not edited. The project-level Preview inventory still
+lists `EXTERNAL_LINK_SECRET`; its value was neither requested nor printed.
+
+**[STOPPED before a Production-connected write]** A masked comparison proved Preview and Production
+resolve to the exact same Neon project, host, database, and connection URLs. A read-only query then
+proved `055_post_presentation_materials.sql` is not tracked and none of its three tables exists.
+Because the owner's approval was Preview-only and explicitly excluded Production changes, migration
+055 was not applied, schema readiness/access were not enabled, and no Postgres/Dataverse/SharePoint
+write or deletion occurred. This is a contract-reconciliation stop, not a failed migration.
+
+## Morning continuation
+
+- Obtain explicit authorization to apply additive migration 055 to the **shared Preview/Production
+  Neon database**. The earlier Preview-only migration approval is insufficient.
+- After successful apply/readback, change only this branch's presentation settings to
+  `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and
+  `POST_PRESENTATION_MATERIALS_ACCESS=test:4236c2b3-b053-f111-bec7-6045bd015cb0`, then create and
+  attest a fresh immutable Preview deployment.
+- Obtain a fresh exact approval before temporarily moving the shared registered-auth Preview alias
+  to that deployment. The immutable hostname is build/smoke evidence but is not a usable Microsoft
+  OAuth test origin by itself.
+- The owner can then open Request `1000334`, generate the materials-only Board link, and use the
+  already retained slot-version-3 recording for Safari Watch, more-than-two-minute seeking where
+  the media permits, and Download integrity. No new upload or deletion is needed.
+- Keep access `off` if migration/readback, deployment, authentication, or smoke fails. Do not change
+  Production runtime configuration/deployment or delete any retained item/row.
+
 # Session 548 Prompt: Durable presentation-media Safari upload acceptance (branch-local)
 
 ## Local-runtime / sandbox-data acceptance — 2026-09-25 PT

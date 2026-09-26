@@ -2178,6 +2178,30 @@ the code-owned 10 MiB default is the accepted fix. The live near-cap upload, sam
 45-minute threshold, and percentage-of-baseline threshold are removed. Keep the exact 2 GB
 validation/schema boundary and offline integrity/resume coverage.
 
+**2026-09-25 disabled-state Preview deployment and shared-database stop:** under the owner's
+concrete Preview-only approval, branch-scoped configuration for `codex/feature-request` was pointed
+at sandbox Dataverse and the approved SharePoint site, with Dataverse DAL enforcement and Meeting
+Tracker readiness on. Presentation schema readiness and access were explicitly pinned off. Ready
+immutable Preview deployment `dpl_BTKYAuCZSefymnUPcahBtGpQgWZf` was built from
+`a1ad6145819f2b993c51330d23a6e6ff48bcbb1a`; Vercel's canonical Turbopack build passed, a protected
+GET reached application sign-in, and the disabled public presentation-context smoke returned
+fail-closed `404 not_found` with no-store headers. No alias moved.
+Atlas, fact-consistency, build-claim-freshness, and memory-router gates each passed after their
+self-tests; docs-catalog and agent-invariant gates also passed. This turn changed configuration and
+durable receipts, not runtime code, so the existing iterative Opus implementation reviews remain
+the code-review evidence.
+
+The migration preflight found that Preview and Production resolve to the exact same Neon project,
+host, database, and connection URLs. Read-only schema inspection proved migration 055 untracked and
+all three presentation tables absent. Applying it would therefore be a Production-connected
+database change, outside the Preview-only approval. The migration was not applied; presentation
+readiness/access remain off; no Postgres, Dataverse, SharePoint, Production-runtime, or deletion
+action occurred. Continuation requires explicit approval naming the shared Preview/Production
+database, followed by migration apply/readback, branch-only readiness/access activation, a fresh
+immutable deployment, and a fresh exact approval before any temporary registered-auth Preview alias
+move. The retained Request `1000334` slot-version-3 recording can supply the eventual Safari
+Watch/seek/Download gate without another upload.
+
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof and local Safari upload acceptance. The remaining decision is
 whether the Production Safari media resolver/long-seek path passes. Failure returns to the bounded
