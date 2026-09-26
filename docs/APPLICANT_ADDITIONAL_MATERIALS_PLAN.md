@@ -801,8 +801,9 @@ them in the Workbench without opening AkoyaGo.
   the Staff Deliberations tab after the distribution panel. Its status line reads: Presentation
   not scheduled, Presentation scheduled · materials not requested / requested / ready. A closed
   collection reads "materials request closed". A failed Site Visit read reads "could not be
-  loaded", never "not scheduled". `useSiteVisitContext` now settles a failed read as
-  `{ unavailable: true }` instead of staying `null`. Rows for Slides and Participant bios link to
+  loaded", never "not scheduled". `useSiteVisitContext` now settles a failed logistics read as
+  `{ unavailable: true }` instead of staying `null`. A recipient-directory failure alone keeps the
+  visit and only drops suggested recipients. Rows for Slides and Participant bios link to
   every file in the matching folder, or say "Not received yet".
 - **Interim folder read:** `GET /api/workbench/site-visit/material-files` (`reviewers`) calls
   `lib/services/site-visit-materials/folder-files-service.js`. It lists the two folders,
@@ -811,5 +812,9 @@ them in the Workbench without opening AkoyaGo.
   Portal uploads land in the same folders and appear too. There are no counters and no registry
   writes: a hand-placed file still does not count toward the collection summary or appear on the
   briefing page.
+- **Residual risk:** the Workbench materials summary (`getMaterialsSummaryForRequest` on the
+  `/api/workbench/pre-site-visit` GET) is fail-open `null` with no availability signal. A failed
+  summary read therefore shows "materials not requested" for a scheduled presentation. The file
+  rows are unaffected because they come from the folder read.
 - **Retire when** the portal is the only intake route. The card's status line and the registry
   can then carry the links, and this route can go. A retirement needs its own caller check.

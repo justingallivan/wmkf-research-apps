@@ -36,18 +36,21 @@ export default function useSiteVisitContext(requestId) {
         signal: controller.signal,
         tolerantBody: true,
       }),
-      requestEnvelope('/api/workbench/site-visit/recipients', { signal: controller.signal, tolerantBody: true }),
+      requestEnvelope('/api/workbench/site-visit/recipients', { signal: controller.signal, tolerantBody: true })
+        .catch(() => ({ ok: false, data: {} })),
     ]).then(([logisticsEnvelope, directoryEnvelope]) => {
       const logisticsBody = logisticsEnvelope.data;
       const directoryBody = directoryEnvelope.data;
       if (cancelled) return;
       // A settled failure is distinct from loading (null) so consumers never
-      // read a failed Site Visit fetch as "no visit scheduled".
-      if (!logisticsEnvelope.ok || !directoryEnvelope.ok) { setContext({ unavailable: true }); return; }
+      // read a failed Site Visit fetch as "no visit scheduled". A directory
+      // failure alone keeps the visit and only loses suggested recipients.
+      if (!logisticsEnvelope.ok) { setContext({ unavailable: true }); return; }
       const visit = logisticsBody.siteVisit || null;
+      const directory = directoryEnvelope.ok ? directoryBody : {};
       const lookup = new Map([
-        ...(directoryBody.staff || []).map((row) => [refKey(row), row]),
-        ...(directoryBody.external || []).map((row) => [refKey(row), row]),
+        ...(directory.staff || []).map((row) => [refKey(row), row]),
+        ...(directory.external || []).map((row) => [refKey(row), row]),
       ]);
       const emails = (refs) => (refs || []).filter(Boolean).map((ref) => (
         ref.kind === 'manual' ? ref : lookup.get(refKey(ref))
