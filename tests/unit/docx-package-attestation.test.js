@@ -331,6 +331,26 @@ describe('attestDocxPackageAgainstSource', () => {
       await expect(attestDocxPackageAgainstSource(promoted, sourceWithOwnCustomXml)).resolves.toBeTruthy();
     });
 
+    // Codex slice review round 3: `[trash]` entries were exempted wholesale.
+    it('an added [trash] entry carrying non-zero bytes is refused by the source attestor (the round-3 counterexample)', async () => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('[trash]/foreign-payload.dat', Buffer.from('hidden payload')); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/trash entry \[trash\]\/foreign-payload\.dat is not a canonical/);
+    });
+    it('a canonically named [trash] entry carrying non-zero bytes is refused', async () => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('[trash]/0000.dat', Buffer.from([0, 0, 1, 0])); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/\[trash\]\/0000\.dat carries non-zero bytes/);
+    });
+    it('zero-filled canonical [trash] padding is normalized on either side', async () => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('[trash]/0000.dat', Buffer.alloc(64)); zip.file('[trash]/0001.dat', Buffer.alloc(8)); });
+      const result = await attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml);
+      expect(result.normalizedParts).toEqual(expect.arrayContaining(['[trash]/0000.dat', '[trash]/0001.dat']));
+      await expect(attestDocxPackageAgainstSource(mutated, mutated)).resolves.toBeTruthy();
+    });
+    it('the render attestor applies the same [trash] rule', async () => {
+      const mutated = await withParts(render, async (zip) => { zip.file('[trash]/0000.dat', Buffer.from('payload')); });
+      await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/\[trash\]\/0000\.dat carries non-zero bytes/);
+    });
+
     it('a customXml rels part beyond the old 2 KB head window is parsed in full: a trailing hyperlink relationship is refused', async () => {
       const padding = `<!-- ${'x'.repeat(2500)} -->`;
       const bad = SP_RELS.replace('<Relationship ', `${padding}<Relationship `).replace('</Relationships>', '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://attacker.example/" TargetMode="External"/></Relationships>');

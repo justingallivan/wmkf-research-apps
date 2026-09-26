@@ -233,6 +233,19 @@ beforeEach(() => {
   createReviewsSandboxDeps.mockReset();
 });
 
+/** The row a correctly created/reused synthetic person reads back as (full projection, marker, active, Contact-less). */
+function ownedSyntheticRow(over = {}) {
+  return {
+    wmkf_potentialreviewersid: DEST_PERSON_A,
+    wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane', wmkf_lastname: 'Reviewer',
+    wmkf_emailaddress: 'throwaway@example.test',
+    wmkf_areaofexpertise: 'Genomics', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
+    wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University',
+    wmkf_issyntheticreviewer: true, statecode: 0, _wmkf_contact_value: null,
+    ...over,
+  };
+}
+
 describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
   it('happy path: creates the person then the suggestion, and advances (single reviewer)', async () => {
     const assignments = [{
@@ -247,7 +260,7 @@ describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
     createReviewsSandboxDeps.mockReturnValue({
       createPerson,
       createSuggestion,
-      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
+      getPersonById: jest.fn(async () => ownedSyntheticRow()),
       getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
     });
     client.get = jest.fn(async () => ({ ok: true, status: 200, body: { akoya_requestnum: '1000', akoya_title: 'x', wmkf_meetingdate: '2026-12-01' }, text: '' }));
@@ -317,7 +330,7 @@ describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
     const createPerson = jest.fn();
     createReviewsSandboxDeps.mockReturnValue({
       createPerson,
-      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
+      getPersonById: jest.fn(async () => ownedSyntheticRow()),
       createSuggestion: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
       getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
     });
@@ -330,6 +343,60 @@ describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
     });
     expect(createPerson).not.toHaveBeenCalled();
     expect(result.outcome).toBe('advanced');
+  });
+});
+
+describe('stepSeedReviewers: create readback ownership (Codex slice round 3)', () => {
+  const bundle = bundleWithOneReviewer();
+  const { run, manifest } = runAndManifestFor(bundle);
+  const assignments = () => [{
+    sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+    addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
+  }];
+  const badRows = [
+    ['wrong address', ownedSyntheticRow({ wmkf_emailaddress: 'someone-else@example.test' }), 'reviewer_person_projection_drift'],
+    ['Contact-linked', ownedSyntheticRow({ _wmkf_contact_value: '11111111-1111-4111-8111-111111111111' }), 'reviewer_person_not_synthetic'],
+    ['inactive', ownedSyntheticRow({ statecode: 1 }), 'reviewer_person_not_synthetic'],
+    ['projection drift', ownedSyntheticRow({ wmkf_areaofexpertise: 'DRIFTED' }), 'reviewer_person_projection_drift'],
+  ];
+
+  it.each(badRows)('after a successful POST, a %s row at the preallocated GUID is refused, the resource stays dispatched, no suggestion is created', async (_label, row, code) => {
+    const { ledger } = createFakeLedger(run, { assignments: assignments() });
+    const createPerson = jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A }));
+    const createSuggestion = jest.fn();
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson, createSuggestion, getPersonById: jest.fn(async () => row), getSuggestionById: jest.fn(),
+    });
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+    const result = await advanceRun({ runId: RUN_ID, ledger, manifest, bundle, deps: { client, graph: {}, sharePointTarget: () => ({}) } });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe(code);
+    expect(createPerson).toHaveBeenCalledTimes(1);
+    expect(createSuggestion).not.toHaveBeenCalled();
+    const personResource = (await ledger.listRunResources()).find((r) => r.resourceKind === 'dataverse_potential_reviewer');
+    expect(personResource.outcome).toBe('dispatched');
+  });
+
+  it.each(badRows)('dispatch-marker recovery of a %s row is refused without re-POSTing', async (_label, row, code) => {
+    const { ledger } = createFakeLedger(run, { assignments: assignments() });
+    const preResource = await ledger.journalPlannedResource({
+      step: 'seed_reviewers', resourceKind: 'dataverse_potential_reviewer', system: 'dataverse',
+      plannedIdentity: { assignmentSequence: 1, destinationPersonId: DEST_PERSON_A, sourcePersonId: SOURCE_PERSON_A, addressSha256: ADDRESS_SHA256 },
+    });
+    await ledger.recordResourceReadback({ resourceId: preResource.resourceId, readback: { personCreateAttemptedAt: '2026-01-01T00:00:00Z' }, outcome: 'dispatched' });
+    const createPerson = jest.fn();
+    const createSuggestion = jest.fn();
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson, createSuggestion, getPersonById: jest.fn(async () => row), getSuggestionById: jest.fn(),
+    });
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+    const result = await advanceRun({ runId: RUN_ID, ledger, manifest, bundle, deps: { client, graph: {}, sharePointTarget: () => ({}) } });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe(code);
+    expect(createPerson).not.toHaveBeenCalled();
+    expect(createSuggestion).not.toHaveBeenCalled();
+    const personResource = (await ledger.listRunResources()).find((r) => r.resourceKind === 'dataverse_potential_reviewer');
+    expect(personResource.outcome).toBe('dispatched');
   });
 });
 
@@ -819,7 +886,7 @@ describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on o
     });
     createReviewsSandboxDeps.mockReturnValue({
       createPerson,
-      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
+      getPersonById: jest.fn(async () => ownedSyntheticRow()),
       createSuggestion: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
       getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
     });
@@ -845,7 +912,7 @@ describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on o
     const { ledger, calls } = createFakeLedger(run, { assignments });
     createReviewsSandboxDeps.mockReturnValue({
       createPerson: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A })),
-      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
+      getPersonById: jest.fn(async () => ownedSyntheticRow()),
       createSuggestion: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
       getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
     });
@@ -1036,7 +1103,7 @@ describe('Opus round 2, P2: destinationGrantCycleCode throwing before the sugges
     const createSuggestion = jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' }));
     createReviewsSandboxDeps.mockReturnValue({
       createPerson: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A })),
-      getPersonById: jest.fn(async () => ({ wmkf_potentialreviewersid: DEST_PERSON_A, wmkf_issyntheticreviewer: true })),
+      getPersonById: jest.fn(async () => ownedSyntheticRow()),
       createSuggestion,
       getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID })),
     });
