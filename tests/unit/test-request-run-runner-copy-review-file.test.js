@@ -270,7 +270,7 @@ describe('stepCopyReviewFile', () => {
     const resources = await ledger.listRunResources();
     const folderResource = resources.find((r) => r.step === 'copy_review_file' && r.resourceKind === 'sharepoint_folder');
     expect(folderResource.outcome).toBe('verified');
-    expect(folderResource.readback.primaryFilename).toBe('Review_1.pdf');
+    expect(folderResource.readback.filename).toBe('Review_1.pdf');
     expect(folderResource.plannedIdentity.folder).toMatch(/^Reviewer_Uploads\/Reviewer_[0-9a-f]{8}\/attempt_[0-9a-f]{32}$/);
     const fileResource = resources.find((r) => r.step === 'copy_review_file' && r.resourceKind === 'sharepoint_file');
     expect(fileResource.outcome).toBe('verified');
@@ -313,7 +313,7 @@ describe('stepCopyReviewFile', () => {
     const resources = await ledger.listRunResources();
     const sameFolderResource = resources.find((r) => r.resourceId === folderResource.resourceId);
     expect(sameFolderResource.plannedIdentity.folder).toBe(folder);
-    expect(sameFolderResource.readback.primaryFilename).toBe('Review_1.pdf');
+    expect(sameFolderResource.readback.filename).toBe('Review_1.pdf');
   });
 
   it('refuses the whole run before any journal when the bundle exceeds the total-bytes ceiling', async () => {

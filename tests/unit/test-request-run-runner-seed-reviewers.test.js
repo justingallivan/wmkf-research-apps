@@ -463,7 +463,7 @@ describe('stepSeedReviewAnswers', () => {
         plannedIdentity: { assignmentSequence: 1, folder: `Reviewer_Uploads/reviewer_abcd1234/attempt_${'a'.repeat(32)}` },
       });
       await ledger.recordResourceReadback({
-        resourceId: folderResource.resourceId, readback: { primaryFilename: 'Review_1.pdf' }, outcome: 'verified',
+        resourceId: folderResource.resourceId, readback: { filename: 'Review_1.pdf' }, outcome: 'verified',
       });
     }
     return {

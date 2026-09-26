@@ -506,24 +506,9 @@ describe('slice 6c-i: verify_initial_assessment terminal branch is per-recipe', 
   });
 });
 
-describe('slice 6c-ii Stage C: verify_reviews stops cleanly with recipe_step_not_built until it is built', () => {
-  // copy_review_file is built (Stage C); only verify_reviews remains a stub
-  // at this point in the branch's history. See
-  // test-request-run-runner-copy-review-file.test.js for copy_review_file's
-  // own coverage and test-request-run-runner-verify-reviews.test.js for
-  // verify_reviews once it lands.
-  it('verify_reviews marks the run needs_attention/recipe_step_not_built without calling markReady', async () => {
-    const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'reviews', currentStep: 'verify_reviews' }));
-    const manifest = baseManifest({ recipe: 'reviews' });
-    const result = await advanceRun({
-      runId: RUN_ID, ledger, manifest, bundle: null,
-      deps: { client: {}, graph: {}, sharePointTarget: () => ({}) },
-    });
-    expect(result.outcome).toBe('needs_attention');
-    expect(result.run.needsAttentionReason).toBe('recipe_step_not_built');
-    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
-  });
-});
+// slice 6c-ii Stage C: copy_review_file and verify_reviews are both built.
+// See test-request-run-runner-copy-review-file.test.js and
+// test-request-run-runner-verify-reviews.test.js for their own coverage.
 
 describe('P1-b: recipeIncludesStep / recipeLeaseSeconds', () => {
   it('recipeIncludesStep reports whether a step is in the recipe order', () => {
