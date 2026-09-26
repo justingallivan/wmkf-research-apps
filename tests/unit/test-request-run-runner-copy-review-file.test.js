@@ -33,7 +33,9 @@ const DEST_ITEM_ID = `01${'B'.repeat(32)}`;
 const DOCX_SOURCE_ITEM_ID = `01${'C'.repeat(32)}`;
 const DOCX_DEST_ITEM_ID = `01${'D'.repeat(32)}`;
 
-const NARRATIVE = Buffer.from('review file bytes');
+// Starts with the real PDF magic bytes ('%PDF-') so it passes P1-2's
+// (Opus round 1) magic-byte sniff in the copy step, same as a real upload.
+const NARRATIVE = Buffer.from('%PDF-1.4 review file bytes');
 const hash = (buffer) => crypto.createHash('sha256').update(buffer).digest('hex');
 
 function ok(body, status = 200) {
@@ -324,15 +326,88 @@ describe('stepCopyReviewFile', () => {
       plannedIdentity: { assignmentSequence: 1, folder },
     });
 
+    const graph = fakeGraph();
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
-      deps: { client: preflightClient(), graph: fakeGraph(), sharePointTarget },
+      deps: { client: preflightClient(), graph, sharePointTarget },
     });
     expect(result.outcome).toBe('advanced');
     const resources = await ledger.listRunResources();
     const sameFolderResource = resources.find((r) => r.resourceId === folderResource.resourceId);
     expect(sameFolderResource.plannedIdentity.folder).toBe(folder);
     expect(sameFolderResource.readback.filename).toBe('Review_1.pdf');
+    // P2-1 (Opus round 1): the fake Graph's ACTUAL upload folder -- not just
+    // the journaled resource's folder -- must equal the recovered attempt
+    // id's folder, so a regenerated (never-uploaded-to) attempt id would be
+    // caught even if the journal bookkeeping alone looked consistent.
+    const uploadFolderArg = graph.uploadFile.mock.calls[0][1];
+    expect(uploadFolderArg.endsWith(`/${folder}`)).toBe(true);
+  });
+
+  it('refuses (P2-1, Opus round 1) when the planned folder disagrees with the journaled folder resource', async () => {
+    const bundle = bundleWithOneReviewer();
+    const { run, manifest } = runAndManifestFor(bundle);
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
+    const { ledger } = createFakeLedger(run, { assignments });
+    await preseedSuggestion(ledger);
+    // Journal a folder resource whose attempt id cannot be recovered by
+    // buildReviewerSubfolder's own convention (a foreign subfolder segment),
+    // simulating a planner regression that would otherwise silently upload
+    // into an un-journaled folder.
+    const foreignFolder = 'Reviewer_Uploads/Reviewer_deadbeef/attempt_cccccccccccccccccccccccccccccccc';
+    await ledger.journalPlannedResource({
+      step: 'copy_review_file', resourceKind: 'sharepoint_folder', system: 'sharepoint',
+      plannedIdentity: { assignmentSequence: 1, folder: foreignFolder },
+    });
+    const graph = fakeGraph();
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client: preflightClient(), graph, sharePointTarget },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('file_journal_unverified');
+    expect(graph.uploadFile).not.toHaveBeenCalled();
+    const resources = await ledger.listRunResources();
+    const fileResource = resources.find((r) => r.step === 'copy_review_file' && r.resourceKind === 'sharepoint_file');
+    expect(fileResource.outcome).toBe('planned');
+  });
+
+  it('refuses (P1-2, Opus round 1) a .pdf-named file whose bytes are actually a DOCX (ZIP magic), before any upload', async () => {
+    const JSZip = require('jszip');
+    const zip = new JSZip();
+    zip.file('word/document.xml', '<w:document xmlns:w="ns"><w:body/></w:document>');
+    const docxBytesUnderPdfName = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const mismatchedFile = {
+      id: 'source-suggestion-1:item-1', kind: 'reviewerUpload', library: 'akoya_request',
+      folder: 'source-request/Reviewer_Uploads/reviewer_abcd1234/attempt_11111111111111111111111111111111',
+      name: 'MyReview.pdf', driveId: 'stale-drive', graphItemId: SOURCE_ITEM_ID, sharePointSite: SITE,
+      size: docxBytesUnderPdfName.length, mimeType: 'application/pdf', eTag: '"src-1"', versionId: '1.0',
+      contentHash: hash(docxBytesUnderPdfName), suggestionId: 'source-suggestion-1',
+    };
+    const bundle = bundleWithOneReviewer({ files: [mismatchedFile] });
+    const { run, manifest } = runAndManifestFor(bundle);
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
+    const { ledger } = createFakeLedger(run, { assignments });
+    await preseedSuggestion(ledger);
+    const graph = fakeGraph();
+    graph.downloadFile = jest.fn(async (driveId, itemId) => {
+      if (itemId === SOURCE_ITEM_ID) return { buffer: docxBytesUnderPdfName };
+      for (const item of graph.destination.values()) if (item.id === itemId) return { buffer: item.buffer };
+      throw new Error('missing');
+    });
+    graph.getFileMetadataById = jest.fn(async (driveId, itemId) => {
+      if (itemId === SOURCE_ITEM_ID) return { id: SOURCE_ITEM_ID, name: 'MyReview.pdf', size: docxBytesUnderPdfName.length, mimeType: 'application/pdf', eTag: '"src-1"', versionId: '1.0' };
+      for (const item of graph.destination.values()) if (item.id === itemId) return item;
+      return null;
+    });
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client: preflightClient(), graph, sharePointTarget },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('file_rejected');
+    expect(graph.ensureFolderPath).not.toHaveBeenCalled();
+    expect(graph.uploadFile).not.toHaveBeenCalled();
   });
 
   it('refuses the whole run before any journal when the bundle exceeds the total-bytes ceiling', async () => {
