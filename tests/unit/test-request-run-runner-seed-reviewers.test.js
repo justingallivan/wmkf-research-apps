@@ -400,6 +400,38 @@ describe('stepSeedReviewers: create readback ownership (Codex slice round 3)', (
   });
 });
 
+describe('stepSeedReviewers: a journaled (terminal) person receipt is re-asserted on resume (Codex reviewer-differs-from-author round)', () => {
+  const bundle = bundleWithOneReviewer();
+  const { run, manifest } = runAndManifestFor(bundle);
+  const assignments = () => [{
+    sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+    addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
+  }];
+  it.each([
+    ['inactive', ownedSyntheticRow({ statecode: 1 }), 'reviewer_person_not_synthetic'],
+    ['Contact-linked', ownedSyntheticRow({ _wmkf_contact_value: '11111111-1111-4111-8111-111111111111' }), 'reviewer_person_not_synthetic'],
+    ['projection-drifted', ownedSyntheticRow({ wmkf_emailaddress: 'someone-else@example.test' }), 'reviewer_person_projection_drift'],
+  ])('a row that became %s after the person receipt was written is refused before the suggestion is created', async (_label, rowNow, code) => {
+    const { ledger } = createFakeLedger(run, { assignments: assignments() });
+    const preResource = await ledger.journalPlannedResource({
+      step: 'seed_reviewers', resourceKind: 'dataverse_potential_reviewer', system: 'dataverse',
+      plannedIdentity: { assignmentSequence: 1, destinationPersonId: DEST_PERSON_A, sourcePersonId: SOURCE_PERSON_A, addressSha256: ADDRESS_SHA256 },
+    });
+    await ledger.recordResourceReadback({ resourceId: preResource.resourceId, readback: { destinationPersonId: DEST_PERSON_A }, outcome: 'verified' });
+    const createPerson = jest.fn();
+    const createSuggestion = jest.fn();
+    createReviewsSandboxDeps.mockReturnValue({
+      createPerson, createSuggestion, getPersonById: jest.fn(async () => rowNow), getSuggestionById: jest.fn(),
+    });
+    client.get = jest.fn(async () => ({ ok: true, status: 200, body: { wmkf_meetingdate: '2026-12-01' }, text: '' }));
+    const result = await advanceRun({ runId: RUN_ID, ledger, manifest, bundle, deps: { client, graph: {}, sharePointTarget: () => ({}) } });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe(code);
+    expect(createPerson).not.toHaveBeenCalled();
+    expect(createSuggestion).not.toHaveBeenCalled();
+  });
+});
+
 describe('stepSeedReviewers: reused person (reused: true)', () => {
   const bundle = bundleWithOneReviewer();
   const { run, manifest } = runAndManifestFor(bundle);

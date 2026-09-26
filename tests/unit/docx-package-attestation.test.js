@@ -351,6 +351,52 @@ describe('attestDocxPackageAgainstSource', () => {
       await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/\[trash\]\/0000\.dat carries non-zero bytes/);
     });
 
+    // Codex reviewer-differs-from-author round: an allowed root carrying a
+    // foreign-namespace payload, oversize parts, DOCTYPE, and UTF-16 parts.
+    const P_NS = 'http://schemas.microsoft.com/office/2006/metadata/properties';
+    it('an allowed p:properties root carrying a 4 KiB foreign-namespace child is refused by both attestors (the counterexample)', async () => {
+      const payload = `<p:properties xmlns:p="${P_NS}"><documentManagement/><x:payload xmlns:x="urn:foreign">${'A'.repeat(4096)}</x:payload></p:properties>`;
+      const mutatedSource = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item99.xml', payload); });
+      await expect(attestDocxPackageAgainstSource(mutatedSource, sourceWithOwnCustomXml)).rejects.toThrow(/item99\.xml carries element urn:foreign:payload outside the SharePoint namespace set/);
+      const mutatedRender = await withParts(render, async (zip) => { zip.file('customXml/item99.xml', payload); });
+      await expect(attestDocxPackageAgainstRender(mutatedRender, render)).rejects.toThrow(/item99\.xml carries element urn:foreign:payload/);
+    });
+    it('a foreign-namespace attribute inside an allowed item is refused', async () => {
+      const payload = `<p:properties xmlns:p="${P_NS}" xmlns:x="urn:foreign"><documentManagement x:data="${'B'.repeat(512)}"/></p:properties>`;
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item98.xml', payload); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/item98\.xml carries attribute x:data outside the SharePoint namespace set/);
+    });
+    it('a datastoreItem carrying a foreign child is refused', async () => {
+      const payload = '<ds:datastoreItem xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"><x:p xmlns:x="urn:foreign">hidden</x:p></ds:datastoreItem>';
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/itemProps9.xml', payload); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/itemProps9\.xml carries element urn:foreign:p/);
+    });
+    it('an allowed item larger than the SharePoint-part ceiling is refused even when every namespace is allowed', async () => {
+      const payload = `<p:properties xmlns:p="${P_NS}"><documentManagement>${'C'.repeat(40 * 1024)}</documentManagement></p:properties>`;
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item97.xml', payload); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/item97\.xml exceeds the 32768-byte ceiling/);
+    });
+    it('a DOCTYPE in any parsed part is refused', async () => {
+      const mutated = await withRels((rels) => `<!DOCTYPE Relationships [<!ENTITY e "x">]>${rels}`);
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/is not well-formed XML \(DOCTYPE/);
+    });
+    it('the live SharePoint properties item with a site-column (GUID) namespace child and xsi attributes passes', async () => {
+      const payload = `<?xml version="1.0" encoding="utf-8"?><p:properties xmlns:p="${P_NS}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><documentManagement><ns2:Column xmlns:ns2="1f0c4b4e-7d43-4c66-9b0f-3d2d6d5f0a11" xsi:nil="true"/></documentManagement></p:properties>`;
+      const promoted = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item5.xml', payload); });
+      await expect(attestDocxPackageAgainstSource(promoted, sourceWithOwnCustomXml)).resolves.toBeTruthy();
+    });
+    const utf16 = (text) => Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
+    it('a byte-identical package whose rels and content-types parts are UTF-16 with a BOM is accepted', async () => {
+      const utf16Package = await withParts(sourceWithOwnCustomXml, async (zip) => {
+        for (const part of ['word/_rels/document.xml.rels', '[Content_Types].xml']) zip.file(part, utf16(await zip.file(part).async('string')));
+      });
+      await expect(attestDocxPackageAgainstSource(utf16Package, utf16Package)).resolves.toBeTruthy();
+    });
+    it('a UTF-16 rels part carrying an added external relationship is still refused', async () => {
+      const mutated = await withRels((rels) => utf16(rels.replace('</Relationships>', '<Relationship Id="rId93" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://attacker.example/" TargetMode="External"/></Relationships>')));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/rId93 .* is not a SharePoint customXml relationship/);
+    });
+
     it('a customXml rels part beyond the old 2 KB head window is parsed in full: a trailing hyperlink relationship is refused', async () => {
       const padding = `<!-- ${'x'.repeat(2500)} -->`;
       const bad = SP_RELS.replace('<Relationship ', `${padding}<Relationship `).replace('</Relationships>', '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://attacker.example/" TargetMode="External"/></Relationships>');

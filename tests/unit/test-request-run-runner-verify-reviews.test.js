@@ -665,6 +665,34 @@ describe('stepVerifyReviews', () => {
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
   });
 
+  it('an inactive destination person (statecode 1) refuses ready even when every projected field matches', async () => {
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer, { statecode: 1 }),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    const { result, calls } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), reviewFileResource(),
+      ],
+      deps: { graph: fakeGraph({ includeReview: true }) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.errorMessage).toMatch(/destination person is not active/);
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+  });
+
   // Codex slice review round 1, F4: the default census depth (3) reaches
   // the attempt folder but not a folder nested INSIDE it, so a rogue file at
   // depth 4 was invisible to the terminal verifier. The fake walker honors
