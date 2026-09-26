@@ -851,4 +851,275 @@ describe('stepVerifyReviews', () => {
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
   });
+
+  // ── P2-5 (Opus round 1): one discriminating test per named finding ──────
+
+  it('mutation (M2): unreceived with wmkf_reviewuploadedbystaff:true fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'unreceived', answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const suggestion = {
+      wmkf_appreviewersuggestionid: DEST_SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID,
+      ...bundleReviewer.suggestion,
+      wmkf_reviewreceivedat: null, wmkf_completedat: null, wmkf_thankyousentat: null, wmkf_reviewstatus: null,
+      wmkf_reviewuploadedbystaff: true, // mutated: must be false/null for unreceived
+      wmkf_grantcyclecode: GRANT_CYCLE_CODE, wmkf_reviewsharepointfolder: null, wmkf_reviewfilename: null,
+      '@odata.etag': 'W/"1"',
+    };
+    mockDataverse({ person: personRow(bundleReviewer), suggestion, answers: [] });
+    const { result } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, reviewForm: 'unreceived' },
+          readback: { suggestionId: DEST_SUGGESTION_A, answerCount: 0 }, outcome: 'verified',
+        },
+      ],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation (M2): unreceived with a non-null wmkf_reviewreceivedat fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'unreceived', answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const suggestion = {
+      wmkf_appreviewersuggestionid: DEST_SUGGESTION_A, _wmkf_potentialreviewer_value: DEST_PERSON_A, _wmkf_request_value: REQUEST_ID,
+      ...bundleReviewer.suggestion,
+      wmkf_reviewreceivedat: '2026-09-25T00:00:00Z', // mutated: must be null for unreceived
+      wmkf_completedat: null, wmkf_thankyousentat: null, wmkf_reviewstatus: null,
+      wmkf_reviewuploadedbystaff: false,
+      wmkf_grantcyclecode: GRANT_CYCLE_CODE, wmkf_reviewsharepointfolder: null, wmkf_reviewfilename: null,
+      '@odata.etag': 'W/"1"',
+    };
+    mockDataverse({ person: personRow(bundleReviewer), suggestion, answers: [] });
+    const { result } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, reviewForm: 'unreceived' },
+          readback: { suggestionId: DEST_SUGGESTION_A, answerCount: 0 }, outcome: 'verified',
+        },
+      ],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation (M8): destination person not marker-true fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer, { wmkf_issyntheticreviewer: false }),
+      suggestion: suggestionRowFor(bundleReviewer),
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation (M9): destination person carries a Contact link fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer, { _wmkf_contact_value: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' }),
+      suggestion: suggestionRowFor(bundleReviewer),
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation: suggestion bound to the wrong destination person fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { overrides: { _wmkf_potentialreviewer_value: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' } }),
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation: suggestion bound to the wrong destination request fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { overrides: { _wmkf_request_value: 'ffffffff-ffff-4fff-8fff-ffffffffffff' } }),
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation: wmkf_grantcyclecode does not match the destination meeting date fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { overrides: { wmkf_grantcyclecode: 'WRONGCYCLE' } }),
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation: a missing answer row fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({ person: personRow(bundleReviewer), suggestion: suggestionRowFor(bundleReviewer), answers: [] });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation: an extra answer row fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer),
+      answers: [...ONE_ANSWER, { ...ONE_ANSWER[0], wmkf_questionkey: 'extraQuestion' }],
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation: a duplicate answer row (same question key twice) fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer),
+      answers: [ONE_ANSWER[0], { ...ONE_ANSWER[0] }],
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it.each([
+    ['wmkf_questionorder', 99],
+    ['wmkf_questiontext', 'Tampered question text'],
+    ['wmkf_questiontype', 'text'],
+    ['wmkf_answerhtml', '<p>tampered</p>'],
+    ['wmkf_answervalue', 999],
+    ['wmkf_questionoptions', JSON.stringify(['tampered'])],
+  ])('mutation: answer row field %s mismatch fails reviews_verification_failed', async (field, value) => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer),
+      answers: [{ ...ONE_ANSWER[0], [field]: value }],
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation: zero-answer received_no_file passes (a valid review can have no answers)', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file', answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({ person: personRow(bundleReviewer), suggestion: suggestionRowFor(bundleReviewer), answers: [] });
+    const { result } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(), answersResource({ eTagAfter: 'W/"2"' }),
+      ],
+    });
+    expect(result.outcome).toBe('ready');
+  });
+
+  it('mutation: a seeded suggestion missing from the destination fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer),
+      liveSuggestionIds: [],
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation (P2-5, Opus round 1): a copied review file failing re-verification inside the verifier fails needs_attention', async () => {
+    // [VERIFIED via run-runner.js:1884-1917, 2829-2836] verify_reviews's own
+    // combined census (verifyBasicAndInitialAssessment's `extraFileCopies:
+    // reviewFileCopies`, which reverifies every copy_review_file entry via
+    // reverifyClone -> reverifyCopiedItems) runs BEFORE the per-reviewer
+    // loop reaches verifyOneReview's own (structurally identical, defense-
+    // in-depth) reverifyCopiedItems call at line 2833 -- so a drifted review
+    // file is always caught there first, surfacing as ia_verification_failed
+    // rather than reviews_verification_failed. Both checks call the exact
+    // same reverifyCopiedItems logic on the exact same journaled entries.
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    // Journal a review file receipt whose eTag disagrees with what the fake
+    // Graph actually serves for that item -- reverifyCopiedItems' exact-hash
+    // re-verification must catch this drift.
+    const tamperedFileResource = { ...reviewFileResource(), readback: { ...reviewFileResource().readback, eTag: '"tampered-etag"' } };
+    const { result } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), tamperedFileResource,
+      ],
+      deps: { graph: fakeGraph({ includeReview: true }) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('ia_verification_failed');
+    expect(result.errorMessage).toMatch(/Review_1\.pdf metadata changed after verification/);
+  });
+
+  it('mutation: journaled folder disagrees with the destination pointers (non-null case) fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    // The suggestion's own pointers claim a DIFFERENT (but still non-null)
+    // folder than the one copy_review_file actually journaled.
+    const pointers = { folder: `${REVIEW_FULL_FOLDER}_wrong`, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    const { result } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), reviewFileResource(),
+      ],
+      deps: { graph: fakeGraph({ includeReview: true }) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
 });
