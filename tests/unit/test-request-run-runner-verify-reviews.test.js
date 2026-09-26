@@ -21,8 +21,9 @@ import { jest } from '@jest/globals';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
 import {
-  MANIFEST_V4, SANDBOX_URL, sha256, foundationBaselineDigest,
+  MANIFEST_V4, SANDBOX_URL, sha256, foundationBaselineDigest, computeRunPlanDigest,
 } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { REVIEW_FILE_COPY_POLICY, reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest, planBundleFileCopies } from '../../lib/services/test-requests/bundle-file-copy.js';
 import { SANDBOX_HOSTS, PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
@@ -205,6 +206,10 @@ function baseManifest(bundle, overrides = {}) {
     createBody,
     createBodySha256: CREATE_BODY_SHA256,
     copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
+    // F2: bound to the LIVE review-file copy policy (assertRunMatchesManifestAndBundle
+    // checks this against reviewFileCopyPolicyDigest() directly, never against
+    // a run-row column), so this must be the real function's output, not a placeholder.
+    reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: reviewFileCopyPolicyDigest() },
     expectedRequestType: { value: REQUEST_TYPE },
     expectedAppUserId: APP_USER_ID,
     expectedOrganization: { accountid: ORG_ID },
@@ -595,11 +600,14 @@ function mockDataverse({
 }
 
 async function runStep({
-  bundle, resources, assignments = [ASSIGNMENT], requestRow = requestReadback(), deps = {},
+  bundle, resources, assignments = [ASSIGNMENT], requestRow = requestReadback(), deps = {}, manifestOverrides = {},
 } = {}) {
-  const run0 = baseRun({}, bundle);
+  const manifest = baseManifest(bundle, manifestOverrides);
+  // F2: the pre-lease check recomputes planDigest from the manifest plus
+  // the ledger's own reviewer-assignment addressSha256 values.
+  const planDigest = computeRunPlanDigest({ manifest, reviewerAddressDigests: assignments.map((a) => a.addressSha256) });
+  const run0 = baseRun({ planDigest }, bundle);
   const { ledger, calls } = createFakeLedger(run0, resources, assignments);
-  const manifest = baseManifest(bundle);
   const result = await bypassDynamicsRestrictions('test:verify-reviews', () => advanceRun({
     runId: RUN_ID, ledger, manifest, bundle,
     deps: { client: fakeClient({ requestRow }), graph: fakeGraph(), sharePointTarget: SHARE_POINT_TARGET, ...deps },
@@ -1005,9 +1013,14 @@ describe('stepVerifyReviews', () => {
     // bundle with fewer files than the source is refused by the source
     // fence first, as `source_changed`. It guards a journal inconsistency,
     // and the missing-file case below covers the bundle-larger direction.)
+    // A MIME-type mutation is NOT in this table (F2, Codex slice 6c-ii
+    // Stage C round 1): review-file-copy.js's extension<->MIME binding
+    // means a `.pdf`-named file with an `application/msword` MIME is a
+    // review-file POLICY violation, not merely a journal/bundle drift, so
+    // the pre-lease `validateReviewFilePlan` check now refuses it before
+    // any lease -- covered separately below.
     ['the bundle lists a second file the journal never copied (missing-file check)', (r) => { r.files.push({ ...r.files[0], name: 'Second.pdf', graphItemId: '01SOURCEREVIEW00000000000000000002' }); }],
     ['the journaled source hash differs from the bundle (hash check)', (r) => { r.files[0].contentHash = 'f'.repeat(64); }],
-    ['the journaled MIME type differs from the bundle (MIME check; name unchanged)', (r) => { r.files[0].mimeType = 'application/msword'; }],
   ])('P3-1 (Opus round 2): uploaded review fails reviews_verification_failed when %s', async (_label, mutate) => {
     const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
     const bundleReviewer = bundle.reviewers[0];
@@ -1034,6 +1047,32 @@ describe('stepVerifyReviews', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('F2: a bundle file whose MIME type disagrees with its extension is refused pre-lease (validateReviewFilePlan), never reaching verify_reviews', async () => {
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    bundleReviewer.files[0].mimeType = 'application/msword';
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    await expect(runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), reviewFileResource(),
+      ],
+      deps: { graph: fakeGraph({ includeReview: true }) },
+    })).rejects.toThrow(/MIME type .* does not match its extension/);
   });
 
   it('mutation (M8): destination person not marker-true fails reviews_verification_failed', async () => {

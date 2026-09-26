@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import crypto from 'node:crypto';
 import {
-  REVIEW_FILE_COPY_POLICY, reviewFileCopyPolicyDigest, planReviewFileCopies,
+  REVIEW_FILE_COPY_POLICY, reviewFileCopyPolicyDigest, planReviewFileCopies, validateReviewFilePlan,
 } from '../../lib/services/test-requests/review-file-copy.js';
 
 const hash = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -120,5 +120,60 @@ describe('planReviewFileCopies', () => {
     ]);
     const reviews = [REVIEW, { ...REVIEW, sourcePersonId: 'person-2' }];
     expect(() => planReviewFileCopies(bundle, { reviews })).toThrow(/same destination folder/);
+  });
+});
+
+describe('validateReviewFilePlan (F2: reservation-time validation, no destination data)', () => {
+  it('passes for a bundle whose uploaded reviewer has valid files', () => {
+    const bundle = bundleWith([{ personId: 'person-1', suggestionId: 'sugg-1', reviewForm: 'uploaded', files: [reviewFile()] }]);
+    expect(() => validateReviewFilePlan(bundle, ['person-1'])).not.toThrow();
+  });
+
+  it('is a no-op for an uploaded reviewer with no files', () => {
+    const bundle = bundleWith([{ personId: 'person-1', suggestionId: 'sugg-1', reviewForm: 'uploaded', files: [] }]);
+    expect(() => validateReviewFilePlan(bundle, ['person-1'])).not.toThrow();
+  });
+
+  it('skips a non-uploaded reviewer (received_no_file/unreceived) EVEN IF its bundle entry carries files, matching copy_review_file\'s own uploadedAssignments filter', () => {
+    const bundle = bundleWith([{
+      personId: 'person-1', suggestionId: 'sugg-1', reviewForm: 'received_no_file',
+      // Policy-violating on purpose: proves this is skipped for its reviewForm, not merely tolerated.
+      files: [reviewFile({ name: 'Sneaky.exe', mimeType: PDF_MIME })],
+    }]);
+    expect(() => validateReviewFilePlan(bundle, ['person-1'])).not.toThrow();
+  });
+
+  it('never requires destination data (no destinationSuggestionId/destinationPersonName/attemptId in its inputs)', () => {
+    const bundle = bundleWith([{ personId: 'person-1', suggestionId: 'sugg-1', reviewForm: 'uploaded', files: [reviewFile()] }]);
+    // sourcePersonIds only -- no shape resembling `review` from planReviewFileCopies is accepted or needed.
+    expect(() => validateReviewFilePlan(bundle, ['person-1'])).not.toThrow();
+  });
+
+  it('refuses a MIME type that does not match its extension, same as planReviewFileCopies', () => {
+    const bundle = bundleWith([{ personId: 'person-1', suggestionId: 'sugg-1', reviewForm: 'uploaded', files: [reviewFile({ name: 'Sneaky.pdf', mimeType: DOCX_MIME })] }]);
+    expect(() => validateReviewFilePlan(bundle, ['person-1'])).toThrow(/MIME type .* does not match its extension/);
+  });
+
+  it('refuses more than maxFilesPerReview files', () => {
+    const files = Array.from({ length: 6 }, (_, i) => reviewFile({ name: `F${i}.pdf`, graphItemId: `item-${i}` }));
+    const bundle = bundleWith([{ personId: 'person-1', suggestionId: 'sugg-1', reviewForm: 'uploaded', files }]);
+    expect(() => validateReviewFilePlan(bundle, ['person-1'])).toThrow(/file-per-review ceiling/);
+  });
+
+  it('refuses more than maxReviewers source person ids', () => {
+    const bundle = bundleWith([{ personId: 'person-1', suggestionId: 'sugg-1', reviewForm: 'uploaded', files: [reviewFile()] }]);
+    const ids = Array.from({ length: REVIEW_FILE_COPY_POLICY.maxReviewers + 1 }, () => 'person-1');
+    expect(() => validateReviewFilePlan(bundle, ids, REVIEW_FILE_COPY_POLICY)).toThrow(/reviewer\(s\) exceeds/);
+  });
+
+  it('refuses when the total plan exceeds maxTotalBytes', () => {
+    const tinyPolicy = { ...REVIEW_FILE_COPY_POLICY, maxTotalBytes: 500 };
+    const bundle = bundleWith([{ personId: 'person-1', suggestionId: 'sugg-1', reviewForm: 'uploaded', files: [reviewFile({ size: 1000 })] }]);
+    expect(() => validateReviewFilePlan(bundle, ['person-1'], tinyPolicy)).toThrow(/exceeding the 500-byte ceiling/);
+  });
+
+  it('refuses a source person id missing from the bundle', () => {
+    const bundle = bundleWith([]);
+    expect(() => validateReviewFilePlan(bundle, ['person-1'])).toThrow(/no reviewer for person/);
   });
 });

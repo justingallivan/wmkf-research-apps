@@ -71,6 +71,7 @@ import {
   bundleSourceOf,
   checkPreallocatedRequestAbsent,
   compileBody,
+  computeRunPlanDigest,
   correctMeetingDate,
   createRequestWithGoverifyBypass,
   fenceSource,
@@ -101,6 +102,7 @@ import {
 } from '../lib/services/test-requests/run-ledger.js';
 import { pgLedgerDb } from '../lib/services/test-requests/run-ledger-db.js';
 import { createReviewsSandboxDeps } from '../lib/services/test-requests/reviews-sandbox-deps.js';
+import { validateReviewFilePlan } from '../lib/services/test-requests/review-file-copy.js';
 import { syntheticPersonProjection } from '../lib/services/reviewer-engagement/seed-synthetic-review.js';
 import { syntheticReviewerIsolationEnabled, SYNTHETIC_REVIEWER_MARKER_FIELDS } from '../lib/services/test-requests/isolation.js';
 
@@ -776,27 +778,25 @@ export async function runReserve(client, args, ledgerUrl) {
       await resolutionDb.end();
     }
   }
+  // F2 (Codex slice 6c-ii Stage C round 1): a `reviews` reservation must
+  // validate the review-file policy against the bundle's uploaded
+  // reviewers BEFORE anything is written -- no manifest, no ledger row --
+  // so a policy violation never strands a half-reserved run.
+  if (manifest.recipe === 'reviews') {
+    validateReviewFilePlan(bundle, reviewerAssignments.map((a) => a.sourcePersonId));
+  }
   // The plan digest binds the ledger-relevant identities/hashes, never
   // purpose text or the create body itself. Recipe is included so a same-key
   // retry naming a different recipe conflicts instead of returning the first
   // run. For `reviews`, the address digests (sorted, order-independent) and
   // the assignment count are bound too (6c-i build notes), so a same-key
   // retry naming different addresses conflicts instead of silently reusing
-  // the first reservation's assignments.
-  const planDigest = sha256({
-    runId: manifest.values.runId,
-    recipe: manifest.recipe,
-    destinationRequestId: manifest.values.requestId,
-    destinationLocationId: manifest.values.locationId,
-    sourceRequestId: manifest.source.requestId,
-    sourceRevision: manifest.source.revision,
-    bundleSha256: manifest.source.bundleSha256,
-    copyPolicyDigest: manifest.copyPolicy.digest,
-    createBodySha256: manifest.createBodySha256,
-    ...(manifest.recipe === 'reviews' ? {
-      reviewerAddressDigests: reviewerAssignments.map((a) => reviewerAddressSha256(a.address).addressSha256).sort(),
-      reviewerAssignmentCount: reviewerAssignments.length,
-    } : {}),
+  // the first reservation's assignments. computeRunPlanDigest (F2 change 3)
+  // is the SAME shared helper the runner's pre-lease check recomputes from
+  // the manifest alone at advance time.
+  const planDigest = computeRunPlanDigest({
+    manifest,
+    reviewerAddressDigests: reviewerAssignments.map((a) => reviewerAddressSha256(a.address).addressSha256),
   });
   const plan = {
     runId: manifest.values.runId,

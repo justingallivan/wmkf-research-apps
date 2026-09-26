@@ -239,6 +239,26 @@ describe('assertSyntheticReviewerIsolationOnForReviews', () => {
   });
 });
 
+describe('F2 (Codex slice 6c-ii Stage C round 1): I4 -- reservation-time review-file validation runs before the manifest is written', () => {
+  // runReserve is not unit-mockable at this depth (buildGraphContext ->
+  // runPreflight -> resolveReviewerAssignments -> Postgres, all real
+  // dependencies with no injection seam) -- this is a SOURCE-ORDER pin, not
+  // a behavioral test: it proves `validateReviewFilePlan` is called
+  // strictly before `writeNewJson(args.manifestOut, ...)` in the script's
+  // own source, exactly as `runReserve`'s call graph in
+  // lib/services/test-requests/review-file-copy.js and the module's own
+  // comments describe. M3 (moving the call after writeNewJson) turns this
+  // red.
+  test('validateReviewFilePlan is called before writeNewJson(args.manifestOut, ...) in runReserve', () => {
+    const source = fs.readFileSync(path.resolve(process.cwd(), 'scripts/rehearse-test-request-sandbox.mjs'), 'utf8');
+    const validateIndex = source.indexOf('validateReviewFilePlan(bundle');
+    const writeManifestIndex = source.indexOf('writeNewJson(args.manifestOut');
+    expect(validateIndex).toBeGreaterThan(-1);
+    expect(writeManifestIndex).toBeGreaterThan(-1);
+    expect(validateIndex).toBeLessThan(writeManifestIndex);
+  });
+});
+
 describe('P2-3: runReserve/runAdvance refuse before any Dataverse or ledger call when the switch is off', () => {
   const ENV_KEY = 'SYNTHETIC_REVIEWER_ISOLATION';
   let saved;

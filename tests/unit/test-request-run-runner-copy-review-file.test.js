@@ -7,8 +7,14 @@
 import crypto from 'node:crypto';
 import { jest } from '@jest/globals';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
-import { sha256, MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
-import { REVIEW_FILE_COPY_POLICY } from '../../lib/services/test-requests/review-file-copy.js';
+import { sha256, MANIFEST_V4, computeRunPlanDigest } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { REVIEW_FILE_COPY_POLICY, reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
+
+// F2 (Codex slice 6c-ii Stage C round 1): every test in this file uses the
+// same single reviewer assignment's addressSha256 (a fixed placeholder, not
+// a real hash of any address) -- one shared constant so the manifest's
+// bound planDigest and the fake ledger's returned assignment always agree.
+const ADDRESS_SHA256 = 'a'.repeat(64);
 import { assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
@@ -77,6 +83,10 @@ function baseManifest(bundleSha256, overrides = {}) {
     source: { requestId: SOURCE_ID, revision: 'rev-1', requestType: 100000000, bundleSha256 },
     createBodySha256: 'body-hash',
     copyPolicy: { digest: 'policy-digest' },
+    // F2: bound to the LIVE review-file copy policy (assertRunMatchesManifestAndBundle
+    // checks this against reviewFileCopyPolicyDigest() directly, never against
+    // a run-row column), so this must be the real function's output, not a placeholder.
+    reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: reviewFileCopyPolicyDigest() },
     expectedRequestType: { value: 100000000 },
     expectedAppUserId: APP_USER_ID,
     expectedOrganization: { accountid: ORG_ID },
@@ -88,7 +98,13 @@ function baseManifest(bundleSha256, overrides = {}) {
 
 function runAndManifestFor(bundle, runOverrides = {}, manifestOverrides = {}) {
   const digest = sha256(bundle);
-  return { run: baseRun({ bundleSha256: digest, ...runOverrides }), manifest: baseManifest(digest, manifestOverrides) };
+  const manifest = baseManifest(digest, manifestOverrides);
+  // F2: the pre-lease check recomputes planDigest from the manifest plus
+  // the ledger's own reviewer-assignment addressSha256 values; every test
+  // in this file uses the single ADDRESS_SHA256 assignment (sequence 1), so
+  // that is the default here too.
+  const planDigest = computeRunPlanDigest({ manifest, reviewerAddressDigests: [ADDRESS_SHA256] });
+  return { run: baseRun({ bundleSha256: digest, planDigest, ...runOverrides }), manifest };
 }
 
 function bundleWithOneReviewer({ reviewForm = 'uploaded', files } = {}) {
@@ -259,13 +275,57 @@ function fakeGraph({ uploadedBytesOverride } = {}) {
 
 const sharePointTarget = () => ({ ...TARGET, siteUrl: 'https://example.sharepoint.com/sites/akoyago' });
 
+describe('F2 (Codex slice 6c-ii Stage C round 1): I5 -- pre-lease check refuses before any lease', () => {
+  it('a stale reviewFilePolicy digest is refused before any lease is claimed', async () => {
+    const bundle = bundleWithOneReviewer({ reviewForm: 'unreceived' });
+    const { run, manifest } = runAndManifestFor(bundle, {}, {
+      reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: 'f'.repeat(64) },
+    });
+    const { ledger, calls } = createFakeLedger(run, { assignments: [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }] });
+    await expect(advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client: preflightClient(), graph: fakeGraph(), sharePointTarget },
+    })).rejects.toThrow(/reviewFilePolicyDigest/);
+    expect(calls.filter((c) => c.op === 'claimLease')).toHaveLength(0);
+  });
+
+  it('a recomputed plan digest that disagrees with run.planDigest is refused before any lease is claimed', async () => {
+    const bundle = bundleWithOneReviewer({ reviewForm: 'unreceived' });
+    const { run, manifest } = runAndManifestFor(bundle, { planDigest: 'e'.repeat(64) });
+    const { ledger, calls } = createFakeLedger(run, { assignments: [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }] });
+    await expect(advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client: preflightClient(), graph: fakeGraph(), sharePointTarget },
+    })).rejects.toThrow(/planDigest/);
+    expect(calls.filter((c) => c.op === 'claimLease')).toHaveLength(0);
+  });
+
+  it('the run\'s uploaded assignments failing validateReviewFilePlan (bad MIME) is refused before any lease is claimed', async () => {
+    const bundle = bundleWithOneReviewer({
+      files: [{
+        id: 'source-suggestion-1:item-1', kind: 'reviewerUpload', library: 'akoya_request',
+        folder: 'x', name: 'MyReview.pdf', driveId: 'stale-drive', graphItemId: SOURCE_ITEM_ID, sharePointSite: SITE,
+        size: NARRATIVE.length, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        eTag: '"src-1"', versionId: '1.0', contentHash: hash(NARRATIVE), suggestionId: 'source-suggestion-1',
+      }],
+    });
+    const { run, manifest } = runAndManifestFor(bundle);
+    const { ledger, calls } = createFakeLedger(run, { assignments: [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }] });
+    await expect(advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client: preflightClient(), graph: fakeGraph(), sharePointTarget },
+    })).rejects.toThrow(/MIME type .* does not match its extension/);
+    expect(calls.filter((c) => c.op === 'claimLease')).toHaveLength(0);
+  });
+});
+
 describe('stepCopyReviewFile', () => {
   beforeEach(() => { process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0'); });
 
   it('a bundle with zero uploaded reviews advances immediately with no journal', async () => {
     const bundle = bundleWithOneReviewer({ reviewForm: 'unreceived' });
     const { run, manifest } = runAndManifestFor(bundle);
-    const { ledger, calls } = createFakeLedger(run, { assignments: [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }] });
+    const { ledger, calls } = createFakeLedger(run, { assignments: [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }] });
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
       deps: { client: preflightClient(), graph: fakeGraph(), sharePointTarget },
@@ -278,7 +338,7 @@ describe('stepCopyReviewFile', () => {
   it('copies the one uploaded file, journals the folder resource with the primary filename, and advances', async () => {
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64), address: 'throwaway@example.test' }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test' }];
     const { ledger, calls } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
 
@@ -301,7 +361,7 @@ describe('stepCopyReviewFile', () => {
   it('a review with no seeded suggestion refuses reviewer_answers_ambiguous', async () => {
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }];
     const { ledger } = createFakeLedger(run, { assignments });
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
@@ -314,7 +374,7 @@ describe('stepCopyReviewFile', () => {
   it('resumes with the SAME attempt id recovered from the journaled folder resource, never a fresh one', async () => {
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }];
     const { ledger } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
     // Pre-seed a folder resource as if a prior call already picked an
@@ -347,7 +407,7 @@ describe('stepCopyReviewFile', () => {
   it('refuses (P2-1, Opus round 1) when the planned folder disagrees with the journaled folder resource', async () => {
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }];
     const { ledger } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
     // Journal a folder resource whose attempt id cannot be recovered by
@@ -386,7 +446,7 @@ describe('stepCopyReviewFile', () => {
     };
     const bundle = bundleWithOneReviewer({ files: [mismatchedFile] });
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }];
     const { ledger } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
     const graph = fakeGraph();
@@ -419,15 +479,21 @@ describe('stepCopyReviewFile', () => {
     };
     const bundle = bundleWithOneReviewer({ files: [bigFile] });
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }];
     const { ledger, calls } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
-    const result = await advanceRun({
+    // F2 (Codex slice 6c-ii Stage C round 1): the pre-lease
+    // `validateReviewFilePlan` check now refuses this BEFORE any lease is
+    // even claimed (via the per-file ceiling -- this fixture's one file also
+    // exceeds it), so it is a caller-error rejection, never a recorded
+    // `needs_attention` transition -- still fail-closed with no journal at
+    // all, just earlier and more specific than `copy_review_file`'s own
+    // whole-bundle total-bytes pre-check.
+    await expect(advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
       deps: { client: preflightClient(), graph: fakeGraph(), sharePointTarget },
-    });
-    expect(result.outcome).toBe('needs_attention');
-    expect(result.run.lastError.message).toMatch(/exceeding the .*-byte ceiling/);
+    })).rejects.toThrow(/-byte ceiling/);
+    expect(calls.filter((c) => c.op === 'claimLease')).toHaveLength(0);
     expect(calls.filter((c) => c.op === 'journalPlannedResource' && c.step === 'copy_review_file')).toHaveLength(0);
   });
 });
@@ -460,7 +526,7 @@ describe('stepCopyReviewFile: DOCX package integrity mode wired end-to-end', () 
     };
     const bundle = bundleWithOneReviewer({ files: [docxFile] });
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: ADDRESS_SHA256 }];
     const { ledger } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
 

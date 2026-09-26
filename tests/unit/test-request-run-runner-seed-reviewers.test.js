@@ -26,10 +26,17 @@ jest.mock('../../lib/services/reviewer-engagement/seed-synthetic-review.js', () 
 });
 
 const { advanceRun } = require('../../lib/services/test-requests/run-runner.js');
-const { MANIFEST_V4, sha256 } = require('../../lib/services/test-requests/basic-clone-steps.js');
+const { MANIFEST_V4, sha256, computeRunPlanDigest } = require('../../lib/services/test-requests/basic-clone-steps.js');
 const { createReviewsSandboxDeps } = require('../../lib/services/test-requests/reviews-sandbox-deps.js');
 const { buildCompletionWrite } = require('../../lib/services/reviewer-engagement/seed-synthetic-review.js');
 const { assertLedgerReceipt } = require('../../lib/services/test-requests/run-ledger.js');
+const { REVIEW_FILE_COPY_POLICY, reviewFileCopyPolicyDigest } = require('../../lib/services/test-requests/review-file-copy.js');
+
+// F2 (Codex slice 6c-ii Stage C round 1): every test in this file uses a
+// single reviewer assignment (sequence 1) with this same fixed placeholder
+// addressSha256 -- one shared constant so the manifest's bound planDigest
+// and the fake ledger's returned assignment always agree.
+const ADDRESS_SHA256 = 'a'.repeat(64);
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -77,6 +84,10 @@ function baseManifest(bundleSha256, overrides = {}) {
     source: { requestId: SOURCE_ID, revision: 'rev-1', requestType: 100000000, bundleSha256 },
     createBodySha256: 'body-hash',
     copyPolicy: { digest: 'policy-digest' },
+    // F2: bound to the LIVE review-file copy policy (assertRunMatchesManifestAndBundle
+    // checks this against reviewFileCopyPolicyDigest() directly, never against
+    // a run-row column), so this must be the real function's output, not a placeholder.
+    reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: reviewFileCopyPolicyDigest() },
     expectedRequestType: { value: 100000000 },
     expectedAppUserId: APP_USER_ID,
     expectedOrganization: { accountid: ORG_ID },
@@ -89,7 +100,13 @@ function baseManifest(bundleSha256, overrides = {}) {
 /** Build a matched {run, manifest} pair whose bundleSha256 agrees with the given bundle's real digest. */
 function runAndManifestFor(bundle, runOverrides = {}, manifestOverrides = {}) {
   const digest = sha256(bundle);
-  return { run: baseRun(digest, runOverrides), manifest: baseManifest(digest, manifestOverrides) };
+  const manifest = baseManifest(digest, manifestOverrides);
+  // F2: the pre-lease check recomputes planDigest from the manifest plus
+  // the ledger's own reviewer-assignment addressSha256 values; every test
+  // in this file uses the single ADDRESS_SHA256 assignment (sequence 1), so
+  // that is the default here too.
+  const planDigest = computeRunPlanDigest({ manifest, reviewerAddressDigests: [ADDRESS_SHA256] });
+  return { run: baseRun(digest, { planDigest, ...runOverrides }), manifest };
 }
 
 function bundleWithOneReviewer(overrides = {}) {
@@ -220,7 +237,7 @@ describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
   it('happy path: creates the person then the suggestion, and advances (single reviewer)', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -257,7 +274,7 @@ describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
   it('alternate-key conflict on the person create stops the run with reviewer_person_conflict', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -282,7 +299,7 @@ describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
   it('dispatch-marker rule: a resource with a prior create attempt never re-POSTs, recovers by GUID', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -292,7 +309,7 @@ describe('stepSeedReviewers: fresh person + suggestion (reused: false)', () => {
     // the real advanceRun call runs (simulating a crash between POST and readback).
     const preResource = await ledger.journalPlannedResource({
       step: 'seed_reviewers', resourceKind: 'dataverse_potential_reviewer', system: 'dataverse',
-      plannedIdentity: { assignmentSequence: 1, destinationPersonId: DEST_PERSON_A, sourcePersonId: SOURCE_PERSON_A, addressSha256: 'a'.repeat(64) },
+      plannedIdentity: { assignmentSequence: 1, destinationPersonId: DEST_PERSON_A, sourcePersonId: SOURCE_PERSON_A, addressSha256: ADDRESS_SHA256 },
     });
     await ledger.recordResourceReadback({
       resourceId: preResource.resourceId, readback: { personCreateAttemptedAt: '2026-01-01T00:00:00Z' }, outcome: 'dispatched',
@@ -323,7 +340,7 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
   it('happy path: re-verifies marker/active/no-contact/projection, journals recovered, never creates', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger } = createFakeLedger(run, { assignments });
     const createPerson = jest.fn();
@@ -355,7 +372,7 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
   it('refuses reuse of a row whose marker is not true (reviewer_person_not_synthetic)', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger } = createFakeLedger(run, { assignments });
     createReviewsSandboxDeps.mockReturnValue({
@@ -375,7 +392,7 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
   it('refuses reuse of a row whose projection has drifted (reviewer_person_projection_drift)', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger } = createFakeLedger(run, { assignments });
     createReviewsSandboxDeps.mockReturnValue({
@@ -401,7 +418,7 @@ describe('stepSeedReviewers: reused person (reused: true)', () => {
   it('a lease_lost is reported when the lease is lost before the person resource can be completed', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger } = createFakeLedger(run, { assignments });
     createReviewsSandboxDeps.mockReturnValue({
@@ -477,7 +494,7 @@ describe('stepSeedReviewAnswers', () => {
   it('uploaded with answers: dispatches the atomic changeset with the copy_review_file-journaled pointers and records eTagBefore/eTagAfter/answerCount', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger, bundle, manifest } = await seededLedger(assignments);
     const runChangeset = jest.fn(async () => ({ ok: true }));
@@ -506,7 +523,7 @@ describe('stepSeedReviewAnswers', () => {
   it('uploaded review refuses reviews_verification_failed when copy_review_file has not journaled its pointers', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer({ reviewer: { reviewForm: 'uploaded' } });
     const { run, manifest } = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 });
@@ -534,7 +551,7 @@ describe('stepSeedReviewAnswers', () => {
   it('unreceived: no changeset dispatched, answerCount 0', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger, bundle, manifest } = await seededLedger(assignments, { reviewForm: 'unreceived' });
     const runChangeset = jest.fn();
@@ -553,7 +570,7 @@ describe('stepSeedReviewAnswers', () => {
   it('received_no_file with zero answers: a single parent-only op through the same changeset transport', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger, bundle, manifest } = await seededLedger(assignments, { reviewForm: 'received_no_file', answers: [] });
     const runChangeset = jest.fn(async () => ({ ok: true }));
@@ -570,7 +587,7 @@ describe('stepSeedReviewAnswers', () => {
   it('a changeset failure with no confirmed outcome stops the run with reviewer_answers_ambiguous', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger, bundle, manifest } = await seededLedger(assignments);
     createReviewsSandboxDeps.mockReturnValue({
@@ -588,7 +605,7 @@ describe('stepSeedReviewAnswers', () => {
   it('missing suggestion resource (seed_reviewers never ran) refuses with reviewer_answers_ambiguous', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 });
@@ -605,7 +622,7 @@ describe('stepSeedReviewAnswers', () => {
   it('P2-1: a changeset resume with the marker set and wmkf_reviewreceivedat null ends reviewer_answers_ambiguous, runChangeset never called', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger, bundle } = await seededLedger(assignments);
     // Pre-seed the answers resource with a dispatched-but-unconfirmed changeset attempt.
@@ -635,10 +652,95 @@ describe('stepSeedReviewAnswers', () => {
     expect(runChangeset).not.toHaveBeenCalled();
   });
 
+  // F3 (Codex slice 6c-ii Stage C round 1), I6/I7, mutation M5: a post-
+  // changeset readback with no eTag must never record `verified`. The
+  // resource stays `dispatched` (attempt marker intact), the step throws
+  // (run stops needs_attention with `reviewer_answers_ambiguous`), and the
+  // NEXT advance takes the existing `changesetAttemptedAt` resume branch,
+  // which repeats the readback ONLY (runChangeset is never called a second
+  // time) and records `recovered` once it sees an eTag.
+  it('F3: a verified-branch readback with no eTag stays dispatched and throws; the next advance resumes, repeats only the readback, and records recovered', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
+    }];
+    const { ledger, bundle, manifest } = await seededLedger(assignments);
+    const runChangeset = jest.fn(async () => ({ ok: true }));
+    const getSuggestionById = jest.fn()
+      // Advance 1's guard read (before dispatch): a valid eTag.
+      .mockResolvedValueOnce({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })
+      // Advance 1's post-changeset readback: NO eTag (the F3 defect this guards against).
+      .mockResolvedValueOnce({ wmkf_appreviewersuggestionid: SUGGESTION_A })
+      // Advance 2's resume readback: now has an eTag AND wmkf_reviewreceivedat set.
+      .mockResolvedValueOnce({ wmkf_appreviewersuggestionid: SUGGESTION_A, wmkf_reviewreceivedat: '2026-01-01T00:00:00Z', _etag: 'W/"2"' });
+    createReviewsSandboxDeps.mockReturnValue({ runChangeset, getSuggestionById });
+
+    const first = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(first.outcome).toBe('needs_attention');
+    expect(first.run.needsAttentionReason).toBe('reviewer_answers_ambiguous');
+    const afterFirst = (await ledger.listRunResources()).find((r) => r.resourceKind === 'dataverse_review_answer_set');
+    expect(afterFirst.outcome).toBe('dispatched');
+    expect(afterFirst.readback.changesetAttemptedAt).toBeTruthy();
+    expect(afterFirst.readback.eTagAfter).toBeUndefined();
+    expect(runChangeset).toHaveBeenCalledTimes(1);
+
+    const second = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    const answerResource = second.resources.find((r) => r.resourceKind === 'dataverse_review_answer_set');
+    expect(answerResource.outcome).toBe('recovered');
+    expect(answerResource.readback.eTagAfter).toBe('W/"2"');
+    // The changeset itself is never re-dispatched across the whole sequence.
+    expect(runChangeset).toHaveBeenCalledTimes(1);
+  });
+
+  // F3, mutation M6: the resume branch reverted to `row._etag || undefined`
+  // would silently record `recovered` with no eTag when the row has none.
+  // Guarded here directly against a resume-state resource (no verified-
+  // branch detour needed): a readback with `wmkf_reviewreceivedat` set but
+  // no `_etag` must stay `dispatched` and throw, never record `recovered`.
+  it('F3 (M6 guard): a resume-branch readback with wmkf_reviewreceivedat set but no eTag stays dispatched, never recovered, runChangeset never called', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
+    }];
+    const { ledger, bundle } = await seededLedger(assignments);
+    // Pre-seed the answers resource with a dispatched-but-unconfirmed changeset attempt.
+    await ledger.journalPlannedResource({
+      step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+      plannedIdentity: { assignmentSequence: 1, suggestionId: SUGGESTION_A, reviewForm: 'uploaded', answerCount: 1 },
+    });
+    const preResources = await ledger.listRunResources();
+    const planned = preResources[preResources.length - 1];
+    await ledger.recordResourceReadback({
+      resourceId: planned.resourceId, readback: { changesetAttemptedAt: '2026-01-01T00:00:00Z', eTagBefore: 'W/"1"' }, outcome: 'dispatched',
+    });
+    const runChangeset = jest.fn();
+    // wmkf_reviewreceivedat IS set (so this is not the P2-1 ambiguous-receivedat
+    // case above) but the row carries no _etag at all.
+    const getSuggestionById = jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, wmkf_reviewreceivedat: '2026-01-01T00:00:00Z' }));
+    createReviewsSandboxDeps.mockReturnValue({ runChangeset, getSuggestionById });
+
+    const manifestForRun = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 }).manifest;
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest: manifestForRun, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviewer_answers_ambiguous');
+    expect(runChangeset).not.toHaveBeenCalled();
+    const answerResource = (await ledger.listRunResources()).find((r) => r.resourceKind === 'dataverse_review_answer_set');
+    expect(answerResource.outcome).toBe('dispatched');
+  });
+
   it('a lease_lost is reported when the lease is lost before the answers resource can be completed', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger, bundle } = await seededLedger(assignments);
     const runChangeset = jest.fn(async () => ({ ok: true }));
@@ -666,7 +768,7 @@ describe('stepSeedReviewAnswers', () => {
   it('Opus round 2, P2: buildCompletionWrite throwing (malformed answer JSON) before the changeset marker leaves no marker; the next --advance dispatches once', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const { ledger, bundle, manifest } = await seededLedger(assignments);
     const runChangeset = jest.fn(async () => ({ ok: true }));
@@ -706,7 +808,7 @@ describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on o
   it('person: recordResourceReadback(personCreateAttemptedAt, dispatched) precedes createPerson', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -736,7 +838,7 @@ describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on o
   it('mutation guard: deleting personCreateAttemptedAt from the marker readback is caught (dispatched marker must carry it)', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -760,7 +862,7 @@ describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on o
   it('suggestion: recordResourceReadback(suggestionCreateAttemptedAt, dispatched) precedes createSuggestion', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -796,7 +898,7 @@ describe('P2-1: attempt markers are journaled BEFORE their dispatch, proven on o
   it('changeset: recordResourceReadback(changesetAttemptedAt, dispatched) precedes runChangeset', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer({ reviewer: { reviewForm: 'received_no_file', answers: [], files: [] } });
     const { run, manifest } = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 });
@@ -828,7 +930,7 @@ describe('P2-1: suggestion ambiguous-recovery covers both the owned and not-owne
   it('owned path: create throws, the row exists and IS owned -> recovers to verified without re-dispatch', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -864,7 +966,7 @@ describe('P2-1: suggestion ambiguous-recovery covers both the owned and not-owne
   it('not-owned path: create throws, the row exists but is bound to a DIFFERENT person -> reviewer_suggestion_present_not_owned', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: true,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -895,7 +997,7 @@ describe('P2-1: suggestion ambiguous-recovery covers both the owned and not-owne
   it('resume after reviewer_person_conflict re-reports reviewer_person_conflict, never ambiguous_create_outcome', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -904,7 +1006,7 @@ describe('P2-1: suggestion ambiguous-recovery covers both the owned and not-owne
     // (simulating a prior --advance that hit the alternate-key conflict).
     const preResource = await ledger.journalPlannedResource({
       step: 'seed_reviewers', resourceKind: 'dataverse_potential_reviewer', system: 'dataverse',
-      plannedIdentity: { assignmentSequence: 1, destinationPersonId: DEST_PERSON_A, sourcePersonId: SOURCE_PERSON_A, addressSha256: 'a'.repeat(64) },
+      plannedIdentity: { assignmentSequence: 1, destinationPersonId: DEST_PERSON_A, sourcePersonId: SOURCE_PERSON_A, addressSha256: ADDRESS_SHA256 },
     });
     await ledger.recordResourceReadback({ resourceId: preResource.resourceId, readback: { personCreateAttemptedAt: '2026-01-01T00:00:00Z' }, outcome: 'dispatched' });
     await ledger.recordResourceFailure({ resourceId: preResource.resourceId, outcome: 'rejected', error: Object.assign(new Error('conflict'), { code: 'reviewer_person_conflict' }) });
@@ -926,7 +1028,7 @@ describe('Opus round 2, P2: destinationGrantCycleCode throwing before the sugges
   it('seed_reviewers: a transient Request-read failure on the first --advance never journals suggestionCreateAttemptedAt; the next --advance dispatches once and ends verified', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -970,7 +1072,7 @@ describe('Opus round 2, P3: the person read-back before verified is proven, not 
   it('createPerson succeeds but the read-back row is missing -> ambiguous_create_outcome, never verified', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
@@ -998,7 +1100,7 @@ describe('Opus round 2, P3: the person read-back before verified is proven, not 
   it('createPerson succeeds but the read-back row has the marker false -> ambiguous_create_outcome, never verified', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
-      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+      addressSha256: ADDRESS_SHA256, address: 'throwaway@example.test',
     }];
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
