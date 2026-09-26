@@ -130,10 +130,13 @@ reserved for a `reviews` recipe run (`run_id`, `sequence`,
   once written. `assertReviewerAssignments` (private to run-ledger.js)
   validates before any SQL: non-empty for `reviews`, none for any other
   recipe, no two assignments sharing a source reviewer or a normalized
-  (trim+lowercase) address. The CLI's `--reserve --recipe=reviews
-  --reviewer-address=<sourcePersonGuid>=<address>` (repeatable) is the only
-  caller today; it preallocates a fresh destination GUID per assignment
-  (`reused: false`) and binds the sorted address digests plus the assignment
+  (trim+lowercase) address. The CLI's `--reserve --recipe=reviews` is the only
+  caller today; each bundle reviewer's address comes from its
+  `--reviewer-address=<sourcePersonGuid>=<address>` flag, else its synthetic
+  bundle address, else the local `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS` base
+  plus-tagged per source reviewer. An address already naming an owned
+  synthetic person bound to the same source reuses it (`reused: true`);
+  otherwise a fresh destination GUID is preallocated. It binds the sorted address digests plus the assignment
   count into the reservation's `plan_digest`, so a same-key retry naming
   different addresses conflicts (`409 test_request_run_conflict`) instead of
   silently reusing the first reservation's assignments.

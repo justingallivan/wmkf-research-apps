@@ -117,6 +117,35 @@ const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * The ledger stores only an authenticated principal GUID or the one-way
  * `cliActorId` digest of an OS username; free text never reaches it.
  */
+const DEFAULT_REVIEWER_ADDRESS_ENV = 'TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS';
+
+/**
+ * The default address for one source reviewer: the base inbox's local part
+ * plus-tagged with the first 12 hex of SHA-256(lowercase source GUID). Stable
+ * per source reviewer, so re-cloning a source reuses its synthetic person, and
+ * distinct across sources, so the one-source-per-address provenance rule
+ * holds. A base that already carries a plus tag is refused.
+ */
+export function defaultReviewerAddressFor(base, sourcePersonId) {
+  let normalized;
+  try {
+    ({ address: normalized } = reviewerAddressSha256(base));
+  } catch {
+    throw new Error(`${DEFAULT_REVIEWER_ADDRESS_ENV} is not a plausible email address.`);
+  }
+  const at = normalized.lastIndexOf('@');
+  const local = normalized.slice(0, at);
+  if (local.includes('+')) throw new Error(`${DEFAULT_REVIEWER_ADDRESS_ENV} must not already carry a plus tag.`);
+  const tag = crypto.createHash('sha256').update(String(sourcePersonId).toLowerCase()).digest('hex').slice(0, 12);
+  const address = `${local}+${tag}${normalized.slice(at)}`;
+  try {
+    reviewerAddressSha256(address);
+  } catch {
+    throw new Error(`${DEFAULT_REVIEWER_ADDRESS_ENV}'s local part is too long for a plus tag (64 characters at most, including +<12 hex>).`);
+  }
+  return address;
+}
+
 function resolveActorId(actor) {
   if (actor == null) return cliActorId(os.userInfo().username);
   if (PRINCIPAL_ACTOR.test(actor)) return actor.toLowerCase();
@@ -140,6 +169,7 @@ function parseArgs(argv) {
     recipe: 'basic',
     reviewerAddress: [],
     reviewerAddressFlags: [],
+    defaultReviewerAddress: null,
     manifestOut: null,
     idempotencyKey: null,
     actor: null,
@@ -209,8 +239,17 @@ function parseArgs(argv) {
   if (parsed.reviewerAddress.length > 0 && (!parsed.reserve || parsed.recipe !== 'reviews')) {
     throw new Error('--reviewer-address is valid only with --reserve --recipe=reviews.');
   }
-  if (parsed.reserve && parsed.recipe === 'reviews' && parsed.reviewerAddress.length === 0) {
-    throw new Error('--reserve --recipe=reviews requires at least one --reviewer-address=<sourcePersonGuid>=<address>.');
+  // Owner decision 2026-09-26 (S544): no minted addresses; a reviewer with no
+  // flag gets the owner-supplied default base inbox, plus-tagged per source
+  // reviewer. Read here so a bad value fails before any Dataverse read.
+  if (parsed.reserve && parsed.recipe === 'reviews') {
+    const base = process.env[DEFAULT_REVIEWER_ADDRESS_ENV];
+    if (base) {
+      defaultReviewerAddressFor(base, '00000000-0000-4000-8000-000000000000');
+      parsed.defaultReviewerAddress = base;
+    } else if (parsed.reviewerAddress.length === 0) {
+      throw new Error(`--reserve --recipe=reviews requires at least one --reviewer-address=<sourcePersonGuid>=<address> or ${DEFAULT_REVIEWER_ADDRESS_ENV}.`);
+    }
   }
   if (parsed.reserve) {
     parsed.actorId = resolveActorId(parsed.actor);
@@ -278,7 +317,7 @@ function printHelp() {
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
   console.log('Reserve a ledger-driven bundle run: ... --reserve --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number> --manifest-out=/absolute/new-manifest.json --idempotency-key=<key> [--actor=<id>] [--recipe=basic|initial_assessment|reviews]');
   console.log('  --recipe: basic (default), initial_assessment, or reviews; a same idempotency key reserved under a different recipe is a conflict, not a return of the first run.');
-  console.log('  --reviewer-address=<sourcePersonGuid>=<address> (repeatable): valid only with --reserve --recipe=reviews, required at least once for it. Each names one source reviewer and the throwaway address its synthetic reviewer will use; resolving the address to an EXISTING synthetic person is not built until 6c-ii -- every reservation here preallocates a fresh destination GUID (reused: false). Reservation refuses zero assignments, a malformed address, or two assignments naming the same source reviewer or the same (case-insensitive) address.');
+  console.log('  --reviewer-address=<sourcePersonGuid>=<address> (repeatable): valid only with --reserve --recipe=reviews. Each names one source reviewer and the throwaway address its synthetic reviewer will use; an address that already names an owned synthetic person bound to the same source reviewer reuses it (reused: true), otherwise a fresh destination GUID is preallocated. A reviewer with no flag takes its synthetic bundle address, else TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS plus-tagged per source reviewer (<local>+<12 hex of sha256(source GUID)>@<domain>); with neither the reservation refuses. Reservation refuses zero assignments, a malformed address, or two assignments naming the same source reviewer or the same (case-insensitive) address.');
   console.log('  --idempotency-key: 1-200 printable ASCII characters, no spaces; the ledger stores only its SHA-256.');
   console.log('  --actor: admin:<guid> or user:<guid>, or an OS username; a username (default: the current OS user) is stored only as cli:<16 hex digest>.');
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
@@ -666,7 +705,9 @@ function isSyntheticActiveContactless(row) {
  *     a race that slipped past this reservation-time check would still be
  *     caught, never silently written.
  */
-export async function resolveReviewerAssignments({ deps, ledger, bundle, reviewerAddressFlags }) {
+export async function resolveReviewerAssignments({
+  deps, ledger, bundle, reviewerAddressFlags, defaultReviewerAddress = null,
+}) {
   const bundleReviewersByPersonId = new Map(
     (bundle.reviewers || []).map((reviewer) => [String(reviewer.personId).toLowerCase(), reviewer]),
   );
@@ -686,8 +727,10 @@ export async function resolveReviewerAssignments({ deps, ledger, bundle, reviewe
     if (rawAddress === undefined) {
       if (bundleReviewer.personIsSynthetic && bundleReviewer.person?.wmkf_emailaddress) {
         rawAddress = bundleReviewer.person.wmkf_emailaddress;
+      } else if (defaultReviewerAddress) {
+        rawAddress = defaultReviewerAddressFor(defaultReviewerAddress, sourcePersonId);
       } else {
-        throw new Error(`Reviewer ${sourcePersonId} has no --reviewer-address and no synthetic default address in the bundle; refusing.`);
+        throw new Error(`Reviewer ${sourcePersonId} has no --reviewer-address, no synthetic default address in the bundle, and no ${DEFAULT_REVIEWER_ADDRESS_ENV}; refusing.`);
       }
     }
     const { address: normalizedAddress } = reviewerAddressSha256(rawAddress);
@@ -769,6 +812,7 @@ export async function runReserve(client, args, ledgerUrl) {
       const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
       reviewerAssignments = await resolveReviewerAssignments({
         deps, ledger: ledgerForResolution, bundle, reviewerAddressFlags: args.reviewerAddressFlags,
+        defaultReviewerAddress: args.defaultReviewerAddress,
       });
     } finally {
       // Resolution is read-only and self-contained; the reservation itself

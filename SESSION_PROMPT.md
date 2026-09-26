@@ -24,8 +24,8 @@
 
 ### Owner Decision Needed
 
-1. **Auto-minted synthetic reviewer addresses.** The `--reviewer-address` flags exist only so the later email slice (6d) can reach owner-controlled inboxes; for a source whose reviewers are real people the recipe has no address to use. Minting deterministic `@test.invalid` addresses would remove the recipe's last manual input. Deferred by the owner's questions on 2026-09-26; decide when a real-reviewer source is first cloned or when 6d is planned.
-   Evidence: design doc 6c-ii live-proof record; `scripts/rehearse-test-request-sandbox.mjs` `resolveReviewerAssignments` (a "synthetic default address" path already exists for synthetic sources).
+1. **DECIDED 2026-09-26 (S544) — reviewer addresses are never minted.** The owner supplies a default base inbox in the local-only `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS`; a reviewer with no `--reviewer-address` flag and no synthetic bundle address gets the base plus-tagged per source reviewer (`defaultReviewerAddressFor`). Built on branch `claude/factory-default-reviewer-address`.
+   Evidence: design doc 6c-ii record, closing note; `scripts/rehearse-test-request-sandbox.mjs` `resolveReviewerAssignments`.
 2. **6d (reviewer email exception)**: own slice, own plan review; not started.
 
 ### Parked

@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   resolveReviewerAssignments,
+  defaultReviewerAddressFor,
   assertSyntheticReviewerIsolationOnForReviews,
   runReserve,
   runAdvance,
@@ -129,7 +130,7 @@ describe('resolveReviewerAssignments', () => {
     const bundle = bundleWith([reviewer(SOURCE_A)]); // personIsSynthetic: false, no address
     await expect(resolveReviewerAssignments({
       deps: fakeDeps(), ledger: fakeLedger(), bundle, reviewerAddressFlags: [],
-    })).rejects.toThrow(/no --reviewer-address and no synthetic default address/);
+    })).rejects.toThrow(/no --reviewer-address, no synthetic default address in the bundle, and no TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS/);
   });
 
   it('a synthetic bundle reviewer with an exported address defaults to it when no flag is given', async () => {
@@ -206,6 +207,70 @@ describe('resolveReviewerAssignments', () => {
     await expect(resolveReviewerAssignments({
       deps, ledger, bundle, reviewerAddressFlags: [{ sourcePersonId: SOURCE_B, address: 'recycled@example.test' }],
     })).rejects.toMatchObject({ code: 'reviewer_person_provenance_mismatch' });
+  });
+});
+
+describe('default reviewer address (owner decision 2026-09-26: no minting, plus-tagged default base)', () => {
+  const BASE = 'Owner.Inbox@Example.test';
+
+  it('plus-tags the normalized base with 12 hex of SHA-256(lowercase source GUID)', () => {
+    const address = defaultReviewerAddressFor(BASE, SOURCE_A);
+    expect(address).toMatch(/^owner\.inbox\+[0-9a-f]{12}@example\.test$/);
+    expect(defaultReviewerAddressFor(BASE, SOURCE_A.toUpperCase())).toBe(address);
+    expect(defaultReviewerAddressFor(BASE, SOURCE_B)).not.toBe(address);
+  });
+
+  it('refuses a base that is not an address, already carries a plus tag, or leaves no room for the tag', () => {
+    expect(() => defaultReviewerAddressFor('not-an-address', SOURCE_A)).toThrow(/not a plausible email address/);
+    expect(() => defaultReviewerAddressFor('owner+x@example.test', SOURCE_A)).toThrow(/already carry a plus tag/);
+    expect(() => defaultReviewerAddressFor(`${'a'.repeat(52)}@example.test`, SOURCE_A)).toThrow(/too long for a plus tag/);
+    expect(defaultReviewerAddressFor(`${'a'.repeat(51)}@example.test`, SOURCE_A)).toHaveLength(51 + 13 + 13);
+  });
+
+  it('gives each flagless real reviewer a distinct default and leaves flagged reviewers alone', async () => {
+    const bundle = bundleWith([reviewer(SOURCE_A), reviewer(SOURCE_B)]);
+    const assignments = await resolveReviewerAssignments({
+      deps: fakeDeps(), ledger: fakeLedger(), bundle,
+      reviewerAddressFlags: [{ sourcePersonId: SOURCE_B, address: 'flagged@example.test' }],
+      defaultReviewerAddress: BASE,
+    });
+    expect(assignments.map((a) => [a.sourcePersonId, a.address])).toEqual([
+      [SOURCE_A, defaultReviewerAddressFor(BASE, SOURCE_A)],
+      [SOURCE_B, 'flagged@example.test'],
+    ]);
+  });
+
+  it('a synthetic bundle address still wins over the default', async () => {
+    const bundle = bundleWith([reviewer(SOURCE_A, {
+      personIsSynthetic: true,
+      person: { wmkf_name: ' TEST · Z Z ', wmkf_firstname: 'TEST · Z', wmkf_lastname: 'Z', wmkf_emailaddress: 'default@example.test' },
+    })]);
+    const [assignment] = await resolveReviewerAssignments({
+      deps: fakeDeps(), ledger: fakeLedger(), bundle, reviewerAddressFlags: [], defaultReviewerAddress: BASE,
+    });
+    expect(assignment.address).toBe('default@example.test');
+  });
+
+  it('re-cloning the same source reuses the synthetic person created under its default address', async () => {
+    const bundle = bundleWith([reviewer(SOURCE_A)]);
+    const defaultAddress = defaultReviewerAddressFor(BASE, SOURCE_A);
+    const lookedUp = [];
+    const existingRow = {
+      wmkf_potentialreviewersid: EXISTING_PERSON,
+      wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane', wmkf_lastname: 'Reviewer',
+      wmkf_emailaddress: defaultAddress,
+      wmkf_areaofexpertise: 'Genomics', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
+      wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University',
+      wmkf_organizationname: 'Example University',
+      wmkf_issyntheticreviewer: true,
+    };
+    const deps = fakeDeps({ findAnyPersonByEmail: async (address) => { lookedUp.push(address); return address === defaultAddress ? existingRow : null; } });
+    const [assignment] = await resolveReviewerAssignments({
+      deps, ledger: fakeLedger({ priorSources: [SOURCE_A] }), bundle, reviewerAddressFlags: [], defaultReviewerAddress: BASE,
+    });
+    expect(lookedUp).toEqual([defaultAddress]);
+    expect(assignment.reused).toBe(true);
+    expect(assignment.destinationPersonId).toBe(EXISTING_PERSON);
   });
 });
 
