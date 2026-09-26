@@ -213,6 +213,56 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     expect(await ledger.listRunReviewerAssignments(run.runId)).toHaveLength(2);
   });
 
+  it('slice 6c-ii Stage B: getRunReviewerAssignment reads the plaintext address (unlike listRunReviewerAssignments)', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '3') });
+    createdRunIds.push(plan.runId);
+    const reviewerAssignments = [
+      { sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'plaintext.check@example.test' },
+    ];
+    const { run } = await ledger.reserveRun({ actorId, idempotencyKey: `key-reviews-plaintext-${plan.runId}`, plan, reviewerAssignments });
+
+    const row = await ledger.getRunReviewerAssignment(run.runId, 1);
+    expect(row.address).toBe('plaintext.check@example.test');
+    expect(row.sourcePersonId).toBe(reviewerAssignments[0].sourcePersonId.toLowerCase());
+    expect(row.destinationPersonId).toBe(reviewerAssignments[0].destinationPersonId.toLowerCase());
+    expect(row.reused).toBe(false);
+
+    expect(await ledger.getRunReviewerAssignment(run.runId, 99)).toBeNull();
+    await expect(ledger.getRunReviewerAssignment(run.runId, 0)).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
+  it('slice 6c-ii Stage B: listAssignmentsByDestinationPerson is the cross-run provenance authority (returns source GUIDs only, across runs)', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const sharedDestination = crypto.randomUUID();
+    const sourceOne = crypto.randomUUID();
+
+    const planA = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '4') });
+    createdRunIds.push(planA.runId);
+    await ledger.reserveRun({
+      actorId, idempotencyKey: `key-reviews-prov-a-${planA.runId}`, plan: planA,
+      reviewerAssignments: [{ sourcePersonId: sourceOne, destinationPersonId: sharedDestination, reused: false, address: 'provenance.a@example.test' }],
+    });
+
+    // A second, independent run's own reservation is unaffected (proves the
+    // authority is scoped correctly and the digest-of-unique-keys reservation
+    // path can name a distinct source/address pair without colliding).
+    const planB = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '5') });
+    createdRunIds.push(planB.runId);
+    await ledger.reserveRun({
+      actorId, idempotencyKey: `key-reviews-prov-b-${planB.runId}`, plan: planB,
+      reviewerAssignments: [{ sourcePersonId: crypto.randomUUID(), destinationPersonId: crypto.randomUUID(), reused: false, address: 'provenance.b@example.test' }],
+    });
+
+    const sources = await ledger.listAssignmentsByDestinationPerson(sharedDestination);
+    expect(sources).toEqual([sourceOne.toLowerCase()]);
+
+    // A destination never assigned anywhere returns an empty array.
+    expect(await ledger.listAssignmentsByDestinationPerson(crypto.randomUUID())).toEqual([]);
+
+    await expect(ledger.listAssignmentsByDestinationPerson('not-a-guid')).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
   it('slice 6c-i: the DB UNIQUE constraint on (run, address) rejects a direct duplicate insert bypassing the JS validator', async () => {
     const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
     const plan = basePlan({ recipe: 'reviews', planDigest: crypto.randomUUID().replace(/-/g, '').padEnd(64, '1') });

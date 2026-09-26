@@ -22,8 +22,9 @@ import JSZip from 'jszip';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { assertLedgerReceipt, ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
 import {
-  MANIFEST_V4, SANDBOX_URL, sha256, foundationBaselineDigest, validateCloneManifest,
+  MANIFEST_V4, SANDBOX_URL, sha256, foundationBaselineDigest, validateCloneManifest, computeRunPlanDigest,
 } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { REVIEW_FILE_COPY_POLICY, reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest, planBundleFileCopies } from '../../lib/services/test-requests/bundle-file-copy.js';
 import { SANDBOX_HOSTS, PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
@@ -148,6 +149,12 @@ const bundle = buildSourceBundle({
   }],
   dataverseHost: PROD_HOST,
   exportedAt: new Date(),
+  // F2 (Codex slice 6c-ii Stage C round 1): an empty (not omitted) reviewers
+  // section, so this same fixture also satisfies the pre-lease
+  // `validateReviewFilePlan` check the "reviews recipe" test below now
+  // exercises (a real `reviews`-recipe bundle always carries this section;
+  // this fixture otherwise never seeds an actual reviewer).
+  reviewers: [],
 });
 
 // Validator-shaped (Stage C round 2, P3): every field validateCloneManifest
@@ -354,6 +361,11 @@ function createFakeLedger(initialRun, initialResources = []) {
     async journalPlannedResource() { throw new Error('verify_initial_assessment must not journal new resources'); },
     async recordResourceReadback() { throw new Error('verify_initial_assessment must not journal new resources'); },
     async listRunResources() { return resources.map((row) => ({ ...row })); },
+    // F2: only reached for the `reviews`-recipe test below (this file's
+    // shared bundle carries an empty reviewers section, so an empty
+    // assignments list is the correct fixture -- no reviewer is actually
+    // seeded in this file's fixtures).
+    async listRunReviewerAssignments() { return []; },
   };
   return { ledger, calls };
 }
@@ -403,13 +415,13 @@ function snapshotResourceRow(overrides = {}) {
 }
 
 async function runStep({
-  deps = {}, resources, requestRow, manifestOverrides = {}, runOverrides = {},
+  deps = {}, resources, requestRow, manifestOverrides = {}, runOverrides = {}, bundle: bundleForAdvance = null,
 } = {}) {
   const run0 = baseRun(runOverrides);
   const { ledger, calls } = createFakeLedger(run0, resources);
   const manifest = baseManifest(manifestOverrides);
   const result = await bypassDynamicsRestrictions('test:verify-initial-assessment', () => advanceRun({
-    runId: RUN_ID, ledger, manifest, bundle: null,
+    runId: RUN_ID, ledger, manifest, bundle: bundleForAdvance,
     deps: { client: fakeClient({ requestRow }), graph: fakeGraph(), sharePointTarget: SHARE_POINT_TARGET, ...deps },
   }));
   return { result, calls };
@@ -545,12 +557,24 @@ describe('stepVerifyInitialAssessment', () => {
   it('reviews recipe: the same verification passes but ADVANCES to seed_reviewers instead of marking ready', async () => {
     mockDataverse();
     const graph = baseGraph();
+    // F2 (Codex slice 6c-ii Stage C round 1): the pre-lease check now binds
+    // a `reviews` manifest to the live review-file copy policy and
+    // recomputes the plan digest from the manifest plus the ledger's
+    // (empty, in this fixture) reviewer-assignment addresses -- both must
+    // agree with `run.planDigest`, and the real bundle (with its empty
+    // `reviewers: []` section) must be passed, not `null`.
+    const manifestOverrides = {
+      recipe: 'reviews',
+      reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: reviewFileCopyPolicyDigest() },
+    };
+    const planDigest = computeRunPlanDigest({ manifest: baseManifest(manifestOverrides), reviewerAddressDigests: [] });
     const { result, calls } = await runStep({
       deps: { graph },
       requestRow: requestReadback(),
       resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource()],
-      manifestOverrides: { recipe: 'reviews' },
-      runOverrides: { recipe: 'reviews' },
+      manifestOverrides,
+      runOverrides: { recipe: 'reviews', planDigest },
+      bundle,
     });
 
     expect(result.outcome).toBe('advanced');
@@ -806,8 +830,8 @@ describe('stepVerifyInitialAssessment', () => {
       zip.file('customXml/item1.xml', SP_SCHEMA);
       zip.file('customXml/itemProps1.xml', SP_PROPS);
       zip.file('customXml/_rels/item1.xml.rels', SP_RELS);
-      zip.file('[trash]/0000.dat', Buffer.alloc(16, 0));
-      zip.file('docProps/custom.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"><property name="ContentTypeId"/></Properties>');
+      zip.file('[trash]/0000.dat', Buffer.concat([Buffer.from([0xff, 0xff, 0xff, 0xff]), Buffer.alloc(12)]));
+      zip.file('docProps/custom.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="ContentTypeId"><vt:lpwstr>0x0101003CC1047D46B85E46831D0019F23BD8E1</vt:lpwstr></property></Properties>');
       const rels = await zip.file('word/_rels/document.xml.rels').async('string');
       zip.file('word/_rels/document.xml.rels', rels.replace('</Relationships>', '<Relationship Id="rId99" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/></Relationships>'));
       const ct = await zip.file('[Content_Types].xml').async('string');

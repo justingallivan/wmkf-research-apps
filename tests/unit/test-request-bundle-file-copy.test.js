@@ -1,5 +1,6 @@
 /** @jest-environment node */
 import crypto from 'node:crypto';
+import JSZip from 'jszip';
 import { jest } from '@jest/globals';
 import {
   BUNDLE_MAX_AGE_MS,
@@ -14,6 +15,8 @@ import {
   verifyCopiedFiles,
 } from '../../lib/services/test-requests/bundle-file-copy.js';
 import { TEST_REQUEST_PREVIEW_READ_LIMITS } from '../../lib/services/test-requests/admin-preview-service.js';
+import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
+import { SYNTHETIC_GENERATED } from '../../lib/services/test-requests/fixtures/initial-assessment-synthetic.js';
 
 const SITE = { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' };
 const TARGET = { ...SITE, registered: true };
@@ -457,4 +460,172 @@ describe('verifyCopiedFiles', () => {
     expect(verifyCopiedFiles([{ ...verifiedCopies[0], status: 'failed' }], [])).toEqual(['1 planned file(s) not verified']);
     expect(verifyCopiedFiles(verifiedCopies, null)).toEqual(['SharePoint folder could not be inspected']);
   });
+});
+
+// ── DOCX package integrity mode (slice 6c-ii Stage C) ─────────────────────
+// Unlike the exact-hash arm exercised throughout copyBundleFiles above, a
+// DOCX destination legitimately differs from its source (SharePoint's
+// property promotion), so the copy step's readback, ambiguous recovery,
+// final reverification and inspection all switch to package attestation
+// instead of raw hash/size equality -- derived purely from mimeType, so the
+// Basic recipe's PDF/XLSX-only files are provably unaffected (proven above:
+// all 34 existing cases still pass unmodified).
+describe('DOCX package integrity mode', () => {
+  const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  let sourceDocx;
+  let promotedDocx; // simulates SharePoint's characterized property promotion
+  let tamperedDocx; // a word/ part changed -- must fail attestation
+
+  beforeAll(async () => {
+    sourceDocx = await renderInitialAssessmentDocx({
+      requestNumber: '1000400', title: 'TEST: reviewer upload', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    const zip = await JSZip.loadAsync(sourceDocx);
+    zip.file('docProps/core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>rewritten by SharePoint</dc:title><cp:lastModifiedBy>Un-named</cp:lastModifiedBy><cp:revision>1</cp:revision><dcterms:modified xsi:type="dcterms:W3CDTF">2026-09-25T03:32:30Z</dcterms:modified></cp:coreProperties>'); // SharePoint rewrites this
+    promotedDocx = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+    const tampered = await JSZip.loadAsync(sourceDocx);
+    const body = await tampered.file('word/document.xml').async('string');
+    tampered.file('word/document.xml', body.replace('</w:body>', '<w:p/></w:body>'));
+    tamperedDocx = await tampered.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  });
+
+  function docxDoc(over = {}) {
+    return doc({
+      id: 'inv-docx', kind: 'reviewerUpload', name: 'Review_1.docx', graphItemId: 'item-docx',
+      mimeType: DOCX_MIME, size: sourceDocx.length, contentHash: hash(sourceDocx),
+      eTag: '"src"', versionId: '1.0', ...over,
+    });
+  }
+
+  function fakeDocxDependencies({ uploadedBytes = promotedDocx } = {}) {
+    const destination = new Map();
+    const deps = {
+      clearGraphCaches: jest.fn(),
+      configuredSharePointTarget: jest.fn(() => TARGET),
+      getSiteId: jest.fn(async () => SITE_ID),
+      getDriveId: jest.fn(async () => REQUEST_DRIVE),
+      // P3-3 (Opus round 2): a reviewerUpload copy refuses without the byte
+      // sniff hook, so the engine-level DOCX tests supply a passing one.
+      validateBytes: jest.fn(() => ({ ok: true })),
+      getFileMetadataById: jest.fn(async (driveId, itemId) => {
+        if (itemId === 'item-docx') return { id: 'item-docx', name: 'Review_1.docx', size: sourceDocx.length, mimeType: DOCX_MIME, eTag: '"src"', versionId: '1.0' };
+        for (const item of destination.values()) if (item.id === itemId) return item;
+        return null;
+      }),
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === 'item-docx') return { buffer: sourceDocx };
+        for (const item of destination.values()) if (item.id === itemId) return { buffer: item.buffer };
+        throw new Error('missing');
+      }),
+      getFileMetadataByPath: jest.fn(async (library, folder, filename) => destination.get(`${folder}/${filename}`) ?? null),
+      ensureFolderPath: jest.fn(async () => ({ id: 'folder' })),
+      uploadFile: jest.fn(async (library, folder, filename, buffer, mimeType, options) => {
+        // Simulates SharePoint: the bytes actually stored differ from what
+        // was PUT (uploadedBytes), exactly like real property promotion.
+        const item = { id: 'new-docx', name: filename, size: uploadedBytes.length, mimeType, eTag: '"new"', versionId: '1.0', buffer: uploadedBytes };
+        destination.set(`${folder}/${filename}`, item);
+        if (options?.onItemCreated) await options.onItemCreated({ id: item.id, name: filename, size: uploadedBytes.length, eTag: item.eTag });
+        return { id: item.id, name: filename, size: uploadedBytes.length, eTag: item.eTag, versionId: '1.0' };
+      }),
+    };
+    return { deps, destination };
+  }
+
+  test('accepts a destination whose bytes differ from the source only by SharePoint property promotion', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const journal = jest.fn(async () => {});
+    const copies = await copyBundleFiles(params(plan), deps, journal);
+    expect(copies[0].status).toBe('verified');
+    expect(copies[0].attestedDigest).toBe(hash(promotedDocx));
+    // Exact-hash equality would have failed (promoted bytes differ) --
+    // proving the docx-package arm, not the exact-hash arm, is what passed.
+    expect(hash(promotedDocx)).not.toBe(hash(sourceDocx));
+  });
+
+  test('rejects a destination whose word/ content was tampered with, beyond SharePoint promotion', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: tamperedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    await expect(copyBundleFiles(params(plan), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source/);
+  });
+
+  test('reverifyCopiedItems re-attests a verified DOCX copy against a fresh source download', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    expect(await reverifyCopiedItems(copies, deps)).toEqual([]);
+  });
+
+  test('reverifyCopiedItems fails when the destination package no longer attests against a fresh source download', async () => {
+    const { deps, destination } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    // Mutate the stored destination bytes after copy, simulating drift.
+    const item = destination.get(`${copies[0].destination.folder}/${copies[0].destination.filename}`);
+    item.buffer = tamperedDocx;
+    const failures = await reverifyCopiedItems(copies, deps);
+    expect(failures[0]).toMatch(/package attestation failed|bytes changed since the copy step's attestation/);
+  });
+
+  test('reverifyCopiedItems refuses (P3-e, Opus round 1) a DOCX copy with no journaled attestedDigest, rather than silently passing', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    delete copies[0].attestedDigest;
+    const failures = await reverifyCopiedItems(copies, deps);
+    expect(failures).toEqual([`${copies[0].destination.filename} has no journaled attestedDigest to re-verify against`]);
+  });
+
+  test('verifyCopiedFiles census compares against the post-promotion size, not the bundle source size', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: promotedDocx.length, folder: copies[0].destination.folder }];
+    expect(verifyCopiedFiles(copies, listing)).toEqual([]);
+  });
+
+  test('verifyCopiedFiles refuses a DOCX whose listed size differs from the journaled post-promotion size (P3-2, Opus round 2)', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: promotedDocx.length + 1, folder: copies[0].destination.folder }];
+    expect(verifyCopiedFiles(copies, listing)).toEqual(['Review_1.docx listing does not match the journaled copy']);
+  });
+
+  test('verifyCopiedFiles refuses a DOCX copy with no journaled post-promotion size rather than passing (P3-2, Opus round 2)', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: promotedDocx.length, folder: copies[0].destination.folder }];
+    const withoutSize = [{ ...copies[0], item: { ...copies[0].item, size: undefined } }];
+    expect(verifyCopiedFiles(withoutSize, listing)).toEqual(['Review_1.docx has no journaled post-promotion size to verify against']);
+  });
+
+  test('a reviewerUpload copy with no validateBytes hook is refused before any write (P3-3, Opus round 2)', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    delete deps.validateBytes;
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    await expect(copyBundleFiles(params(plan), deps, jest.fn(async () => {})))
+      .rejects.toMatchObject({ code: 'file_rejected' });
+    expect(deps.ensureFolderPath ?? jest.fn()).not.toHaveBeenCalled?.();
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('mutation: the exact-hash arm would wrongly reject a legitimately-promoted DOCX (proves the branch matters)', async () => {
+    // A raw byte/size comparison (the Basic recipe's own rule) must NOT be
+    // satisfied by promoted bytes -- if it were, the docx-package branch
+    // would not be exercising anything real.
+    expect(promotedDocx.length).not.toBe(sourceDocx.length);
+    expect(hash(promotedDocx)).not.toBe(hash(sourceDocx));
+  });
+
+  /** Builds a one-file plan directly (bypassing the Basic-only planBundleFileCopies), matching the shape copyBundleFiles expects. */
+  function planReviewFileCopiesForTest(sourceDocument) {
+    return [{
+      kind: 'reviewerUpload',
+      source: { ...sourceDocument },
+      destination: { library: 'akoya_request', folder: 'Reviewer_Uploads/reviewer_abcd1234/attempt_' + '0'.repeat(32), filename: 'Review_1.docx' },
+    }];
+  }
 });

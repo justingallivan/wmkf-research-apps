@@ -133,6 +133,13 @@ function createFakeLedger(initialRun) {
       calls.push({ op: 'listRunResources', runId });
       return resources.map((row) => ({ ...row }));
     },
+    async listRunReviewerAssignments(runId) {
+      calls.push({ op: 'listRunReviewerAssignments', runId });
+      return [];
+    },
+    async getRunReviewerAssignment() {
+      return null;
+    },
   };
   return { ledger, calls, getRun: () => run, getResources: () => resources };
 }
@@ -499,22 +506,9 @@ describe('slice 6c-i: verify_initial_assessment terminal branch is per-recipe', 
   });
 });
 
-describe('slice 6c-i: reviews-only steps stop cleanly with recipe_step_not_built (6c-ii builds the bodies)', () => {
-  it.each(['seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews'])(
-    '%s marks the run needs_attention/recipe_step_not_built without calling markReady',
-    async (step) => {
-      const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'reviews', currentStep: step }));
-      const manifest = baseManifest({ recipe: 'reviews' });
-      const result = await advanceRun({
-        runId: RUN_ID, ledger, manifest, bundle: null,
-        deps: { client: {}, graph: {}, sharePointTarget: () => ({}) },
-      });
-      expect(result.outcome).toBe('needs_attention');
-      expect(result.run.needsAttentionReason).toBe('recipe_step_not_built');
-      expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
-    },
-  );
-});
+// slice 6c-ii Stage C: copy_review_file and verify_reviews are both built.
+// See test-request-run-runner-copy-review-file.test.js and
+// test-request-run-runner-verify-reviews.test.js for their own coverage.
 
 describe('P1-b: recipeIncludesStep / recipeLeaseSeconds', () => {
   it('recipeIncludesStep reports whether a step is in the recipe order', () => {

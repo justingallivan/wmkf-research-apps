@@ -40,6 +40,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import { createRequire } from 'module';
 import {
   expectedRequestFolder,
@@ -50,7 +51,11 @@ import {
   reserveRehearsalReceipt,
   updateRehearsalReceipt,
 } from '../lib/services/test-requests/rehearsal-receipt.js';
-import { readSourceBundle, summarizeSourceBundle } from '../lib/services/test-requests/source-bundle.js';
+import {
+  readSourceBundle,
+  summarizeSourceBundle,
+  assertBundleHasReviewerSectionForRecipe,
+} from '../lib/services/test-requests/source-bundle.js';
 import {
   assertBundleFresh,
   copyBundleFiles,
@@ -66,6 +71,7 @@ import {
   bundleSourceOf,
   checkPreallocatedRequestAbsent,
   compileBody,
+  computeRunPlanDigest,
   correctMeetingDate,
   createRequestWithGoverifyBypass,
   fenceSource,
@@ -95,6 +101,10 @@ import {
   LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
 } from '../lib/services/test-requests/run-ledger.js';
 import { pgLedgerDb } from '../lib/services/test-requests/run-ledger-db.js';
+import { createReviewsSandboxDeps } from '../lib/services/test-requests/reviews-sandbox-deps.js';
+import { validateReviewFilePlan } from '../lib/services/test-requests/review-file-copy.js';
+import { syntheticPersonProjection } from '../lib/services/reviewer-engagement/seed-synthetic-review.js';
+import { syntheticReviewerIsolationEnabled, SYNTHETIC_REVIEWER_MARKER_FIELDS } from '../lib/services/test-requests/isolation.js';
 
 const require = createRequire(import.meta.url);
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
@@ -129,6 +139,7 @@ function parseArgs(argv) {
     reserve: false,
     recipe: 'basic',
     reviewerAddress: [],
+    reviewerAddressFlags: [],
     manifestOut: null,
     idempotencyKey: null,
     actor: null,
@@ -231,13 +242,14 @@ function parseArgs(argv) {
         if (seen.has(sourcePersonId)) throw new Error(`--reviewer-address names ${sourcePersonId} more than once.`);
         seen.add(sourcePersonId);
       }
-      // Resolving an address to an EXISTING synthetic person is 6c-ii (it
-      // needs the exporter's bundle v3 and the synthetic-only lookup); here
-      // every assignment is a fresh, preallocated destination GUID with
-      // reused: false.
-      parsed.reviewerAssignments = parsedFlags.map(({ sourcePersonId, address }) => ({
-        sourcePersonId, destinationPersonId: crypto.randomUUID(), reused: false, address,
-      }));
+      // Resolving each address against the bundle's reviewers[] and the
+      // sandbox's synthetic-only lookup (slice 6c-ii Stage B) needs a
+      // Dataverse read and a ledger read, neither available yet during sync
+      // arg parsing; runReserve's resolveReviewerAssignments does that
+      // resolution and builds the final { sourcePersonId, destinationPersonId,
+      // reused, address } assignments passed to ledger.reserveRun. This only
+      // carries the raw flag pairs forward.
+      parsed.reviewerAddressFlags = parsedFlags;
     }
   }
   for (const runId of [parsed.advance, parsed.runInspect].filter(Boolean)) {
@@ -599,10 +611,143 @@ function requireLedgerUrl() {
   return url;
 }
 
-async function runReserve(client, args, ledgerUrl) {
+/**
+ * B5 (slice 6c-ii Stage B): the seeder must never run where the read-side
+ * fences are off. `SYNTHETIC_REVIEWER_ISOLATION=on` is required in THIS
+ * process for both `--reserve --recipe=reviews` (the resolution below reads
+ * the synthetic-only lookup) and `--advance` of a `reviews` run.
+ */
+export function assertSyntheticReviewerIsolationOnForReviews(recipe) {
+  if (recipe !== 'reviews') return;
+  if (!syntheticReviewerIsolationEnabled()) {
+    throw new Error(
+      'SYNTHETIC_REVIEWER_ISOLATION must be "on" in this process to reserve or advance a reviews-recipe run '
+      + '(the seeder must never run where the read-side fences are off). Set SYNTHETIC_REVIEWER_ISOLATION=on '
+      + 'in the operator shell and confirm the target sandbox has wave30 (wmkf_issyntheticreviewer) applied.',
+    );
+  }
+}
+
+/** Marker/active/Contact-link check on a raw (unfiltered) person row (P2-4). */
+function isSyntheticActiveContactless(row) {
+  return !!row && row[SYNTHETIC_REVIEWER_MARKER_FIELDS.marker] === true
+    && (row.statecode === undefined || row.statecode === 0)
+    && !row._wmkf_contact_value;
+}
+
+/**
+ * B1 (slice 6c-ii Stage B, plan "Reserve"/"Identity contract"). Resolves
+ * EVERY bundle reviewer (not only the ones named by an explicit
+ * --reviewer-address flag) to a destination assignment, entirely before
+ * ledger.reserveRun ever runs:
+ *   - the source GUID must name a reviewer in the bundle (else refuse);
+ *   - an address is required for every bundle reviewer (a synthetic source
+ *     reviewer with an exported address may default to it; a real source
+ *     reviewer requires the flag); two reviewers sharing an address refuse;
+ *   - the address is resolved through an UNFILTERED lookup (P2-4,
+ *     `findAnyPersonByEmail` -- deliberately not a synthetic-only lookup: a
+ *     synthetic-only lookup would return null for a REAL reviewer's address,
+ *     which would then get a fresh preallocated GUID and store that real
+ *     address as the run's recipient-confinement address, refusing only much
+ *     later at seed time on the alternate-key conflict). A row that exists
+ *     and is NOT an active, Contact-less, marker-true synthetic person
+ *     refuses the reservation immediately (`reviewer_person_not_synthetic`).
+ *     A marker-true/active/Contact-less row is reused ONLY IF every prior
+ *     assignment naming that destination GUID (any run, any status) names
+ *     this same source GUID, AND the row equals syntheticPersonProjection
+ *     field-by-field with null preserved; otherwise a fresh destination GUID
+ *     is preallocated (reused: false). The cross-run provenance check
+ *     (`listAssignmentsByDestinationPerson`) reads OUTSIDE the reservation's
+ *     own transaction (`reserveRun`'s INSERT), so it cannot itself observe or
+ *     prevent a concurrent second reservation racing the same destination
+ *     GUID; it is backstopped by the field-by-field projection check here
+ *     AND by `resolveReviewerPerson`'s identical re-verification at seed time
+ *     (run-runner.js), which re-reads and re-checks both before any write --
+ *     a race that slipped past this reservation-time check would still be
+ *     caught, never silently written.
+ */
+export async function resolveReviewerAssignments({ deps, ledger, bundle, reviewerAddressFlags }) {
+  const bundleReviewersByPersonId = new Map(
+    (bundle.reviewers || []).map((reviewer) => [String(reviewer.personId).toLowerCase(), reviewer]),
+  );
+  const flagsBySource = new Map(reviewerAddressFlags.map((flag) => [flag.sourcePersonId, flag.address]));
+  for (const sourcePersonId of flagsBySource.keys()) {
+    if (!bundleReviewersByPersonId.has(sourcePersonId)) {
+      throw new Error(`--reviewer-address names ${sourcePersonId}, which is not a reviewer in the bundle.`);
+    }
+  }
+
+  const resolved = [];
+  const seenAddresses = new Map();
+  const sourceIds = [...bundleReviewersByPersonId.keys()].sort();
+  for (const sourcePersonId of sourceIds) {
+    const bundleReviewer = bundleReviewersByPersonId.get(sourcePersonId);
+    let rawAddress = flagsBySource.get(sourcePersonId);
+    if (rawAddress === undefined) {
+      if (bundleReviewer.personIsSynthetic && bundleReviewer.person?.wmkf_emailaddress) {
+        rawAddress = bundleReviewer.person.wmkf_emailaddress;
+      } else {
+        throw new Error(`Reviewer ${sourcePersonId} has no --reviewer-address and no synthetic default address in the bundle; refusing.`);
+      }
+    }
+    const { address: normalizedAddress } = reviewerAddressSha256(rawAddress);
+    if (seenAddresses.has(normalizedAddress)) {
+      throw new Error(`--reviewer-address: address ${normalizedAddress} is assigned to more than one source reviewer.`);
+    }
+    seenAddresses.set(normalizedAddress, sourcePersonId);
+
+    const existing = await deps.findAnyPersonByEmail(normalizedAddress);
+    if (!existing) {
+      resolved.push({
+        sourcePersonId, destinationPersonId: crypto.randomUUID(), reused: false, address: rawAddress,
+      });
+      continue;
+    }
+    if (!isSyntheticActiveContactless(existing)) {
+      throw Object.assign(
+        new Error(`Address ${normalizedAddress} is already owned by a person that is not an active, Contact-less synthetic reviewer; refusing (reviewer_person_not_synthetic).`),
+        { code: 'reviewer_person_not_synthetic' },
+      );
+    }
+    const destinationPersonId = existing.wmkf_potentialreviewersid;
+    const priorSources = await ledger.listAssignmentsByDestinationPerson(destinationPersonId);
+    if (priorSources.some((id) => String(id).toLowerCase() !== sourcePersonId)) {
+      throw Object.assign(
+        new Error(`Address ${normalizedAddress} resolves to a synthetic person already bound to a different source reviewer; refusing (reviewer_person_provenance_mismatch).`),
+        { code: 'reviewer_person_provenance_mismatch' },
+      );
+    }
+    const expected = syntheticPersonProjection(bundleReviewer, normalizedAddress);
+    for (const [field, expectedValue] of Object.entries(expected)) {
+      const actualValue = existing[field] ?? null;
+      const wanted = expectedValue ?? null;
+      if (actualValue !== wanted) {
+        throw Object.assign(
+          new Error(`Existing synthetic person ${destinationPersonId} field ${field} does not match the bundle's synthetic-person projection; refusing reuse (reviewer_person_projection_drift).`),
+          { code: 'reviewer_person_projection_drift' },
+        );
+      }
+    }
+    resolved.push({
+      sourcePersonId, destinationPersonId, reused: true, address: rawAddress,
+    });
+  }
+  return resolved;
+}
+
+export async function runReserve(client, args, ledgerUrl) {
+  assertSyntheticReviewerIsolationOnForReviews(args.recipe);
+  if (args.recipe === 'reviews') {
+    // Same script-only precedent as runAdvance: a single-process,
+    // single-invocation CLI, entered narrowly before the first sandbox-bound
+    // dependency call this recipe needs.
+    const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+    enterDynamicsBypassForScript('rehearse-test-request-sandbox:reserve-reviews');
+  }
   const { graph, sharePointTarget } = await buildGraphContext();
   const preflight = await runPreflight(client, graph, sharePointTarget);
   const bundle = readSourceBundle(readJson(args.bundle));
+  assertBundleHasReviewerSectionForRecipe(args.recipe, bundle);
   const source = bundle.source.request;
   if (source.akoya_requestnum !== args.sourceRequestNumber) {
     throw new Error(`Bundle source is Request ${source.akoya_requestnum}; --source-request-number attests ${args.sourceRequestNumber}. Refusing.`);
@@ -616,28 +761,42 @@ async function runReserve(client, args, ledgerUrl) {
   if (!isBundleManifest(manifest)) throw new Error('The bounded ledger-driven runner only supports bundle (v4) manifests.');
 
   const { actorId } = args;
-  const reviewerAssignments = manifest.recipe === 'reviews' ? (args.reviewerAssignments ?? []) : [];
+  let reviewerAssignments = [];
+  if (manifest.recipe === 'reviews') {
+    const resolutionDb = pgLedgerDb(ledgerUrl);
+    try {
+      const ledgerForResolution = createRunLedger(resolutionDb);
+      const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
+      reviewerAssignments = await resolveReviewerAssignments({
+        deps, ledger: ledgerForResolution, bundle, reviewerAddressFlags: args.reviewerAddressFlags,
+      });
+    } finally {
+      // Resolution is read-only and self-contained; the reservation itself
+      // reopens its own connection below (mirrors the pre-existing
+      // pgLedgerDb-per-call shape rather than threading one connection through
+      // both an unconditional and a recipe-conditional path).
+      await resolutionDb.end();
+    }
+  }
+  // F2 (Codex slice 6c-ii Stage C round 1): a `reviews` reservation must
+  // validate the review-file policy against the bundle's uploaded
+  // reviewers BEFORE anything is written -- no manifest, no ledger row --
+  // so a policy violation never strands a half-reserved run.
+  if (manifest.recipe === 'reviews') {
+    validateReviewFilePlan(bundle, reviewerAssignments.map((a) => a.sourcePersonId));
+  }
   // The plan digest binds the ledger-relevant identities/hashes, never
   // purpose text or the create body itself. Recipe is included so a same-key
   // retry naming a different recipe conflicts instead of returning the first
   // run. For `reviews`, the address digests (sorted, order-independent) and
   // the assignment count are bound too (6c-i build notes), so a same-key
   // retry naming different addresses conflicts instead of silently reusing
-  // the first reservation's assignments.
-  const planDigest = sha256({
-    runId: manifest.values.runId,
-    recipe: manifest.recipe,
-    destinationRequestId: manifest.values.requestId,
-    destinationLocationId: manifest.values.locationId,
-    sourceRequestId: manifest.source.requestId,
-    sourceRevision: manifest.source.revision,
-    bundleSha256: manifest.source.bundleSha256,
-    copyPolicyDigest: manifest.copyPolicy.digest,
-    createBodySha256: manifest.createBodySha256,
-    ...(manifest.recipe === 'reviews' ? {
-      reviewerAddressDigests: reviewerAssignments.map((a) => reviewerAddressSha256(a.address).addressSha256).sort(),
-      reviewerAssignmentCount: reviewerAssignments.length,
-    } : {}),
+  // the first reservation's assignments. computeRunPlanDigest (F2 change 3)
+  // is the SAME shared helper the runner's pre-lease check recomputes from
+  // the manifest alone at advance time.
+  const planDigest = computeRunPlanDigest({
+    manifest,
+    reviewerAddressDigests: reviewerAssignments.map((a) => reviewerAddressSha256(a.address).addressSha256),
   });
   const plan = {
     runId: manifest.values.runId,
@@ -695,7 +854,7 @@ async function runReserve(client, args, ledgerUrl) {
   }
 }
 
-async function runAdvance(client, args, ledgerUrl) {
+export async function runAdvance(client, args, ledgerUrl) {
   // Every Initial Assessment step's sandbox dependency
   // (lib/services/test-requests/ia-sandbox-deps.js) calls
   // assertTrustedDalContext; this CLI is a single-process, single-invocation
@@ -709,6 +868,7 @@ async function runAdvance(client, args, ledgerUrl) {
   const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   enterDynamicsBypassForScript('rehearse-test-request-sandbox:advance');
   const manifest = readJson(args.manifest);
+  assertSyntheticReviewerIsolationOnForReviews(manifest.recipe ?? 'basic');
   const bundle = readSourceBundle(readJson(args.bundle));
   const { graph, sharePointTarget } = await buildGraphContext();
   const db = pgLedgerDb(ledgerUrl);
@@ -765,6 +925,47 @@ async function runAdvance(client, args, ledgerUrl) {
   }
 }
 
+/**
+ * Slice 6c-ii Stage C: a curated per-reviewer summary (form, file count,
+ * attested digest, pointers) for `--run-inspect`, distinct from the raw
+ * `resources` dump below. Every value here already passed run-ledger.js's
+ * no-text-invariant receipt validation at write time (finite enum tokens,
+ * GUIDs, hashes and grammar-matched paths only -- never free text or a
+ * plaintext address), so this summary carries nothing new to redact; it
+ * exists to make the reviews recipe's outcome legible without hand-parsing
+ * the raw resource rows.
+ */
+export function summarizeReviewResources(resources, reviewerAssignments) {
+  return reviewerAssignments.map((assignment) => {
+    const suggestionResource = resources.find((r) => r.step === 'seed_reviewers' && r.resourceKind === 'dataverse_reviewer_suggestion'
+      && r.plannedIdentity?.assignmentSequence === assignment.sequence);
+    const answersResource = resources.find((r) => r.step === 'seed_review_answers' && r.resourceKind === 'dataverse_review_answer_set'
+      && r.plannedIdentity?.assignmentSequence === assignment.sequence);
+    const folderResource = resources.find((r) => r.step === 'copy_review_file' && r.resourceKind === 'sharepoint_folder'
+      && r.plannedIdentity?.assignmentSequence === assignment.sequence);
+    const fileResources = resources.filter((r) => r.step === 'copy_review_file' && r.resourceKind === 'sharepoint_file'
+      && r.plannedIdentity?.assignmentSequence === assignment.sequence);
+    const attestedDigests = fileResources.map((r) => r.readback?.attestedDigest).filter(Boolean);
+    return {
+      sequence: assignment.sequence,
+      destinationSuggestionId: suggestionResource?.plannedIdentity?.suggestionId ?? null,
+      reviewForm: answersResource?.plannedIdentity?.reviewForm ?? null,
+      answerCount: answersResource?.readback?.answerCount ?? null,
+      fileCount: fileResources.length,
+      // Only present for a DOCX file (property-promotion evidence); null for
+      // an exact-hash PDF/DOC file or when no file was copied.
+      attestedDigests: attestedDigests.length ? attestedDigests : null,
+      // The folder is the ledger's own grammar-matched relative path, never
+      // a full URL; the filename is one of `Review_[1-5].(pdf|docx|doc)`.
+      // Both null for received_no_file/unreceived, exactly mirroring the
+      // verifier's own mutually-exclusive branch.
+      pointers: folderResource?.readback?.filename
+        ? { folder: folderResource.plannedIdentity?.folder ?? null, filename: folderResource.readback.filename }
+        : null,
+    };
+  });
+}
+
 async function runRunInspect(runInspect, ledgerUrl) {
   const db = pgLedgerDb(ledgerUrl);
   try {
@@ -775,7 +976,10 @@ async function runRunInspect(runInspect, ledgerUrl) {
     // Never the plaintext address, only its digest (D-R2): listRunReviewerAssignments
     // never selects the `address` column, so there is nothing to redact here.
     const reviewerAssignments = run.recipe === 'reviews' ? await ledger.listRunReviewerAssignments(runInspect) : [];
-    console.log(JSON.stringify({ mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments }, null, 2));
+    const reviewsSummary = run.recipe === 'reviews' ? summarizeReviewResources(resources, reviewerAssignments) : [];
+    console.log(JSON.stringify({
+      mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments, reviewsSummary,
+    }, null, 2));
   } finally {
     await db.end();
   }
@@ -865,7 +1069,13 @@ async function main() {
   console.log(JSON.stringify({ mode: 'READ_ONLY_PREFLIGHT', preflight: preflightSummary(preflight) }, null, 2));
 }
 
-main().catch((error) => {
-  console.error(`FATAL: ${error.message}`);
-  process.exit(1);
-});
+// Guarded so a test can import this module's exported pure helpers
+// (resolveReviewerAssignments, assertSyntheticReviewerIsolationOnForReviews)
+// without triggering a live run (mirrors
+// export-test-request-source-bundle.mjs's own guard).
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error(`FATAL: ${error.message}`);
+    process.exit(1);
+  });
+}
