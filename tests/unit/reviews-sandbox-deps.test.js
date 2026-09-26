@@ -5,14 +5,16 @@
  *
  * Proves:
  *  1. Host refusal (production/unknown/unparseable).
- *  2. Every dependency (findSyntheticByEmail, getPersonById,
- *     getSuggestionById, createPerson, createSuggestion, patchSuggestion,
- *     runChangeset — including the embedded $batch URLs) routes to the bound
- *     sandbox host only, even with DYNAMICS_URL pointed at a production host
- *     from the same tracked registry.
- *  3. findSyntheticByEmail fails closed when SYNTHETIC_REVIEWER_ISOLATION is
- *     off, and applies the same marker/active/no-Contact/exact-match
- *     predicate as the production adapter.
+ *  2. Every dependency (findAnyPersonByEmail, getPersonById,
+ *     getSuggestionById, createPerson, createSuggestion, runChangeset —
+ *     including the embedded $batch URLs) routes to the bound sandbox host
+ *     only, even with DYNAMICS_URL pointed at a production host from the
+ *     same tracked registry.
+ *  3. findAnyPersonByEmail fails closed when SYNTHETIC_REVIEWER_ISOLATION is
+ *     off, and applies NO marker/active/Contact filter (P2-4) — it returns a
+ *     real, non-synthetic, inactive, or Contact-linked row exactly as it
+ *     returns a synthetic one; the caller (the CLI reservation resolver)
+ *     applies that classification itself.
  *  4. createPerson is the one sanctioned marker write (raw opted-out
  *     client); createSuggestion goes through write-core (which would refuse
  *     any marker field with no opt-out).
@@ -153,48 +155,61 @@ describe('createReviewsSandboxDeps — every dependency routes to the bound sand
     return captured.filter((url) => new URL(url).hostname !== 'login.microsoftonline.com');
   }
 
-  it('findSyntheticByEmail reads from the sandbox host only and returns the synthetic row', ctx(async () => {
+  it('findAnyPersonByEmail reads from the sandbox host only and returns the row', ctx(async () => {
     const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
-    const row = await deps.findSyntheticByEmail('throwaway@example.test');
+    const row = await deps.findAnyPersonByEmail('throwaway@example.test');
     expect(row.wmkf_potentialreviewersid).toBe(PERSON_ID);
     for (const url of dataverseUrls()) expect(new URL(url).hostname).toBe(SANDBOX_HOSTS[0]);
   }));
 
-  it('findSyntheticByEmail fails closed when SYNTHETIC_REVIEWER_ISOLATION is off', ctx(async () => {
+  it('findAnyPersonByEmail fails closed when SYNTHETIC_REVIEWER_ISOLATION is off', ctx(async () => {
     process.env.SYNTHETIC_REVIEWER_ISOLATION = 'off';
     const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
-    await expect(deps.findSyntheticByEmail('throwaway@example.test')).rejects.toMatchObject({ code: 'synthetic_reviewer_isolation_disabled' });
+    await expect(deps.findAnyPersonByEmail('throwaway@example.test')).rejects.toMatchObject({ code: 'synthetic_reviewer_isolation_disabled' });
     expect(dataverseUrls()).toHaveLength(0);
   }));
 
-  it('findSyntheticByEmail excludes a row whose marker is not true', ctx(async () => {
+  it('findAnyPersonByEmail applies NO marker filter: returns a row whose marker is not true (P2-4)', ctx(async () => {
     fetch.mockImplementation((url) => {
       const href = String(url);
       if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
       return jsonResponse({ value: [{ ...SYNTHETIC_ROW, wmkf_issyntheticreviewer: false }] });
     });
     const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
-    expect(await deps.findSyntheticByEmail('throwaway@example.test')).toBeNull();
+    const row = await deps.findAnyPersonByEmail('throwaway@example.test');
+    expect(row.wmkf_issyntheticreviewer).toBe(false);
   }));
 
-  it('findSyntheticByEmail excludes a Contact-linked row', ctx(async () => {
+  it('findAnyPersonByEmail applies NO Contact-link filter: returns a Contact-linked row (P2-4)', ctx(async () => {
     fetch.mockImplementation((url) => {
       const href = String(url);
       if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
       return jsonResponse({ value: [{ ...SYNTHETIC_ROW, _wmkf_contact_value: '77777777-7777-4777-8777-777777777777' }] });
     });
     const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
-    expect(await deps.findSyntheticByEmail('throwaway@example.test')).toBeNull();
+    const row = await deps.findAnyPersonByEmail('throwaway@example.test');
+    expect(row._wmkf_contact_value).toBe('77777777-7777-4777-8777-777777777777');
   }));
 
-  it('findSyntheticByEmail throws ambiguous_email_owner on more than one match', ctx(async () => {
+  it('findAnyPersonByEmail applies NO active/statecode filter: returns an inactive row (P2-4)', ctx(async () => {
+    fetch.mockImplementation((url) => {
+      const href = String(url);
+      if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
+      return jsonResponse({ value: [{ ...SYNTHETIC_ROW, statecode: 1 }] });
+    });
+    const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
+    const row = await deps.findAnyPersonByEmail('throwaway@example.test');
+    expect(row.statecode).toBe(1);
+  }));
+
+  it('findAnyPersonByEmail throws ambiguous_email_owner on more than one match', ctx(async () => {
     fetch.mockImplementation((url) => {
       const href = String(url);
       if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
       return jsonResponse({ value: [SYNTHETIC_ROW, { ...SYNTHETIC_ROW, wmkf_potentialreviewersid: 'other' }] });
     });
     const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
-    await expect(deps.findSyntheticByEmail('throwaway@example.test')).rejects.toMatchObject({ code: 'ambiguous_email_owner' });
+    await expect(deps.findAnyPersonByEmail('throwaway@example.test')).rejects.toMatchObject({ code: 'ambiguous_email_owner' });
   }));
 
   it('getPersonById / getSuggestionById read from the sandbox host only', ctx(async () => {
@@ -224,14 +239,6 @@ describe('createReviewsSandboxDeps — every dependency routes to the bound sand
     const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
     await expect(deps.createSuggestion({ wmkf_appreviewersuggestionid: SUGGESTION_ID, wmkf_issyntheticreviewer: true }))
       .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
-  }));
-
-  it('patchSuggestion PATCHes to the sandbox host only, carrying If-Match', ctx(async () => {
-    const deps = createReviewsSandboxDeps({ resourceUrl: SANDBOX_URL });
-    await deps.patchSuggestion(SUGGESTION_ID, { wmkf_reviewstatus: 100000001 }, { ifMatch: 'W/"1"' });
-    const patchCall = fetch.mock.calls.find(([, init]) => init?.method === 'PATCH');
-    expect(patchCall[1].headers['If-Match']).toBe('W/"1"');
-    for (const url of dataverseUrls()) expect(new URL(url).hostname).toBe(SANDBOX_HOSTS[0]);
   }));
 
   it('runChangeset writes the $batch to the sandbox host only', ctx(async () => {
