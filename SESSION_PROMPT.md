@@ -1,3 +1,105 @@
+# Session 543-UI Prompt: owner check of the Research Presentation Materials card (worktree `claude/ui-work`)
+
+> **Where things live.** This handoff is on branch `claude/ui-work` in the worktree
+> `/Users/gallivan/Code/WMKF_Apps-ui`. **The Test Request Factory work (synthetic reviewers, 6c-ii)
+> is in the main checkout `/Users/gallivan/Code/WMKF_Apps` on `claude/factory-synthetic-reviewers-6c-ii`,
+> not here.** Its prompt is the "Session 543 Prompt" further down. Do not switch this worktree to
+> `main` or pull `main` into it. Keep the Factory-owned files untouched: `lib/services/test-requests/`,
+> `lib/services/reviewer-engagement/`, the potential-reviewer and reviewer-suggestion adapters,
+> `reviewer-merge.js`, the two test-request scripts, migration 054, and the Factory design doc.
+
+## Session 543-UI Summary — 2026-09-25 PT (Opus; parallel UI worktree)
+
+[VERIFIED via commits on `claude/ui-work`, full Jest run, and gates run in this worktree]
+
+### What Was Completed
+
+1. **Research Presentation Materials card** on the Workbench Staff Deliberations tab
+   (`shared/components/workbench/ResearchPresentationMaterialsCard.js`). It is always shown, after the
+   distribution panel and Briefing page link card. Its status line reads: Presentation not scheduled /
+   Presentation scheduled · materials not requested / requested / ready. A closed collection reads
+   "materials request closed"; a failed read reads "could not be loaded". Rows for Slides and
+   Participant bios link to every file in the request's `Site Visit - Slides` /
+   `Site Visit - Participant Bios` folders, or say "Not received yet".
+2. **Interim folder read.** `GET /api/workbench/site-visit/material-files` (`reviewers`) calls
+   `lib/services/site-visit-materials/folder-files-service.js`. The owner needs files that staff put in
+   those folders by hand through AkoyaGo (Request 1002903) to show while the upload portal is in
+   testing; those files have no `wmkf_requestdocument` row. Contract and retirement trigger:
+   `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.13. Security matrix row, `CANONICAL_COUNTS`
+   (route files 227, requireAppAccess endpoints 141), and a service catalog entry were added.
+3. **`useSiteVisitContext`** now settles a failed logistics read as `{ unavailable: true }` instead of
+   staying `null`. A recipient-directory failure alone keeps the visit.
+4. **Owner answers this session:** there is no "awaiting confirmation" status (all received but
+   unconfirmed reads "requested"); there are no counters for the folder fallback; the one-line
+   fact-consistency fix in the Factory doc is left to the Factory session.
+5. **Verification:** full Jest suite 1,104 suites / 16,553 tests passed; new suites for the service
+   (5 tests), the card (13), and hook directory-failure cases; one mutation killed (directory
+   coupling). Every gate is green except `check:fact-consistency` (below). No visual pass was run:
+   local dev here reads production Dataverse, so it was not started.
+
+### Commits (`claude/ui-work`, pushed)
+- `3c8e06915` — Add Research Presentation Materials card to Staff Deliberations
+- `4e79ba433` — Keep the Site Visit when only the recipient directory fails
+
+## Next Items (UI worktree)
+
+### Verified Open
+
+1. **Owner check on Request 1002903.** Open Staff Deliberations on the branch Preview (or
+   `npm run dev` in the owner's own shell) and confirm both rows link the uploaded files.
+   [ASSUMED] The files sit in folders named exactly `Site Visit - Slides` /
+   `Site Visit - Participant Bios` under the request's active `akoya_request` folder. If a row reads
+   "Not received yet", the folder name or location differs; check it in AkoyaGo before changing code.
+   [ASSUMED] Preview reads the same Dataverse/SharePoint as production; confirm on the Preview.
+2. **Promotion.** The card is Tier 1 runtime work on a feature branch. Open a PR from `claude/ui-work`
+   after the owner check; `main` auto-deploys.
+3. **`check:fact-consistency` is red on this branch** for one line only:
+   `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md:198` (historical "226 route files", live 227).
+   The fix is a `<!-- fact-consistency:ignore fact=api-route-file-count reason=historical -->` marker on that
+   line. **Owner decision:** the Factory session (or whichever branch merges second) adds it; this
+   worktree does not touch that file. Once this route reaches `main`, the main checkout's gate goes red too.
+
+### Owner Decision Needed
+
+1. Whether to move the header's "Materials: N of 3 received · due …" line into the new card. It stays
+   in the header for now (not confirmed), so once a collection exists the two partly repeat each other.
+2. Placement relative to Codex's post-visit "Research presentation follow-up" section (Codex plan
+   `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md` §4.2, Slice 5, on
+   `codex/feature-request`). The two should be placed together.
+
+### Verify Before Acting
+
+1. **Merge overlap with Codex Slice 5.** Codex will wire `useSiteVisitContext` and add a section to
+   `StaffDeliberationsTab.js`, and already edits `lib/services/site-visit/logistics-service.js` and
+   `pages/api/workbench/site-visit/logistics.js` (this branch does not). This branch changed
+   the hook's failure settle (`{ unavailable: true }`, directory decoupled) and mounted the card after
+   the distribution-panel block. Whoever merges second reconciles those two files.
+2. **Residual risk (§16.13):** the Workbench materials summary is fail-open `null`, so a failed summary
+   read shows "materials not requested" for a scheduled presentation.
+3. **Agent wiki:** the write hook flagged `docs/agent-wiki/topics/security-auth.md` for the new route. It
+   was deliberately not updated (interim read-only route; `check:agent-wiki` green). Revisit if the
+   route outlives this cycle.
+
+## Key Files Reference (UI worktree)
+
+| File | Purpose |
+|---|---|
+| `shared/components/workbench/ResearchPresentationMaterialsCard.js` | Card, status mapping, file rows |
+| `lib/services/site-visit-materials/folder-files-service.js` | Interim folder listing |
+| `pages/api/workbench/site-visit/material-files.js` | Thin route shell |
+| `shared/components/workbench/useSiteVisitContext.js` | Site Visit read with `unavailable` settle |
+| `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.13 | Contract, residual risk, retirement trigger |
+
+## Stop-time notes (UI worktree)
+
+- Claim-evidence pilot: no eligible edit recorded for this session; no observation row.
+- Milestone: none required (branch-only, not deployed).
+- `CLAUDE.md`: no change (the route is catalogued in the matrix and service catalog).
+
+---
+
+## Prior prompt (main checkout's Session 543 prompt, unchanged)
+
 # Session 543 Prompt: Factory follow-ups, item 6 next recipe, and the two Codex-led threads
 
 ## Owner brief: where the Test Request Factory stands (written 2026-09-24 PT, end of Session 542)
