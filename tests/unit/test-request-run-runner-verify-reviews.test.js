@@ -456,7 +456,7 @@ function reviewFileResource() {
     plannedIdentity: { assignmentSequence: 1, index: 0, filename: 'Review_1.pdf' },
     readback: {
       index: 0, filename: 'Review_1.pdf', folder: REVIEW_FULL_FOLDER, library: 'akoya_request',
-      size: REVIEW_FILE_BYTES.length, contentHash: REVIEW_FILE_SHA256,
+      size: REVIEW_FILE_BYTES.length, contentHash: REVIEW_FILE_SHA256, mimeType: 'application/pdf',
       driveId: EXPECTED_DRIVE_ID, itemId: REVIEW_ITEM_ID, eTag: '"review-1"', versionId: '1.0',
     },
     outcome: 'verified',
@@ -650,6 +650,16 @@ describe('stepVerifyReviews', () => {
     const { sourceDocx, destDocx } = await buildDocxReviewFixture();
     const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
     const bundleReviewer = bundle.reviewers[0];
+    // The bundle must describe the SAME source file the journal copied (a
+    // DOCX), not the PDF fixture: the verifier now compares each journaled
+    // file against the bundle by ordinal name, source hash and MIME type
+    // (Opus round 2 P3-1), which exposed this fixture's PDF/DOCX mismatch.
+    bundleReviewer.files[0] = {
+      ...bundleReviewer.files[0],
+      name: 'MyReview.docx', size: sourceDocx.length,
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      contentHash: crypto.createHash('sha256').update(sourceDocx).digest('hex'),
+    };
     const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.docx' };
     mockDataverse({
       person: personRow(bundleReviewer),
@@ -906,6 +916,43 @@ describe('stepVerifyReviews', () => {
           readback: { suggestionId: DEST_SUGGESTION_A, answerCount: 0 }, outcome: 'verified',
         },
       ],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it.each([
+    // Each case isolates ONE comparison in verifyOneReview's bundle check.
+    // (The count check itself is not reachable by mutating the bundle: a
+    // bundle with fewer files than the source is refused by the source
+    // fence first, as `source_changed`. It guards a journal inconsistency,
+    // and the missing-file case below covers the bundle-larger direction.)
+    ['the bundle lists a second file the journal never copied (missing-file check)', (r) => { r.files.push({ ...r.files[0], name: 'Second.pdf', graphItemId: '01SOURCEREVIEW00000000000000000002' }); }],
+    ['the journaled source hash differs from the bundle (hash check)', (r) => { r.files[0].contentHash = 'f'.repeat(64); }],
+    ['the journaled MIME type differs from the bundle (MIME check; name unchanged)', (r) => { r.files[0].mimeType = 'application/msword'; }],
+  ])('P3-1 (Opus round 2): uploaded review fails reviews_verification_failed when %s', async (_label, mutate) => {
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    mutate(bundleReviewer);
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    const { result } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), reviewFileResource(),
+      ],
+      deps: { graph: fakeGraph({ includeReview: true }) },
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');

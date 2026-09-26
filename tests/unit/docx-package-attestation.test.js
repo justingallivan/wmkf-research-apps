@@ -154,6 +154,33 @@ describe('attestDocxPackageAgainstSource', () => {
       .rejects.toThrow(/content-type override \/word\/document\.xml changed ContentType/);
   });
 
+  it('rejects a duplicated [Content_Types].xml Override where a rogue entry precedes the original (P3-4, Opus round 2)', async () => {
+    const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => {
+      const ct = await zip.file('[Content_Types].xml').async('string');
+      // A Map keyed by PartName would keep the LAST (original) entry and pass;
+      // the comparator must refuse the repeat itself.
+      const rogue = '<Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/>';
+      zip.file('[Content_Types].xml', ct.replace('<Override', `${rogue}<Override`));
+    });
+    await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml))
+      .rejects.toThrow(/repeats override \/word\/document\.xml/);
+  });
+
+  it('treats [Content_Types].xml Default extensions case-insensitively: a duplicate that differs only by case is refused (P3-4, Opus round 2)', async () => {
+    const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => {
+      const ct = await zip.file('[Content_Types].xml').async('string');
+      // Attribute order is not fixed (the render writes ContentType first).
+      const tag = ct.match(/<Default\b[^>]*>/)?.[0];
+      expect(tag).toBeTruthy(); // the render must declare at least one Default
+      const ext = tag.match(/Extension="([^"]+)"/)[1];
+      const contentType = tag.match(/ContentType="([^"]+)"/)[1];
+      const upper = `<Default Extension="${ext.toUpperCase()}" ContentType="${contentType}"/>`;
+      zip.file('[Content_Types].xml', ct.replace('</Types>', `${upper}</Types>`));
+    });
+    await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml))
+      .rejects.toThrow(/repeats default extension/);
+  });
+
   it('rejects an added [Content_Types].xml <Default> entry (P3-a, Opus round 1)', async () => {
     const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => {
       const ct = await zip.file('[Content_Types].xml').async('string');
