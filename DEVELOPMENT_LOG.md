@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Staff Deliberations shows applicant presentation materials (Session 543-UI)
+
+**Milestone:** The Workbench Staff Deliberations tab links an applicant's slides and participant bios straight from the request's SharePoint folders, with a presentation/materials status line, so staff no longer open AkoyaGo to find them.
+**Sessions:** 543-UI (parallel `claude/ui-work` worktree; Opus; owner check on Request 1002903).
+**Ship state:**
+- PR #338 merged `98cc433ad`; production `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` Ready on `applications.wmkeck.org`.
+- New read-only route `/api/workbench/site-visit/material-files` lists `Site Visit - Slides` / `Site Visit - Participant Bios`. It is interim while the upload portal is in testing and files are placed by hand.
+- The card sits above Email history once the brief is shared. The Site Visit read now reports a failure instead of looking like "not scheduled".
+**Why it matters:** the files the Board and staff deliberate on are one click from the request, whether they came through the portal or not.
+**Pointers:** `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.13; `98cc433ad`.
+
 ## September 2026 — Test Request Factory promoted: ledger-driven runner and the Initial Assessment recipe (Sessions 536–542)
 
 **Milestone:** Disposable, realistic test Requests can now be manufactured from a production source bundle into the Dataverse sandbox through a durable run ledger and a bounded, resumable runner, and the first later-stage recipe seeds a synthetic Initial Assessment plus Board snapshot through the unmodified production lineage functions.

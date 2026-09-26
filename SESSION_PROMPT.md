@@ -52,13 +52,14 @@
    `Site Visit - Participant Bios` under the request's active `akoya_request` folder. If a row reads
    "Not received yet", the folder name or location differs; check it in AkoyaGo before changing code.
    [ASSUMED] Preview reads the same Dataverse/SharePoint as production; confirm on the Preview.
-2. **Promotion.** The card is Tier 1 runtime work on a feature branch. Open a PR from `claude/ui-work`
-   after the owner check; `main` auto-deploys.
+2. **Promotion — DONE.** PR #338 merged `98cc433ad` (the owner ran the merge); production
+   `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` Ready on `applications.wmkeck.org` and verified as the merge build.
+   These post-merge doc updates are on `claude/ui-work` and need a small docs PR (Tier 0) to reach `main`.
 3. **`check:fact-consistency` is red on this branch** for one line only:
    `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md:198` (a historical route-file count one below the live value).
    The fix is a `<!-- fact-consistency:ignore fact=api-route-file-count reason=historical -->` marker on that
-   line. **Owner decision:** the Factory session (or whichever branch merges second) adds it; this
-   worktree does not touch that file. Once this route reaches `main`, the main checkout's gate goes red too.
+   line. **Owner decision:** the Factory session adds it; this worktree does not touch that file.
+   **Now red on `main` as well** (the route merged in PR #338).
 
 ### Owner Decision Needed
 
@@ -94,7 +95,7 @@
 ## Stop-time notes (UI worktree)
 
 - Claim-evidence pilot: no eligible edit recorded for this session; no observation row.
-- Milestone: none required (branch-only, not deployed).
+- Milestone: `DEVELOPMENT_LOG.md` entry added after the PR #338 production deploy.
 - `CLAUDE.md`: no change (the route is catalogued in the matrix and service catalog).
 
 ---
