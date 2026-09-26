@@ -1,9 +1,78 @@
+# Session 544 Prompt: Factory item 6 recipes 3–5 (plan one paragraph, one Codex plan review), then item 7
+
+## Session 543 Summary — 2026-09-25/26 PT (Fable; slices 6c-i and 6c-ii built, reviewed, merged, live-proven)
+
+### What Was Completed
+
+1. **Slice 6c-i merged (PR #337, `39f641bac`)**: reviews recipe token, ledger reviewer assignments (migration 054 edited in place, unapplied everywhere), operation-scoped marker-write opt-out with WHATWG-canonical target checks on both guards.
+2. **Slice 6c-ii built, reviewed, merged (PR #341, `f54f5d5cf`)**: bundle v3 exporter (`--with-reviewers`, `--source-marker-column`), synthetic-person isolation behind `SYNTHETIC_REVIEWER_ISOLATION=on`, the seeder (`seed_reviewers`, `copy_review_file`, `seed_review_answers`), `docx-package-attestation.js`, `verify_reviews`. Review history: Opus per stage, Fable invariant checks and mutations before each Opus round (new process, memory `feedback-orchestrator-checks-builds-before-review`), three Codex adversarial rounds (nine findings, all closed), then an owner-directed Codex review of the Fable-authored closures (four rounds: customXml shapes characterized from the live promoted IA files read back from the sandbox, comments/PIs/DOCTYPE refused, every normalized part under a byte ceiling and a shape, a closed customXml graph, the person row re-asserted on every resume, BOM-aware XML decoding) ending in **approve, no material findings**.
+3. **Live proof (PR #342, `df733dbc6`)**: owner applied wave30 to the sandbox; sandbox Request 1000343 reached `ready` through all eighteen steps of the `reviews` recipe from production Request 1003222 (D-R5 read scope; its three reviewers are the owner's throwaway inboxes, passed through as the `--reviewer-address` flags). Two live-only facts fixed: Dataverse derives a potential reviewer's primary name from first/last on create AND update (the `TEST · ` prefix now lives in `wmkf_firstname`; `isSyntheticNameDerived` checks the derived name; agent-wiki fact corrected), and `wmkf_externaltokenrevoked` defaults to `false` so only `true` is a live value there. Gitleaks config allow-lists the ledger digest lines in the Factory's run-inspection evidence files.
+4. **UI worktree (Opus, parallel)**: PRs #338/#339 merged; see the Session 543-UI block below (its open items stand).
+
+### Commits (all on `main` via merged PRs)
+- `39f641bac` PR #337 (6c-i) · `f54f5d5cf` PR #341 (6c-ii) · `df733dbc6` PR #342 (live-proof fixes, evidence, wiki correction, Gitleaks allowlist).
+
+## Next Items
+
+### Verified Open
+
+1. **Item 6, recipes 3–5** (site-visit materials and transcripts; Pre-Site seed and render; Pre-RP brief, site-visit start, Final Writeup).
+   Evidence: `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` build order; nothing planned for these yet.
+   Recommendation carried from S543: one plan paragraph covering all three, ONE Codex plan review (the 6c plan took fifteen rounds because findings were closed one at a time; canonicalize each finding's class on the first hit), then slices with the S543 process (invariant table + mutations checked by the orchestrator before any Opus round; Codex capped at three rounds per slice).
+2. **Item 7** (admin form, resume/retire, first shared apply of migration 054 and of wave30 to production, production release). Requirement carried: deterministic reservation identity per actor + idempotency key so retries reach the ledger's assignment comparison.
+   Evidence: design doc slice 6c-i record (Codex round 1 declined finding 1).
+
+### Owner Decision Needed
+
+1. **Auto-minted synthetic reviewer addresses.** The `--reviewer-address` flags exist only so the later email slice (6d) can reach owner-controlled inboxes; for a source whose reviewers are real people the recipe has no address to use. Minting deterministic `@test.invalid` addresses would remove the recipe's last manual input. Deferred by the owner's questions on 2026-09-26; decide when a real-reviewer source is first cloned or when 6d is planned.
+   Evidence: design doc 6c-ii live-proof record; `scripts/rehearse-test-request-sandbox.mjs` `resolveReviewerAssignments` (a "synthetic default address" path already exists for synthetic sources).
+2. **6d (reviewer email exception)**: own slice, own plan review; not started.
+
+### Parked
+
+1. **Uploaded-review branch live pass** (`copy_review_file`, DOCX attestation, `Reviewer_Uploads` census). Unit-proven; 1003222's reviews were form submissions. Re-open trigger: the first clone of a source Request with an uploaded review. Owner direction 2026-09-26: nobody uploads anything by hand to force it.
+   Evidence: `docs/plans/evidence/test-request-factory/reviews-recipe-live-proof-2026-09-26.md`.
+2. **Live-ledger suite flake**: `tests/integration/test-request-run-ledger.pg.test.js` failed once in two of ~20 local runs when both live suites shared one container in parallel workers; 10/10 green in a capture loop, test name never captured; CI runs both files in one invocation. Re-open trigger: a recurrence with a captured test name.
+
+### Verify Before Acting
+
+1. **Sandbox residue from the proofs**: Requests 1000341–1000343 with their Initial Assessments, three marker-true synthetic persons (addresses = the owner's throwaway inboxes), suggestions and 22 answer rows. Nothing to clean now; if item 7's retire path is built, these are its first candidates.
+   Preflight: `--run-inspect` on runs `f8aae6aa…` and `83c5da2e…` in the local ledger container `wmkf-ledger-pg` (`TEST_REQUEST_LEDGER_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger`).
+
+### Do Not Reopen Without New Decision
+
+1. Migration 054 edited in place until item 7 (owner, 2026-09-24). Wave30 applied to the sandbox only (owner, 2026-09-26); production apply is item 7's.
+2. `SYNTHETIC_REVIEWER_ISOLATION` unset = off; order in any environment is wave30 → switch → seeder.
+3. Codex per-slice cap of three adversarial rounds; Fable closes the loop after the cap and the owner accepts the self-reviewed closures (accepted for 6b and 6c-ii) — but an owner-directed Codex pass over Fable-authored closures found seven more real findings in 6c-ii, so offer that pass by default at the end of a slice.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Design, decisions D-R1–D-R6, every stage and review record |
+| `lib/services/test-requests/run-runner.js` | Recipes, steps, `verify_reviews`, person-ownership invariant |
+| `lib/services/reviewer-engagement/seed-synthetic-review.js` | Synthetic projection (`TEST · ` in first name), completion write, allowlists |
+| `lib/services/test-requests/docx-package-attestation.js` | One promotion attestor: shapes, ceilings, closed customXml graph |
+| `lib/services/test-requests/review-file-copy.js` | Review-file policy (10 reviewers × 5 files under the 100-file census) |
+| `scripts/rehearse-test-request-sandbox.mjs`, `scripts/export-test-request-source-bundle.mjs` | Reserve / advance / inspect; bundle export with reviewers |
+| `lib/dataverse/schema/wave30-synthetic-reviewer-marker/` | The marker column wave (sandbox-applied) |
+| `docs/plans/evidence/test-request-factory/reviews-recipe-live-proof-2026-09-26.md` | Live proof record, stops, residue |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|docx-package|seed-synthetic|source-bundle|reviews-sandbox|graph-).*"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger TEST_REQUEST_LEDGER_REQUIRE=1 npx jest "tests/integration/.*\.pg\.test\.js"   # container wmkf-ledger-pg (Colima)
+```
+
+---
+
 # Session 543-UI Prompt: owner check of the Research Presentation Materials card (worktree `claude/ui-work`)
 
 > **Where things live.** This handoff is on branch `claude/ui-work` in the worktree
 > `/Users/gallivan/Code/WMKF_Apps-ui`. **The Test Request Factory work (synthetic reviewers, 6c-ii)
-> is in the main checkout `/Users/gallivan/Code/WMKF_Apps` on `claude/factory-synthetic-reviewers-6c-ii`,
-> not here.** Its prompt is the "Session 543 Prompt" further down. Do not switch this worktree to
+> is merged to `main` as of 2026-09-26 (PRs #341, #342); the main checkout is back on `main`.**
+> Its handoff is the "Session 544 Prompt" above. Do not switch this worktree to
 > `main` or pull `main` into it. Keep the Factory-owned files untouched: `lib/services/test-requests/`,
 > `lib/services/reviewer-engagement/`, the potential-reviewer and reviewer-suggestion adapters,
 > `reviewer-merge.js`, the two test-request scripts, migration 054, and the Factory design doc.

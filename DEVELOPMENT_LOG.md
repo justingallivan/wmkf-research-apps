@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Test Request Factory: synthetic reviewers and reviews recipe promoted and live-proven (Session 543)
+
+**Milestone:** A cloned test Request can now carry synthetic reviewers and their reviews copied from the source: marker-isolated synthetic person rows (`wmkf_issyntheticreviewer`, wave30), suggestions, answer rows and received stamps, with review files copied and DOCX packages attested against SharePoint's characterized property promotion, and a terminal verifier that marks the run ready.
+**Sessions:** 543 (Fable orchestrating; Sonnet builds; Opus stage reviews; three Codex adversarial rounds on the slice plus an owner-directed Codex loop over the Fable-authored closures, ending in approve; owner acceptance; live proof).
+**Ship state:**
+- PR #337 (`39f641bac`, marker-guard hardening), #341 (`f54f5d5cf`, slice 6c-ii) and #342 (`df733dbc6`, live-proof fixes) merged and deployed; `SYNTHETIC_REVIEWER_ISOLATION` unset in production (off); wave30 applied to the sandbox only; migration 054 still unapplied on every shared database.
+- Live proof: sandbox Request 1000343 reached `ready` through eighteen steps; two live-only facts fixed (Dataverse derives a reviewer's primary name from first/last on create and update; a Boolean's platform default is not a live value).
+- Not exercised live: the uploaded-review branch (copy, DOCX attestation, `Reviewer_Uploads` census) — unit-proven, live-pending until a source with an uploaded review is cloned.
+**Why it matters:** reviewer-facing staff workflows can be exercised on a test Request whose reviewers are synthetic and invisible to ordinary reviewer lookups, with every write journaled before dispatch and every normalized DOCX part held to a byte ceiling and a shape.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (slice 6c-i/6c-ii records); `docs/plans/evidence/test-request-factory/reviews-recipe-live-proof-2026-09-26.md`; `docs/agent-wiki/topics/dataverse-dynamics.md` (name-derivation correction).
+
 ## September 2026 — Staff Deliberations shows applicant presentation materials (Session 543-UI)
 
 **Milestone:** The Workbench Staff Deliberations tab links an applicant's slides and participant bios straight from the request's SharePoint folders, with a presentation/materials status line, so staff no longer open AkoyaGo to find them.
