@@ -5,6 +5,7 @@
  */
 import {
   syntheticPersonProjection,
+  SYNTHETIC_PERSON_PROJECTION_FIELDS,
   SUGGESTION_CREATE_ALLOWLIST,
   buildSuggestionCreateBody,
   buildCompletionWrite,
@@ -55,7 +56,7 @@ function bundleReviewer(overrides = {}) {
 }
 
 describe('syntheticPersonProjection', () => {
-  it('prefixes the name, copies expertise/affiliation fields verbatim with null preserved, sets the marker true', () => {
+  it('prefixes the name, copies expertise/affiliation fields verbatim with null preserved, sets the marker true, derives the organizationname shadow', () => {
     const projection = syntheticPersonProjection(bundleReviewer(), 'throwaway@example.test');
     expect(projection).toEqual({
       wmkf_name: 'TEST · Jane Reviewer',
@@ -68,10 +69,11 @@ describe('syntheticPersonProjection', () => {
       wmkf_academicrank: 'Professor',
       wmkf_primarydepartment: 'Biology',
       wmkf_maininstitution: 'Example University',
+      wmkf_organizationname: 'Example University',
     });
   });
 
-  it('preserves null on every copied field when the source carries none', () => {
+  it('preserves null on every copied field when the source carries none, including the organizationname shadow', () => {
     const reviewer = bundleReviewer({
       person: { wmkf_name: 'X', wmkf_firstname: null, wmkf_lastname: null, wmkf_areaofexpertise: null, wmkf_primaryaffiliation: null, wmkf_academicrank: null, wmkf_primarydepartment: null, wmkf_maininstitution: null },
     });
@@ -79,6 +81,17 @@ describe('syntheticPersonProjection', () => {
     expect(projection.wmkf_firstname).toBeNull();
     expect(projection.wmkf_areaofexpertise).toBeNull();
     expect(projection.wmkf_maininstitution).toBeNull();
+    expect(projection.wmkf_organizationname).toBeNull();
+  });
+
+  it('clamps the organizationname shadow to 100 chars (byte-mirror of potential-reviewer.js clamp()), the primaryaffiliation field itself uncapped', () => {
+    const longAffiliation = `${'A'.repeat(150)}`;
+    const reviewer = bundleReviewer({ person: { ...bundleReviewer().person, wmkf_primaryaffiliation: longAffiliation } });
+    const projection = syntheticPersonProjection(reviewer, 'a@example.test');
+    expect(projection.wmkf_primaryaffiliation).toBe(longAffiliation);
+    expect(projection.wmkf_organizationname).toHaveLength(100);
+    expect(projection.wmkf_organizationname.endsWith('…')).toBe(true);
+    expect(projection.wmkf_organizationname.startsWith('A'.repeat(99))).toBe(true);
   });
 
   it('never emits an ORCID, Contact link, email-source, or trust-state field', () => {
@@ -86,6 +99,13 @@ describe('syntheticPersonProjection', () => {
     for (const forbidden of ['wmkf_orcid', 'wmkf_orcidurl', '_wmkf_contact_value', 'wmkf_emailsource', 'wmkf_addresstruststatejson']) {
       expect(Object.prototype.hasOwnProperty.call(projection, forbidden)).toBe(false);
     }
+  });
+});
+
+describe('SYNTHETIC_PERSON_PROJECTION_FIELDS', () => {
+  it('is exactly the key set syntheticPersonProjection writes, for any input', () => {
+    const keys = Object.keys(syntheticPersonProjection(bundleReviewer(), 'a@example.test')).sort();
+    expect([...SYNTHETIC_PERSON_PROJECTION_FIELDS].sort()).toEqual(keys);
   });
 });
 
