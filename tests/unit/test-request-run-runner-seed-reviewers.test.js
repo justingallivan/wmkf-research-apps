@@ -448,12 +448,30 @@ describe('stepSeedReviewAnswers', () => {
       plannedIdentity: { assignmentSequence: 1, suggestionId: SUGGESTION_A, destinationPersonId: DEST_PERSON_A },
     });
     await ledger.recordResourceReadback({ resourceId: resource.resourceId, readback: { suggestionId: SUGGESTION_A }, outcome: 'verified' });
+    // Stage C: an `uploaded` review's completion write now reads its file
+    // pointers off copy_review_file's own journaled folder resource, so
+    // seededLedger pre-seeds that resource exactly as a completed
+    // copy_review_file step would have left it, and client.get answers the
+    // (now lazily-called) getRequest read stepSeedReviewAnswers needs to
+    // reconstruct the full wmkf_reviewsharepointfolder path.
+    client.get = jest.fn(async () => ({
+      ok: true, status: 200, body: { akoya_requestnum: '1000', akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-12-01' }, text: '',
+    }));
+    if (reviewForm === 'uploaded') {
+      const folderResource = await ledger.journalPlannedResource({
+        step: 'copy_review_file', resourceKind: 'sharepoint_folder', system: 'sharepoint',
+        plannedIdentity: { assignmentSequence: 1, folder: `Reviewer_Uploads/reviewer_abcd1234/attempt_${'a'.repeat(32)}` },
+      });
+      await ledger.recordResourceReadback({
+        resourceId: folderResource.resourceId, readback: { primaryFilename: 'Review_1.pdf' }, outcome: 'verified',
+      });
+    }
     return {
       ledger, bundle, run, manifest, calls,
     };
   }
 
-  it('uploaded with answers: dispatches the atomic changeset with filePointers: null and records eTagBefore/eTagAfter/answerCount', async () => {
+  it('uploaded with answers: dispatches the atomic changeset with the copy_review_file-journaled pointers and records eTagBefore/eTagAfter/answerCount', async () => {
     const assignments = [{
       sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
       addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
@@ -471,12 +489,43 @@ describe('stepSeedReviewAnswers', () => {
     const ops = runChangeset.mock.calls[0][0];
     expect(ops).toHaveLength(2); // one answer + parent PATCH
     const parentOp = ops[ops.length - 1];
-    expect('wmkf_reviewsharepointfolder' in parentOp.body).toBe(false);
+    expect(parentOp.body.wmkf_reviewsharepointfolder).toBe(
+      `1000_${REQUEST_ID.replace(/-/g, '').toUpperCase()}/Reviewer_Uploads/reviewer_abcd1234/attempt_${'a'.repeat(32)}`,
+    );
+    expect(parentOp.body.wmkf_reviewfilename).toBe('Review_1.pdf');
     const answerResource = result.resources.find((r) => r.resourceKind === 'dataverse_review_answer_set');
     expect(answerResource.outcome).toBe('verified');
     expect(answerResource.readback.answerCount).toBe(1);
     expect(result.outcome).toBe('advanced');
     expect(result.run.currentStep).toBe('verify_reviews');
+  });
+
+  it('uploaded review refuses reviews_verification_failed when copy_review_file has not journaled its pointers', async () => {
+    const assignments = [{
+      sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false,
+      addressSha256: 'a'.repeat(64), address: 'throwaway@example.test',
+    }];
+    const bundle = bundleWithOneReviewer({ reviewer: { reviewForm: 'uploaded' } });
+    const { run, manifest } = runAndManifestFor(bundle, { currentStep: 'seed_review_answers', stepIndex: 12 });
+    const { ledger } = createFakeLedger(run, { assignments });
+    const resource = await ledger.journalPlannedResource({
+      step: 'seed_reviewers', resourceKind: 'dataverse_reviewer_suggestion', system: 'dataverse',
+      plannedIdentity: { assignmentSequence: 1, suggestionId: SUGGESTION_A, destinationPersonId: DEST_PERSON_A },
+    });
+    await ledger.recordResourceReadback({ resourceId: resource.resourceId, readback: { suggestionId: SUGGESTION_A }, outcome: 'verified' });
+    // Deliberately no copy_review_file folder resource.
+    client.get = jest.fn(async () => ({
+      ok: true, status: 200, body: { akoya_requestnum: '1000', akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-12-01' }, text: '',
+    }));
+    createReviewsSandboxDeps.mockReturnValue({
+      runChangeset: jest.fn(), getSuggestionById: jest.fn(async () => ({ wmkf_appreviewersuggestionid: SUGGESTION_A, _etag: 'W/"1"' })),
+    });
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: {}, sharePointTarget: () => ({}) },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
   });
 
   it('unreceived: no changeset dispatched, answerCount 0', async () => {
