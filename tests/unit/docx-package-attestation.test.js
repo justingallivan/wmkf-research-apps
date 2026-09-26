@@ -137,6 +137,31 @@ describe('attestDocxPackageAgainstSource', () => {
     await expect(attestDocxPackageAgainstSource(bad, sourceWithOwnCustomXml))
       .rejects.toThrow(/item9\.xml is not a SharePoint property-promotion item/);
   });
+
+  it('rejects a changed ContentType on an existing [Content_Types].xml Override (P3-a, Opus round 1)', async () => {
+    const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => {
+      const ct = await zip.file('[Content_Types].xml').async('string');
+      // word/document.xml's own Override must already be present in the
+      // render's content types; swap its ContentType to something else.
+      const changed = ct.replace(
+        /(<Override ContentType=")[^"]+(" PartName="\/word\/document\.xml"\s*\/?>)/,
+        '$1application/x-tampered$2',
+      );
+      expect(changed).not.toBe(ct); // the fixture assumption must hold
+      zip.file('[Content_Types].xml', changed);
+    });
+    await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml))
+      .rejects.toThrow(/content-type override \/word\/document\.xml changed ContentType/);
+  });
+
+  it('rejects an added [Content_Types].xml <Default> entry (P3-a, Opus round 1)', async () => {
+    const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => {
+      const ct = await zip.file('[Content_Types].xml').async('string');
+      zip.file('[Content_Types].xml', ct.replace('</Types>', '<Default Extension="webp" ContentType="image/webp"/></Types>'));
+    });
+    await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml))
+      .rejects.toThrow(/content-type default for extension webp was added/);
+  });
 });
 
 describe('ZIP central-directory budget (fail-closed, Codex plan rounds 13-14)', () => {
