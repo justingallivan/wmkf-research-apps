@@ -1,3 +1,64 @@
+# Session 548 Prompt: Durable presentation-media Safari upload acceptance (branch-local)
+
+## Local-runtime / sandbox-data acceptance — 2026-09-25 PT
+
+**[VERIFIED via Git, owner-operated signed-in macOS Safari, disposable local PostgreSQL 16,
+sandbox Dataverse readback, Microsoft Graph metadata, and exact Graph download]** Work remained in
+`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on `codex/feature-request`; the main
+checkout, Factory branch, and `main` were not edited or pushed. The turn began at local/origin
+`48f447135`; bounded-range correction `1fcc6bc0f` and the historical handoff `c628d7367` remain
+contained. No deployment, Preview alias move, Production write, or deletion occurred.
+
+The owner approved two sequential Safari uploads of the exact retained test file to human-created
+sandbox Request `1000334` / `4236c2b3-b053-f111-bec7-6045bd015cb0`, including the necessary local
+intent and sandbox Request Document writes and retention of all governed items/records. The first
+Safari upload finalized normally as intent `48e3c648-af86-4730-9819-34bfee6e35e2`; its completed
+screen correctly hid the transient Pause/Resume controls. Under a fresh one-upload approval, the
+second Safari run visibly reached Pause, Resume, and successful save according to the owner.
+
+**[VERIFIED Safari pause/resume result]** Intent `99b13f1f-9d77-4468-92aa-f6bc05c0c691` finalized
+as exact SharePoint item `01G4GVMSZMGFZUIBYSWZGZDSLZFQLSDVFW` / physical filename
+`1000334-Recording-99b13f1f-9d77-4468-92aa-f6bc05c0c691.mp4`. The durable row has equal declared
+and candidate sizes of 100,665,703 bytes and cleared upload-URL ciphertext. A fresh Graph download
+returned 100,665,703 bytes, MIME `video/mp4`, and SHA-256
+`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`, exactly matching the local
+source. Graph's current eTag advanced from the registry-time `,2` to `,3` with stable identity,
+size, hash, and version `1.0`; this is metadata advancement, not content drift.
+
+Ready Request Document `aa09e166-6ab9-f111-aaad-70a8a59af221` binds the Safari pause/resume item
+at slot version 3. Safari slot-version-2 document `f39a712d-69b9-f111-aaad-70a8a59af221` and Chrome
+slot-version-1 document `0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` are Superseded; all three exact
+items, documents, and intents remain retained as approved. The 64.088-second intent-to-finalized
+interval includes the deliberate pause and is not an active-rate benchmark. The owner-observed UI
+sequence plus durable/Graph/Dataverse readback closes the local Safari upload/pause/resume/finalize
+subpath. It does not prove the exact pause boundary, displayed rate/ETA, Production Watch,
+long-seek, Download UI, near-cap throughput, live retry/reconnect/watchdog, or Graph-confirmed
+terminal expiry.
+
+**[VERIFIED local-harness cleanup]** The temporary branch-local `next.config.js` alias/transpile
+hook for `/private/tmp/wmkf-local-vercel-postgres-adapter.cjs` was removed and is not part of the
+branch diff. The local Next server was stopped. The disposable PostgreSQL container/database and
+adapter file remain retained; deletion was not approved. No runtime code changed during the
+Safari run, so no new Opus code-review claim is made; the shared transport and bounded-range code
+retain their previously completed iterative read-only OAuth Claude Opus reviews.
+
+## Remaining release work
+
+- Chrome's upload-session expiry row remains **PARTIAL** because neither the Chrome nor Safari
+  durable-producer run observed Graph-confirmed terminal expiry. Retest only through the durable
+  producer; do not restore the retired Preview proof harness.
+- Migration 055 is not applied to the actual Preview-connected database, and this branch is not
+  deployed or enabled in Preview or Production. Any migration, configuration, deployment, alias
+  move, SharePoint upload/deletion, or Production write requires a fresh concrete approval list.
+- Local Safari upload is accepted. Production Safari Watch, >2-minute seeking, Download UI and
+  integrity, and the actual near-cap desktop Production upload remain deferred to a freshly
+  approved human-created Request. The Test Request Factory is unfinished and is not a dependency.
+- Live retry, reconnect, and watchdog states remain offline-tested only. Do not attempt iPadOS or
+  another Edge run.
+- Do not delete Request `1000334`, its Site Visit, any of the three retained Request Documents,
+  SharePoint items, local acceptance database/container, or adapter file without a separate exact
+  cleanup approval and registry-safe teardown.
+
 # Session 547 Prompt: Durable presentation-media Chrome acceptance (branch-local)
 
 ## Local-runtime / sandbox-data acceptance — 2026-09-25 PT
