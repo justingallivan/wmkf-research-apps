@@ -909,8 +909,14 @@ test('MP4 begin reports a failed session-creation replay as terminal instead of 
   expect(d.createBrowserUploadSession).not.toHaveBeenCalled();
 });
 
-test('MP4 resume ignores sealed initial expiry, checks live Graph status, and refreshes review-after', async () => {
-  const d = deps({ getUploadIntent: jest.fn(async () => mp4Intent()) });
+test('MP4 resume accepts Graph bounded remaining range and refreshes review-after', async () => {
+  const d = deps({
+    getUploadIntent: jest.fn(async () => mp4Intent()),
+    getBrowserUploadSessionStatus: jest.fn(async () => ({
+      expiresAt: '2026-09-25T14:00:00.000Z',
+      nextExpectedRanges: ['10-99'],
+    })),
+  });
   const result = await getMp4UploadStatus({
     requestId: REQUEST_ID,
     uploadId: OPERATION_ID,
@@ -928,9 +934,43 @@ test('MP4 resume ignores sealed initial expiry, checks live Graph status, and re
   expect(result).toMatchObject({
     complete: false,
     uploadUrl: 'https://upload.example/session',
-    nextExpectedRanges: ['10-'],
+    nextExpectedRanges: ['10-99'],
   });
 });
+
+test('MP4 resume continues to accept Graph open-ended remaining range', async () => {
+  const d = deps({ getUploadIntent: jest.fn(async () => mp4Intent()) });
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID,
+    uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID,
+    resumeFingerprint: 'a'.repeat(64),
+  }, d)).resolves.toMatchObject({
+    complete: false,
+    nextExpectedRanges: ['10-'],
+  });
+  expect(d.refreshUploadSession).toHaveBeenCalled();
+});
+
+test.each(['10-98', '10-100'])(
+  'MP4 resume rejects bounded range %s whose end does not match the declared file',
+  async (nextRange) => {
+    const d = deps({
+      getUploadIntent: jest.fn(async () => mp4Intent()),
+      getBrowserUploadSessionStatus: jest.fn(async () => ({
+        expiresAt: '2026-09-25T14:00:00.000Z',
+        nextExpectedRanges: [nextRange],
+      })),
+    });
+    await expect(getMp4UploadStatus({
+      requestId: REQUEST_ID,
+      uploadId: OPERATION_ID,
+      actingUserSystemId: ACTOR_ID,
+      resumeFingerprint: 'a'.repeat(64),
+    }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_range_invalid', httpStatus: 502 });
+    expect(d.refreshUploadSession).not.toHaveBeenCalled();
+  },
+);
 
 test('MP4 resume rejects a different edge fingerprint before Graph or path access', async () => {
   const d = deps({ getUploadIntent: jest.fn(async () => mp4Intent()) });

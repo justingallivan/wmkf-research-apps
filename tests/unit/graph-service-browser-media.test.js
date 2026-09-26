@@ -38,7 +38,7 @@ test('creates, reads, and cancels a browser-direct upload session without proxyi
     }))
     .mockResolvedValueOnce(response(200, {
       expirationDateTime: '2026-09-22T13:00:00Z',
-      nextExpectedRanges: ['10485760-'],
+      nextExpectedRanges: ['10485760-100665702'],
     }))
     .mockResolvedValueOnce(response(204));
 
@@ -52,7 +52,7 @@ test('creates, reads, and cancels a browser-direct upload session without proxyi
   expect(global.fetch.mock.calls[0][1].body).toContain('"@microsoft.graph.conflictBehavior":"fail"');
 
   await expect(GraphService.getBrowserUploadSessionStatus('https://upload.example/session-secret'))
-    .resolves.toMatchObject({ nextExpectedRanges: ['10485760-'] });
+    .resolves.toMatchObject({ nextExpectedRanges: ['10485760-100665702'] });
   expect(global.fetch.mock.calls[1][1].headers).toBeUndefined();
 
   await expect(GraphService.cancelBrowserUploadSession('https://upload.example/session-secret'))
