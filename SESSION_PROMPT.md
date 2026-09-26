@@ -1,3 +1,48 @@
+# Session 550 Prompt: Shared schema applied; Git-linked Preview activation in progress (branch-local)
+
+## Authorized rollout progress — 2026-09-25/26 PT
+
+**[VERIFIED via the canonical migration runner and direct shared-Neon readback]** The owner
+explicitly authorized additive migrations 054 and 055 after preflight proved both were pending on
+the shared Preview/Production Neon database. `node scripts/apply-migrations.js` applied exactly
+`054_test_request_runs.sql` and `055_post_presentation_materials.sql`; a second canonical run was
+an idempotent 0-applied/54-skipped no-op. `schema_migrations` records both at
+2026-09-26T06:54:20Z with `applied_by=codex-feature-request-2026-09-26`. Exact readback found the
+five expected tables, the presentation indexes/constraints, the five-scope staging constraint,
+and `test_request_receipt_ok(jsonb)`. All five new tables contain zero rows. This schema apply does
+not make the unfinished Test Request Factory usable and did not run any Factory producer.
+
+**[VERIFIED via branch-scoped Vercel configuration and masked pull]** Only Preview settings scoped
+to `codex/feature-request` were changed: `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and
+`POST_PRESENTATION_MATERIALS_ACCESS=test:4236c2b3-b053-f111-bec7-6045bd015cb0`. Sandbox
+Dataverse, the approved SharePoint site, both Dataverse safety controls, and Meeting Tracker
+readiness remain correctly configured. Production runtime configuration/deployment was not
+changed.
+
+**[PARTIAL deployment result; fail-closed]** Direct CLI Preview deployment
+`dpl_LT4y71456H53U91sNnG5vm2zi5NB` is Ready from branch commit
+`ffd9b79e8fbe448da9d5ca26b328376bc1418460`, and the registered Preview alias was temporarily moved
+to it under the owner's exact approval. A signed-in Chrome check then showed “Meeting Tracker is
+not yet enabled.” This proves the direct CLI source deployment did not receive the branch-scoped
+Preview overrides even though its metadata names the branch. It performed no Request, Postgres,
+Dataverse, or SharePoint mutation. Keep this result fail-closed; create the next deployment through
+the Git integration so branch-scoped variables are present, verify readiness before moving the
+alias again, and restore exact prior Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` if
+that correction fails.
+
+## Immediate continuation
+
+- Reconcile the shared-schema facts in Atlas and the presentation plan, run the relevant
+  documentation/migration gates with self-tests sequentially, commit, and push only
+  `codex/feature-request`.
+- Attest the resulting Git-linked Preview deployment, smoke it, then move the temporary Preview
+  alias to that exact deployment and reload the signed-in Chrome Request page.
+- The bounded acceptance target is human-created sandbox Request `1000334` /
+  `4236c2b3-b053-f111-bec7-6045bd015cb0` and its retained slot-version-3 recording. Do not upload
+  or delete anything. Do not change or deploy Production runtime configuration.
+- Leave the alias on the verified feature deployment for the owner's Safari Watch, long-seek, and
+  Download-integrity test. Alias restoration is a later explicit cleanup step.
+
 # Session 549 Prompt: Disabled-state Preview deployment and shared-DB stop (branch-local)
 
 ## Approved Preview preflight/deploy — 2026-09-25 PT

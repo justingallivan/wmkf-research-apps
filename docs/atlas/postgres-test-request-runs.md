@@ -3,10 +3,10 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable operation ledger for admin-driven test request clone runs; unapplied to any live database."
+summary: "Durable operation ledger for admin-driven test request clone runs; schema live and empty in shared Neon, while the Factory remains unfinished."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-09-23
+last_verified: 2026-09-26
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
@@ -15,16 +15,16 @@ related:
 
 # Atlas: `test_request_runs` / `test_request_run_resources` (Postgres)
 
-**[VERIFIED via source, 2026-09-23]** Migration 054 and its fresh-install
+**[VERIFIED via source and shared-Neon readback, 2026-09-26]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
 the Test Request Factory's "basic clone" stage
 (docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md, "Operation contract
-and recovery" and the "3. Basic clone" build-stage row). **Neither table
-exists in any live database yet.** Migration 054 is listed in
-`lib/db/migrations-manifest.json` but has not been run against the shared
-Production/Preview Postgres database; applying it requires explicit owner
-authorization and `node scripts/apply-migrations.js`, which this slice does
-not perform.
+and recovery" and the "3. Basic clone" build-stage row). Under explicit owner
+authorization, the canonical migration runner applied 054 to the shared
+Production/Preview Neon database at 2026-09-26T06:54:20Z. Exact readback found
+both tables and `test_request_receipt_ok(jsonb)` with zero rows; a second
+canonical runner invocation was an idempotent no-op. This schema apply does
+not make the unfinished Factory usable and did not execute a clone run.
 
 ## Contract
 
@@ -109,8 +109,10 @@ not perform.
 
 ## Limits
 
-- Migration 054 is unapplied; nothing in this repository writes to these
-  tables yet outside tests.
+- Migration 054 is live in the shared database, but both tables are empty and
+  no deployed API route or worker writes them. The operator-only rehearsal
+  CLI still refuses shared Neon and requires a separately supplied local
+  `TEST_REQUEST_LEDGER_URL`.
 - `test_request_run_resources.readback`/`source_provenance` are JSONB and
   the schema cannot itself forbid a caller from stuffing prohibited content
   (document bodies, tokens) into them — that discipline lives in the

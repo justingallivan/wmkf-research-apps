@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-09-25. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-09-26. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger and explicitly dated migration readbacks below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -585,15 +585,19 @@ reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
 
-### Post-presentation material ledgers — SOURCE-BUILT; MIGRATION 055 NOT APPLIED
+### Post-presentation material ledgers — SHARED-SCHEMA LIVE/EMPTY; BRANCH PREVIEW ACTIVATION IN PROGRESS
 
-**[SOURCE-VERIFIED 2026-09-25 on `codex/feature-request`.]** Migration
+**[VERIFIED via source, canonical migration runner, and shared-Neon readback 2026-09-26 on
+`codex/feature-request`.]** Migration
 `055_post_presentation_materials.sql`, mirrored by fresh-install V56, defines
-three additive tables for the post-research-presentation feature. It was applied only to the
-disposable local PostgreSQL 16 database used for the 2026-09-25 sandbox-data Chrome acceptance;
-no shared Preview or Production database has been migrated. Shared-environment rollout and
-destructive-cleanup controls remain off/unconfigured, and no producer or consumer route is
-deployed or enabled. Slice 3's
+three additive tables for the post-research-presentation feature. Under explicit owner
+authorization, the canonical runner applied 055 to the shared Preview/Production Neon database
+at 2026-09-26T06:54:20Z. Exact readback found all three tables, all four named indexes, the
+expected constraints, and zero rows; a second runner invocation was an idempotent no-op. Only
+`codex/feature-request` Preview configuration is schema-ready and limited to approved sandbox
+Request `4236c2b3-b053-f111-bec7-6045bd015cb0`; Production runtime configuration remains unchanged
+and destructive cleanup remains off. A usable Git-linked Preview deployment is still being
+verified. Slice 3's
 transcript producer, Slice 4's browser-direct MP4 intent/status/finalize routes, and Slice 5's
 independent 60-day link lifecycle plus token-verified materials-only consumer are source-built
 and offline-tested only on `codex/feature-request`.
@@ -621,10 +625,10 @@ and offline-tested only on `codex/feature-request`.
 
 The same migration and every fresh-install definition enumerate the complete
 five-scope `portal_upload_staging` allowlist, adding
-`post_presentation_transcript` without removing the four live scopes. Slice 3's
-source-built cleanup reconciler recognizes the transcript candidate shape, but
-the schema remains unapplied in shared Preview/Production databases and disabled rollout controls
-provide no deployed producer or new deletion authority. The local acceptance finalized intent
+`post_presentation_transcript` without removing the four live scopes. Exact shared-database
+readback confirmed that constraint. Slice 3's source-built cleanup reconciler recognizes the
+transcript candidate shape, but disabled destructive-cleanup controls provide no new deletion
+authority. The local acceptance finalized intent
 `e7236795-42d8-4018-8ee8-cdc66b953e9b` and retained its registry-bound SharePoint item; that
 disposable database/container is test evidence, not a deployed state store.
 

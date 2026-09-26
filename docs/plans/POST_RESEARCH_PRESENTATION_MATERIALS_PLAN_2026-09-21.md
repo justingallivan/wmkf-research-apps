@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow is built and passed retained local-runtime/sandbox-data Chrome and macOS Safari upload acceptance, the code-owned 10 MiB chunk policy is accepted as the performance fix, the Preview proof harness is retired, Preview/Production rollout remains unapplied, and Graph-confirmed expiry plus Production Safari media/long-seek gates remain."
+summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow and shared schema are built, migration 055 is live and empty in shared Neon, branch-scoped Preview activation is in progress, the code-owned 10 MiB policy is accepted, and Graph-confirmed expiry plus Safari media/long-seek gates remain."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -409,13 +409,15 @@ transport dependency and must not revoke or stale a briefing send.
 
 ### 5.5 Durable large-upload intents
 
-**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; LOCAL DISPOSABLE-POSTGRES /
-SANDBOX-DATAVERSE CHROME ACCEPTANCE PASSED; NOT DEPLOYED OR ENABLED IN PREVIEW/PRODUCTION.]** The
+**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; SHARED SCHEMA LIVE/EMPTY
+2026-09-26; BRANCH PREVIEW ACTIVATION IN PROGRESS.]** The
 retired Preview proof created no application table. The durable production producer creates the
-intent below before any Graph upload-session URL leaves the server. Migration 055 was applied only
-to the disposable local acceptance database and Wave 30 only to sandbox Dataverse; the shared
-Preview/Production databases, runtime deployments, access flags, and destructive-cleanup controls
-remain unapplied or off, so this is not a released capability.
+intent below before any Graph upload-session URL leaves the server. Under explicit owner approval,
+migration 055 is now tracked in the shared Preview/Production Neon database; exact readback found
+the empty presentation tables and expected constraints. Wave 30 remains sandbox-only. Only this
+branch's Preview configuration is schema-ready and limited to the approved sandbox Request;
+Production runtime configuration and destructive cleanup remain off, so this is not a released
+capability.
 
 Add `presentation_material_uploads` in the same migration. A row exists before any Graph upload
 URL leaves the server and carries:
@@ -1481,15 +1483,16 @@ deleted the exact committed item to the recycle bin or confirmed that the upload
 cancelled, gone, or expired with no exact item; uncertain transport retained the encrypted permit
 for retry.
 
-### Slice 1 — Additive schema and readiness — SOURCE-BUILT 2026-09-25; SANDBOX WAVE APPLIED; SHARED PREVIEW/PRODUCTION STORES NOT APPLIED
+### Slice 1 — Additive schema and readiness — SHARED POSTGRES APPLIED 2026-09-26; SANDBOX WAVE APPLIED; PRODUCTION RUNTIME OFF
 
 **[VERIFIED via source, focused tests, preflight self-test, migration/fresh-install parity, and
 sandbox readback.]** Wave 30, migration 055/V56, readiness/access parsing, compatibility-gated
 Request Document projection, Atlas, and runbook updates are built on `codex/feature-request`.
-Wave 30 was applied to sandbox Dataverse and both fields were read back with their exact types;
-migration 055 was applied only to the disposable local acceptance database. No shared Preview or
-Production Postgres migration, deployment, environment change, or general producer enablement
-occurred.
+Wave 30 was applied to sandbox Dataverse and both fields were read back with their exact types.
+Under explicit owner authorization, migration 055 was later applied by the canonical runner to the
+shared Preview/Production Neon database and exact readback found all three presentation tables
+empty. Branch-scoped Preview readiness/access activation is in progress; Production runtime
+configuration and general producer enablement remain off.
 
 - Dataverse wave adds `wmkf_ExternalUrl` and `wmkf_SlotVersion` to Request Document plus exact
   preflight.
@@ -1880,14 +1883,12 @@ Release order:
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
    `EXTERNAL_LINK_SECRET` separately in Preview and Production;
-3. **PARTIAL:** Wave 30 is applied and read back in sandbox Dataverse. The owner still applies the
-   Postgres migration to the actual Preview-connected database and runs the cross-store preflights
-   while readiness remains off. The disposable local PostgreSQL acceptance store does not satisfy
-   this Preview migration step;
-4. deploy the compatible producer runtime to Preview, run the prior-runtime-tolerance fixtures,
-   then owner sets
-   `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` only in Preview and enables the separate
-   `POST_PRESENTATION_MATERIALS_ACCESS=test:<approved request GUID>` for a bounded Preview
+3. **COMPLETE 2026-09-26:** Wave 30 is applied/read back in sandbox Dataverse, and owner-approved
+   migrations 054/055 are tracked in the shared Neon database with exact empty-schema readback and
+   a canonical-runner idempotence pass;
+4. **IN PROGRESS:** deploy the compatible producer runtime through the Git-linked Preview path.
+   Branch-scoped `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and
+   `POST_PRESENTATION_MATERIALS_ACCESS=test:<approved request GUID>` are set for the bounded Preview
    acceptance with a file over 50 MB, including reload/resume, a live upload-session expiry and
    recovery through the durable producer's authenticated resume route, and separate short-lived
    playback-URL expiry recovery;
@@ -2206,3 +2207,18 @@ The product behavior remains locked. Browser-direct Graph upload is the leading 
 after the corrected Chrome proof and local Safari upload acceptance. The remaining decision is
 whether the Production Safari media resolver/long-seek path passes. Failure returns to the bounded
 SharePoint-first-party fallback and is not permission to introduce application byte proxying.
+
+**2026-09-25/26 shared-schema apply and branch Preview activation:** after a read-only preflight
+proved migrations 054 and 055 were the only pending files on the shared Preview/Production Neon
+database, the owner explicitly authorized both additive migrations. The canonical runner applied
+both, exact readback found all five new tables empty plus the expected function, indexes, and
+constraints, and a second runner invocation applied nothing. This does not imply that the Test
+Request Factory is finished. Only `codex/feature-request` Preview settings were changed to schema
+ready and `test:4236c2b3-b053-f111-bec7-6045bd015cb0`; Production runtime configuration was not
+changed. Direct CLI deployment `dpl_LT4y71456H53U91sNnG5vm2zi5NB` built successfully and received
+the temporary Preview alias, but a signed-in Chrome check showed Meeting Tracker disabled,
+demonstrating that this direct source deployment did not inherit branch-scoped variables. It
+failed closed without a Request, Postgres, Dataverse, or SharePoint mutation. The corrective step
+is a Git-linked deployment from this branch, followed by exact deployment/alias/readiness
+attestation. No upload, deletion, Production deployment, or Production runtime configuration
+change is authorized by this receipt.
