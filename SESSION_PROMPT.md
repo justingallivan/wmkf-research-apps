@@ -53,17 +53,29 @@ clipboard and was left on the exact Request page for the owner's Safari gate. No
 email/recipient action, Production deployment, or Production runtime configuration change
 occurred.
 
+**[VERIFIED via owner-operated macOS Safari and local file readback]** The materials-only page's
+Watch action played the retained recording in Safari, and seeking worked across the available
+timeline. The file is under one minute, so a seek beyond two minutes was impossible and is not
+claimed. Download completed as
+`1000334-Recording-99b13f1f-9d77-4468-92aa-f6bc05c0c691.mp4`; local readback found exactly
+100,665,703 bytes and SHA-256
+`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`, equal to the approved
+source and retained Graph item. This closes the bounded Preview macOS Safari Watch/available-seek/
+Download-integrity row. It does not claim a greater-than-two-minute seek or a Production runtime
+deployment.
+
 ## Immediate continuation
 
 - The bounded acceptance target is human-created sandbox Request `1000334` /
   `4236c2b3-b053-f111-bec7-6045bd015cb0` and its retained slot-version-3 recording. Do not upload
   or delete anything. Do not change or deploy Production runtime configuration.
-- The materials-only URL is already on the local clipboard. The owner opens it in macOS Safari and
-  checks Watch, seeking beyond two minutes where the media duration permits, and Download
-  integrity. No new link, upload, or deletion is needed.
-- Leave the alias on corrected feature deployment `dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr` until the
-  owner completes that Safari test. Alias restoration to exact prior Factory deployment
-  `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` is a later explicit cleanup step.
+- The bounded Safari media gate is complete. Remaining technical evidence is Graph-confirmed
+  terminal upload-session expiry/recovery; live retry/reconnect/watchdog states remain
+  offline-tested only. Do not restore the retired proof harness.
+- The alias remains on corrected feature deployment `dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr`.
+  Restoring it to exact prior Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` and turning
+  branch presentation access off require an explicit cleanup approval. Leave the live link row and
+  retained file untouched unless separately authorized.
 
 # Session 549 Prompt: Disabled-state Preview deployment and shared-DB stop (branch-local)
 
