@@ -4,16 +4,21 @@
  * `resolveReviewerAssignments` / `assertSyntheticReviewerIsolationOnForReviews`).
  *
  * Fake sandbox transport (`deps`) + fake ledger (only the two methods this
- * resolution calls: findSyntheticByEmail, listAssignmentsByDestinationPerson).
+ * resolution calls: findAnyPersonByEmail, listAssignmentsByDestinationPerson).
  * Importing the script is safe: it now guards `main()` behind an
  * import.meta.url === argv[1] check (mirrors
  * export-test-request-source-bundle.mjs's own guard).
  *
  * @jest-environment node
  */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   resolveReviewerAssignments,
   assertSyntheticReviewerIsolationOnForReviews,
+  runReserve,
+  runAdvance,
 } from '../../scripts/rehearse-test-request-sandbox.mjs';
 
 const SOURCE_A = '77777777-7777-4777-8777-777777777771';
@@ -42,8 +47,8 @@ function reviewer(personId, overrides = {}) {
   };
 }
 
-function fakeDeps({ findSyntheticByEmail } = {}) {
-  return { findSyntheticByEmail: findSyntheticByEmail || (async () => null) };
+function fakeDeps({ findAnyPersonByEmail } = {}) {
+  return { findAnyPersonByEmail: findAnyPersonByEmail || (async () => null) };
 }
 
 function fakeLedger({ priorSources = [] } = {}) {
@@ -70,9 +75,10 @@ describe('resolveReviewerAssignments', () => {
       wmkf_emailaddress: 'throwaway@example.test',
       wmkf_areaofexpertise: 'Genomics', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
       wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University',
+      wmkf_organizationname: 'Example University',
       wmkf_issyntheticreviewer: true,
     };
-    const deps = fakeDeps({ findSyntheticByEmail: async () => existingRow });
+    const deps = fakeDeps({ findAnyPersonByEmail: async () => existingRow });
     const ledger = fakeLedger({ priorSources: [SOURCE_A] });
     const [assignment] = await resolveReviewerAssignments({
       deps, ledger, bundle, reviewerAddressFlags: [{ sourcePersonId: SOURCE_A, address: 'throwaway@example.test' }],
@@ -86,9 +92,9 @@ describe('resolveReviewerAssignments', () => {
     const existingRow = {
       wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: 'TEST · X', wmkf_firstname: 'X', wmkf_lastname: 'Y',
       wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: null, wmkf_primaryaffiliation: null,
-      wmkf_academicrank: null, wmkf_primarydepartment: null, wmkf_maininstitution: null, wmkf_issyntheticreviewer: true,
+      wmkf_academicrank: null, wmkf_primarydepartment: null, wmkf_maininstitution: null, wmkf_organizationname: null, wmkf_issyntheticreviewer: true,
     };
-    const deps = fakeDeps({ findSyntheticByEmail: async () => existingRow });
+    const deps = fakeDeps({ findAnyPersonByEmail: async () => existingRow });
     // Prior assignment(s) name a DIFFERENT source than this reservation's SOURCE_B.
     const ledger = fakeLedger({ priorSources: [SOURCE_A] });
     await expect(resolveReviewerAssignments({
@@ -102,9 +108,9 @@ describe('resolveReviewerAssignments', () => {
       wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
       wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test',
       wmkf_areaofexpertise: 'DRIFTED', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
-      wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University', wmkf_issyntheticreviewer: true,
+      wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University', wmkf_issyntheticreviewer: true,
     };
-    const deps = fakeDeps({ findSyntheticByEmail: async () => driftedRow });
+    const deps = fakeDeps({ findAnyPersonByEmail: async () => driftedRow });
     const ledger = fakeLedger({ priorSources: [SOURCE_A] });
     await expect(resolveReviewerAssignments({
       deps, ledger, bundle, reviewerAddressFlags: [{ sourcePersonId: SOURCE_A, address: 'throwaway@example.test' }],
@@ -149,6 +155,42 @@ describe('resolveReviewerAssignments', () => {
     })).rejects.toThrow(/assigned to more than one source reviewer/);
   });
 
+  it('P2-4: refuses a real (non-synthetic) person already owning the address (reviewer_person_not_synthetic)', async () => {
+    const bundle = bundleWith([reviewer(SOURCE_A)]);
+    const realPersonRow = {
+      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_emailaddress: 'real.reviewer@example.test',
+      wmkf_issyntheticreviewer: false, statecode: 0,
+    };
+    const deps = fakeDeps({ findAnyPersonByEmail: async () => realPersonRow });
+    await expect(resolveReviewerAssignments({
+      deps, ledger: fakeLedger(), bundle, reviewerAddressFlags: [{ sourcePersonId: SOURCE_A, address: 'real.reviewer@example.test' }],
+    })).rejects.toMatchObject({ code: 'reviewer_person_not_synthetic' });
+  });
+
+  it('P2-4: refuses an inactive (statecode != 0) row even if marker-true', async () => {
+    const bundle = bundleWith([reviewer(SOURCE_A)]);
+    const inactiveRow = {
+      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_emailaddress: 'throwaway@example.test',
+      wmkf_issyntheticreviewer: true, statecode: 1,
+    };
+    const deps = fakeDeps({ findAnyPersonByEmail: async () => inactiveRow });
+    await expect(resolveReviewerAssignments({
+      deps, ledger: fakeLedger(), bundle, reviewerAddressFlags: [{ sourcePersonId: SOURCE_A, address: 'throwaway@example.test' }],
+    })).rejects.toMatchObject({ code: 'reviewer_person_not_synthetic' });
+  });
+
+  it('P2-4: refuses a Contact-linked row even if marker-true and active', async () => {
+    const bundle = bundleWith([reviewer(SOURCE_A)]);
+    const contactLinkedRow = {
+      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_emailaddress: 'throwaway@example.test',
+      wmkf_issyntheticreviewer: true, statecode: 0, _wmkf_contact_value: '99999999-9999-4999-8999-999999999999',
+    };
+    const deps = fakeDeps({ findAnyPersonByEmail: async () => contactLinkedRow });
+    await expect(resolveReviewerAssignments({
+      deps, ledger: fakeLedger(), bundle, reviewerAddressFlags: [{ sourcePersonId: SOURCE_A, address: 'throwaway@example.test' }],
+    })).rejects.toMatchObject({ code: 'reviewer_person_not_synthetic' });
+  });
+
   it('mutation guard: proves a recycled address is refused rather than silently rebound to a new source', async () => {
     // Alice's old synthetic identity (recorded provenance: SOURCE_A) must not
     // be silently rebound to Bob (SOURCE_B) just because Bob's flag reuses
@@ -157,9 +199,9 @@ describe('resolveReviewerAssignments', () => {
     const aliceProjectedRow = {
       wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: 'TEST · Alice', wmkf_firstname: 'Alice', wmkf_lastname: 'A',
       wmkf_emailaddress: 'recycled@example.test', wmkf_areaofexpertise: null, wmkf_primaryaffiliation: null,
-      wmkf_academicrank: null, wmkf_primarydepartment: null, wmkf_maininstitution: null, wmkf_issyntheticreviewer: true,
+      wmkf_academicrank: null, wmkf_primarydepartment: null, wmkf_maininstitution: null, wmkf_organizationname: null, wmkf_issyntheticreviewer: true,
     };
-    const deps = fakeDeps({ findSyntheticByEmail: async () => aliceProjectedRow });
+    const deps = fakeDeps({ findAnyPersonByEmail: async () => aliceProjectedRow });
     const ledger = fakeLedger({ priorSources: [SOURCE_A] }); // "Alice" was the source
     await expect(resolveReviewerAssignments({
       deps, ledger, bundle, reviewerAddressFlags: [{ sourcePersonId: SOURCE_B, address: 'recycled@example.test' }],
@@ -194,5 +236,40 @@ describe('assertSyntheticReviewerIsolationOnForReviews', () => {
   it('allows a reviews recipe when the switch is "on"', () => {
     process.env[ENV_KEY] = 'on';
     expect(() => assertSyntheticReviewerIsolationOnForReviews('reviews')).not.toThrow();
+  });
+});
+
+describe('P2-3: runReserve/runAdvance refuse before any Dataverse or ledger call when the switch is off', () => {
+  const ENV_KEY = 'SYNTHETIC_REVIEWER_ISOLATION';
+  let saved;
+  beforeEach(() => { saved = process.env[ENV_KEY]; delete process.env[ENV_KEY]; });
+  afterEach(() => {
+    if (saved === undefined) delete process.env[ENV_KEY]; else process.env[ENV_KEY] = saved;
+  });
+
+  /** A client whose every method fails the test if invoked at all. */
+  function neverCalledClient() {
+    const fail = (name) => jest.fn(() => { throw new Error(`client.${name} must not be called`); });
+    return { get: fail('get'), post: fail('post'), patch: fail('patch'), delete_: fail('delete_') };
+  }
+
+  it('runReserve refuses immediately for --recipe=reviews with zero client calls', async () => {
+    const client = neverCalledClient();
+    await expect(runReserve(client, { recipe: 'reviews' }, 'postgres://unused')).rejects.toThrow(/SYNTHETIC_REVIEWER_ISOLATION/);
+    for (const fn of Object.values(client)) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('runAdvance refuses immediately for a reviews-recipe manifest with zero client calls', async () => {
+    const client = neverCalledClient();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reviews-manifest-'));
+    const manifestPath = path.join(dir, 'manifest.json');
+    fs.writeFileSync(manifestPath, JSON.stringify({ recipe: 'reviews' }));
+    try {
+      await expect(runAdvance(client, { manifest: manifestPath, bundle: undefined, steps: 1 }, 'postgres://unused'))
+        .rejects.toThrow(/SYNTHETIC_REVIEWER_ISOLATION/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    for (const fn of Object.values(client)) expect(fn).not.toHaveBeenCalled();
   });
 });

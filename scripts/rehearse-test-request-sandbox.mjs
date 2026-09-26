@@ -102,7 +102,7 @@ import {
 import { pgLedgerDb } from '../lib/services/test-requests/run-ledger-db.js';
 import { createReviewsSandboxDeps } from '../lib/services/test-requests/reviews-sandbox-deps.js';
 import { syntheticPersonProjection } from '../lib/services/reviewer-engagement/seed-synthetic-review.js';
-import { syntheticReviewerIsolationEnabled } from '../lib/services/test-requests/isolation.js';
+import { syntheticReviewerIsolationEnabled, SYNTHETIC_REVIEWER_MARKER_FIELDS } from '../lib/services/test-requests/isolation.js';
 
 const require = createRequire(import.meta.url);
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
@@ -626,6 +626,13 @@ export function assertSyntheticReviewerIsolationOnForReviews(recipe) {
   }
 }
 
+/** Marker/active/Contact-link check on a raw (unfiltered) person row (P2-4). */
+function isSyntheticActiveContactless(row) {
+  return !!row && row[SYNTHETIC_REVIEWER_MARKER_FIELDS.marker] === true
+    && (row.statecode === undefined || row.statecode === 0)
+    && !row._wmkf_contact_value;
+}
+
 /**
  * B1 (slice 6c-ii Stage B, plan "Reserve"/"Identity contract"). Resolves
  * EVERY bundle reviewer (not only the ones named by an explicit
@@ -635,12 +642,27 @@ export function assertSyntheticReviewerIsolationOnForReviews(recipe) {
  *   - an address is required for every bundle reviewer (a synthetic source
  *     reviewer with an exported address may default to it; a real source
  *     reviewer requires the flag); two reviewers sharing an address refuse;
- *   - the address is resolved through the sandbox's synthetic-only lookup;
- *     an existing marker-true/active/Contact-less row is reused ONLY IF
- *     every prior assignment naming that destination GUID (any run, any
- *     status) names this same source GUID, AND the row equals
- *     syntheticPersonProjection field-by-field with null preserved;
- *     otherwise a fresh destination GUID is preallocated (reused: false).
+ *   - the address is resolved through an UNFILTERED lookup (P2-4,
+ *     `findAnyPersonByEmail` -- deliberately not a synthetic-only lookup: a
+ *     synthetic-only lookup would return null for a REAL reviewer's address,
+ *     which would then get a fresh preallocated GUID and store that real
+ *     address as the run's recipient-confinement address, refusing only much
+ *     later at seed time on the alternate-key conflict). A row that exists
+ *     and is NOT an active, Contact-less, marker-true synthetic person
+ *     refuses the reservation immediately (`reviewer_person_not_synthetic`).
+ *     A marker-true/active/Contact-less row is reused ONLY IF every prior
+ *     assignment naming that destination GUID (any run, any status) names
+ *     this same source GUID, AND the row equals syntheticPersonProjection
+ *     field-by-field with null preserved; otherwise a fresh destination GUID
+ *     is preallocated (reused: false). The cross-run provenance check
+ *     (`listAssignmentsByDestinationPerson`) reads OUTSIDE the reservation's
+ *     own transaction (`reserveRun`'s INSERT), so it cannot itself observe or
+ *     prevent a concurrent second reservation racing the same destination
+ *     GUID; it is backstopped by the field-by-field projection check here
+ *     AND by `resolveReviewerPerson`'s identical re-verification at seed time
+ *     (run-runner.js), which re-reads and re-checks both before any write --
+ *     a race that slipped past this reservation-time check would still be
+ *     caught, never silently written.
  */
 export async function resolveReviewerAssignments({ deps, ledger, bundle, reviewerAddressFlags }) {
   const bundleReviewersByPersonId = new Map(
@@ -672,12 +694,18 @@ export async function resolveReviewerAssignments({ deps, ledger, bundle, reviewe
     }
     seenAddresses.set(normalizedAddress, sourcePersonId);
 
-    const existing = await deps.findSyntheticByEmail(normalizedAddress);
+    const existing = await deps.findAnyPersonByEmail(normalizedAddress);
     if (!existing) {
       resolved.push({
         sourcePersonId, destinationPersonId: crypto.randomUUID(), reused: false, address: rawAddress,
       });
       continue;
+    }
+    if (!isSyntheticActiveContactless(existing)) {
+      throw Object.assign(
+        new Error(`Address ${normalizedAddress} is already owned by a person that is not an active, Contact-less synthetic reviewer; refusing (reviewer_person_not_synthetic).`),
+        { code: 'reviewer_person_not_synthetic' },
+      );
     }
     const destinationPersonId = existing.wmkf_potentialreviewersid;
     const priorSources = await ledger.listAssignmentsByDestinationPerson(destinationPersonId);
@@ -705,7 +733,7 @@ export async function resolveReviewerAssignments({ deps, ledger, bundle, reviewe
   return resolved;
 }
 
-async function runReserve(client, args, ledgerUrl) {
+export async function runReserve(client, args, ledgerUrl) {
   assertSyntheticReviewerIsolationOnForReviews(args.recipe);
   if (args.recipe === 'reviews') {
     // Same script-only precedent as runAdvance: a single-process,
@@ -826,7 +854,7 @@ async function runReserve(client, args, ledgerUrl) {
   }
 }
 
-async function runAdvance(client, args, ledgerUrl) {
+export async function runAdvance(client, args, ledgerUrl) {
   // Every Initial Assessment step's sandbox dependency
   // (lib/services/test-requests/ia-sandbox-deps.js) calls
   // assertTrustedDalContext; this CLI is a single-process, single-invocation
