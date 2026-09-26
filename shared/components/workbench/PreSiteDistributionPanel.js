@@ -297,6 +297,9 @@ export default function PreSiteDistributionPanel({
   needsLock = false,
   // Briefing-link card and email history; the tab hides them until the draft is shared.
   record = true,
+  // Rendered between the briefing-link card and Email history when `record`
+  // is on (owner 2026-09-25: the tab's Research Presentation Materials card).
+  beforeHistory = null,
 }) {
   // No attachment field: since 2026-09-10 the email carries the briefing page
   // link instead of the writeup (owner; shape brief). The server records
@@ -1009,6 +1012,8 @@ export default function PreSiteDistributionPanel({
         )}
       </Card>
       )}
+
+      {record && beforeHistory}
 
       {record && (
       <Card hover={false}>
