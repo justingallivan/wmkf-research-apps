@@ -293,11 +293,22 @@ async function docxBytes() {
 const iaId = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const snapId = '01BCDEFGHIJKLMNOPQRSTUVWXYZ234567A';
 
-function fakeGraph({ includeReview = false, docxReview = null, overrides = {} } = {}) {
+// Folder depth below the Request folder (the Request folder itself is 0),
+// mirroring lib/services/graph/files.js which recurses while
+// `depth < maxDepth` and so lists files in folders at depth 0..maxDepth.
+function folderDepthBelowRequest(folder) {
+  const rel = folder.slice(REQUEST_FOLDER.length).replace(/^\//, '');
+  return rel ? rel.split('/').length : 0;
+}
+
+function fakeGraph({ includeReview = false, docxReview = null, extraFiles = [], overrides = {} } = {}) {
   return {
     getSiteId: jest.fn(async () => EXPECTED_SITE_ID),
     getDriveId: jest.fn(async () => EXPECTED_DRIVE_ID),
-    listFiles: jest.fn(async () => [
+    // Honors `maxDepth` like the real walker does (Codex F4): a file whose
+    // folder is deeper than the requested depth is NOT listed.
+    listFiles: jest.fn(async (parent, location, options = {}) => [
+      ...extraFiles,
       { id: BASIC_ITEM_ID, name: BASIC_FILENAME, folder: BASIC_FOLDER, size: BASIC_FILE_BYTES.length },
       { id: iaId, name: 'ia.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment`, size: cachedDocxBytes ? cachedDocxBytes.length : 0 },
       { id: snapId, name: 'snap.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment/Board Milestones`, size: cachedDocxBytes ? cachedDocxBytes.length : 0 },
@@ -307,7 +318,7 @@ function fakeGraph({ includeReview = false, docxReview = null, overrides = {} } 
       // source's size -- proving the census compares against the
       // journaled `itemSize`, never the source's `size`.
       ...(docxReview ? [{ id: docxReview.destItemId, name: 'Review_1.docx', folder: REVIEW_FULL_FOLDER, size: docxReview.destBuffer.length }] : []),
-    ]),
+    ].filter((file) => !Number.isInteger(options.maxDepth) || folderDepthBelowRequest(file.folder) <= options.maxDepth)),
     getFileMetadataById: jest.fn(async (driveId, itemId) => {
       if (itemId === iaId) return { driveId: EXPECTED_DRIVE_ID, id: iaId, name: 'ia.docx', size: cachedDocxBytes.length, eTag: '"ia-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/ia' };
       if (itemId === snapId) return { driveId: EXPECTED_DRIVE_ID, id: snapId, name: 'snap.docx', size: cachedDocxBytes.length, eTag: '"snap-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/snap' };
@@ -477,8 +488,8 @@ const DOCX_DEST_ITEM_ID = `01${'F'.repeat(32)}`;
 async function buildDocxReviewFixture() {
   const zip = new JSZip();
   zip.file('word/document.xml', '<w:document xmlns:w="ns"><w:body><w:p/></w:body></w:document>');
-  zip.file('[Content_Types].xml', '<Types xmlns="ns"></Types>');
-  zip.file('word/_rels/document.xml.rels', '<Relationships xmlns="ns"></Relationships>');
+  zip.file('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>');
+  zip.file('word/_rels/document.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>');
   zip.file('docProps/core.xml', '<cp:coreProperties/>');
   const sourceDocx = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   const promotedZip = await JSZip.loadAsync(sourceDocx);
@@ -644,6 +655,73 @@ describe('stepVerifyReviews', () => {
     });
     expect(result.outcome).toBe('ready');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  // Codex slice review round 1, F4: the default census depth (3) reaches
+  // the attempt folder but not a folder nested INSIDE it, so a rogue file at
+  // depth 4 was invisible to the terminal verifier. The fake walker honors
+  // `maxDepth`, so this test is green only if verify_reviews asks for a
+  // deeper census than the default.
+  it('a rogue file nested inside an attempt folder (depth 4) is seen by the census and refuses ready (Codex F4)', async () => {
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    expect(folderDepthBelowRequest(REVIEW_FULL_FOLDER)).toBe(3);
+    const rogue = { id: 'rogue-depth-4', name: 'smuggled.bin', folder: `${REVIEW_FULL_FOLDER}/nested`, size: 3 };
+    const graph = fakeGraph({ includeReview: true, extraFiles: [rogue] });
+    const { result, calls } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), reviewFileResource(),
+      ],
+      deps: { graph },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+    const listOptions = graph.listFiles.mock.calls[0][2];
+    expect(listOptions.maxDepth).toBeGreaterThanOrEqual(4);
+    expect(listOptions.failOnTruncation).toBe(true);
+  });
+
+  it('a truncated census (Graph stopped at its file limit) is a verification failure, never a shorter file list (Codex F4)', async () => {
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.pdf' };
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    const graph = fakeGraph({ includeReview: true });
+    graph.listFiles = jest.fn(async () => { const error = new Error('listFiles(x) exceeded the 100-file inventory limit'); error.code = 'graph_file_list_truncated'; throw error; });
+    const { result, calls } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResource(), reviewFileResource(),
+      ],
+      deps: { graph },
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
   });
 
   it('happy path (uploaded, one DOCX file, SharePoint-promoted size): reaches markReady with the correct post-promotion census (P1-1 regression)', async () => {

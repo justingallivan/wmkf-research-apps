@@ -443,8 +443,8 @@ describe('stepCopyReviewFile: DOCX package integrity mode wired end-to-end', () 
     const JSZip = require('jszip');
     const zip = new JSZip();
     zip.file('word/document.xml', '<w:document xmlns:w="ns"><w:body><w:p/></w:body></w:document>');
-    zip.file('[Content_Types].xml', '<Types xmlns="ns"></Types>');
-    zip.file('word/_rels/document.xml.rels', '<Relationships xmlns="ns"></Relationships>');
+    zip.file('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>');
+    zip.file('word/_rels/document.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>');
     zip.file('docProps/core.xml', '<cp:coreProperties/>');
     const sourceDocx = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
     const promotedZip = await JSZip.loadAsync(sourceDocx);

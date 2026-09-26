@@ -189,6 +189,91 @@ describe('attestDocxPackageAgainstSource', () => {
     await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml))
       .rejects.toThrow(/content-type default for extension webp was added/);
   });
+
+  // Codex slice review round 1, F1: the former regex parser matched only the
+  // literal `<Relationship` / `<Override` / `<Default` spellings with
+  // double-quoted attributes. Namespace-prefixed or single-quoted forms were
+  // invisible to it, so an added external relationship could attest as
+  // unchanged. Every case below must now be refused.
+  describe('namespace-aware OPC parsing (Codex F1)', () => {
+    const RELS_NS = 'http://schemas.openxmlformats.org/package/2006/relationships';
+    const CT_NS = 'http://schemas.openxmlformats.org/package/2006/content-types';
+    const withRels = (edit) => withParts(sourceWithOwnCustomXml, async (zip) => {
+      const rels = await zip.file('word/_rels/document.xml.rels').async('string');
+      zip.file('word/_rels/document.xml.rels', edit(rels));
+    });
+    const withCt = (edit) => withParts(sourceWithOwnCustomXml, async (zip) => {
+      const ct = await zip.file('[Content_Types].xml').async('string');
+      zip.file('[Content_Types].xml', edit(ct));
+    });
+    const prefixed = (xml, tag, ns) => xml.replace(/<Relationships\b([^>]*)>/, `<${tag}:Relationships xmlns:${tag}="${ns}"$1>`).replace(/<Relationship\b/g, `<${tag}:Relationship`).replace('</Relationships>', `</${tag}:Relationships>`);
+
+    it('a prefixed <r:Relationship TargetMode="External"> hidden in a prefixed rels part is still seen and refused', async () => {
+      const mutated = await withRels((rels) => prefixed(rels, 'r', RELS_NS).replace('</r:Relationships>', '<r:Relationship Id="rId99" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://attacker.example/" TargetMode="External"/></r:Relationships>'));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/rId99 .* is not a SharePoint customXml relationship/);
+    });
+
+    it('an added relationship written with single-quoted attributes is refused', async () => {
+      const mutated = await withRels((rels) => rels.replace('</Relationships>', "<Relationship Id='rId98' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject' Target='embeddings/x.bin'/></Relationships>"));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/rId98 .* is not a SharePoint customXml relationship/);
+    });
+
+    it('an added customXml relationship whose TargetMode is External is refused', async () => {
+      const mutated = await withRels((rels) => rels.replace('</Relationships>', '<Relationship Id="rId97" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="https://attacker.example/item.xml" TargetMode="External"/></Relationships>'));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/rId97 .* is an external customXml relationship/);
+    });
+
+    it('a foreign-namespace element inside the rels part is refused', async () => {
+      const mutated = await withRels((rels) => rels.replace('</Relationships>', '<x:Relationship xmlns:x="urn:foreign" Id="rId96" Target="a"/></Relationships>'));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/unexpected element urn:foreign:Relationship/);
+    });
+
+    it('a duplicated relationship Id is refused', async () => {
+      const mutated = await withRels((rels) => {
+        const first = rels.match(/<Relationship\b[^>]*\/>/)[0];
+        return rels.replace(first, `${first}${first}`);
+      });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/repeats relationship rId/);
+    });
+
+    it('a rels part whose root is not Relationships in the package namespace is refused', async () => {
+      const mutated = await withRels((rels) => rels.replace(RELS_NS, 'urn:not-opc'));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/root element is not Relationships in the package namespace/);
+    });
+
+    it('a malformed rels part fails closed instead of parsing as empty', async () => {
+      const mutated = await withRels((rels) => rels.replace('</Relationships>', '<Relationship Id="rId95"'));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/is not well-formed XML/);
+    });
+
+    it('a prefixed <ct:Override> added to a prefixed [Content_Types].xml is still seen and refused', async () => {
+      const mutated = await withCt((ct) => ct
+        .replace(/<Types\b([^>]*)>/, '<ct:Types xmlns:ct="' + CT_NS + '"$1>')
+        .replace(/<(Default|Override)\b/g, '<ct:$1')
+        .replace('</Types>', '<ct:Override PartName="/word/embeddings/x.bin" ContentType="application/octet-stream"/></ct:Types>'));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/x\.bin/);
+    });
+
+    it('a foreign-namespace element inside [Content_Types].xml is refused', async () => {
+      const mutated = await withCt((ct) => ct.replace('</Types>', '<x:Override xmlns:x="urn:foreign" PartName="/a" ContentType="b"/></Types>'));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/unexpected element urn:foreign:Override/);
+    });
+
+    it('the render attestor applies the same parser: a prefixed external relationship is refused there too', async () => {
+      const mutated = await withParts(render, async (zip) => {
+        const rels = await zip.file('word/_rels/document.xml.rels').async('string');
+        zip.file('word/_rels/document.xml.rels', prefixed(rels, 'r', RELS_NS).replace('</r:Relationships>', '<r:Relationship Id="rId99" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://attacker.example/" TargetMode="External"/></r:Relationships>'));
+      });
+      await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/rId99 .* is not a SharePoint customXml relationship/);
+    });
+
+    it('a customXml rels part beyond the old 2 KB head window is parsed in full: a trailing hyperlink relationship is refused', async () => {
+      const padding = `<!-- ${'x'.repeat(2500)} -->`;
+      const bad = SP_RELS.replace('<Relationship ', `${padding}<Relationship `).replace('</Relationships>', '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://attacker.example/" TargetMode="External"/></Relationships>');
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/_rels/item4.xml.rels', bad); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/non-customXmlProps relationship/);
+    });
+  });
 });
 
 describe('ZIP central-directory budget (fail-closed, Codex plan rounds 13-14)', () => {
