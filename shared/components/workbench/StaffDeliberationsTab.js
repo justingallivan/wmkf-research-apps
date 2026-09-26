@@ -42,6 +42,7 @@ import PreSiteDistributionPanel from './PreSiteDistributionPanel';
 import useSiteVisitContext from './useSiteVisitContext';
 import DeliberationStageRail from './DeliberationStageRail';
 import OverflowMenu from './OverflowMenu';
+import ResearchPresentationMaterialsCard from './ResearchPresentationMaterialsCard';
 import {
   DELIBERATION_STAGE_DEFAULT_LABELS,
   deliberationSessionLine,
@@ -1360,6 +1361,12 @@ export default function StaffDeliberationsTab({
           record={briefShared}
         />
       )}
+
+      <ResearchPresentationMaterialsCard
+        requestId={requestId}
+        siteVisitContext={siteVisitContext}
+        materialsSummary={materials}
+      />
 
       {isSuperuser && (preSiteShared || reopenHistory.length > 0) && (
         <Card hover={false}>

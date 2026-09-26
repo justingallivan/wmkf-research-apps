@@ -79,13 +79,13 @@ test('yields empty suggestions when no visit is scheduled', async () => {
   }));
 });
 
-test('fails open: a load error leaves the context null and does not throw', async () => {
+test('fails open: a load error reports unavailable (never a false "no visit") and does not throw', async () => {
   global.fetch = jest.fn(async () => response({ error: 'nope' }, 500));
 
   render(<Harness requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId('context').textContent).toBe('null');
+  await waitFor(() => expect(screen.getByTestId('context').textContent).toBe('{"unavailable":true}'));
 });
 
 test('does not fetch without a requestId', async () => {
@@ -97,16 +97,18 @@ test('does not fetch without a requestId', async () => {
 
 // T5 gap-fill (Stage 5a): network rejection and axis (e) — a non-2xx
 // response whose body cannot be parsed — both stay fail-open, never throw.
+// Since 2026-09-25 a settled failure reports `{ unavailable: true }` rather
+// than staying null, so a failed read is never mistaken for "no visit".
 test('fails open on a network rejection', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId('context').textContent).toBe('null');
+  await waitFor(() => expect(screen.getByTestId('context').textContent).toBe('{"unavailable":true}'));
 });
 
 test('axis (e): fails open on a non-2xx unparseable body', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: () => Promise.reject(new SyntaxError('Unexpected token <')) });
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId('context').textContent).toBe('null');
+  await waitFor(() => expect(screen.getByTestId('context').textContent).toBe('{"unavailable":true}'));
 });

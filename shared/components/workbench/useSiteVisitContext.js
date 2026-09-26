@@ -40,7 +40,10 @@ export default function useSiteVisitContext(requestId) {
     ]).then(([logisticsEnvelope, directoryEnvelope]) => {
       const logisticsBody = logisticsEnvelope.data;
       const directoryBody = directoryEnvelope.data;
-      if (cancelled || !logisticsEnvelope.ok || !directoryEnvelope.ok) return;
+      if (cancelled) return;
+      // A settled failure is distinct from loading (null) so consumers never
+      // read a failed Site Visit fetch as "no visit scheduled".
+      if (!logisticsEnvelope.ok || !directoryEnvelope.ok) { setContext({ unavailable: true }); return; }
       const visit = logisticsBody.siteVisit || null;
       const lookup = new Map([
         ...(directoryBody.staff || []).map((row) => [refKey(row), row]),
@@ -55,7 +58,9 @@ export default function useSiteVisitContext(requestId) {
         suggestedTo: visit ? emails([visit.organizer, ...(visit.requiredAttendees || [])]) : [],
         suggestedCc: visit ? emails(visit.optionalAttendees) : [],
       });
-    }).catch(() => {});
+    }).catch(() => {
+      if (!cancelled) setContext({ unavailable: true });
+    });
     return () => {
       cancelled = true;
       controller.abort();

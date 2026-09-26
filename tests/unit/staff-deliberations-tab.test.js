@@ -28,6 +28,14 @@ let lastDistributionProps = null;
 // proving the tab actually forces a fresh mount for a new brief artifact id
 // (via the `key` on <PreSiteDistributionPanel>) is what proves history gets
 // reloaded rather than silently keeping the predecessor's cached state.
+// The Research Presentation Materials card owns its own fetch and has its own
+// suite (research-presentation-materials-card.test.js); here it is a probe
+// that records the props the tab passes.
+let lastMaterialsCardProps = null;
+jest.mock('../../shared/components/workbench/ResearchPresentationMaterialsCard', () => function MockMaterialsCard(props) {
+  lastMaterialsCardProps = props;
+  return <div data-testid="mock-materials-card" />;
+});
 let mountedSourceArtifactIds = [];
 jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
   const { useEffect } = require('react');
@@ -211,6 +219,7 @@ beforeEach(() => {
   distributionHistoryFeed = null;
   lastDistributionProps = null;
   mountedSourceArtifactIds = [];
+  lastMaterialsCardProps = null;
   siteVisitContextFeed = null;
   visitExpectedFeed = true;
   queues = Object.fromEntries(ROUTE_DEFS.map((r) => [r.key, []]));
@@ -1293,6 +1302,17 @@ test('the applicant-materials line renders from the status payload at draft and 
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   await screen.findByText('Working document:');
   expect(screen.getByTestId('deliberations-materials-line')).toHaveTextContent(/^Materials: 1 of 3 received · due /);
+});
+
+test('the Research Presentation Materials card is always mounted with the visit read and materials summary', async () => {
+  const materials = { state: 'ready', receivedCount: 3, requiredCount: 3, otherCount: 0, dueAt: '2026-10-05T19:00:00Z', closesAt: '2026-10-14T19:00:00Z', overdue: false, invited: true };
+  siteVisitContextFeed = { siteVisit: { startIso: '2026-10-09T17:00:00Z' } };
+  queueRoute('presiteGet', statusResponse({ materials }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByTestId('mock-materials-card')).toBeInTheDocument();
+  await waitFor(() => expect(lastMaterialsCardProps.materialsSummary).toEqual(materials));
+  expect(lastMaterialsCardProps.requestId).toBe(REQUEST_ID);
+  expect(lastMaterialsCardProps.siteVisitContext).toBe(siteVisitContextFeed);
 });
 
 // ── T2 (client-request-layer Stage 2, plan §5) gap-fill: per-call-site

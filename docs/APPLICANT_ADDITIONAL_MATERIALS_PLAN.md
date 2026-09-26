@@ -787,3 +787,29 @@ Franklin Cat with the liaison name resolved and Send enabled. No email was sent
 in that rehearsal or during release verification. Production auth-provider and
 unauthenticated route checks passed. Staff confirmed on 2026-09-24 that the
 production Meeting Tracker opens. No production email send was tested.
+
+### 16.13 2026-09-25: Staff Deliberations materials card and interim folder read [SOURCE-BUILT on `claude/ui-work`; NOT DEPLOYED]
+
+The upload portal is still in testing this cycle, so staff are placing applicants' slides and
+participant bios in the request's `Site Visit - Slides` and `Site Visit - Participant Bios`
+folders by hand through AkoyaGo (Request 1002903 is the first such case). Those files have no
+`wmkf_requestdocument` row, so the registry consumers (Workbench `materials`, the collection's
+received-item match, and the briefing page) never see them. The owner asked for staff to see
+them in the Workbench without opening AkoyaGo.
+
+- **Card:** `shared/components/workbench/ResearchPresentationMaterialsCard.js`, always shown on
+  the Staff Deliberations tab after the distribution panel. Its status line reads: Presentation
+  not scheduled, Presentation scheduled · materials not requested / requested / ready. A closed
+  collection reads "materials request closed". A failed Site Visit read reads "could not be
+  loaded", never "not scheduled". `useSiteVisitContext` now settles a failed read as
+  `{ unavailable: true }` instead of staying `null`. Rows for Slides and Participant bios link to
+  every file in the matching folder, or say "Not received yet".
+- **Interim folder read:** `GET /api/workbench/site-visit/material-files` (`reviewers`) calls
+  `lib/services/site-visit-materials/folder-files-service.js`. It lists the two folders,
+  non-recursively, under the same active Dynamics bucket the portal writes to
+  (`activeBucket` in `contributor-service.js`), and returns names and staff SharePoint `webUrl`s.
+  Portal uploads land in the same folders and appear too. There are no counters and no registry
+  writes: a hand-placed file still does not count toward the collection summary or appear on the
+  briefing page.
+- **Retire when** the portal is the only intake route. The card's status line and the registry
+  can then carry the links, and this route can go. A retirement needs its own caller check.
