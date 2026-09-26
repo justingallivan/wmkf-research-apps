@@ -588,7 +588,7 @@ function mockDataverse({
 } = {}) {
   fetch.mockImplementation((url) => {
     const href = String(url);
-    if (href.includes('login.microsoftonline.com')) return tokenResponse();
+    if (new URL(href).hostname === 'login.microsoftonline.com') return tokenResponse();
     if (href.startsWith(`https://${SANDBOX_HOST}/api/data/v9.2/akoya_requests(${REQUEST_ID})`)) return jsonResponse(request);
     if (href.includes('wmkf_requestdocuments')) return jsonResponse({ value: [ia, snapshot].filter(Boolean) });
     if (href.includes(`wmkf_potentialreviewerses(${DEST_PERSON_A})`)) return jsonResponse(person);
