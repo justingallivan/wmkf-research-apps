@@ -408,6 +408,16 @@ describeIf('slice 5b runner against the live run ledger', () => {
       'copy_file/sharepoint_file/verified',
     ]);
     expect(resources.filter((row) => row.step === 'copy_file').map((row) => row.readback.index)).toEqual([0, 1]);
+    // P3-f (Opus round 1) regression pin: Basic copy_file's journaled
+    // receipt must carry sourceDriveId (flattenFileCopyEntry's non-
+    // reviewerUpload branch reads it from entry.source?.snapshotDriveId --
+    // a regression there would silently drop it without any other test
+    // noticing, since it is otherwise unused by verify_reviews's own
+    // basicFileCopyResource fixture, which hand-builds its receipt).
+    for (const row of resources.filter((r) => r.step === 'copy_file')) {
+      expect(typeof row.readback.sourceDriveId).toBe('string');
+      expect(row.readback.sourceDriveId.length).toBeGreaterThan(0);
+    }
 
     // Journal strictly before each dispatch.
     const first = (name) => log.indexOf(name);

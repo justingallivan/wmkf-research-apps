@@ -205,6 +205,14 @@ describe('ZIP central-directory budget (fail-closed, Codex plan rounds 13-14)', 
     expect(() => validateZipCentralDirectory(bytes, DOCX_PACKAGE_BUDGET)).toThrow(/path-alias duplicates/);
   });
 
+  it('rejects word/./document.xml as a path-alias duplicate of word/document.xml (P3-b, Opus round 1)', async () => {
+    const zip = new JSZip();
+    zip.file('word/document.xml', 'one');
+    zip.file('word/./document.xml', 'two');
+    const bytes = await zip.generateAsync({ type: 'nodebuffer' });
+    expect(() => validateZipCentralDirectory(bytes, DOCX_PACKAGE_BUDGET)).toThrow(/path-alias duplicates/);
+  });
+
   it('rejects a declared per-part uncompressed size over the ceiling', async () => {
     const zip = new JSZip();
     zip.file('a.txt', Buffer.alloc(TINY_BUDGET.maxPartUncompressedBytes + 1, 0x41));
