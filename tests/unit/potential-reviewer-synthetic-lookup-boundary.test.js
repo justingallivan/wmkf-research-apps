@@ -4,10 +4,24 @@
  * P2-3 (Opus round 1): the docblock at potential-reviewer.js's
  * `findSyntheticByEmail` cites this file. It pins the allowlist: no ordinary
  * path may import the factory-only synthetic-reservation lookup. The only
- * sanctioned importer today is the definition itself (no callers exist yet);
- * the seeder module Stage B creates, `lib/services/reviewer-engagement/
- * seed-synthetic-review.js`, is pre-allowlisted so its eventual import does
- * not require touching this gate.
+ * sanctioned importer today is the definition itself (no production callers
+ * exist -- Stage B's own reservation resolver deliberately does NOT use it;
+ * see P2-4 below).
+ *
+ * Allowlist residue (Opus round 2 / P3): Stage B originally re-implemented
+ * this adapter's marker/active/Contact-filtered predicate under the SAME
+ * name (`findSyntheticByEmail`) in `reviews-sandbox-deps.js` and
+ * `rehearse-test-request-sandbox.mjs`, so both were pre-allowlisted. Round 2
+ * (P2-4) replaced that filtered predicate with an UNFILTERED
+ * `findAnyPersonByEmail` in both files -- a synthetic-only lookup at
+ * reservation time was found to let a real reviewer's row silently pass
+ * through as "not found" and be handed a fresh preallocated GUID. The CLI
+ * script no longer names the identifier `findSyntheticByEmail` anywhere
+ * (verified: `grep -n findSyntheticByEmail scripts/rehearse-test-request-
+ * sandbox.mjs` finds nothing), so its allowlist entry is removed as
+ * vestigial. `reviews-sandbox-deps.js` still names the identifier in prose
+ * (documenting why it deliberately does NOT call the adapter), so it stays
+ * allowlisted below.
  */
 
 const fs = require('fs');
@@ -18,23 +32,10 @@ const SCAN_DIRS = ['lib', 'pages', 'scripts'];
 const DEFINITION_FILE = 'lib/dataverse/adapters/potential-reviewer.js';
 const ALLOWLISTED_IMPORTERS = new Set([
   DEFINITION_FILE,
-  // Stage B seeder (not yet created); pre-allowlisted per the plan's
-  // "the pin may list it now" allowance.
-  'lib/services/reviewer-engagement/seed-synthetic-review.js',
-  // Stage B built the lookup differently than anticipated: the adapter's
-  // `findSyntheticByEmail` does not take an `options.svc` (it always reads
-  // through the DynamicsService singleton, i.e. process.env.DYNAMICS_URL),
-  // so it cannot actually be bound to the sandbox. `reviews-sandbox-deps.js`
-  // re-implements the SAME predicate (marker true, active, no Contact link,
-  // exact-match) against a sandbox-bound raw read instead of importing the
-  // adapter function -- this text-substring scan flags it only because it
-  // names the identifier for API-shape consistency with the plan
-  // (`deps.findSyntheticByEmail`), not because it imports the adapter.
+  // reviews-sandbox-deps.js names the identifier only in comments explaining
+  // why its own `findAnyPersonByEmail` is deliberately unfiltered (P2-4) --
+  // it never imports or calls the adapter's `findSyntheticByEmail`.
   'lib/services/test-requests/reviews-sandbox-deps.js',
-  // The CLI's reservation-time resolution (runReserve/resolveReviewerAssignments)
-  // calls `deps.findSyntheticByEmail(...)` on the sandbox-bound deps object
-  // above -- same non-import reason.
-  'scripts/rehearse-test-request-sandbox.mjs',
 ]);
 const IDENTIFIER = 'findSyntheticByEmail';
 
