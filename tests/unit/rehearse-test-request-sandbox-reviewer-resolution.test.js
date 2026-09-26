@@ -71,7 +71,7 @@ describe('resolveReviewerAssignments', () => {
     const bundle = bundleWith([reviewer(SOURCE_A)]);
     const existingRow = {
       wmkf_potentialreviewersid: EXISTING_PERSON,
-      wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane', wmkf_lastname: 'Reviewer',
+      wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane', wmkf_lastname: 'Reviewer',
       wmkf_emailaddress: 'throwaway@example.test',
       wmkf_areaofexpertise: 'Genomics', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
       wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University',
@@ -90,7 +90,7 @@ describe('resolveReviewerAssignments', () => {
   it('the same address for a DIFFERENT source than a prior assignment refuses (reviewer_person_provenance_mismatch)', async () => {
     const bundle = bundleWith([reviewer(SOURCE_B)]);
     const existingRow = {
-      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: 'TEST · X', wmkf_firstname: 'X', wmkf_lastname: 'Y',
+      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: ' TEST · X Y ', wmkf_firstname: 'TEST · X', wmkf_lastname: 'Y',
       wmkf_emailaddress: 'throwaway@example.test', wmkf_areaofexpertise: null, wmkf_primaryaffiliation: null,
       wmkf_academicrank: null, wmkf_primarydepartment: null, wmkf_maininstitution: null, wmkf_organizationname: null, wmkf_issyntheticreviewer: true,
     };
@@ -105,7 +105,7 @@ describe('resolveReviewerAssignments', () => {
   it('a same-source reused row whose projection metadata drifted refuses (reviewer_person_projection_drift)', async () => {
     const bundle = bundleWith([reviewer(SOURCE_A)]);
     const driftedRow = {
-      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: 'TEST · Jane Reviewer', wmkf_firstname: 'Jane',
+      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: ' TEST · Jane Reviewer ', wmkf_firstname: 'TEST · Jane',
       wmkf_lastname: 'Reviewer', wmkf_emailaddress: 'throwaway@example.test',
       wmkf_areaofexpertise: 'DRIFTED', wmkf_primaryaffiliation: 'Example University', wmkf_academicrank: 'Professor',
       wmkf_primarydepartment: 'Biology', wmkf_maininstitution: 'Example University', wmkf_organizationname: 'Example University', wmkf_issyntheticreviewer: true,
@@ -135,7 +135,7 @@ describe('resolveReviewerAssignments', () => {
   it('a synthetic bundle reviewer with an exported address defaults to it when no flag is given', async () => {
     const bundle = bundleWith([reviewer(SOURCE_A, {
       personIsSynthetic: true,
-      person: { wmkf_name: 'TEST · Z', wmkf_firstname: 'Z', wmkf_lastname: 'Z', wmkf_emailaddress: 'default@example.test' },
+      person: { wmkf_name: ' TEST · Z Z ', wmkf_firstname: 'TEST · Z', wmkf_lastname: 'Z', wmkf_emailaddress: 'default@example.test' },
     })]);
     const [assignment] = await resolveReviewerAssignments({
       deps: fakeDeps(), ledger: fakeLedger(), bundle, reviewerAddressFlags: [],
@@ -197,7 +197,7 @@ describe('resolveReviewerAssignments', () => {
     // Alice's throwaway address.
     const bundle = bundleWith([reviewer(SOURCE_B)]);
     const aliceProjectedRow = {
-      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: 'TEST · Alice', wmkf_firstname: 'Alice', wmkf_lastname: 'A',
+      wmkf_potentialreviewersid: EXISTING_PERSON, wmkf_name: ' TEST · Alice A ', wmkf_firstname: 'TEST · Alice', wmkf_lastname: 'A',
       wmkf_emailaddress: 'recycled@example.test', wmkf_areaofexpertise: null, wmkf_primaryaffiliation: null,
       wmkf_academicrank: null, wmkf_primarydepartment: null, wmkf_maininstitution: null, wmkf_organizationname: null, wmkf_issyntheticreviewer: true,
     };
