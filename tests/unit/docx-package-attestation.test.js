@@ -267,6 +267,34 @@ describe('attestDocxPackageAgainstSource', () => {
       await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/rId99 .* is not a SharePoint customXml relationship/);
     });
 
+    it('a prefixed shadow attribute (x:Type="…/customXml" beside Type="…/oleObject") cannot make a rogue relationship read as tolerated', async () => {
+      const mutated = await withRels((rels) => rels.replace('</Relationships>', '<Relationship xmlns:x="urn:foreign" Id="rId94" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" x:Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="embeddings/x.bin"/></Relationships>'));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/namespaced attribute x:Type/);
+    });
+
+    it('a prefixed shadow attribute on a [Content_Types].xml Override is refused', async () => {
+      const mutated = await withCt((ct) => ct.replace(/<Override\b/, '<Override xmlns:x="urn:foreign" x:PartName="/shadow" '));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/namespaced attribute x:PartName/);
+    });
+
+    it('a known relationship flipped to TargetMode="External" on the destination is no longer "known"', async () => {
+      const mutated = await withRels((rels) => rels.replace(/<Relationship\b/, '<Relationship TargetMode="External" '));
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/is missing/);
+    });
+
+    it('a customXml rels part whose customXmlProps relationship is External is refused', async () => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/_rels/item4.xml.rels', SP_RELS.replace('Target=', 'TargetMode="External" Target=')); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/non-customXmlProps relationship/);
+    });
+
+    it('the render attestor refuses a prefixed shadow attribute too', async () => {
+      const mutated = await withParts(render, async (zip) => {
+        const rels = await zip.file('word/_rels/document.xml.rels').async('string');
+        zip.file('word/_rels/document.xml.rels', rels.replace('</Relationships>', '<Relationship xmlns:x="urn:foreign" Id="rId94" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" x:Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="embeddings/x.bin"/></Relationships>'));
+      });
+      await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/namespaced attribute x:Type/);
+    });
+
     it('a customXml rels part beyond the old 2 KB head window is parsed in full: a trailing hyperlink relationship is refused', async () => {
       const padding = `<!-- ${'x'.repeat(2500)} -->`;
       const bad = SP_RELS.replace('<Relationship ', `${padding}<Relationship `).replace('</Relationships>', '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://attacker.example/" TargetMode="External"/></Relationships>');
