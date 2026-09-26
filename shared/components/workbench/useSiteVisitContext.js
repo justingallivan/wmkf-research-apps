@@ -27,35 +27,69 @@ export default function useSiteVisitContext(requestId) {
   const [context, setContext] = useState(null);
 
   useEffect(() => {
-    setContext(null);
+    setContext(requestId ? {
+      siteVisit: null,
+      materials: [],
+      suggestedTo: [],
+      suggestedCc: [],
+      presentationMaterialsStatus: 'loading',
+      presentationMaterials: [],
+      presentationMaterialConflicts: [],
+    } : null);
     if (!requestId) return undefined;
     const controller = new AbortController();
     let cancelled = false;
-    Promise.all([
-      requestEnvelope(`/api/workbench/site-visit/logistics?requestId=${encodeURIComponent(requestId)}`, {
-        signal: controller.signal,
-        tolerantBody: true,
-      }),
-      requestEnvelope('/api/workbench/site-visit/recipients', { signal: controller.signal, tolerantBody: true }),
-    ]).then(([logisticsEnvelope, directoryEnvelope]) => {
+    const logistics = requestEnvelope(`/api/workbench/site-visit/logistics?requestId=${encodeURIComponent(requestId)}`, {
+      signal: controller.signal,
+      tolerantBody: true,
+    });
+    const directory = requestEnvelope('/api/workbench/site-visit/recipients', {
+      signal: controller.signal,
+      tolerantBody: true,
+    }).catch(() => null);
+
+    // Presentation materials are projected by the logistics read and become
+    // visible as soon as that response succeeds. Recipient-directory failure
+    // may suppress suggestions, but cannot erase a successfully loaded material.
+    logistics.then((logisticsEnvelope) => {
       const logisticsBody = logisticsEnvelope.data;
-      const directoryBody = directoryEnvelope.data;
-      if (cancelled || !logisticsEnvelope.ok || !directoryEnvelope.ok) return;
+      if (cancelled) return;
+      if (!logisticsEnvelope.ok) {
+        setContext((value) => value ? { ...value, presentationMaterialsStatus: 'unavailable' } : value);
+        return;
+      }
       const visit = logisticsBody.siteVisit || null;
-      const lookup = new Map([
-        ...(directoryBody.staff || []).map((row) => [refKey(row), row]),
-        ...(directoryBody.external || []).map((row) => [refKey(row), row]),
-      ]);
-      const emails = (refs) => (refs || []).filter(Boolean).map((ref) => (
-        ref.kind === 'manual' ? ref : lookup.get(refKey(ref))
-      )).filter((row) => row?.email).map((row) => row.email);
-      setContext({
+      const projectionReady = logisticsBody.presentationMaterialsStatus === 'ready';
+      setContext((value) => ({
+        ...(value || {}),
         siteVisit: visit,
         materials: logisticsBody.materials || [],
-        suggestedTo: visit ? emails([visit.organizer, ...(visit.requiredAttendees || [])]) : [],
-        suggestedCc: visit ? emails(visit.optionalAttendees) : [],
+        presentationMaterialsStatus: projectionReady ? 'loaded' : 'disabled',
+        presentationMaterials: projectionReady ? (logisticsBody.presentationMaterials || []) : [],
+        presentationMaterialConflicts: projectionReady ? (logisticsBody.presentationMaterialConflicts || []) : [],
+      }));
+      return directory.then((directoryEnvelope) => {
+        if (cancelled || !directoryEnvelope?.ok) return;
+        const directoryBody = directoryEnvelope.data;
+        const lookup = new Map([
+          ...(directoryBody.staff || []).map((row) => [refKey(row), row]),
+          ...(directoryBody.external || []).map((row) => [refKey(row), row]),
+        ]);
+        const emails = (refs) => (refs || []).filter(Boolean).map((ref) => (
+          ref.kind === 'manual' ? ref : lookup.get(refKey(ref))
+        )).filter((row) => row?.email).map((row) => row.email);
+        if (cancelled) return;
+        setContext((value) => ({
+          ...(value || {}),
+          suggestedTo: visit ? emails([visit.organizer, ...(visit.requiredAttendees || [])]) : [],
+          suggestedCc: visit ? emails(visit.optionalAttendees) : [],
+        }));
       });
-    }).catch(() => {});
+    }).catch(() => {
+      if (!cancelled) {
+        setContext((value) => value ? { ...value, presentationMaterialsStatus: 'unavailable' } : value);
+      }
+    });
     return () => {
       cancelled = true;
       controller.abort();

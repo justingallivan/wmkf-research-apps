@@ -59,6 +59,9 @@ test('derives siteVisit, materials, and suggested recipients from the logistics 
     materials: [{ artifactId: 'm1', filename: 'Slides.pdf', artifactTypeLabel: 'Applicant Slides' }],
     suggestedTo: ['organizer@wmkeck.org', 'required@wmkeck.org', 'guest@example.org'],
     suggestedCc: ['optional@example.org'],
+    presentationMaterialsStatus: 'disabled',
+    presentationMaterials: [],
+    presentationMaterialConflicts: [],
   }));
 });
 
@@ -76,16 +79,20 @@ test('yields empty suggestions when no visit is scheduled', async () => {
     materials: [],
     suggestedTo: [],
     suggestedCc: [],
+    presentationMaterialsStatus: 'disabled',
+    presentationMaterials: [],
+    presentationMaterialConflicts: [],
   }));
 });
 
-test('fails open: a load error leaves the context null and does not throw', async () => {
+test('a load error exposes presentation unavailable and does not throw', async () => {
   global.fetch = jest.fn(async () => response({ error: 'nope' }, 500));
 
   render(<Harness requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId('context').textContent).toBe('null');
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
+    .toMatchObject({ presentationMaterialsStatus: 'unavailable' }));
 });
 
 test('does not fetch without a requestId', async () => {
@@ -97,16 +104,48 @@ test('does not fetch without a requestId', async () => {
 
 // T5 gap-fill (Stage 5a): network rejection and axis (e) — a non-2xx
 // response whose body cannot be parsed — both stay fail-open, never throw.
-test('fails open on a network rejection', async () => {
+test('fails open on a network rejection while reporting presentation unavailable', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId('context').textContent).toBe('null');
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
+    .toMatchObject({ presentationMaterialsStatus: 'unavailable' }));
 });
 
 test('axis (e): fails open on a non-2xx unparseable body', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: () => Promise.reject(new SyntaxError('Unexpected token <')) });
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId('context').textContent).toBe('null');
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
+    .toMatchObject({ presentationMaterialsStatus: 'unavailable' }));
+});
+
+test('keeps presentation materials when the independent recipient directory fails', async () => {
+  const recording = {
+    artifactId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    artifactType: 100000005,
+    filename: 'Recording.mp4',
+    backing: 'file',
+    webUrl: 'https://tenant.sharepoint.com/recording.mp4',
+  };
+  global.fetch = jest.fn(async (url) => (
+    String(url).includes('/logistics')
+      ? response({
+        siteVisit: null,
+        materials: [],
+        presentationMaterialsStatus: 'ready',
+        presentationMaterials: [recording],
+        presentationMaterialConflicts: [],
+      })
+      : response({ error: 'directory unavailable' }, 503)
+  ));
+
+  render(<Harness requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent)).toMatchObject({
+    presentationMaterialsStatus: 'loaded',
+    presentationMaterials: [recording],
+    suggestedTo: [],
+    suggestedCc: [],
+  }));
 });

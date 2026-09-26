@@ -158,6 +158,32 @@ const nextConfig = {
         ],
       },
       {
+        source: '/external/presentation/:path*',
+        headers: [
+          {
+            key: 'Referrer-Policy',
+            value: 'no-referrer',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'private, no-store, max-age=0',
+          },
+        ],
+      },
+      {
+        source: '/api/external/presentation/:path*',
+        headers: [
+          {
+            key: 'Referrer-Policy',
+            value: 'no-referrer',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'private, no-store, max-age=0',
+          },
+        ],
+      },
+      {
         // The Cycle Dossier page previews an edition PDF in a same-origin
         // iframe; the global DENY would blank it. Later rules override
         // earlier ones for the same header key. Still no cross-site framing.

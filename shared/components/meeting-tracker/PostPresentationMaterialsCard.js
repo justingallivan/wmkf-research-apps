@@ -134,11 +134,20 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   const [busyUploadId, setBusyUploadId] = useState(null);
   const [transfer, setTransfer] = useState(null);
   const [pauseRequested, setPauseRequested] = useState(false);
+  const [link, setLink] = useState(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [manualCopy, setManualCopy] = useState(false);
+  const [confirmReissue, setConfirmReissue] = useState(false);
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
   const controllerRef = useRef(null);
   const pauseControllerRef = useRef(null);
   const pauseRef = useRef(false);
+  const linkIdRef = useRef(null);
+  const linkEpochRef = useRef(0);
+  const linkReadRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -151,6 +160,43 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   }, []);
 
   const current = (generation) => mountedRef.current && generation === generationRef.current;
+
+  const applyLink = useCallback((nextLink) => {
+    const nextId = nextLink?.id || null;
+    if (linkIdRef.current !== nextId) {
+      setLinkCopied(false);
+      setManualCopy(false);
+      setConfirmReissue(false);
+      setLinkError(null);
+    }
+    linkIdRef.current = nextId;
+    setLink(nextLink || null);
+  }, []);
+
+  const loadLink = useCallback(async (generation) => {
+    const epoch = linkEpochRef.current;
+    const readId = ++linkReadRef.current;
+    const isCurrentLinkRead = () => current(generation)
+      && epoch === linkEpochRef.current
+      && readId === linkReadRef.current;
+    try {
+      const result = await requestEnvelope(
+        `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-link`,
+        { tolerantBody: true },
+      );
+      if (!isCurrentLinkRead()) return { ok: false, stale: true };
+      if (result.ok) {
+        applyLink(result.data.link || null);
+        return { ok: true };
+      }
+      setLinkError(result.data?.error || 'The presentation link could not be loaded.');
+      return { ok: false };
+    } catch (linkLoadError) {
+      if (!isCurrentLinkRead()) return { ok: false, stale: true };
+      setLinkError(linkLoadError.message || 'The presentation link could not be loaded.');
+      return { ok: false };
+    }
+  }, [applyLink, requestId]);
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -170,12 +216,13 @@ export default function PostPresentationMaterialsCard({ requestId }) {
       setData(result.data);
       setUnavailable(false);
       setError(null);
+      void loadLink(generation);
     } catch (loadError) {
       if (current(generation)) setError(loadError.message || 'Presentation materials could not be loaded.');
     } finally {
       if (current(generation)) setLoading(false);
     }
-  }, [requestId]);
+  }, [loadLink, requestId]);
 
   useEffect(() => {
     generationRef.current += 1;
@@ -193,6 +240,15 @@ export default function PostPresentationMaterialsCard({ requestId }) {
       setTransfer(null);
       setPauseRequested(false);
       setUnavailable(false);
+      linkIdRef.current = null;
+      linkEpochRef.current += 1;
+      linkReadRef.current += 1;
+      setLink(null);
+      setLinkBusy(false);
+      setLinkError(null);
+      setLinkCopied(false);
+      setManualCopy(false);
+      setConfirmReissue(false);
       void load();
     }, 0);
     return () => window.clearTimeout(timer);
@@ -412,6 +468,61 @@ export default function PostPresentationMaterialsCard({ requestId }) {
     }
   };
 
+  const mutateLink = async (action) => {
+    const generation = generationRef.current;
+    const mutationEpoch = ++linkEpochRef.current;
+    setLinkBusy(true);
+    setLinkError(null);
+    try {
+      const body = await requestJson(
+        `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-link`,
+        {
+          method: 'POST',
+          body: {
+            action,
+            ...(action === 'reissue' ? { expectedLinkId: link?.id } : {}),
+          },
+          tolerantBody: true,
+        },
+      );
+      if (!current(generation) || mutationEpoch !== linkEpochRef.current) return;
+      linkEpochRef.current += 1;
+      applyLink(body.link || null);
+    } catch (linkMutationError) {
+      if (current(generation)
+        && mutationEpoch === linkEpochRef.current
+        && linkMutationError?.payload?.code === 'presentation_link_superseded') {
+        linkEpochRef.current += 1;
+        setConfirmReissue(false);
+        applyLink(null);
+        const refreshed = await loadLink(generation);
+        if (current(generation) && refreshed.ok) {
+          setLinkError('Another action replaced this link first. The current link has been refreshed.');
+        }
+      } else if (current(generation) && mutationEpoch === linkEpochRef.current) {
+        linkEpochRef.current += 1;
+        setLinkError(linkMutationError.message || 'The presentation link could not be updated.');
+      }
+    } finally {
+      if (current(generation)) setLinkBusy(false);
+    }
+  };
+
+  const copyLink = async () => {
+    const generation = generationRef.current;
+    try {
+      await navigator.clipboard.writeText(link.url);
+      if (!current(generation)) return;
+      setLinkCopied(true);
+      setManualCopy(false);
+    } catch {
+      if (!current(generation)) return;
+      setLinkCopied(false);
+      setManualCopy(true);
+      setLinkError('Automatic copy was blocked. Select and copy the link below.');
+    }
+  };
+
   if (unavailable) return null;
   const intents = data?.uploads || [];
   const confirmed = transfer?.confirmedBytes || 0;
@@ -481,6 +592,41 @@ export default function PostPresentationMaterialsCard({ requestId }) {
               {data.materials.map((material) => <li key={material.artifactId} className="px-4 py-3 text-sm text-gray-800">{material.label || material.filename || material.artifactTypeLabel || 'Presentation material'}</li>)}
             </ul>
           )}
+
+          <div className="mt-6 rounded-lg border border-gray-200 p-4" data-testid="presentation-link-controls">
+            <h3 className="text-sm font-semibold text-gray-900">Board presentation link</h3>
+            <p className="mt-1 text-xs text-gray-600">This materials-only link does not send email or change recipients.</p>
+            {!link && (
+              <Button type="button" size="sm" className="mt-3" loading={linkBusy} disabled={linkBusy} onClick={() => mutateLink('ensure')}>Generate link</Button>
+            )}
+            {link && (
+              <>
+                {link.url ? (
+                  <>
+                    <p className="mt-3 truncate font-mono text-xs text-gray-500" title={link.url}>{link.url}</p>
+                    {manualCopy && <input aria-label="Presentation link for manual copy" readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded border border-gray-300 p-2 font-mono text-xs" />}
+                    <p className="mt-1 text-xs text-gray-500">Expires {new Date(link.expiresAt).toLocaleDateString()}.</p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-amber-800">The current link cannot be read. Issue a new link to replace it.</p>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {link.url && <Button type="button" size="sm" variant="outline" onClick={copyLink}>{linkCopied ? 'Copied' : 'Copy link'}</Button>}
+                  {!confirmReissue && <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => setConfirmReissue(true)}>Issue new link</Button>}
+                </div>
+                {confirmReissue && (
+                  <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                    <p>The current presentation link will stop working immediately.</p>
+                    <div className="mt-2 flex gap-2">
+                      <Button type="button" size="sm" loading={linkBusy} disabled={linkBusy} onClick={() => mutateLink('reissue')}>Issue new link</Button>
+                      <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => setConfirmReissue(false)}>Keep current link</Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            {linkError && <p role="alert" className="mt-2 text-sm text-red-700">{linkError}</p>}
+          </div>
         </>
       )}
     </section>

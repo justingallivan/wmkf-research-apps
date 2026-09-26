@@ -58,6 +58,15 @@ Carried from the Codex Site Visit Materials plan §2 and §9, unchanged: one sha
 
 Before any Share has been sent, the staff-brief section reads “The staff brief will appear here once staff share it.” Everything else still renders.
 
+**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; NOT DEPLOYED OR ENABLED.]** The
+post-presentation plan now adds a separate 60-day, materials-only presentation
+audience and page. It is not a replacement for this full briefing D19/D28
+superset and has no lifecycle coupling to briefing links. Its Watch/Download
+routes issue fresh, exact-item Microsoft redirects, so a current SharePoint MP4
+larger than 50 MiB can play without crossing the application body limit; this
+briefing page deliberately retains its existing 50 MiB behavior until changed
+under its own contract.
+
 Departure from the Codex plan §8 (stored manifest): no manifest row. The link row holds identity, expiry, and revocation only. Staff-brief identity comes from the distribution ledger, which already pins exact snapshots per send. Reviews are resolved live because D14 replaced staff selection with “all completed.”
 
 ### 2.2 Link lifecycle

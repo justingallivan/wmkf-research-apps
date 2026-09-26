@@ -127,6 +127,318 @@ test('automatic retry exhaustion is not labelled as a user pause', async () => {
   expect(screen.getByRole('status')).not.toHaveTextContent('Upload paused');
 });
 
+test('presentation link supports generate, manual-copy fallback, confirmed reissue, and resets copy state', async () => {
+  const oldLink = {
+    id: '55555555-5555-4555-8555-555555555555',
+    url: 'https://materials.test/external/presentation/old',
+    expiresAt: '2026-11-24T12:00:00.000Z',
+  };
+  const newLink = {
+    id: '66666666-6666-4666-8666-666666666666',
+    url: 'https://materials.test/external/presentation/new',
+    expiresAt: '2026-11-24T12:05:00.000Z',
+  };
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: jest.fn(async () => { throw new Error('blocked'); }) },
+  });
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).endsWith('/presentation-link') && options.method === 'POST') {
+      const body = JSON.parse(options.body);
+      if (body.action === 'ensure') return response({ success: true, link: oldLink });
+      expect(body).toEqual({ action: 'reissue', expectedLinkId: oldLink.id });
+      return response({ success: true, link: newLink });
+    }
+    if (String(url).endsWith('/presentation-link')) return response({ success: true, link: null });
+    return response({ success: true, status: 'ready', materials: [], uploads: [] });
+  });
+
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Generate link' }));
+  expect(await screen.findByText(oldLink.url)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
+  expect(await screen.findByLabelText('Presentation link for manual copy')).toHaveValue(oldLink.url);
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  const confirm = screen.getAllByRole('button', { name: 'Issue new link' }).at(-1);
+  fireEvent.click(confirm);
+  expect(await screen.findByText(newLink.url)).toBeInTheDocument();
+  expect(screen.queryByLabelText('Presentation link for manual copy')).not.toBeInTheDocument();
+});
+
+test('a background reload that discovers a different link clears stale copy and confirmation UI', async () => {
+  const oldLink = {
+    id: '55555555-5555-4555-8555-555555555555',
+    url: 'https://materials.test/external/presentation/old',
+    expiresAt: '2026-11-24T12:00:00.000Z',
+  };
+  const newLink = {
+    id: '66666666-6666-4666-8666-666666666666',
+    url: 'https://materials.test/external/presentation/new',
+    expiresAt: '2026-11-24T12:05:00.000Z',
+  };
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: jest.fn(async () => { throw new Error('blocked'); }) },
+  });
+  uploadBrowserDirectGraphFile.mockResolvedValue({
+    complete: false, paused: true, reason: 'retry_exhausted', nextStart: 0,
+  });
+  let linkReads = 0;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).endsWith('/presentation-link')) {
+      linkReads += 1;
+      return response({ success: true, link: linkReads === 1 ? oldLink : newLink });
+    }
+    if (options.method === 'POST' && String(url).endsWith('/presentation-uploads')) {
+      return response({ success: true, upload: uploadContract() });
+    }
+    return response({ success: true, status: 'ready', materials: [], uploads: [] });
+  });
+
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  expect(await screen.findByText(oldLink.url)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
+  expect(await screen.findByLabelText('Presentation link for manual copy')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  expect(screen.getByText('The current presentation link will stop working immediately.')).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText('Zoom MP4'), {
+    target: { files: [new File(['0123456789'], 'recording.mp4', { type: 'video/mp4' })] },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload recording' }));
+  expect(await screen.findByText(newLink.url)).toBeInTheDocument();
+  expect(screen.queryByLabelText('Presentation link for manual copy')).not.toBeInTheDocument();
+  expect(screen.queryByText('The current presentation link will stop working immediately.')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Copy link' })).toHaveTextContent('Copy link');
+});
+
+test('a lost reissue race refreshes the winner and removes the revoked link from copy controls', async () => {
+  const oldLink = {
+    id: '55555555-5555-4555-8555-555555555555',
+    url: 'https://materials.test/external/presentation/old',
+    expiresAt: '2026-11-24T12:00:00.000Z',
+  };
+  const winner = {
+    id: '66666666-6666-4666-8666-666666666666',
+    url: 'https://materials.test/external/presentation/winner',
+    expiresAt: '2026-11-24T12:05:00.000Z',
+  };
+  let linkReads = 0;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).endsWith('/presentation-link') && options.method === 'POST') {
+      return response({
+        error: 'The presentation link was replaced by another action.',
+        code: 'presentation_link_superseded',
+      }, 409);
+    }
+    if (String(url).endsWith('/presentation-link')) {
+      linkReads += 1;
+      return response({ success: true, link: linkReads === 1 ? oldLink : winner });
+    }
+    return response({ success: true, status: 'ready', materials: [], uploads: [] });
+  });
+
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  expect(await screen.findByText(oldLink.url)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Issue new link' }).at(-1));
+  expect(await screen.findByText(winner.url)).toBeInTheDocument();
+  expect(screen.queryByText(oldLink.url)).not.toBeInTheDocument();
+  expect(screen.queryByText('The current presentation link will stop working immediately.')).not.toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('current link has been refreshed');
+});
+
+test('a lost reissue race clears the revoked link when the winner refresh fails', async () => {
+  const oldLink = {
+    id: '55555555-5555-4555-8555-555555555555',
+    url: 'https://materials.test/external/presentation/old',
+    expiresAt: '2026-11-24T12:00:00.000Z',
+  };
+  let linkReads = 0;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).endsWith('/presentation-link') && options.method === 'POST') {
+      return response({
+        error: 'The presentation link was replaced by another action.',
+        code: 'presentation_link_superseded',
+      }, 409);
+    }
+    if (String(url).endsWith('/presentation-link')) {
+      linkReads += 1;
+      return linkReads === 1
+        ? response({ success: true, link: oldLink })
+        : response({ error: 'The current link could not be loaded.' }, 503);
+    }
+    return response({ success: true, status: 'ready', materials: [], uploads: [] });
+  });
+
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  expect(await screen.findByText(oldLink.url)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Issue new link' }).at(-1));
+  expect(await screen.findByRole('alert')).toHaveTextContent('current link could not be loaded');
+  expect(screen.queryByText(oldLink.url)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Copy link' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/current link has been refreshed/i)).not.toBeInTheDocument();
+});
+
+test('a background link read started before reissue cannot restore the revoked URL', async () => {
+  const oldLink = {
+    id: '55555555-5555-4555-8555-555555555555',
+    url: 'https://materials.test/external/presentation/old',
+    expiresAt: '2026-11-24T12:00:00.000Z',
+  };
+  const winner = {
+    id: '66666666-6666-4666-8666-666666666666',
+    url: 'https://materials.test/external/presentation/winner',
+    expiresAt: '2026-11-24T12:05:00.000Z',
+  };
+  uploadBrowserDirectGraphFile.mockResolvedValue({
+    complete: false, paused: true, reason: 'retry_exhausted', nextStart: 0,
+  });
+  let linkReads = 0;
+  let resolveStaleRead;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).endsWith('/presentation-link') && options.method === 'POST') {
+      return response({ success: true, link: winner });
+    }
+    if (String(url).endsWith('/presentation-link')) {
+      linkReads += 1;
+      if (linkReads === 1) return response({ success: true, link: oldLink });
+      return new Promise((resolve) => {
+        resolveStaleRead = () => resolve(response({ success: true, link: oldLink }));
+      });
+    }
+    if (options.method === 'POST' && String(url).endsWith('/presentation-uploads')) {
+      return response({ success: true, upload: uploadContract() });
+    }
+    return response({ success: true, status: 'ready', materials: [], uploads: [] });
+  });
+
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  expect(await screen.findByText(oldLink.url)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Zoom MP4'), {
+    target: { files: [new File(['0123456789'], 'recording.mp4', { type: 'video/mp4' })] },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload recording' }));
+  await waitFor(() => expect(resolveStaleRead).toEqual(expect.any(Function)));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Issue new link' }).at(-1));
+  expect(await screen.findByText(winner.url)).toBeInTheDocument();
+  await act(async () => resolveStaleRead());
+  expect(screen.getByText(winner.url)).toBeInTheDocument();
+  expect(screen.queryByText(oldLink.url)).not.toBeInTheDocument();
+});
+
+test('a background link read started during a successful reissue cannot restore the revoked URL', async () => {
+  const oldLink = {
+    id: '55555555-5555-4555-8555-555555555555',
+    url: 'https://materials.test/external/presentation/old',
+    expiresAt: '2026-11-24T12:00:00.000Z',
+  };
+  const winner = {
+    id: '66666666-6666-4666-8666-666666666666',
+    url: 'https://materials.test/external/presentation/winner',
+    expiresAt: '2026-11-24T12:05:00.000Z',
+  };
+  uploadBrowserDirectGraphFile.mockResolvedValue({
+    complete: false, paused: true, reason: 'retry_exhausted', nextStart: 0,
+  });
+  let linkReads = 0;
+  let resolveMutation;
+  let resolveStaleRead;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).endsWith('/presentation-link') && options.method === 'POST') {
+      return new Promise((resolve) => {
+        resolveMutation = () => resolve(response({ success: true, link: winner }));
+      });
+    }
+    if (String(url).endsWith('/presentation-link')) {
+      linkReads += 1;
+      if (linkReads === 1) return response({ success: true, link: oldLink });
+      return new Promise((resolve) => {
+        resolveStaleRead = () => resolve(response({ success: true, link: oldLink }));
+      });
+    }
+    if (options.method === 'POST' && String(url).endsWith('/presentation-uploads')) {
+      return response({ success: true, upload: uploadContract() });
+    }
+    return response({ success: true, status: 'ready', materials: [], uploads: [] });
+  });
+
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  expect(await screen.findByText(oldLink.url)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Zoom MP4'), {
+    target: { files: [new File(['0123456789'], 'recording.mp4', { type: 'video/mp4' })] },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Issue new link' }).at(-1));
+  await waitFor(() => expect(resolveMutation).toEqual(expect.any(Function)));
+  fireEvent.click(screen.getByRole('button', { name: 'Upload recording' }));
+  await waitFor(() => expect(resolveStaleRead).toEqual(expect.any(Function)));
+
+  await act(async () => resolveMutation());
+  expect(await screen.findByText(winner.url)).toBeInTheDocument();
+  await act(async () => resolveStaleRead());
+  expect(screen.getByText(winner.url)).toBeInTheDocument();
+  expect(screen.queryByText(oldLink.url)).not.toBeInTheDocument();
+});
+
+test('a background link read started during a failed mutation cannot erase the mutation error', async () => {
+  const oldLink = {
+    id: '55555555-5555-4555-8555-555555555555',
+    url: 'https://materials.test/external/presentation/old',
+    expiresAt: '2026-11-24T12:00:00.000Z',
+  };
+  const unrelatedWinner = {
+    id: '66666666-6666-4666-8666-666666666666',
+    url: 'https://materials.test/external/presentation/unrelated',
+    expiresAt: '2026-11-24T12:05:00.000Z',
+  };
+  uploadBrowserDirectGraphFile.mockResolvedValue({
+    complete: false, paused: true, reason: 'retry_exhausted', nextStart: 0,
+  });
+  let linkReads = 0;
+  let rejectMutation;
+  let resolveOverlappingRead;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).endsWith('/presentation-link') && options.method === 'POST') {
+      return new Promise((resolve) => {
+        rejectMutation = () => resolve(response({ error: 'Reissue failed.' }, 500));
+      });
+    }
+    if (String(url).endsWith('/presentation-link')) {
+      linkReads += 1;
+      if (linkReads === 1) return response({ success: true, link: oldLink });
+      return new Promise((resolve) => {
+        resolveOverlappingRead = () => resolve(response({ success: true, link: unrelatedWinner }));
+      });
+    }
+    if (options.method === 'POST' && String(url).endsWith('/presentation-uploads')) {
+      return response({ success: true, upload: uploadContract() });
+    }
+    return response({ success: true, status: 'ready', materials: [], uploads: [] });
+  });
+
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  expect(await screen.findByText(oldLink.url)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Zoom MP4'), {
+    target: { files: [new File(['0123456789'], 'recording.mp4', { type: 'video/mp4' })] },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Issue new link' }).at(-1));
+  await waitFor(() => expect(rejectMutation).toEqual(expect.any(Function)));
+  fireEvent.click(screen.getByRole('button', { name: 'Upload recording' }));
+  await waitFor(() => expect(resolveOverlappingRead).toEqual(expect.any(Function)));
+
+  await act(async () => rejectMutation());
+  expect(await screen.findByRole('alert')).toHaveTextContent('Reissue failed.');
+  await act(async () => resolveOverlappingRead());
+  expect(screen.getByText(oldLink.url)).toBeInTheDocument();
+  expect(screen.queryByText(unrelatedWinner.url)).not.toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('Reissue failed.');
+});
+
 test('a failed status check refreshes unfinished uploads and gives status-specific guidance', async () => {
   uploadBrowserDirectGraphFile.mockImplementation(async ({ authorizeStatus, onState }) => {
     onState({

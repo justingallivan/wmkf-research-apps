@@ -592,13 +592,18 @@ rows stay as audit history (bounded by one live row per request).
 three additive tables for the post-research-presentation feature. No
 environment has been migrated by this milestone, the rollout and destructive-cleanup controls
 remain off/unconfigured, and no producer or consumer route is deployed or enabled. Slice 3's
-transcript producer and Slice 4's browser-direct MP4 intent/status/finalize routes are
-source-built and offline-tested only on `codex/feature-request`.
+transcript producer, Slice 4's browser-direct MP4 intent/status/finalize routes, and Slice 5's
+independent 60-day link lifecycle plus token-verified materials-only consumer are source-built
+and offline-tested only on `codex/feature-request`.
 
 - `presentation_material_links` stores one non-revoked materials-only link per
   Request: UUID/JTI, unique SHA-256 token digest, sealed token ciphertext,
   expiry, creator/time, and revocation/supersession evidence. Raw tokens are
-  absent from the schema.
+  absent from the schema. `presentation-link-service.js` reuses one readable
+  live row, atomically replaces expired/unreadable state, and compare-and-swap
+  reissues only the inspected presentation row. `verify-presentation-token.js`
+  rechecks the distinct `presentation-materials` audience, request rollout,
+  digest, revocation, and expiry before every external context/media action.
 - `presentation_material_uploads` stores one actor/request/active-Site-Visit
   bound browser-direct Graph intent before any preauthenticated URL is returned.
   It records the bounded file fingerprint, code-owned path/generation identity,

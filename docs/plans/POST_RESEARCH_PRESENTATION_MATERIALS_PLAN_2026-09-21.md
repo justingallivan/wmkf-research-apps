@@ -838,10 +838,10 @@ feature and supplies no test Request.
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript and recording source-built/offline-tested:** transcript begins bounded private-Blob staging; recording writes an immutable durable intent before creating a browser-direct Graph session and returns the code-owned 10 MiB contract. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | **Source-built/offline-tested:** independently reauthorize creating actor/request/visit, verify the bounded local-file fingerprint, resolve the exact path, and check live Graph status. Return the no-store URL plus one validated sequential range only while live; for an exact committed item return finalize-only state and no URL. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript and recording source-built/offline-tested:** lease-fenced, request-bound finalize/recovery. MP4 re-resolves the exact stable candidate, validates bounded signature/malware facts, then uses the Recording slot fence and durable replay. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | GET current link; POST exact `ensure` or compare-and-swap `reissue`. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | **Source-built/offline-tested:** GET current link; POST exact `ensure` or compare-and-swap `reissue`, behind both Meeting Tracker and post-presentation readiness/access checks. |
 | Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection/status for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While readiness is off, return the legacy payload with `presentationMaterialsStatus: 'disabled'`, not a false empty collection; do not 503 the existing logistics read. |
-| `/api/external/presentation/[token]/context` | GET | Rate limit, verify presentation token, return minimal material descriptors. |
-| `/api/external/presentation/[token]/open` | GET | Reverify token and exact live audience membership; redirect Zoom. For eligible SharePoint members, use the Slice 0-selected no-store 302 or one-shot URL response. `mode=open|watch|download` is content-type constrained. |
+| `/api/external/presentation/[token]/context` | GET | **Source-built/offline-tested:** fail-closed context-only token/IP limiter, verify presentation token, return minimal material descriptors. Its buckets are separate from media actions. |
+| `/api/external/presentation/[token]/open` | GET | **Source-built/offline-tested:** fail-closed media limiter; reverify token and exact live audience membership; redirect Zoom or a fresh exact-item Microsoft URL without buffering bytes. `mode=open|watch|download` is content-type constrained. |
 | `/api/external/briefing/[token]/open` | GET | Preserve D19/D28 full-briefing semantics while resolving eligible Zoom or large SharePoint-backed post-presentation winners through the briefing token's distinct verifier/audience. |
 
 Keep routes thin. Domain logic belongs under
@@ -1559,6 +1559,20 @@ remaining approval-bound live gates or imply that migration 055/configuration ha
   materials-only page, Zoom redirect, and SharePoint Watch/Download redirect.
 - Prove cross-audience isolation and >50 MB media behavior.
 
+**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; NOT
+DEPLOYED OR ENABLED.]** The staff projection now loads independently of
+recipient-directory failures and distinguishes loading, loaded-empty,
+unavailable, and rollout-disabled states. The separate presentation audience
+has a fixed 60-day durable link, exact compare-and-swap reissue, minimal context,
+fresh Zoom/Graph redirects, MP4 Watch with one automatic URL re-resolution and
+position restore, and Download-only controls for other files. The full briefing
+remains the D19/D28 superset. Page-load and media-action limiter buckets are
+separate and fail closed; stale singleton rows, wrong producers, invalid
+lifecycle/status, malware, and Graph identity drift fail before redirect. A
+lost staff reissue race refreshes the winning link rather than leaving the
+revoked URL copyable. No schema, environment, SharePoint, deployment, alias, or
+Production write was performed for this slice.
+
 ### Slice 6 — Release and reconciliation
 
 - Owner-applied schema/migration and readiness enablement.
@@ -1574,6 +1588,18 @@ remaining approval-bound live gates or imply that migration 055/configuration ha
 307 tests, including 41 focused staff-card cases. The remaining deployed-browser rows below keep
 their prior evidence level; in particular, the Chrome expiry row is still PARTIAL because no
 Graph-confirmed terminal expiry has been observed.
+
+**[SLICE 5 OFFLINE RESULT 2026-09-25]** The final changed surface passes 40
+Jest suites / 555 tests (focused staff card: 48), including exact 60-day expiry, audience isolation,
+expired/unreadable replacement, insert and compare-and-swap race adoption,
+row-lock SQL parameters, separate fail-closed limiter buckets, current-winner
+and producer/lifecycle/status membership, Graph malware/identity rejection,
+large MP4 Watch without buffering, revoked-link race refresh, and truthful
+temporary-unavailable page copy. Type checking and the webpack production build
+pass. Scoped ESLint reports zero errors and two existing
+`react-hooks/set-state-in-effect` warnings. API-route, route-lifecycle-auth,
+route-service-boundary, GUID trust-boundary, Dynamics-context-boundary, and
+fact-consistency gates each pass after their self-test ran sequentially.
 
 ### Model and persistence
 
@@ -1671,9 +1697,10 @@ Graph-confirmed terminal expiry has been observed.
 
 ## 14. Durable surfaces and gates
 
-**[SLICE 4 SOURCE RECONCILIATION 2026-09-25]** The route matrix, service catalogue, Atlas,
+**[SLICE 4–5 SOURCE RECONCILIATION 2026-09-25]** The route matrix, service catalogue, Atlas,
 credential runbook, maintenance surface, plan, and branch handoff now describe the offline-built
-MP4 lifecycle and separate destructive-cleanup control. Gate outcomes are recorded only after the
+MP4 lifecycle, separate destructive-cleanup control, staff consumer, and separate materials-only
+presentation audience. Gate outcomes are recorded only after the
 gate and its self-test pass sequentially; this statement is not a deployment or schema claim.
 
 Implementation must update, as applicable:
@@ -1980,6 +2007,24 @@ scoped lint had zero errors. Migration, deployment, configuration, Graph-confirm
 Production Safari, and near-cap checks remain open and approval-bound. The Test Request Factory is
 still unfinished; a future bounded live gate must use an explicitly approved human-created test
 Request. No Ultrareview or other metered review product was used.
+
+**2026-09-25 Slice 5 offline implementation and iterative Opus review:** the Staff
+Deliberations consumer, independent 60-day presentation-link lifecycle, minimal
+external page, and exact non-buffering Zoom/Graph resolver are source-built but
+not deployed or enabled. Five completed read-only OAuth Claude Opus rounds
+reviewed the cross-layer implementation. Accepted findings added route-level
+Meeting Tracker readiness, separate fail-closed context/media limiter buckets,
+race adoption and row-expiry/SQL tests, large-MP4 and membership-negative
+fixtures, authoritative winner refresh after a lost reissue race, and monotonic
+link-read/mutation epochs so stale GETs cannot restore a revoked URL or erase a
+mutation error. The documented loading/loaded-empty/unavailable/disabled Staff
+Deliberations states were retained: a failed shared logistics read cannot be
+truthfully reclassified as rollout-disabled. Round 5 returned exactly “No
+findings.” The final changed surface passed 40 suites / 555 tests; types,
+webpack build, scoped lint (zero errors, two existing warnings), and every
+relevant gate/self-test pair passed. No schema, configuration, deployment,
+alias, SharePoint, Dataverse, or Production action occurred. No Ultrareview or
+other metered review product was used.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof. The remaining decision is whether it survives the measured

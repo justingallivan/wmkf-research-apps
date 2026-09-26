@@ -237,6 +237,22 @@ describe('proxy CSP function', () => {
     expect(production.headers.get('Content-Security-Policy')).not.toContain('media-src');
   });
 
+  test('the exact materials-only presentation page can load Microsoft media in every deployment', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    const page = proxyFn(makeReq({}, 'https://applications.example/external/presentation/token'));
+    const mediaSrc = page.headers.get('Content-Security-Policy')
+      .split('; ').find(d => d.startsWith('media-src'));
+    expect(mediaSrc).toBe("media-src 'self' https://appriver3651007194.sharepoint.com");
+    for (const url of [
+      'https://applications.example/external/presentation/',
+      'https://applications.example/external/presentation/token/extra',
+      'https://applications.example/external/presentationish/token',
+    ]) {
+      expect(proxyFn(makeReq({}, url)).headers.get('Content-Security-Policy')).not.toContain('media-src');
+    }
+  });
+
   test('successive requests get distinct nonces', () => {
     process.env.NODE_ENV = 'production';
     proxyFn(makeReq());

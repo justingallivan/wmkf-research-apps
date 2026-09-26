@@ -33,6 +33,7 @@ const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
 const PRESENTATION_UPLOAD_PROOF_PATH = '/meeting-tracker/presentation-media-proof';
 const PRESENTATION_UPLOAD_PAGE = /^\/meeting-tracker\/visits\/[^/]+\/?$/;
 const PRESENTATION_PLAYBACK_PROOF_PREFIX = '/external/presentation-media-proof/';
+const PRESENTATION_MATERIALS_PAGE = /^\/external\/presentation\/[^/]+\/?$/;
 
 export default withAuth(
   function proxy(req) {
@@ -54,6 +55,7 @@ export default withAuth(
     const isPresentationPlaybackProof = isPreview
       && playbackProofToken.length > 0
       && !playbackProofToken.includes('/');
+    const isPresentationMaterialsPage = PRESENTATION_MATERIALS_PAGE.test(pathname);
 
     // Build CSP directives
     // Dev: Turbopack injects inline scripts without nonces, needs unsafe-inline + unsafe-eval.
@@ -92,7 +94,7 @@ export default withAuth(
       `frame-ancestors 'none'`,
     ];
 
-    if (isPresentationPlaybackProof) {
+    if (isPresentationPlaybackProof || isPresentationMaterialsPage) {
       // Graph's short-lived download URL for this governed drive is hosted on
       // the canonical tenant. Other pages retain default-src 'self'.
       directives.push(`media-src 'self' ${SHAREPOINT_CANONICAL_ORIGIN}`);

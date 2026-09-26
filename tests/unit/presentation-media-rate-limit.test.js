@@ -1,5 +1,8 @@
 /** @jest-environment node */
-import { checkPresentationMediaRateLimit } from '../../lib/external/presentation-media-rate-limit.js';
+import {
+  checkPresentationContextRateLimit,
+  checkPresentationMediaRateLimit,
+} from '../../lib/external/presentation-media-rate-limit.js';
 
 const req = { headers: { 'x-forwarded-for': '203.0.113.8' }, socket: {} };
 
@@ -26,6 +29,29 @@ test('presentation resolver limiter enforces token/IP limits and fails closed on
     now: () => 10_000,
   })).resolves.toMatchObject({ ok: false, reason: 'rate_limited' });
   await expect(checkPresentationMediaRateLimit(req, 'token', {
+    query: async () => { throw new Error('postgres down'); },
+    now: () => 10_000,
+  })).resolves.toEqual({ ok: false, reason: 'rate_limit_unavailable', retryAfterSeconds: 5 });
+});
+
+test('page context uses a separate fail-closed bucket and budget from media actions', async () => {
+  const seen = [];
+  const query = async (strings, ...values) => {
+    seen.push(values);
+    return {
+      rows: [
+        { bucket_key: values[0], hit_count: 21 },
+        { bucket_key: values[2], hit_count: 1 },
+      ],
+    };
+  };
+  await expect(checkPresentationContextRateLimit(req, 'token', {
+    query,
+    now: () => 10_000,
+  })).resolves.toEqual({ ok: true });
+  expect(seen[0][0]).toMatch(/^presentation-context-tok:/);
+  expect(seen[0][2]).toMatch(/^presentation-context-ip:/);
+  await expect(checkPresentationContextRateLimit(req, 'token', {
     query: async () => { throw new Error('postgres down'); },
     now: () => 10_000,
   })).resolves.toEqual({ ok: false, reason: 'rate_limit_unavailable', retryAfterSeconds: 5 });

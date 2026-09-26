@@ -101,8 +101,12 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   reported 22 exact / 0 absent / 0 divergent, and
   `MEETING_TRACKER_SCHEMA_READY` evaluates exact-on. The grant-protected
   runtime and UI are live.
-- **Recording / transcript / transcript-summary** artifact types exist in the registry but have no
-  producer; only distribution and logistics reference them as material categories.
+- **[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; NOT DEPLOYED OR ENABLED.]** Recording,
+  transcript, and transcript-summary now have governed producers under the
+  post-presentation rollout gates. The visit page has browser-direct MP4 upload,
+  transcript upload, and independent 60-day Board presentation-link Copy/Reissue
+  controls; the Staff Deliberations tab reads the current three slots. No live
+  schema, flag, or route enablement is implied.
 
 ## 4. The conflict the build must resolve first
 
@@ -273,8 +277,9 @@ schema readback and the readiness flip are complete.
 - Distribution email and logistics copy edits (owner: "noting for later").
 - Post-presentation recording/transcript product behavior remains governed by
   `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`, outside
-  this tracker plan's original slices. Its transcript producer is source-built
-  and offline-tested only; it is not deployed or enabled.
+  this tracker plan's original slices. Its Zoom/transcript/MP4 producers,
+  Staff Deliberations projection, and separate materials-only Board link are
+  source-built and offline-tested only; none is deployed or enabled.
 - A PC role. D4 stands until evidence says otherwise.
 - J27 differences (the auto-generation trigger and the narrative source path; register J27-082).
 
