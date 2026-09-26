@@ -437,7 +437,10 @@ function answersResource({ eTagAfter = 'W/"2"' } = {}) {
   return {
     resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
     plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'received_no_file', answerCount: 1 },
-    readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter, answerCount: 1 }, outcome: 'verified',
+    readback: eTagAfter == null
+      ? { suggestionId: DEST_SUGGESTION_A, answerCount: 1 }
+      : { suggestionId: DEST_SUGGESTION_A, eTagAfter, answerCount: 1 },
+    outcome: 'verified',
   };
 }
 function reviewFolderResource() {
@@ -703,6 +706,18 @@ describe('stepVerifyReviews', () => {
   });
 
   const happyResources = () => [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(), personResource(), suggestionResource(), answersResource()];
+
+  it('mutation (P2-2, Opus round 1): received_no_file with no journaled eTagAfter fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({ person: personRow(bundleReviewer), suggestion: suggestionRowFor(bundleReviewer) });
+    const { result } = await runStep({
+      bundle,
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(), personResource(), suggestionResource(), answersResource({ eTagAfter: null })],
+    });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
 
   it('mutation: a mismatched person name (missing TEST prefix) fails reviews_verification_failed', async () => {
     const bundle = buildBundle({ reviewForm: 'received_no_file' });
