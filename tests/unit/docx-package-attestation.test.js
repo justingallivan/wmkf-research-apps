@@ -238,6 +238,39 @@ describe('ZIP central-directory budget (fail-closed, Codex plan rounds 13-14)', 
     expect(() => validateZipCentralDirectory(bytes, DOCX_PACKAGE_BUDGET)).toThrow(/path-alias duplicates/);
   });
 
+  it('packagePartsBudgeted (the reader) also rejects a duplicate entry name, not just the validator called directly (P2-4, Opus round 1)', async () => {
+    const zip = new JSZip();
+    zip.file('a.txt', 'one');
+    const bytes = await zip.generateAsync({ type: 'nodebuffer' });
+    const buf = Buffer.from(bytes);
+    const offset = findCentralDirectoryOffset(buf, 'a.txt');
+    const nextSigIndex = buf.indexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]), offset + 4);
+    const header = buf.subarray(offset, nextSigIndex);
+    const eocdOffset = nextSigIndex;
+    const newEocdOffset = eocdOffset + header.length;
+    const patched = Buffer.concat([buf.subarray(0, eocdOffset), header, header, buf.subarray(eocdOffset)]);
+    const eocd = newEocdOffset + header.length;
+    patched.writeUInt16LE(2, eocd + 8);
+    patched.writeUInt16LE(2, eocd + 10);
+    patched.writeUInt32LE(header.length * 2, eocd + 12);
+    await expect(packagePartsBudgeted(patched, DOCX_PACKAGE_BUDGET)).rejects.toThrow(/duplicate entry name/);
+  });
+
+  it('packagePartsBudgeted (the reader) also rejects a path-alias duplicate, not just the validator called directly (P2-4, Opus round 1)', async () => {
+    const zip = new JSZip();
+    zip.file('a.txt', 'one');
+    zip.file('/a.txt', 'two');
+    const bytes = await zip.generateAsync({ type: 'nodebuffer' });
+    await expect(packagePartsBudgeted(bytes, DOCX_PACKAGE_BUDGET)).rejects.toThrow(/path-alias duplicates/);
+  });
+
+  it('packagePartsBudgeted (the reader) also rejects an over-ceiling declared per-part size, not just the validator called directly (P2-4, Opus round 1)', async () => {
+    const zip = new JSZip();
+    zip.file('a.txt', Buffer.alloc(TINY_BUDGET.maxPartUncompressedBytes + 1, 0x41));
+    const bytes = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    await expect(packagePartsBudgeted(bytes, TINY_BUDGET)).rejects.toThrow(/exceeding the per-part ceiling/);
+  });
+
   it('rejects a declared per-part uncompressed size over the ceiling', async () => {
     const zip = new JSZip();
     zip.file('a.txt', Buffer.alloc(TINY_BUDGET.maxPartUncompressedBytes + 1, 0x41));
