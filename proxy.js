@@ -26,13 +26,10 @@ import { NextResponse } from 'next/server';
 import { withAuth } from 'next-auth/middleware';
 import { isAuthRequired } from './lib/utils/auth-policy';
 import { SHAREPOINT_CANONICAL_SITE_URL } from './lib/services/graph/constants';
-import { classifyDeployment } from './lib/dataverse/core/interlock';
 
 const SHAREPOINT_CANONICAL_ORIGIN = new URL(SHAREPOINT_CANONICAL_SITE_URL).origin;
 const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
-const PRESENTATION_UPLOAD_PROOF_PATH = '/meeting-tracker/presentation-media-proof';
 const PRESENTATION_UPLOAD_PAGE = /^\/meeting-tracker\/visits\/[^/]+\/?$/;
-const PRESENTATION_PLAYBACK_PROOF_PREFIX = '/external/presentation-media-proof/';
 const PRESENTATION_MATERIALS_PAGE = /^\/external\/presentation\/[^/]+\/?$/;
 
 export default withAuth(
@@ -44,17 +41,9 @@ export default withAuth(
     const isDev = process.env.NODE_ENV === 'development';
     const hostname = req.nextUrl?.hostname;
     const pathname = req.nextUrl?.pathname || '';
-    const isPreview = classifyDeployment() === 'preview';
     const isLoopbackHttp = req.nextUrl?.protocol === 'http:'
       && ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
-    const isPresentationUploadProof = isPreview && pathname === PRESENTATION_UPLOAD_PROOF_PATH;
     const isPresentationUploadPage = PRESENTATION_UPLOAD_PAGE.test(pathname);
-    const playbackProofToken = pathname.startsWith(PRESENTATION_PLAYBACK_PROOF_PREFIX)
-      ? pathname.slice(PRESENTATION_PLAYBACK_PROOF_PREFIX.length)
-      : '';
-    const isPresentationPlaybackProof = isPreview
-      && playbackProofToken.length > 0
-      && !playbackProofToken.includes('/');
     const isPresentationMaterialsPage = PRESENTATION_MATERIALS_PAGE.test(pathname);
 
     // Build CSP directives
@@ -76,7 +65,7 @@ export default withAuth(
     let connectSrc = isDev
       ? `'self' https://*.public.blob.vercel-storage.com https://vercel.com https://*.vercel-insights.com ws://localhost:3000 ws://127.0.0.1:3000`
       : `'self' https://vercel.com https://*.vercel-insights.com`;
-    if (isPresentationUploadProof || isPresentationUploadPage) {
+    if (isPresentationUploadPage) {
       // Graph upload sessions currently resolve to signed *.up.1drv.com URLs;
       // keep that egress capability confined to authenticated upload pages.
       // The canonical tenant origin is included because Microsoft may issue a
@@ -94,7 +83,7 @@ export default withAuth(
       `frame-ancestors 'none'`,
     ];
 
-    if (isPresentationPlaybackProof || isPresentationMaterialsPage) {
+    if (isPresentationMaterialsPage) {
       // Graph's short-lived download URL for this governed drive is hosted on
       // the canonical tenant. Other pages retain default-src 'self'.
       directives.push(`media-src 'self' ${SHAREPOINT_CANONICAL_ORIGIN}`);

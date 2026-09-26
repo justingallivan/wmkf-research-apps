@@ -129,35 +129,6 @@ const nextConfig = {
         ],
       },
       {
-        // The Preview transport proof embeds a short-lived bearer token in its
-        // path and returns one-shot Microsoft URLs. Never disclose either path
-        // through a Referer header. Later rules override the global policy.
-        source: '/external/presentation-media-proof/:path*',
-        headers: [
-          {
-            key: 'Referrer-Policy',
-            value: 'no-referrer',
-          },
-          {
-            key: 'Cache-Control',
-            value: 'private, no-store, max-age=0',
-          },
-        ],
-      },
-      {
-        source: '/api/:scope(meeting-tracker|external)/presentation-media-proof/:path*',
-        headers: [
-          {
-            key: 'Referrer-Policy',
-            value: 'no-referrer',
-          },
-          {
-            key: 'Cache-Control',
-            value: 'private, no-store, max-age=0',
-          },
-        ],
-      },
-      {
         source: '/external/presentation/:path*',
         headers: [
           {

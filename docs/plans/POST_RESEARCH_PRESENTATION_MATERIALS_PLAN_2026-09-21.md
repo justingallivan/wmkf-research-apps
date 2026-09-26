@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; Slice 1 additive schema/readiness is source-built but unapplied, the shared 10 MiB direct-Graph transport passed its representative Chrome Preview benchmark, and Graph-confirmed expiry, Safari, and near-cap Production gates remain."
+summary: "Active plan for Meeting Tracker presentation materials; the production-safe offline flow is built, the Preview proof harness is retired, schema/readiness remain unapplied, and Graph-confirmed expiry, Safari, and near-cap Production gates remain."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -564,15 +564,15 @@ Graph upload URL and follow `nextExpectedRanges`. The deployed *historical* proo
 320 KiB alignment unit as its whole fragment and a 60-second XHR fragment timeout with byte-level
 progress; these are not the production performance policy in §7.2.1. Chrome completed a 96.0 MiB
 upload after the proof route's CSP admitted only the Microsoft upload and canonical tenant origins.
-[VERIFIED via branch source and focused tests, 2026-09-23] The Preview harness now stores a
-SHA-256 fingerprint of file size plus the first and last 1 MiB alongside its encrypted browser
-permit. After reload it requires reselection and checks name, size, modification time, and that
-fingerprint before requesting Graph resume status. An old permit without a fingerprint remains
-available for exact Cleanup but cannot resume. [VERIFIED via signed-in desktop Chrome on 2026-09-24]
+[VERIFIED historically via branch source and focused tests, 2026-09-23] The Preview harness stored
+a SHA-256 fingerprint of file size plus the first and last 1 MiB alongside its encrypted browser
+permit. After reload it required reselection and checked name, size, modification time, and that
+fingerprint before requesting Graph resume status. An old permit without a fingerprint remained
+available for exact Cleanup but could not resume. [VERIFIED via signed-in desktop Chrome on 2026-09-24]
 Reload and same-file reselect resumed the paused upload to a full-size commit. Safari remains
 deferred to a Production run on an owner-approved human-created disposable Request; the unfinished
-Test Request Factory is not a dependency, and the production intent remains a
-separate build.
+Test Request Factory is not a dependency. The proof harness is retired; the durable production
+intent that replaced it is source-built/offline-tested but not deployed or enabled.
 
 After reload, the materials GET makes unfinished intents discoverable. An in-progress intent shows
 Resume; a committed candidate with no registry row shows Finish saving. Only the creating actor
@@ -603,11 +603,12 @@ The bounded fallback decision, only if the remaining browser matrix fails, is:
 ### 7.2.1 Direct-Graph performance and recovery policy (Preview benchmark passed 2026-09-25; remaining live gates pending)
 
 **[VERIFIED via commit `bab770fe6`, the current `codex/feature-request` source,
-`shared/utils/graph-browser-upload.js`, the Preview proof and durable-intent adapters, and focused
-tests]** the branch now has one browser-direct transport with a
+`shared/utils/graph-browser-upload.js`, the durable-intent adapter, and focused tests]** the branch
+has one browser-direct transport with a
 code-owned 10 MiB default, strict sequential ranges, status-aware bounded retry, stall/response
 watchdogs, truthful progress/rate/ETA states, pause/offline/reconnect handling, and a same-browser
-lock. The Preview proof uses it and checks live Graph state after the sealed initial expiry.
+lock. The retired Preview proof used this same module and historically checked live Graph state
+after the sealed initial expiry; the durable producer is now the only runtime consumer.
 **[VERIFIED via signed-in desktop Chrome, immutable Preview deployment
 `dpl_FX7HvZZWTvvVchDytB3rRqCtEYoX`, Vercel request logs, and Microsoft Graph on 2026-09-25]**
 the representative benchmark in item 2 below passed with the same 100,665,703-byte MP4 and an
@@ -642,18 +643,18 @@ The shared transport and its tests preserve these failure contracts:
 | `429` | Follow Graph's [throttling guidance](https://learn.microsoft.com/en-us/graph/throttling): expose the response's `Retry-After` through the browser XHR wrapper and honor a valid value before the next status/PUT request; otherwise use capped exponential backoff. Cap automatic throttling at three consecutive 429s or two minutes of total wait, whichever comes first. Then pause and require a fresh authorized status check for manual Resume; never spin indefinitely. |
 | `404`/`410` session after an ambiguous or final PUT | A closed session may mean a successful commit. Check the exact full-size item immediately and twice more after 2 and 10 seconds to allow SharePoint visibility. If still absent, mark the session closed but the item outcome unresolved; retain the intent/candidate for later status and registry-safe cleanup. Never auto-start a replacement or delete on this signal alone. Other 4xx or malformed/ambiguous ranges fail closed and retain the intent. |
 | Application resume/status route returns `401`/`403`, `5xx`, or is unreachable | Preserve the intent and Graph offset. Ask staff to sign in again for `401`/`403`; show Retry later for transient app/Dataverse failures. These are not Graph fragment failures and do not consume the fragment retry budget. Never bypass server reauthorization with a cached upload URL. |
-| Pause, reload, same-file reselect, or request switch | Show Pausing while a 10 MiB fragment finishes. The shipped control is graceful pause-after-fragment, not immediate abort. A lifecycle abort cancels XHR/timers and retains the permit; the next manual Resume performs the fresh authorized status reconciliation because commit is uncertain. Reauthorize and fingerprint-check before resume, and suppress stale progress/errors/PUTs for a different Request. Do not discard a recoverable intent or claim that committed bytes must restart. |
+| Pause, reload, same-file reselect, or request switch | Show Pausing while a 10 MiB fragment finishes. The shipped control is graceful pause-after-fragment, not immediate abort. A lifecycle abort cancels XHR/timers and retains durable resume state; the next manual Resume performs the fresh authorized status reconciliation because commit is uncertain. Reauthorize and fingerprint-check before resume, and suppress stale progress/errors/PUTs for a different Request. Do not discard a recoverable intent or claim that committed bytes must restart. |
 
-**[VERIFIED via `presentation-media-proof-service.js::getPresentationMediaProofUploadStatus`
-and focused tests]** the proof still seals the *initial* Graph expiry as advisory evidence, but
-no longer returns 410 merely because that timestamp passed. It checks the exact full-size item,
-then Graph's live status, with exact-item rechecks after terminal 404/410 outcomes. Microsoft's
+**[VERIFIED via `material-service.js::getMp4UploadStatus` and focused tests]** the production
+resume route does not treat the stored initial Graph expiry as terminal. It checks the exact
+full-size item, then Graph's live status, with exact-item rechecks after terminal 404/410 outcomes. Microsoft's
 [upload-session contract](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0)
-says each successful fragment extends expiry. A transient/uncertain status retains the permit.
-The disposable proof permit now uses an absolute 72-hour lifetime from mint, independent of the
-initial Graph expiry; after that, any unresolved exact item needs an operator-approved cleanup
-path rather than an unguarded browser deletion. This lifetime bounds proof access and covers
-the planned desktop run plus cleanup grace. The durable production intent stores the last *server-observed* Graph
+says each successful fragment extends expiry. A transient/uncertain status retains the intent.
+The intent's review-after is the last server-observed Graph expiry plus a three-day grace and is
+recomputed only after an authorized live status response. After that, any unresolved exact item
+needs an operator-approved cleanup path rather than an unguarded browser deletion. This sliding
+window bounds recovery authority and covers the planned desktop run plus cleanup grace. The
+durable production intent stores the last *server-observed* Graph
 expiry as advisory; the browser may display refreshed expiry from `202` responses, but cannot
 extend server authority by submitting its own timestamp. No per-fragment application callback is
 required. Maintenance checks live Graph and exact item state before terminal cleanup.
@@ -686,15 +687,17 @@ logs, measurements, and persisted plaintext.
 
 Performance verification is a release gate with separate evidence levels:
 
-1. **Offline before another live run — PASS for the proof at `bab770fe6`; durable producer
-   SOURCE-BUILT/OFFLINE-TESTED 2026-09-25:** proof tests cover 10 MiB alignment and final remainder, sequential
+1. **Offline before another live run — HISTORICAL PASS for the proof at `bab770fe6`; durable producer
+   SOURCE-BUILT/OFFLINE-TESTED 2026-09-25:** at that commit, proof tests covered 10 MiB alignment and final remainder, sequential
    ranges and final commit, slow continuous progress versus true stall, abort/pause, bounded
    5xx/network and 429 retries, ambiguous commit/416 status reconciliation, terminal 404,
    refreshed expiry after initial expiry, reselect fingerprint, duplicate-tab/device attempts,
-   app-route `401`/`403`/`5xx`, cancelled retry timers, and stale Request UI state. Invert the
-   former tests that expected an initial-expiry 410 and a 60-second XHR timeout. They exercise the
-   XHR path, protected proof resume route, encrypted permit, and exact cleanup semantics rather
-   than only a helper. The durable production adapter now adds actor/request/visit-bound intent
+   app-route `401`/`403`/`5xx`, cancelled retry timers, and stale Request UI state. The accepted
+   change inverted the former tests that expected an initial-expiry 410 and a 60-second XHR timeout. Those historical
+   tests exercised the XHR path, protected proof resume route, encrypted permit, and exact cleanup
+   semantics before being retired with the harness. Current `graph-browser-upload.test.js` and
+   durable-producer tests retain shared transport and production lifecycle coverage. The durable
+   production adapter adds actor/request/visit-bound intent
    creation, live-status resume, exact finalize, ciphertext-only session persistence, maintenance,
    and truthful staff UI. The changed-surface run passed 16 suites / 307 tests, with the focused
    card suite at 41 tests; no live service was invoked.
@@ -852,7 +855,7 @@ Suggested source ownership:
 
 - `shared/utils/graph-browser-upload.js`: **[SOURCE-BUILT/OFFLINE-TESTED at `bab770fe6`;
   REPRESENTATIVE CHROME PREVIEW BENCHMARK PASSED 2026-09-25]** the shared browser byte transport
-  consumed by the Preview harness and later production producer;
+  originally benchmarked by the retired Preview harness and now consumed by the durable production producer;
 - `material-model.js`: backing-mode validation and latest-winner projection;
 - `material-service.js`: staff read, Zoom-link write, transcript producer, and durable MP4 mint/status/finalize;
 - `upload-intent-store.js` / `upload-session-crypto.js` / `upload-intent-cleanup.js`: encrypted Graph intent lifecycle, exact cleanup reconciliation, and daily maintenance;
@@ -974,12 +977,12 @@ Upload-specific rules:
 
 ## 12. Implementation slices
 
-### Slice 0 — Deployed-Preview browser proof
+### Slice 0 — Historical Deployed-Preview browser proof; acceptance rows remain open
 
-**Implementation status (2026-09-25): CHROME CORE PATH PASSED; EDGE UPLOAD/PLAYBACK/DOWNLOAD
+**Historical proof status (retired 2026-09-25): CHROME CORE PATH PASSED; EDGE UPLOAD/PLAYBACK/DOWNLOAD
 REPORTED; SHARED PERFORMANCE TRANSPORT IMPLEMENTED AT `bab770fe6` AND REPRESENTATIVE CHROME
-PREVIEW BENCHMARK PASSED; SLICE REMAINS OPEN.** [VERIFIED via focused unit/contract tests] the isolated
-feature branch contains the Preview-only staff harness, browser-direct Graph upload session,
+PREVIEW BENCHMARK PASSED; GRAPH-EXPIRY/SAFARI/NEAR-CAP ACCEPTANCE REMAINS OPEN.** At the benchmark
+commit, [VERIFIED via focused unit/contract tests] the isolated feature branch contained the Preview-only staff harness, browser-direct Graph upload session,
 encrypted staff permit, five-minute encrypted-subject proof token, fail-closed resolver limiter,
 302/one-shot playback comparison, scoped CSP, and exact-item cleanup. [VERIFIED via signed-in
 Chrome] the current-hardening Preview paused and resumed the 96.0 MiB upload in the same page,
@@ -987,8 +990,8 @@ completed bounded finalize, visibly played and sought through the 302 resolver w
 application resolution, played through one-shot Watch resolution, downloaded byte- and
 SHA-256-identical content, and deleted the exact item to the recycle bin. Resolver counts stayed
 bounded to explicit actions. The downloaded filename was the opaque physical MP4 name, not the
-display name. [VERIFIED via branch source and focused tests, 2026-09-23] The Preview harness
-now checks a bounded same-file fingerprint before reload/reselect resume, retains cleanup authority
+display name. [VERIFIED via branch source and focused tests, 2026-09-23] The deployed Preview harness
+checked a bounded same-file fingerprint before reload/reselect resume, retained cleanup authority
 on session expiry, can delete only the exact partial placeholder after a confirmed terminal
 session outcome, can mint a fresh five-minute token from the exact committed item, and performs
 one automatic playback re-resolution with position restore before offering manual Resume Watch.
@@ -1005,12 +1008,13 @@ Edge byte/hash comparison or detailed pause, resolver, seek, or range evidence w
 [VERIFIED via signed-in desktop Chrome, owner UI report, and Graph on 2026-09-24]
 Reload/reselect and proof-token expiry recovery passed. The upload-session expiry cell proved
 the local initial-timestamp refusal and cancellation, not Graph-confirmed expiry; it needs a
-corrective retest after §7.2.1. Production desktop macOS Safari, long-duration seeking, and
+corrective retest after §7.2.1 through the durable producer's authenticated resume route during
+bounded Preview acceptance on a freshly approved human-created sandbox Request. Production desktop macOS Safari, long-duration seeking, and
 near-cap throughput remain open, so Slice 0 is not yet complete.
 
-[VERIFIED via commit `bab770fe6`, 84 focused proof tests, scoped ESLint, type checking, and a
-local webpack production build] the Preview harness consumes the shared 10 MiB browser transport
-described in §7.2.1, and its status service no longer refuses solely on the initial Graph expiry.
+[VERIFIED historically via commit `bab770fe6`, 84 focused proof tests, scoped ESLint, type checking,
+and a local webpack production build] the Preview harness consumed the shared 10 MiB browser
+transport described in §7.2.1, and its status service no longer refused solely on the initial Graph expiry.
 [VERIFIED via the 2026-09-25 receipt in §7.2.1] deployment
 `dpl_FX7HvZZWTvvVchDytB3rRqCtEYoX` passed the approved representative Chrome benchmark and exact
 cleanup on Request `1003220`; the independent direct-Graph baseline item and app item are both
@@ -1020,9 +1024,9 @@ Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and the three tempo
 incompatible with this worktree's external `node_modules` symlink; the webpack build passed with
 the existing dynamic-dependency warnings.
 
-This is a disposable transport spike, not the production feature. It may add a Preview-only,
-authenticated proof route and minimal harness, but it creates no durable application schema and is
-removed or converted into production code after the decision. Use an owner-sanctioned disposable
+This was a disposable transport spike, not the production feature. It added a Preview-only,
+authenticated proof route and minimal harness, created no durable application schema, and was
+retired after the shared transport moved into the durable production flow. Historical runs used an owner-sanctioned disposable
 request, the server-chosen proof folder in that request's configured governed SharePoint site, and
 a real Zoom-produced MP4 larger than 50 MB. Record the actual Dataverse and SharePoint targets
 before each run; Preview is an application-deployment boundary, not automatic data-target isolation.
@@ -1034,12 +1038,11 @@ playback, and Download actions without a further Edge run. Desktop macOS Safari 
 unpassed browser gate; a resolver shape that passes only Chromium does not complete Slice 0.
 iPadOS is outside the release matrix by owner decision.
 
-The proof harness fails closed unless `classifyDeployment() === 'preview'`, its mint route requires
-an authenticated Meeting Tracker user, and its short-lived JWT uses a distinct
-`presentation-media-proof` audience. Every proof route denies Production even if a configuration
-value is wrong. Remove or convert the harness before Slice 2 now that the timed benchmark is complete, carrying only
-the reviewed shared browser transport into the production routes; a release gate asserts that
-the proof audience/routes cannot ship enabled.
+**[SOURCE-RETIRED/OFFLINE-TESTED 2026-09-25]** the Preview proof pages, API routes, service,
+rate limiter, token audience, and proof-only CSP/header exceptions have been removed. The shared
+browser transport remains imported by the production Meeting Tracker producer. A focused release
+regression test pins the proof runtime paths and proof-only exception strings absent;
+`proxy.test.js` separately pins the production upload/media CSP scopes and their negative siblings.
 
 #### Remaining Slice 0 browser matrix (updated 2026-09-25)
 
@@ -1063,9 +1066,9 @@ create/use `Post Site Visit Materials` directly under that request folder, with 
 MP4 directly inside. Existing sealed permits retain their original paths for resume/cleanup.
 An earlier approved single GET for the mistakenly supplied `1003332` returned zero exact rows;
 no document-location reads followed that result. The owner selected the MP4 for the completed
-Edge run; any later file and upload need fresh approval. The Windows Edge colleague has Meeting
-Tracker access and had the MP4 on that PC; give them the staff harness link after any newly
-approved deployment, since the playback proof link lasts only five minutes. Re-inspect the alias target and
+Edge run; any later file and upload need fresh approval. For the historical Edge run, the Windows
+colleague had Meeting Tracker access and the MP4 on that PC and used the then-live staff harness;
+that instruction is retired with the harness. Re-inspect the alias target and
 branch-scoped Preview variable names before an alias change, then restore and re-inspect the exact
 prior target. Do not clear a permit or delete an item on an uncertain cleanup response; ask the
 owner before deleting each exact disposable item.
@@ -1160,7 +1163,7 @@ exact deletion. No bearer URL or token was saved.
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. | Agent (historical PASS) |
 | Desktop Chrome | Reload and same-file reselect Resume | 2026-09-24 PASS: paused at 0.9 MiB, reloaded, reselected the same file, resumed direct Microsoft `202` chunks, committed 100,665,703 bytes, finalized, and cleaned the exact item. | Agent |
-| Desktop Chrome | Upload-session expiry and recovery | PARTIAL: after the sealed initial expiry, Resume refused and retained its permit; approved Cleanup returned `session_cancelled` with no item. This proves the old local refusal/cleanup path, but a 2xx Graph cancellation means Graph-confirmed expiry was not observed. Commit `bab770fe6` corrected the initial-expiry predicate offline; retest live status/terminal recovery before changing this row. The third fresh session did commit 100,665,703 bytes and was cleaned exactly. | Agent, with owner final UI clicks after browser auto-review block |
+| Desktop Chrome | Upload-session expiry and recovery | PARTIAL: after the sealed initial expiry, Resume refused and retained its permit; approved Cleanup returned `session_cancelled` with no item. This proves the old local refusal/cleanup path, but a 2xx Graph cancellation means Graph-confirmed expiry was not observed. Commit `bab770fe6` corrected the initial-expiry predicate offline. Retest live status/terminal recovery through the durable producer's authenticated resume route during the bounded Preview acceptance on a freshly approved human-created sandbox Request; the retired harness is not the test surface. The third historical session did commit 100,665,703 bytes and was cleaned exactly. | Agent, with owner final UI clicks after browser auto-review block |
 | Desktop Chrome | Five-minute proof-token expiry recovery | 2026-09-24 PASS: old link refused as `expired` after reload; fresh link from the same item played and accepted End/Home seeks with resolver count one. | Agent |
 | Desktop Edge | 2026-09-23 upload, playback, Download | Colleague reported these actions for 97,777,999 bytes; Graph confirmed the item. Remaining detailed Edge trace is not a Slice 0 blocker under Session 536. | Historical owner colleague; no new Edge run |
 | macOS Safari | Upload, selected Production Watch shape with long seeking, Download | Deferred to Production on an owner-approved human-created disposable Request; record redacted statuses/ranges and source/download size and SHA-256. Test a fallback Watch shape only if it ships. | Owner by hand |
@@ -1178,7 +1181,7 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 | macOS Safari full path | DEFERRED | [UPDATED by owner 2026-09-25] Production run on an owner-approved human-created disposable Request remains for upload, selected Watch shape with long seeking, Download, and integrity evidence; the unfinished Factory is not a prerequisite. |
 | iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] Staff will not use iPadOS for this work; its upload, playback, Files-app, and backgrounding checks are removed from the acceptance matrix. |
 | Reload and same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] 0.9 MiB pause, reload, reselect, direct Microsoft `202` chunks, 100,665,703-byte commit/finalize, exact ETag-guarded cleanup with Graph 404 and empty folder. |
-| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. [VERIFIED offline at `bab770fe6`] the false terminal predicate is corrected; live expiry recovery still requires a fresh approval and retest. |
+| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. [VERIFIED offline at `bab770fe6`] the false terminal predicate is corrected; live expiry recovery still requires fresh approval and a retest through the durable producer's authenticated resume route during bounded Preview acceptance on a freshly approved human-created sandbox Request; the retired harness is not restored. |
 | Five-minute proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] expired old link refused after reload; Finish saving minted a fresh link from the same committed item; Watch played and End/Home seeks caused no additional resolver action. |
 | Long-duration seeking | DEFERRED | [VERIFIED via Chrome receipt] current recording is only 67.33 seconds; desktop macOS Safari Production run still needs a >2-minute recording and ten seeks. |
 | Upload and throughput near 2,000,000,000 bytes | DEFERRED | [VERIFIED via 2026-09-24 owner decision; fixture corrected 2026-09-25] one near-cap desktop Production upload remains to test the proposed 2 GB cap. [PLANNED] Run it with the macOS Safari check on the exact owner-approved human-created disposable Request. |
@@ -1193,10 +1196,12 @@ Before any alias move, re-inspect its current target and presentation/Factory br
 Preview variable names; restore and re-inspect afterward. The 2026-09-23 Edge upload approval
 and cleanup authorization are spent.
 
-**Historical Preview click sequence, superseded by the Session 536 Production decision.**
+**Historical Preview click sequence, superseded by the Session 536 Production decision and the
+2026-09-25 harness retirement.**
 The numbered steps below describe the Preview harness and are not instructions for the deferred
-Safari run. [VERIFIED via branch source and Session 536 owner decision] The harness is Preview-only;
-the Production Safari run needs a Production-safe presentation flow and an owner-approved
+Safari run. [VERIFIED via historical branch source and Session 536 owner decision] The retired
+harness was Preview-only. The Production-safe presentation flow is now source-built/offline-tested
+but not deployed; the Production Safari run still needs that flow released and an owner-approved
 human-created disposable Request before the owner can exercise upload, the selected Watch shape,
 long seeking, Download, and the
 near-cap desktop upload. Define its exact disposable target and cleanup receipts at that time.
@@ -1304,9 +1309,10 @@ Pass only when all of the following are observed:
 - no raw token or preauthenticated URL appears in application-emitted logs or persisted rows;
   the accepted `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md` D18 limitation is that the hosting
   platform may retain the request-path token;
-- exact-item cleanup succeeds for a Preview-harness disposable upload; a registry-bound
-  Production gate or release-smoke item instead records its exact identity and the owner-approved
-  retention decision (§7.2.1 item 3).
+- **Historical PASS:** exact-item cleanup succeeded for the Preview-harness disposable upload.
+  Durable-producer Preview acceptance and any Production gate instead record the registry-bound
+  item's exact identity and owner-approved retention decision; deletion is separately reviewed
+  only after zero binding is proved (§7.2.1 item 3).
 
 If the 302 passes, keep it. If only the one-shot URL response passes, adopt that shape and state
 the short-lived URL exposure explicitly in the security contract. If direct upload or both media
@@ -1402,13 +1408,15 @@ Also send a sanctioned 25 MiB clean transcript through the configured scanner in
 record success; if the scanner cannot accept the code-owned cap, reduce the cap before deploying
 or enabling the transcript producer.
 
-Run this harness only from the Preview application deployment and only with an owner-sanctioned
-disposable request. Before every run, explicitly record the configured Dataverse and SharePoint
+**Historical harness constraint:** while the harness existed, it ran only from the Preview
+application deployment and only with an owner-sanctioned disposable request. Before every such
+run, the operator explicitly recorded the configured Dataverse and SharePoint
 targets and obtain authorization appropriate to those targets. Do not describe Preview as a
 sandbox-data guarantee: the owner-authorized 2026-09-22 proof read Request `1003222` from Production
-Dataverse and wrote the disposable item to the canonical SharePoint site. Preview-harness cleanup must delete the
-exact committed item to the recycle bin or confirm that the upload session is cancelled, gone, or
-expired with no exact item; an uncertain transport retains the encrypted permit for retry.
+Dataverse and wrote the disposable item to the canonical SharePoint site. Preview-harness cleanup
+deleted the exact committed item to the recycle bin or confirmed that the upload session was
+cancelled, gone, or expired with no exact item; uncertain transport retained the encrypted permit
+for retry.
 
 ### Slice 1 — Additive schema and readiness — SOURCE-BUILT 2026-09-25; NOT APPLIED
 
@@ -1524,9 +1532,9 @@ check; it is not inferred from mocks.
 
 ### Slice 4 — Large MP4 producer — SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; NOT DEPLOYED
 
-- Wire the §7.2.1 browser-direct Graph transport module already built and timed with the Preview
-  harness in Slice 0 into the durable producer. It accepts a status/reauthorization adapter:
-  the Preview proof and Production intent routes share byte/range/retry code but not authorization
+- The §7.2.1 browser-direct Graph transport module originally timed with the retired Preview
+  harness is now wired into the durable producer. It accepts a status/reauthorization adapter:
+  the historical Preview proof and current production intent route used the same byte/range/retry code but not authorization
   state. Any later change to that shared module requires a renewed benchmark or explicit coverage
   in the Production gate. The deferred Production macOS Safari, long-seek, and desktop near-cap cells remain
   in the Slice 0 matrix but block **general release**, not implementation. Keep Production access
@@ -1575,6 +1583,8 @@ Production write was performed for this slice.
 
 ### Slice 6 — Release and reconciliation
 
+- **[SOURCE-RETIRED/OFFLINE-TESTED 2026-09-25]** Remove the Preview proof harness while retaining
+  the shared Graph transport and historical benchmark receipts.
 - Owner-applied schema/migration and readiness enablement.
 - Signed-in Meeting Tracker smoke with one Zoom link, one transcript, and one owner-approved,
   registry-bound retained test MP4 (retention per §15 step 6).
@@ -1691,7 +1701,8 @@ fact-consistency gates each pass after their self-test ran sequentially.
   remains the selected candidate unless that desktop check falsifies it;
 - expired/revoked tokens, Microsoft URL expiry recovery with playback-position restore, and fresh
   download action after URL expiry;
-- Preview proof harness rejects Production and is removed/disabled before release.
+- **PASS offline:** Preview proof harness routes/audience are removed before release, with a
+  regression test pinning the runtime files and proof-only CSP/header exceptions absent.
 - pre-compatibility runtime is rejected as a rollback target; compatibility-floor readers tolerate
   external-backed, fenced, duplicate-active, and Superseded fixtures.
 
@@ -1758,19 +1769,21 @@ This is Tier 2 cross-store runtime work. Build on a feature branch and promote d
 
 Release order:
 
-1. **IN PROGRESS:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
+1. **HISTORICAL PROOF COMPLETE; ACCEPTANCE PARTIAL:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
    route-scoped CSP correction. Chrome reload/reselect and proof-token recovery passed on
    2026-09-24; Graph-confirmed session expiry needs a corrective retest. Commit `bab770fe6`
    built and offline-tested the §7.2.1 transport as one browser module used by the Preview
    benchmark harness and intended for the later production producer. The separately approved
-   representative Chrome benchmark passed on 2026-09-25; retest the expiry row through live Graph status.
+   representative Chrome benchmark passed on 2026-09-25. Retest the expiry row through the durable
+   producer's authenticated resume route during bounded Preview acceptance on a freshly approved
+   human-created sandbox Request; do not restore the retired harness.
    Keep 302 as the
    leading resolver and the one-shot URL as the bounded fallback. The deferred Production Safari,
    long-seek, and near-cap cells remain in the Slice 0 matrix but block general release after
    the production-safe flow exists, not coding of that flow. **[SOURCE-BUILT/OFFLINE-TESTED
    2026-09-25]** that durable MP4 flow now exists on `codex/feature-request`, but has not been
    deployed, migrated, enabled, or live-tested;
-2. now remove/convert the proof harness and merge the compatibility floor: deploy-safe readers,
+2. **SOURCE COMPLETE/OFFLINE-TESTED:** remove the proof harness and merge the compatibility floor: deploy-safe readers,
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
    `EXTERNAL_LINK_SECRET` separately in Preview and Production;
@@ -2025,6 +2038,15 @@ webpack build, scoped lint (zero errors, two existing warnings), and every
 relevant gate/self-test pair passed. No schema, configuration, deployment,
 alias, SharePoint, Dataverse, or Production action occurred. No Ultrareview or
 other metered review product was used.
+
+**2026-09-25 Slice 6 offline release hardening:** with explicit owner approval, the Preview-only
+presentation-media proof harness was retired after its benchmark purpose was complete. Its pages,
+API routes, service, token audience, limiter, UI, and proof-only CSP/header exceptions are absent;
+the shared Graph transport and production Meeting Tracker producer remain. A focused regression
+test pins the retired runtime files and proof-only exceptions absent; `proxy.test.js`
+separately pins the positive production upload/media CSP scopes and their negative siblings.
+Historical benchmark receipts remain in this plan. No deployment, environment/schema change,
+alias move, SharePoint action, or Production/Dataverse write occurred.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof. The remaining decision is whether it survives the measured

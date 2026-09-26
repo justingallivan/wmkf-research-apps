@@ -1,7 +1,7 @@
 /** @jest-environment node */
 
-import { fingerprintPresentationMediaProofFile } from '../../shared/utils/presentation-media-proof-upload';
 import {
+  fingerprintGraphBrowserUploadFile,
   GRAPH_UPLOAD_DEFAULT_CHUNK_BYTES,
   nextExpectedStart,
   uploadBrowserDirectGraphFile,
@@ -551,14 +551,14 @@ test('resume fingerprint binds size and both file edges without reading middle b
     size: value.length,
     slice: (start, end) => ({ arrayBuffer: async () => value.slice(start, end).buffer }),
   });
-  const original = await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle);
+  const original = await fingerprintGraphBrowserUploadFile(fileOf(bytes), webcrypto.subtle);
   bytes[0] = 1;
-  expect(await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle)).not.toBe(original);
+  expect(await fingerprintGraphBrowserUploadFile(fileOf(bytes), webcrypto.subtle)).not.toBe(original);
   bytes[0] = 0;
   bytes[size - 1] = 1;
-  expect(await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle)).not.toBe(original);
+  expect(await fingerprintGraphBrowserUploadFile(fileOf(bytes), webcrypto.subtle)).not.toBe(original);
   bytes[size - 1] = 0;
   bytes[1_500_000] = 1;
-  expect(await fingerprintPresentationMediaProofFile(fileOf(bytes), webcrypto.subtle)).toBe(original);
-  expect(await fingerprintPresentationMediaProofFile(fileOf(bytes.slice(1)), webcrypto.subtle)).not.toBe(original);
+  expect(await fingerprintGraphBrowserUploadFile(fileOf(bytes), webcrypto.subtle)).toBe(original);
+  expect(await fingerprintGraphBrowserUploadFile(fileOf(bytes.slice(1)), webcrypto.subtle)).not.toBe(original);
 });

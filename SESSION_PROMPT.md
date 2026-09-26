@@ -1,3 +1,36 @@
+# Session 546 Prompt: Preview proof retirement (branch-local)
+
+## Offline Slice 6 release hardening — 2026-09-25 PT
+
+**[VERIFIED via Git/source]** With the owner's explicit approval, the Preview-only
+presentation-media proof pages, API routes, service, limiter, token audience, UI, compatibility
+export wrapper, and proof-only CSP/header exceptions were retired on `codex/feature-request`. The shared
+`graph-browser-upload.js` transport and the production Meeting Tracker producer/consumer remain.
+A regression test pins all nine proof runtime files absent; Preview-mode proxy tests prove the
+retired URLs receive no Microsoft CSP exception while the production upload and materials pages
+retain their exact scoped exceptions. Historical benchmark receipts remain in the product plan.
+
+**[VERIFIED offline]** Four focused Jest suites pass 103 tests. `npm run check:types`, scoped
+ESLint (zero warnings/errors), and `npm run build -- --webpack` pass; the build reports only the
+repository's existing dynamic-dependency and Next configuration warnings. API-route,
+route-lifecycle-auth, route-service-boundary, and fact-consistency gates pass with their self-tests
+run sequentially. Canonical counts are 234 API route files and 145 `requireAppAccess` endpoint
+files. Six iterative read-only OAuth Claude Opus rounds found no runtime, security, CSP, or
+shared-transport regression. Accepted evidence fixes moved the retired-path negative test into
+Preview mode, preserved historical Slice 5 counts, marked Session 542's work item superseded,
+described the intent's sliding Graph-expiry-plus-three-day review window accurately, removed
+decorative assertions, and reconciled all historical proof language with the new durable-producer
+expiry gate. Round 6 returned exactly `No findings.` No Ultrareview or other metered product was
+used.
+
+**[NO LIVE EFFECTS]** No migration, schema/readiness/access setting, deployment, alias move,
+SharePoint upload/deletion, benchmark, or Production/Dataverse write occurred. The shared Preview
+alias was inspected read-only and still resolved to Ready Factory deployment
+`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; `codex/feature-request` had no branch-scoped Preview variables.
+Live Slice 6 work still requires a fresh concrete, staged approval list. Request `1003220` remains
+a Production request whose prior upload/cleanup approvals are spent; it is not silently authorized
+as a Preview sandbox write fixture.
+
 # Session 545 Prompt: Presentation-material consumers and Board link (branch-local)
 
 ## Offline Slice 5 milestone — 2026-09-25 PT
@@ -42,8 +75,9 @@ two existing `react-hooks/set-state-in-effect` warnings in
 `StaffDeliberationsTab.js` and `useSiteVisitContext.js`. API-route,
 route-lifecycle-auth, route-service-boundary, GUID trust-boundary,
 Dynamics-context-boundary, and fact-consistency gates each passed after their
-self-test ran sequentially. Canonical counts are 237 API route files and 146
-`requireAppAccess` endpoint files. `git diff --check` passed.
+self-test ran sequentially. Canonical counts at that run were 237 API route files. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-09-25 -->
+At that run there were 146 `requireAppAccess` endpoint files. <!-- fact-consistency:ignore fact=requireappaccess-endpoint-count as-of=2026-09-25 -->
+`git diff --check` passed.
 
 **[VERIFIED iterative review]** Five completed read-only OAuth Claude Opus
 rounds reviewed Slice 5. Accepted findings added route-level Meeting Tracker
@@ -372,7 +406,10 @@ It changed only this handoff and
 and their self-tests, plus `check:docs-catalog`, passed. No runtime code or live service changed.
 The read-only Claude Opus review and its two follow-ups are recorded in the plan's §17.
 
-**Verified open:** [VERIFIED via `presentation-media-proof-service.js` and
+**SUPERSEDED 2026-09-25 by the owner-approved Slice 6 proof retirement.** The following paragraph
+records the then-open Session 542 state and is not a current work item.
+
+**Verified open at Session 542:** [VERIFIED then via `presentation-media-proof-service.js` and
 `presentation-media-proof-upload.js`] the proof still uses 320 KiB fragments, a fixed 60-second
 XHR timeout, and the initial-expiry refusal. Implement and offline-test the reviewed §7.2.1
 shared browser transport and correct the expiry classification before another live benchmark.
