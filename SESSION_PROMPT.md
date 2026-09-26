@@ -54,7 +54,7 @@
 2. **Promotion.** The card is Tier 1 runtime work on a feature branch. Open a PR from `claude/ui-work`
    after the owner check; `main` auto-deploys.
 3. **`check:fact-consistency` is red on this branch** for one line only:
-   `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md:198` (historical "226 route files", live 227).
+   `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md:198` (a historical route-file count one below the live value).
    The fix is a `<!-- fact-consistency:ignore fact=api-route-file-count reason=historical -->` marker on that
    line. **Owner decision:** the Factory session (or whichever branch merges second) adds it; this
    worktree does not touch that file. Once this route reaches `main`, the main checkout's gate goes red too.
