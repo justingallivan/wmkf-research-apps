@@ -565,6 +565,15 @@ describe('DOCX package integrity mode', () => {
     expect(failures[0]).toMatch(/package attestation failed|bytes changed since the copy step's attestation/);
   });
 
+  test('reverifyCopiedItems refuses (P3-e, Opus round 1) a DOCX copy with no journaled attestedDigest, rather than silently passing', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    delete copies[0].attestedDigest;
+    const failures = await reverifyCopiedItems(copies, deps);
+    expect(failures).toEqual([`${copies[0].destination.filename} has no journaled attestedDigest to re-verify against`]);
+  });
+
   test('verifyCopiedFiles census compares against the post-promotion size, not the bundle source size', async () => {
     const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
     const plan = planReviewFileCopiesForTest(docxDoc());
