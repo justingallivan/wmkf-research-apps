@@ -481,7 +481,7 @@ describe('DOCX package integrity mode', () => {
       requestNumber: '1000400', title: 'TEST: reviewer upload', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
     });
     const zip = await JSZip.loadAsync(sourceDocx);
-    zip.file('docProps/core.xml', '<cp:coreProperties/>'); // SharePoint rewrites this
+    zip.file('docProps/core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>rewritten by SharePoint</dc:title><cp:lastModifiedBy>Un-named</cp:lastModifiedBy><cp:revision>1</cp:revision><dcterms:modified xsi:type="dcterms:W3CDTF">2026-09-25T03:32:30Z</dcterms:modified></cp:coreProperties>'); // SharePoint rewrites this
     promotedDocx = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
     const tampered = await JSZip.loadAsync(sourceDocx);

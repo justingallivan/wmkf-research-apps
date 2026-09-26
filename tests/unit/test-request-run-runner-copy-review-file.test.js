@@ -511,10 +511,10 @@ describe('stepCopyReviewFile: DOCX package integrity mode wired end-to-end', () 
     zip.file('word/document.xml', '<w:document xmlns:w="ns"><w:body><w:p/></w:body></w:document>');
     zip.file('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>');
     zip.file('word/_rels/document.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>');
-    zip.file('docProps/core.xml', '<cp:coreProperties/>');
+    zip.file('docProps/core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>source</dc:title><cp:lastModifiedBy>Un-named</cp:lastModifiedBy><cp:revision>1</cp:revision><dcterms:modified xsi:type="dcterms:W3CDTF">2026-09-25T03:32:30Z</dcterms:modified></cp:coreProperties>');
     const sourceDocx = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
     const promotedZip = await JSZip.loadAsync(sourceDocx);
-    promotedZip.file('docProps/core.xml', '<cp:coreProperties>rewritten</cp:coreProperties>');
+    promotedZip.file('docProps/core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>rewritten by SharePoint promotion, longer than the source docProps/core.xml part</dc:title><cp:lastModifiedBy>Un-named</cp:lastModifiedBy><cp:revision>1</cp:revision><dcterms:modified xsi:type="dcterms:W3CDTF">2026-09-25T03:32:30Z</dcterms:modified></cp:coreProperties>');
     const promotedDocx = await promotedZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
     const docxFile = {
