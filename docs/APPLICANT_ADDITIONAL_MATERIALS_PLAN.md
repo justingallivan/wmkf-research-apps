@@ -788,7 +788,7 @@ in that rehearsal or during release verification. Production auth-provider and
 unauthenticated route checks passed. Staff confirmed on 2026-09-24 that the
 production Meeting Tracker opens. No production email send was tested.
 
-### 16.13 2026-09-25: Staff Deliberations materials card and interim folder read [SOURCE-BUILT on `claude/ui-work`; NOT DEPLOYED]
+### 16.13 2026-09-25: Staff Deliberations materials card and interim folder read [PRODUCTION-LIVE via PR #338]
 
 The upload portal is still in testing this cycle, so staff are placing applicants' slides and
 participant bios in the request's `Site Visit - Slides` and `Site Visit - Participant Bios`
@@ -820,3 +820,9 @@ them in the Workbench without opening AkoyaGo.
   rows are unaffected because they come from the folder read.
 - **Retire when** the portal is the only intake route. The card's status line and the registry
   can then carry the links, and this route can go. A retirement needs its own caller check.
+
+PR #338 merged as `98cc433add79f2f3d8a637d7be17db9ec6a2630e` on 2026-09-26 UTC (2026-09-25 PT).
+Production deployment `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` reached Ready and serves
+`applications.wmkeck.org`. The owner confirmed on Request 1002903 in local dev (production reads) that
+both rows link the hand-placed files. An unauthenticated production call to the route redirects to sign-in,
+the same as the sibling Workbench routes.
