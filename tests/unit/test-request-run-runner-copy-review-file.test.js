@@ -9,6 +9,7 @@ import { jest } from '@jest/globals';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { sha256, MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { REVIEW_FILE_COPY_POLICY } from '../../lib/services/test-requests/review-file-copy.js';
+import { assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -18,8 +19,19 @@ const APP_USER_ID = '55555555-5555-4555-8555-555555555555';
 const ORG_ID = '66666666-6666-4666-8666-666666666666';
 const SOURCE_PERSON_A = '77777777-7777-4777-8777-777777777771';
 const DEST_SUGGESTION_A = '99999999-9999-4999-8999-999999999991';
+const DEST_PERSON_A = '88888888-8888-4888-8888-888888888881';
 const SITE = { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' };
 const TARGET = { ...SITE, registered: true };
+// Grammar-conformant Graph identities (run-ledger.js's GRAPH_DRIVE_ID/GRAPH_SITE_ID/
+// GRAPH_ITEM_ID): the fake ledger below runs every plannedIdentity/readback
+// through the REAL assertLedgerReceipt, so these must be shape-valid, not
+// just distinct strings.
+const EXPECTED_DRIVE_ID = 'b!driveIdSample1234567890';
+const EXPECTED_SITE_ID = 'contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222';
+const SOURCE_ITEM_ID = `01${'A'.repeat(32)}`;
+const DEST_ITEM_ID = `01${'B'.repeat(32)}`;
+const DOCX_SOURCE_ITEM_ID = `01${'C'.repeat(32)}`;
+const DOCX_DEST_ITEM_ID = `01${'D'.repeat(32)}`;
 
 const NARRATIVE = Buffer.from('review file bytes');
 const hash = (buffer) => crypto.createHash('sha256').update(buffer).digest('hex');
@@ -47,8 +59,8 @@ function baseRun(overrides = {}) {
     destinationLocationId: LOCATION_ID,
     expectedAppUserId: APP_USER_ID,
     expectedOrganizationId: ORG_ID,
-    expectedGraphSiteId: 'site-1',
-    expectedGraphDriveId: 'drive-1',
+    expectedGraphSiteId: EXPECTED_SITE_ID,
+    expectedGraphDriveId: EXPECTED_DRIVE_ID,
     destinationRequestNumber: null,
     meetingDate: '2026-12-01',
     ...overrides,
@@ -91,7 +103,7 @@ function bundleWithOneReviewer({ reviewForm = 'uploaded', files } = {}) {
         files: files ?? (reviewForm === 'uploaded' ? [{
           id: 'source-suggestion-1:item-1', kind: 'reviewerUpload', library: 'akoya_request',
           folder: 'source-request/Reviewer_Uploads/reviewer_abcd1234/attempt_11111111111111111111111111111111',
-          name: 'MyReview.pdf', driveId: 'stale-drive', graphItemId: 'item-1', sharePointSite: SITE,
+          name: 'MyReview.pdf', driveId: 'stale-drive', graphItemId: SOURCE_ITEM_ID, sharePointSite: SITE,
           size: NARRATIVE.length, mimeType: 'application/pdf', eTag: '"src-1"', versionId: '1.0',
           contentHash: hash(NARRATIVE), suggestionId: 'source-suggestion-1',
         }] : []),
@@ -136,12 +148,19 @@ function createFakeLedger(initialRun, { assignments = [], preseed = [] } = {}) {
       return { ...run };
     },
     async journalPlannedResource({ step, resourceKind, system, plannedIdentity }) {
+      // Pin the REAL receipt allowlist (run-ledger.js assertLedgerReceipt) --
+      // the same validation the live Postgres ledger applies before any
+      // CHECK constraint ever runs. A fake ledger that skips this can hide
+      // an unallowlisted key (as `primaryFilename` was, pre-Stage-C-fix)
+      // indefinitely.
+      assertLedgerReceipt(plannedIdentity, 'plannedIdentity');
       const resource = { resourceId: nextResourceId++, sequence: nextSequence++, step, resourceKind, system, plannedIdentity, readback: null, outcome: 'planned' };
       resources.push(resource);
       calls.push({ op: 'journalPlannedResource', step, resourceKind, plannedIdentity });
       return { ...resource };
     },
     async recordResourceReadback({ resourceId, responseStatus, readback, outcome }) {
+      assertLedgerReceipt(readback, 'readback');
       const resource = resources.find((row) => row.resourceId === resourceId);
       resource.readback = { ...(resource.readback || {}), ...(readback || {}) };
       resource.outcome = outcome;
@@ -172,7 +191,7 @@ function createFakeLedger(initialRun, { assignments = [], preseed = [] } = {}) {
 async function preseedSuggestion(ledger) {
   const resource = await ledger.journalPlannedResource({
     step: 'seed_reviewers', resourceKind: 'dataverse_reviewer_suggestion', system: 'dataverse',
-    plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, destinationPersonId: 'dest-person-1' },
+    plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, destinationPersonId: DEST_PERSON_A },
   });
   await ledger.recordResourceReadback({ resourceId: resource.resourceId, readback: { suggestionId: DEST_SUGGESTION_A }, outcome: 'verified' });
 }
@@ -211,15 +230,15 @@ function fakeGraph({ uploadedBytesOverride } = {}) {
   return {
     clearGraphCaches: jest.fn(),
     configuredSharePointTarget: jest.fn(() => TARGET),
-    getSiteId: jest.fn(async () => 'site-1'),
-    getDriveId: jest.fn(async () => 'drive-1'),
+    getSiteId: jest.fn(async () => EXPECTED_SITE_ID),
+    getDriveId: jest.fn(async () => EXPECTED_DRIVE_ID),
     getFileMetadataById: jest.fn(async (driveId, itemId) => {
-      if (itemId === 'item-1') return { id: 'item-1', name: 'MyReview.pdf', size: NARRATIVE.length, mimeType: 'application/pdf', eTag: '"src-1"', versionId: '1.0' };
+      if (itemId === SOURCE_ITEM_ID) return { id: SOURCE_ITEM_ID, name: 'MyReview.pdf', size: NARRATIVE.length, mimeType: 'application/pdf', eTag: '"src-1"', versionId: '1.0' };
       for (const item of destination.values()) if (item.id === itemId) return item;
       return null;
     }),
     downloadFile: jest.fn(async (driveId, itemId) => {
-      if (itemId === 'item-1') return { buffer: NARRATIVE };
+      if (itemId === SOURCE_ITEM_ID) return { buffer: NARRATIVE };
       for (const item of destination.values()) if (item.id === itemId) return { buffer: item.buffer };
       throw new Error('missing');
     }),
@@ -227,7 +246,7 @@ function fakeGraph({ uploadedBytesOverride } = {}) {
     ensureFolderPath: jest.fn(async (library, folder) => ({ id: `folder:${folder}` })),
     uploadFile: jest.fn(async (library, folder, filename, buffer, mimeType, options) => {
       const bytes = uploadedBytesOverride ?? buffer;
-      const item = { id: 'new-review-1', name: filename, size: bytes.length, mimeType, eTag: '"new"', versionId: '1.0', buffer: bytes };
+      const item = { id: DEST_ITEM_ID, name: filename, size: bytes.length, mimeType, eTag: '"new"', versionId: '1.0', buffer: bytes };
       destination.set(`${folder}/${filename}`, item);
       if (options?.onItemCreated) await options.onItemCreated({ id: item.id, name: filename, size: bytes.length, eTag: item.eTag });
       return { id: item.id, name: filename, size: bytes.length, eTag: item.eTag, versionId: '1.0' };
@@ -244,7 +263,7 @@ describe('stepCopyReviewFile', () => {
   it('a bundle with zero uploaded reviews advances immediately with no journal', async () => {
     const bundle = bundleWithOneReviewer({ reviewForm: 'unreceived' });
     const { run, manifest } = runAndManifestFor(bundle);
-    const { ledger, calls } = createFakeLedger(run, { assignments: [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: 'dest-person-1', reused: false, addressSha256: 'a'.repeat(64) }] });
+    const { ledger, calls } = createFakeLedger(run, { assignments: [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }] });
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
       deps: { client: preflightClient(), graph: fakeGraph(), sharePointTarget },
@@ -257,7 +276,7 @@ describe('stepCopyReviewFile', () => {
   it('copies the one uploaded file, journals the folder resource with the primary filename, and advances', async () => {
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: 'dest-person-1', reused: false, addressSha256: 'a'.repeat(64), address: 'throwaway@example.test' }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64), address: 'throwaway@example.test' }];
     const { ledger, calls } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
 
@@ -280,7 +299,7 @@ describe('stepCopyReviewFile', () => {
   it('a review with no seeded suggestion refuses reviewer_answers_ambiguous', async () => {
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: 'dest-person-1', reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
     const { ledger } = createFakeLedger(run, { assignments });
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
@@ -293,7 +312,7 @@ describe('stepCopyReviewFile', () => {
   it('resumes with the SAME attempt id recovered from the journaled folder resource, never a fresh one', async () => {
     const bundle = bundleWithOneReviewer();
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: 'dest-person-1', reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
     const { ledger } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
     // Pre-seed a folder resource as if a prior call already picked an
@@ -319,13 +338,13 @@ describe('stepCopyReviewFile', () => {
   it('refuses the whole run before any journal when the bundle exceeds the total-bytes ceiling', async () => {
     const bigFile = {
       id: 'source-suggestion-1:item-1', kind: 'reviewerUpload', library: 'akoya_request',
-      folder: 'x', name: 'MyReview.pdf', driveId: 'stale-drive', graphItemId: 'item-1', sharePointSite: SITE,
+      folder: 'x', name: 'MyReview.pdf', driveId: 'stale-drive', graphItemId: SOURCE_ITEM_ID, sharePointSite: SITE,
       size: REVIEW_FILE_COPY_POLICY.maxTotalBytes + 1, mimeType: 'application/pdf', eTag: '"src-1"', versionId: '1.0',
       contentHash: hash(NARRATIVE), suggestionId: 'source-suggestion-1',
     };
     const bundle = bundleWithOneReviewer({ files: [bigFile] });
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: 'dest-person-1', reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
     const { ledger, calls } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
     const result = await advanceRun({
@@ -360,24 +379,24 @@ describe('stepCopyReviewFile: DOCX package integrity mode wired end-to-end', () 
     const docxFile = {
       id: 'source-suggestion-1:item-docx', kind: 'reviewerUpload', library: 'akoya_request',
       folder: 'source-request/Reviewer_Uploads/reviewer_abcd1234/attempt_11111111111111111111111111111111',
-      name: 'MyReview.docx', driveId: 'stale-drive', graphItemId: 'item-docx', sharePointSite: SITE,
+      name: 'MyReview.docx', driveId: 'stale-drive', graphItemId: DOCX_SOURCE_ITEM_ID, sharePointSite: SITE,
       size: sourceDocx.length, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       eTag: '"src-docx"', versionId: '1.0', contentHash: hash(sourceDocx), suggestionId: 'source-suggestion-1',
     };
     const bundle = bundleWithOneReviewer({ files: [docxFile] });
     const { run, manifest } = runAndManifestFor(bundle);
-    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: 'dest-person-1', reused: false, addressSha256: 'a'.repeat(64) }];
+    const assignments = [{ sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64) }];
     const { ledger } = createFakeLedger(run, { assignments });
     await preseedSuggestion(ledger);
 
     const graph = fakeGraph({ uploadedBytesOverride: promotedDocx });
     graph.getFileMetadataById = jest.fn(async (driveId, itemId) => {
-      if (itemId === 'item-docx') return { id: 'item-docx', name: 'MyReview.docx', size: sourceDocx.length, mimeType: docxFile.mimeType, eTag: '"src-docx"', versionId: '1.0' };
+      if (itemId === DOCX_SOURCE_ITEM_ID) return { id: DOCX_SOURCE_ITEM_ID, name: 'MyReview.docx', size: sourceDocx.length, mimeType: docxFile.mimeType, eTag: '"src-docx"', versionId: '1.0' };
       for (const item of graph.destination.values()) if (item.id === itemId) return item;
       return null;
     });
     graph.downloadFile = jest.fn(async (driveId, itemId) => {
-      if (itemId === 'item-docx') return { buffer: sourceDocx };
+      if (itemId === DOCX_SOURCE_ITEM_ID) return { buffer: sourceDocx };
       for (const item of graph.destination.values()) if (item.id === itemId) return { buffer: item.buffer };
       throw new Error('missing');
     });

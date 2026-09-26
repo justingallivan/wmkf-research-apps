@@ -29,6 +29,7 @@ const { advanceRun } = require('../../lib/services/test-requests/run-runner.js')
 const { MANIFEST_V4, sha256 } = require('../../lib/services/test-requests/basic-clone-steps.js');
 const { createReviewsSandboxDeps } = require('../../lib/services/test-requests/reviews-sandbox-deps.js');
 const { buildCompletionWrite } = require('../../lib/services/reviewer-engagement/seed-synthetic-review.js');
+const { assertLedgerReceipt } = require('../../lib/services/test-requests/run-ledger.js');
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -172,12 +173,14 @@ function createFakeLedger(initialRun, { assignments = [] } = {}) {
       return { ...run };
     },
     async journalPlannedResource({ step, resourceKind, system, plannedIdentity }) {
+      assertLedgerReceipt(plannedIdentity, 'plannedIdentity');
       const resource = { resourceId: nextResourceId++, sequence: nextSequence++, step, resourceKind, system, plannedIdentity, readback: null, outcome: 'planned' };
       resources.push(resource);
       calls.push({ op: 'journalPlannedResource', step, resourceKind, plannedIdentity });
       return { ...resource };
     },
     async recordResourceReadback({ resourceId, responseStatus, readback, outcome }) {
+      assertLedgerReceipt(readback, 'readback');
       const resource = resources.find((row) => row.resourceId === resourceId);
       resource.readback = { ...(resource.readback || {}), ...(readback || {}) };
       resource.outcome = outcome;
