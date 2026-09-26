@@ -406,6 +406,24 @@ describe('end-to-end through exportTestRequestSourceBundle', () => {
     expect(downloadFile).toHaveBeenCalledTimes(1);
   });
 
+  test('the primary file (matching wmkf_reviewfilename) is ordered first, regardless of the folder listing order', async () => {
+    const secondaryFile = { id: '01SECONDARY', name: 'appendix.pdf', mimeType: 'application/pdf', eTag: '"{SEC},1"', versionId: '1.0', buffer: Buffer.from('secondary bytes') };
+    // The folder listing returns the secondary file BEFORE the primary one --
+    // graph.listFiles carries no ordering guarantee.
+    const graph = makeFakeGraph({ files: [secondaryFile, REVIEW_FILE] });
+    const client = makeFakeClient({
+      suggestionListRows: [{ wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_potentialreviewer_value: PERSON_ID }],
+      suggestionRow: baseSuggestionRow({ wmkf_reviewfilename: 'review.pdf' }),
+      personRow: basePersonRow(),
+      answerRows: [baseAnswerRow()],
+    });
+    const deps = createReviewerSourceDependencies({ client, graph, markerColumnPresent: false });
+    const hydrated = await deps.hydrateReviewer(ENTRY);
+    expect(hydrated.files).toHaveLength(2);
+    expect(hydrated.files[0].name).toBe('review.pdf');
+    expect(hydrated.files[1].name).toBe('appendix.pdf');
+  });
+
   test('a request with zero suggestions still gets a v3 bundle with an EMPTY reviewers array', async () => {
     const client = makeFakeClient({ suggestionListRows: [] });
     const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
