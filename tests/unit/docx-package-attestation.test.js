@@ -515,6 +515,12 @@ describe('attestDocxPackageAgainstSource', () => {
       await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(pattern);
     });
 
+    it.each(['docProps/core.xml', 'docProps/custom.xml'])('a baseline %s deleted from the destination is refused (Codex final re-review)', async (part) => {
+      const withCustom = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('docProps/custom.xml', CUSTOM_OK); });
+      const mutated = await withParts(withCustom, async (zip) => { zip.remove(part); });
+      await expect(attestDocxPackageAgainstSource(mutated, withCustom)).rejects.toThrow(new RegExp(`part ${part.replace('.', '\\.')} is missing`));
+    });
+
     const utf16 = (text) => Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
     it('a byte-identical package whose rels and content-types parts are UTF-16 with a BOM is accepted', async () => {
       const utf16Package = await withParts(sourceWithOwnCustomXml, async (zip) => {
