@@ -16,6 +16,7 @@
  */
 
 import crypto from 'node:crypto';
+import JSZip from 'jszip';
 import { jest } from '@jest/globals';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
 import { ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
@@ -292,7 +293,7 @@ async function docxBytes() {
 const iaId = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const snapId = '01BCDEFGHIJKLMNOPQRSTUVWXYZ234567A';
 
-function fakeGraph({ includeReview = false, overrides = {} } = {}) {
+function fakeGraph({ includeReview = false, docxReview = null, overrides = {} } = {}) {
   return {
     getSiteId: jest.fn(async () => EXPECTED_SITE_ID),
     getDriveId: jest.fn(async () => EXPECTED_DRIVE_ID),
@@ -301,12 +302,19 @@ function fakeGraph({ includeReview = false, overrides = {} } = {}) {
       { id: iaId, name: 'ia.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment`, size: cachedDocxBytes ? cachedDocxBytes.length : 0 },
       { id: snapId, name: 'snap.docx', folder: `${REQUEST_FOLDER}/Artifacts/Initial Assessment/Board Milestones`, size: cachedDocxBytes ? cachedDocxBytes.length : 0 },
       ...(includeReview ? [{ id: REVIEW_ITEM_ID, name: 'Review_1.pdf', folder: REVIEW_FULL_FOLDER, size: REVIEW_FILE_BYTES.length }] : []),
+      // P1-1 regression test fixture: the LISTED size is the SharePoint-
+      // promoted (destination) size, deliberately different from the
+      // source's size -- proving the census compares against the
+      // journaled `itemSize`, never the source's `size`.
+      ...(docxReview ? [{ id: docxReview.destItemId, name: 'Review_1.docx', folder: REVIEW_FULL_FOLDER, size: docxReview.destBuffer.length }] : []),
     ]),
     getFileMetadataById: jest.fn(async (driveId, itemId) => {
       if (itemId === iaId) return { driveId: EXPECTED_DRIVE_ID, id: iaId, name: 'ia.docx', size: cachedDocxBytes.length, eTag: '"ia-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/ia' };
       if (itemId === snapId) return { driveId: EXPECTED_DRIVE_ID, id: snapId, name: 'snap.docx', size: cachedDocxBytes.length, eTag: '"snap-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/snap' };
       if (itemId === BASIC_ITEM_ID) return { driveId: EXPECTED_DRIVE_ID, id: BASIC_ITEM_ID, name: BASIC_FILENAME, size: BASIC_FILE_BYTES.length, eTag: '"basic-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/basic' };
       if (includeReview && itemId === REVIEW_ITEM_ID) return { driveId: EXPECTED_DRIVE_ID, id: REVIEW_ITEM_ID, name: 'Review_1.pdf', size: REVIEW_FILE_BYTES.length, eTag: '"review-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/review' };
+      if (docxReview && itemId === docxReview.destItemId) return { driveId: EXPECTED_DRIVE_ID, id: docxReview.destItemId, name: 'Review_1.docx', size: docxReview.destBuffer.length, eTag: '"review-docx-1"', versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/review-docx' };
+      if (docxReview && itemId === docxReview.sourceItemId) return { driveId: docxReview.sourceDriveId, id: docxReview.sourceItemId, name: 'MyReview.docx', size: docxReview.sourceBuffer.length, eTag: docxReview.sourceETag, versionId: '1.0', lastModified: '2026-09-24T00:00:00Z', webUrl: 'https://x/review-docx-source' };
       return null;
     }),
     downloadFile: jest.fn(async (driveId, itemId) => {
@@ -314,6 +322,8 @@ function fakeGraph({ includeReview = false, overrides = {} } = {}) {
       if (itemId === snapId) return { buffer: cachedDocxBytes };
       if (itemId === BASIC_ITEM_ID) return { buffer: BASIC_FILE_BYTES };
       if (includeReview && itemId === REVIEW_ITEM_ID) return { buffer: REVIEW_FILE_BYTES };
+      if (docxReview && itemId === docxReview.destItemId) return { buffer: docxReview.destBuffer };
+      if (docxReview && itemId === docxReview.sourceItemId) return { buffer: docxReview.sourceBuffer };
       return null;
     }),
     ...overrides,
@@ -450,6 +460,56 @@ function reviewFileResource() {
   };
 }
 
+const DOCX_SOURCE_ITEM_ID = `01${'E'.repeat(32)}`;
+const DOCX_DEST_ITEM_ID = `01${'F'.repeat(32)}`;
+
+/**
+ * Build a minimal real DOCX and a SharePoint-"promoted" copy for the P1-1
+ * DOCX-through-verifier regression. Mirrors the exact tolerated mutation
+ * used by test-request-run-runner-copy-review-file.test.js's DOCX
+ * end-to-end test (metadata-part rewrite only, via `attestDocxPackageAgainstSource`'s
+ * METADATA_PARTS allowance for docProps/core.xml) so this fixture is known
+ * to pass attestation and isolates the itemSize census bug.
+ */
+async function buildDocxReviewFixture() {
+  const zip = new JSZip();
+  zip.file('word/document.xml', '<w:document xmlns:w="ns"><w:body><w:p/></w:body></w:document>');
+  zip.file('[Content_Types].xml', '<Types xmlns="ns"></Types>');
+  zip.file('word/_rels/document.xml.rels', '<Relationships xmlns="ns"></Relationships>');
+  zip.file('docProps/core.xml', '<cp:coreProperties/>');
+  const sourceDocx = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  const promotedZip = await JSZip.loadAsync(sourceDocx);
+  promotedZip.file('docProps/core.xml', '<cp:coreProperties>rewritten by SharePoint promotion, longer than the source docProps/core.xml part</cp:coreProperties>');
+  const destDocx = await promotedZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  return { sourceDocx, destDocx };
+}
+
+function reviewFolderResourceDocx() {
+  return {
+    resourceId: 8, sequence: 8, step: 'copy_review_file', resourceKind: 'sharepoint_folder', system: 'sharepoint',
+    plannedIdentity: { assignmentSequence: 1, folder: REVIEW_RELATIVE_FOLDER },
+    readback: { filename: 'Review_1.docx' }, outcome: 'verified',
+  };
+}
+function reviewFileResourceDocx({ sourceDocx, destDocx }) {
+  return {
+    resourceId: 9, sequence: 9, step: 'copy_review_file', resourceKind: 'sharepoint_file', system: 'sharepoint',
+    plannedIdentity: { assignmentSequence: 1, index: 0, filename: 'Review_1.docx' },
+    readback: {
+      index: 0, filename: 'Review_1.docx', folder: REVIEW_FULL_FOLDER, library: 'akoya_request',
+      // `size` is the SOURCE's pre-copy size (never equal to the
+      // destination's post-promotion size); `itemSize` is the destination's
+      // own post-write size (P1-1) -- the census must use the latter.
+      size: sourceDocx.length, itemSize: destDocx.length, contentHash: crypto.createHash('sha256').update(sourceDocx).digest('hex'),
+      driveId: EXPECTED_DRIVE_ID, itemId: DOCX_DEST_ITEM_ID, eTag: '"review-docx-1"', versionId: '1.0',
+      sourceDriveId: EXPECTED_DRIVE_ID, sourceGraphItemId: DOCX_SOURCE_ITEM_ID, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      eTagBefore: '"source-docx-1"', sourceVersionId: '1.0',
+      attestedDigest: crypto.createHash('sha256').update(destDocx).digest('hex'),
+    },
+    outcome: 'verified',
+  };
+}
+
 const ASSIGNMENT = { sequence: 1, sourcePersonId: SOURCE_PERSON_A, destinationPersonId: DEST_PERSON_A, reused: false, addressSha256: 'a'.repeat(64), address: 'throwaway@example.test' };
 
 function iaRow(overrides = {}) {
@@ -578,6 +638,38 @@ describe('stepVerifyReviews', () => {
         reviewFolderResource(), reviewFileResource(),
       ],
       deps: { graph: fakeGraph({ includeReview: true }) },
+    });
+    expect(result.outcome).toBe('ready');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  it('happy path (uploaded, one DOCX file, SharePoint-promoted size): reaches markReady with the correct post-promotion census (P1-1 regression)', async () => {
+    const { sourceDocx, destDocx } = await buildDocxReviewFixture();
+    const bundle = buildBundle({ reviewForm: 'uploaded', includeFiles: true, answers: [] });
+    const bundleReviewer = bundle.reviewers[0];
+    const pointers = { folder: REVIEW_FULL_FOLDER, filename: 'Review_1.docx' };
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { pointers, overrides: { wmkf_reviewuploadedbystaff: false } }),
+      answers: [],
+    });
+    const docxReview = {
+      destItemId: DOCX_DEST_ITEM_ID, destBuffer: destDocx,
+      sourceItemId: DOCX_SOURCE_ITEM_ID, sourceBuffer: sourceDocx, sourceDriveId: EXPECTED_DRIVE_ID, sourceETag: '"source-docx-1"',
+    };
+    const { result, calls } = await runStep({
+      bundle,
+      resources: [
+        baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(),
+        personResource(), suggestionResource(),
+        {
+          resourceId: 7, sequence: 7, step: 'seed_review_answers', resourceKind: 'dataverse_review_answer_set', system: 'dataverse',
+          plannedIdentity: { assignmentSequence: 1, suggestionId: DEST_SUGGESTION_A, reviewForm: 'uploaded', answerCount: 0 },
+          readback: { suggestionId: DEST_SUGGESTION_A, eTagAfter: 'W/"2"', answerCount: 0 }, outcome: 'verified',
+        },
+        reviewFolderResourceDocx(), reviewFileResourceDocx({ sourceDocx, destDocx }),
+      ],
+      deps: { graph: fakeGraph({ docxReview }) },
     });
     expect(result.outcome).toBe('ready');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
