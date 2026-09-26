@@ -719,6 +719,30 @@ describe('stepVerifyReviews', () => {
     expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
   });
 
+  it('mutation (P2-3, Opus round 1): a non-null wmkf_externaltokenhash fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { overrides: { wmkf_externaltokenhash: 'a'.repeat(64) } }),
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  it('mutation (P2-3, Opus round 1): a non-null _wmkf_honorariumrequest_value fails reviews_verification_failed', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({
+      person: personRow(bundleReviewer),
+      suggestion: suggestionRowFor(bundleReviewer, { overrides: { _wmkf_honorariumrequest_value: 'f'.repeat(8) + '-1111-1111-1111-' + 'f'.repeat(12) } }),
+    });
+    const { result } = await runStep({ bundle, resources: happyResources() });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
   it('mutation: a mismatched person name (missing TEST prefix) fails reviews_verification_failed', async () => {
     const bundle = buildBundle({ reviewForm: 'received_no_file' });
     const bundleReviewer = bundle.reviewers[0];
