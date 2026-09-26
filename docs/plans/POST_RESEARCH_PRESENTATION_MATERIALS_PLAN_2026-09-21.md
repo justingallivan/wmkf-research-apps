@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow and shared schema are built, migration 055 is live and empty in shared Neon, branch-scoped Preview activation is in progress, the code-owned 10 MiB policy is accepted, and Graph-confirmed expiry plus Safari media/long-seek gates remain."
+summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow and shared schema are built, migration 055 is live in shared Neon, bounded branch Preview is active with one materials link, the code-owned 10 MiB policy is accepted, and Graph-confirmed expiry plus Safari media/long-seek gates remain."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -409,15 +409,16 @@ transport dependency and must not revoke or stale a briefing send.
 
 ### 5.5 Durable large-upload intents
 
-**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; SHARED SCHEMA LIVE/EMPTY
-2026-09-26; BRANCH PREVIEW ACTIVATION IN PROGRESS.]** The
+**[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25 on `codex/feature-request`; SHARED SCHEMA LIVE
+2026-09-26; BOUNDED BRANCH PREVIEW ACTIVE.]** The
 retired Preview proof created no application table. The durable production producer creates the
 intent below before any Graph upload-session URL leaves the server. Under explicit owner approval,
 migration 055 is now tracked in the shared Preview/Production Neon database; exact readback found
 the empty presentation tables and expected constraints. Wave 30 remains sandbox-only. Only this
-branch's Preview configuration is schema-ready and limited to the approved sandbox Request;
-Production runtime configuration and destructive cleanup remain off, so this is not a released
-capability.
+branch's Preview configuration is schema-ready and limited to the approved sandbox Request; the
+registered-alias deployment is verified and one materials link is live for that Request.
+Production runtime configuration and destructive cleanup remain off, so this is not a generally
+released capability.
 
 Add `presentation_material_uploads` in the same migration. A row exists before any Graph upload
 URL leaves the server and carries:
@@ -1483,7 +1484,7 @@ deleted the exact committed item to the recycle bin or confirmed that the upload
 cancelled, gone, or expired with no exact item; uncertain transport retained the encrypted permit
 for retry.
 
-### Slice 1 — Additive schema and readiness — SHARED POSTGRES APPLIED 2026-09-26; SANDBOX WAVE APPLIED; PRODUCTION RUNTIME OFF
+### Slice 1 — Additive schema and readiness — SHARED POSTGRES APPLIED 2026-09-26; BOUNDED PREVIEW ACTIVE; PRODUCTION RUNTIME OFF
 
 **[VERIFIED via source, focused tests, preflight self-test, migration/fresh-install parity, and
 sandbox readback.]** Wave 30, migration 055/V56, readiness/access parsing, compatibility-gated
@@ -1491,8 +1492,8 @@ Request Document projection, Atlas, and runbook updates are built on `codex/feat
 Wave 30 was applied to sandbox Dataverse and both fields were read back with their exact types.
 Under explicit owner authorization, migration 055 was later applied by the canonical runner to the
 shared Preview/Production Neon database and exact readback found all three presentation tables
-empty. Branch-scoped Preview readiness/access activation is in progress; Production runtime
-configuration and general producer enablement remain off.
+empty. Branch-scoped Preview readiness/access is active for the approved sandbox Request;
+Production runtime configuration and general producer enablement remain off.
 
 - Dataverse wave adds `wmkf_ExternalUrl` and `wmkf_SlotVersion` to Request Document plus exact
   preflight.
@@ -1877,8 +1878,8 @@ Release order:
    leading resolver and the one-shot URL as the bounded fallback. The deferred Production Safari media
    and long-seek cells remain in the Slice 0 matrix but block general release after
    the production-safe flow exists, not coding of that flow. **[SOURCE-BUILT/OFFLINE-TESTED
-   2026-09-25]** that durable MP4 flow now exists on `codex/feature-request`, but has not been
-   deployed, migrated, enabled, or live-tested;
+   2026-09-25]** that durable MP4 flow now exists on `codex/feature-request`; as of 2026-09-26 its
+   shared schema and bounded registered-alias Preview are active, while no new upload was run;
 2. **SOURCE COMPLETE/OFFLINE-TESTED:** remove the proof harness and merge the compatibility floor: deploy-safe readers,
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
@@ -1886,8 +1887,8 @@ Release order:
 3. **COMPLETE 2026-09-26:** Wave 30 is applied/read back in sandbox Dataverse, and owner-approved
    migrations 054/055 are tracked in the shared Neon database with exact empty-schema readback and
    a canonical-runner idempotence pass;
-4. **IN PROGRESS:** deploy the compatible producer runtime through the Git-linked Preview path.
-   Branch-scoped `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and
+4. **BOUNDED PREVIEW ACTIVE 2026-09-26:** the compatible producer/consumer runtime is on the
+   registered Preview alias. Branch-scoped `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and
    `POST_PRESENTATION_MATERIALS_ACCESS=test:<approved request GUID>` are set for the bounded Preview
    acceptance with a file over 50 MB, including reload/resume, a live upload-session expiry and
    recovery through the durable producer's authenticated resume route, and separate short-lived
@@ -2220,5 +2221,12 @@ the temporary Preview alias, but a signed-in Chrome check showed Meeting Tracker
 demonstrating that this direct source deployment did not inherit branch-scoped variables. It
 failed closed without a Request, Postgres, Dataverse, or SharePoint mutation. The corrective step
 is a Git-linked deployment from this branch, followed by exact deployment/alias/readiness
-attestation. No upload, deletion, Production deployment, or Production runtime configuration
-change is authorized by this receipt.
+attestation. The first alias POST then exposed a CSRF-origin mismatch: the server allowed the
+immutable deployment origin while the browser used the registered alias. No link row was created.
+Branch-only Preview `NEXTAUTH_URL` was pinned to the exact registered alias, the same Git commit
+was redeployed as `dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr`, and the alias was moved and re-inspected.
+Signed-in Chrome loaded Request `1000334`, displayed the retained slot-version-3 recording, and
+issued link row `c7cc8602-59c5-43d1-b703-e5dec26d0eba`. Readback found that one row live/non-revoked
+and the upload/lease tables empty. The URL was copied locally for the owner's macOS Safari
+Watch/long-seek/Download test; it is not recorded here. No upload, deletion, email/recipient
+action, Production deployment, or Production runtime configuration change occurred.

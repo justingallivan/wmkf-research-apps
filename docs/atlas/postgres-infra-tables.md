@@ -585,7 +585,7 @@ reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
 
-### Post-presentation material ledgers — SHARED-SCHEMA LIVE/EMPTY; BRANCH PREVIEW ACTIVATION IN PROGRESS
+### Post-presentation material ledgers — SHARED-SCHEMA LIVE; BOUNDED BRANCH PREVIEW ACTIVE
 
 **[VERIFIED via source, canonical migration runner, and shared-Neon readback 2026-09-26 on
 `codex/feature-request`.]** Migration
@@ -595,9 +595,10 @@ authorization, the canonical runner applied 055 to the shared Preview/Production
 at 2026-09-26T06:54:20Z. Exact readback found all three tables, all four named indexes, the
 expected constraints, and zero rows; a second runner invocation was an idempotent no-op. Only
 `codex/feature-request` Preview configuration is schema-ready and limited to approved sandbox
-Request `4236c2b3-b053-f111-bec7-6045bd015cb0`; Production runtime configuration remains unchanged
-and destructive cleanup remains off. A usable Git-linked Preview deployment is still being
-verified. Slice 3's
+Request `4236c2b3-b053-f111-bec7-6045bd015cb0`; corrected registered-alias deployment
+`dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr` is Ready and passed signed-in Chrome readiness/link issuance.
+Exact readback found one live link row for the approved Request and zero upload/lease rows.
+Production runtime configuration remains unchanged and destructive cleanup remains off. Slice 3's
 transcript producer, Slice 4's browser-direct MP4 intent/status/finalize routes, and Slice 5's
 independent 60-day link lifecycle plus token-verified materials-only consumer are source-built
 and offline-tested only on `codex/feature-request`.

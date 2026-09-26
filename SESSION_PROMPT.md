@@ -1,4 +1,4 @@
-# Session 550 Prompt: Shared schema applied; Git-linked Preview activation in progress (branch-local)
+# Session 550 Prompt: Shared schema applied; bounded Preview Safari gate ready (branch-local)
 
 ## Authorized rollout progress — 2026-09-25/26 PT
 
@@ -19,7 +19,7 @@ Dataverse, the approved SharePoint site, both Dataverse safety controls, and Mee
 readiness remain correctly configured. Production runtime configuration/deployment was not
 changed.
 
-**[PARTIAL deployment result; fail-closed]** Direct CLI Preview deployment
+**[HISTORICAL PARTIAL deployment result; fail-closed]** Direct CLI Preview deployment
 `dpl_LT4y71456H53U91sNnG5vm2zi5NB` is Ready from branch commit
 `ffd9b79e8fbe448da9d5ca26b328376bc1418460`, and the registered Preview alias was temporarily moved
 to it under the owner's exact approval. A signed-in Chrome check then showed “Meeting Tracker is
@@ -30,18 +30,40 @@ the Git integration so branch-scoped variables are present, verify readiness bef
 alias again, and restore exact prior Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` if
 that correction fails.
 
+**[VERIFIED via Git/Vercel metadata, protected HTTP smoke, signed-in Chrome, and exact shared-Neon
+readback]** Commit `e78eec9278d17d9630dd7c061854a97c7c710f21` was pushed only to
+`codex/feature-request`. The Git-triggered deployment proved branch-scoped presentation readiness
+was present, but its first alias POST exposed an origin mismatch: Preview's CSRF allowlist had
+derived the immutable deployment hostname while the registered browser origin was
+`https://wmkfresearchapps-preview.vercel.app`. No link row was created by that rejected request.
+The smallest configuration-only correction added branch-scoped Preview `NEXTAUTH_URL` for that
+exact registered alias and redeployed the same attested Git commit. Corrected deployment
+`dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr` is Ready, has Git source ref `codex/feature-request` and SHA
+`e78eec9278d17d9630dd7c061854a97c7c710f21`, and the alias was re-inspected after moving to it.
+A protected fake-token request reached the app and failed closed `401 malformed` with
+`private, no-store`, proving schema readiness was active.
+
+The existing signed-in Chrome session then loaded human-created sandbox Request `1000334`, showed
+retained slot-version-3 recording `1000334-Recording-99b13f1f-9d77-4468-92aa-f6bc05c0c691.mp4`,
+and successfully generated one materials-only link. Shared-Neon readback found exactly one live,
+non-revoked link row (`c7cc8602-59c5-43d1-b703-e5dec26d0eba`) for the approved Request, created
+2026-09-26T07:31:15Z and expiring 2026-11-25T07:31:15Z; upload and slot-lease tables remain empty.
+The token/ciphertext was not printed or added to tracked files. Chrome copied the URL to the local
+clipboard and was left on the exact Request page for the owner's Safari gate. No upload, deletion,
+email/recipient action, Production deployment, or Production runtime configuration change
+occurred.
+
 ## Immediate continuation
 
-- Reconcile the shared-schema facts in Atlas and the presentation plan, run the relevant
-  documentation/migration gates with self-tests sequentially, commit, and push only
-  `codex/feature-request`.
-- Attest the resulting Git-linked Preview deployment, smoke it, then move the temporary Preview
-  alias to that exact deployment and reload the signed-in Chrome Request page.
 - The bounded acceptance target is human-created sandbox Request `1000334` /
   `4236c2b3-b053-f111-bec7-6045bd015cb0` and its retained slot-version-3 recording. Do not upload
   or delete anything. Do not change or deploy Production runtime configuration.
-- Leave the alias on the verified feature deployment for the owner's Safari Watch, long-seek, and
-  Download-integrity test. Alias restoration is a later explicit cleanup step.
+- The materials-only URL is already on the local clipboard. The owner opens it in macOS Safari and
+  checks Watch, seeking beyond two minutes where the media duration permits, and Download
+  integrity. No new link, upload, or deletion is needed.
+- Leave the alias on corrected feature deployment `dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr` until the
+  owner completes that Safari test. Alias restoration to exact prior Factory deployment
+  `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` is a later explicit cleanup step.
 
 # Session 549 Prompt: Disabled-state Preview deployment and shared-DB stop (branch-local)
 
