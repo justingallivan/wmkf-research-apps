@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 import {
   REVIEW_FILE_COPY_POLICY, reviewFileCopyPolicyDigest, planReviewFileCopies, validateReviewFilePlan,
 } from '../../lib/services/test-requests/review-file-copy.js';
+import { SANDBOX_REHEARSAL_COPY_POLICY } from '../../lib/services/test-requests/bundle-file-copy.js';
+import { SHAREPOINT_CENSUS_DEFAULTS } from '../../lib/services/test-requests/basic-clone-steps.js';
 
 const hash = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const PDF_MIME = 'application/pdf';
@@ -33,10 +35,19 @@ const REVIEW = {
 };
 
 describe('REVIEW_FILE_COPY_POLICY', () => {
+  // Codex slice review round 2: a plan the reservation accepts must fit
+  // under the terminal census bound, or it can never verify.
+  it('reconciles maxReviewers with the terminal census capacity', () => {
+    const IA_FILES = 2; // Initial Assessment DOCX + Board snapshot
+    const largestPlan = REVIEW_FILE_COPY_POLICY.maxReviewers * REVIEW_FILE_COPY_POLICY.maxFilesPerReview
+      + SANDBOX_REHEARSAL_COPY_POLICY.maxFiles + IA_FILES;
+    expect(largestPlan).toBeLessThanOrEqual(SHAREPOINT_CENSUS_DEFAULTS.maxFiles);
+  });
+
   it('binds every extension to exactly one MIME type and states a defensible total', () => {
     expect(REVIEW_FILE_COPY_POLICY.extensionMimeTypes).toEqual({ pdf: PDF_MIME, docx: DOCX_MIME, doc: DOC_MIME });
     expect(REVIEW_FILE_COPY_POLICY.maxFilesPerReview).toBe(5);
-    expect(REVIEW_FILE_COPY_POLICY.maxReviewers).toBe(100);
+    expect(REVIEW_FILE_COPY_POLICY.maxReviewers).toBe(10);
     expect(REVIEW_FILE_COPY_POLICY.maxFileBytes).toBe(25 * 1024 * 1024);
     // NOT maxReviewers * maxFilesPerReview * maxFileBytes (12.5 GB).
     expect(REVIEW_FILE_COPY_POLICY.maxTotalBytes).toBeLessThan(

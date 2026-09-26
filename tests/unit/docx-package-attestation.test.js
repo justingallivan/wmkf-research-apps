@@ -20,7 +20,8 @@ async function withParts(bytes, mutate) {
   await mutate(zip);
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
-const SP_SCHEMA = '<?xml version="1.0" encoding="utf-8"?><ct:contentTypeSchema ct:_="" ma:_="" xmlns:ct="http://schemas.microsoft.com/office/2006/metadata/contentType"></ct:contentTypeSchema>';
+// The live shape (matches tests/unit/test-request-run-runner-verify-initial-assessment.test.js): every prefix is declared.
+const SP_SCHEMA = '<?xml version="1.0" encoding="utf-8"?><ct:contentTypeSchema ct:_="" ma:_="" ma:contentTypeName="Document" xmlns:ct="http://schemas.microsoft.com/office/2006/metadata/contentType" xmlns:ma="http://schemas.microsoft.com/office/2006/metadata/properties/metaAttributes"></ct:contentTypeSchema>';
 const SP_FORMS = '<?mso-contentType?><FormTemplates xmlns="http://schemas.microsoft.com/sharepoint/v3/contenttype/forms"><Display>DocumentLibraryForm</Display></FormTemplates>';
 const SP_DM = '<?xml version="1.0" encoding="utf-8"?><p:properties xmlns:p="http://schemas.microsoft.com/office/2006/metadata/properties"><documentManagement/></p:properties>';
 const SP_PROPS = '<?xml version="1.0" encoding="UTF-8" standalone="no"?><ds:datastoreItem ds:itemID="{X}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"/>';
@@ -293,6 +294,41 @@ describe('attestDocxPackageAgainstSource', () => {
         zip.file('word/_rels/document.xml.rels', rels.replace('</Relationships>', '<Relationship xmlns:x="urn:foreign" Id="rId94" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" x:Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="embeddings/x.bin"/></Relationships>'));
       });
       await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/namespaced attribute x:Type/);
+    });
+
+    // Codex slice review round 2: root recognition by PARSED root, not by a
+    // regex over a text head. Each bait below contains a permitted-looking
+    // tag somewhere other than the document root.
+    const CT_SCHEMA_NS = 'http://schemas.microsoft.com/office/2006/metadata/contentType';
+    const itemBaits = [
+      ['comment bait', `<evil xmlns="urn:foreign"><!-- <ct:contentTypeSchema xmlns:ct="${CT_SCHEMA_NS}"/> --></evil>`],
+      ['nested permitted child', `<evil xmlns="urn:foreign"><ct:contentTypeSchema xmlns:ct="${CT_SCHEMA_NS}"/></evil>`],
+      ['permitted local name in a foreign namespace', '<ct:contentTypeSchema xmlns:ct="urn:foreign"/>'],
+      ['permitted namespace, wrong local name', `<ct:other xmlns:ct="${CT_SCHEMA_NS}"/>`],
+      ['not XML at all', 'ct:contentTypeSchema <ct:contentTypeSchema'],
+    ];
+    it.each(itemBaits)('a customXml item whose real root is foreign is refused by the source attestor (%s)', async (_label, xml) => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item7.xml', xml); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/item7\.xml is not a SharePoint property-promotion item/);
+    });
+    it.each(itemBaits)('a customXml item whose real root is foreign is refused by the render attestor (%s)', async (_label, xml) => {
+      const mutated = await withParts(render, async (zip) => { zip.file('customXml/item7.xml', xml); });
+      await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/item7\.xml is not a SharePoint property-promotion item/);
+    });
+    it('a customXml itemProps part whose real root is foreign (datastoreItem nested inside) is refused', async () => {
+      const bait = '<evil xmlns="urn:foreign"><ds:datastoreItem xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"/></evil>';
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/itemProps7.xml', bait); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/itemProps7\.xml is not a SharePoint datastore item/);
+    });
+    it('a datastoreItem root in the wrong namespace is refused', async () => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/itemProps7.xml', '<ds:datastoreItem xmlns:ds="urn:foreign"/>'); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/itemProps7\.xml is not a SharePoint datastore item/);
+    });
+    it('the live SharePoint item shapes (processing instruction, declared prefixes) still pass root recognition', async () => {
+      const promoted = await withParts(sourceWithOwnCustomXml, async (zip) => {
+        zip.file('customXml/item2.xml', SP_SCHEMA); zip.file('customXml/item3.xml', SP_FORMS); zip.file('customXml/item4.xml', SP_DM);
+      });
+      await expect(attestDocxPackageAgainstSource(promoted, sourceWithOwnCustomXml)).resolves.toBeTruthy();
     });
 
     it('a customXml rels part beyond the old 2 KB head window is parsed in full: a trailing hyperlink relationship is refused', async () => {

@@ -701,6 +701,7 @@ describe('stepVerifyReviews', () => {
     const listOptions = graph.listFiles.mock.calls[0][2];
     expect(listOptions.maxDepth).toBeGreaterThanOrEqual(4);
     expect(listOptions.failOnTruncation).toBe(true);
+    expect(listOptions.failOnDepthLimit).toBe(true);
   });
 
   it('a truncated census (Graph stopped at its file limit) is a verification failure, never a shorter file list (Codex F4)', async () => {
