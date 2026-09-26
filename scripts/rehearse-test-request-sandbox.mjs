@@ -925,6 +925,47 @@ export async function runAdvance(client, args, ledgerUrl) {
   }
 }
 
+/**
+ * Slice 6c-ii Stage C: a curated per-reviewer summary (form, file count,
+ * attested digest, pointers) for `--run-inspect`, distinct from the raw
+ * `resources` dump below. Every value here already passed run-ledger.js's
+ * no-text-invariant receipt validation at write time (finite enum tokens,
+ * GUIDs, hashes and grammar-matched paths only -- never free text or a
+ * plaintext address), so this summary carries nothing new to redact; it
+ * exists to make the reviews recipe's outcome legible without hand-parsing
+ * the raw resource rows.
+ */
+export function summarizeReviewResources(resources, reviewerAssignments) {
+  return reviewerAssignments.map((assignment) => {
+    const suggestionResource = resources.find((r) => r.step === 'seed_reviewers' && r.resourceKind === 'dataverse_reviewer_suggestion'
+      && r.plannedIdentity?.assignmentSequence === assignment.sequence);
+    const answersResource = resources.find((r) => r.step === 'seed_review_answers' && r.resourceKind === 'dataverse_review_answer_set'
+      && r.plannedIdentity?.assignmentSequence === assignment.sequence);
+    const folderResource = resources.find((r) => r.step === 'copy_review_file' && r.resourceKind === 'sharepoint_folder'
+      && r.plannedIdentity?.assignmentSequence === assignment.sequence);
+    const fileResources = resources.filter((r) => r.step === 'copy_review_file' && r.resourceKind === 'sharepoint_file'
+      && r.plannedIdentity?.assignmentSequence === assignment.sequence);
+    const attestedDigests = fileResources.map((r) => r.readback?.attestedDigest).filter(Boolean);
+    return {
+      sequence: assignment.sequence,
+      destinationSuggestionId: suggestionResource?.plannedIdentity?.suggestionId ?? null,
+      reviewForm: answersResource?.plannedIdentity?.reviewForm ?? null,
+      answerCount: answersResource?.readback?.answerCount ?? null,
+      fileCount: fileResources.length,
+      // Only present for a DOCX file (property-promotion evidence); null for
+      // an exact-hash PDF/DOC file or when no file was copied.
+      attestedDigests: attestedDigests.length ? attestedDigests : null,
+      // The folder is the ledger's own grammar-matched relative path, never
+      // a full URL; the filename is one of `Review_[1-5].(pdf|docx|doc)`.
+      // Both null for received_no_file/unreceived, exactly mirroring the
+      // verifier's own mutually-exclusive branch.
+      pointers: folderResource?.readback?.filename
+        ? { folder: folderResource.plannedIdentity?.folder ?? null, filename: folderResource.readback.filename }
+        : null,
+    };
+  });
+}
+
 async function runRunInspect(runInspect, ledgerUrl) {
   const db = pgLedgerDb(ledgerUrl);
   try {
@@ -935,7 +976,10 @@ async function runRunInspect(runInspect, ledgerUrl) {
     // Never the plaintext address, only its digest (D-R2): listRunReviewerAssignments
     // never selects the `address` column, so there is nothing to redact here.
     const reviewerAssignments = run.recipe === 'reviews' ? await ledger.listRunReviewerAssignments(runInspect) : [];
-    console.log(JSON.stringify({ mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments }, null, 2));
+    const reviewsSummary = run.recipe === 'reviews' ? summarizeReviewResources(resources, reviewerAssignments) : [];
+    console.log(JSON.stringify({
+      mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments, reviewsSummary,
+    }, null, 2));
   } finally {
     await db.end();
   }
