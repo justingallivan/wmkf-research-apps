@@ -32,8 +32,16 @@ items, documents, and intents remain retained as approved. The 64.088-second int
 interval includes the deliberate pause and is not an active-rate benchmark. The owner-observed UI
 sequence plus durable/Graph/Dataverse readback closes the local Safari upload/pause/resume/finalize
 subpath. It does not prove the exact pause boundary, displayed rate/ETA, Production Watch,
-long-seek, Download UI, near-cap throughput, live retry/reconnect/watchdog, or Graph-confirmed
+long-seek, Download UI, live retry/reconnect/watchdog, or Graph-confirmed
 terminal expiry.
+
+**[OWNER DECISION 2026-09-25 — performance gate closed]** Stop treating the temporarily slow home
+uplink as a release proxy and do not run another live throughput/near-cap benchmark. The office
+failure mode was request/rate-limit overhead from 320 KiB fragments, not available bandwidth. The
+accepted fix is the code-owned 10 MiB default: about 308 → 10 PUTs for the 100,665,703-byte test
+file and 6,104 → 191 nominal PUTs at the 2,000,000,000-byte cap. Remove the same-network baseline,
+45-minute threshold, and percentage-of-baseline gate. Preserve the exact 2 GB validation/schema
+boundary, aligned final remainder, resume/integrity checks, and no-full-file-proxy contract.
 
 **[VERIFIED local-harness cleanup]** The temporary branch-local `next.config.js` alias/transpile
 hook for `/private/tmp/wmkf-local-vercel-postgres-adapter.cjs` was removed and is not part of the
@@ -50,9 +58,9 @@ retain their previously completed iterative read-only OAuth Claude Opus reviews.
 - Migration 055 is not applied to the actual Preview-connected database, and this branch is not
   deployed or enabled in Preview or Production. Any migration, configuration, deployment, alias
   move, SharePoint upload/deletion, or Production write requires a fresh concrete approval list.
-- Local Safari upload is accepted. Production Safari Watch, >2-minute seeking, Download UI and
-  integrity, and the actual near-cap desktop Production upload remain deferred to a freshly
-  approved human-created Request. The Test Request Factory is unfinished and is not a dependency.
+- Local Safari upload is accepted. Production Safari Watch, >2-minute seeking, and Download UI/
+  integrity remain deferred to a freshly approved human-created Request. The Test Request Factory
+  is unfinished and is not a dependency. No live near-cap throughput run is required.
 - Live retry, reconnect, and watchdog states remain offline-tested only. Do not attempt iPadOS or
   another Edge run.
 - Do not delete Request `1000334`, its Site Visit, any of the three retained Request Documents,

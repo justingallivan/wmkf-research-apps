@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow is built and passed retained local-runtime/sandbox-data Chrome and macOS Safari upload acceptance, the Preview proof harness is retired, Preview/Production rollout remains unapplied, and Graph-confirmed expiry, Production Safari media, long-seek, and near-cap gates remain."
+summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow is built and passed retained local-runtime/sandbox-data Chrome and macOS Safari upload acceptance, the code-owned 10 MiB chunk policy is accepted as the performance fix, the Preview proof harness is retired, Preview/Production rollout remains unapplied, and Graph-confirmed expiry plus Production Safari media/long-seek gates remain."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -39,10 +39,10 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
 | Version display | Recording, transcript, and transcript summary are latest-only. Superseded rows remain retained internally. |
 | SharePoint video delivery | Offer Watch and Download without proxying the complete file through the application. |
 | First-slice MP4 cap | 2,000,000,000 bytes (about 1.86 GiB), so the exact byte count fits the existing Dataverse `wmkf_FileSize` integer. Raising the cap requires a reviewed larger-size schema field. |
-| Production test isolation | Schema readiness is environment-wide and is not a feature rollout guard. Add a separate server-enforced presentation access mode: `off`, `test:<approved request GUID>`, or `on`. Keep Production `off` until an owner-approved human-created disposable Request exists; the Test Request Factory is unfinished and is not a dependency. Use `test:<GUID>` for the bounded Safari/near-cap run and switch to `on` only after the release gates pass. |
-| Supported browser scope | Staff desktop browsers are the release target. The owner removed iPadOS support and its browser/device acceptance rows on 2026-09-24; no iPadOS run blocks this feature. Keep the near-cap upload check on desktop for the proposed 2 GB cap. |
+| Production test isolation | Schema readiness is environment-wide and is not a feature rollout guard. Add a separate server-enforced presentation access mode: `off`, `test:<approved request GUID>`, or `on`. Keep Production `off` until an owner-approved human-created disposable Request exists; the Test Request Factory is unfinished and is not a dependency. Use `test:<GUID>` for the bounded Production Safari media smoke and switch to `on` only after the remaining release gates pass. |
+| Supported browser scope | Staff desktop browsers are the release target. The owner removed iPadOS support and its browser/device acceptance rows on 2026-09-24; no iPadOS run blocks this feature. The 2,000,000,000-byte cap remains a code/schema/integrity contract, but the owner removed a live near-cap throughput benchmark as a release gate on 2026-09-25. |
 | Existing full briefing | Preserve D19/D28: the existing distributed briefing remains a superset and continues to include research-presentation materials. Add audience-specific non-buffering Watch/Download resolution for Zoom and large SharePoint recordings. The new copied link is an additional materials-only option. |
-| Transport proof | **CHROME CORE PATH PASSED 2026-09-22; EDGE PARTIAL PATH REPORTED 2026-09-23; CHROME RELOAD/RESELECT AND PROOF-TOKEN RECOVERY PASSED 2026-09-24; SHARED 10 MiB PERFORMANCE TRANSPORT BENCHMARKED IN CHROME PREVIEW 2026-09-25; LOCAL-RUNTIME/SANDBOX-DATA SAFARI UPLOAD, PAUSE, RESUME, AND FINALIZE PASSED 2026-09-25.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. Commit `bab770fe6` replaces the proof's 320 KiB/60-second loop with the shared 10 MiB, status-aware, stall-aware transport and removes the sealed-initial-expiry refusal. Deployment `dpl_FX7HvZZWTvvVchDytB3rRqCtEYoX` then uploaded the same 100,665,703-byte MP4 in Chrome with a 3.22 Mbps final post-resume active rate and 300.133-second begin-to-verification wall time, including one deliberate 10 MiB boundary pause; a separate same-machine/network direct-Graph Chrome baseline measured 2.383 Mbps over 337.997 seconds. The durable producer then passed retained Chrome and Safari local-runtime/sandbox-data uploads on human-created Request `1000334`; the Safari run exercised the visible Pause → Resume → saved sequence, and exact Graph download independently matched the source size and SHA-256. These samples do not substitute for the near-cap gate. The earlier session-expiry UI refusal/cleanup used the sealed initial timestamp while Graph later confirmed cancellation, so Graph-confirmed expiry remains unverified. The Windows Edge colleague reported upload, playback, and Download for a 97,777,999-byte MP4; the exact item was deleted after owner approval. Owner accepted Chrome and Edge as working. The local Safari upload subpath is now accepted, but the Production Safari Watch/long-seek/Download and near-cap rows still require an owner-approved human-created disposable Production Request because the Factory remains unfinished. iPadOS was removed from scope by the owner on 2026-09-24. |
+| Transport proof | **CHROME CORE PATH PASSED 2026-09-22; EDGE PARTIAL PATH REPORTED 2026-09-23; CHROME RELOAD/RESELECT AND PROOF-TOKEN RECOVERY PASSED 2026-09-24; SHARED 10 MiB PERFORMANCE TRANSPORT BENCHMARKED IN CHROME PREVIEW 2026-09-25; LOCAL-RUNTIME/SANDBOX-DATA SAFARI UPLOAD, PAUSE, RESUME, AND FINALIZE PASSED 2026-09-25.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. Commit `bab770fe6` replaces the proof's 320 KiB/60-second loop with the shared 10 MiB, status-aware, stall-aware transport and removes the sealed-initial-expiry refusal. The performance problem to solve was request/rate-limit overhead from 320 KiB fragments on the office network, not the owner's temporarily slow home uplink. The code-owned 10 MiB default reduces a 100,665,703-byte upload from about 308 PUTs to 10 and a 2,000,000,000-byte upload from 6,104 nominal PUTs to 191. The owner accepted that policy as the performance resolution on 2026-09-25 and removed further live throughput/near-cap benchmarking as a release gate. The durable producer passed retained Chrome and Safari local-runtime/sandbox-data uploads on human-created Request `1000334`; Safari exercised Pause → Resume → saved, and exact Graph download matched source size/SHA-256. Graph-confirmed expiry remains unverified. The Windows Edge colleague reported upload, playback, and Download for a 97,777,999-byte MP4; the exact item was deleted after owner approval. The remaining Production Safari work is bounded to Watch/long-seek/Download behavior on an owner-approved human-created Request; the Factory remains unfinished and iPadOS is out of scope. |
 | Distribution | No new email composer or automatic distribution for the materials-only link. Meeting Tracker provides Copy link for staff to share through their chosen channel; the existing deliberation email continues distributing the full briefing link. |
 
 ## 2. Verified current state
@@ -133,7 +133,8 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
   post-resume rate around 3.30–3.35 Mbps, and finalized the exact 100,665,703-byte item. The
   retained SharePoint item's SHA-256 equals the approved local MP4's SHA-256, and its stable item
   ID is bound to Ready Request Document `0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6`. This run did not
-  prove Graph-confirmed terminal session expiry or a near-cap Production transfer.
+  prove Graph-confirmed terminal session expiry. The owner later removed a live near-cap transfer
+  as a release requirement; the exact 2,000,000,000-byte bound remains covered by code/tests.
 - **[VERIFIED 2026-09-25 via owner-operated signed-in macOS Safari, disposable local PostgreSQL,
   sandbox Dataverse readback, Microsoft Graph metadata, and exact Graph download]** the same local
   production producer passed a second Safari upload on Request `1000334`. The owner observed
@@ -143,7 +144,7 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
   Ready Request Document `aa09e166-6ab9-f111-aaad-70a8a59af221` is slot version 3; the retained
   slot-version-2 and slot-version-1 documents are Superseded. No deletion, deployment, alias move,
   or Production write occurred. This closes the Safari browser upload/pause/resume/finalize
-  subpath only; Production Watch, long seeking, Download UI, near-cap throughput, retry,
+  subpath only; Production Watch, long seeking, Download UI, retry,
   reconnect, watchdog, and Graph-confirmed terminal expiry remain open.
 
 ## 3. Invariant table
@@ -597,7 +598,7 @@ available for exact Cleanup but could not resume. [VERIFIED via signed-in deskto
 Reload and same-file reselect resumed the paused upload to a full-size commit. The durable
 producer subsequently passed a local-runtime/sandbox-data Safari upload with owner-observed Pause
 and Resume plus exact Graph size/SHA-256 verification. The remaining Production Safari Watch,
-long-seek, Download UI, and near-cap rows stay deferred to an owner-approved human-created
+long-seek, and Download UI rows stay deferred to an owner-approved human-created
 disposable Request; the unfinished Test Request Factory is not a dependency. The proof harness is
 retired; the durable production intent that replaced it is source-built/offline-tested but not
 deployed or enabled in Preview or Production.
@@ -658,7 +659,7 @@ store, sandbox Dataverse, and Microsoft Graph on 2026-09-25]** a later upload sh
 Resume to the owner and finalized successfully. The durable row and Graph metadata agree on
 100,665,703 bytes, and an independent exact Graph download matched the approved source SHA-256.
 This verifies the Safari upload/pause/resume/finalize subpath, not Production playback, long
-seeking, Download UI, near-cap throughput, or live retry/reconnect/watchdog/terminal-expiry states.
+seeking, Download UI, or live retry/reconnect/watchdog/terminal-expiry states.
 Keep browser → preauthenticated Microsoft Graph → governed SharePoint as the MP4 byte route.
 The transcript's private Blob staging remains a separate small-file route; routing MP4s through
 it would add a complete second byte transfer and another recovery/cleanup surface. Converge the
@@ -705,13 +706,13 @@ required. Maintenance checks live Graph and exact item state before terminal cle
 upload-inactivity watchdog (provisional 120 seconds), plus a provisional 180-second wait for
 Graph's response after the browser reports the fragment sent. The initial supported-link
 assumption is at least 1 Mbps upstream; a 10 MiB fragment at that rate takes about 84 seconds
-before commit overhead. Slower links remain recoverable through status/manual Resume, but their
-near-cap UX is INCONCLUSIVE until measured. Do not assume an XHR
+before commit overhead. Slower links remain recoverable through status/manual Resume; raw uplink
+speed is environment-dependent and is not a release gate. Do not assume an XHR
 progress event means Microsoft has received the bytes. A continuous 10 MiB transfer at 1 Mbps
 may exceed the old 60-second timeout. Every watchdog trip, including a slow final commit,
 enters status reconciliation and never discards the intent. Clear timers on completion, abort,
-unmount, and Request change. Validate thresholds and Safari progress-event cadence in simulated
-slow-link tests and the real desktop gate; revise them from evidence, not an Admin setting.
+unmount, and Request change. Keep threshold behavior covered by simulated slow-link tests and
+revise it only from a demonstrated transport failure, not an Admin setting.
 
 **[VERIFIED via source, focused UI tests, and adversarial review]** The staff UI distinguishes
 Graph-confirmed bytes from in-flight bytes and shows effective Mbps and an ETA only after a
@@ -727,7 +728,9 @@ race, so server reauthorization, Graph range/status reconciliation, and finalize
 remain correct under two clients. Test both cases. Keep preauthenticated URLs and tokens out of
 logs, measurements, and persisted plaintext.
 
-Performance verification is a release gate with separate evidence levels:
+Performance verification evidence has separate levels. The owner accepted the code-owned 10 MiB
+policy as the performance resolution on 2026-09-25; no additional live throughput or near-cap
+benchmark blocks release:
 
 1. **Offline before another live run — HISTORICAL PASS for the proof at `bab770fe6`; durable producer
    SOURCE-BUILT/OFFLINE-TESTED 2026-09-25:** at that commit, proof tests covered 10 MiB alignment and final remainder, sequential
@@ -743,17 +746,12 @@ Performance verification is a release gate with separate evidence levels:
    creation, live-status resume, exact finalize, ciphertext-only session persistence, maintenance,
    and truthful staff UI. The changed-surface run passed 16 suites / 307 tests, with the focused
    card suite at 41 tests; no live service was invoked.
-2. **Representative desktop benchmark — PASS 2026-09-25:** on a freshly approved disposable request/target and
-   approved MP4, record exact byte count, chunk policy, start/commit timestamps, active transfer
-   and wall time, retry/pause count, Graph expiry changes, progress-event cadence/watchdog trips,
-   and effective decimal Mbps (`8 × committed bytes / elapsed seconds / 1,000,000`). For a
-   comparable transport baseline, time the same file over sequential 10 MiB direct Graph PUTs
-   from the same machine/network to a *second* owner-approved disposable SharePoint session,
-   without the app UI; include that exact item and its cleanup in the live approval list.
-   Compare the app's active rate with this single-stream Microsoft baseline. The old 320 KiB
-   receipts have no timing; claim no measured
-   improvement without a same-session A/B run. Extrapolate a 2,000,000,000-byte duration using
-   the measured end-to-end rate and label it **ESTIMATE**, not near-cap PASS. Redact URLs/tokens.
+2. **Representative desktop benchmark — HISTORICAL PASS 2026-09-25:** the approved receipt below
+   established that the shared 10 MiB transport did not add an apparent application bottleneck in
+   that run. Its home-network Mbps values are observations, not office-network capacity or a
+   continuing release threshold. Do not repeat the same-session baseline or extrapolate a live
+   near-cap duration unless a future regression supplies new evidence that the request-count fix
+   is insufficient.
 
    **[VERIFIED receipt]** Request `1003220` / GUID
    `4bfb6e40-678f-f111-8076-7ced8d3d15a6`, governed folder
@@ -781,9 +779,8 @@ Performance verification is a release gate with separate evidence levels:
    `01G4GVMS7LYCLMCV7HI5GL427ZLUYRYSV2` was deleted using its fresh ETag; Graph confirmed it
    absent and the folder empty. The app's final active rate was about 35% above this immediately
    preceding baseline and its pause-inclusive wall rate was about 2.683 Mbps; interpret that only
-   as no apparent app penalty in this run, not a repeatable acceleration. At 3.22 Mbps,
-   2,000,000,000 bytes would take about 82.8 minutes of active transfer (**ESTIMATE**); the actual
-   near-cap Safari Production row remains open.
+   as no apparent app penalty in this run, not a repeatable acceleration or an office-network
+   throughput claim.
 
    **[VERIFIED durable-producer acceptance receipt]** The owner approved sandbox Request `1000334`
    / GUID `4236c2b3-b053-f111-bec7-6045bd015cb0`, its active Site Visit
@@ -821,34 +818,15 @@ Performance verification is a release gate with separate evidence levels:
    deployment, alias move, or Production write occurred. Fragment boundary, displayed rate/ETA,
    retry, reconnect, watchdog, playback, long-seek, Download UI, and Graph-confirmed terminal
    expiry were not independently recorded in this Safari run.
-3. **Actual near-cap desktop Production gate:** after the production-safe flow exists and the owner
-   approves an exact human-created disposable Request, run a real MP4 close to the
-   2,000,000,000-byte cap in macOS Safari, record
-   elapsed time/effective Mbps and refreshed expiry, exercise an interruption/resume, the
-   selected Production Watch shape (and a fallback only if shipped), >2-minute seeking, and
-   Download size/hash integrity. Immediately before this run, on the same Mac and network, time
-   a sequential 10 MiB direct-Graph single-stream baseline using a second owner-approved
-   disposable Production session; approve and verify its exact-item cleanup separately. The
-   near-cap app path must reach at least 60% of this same-session baseline. The near-cap
-   engineering gate is *active upload time* (including retries/backoff but excluding the
-   deliberate pause) no greater than the smaller of 45 minutes or 1.5× the same-session
-   baseline-extrapolated 2 GB time plus five minutes. The item-2 Preview benchmark informs the
-   chunk policy and measures app overhead there; it is not the Safari time baseline. Also record
-   total staff wall time including the deliberate pause. An unstable baseline or
-   unexplained throttling makes the result INCONCLUSIVE and requires a repeat or an owner
-   decision before release. PASS also requires no involuntary restart,
-   truthful recovery/UI states, exact committed size, and recorded Safari progress cadence.
-   Because playback finalization binds the item to a Request Document and the first slice has no
-   hard delete, the planned disposition is **retain the exact governed test item** with its
-   human-created test Request and registry row. Record its identity, size, and retention decision in the
-   run receipt; include that retention in the owner's preflight approval. Do not assume the
-   unfinished Factory provides any teardown. Any later deletion requires a separately reviewed/approved
-   teardown that removes every exact Ready or Superseded registry binding first, proves zero
-   rows by generation key and drive/item, then ETag-deletes only the exact item and verifies
-   exact-path absence. Never delete registry-bound bytes merely to close the test receipt.
-   A 100 MB extrapolation alone cannot close the owner-retained near-cap row. Any live write,
-   deployment, alias move, or deletion still requires the fresh approval and preflight in §12 and
-   the §15 release order.
+3. **Live near-cap throughput benchmark — REMOVED BY OWNER DECISION 2026-09-25:** the owner's home
+   upload speed was temporarily degraded and is not representative of the office network. The
+   original office issue was Graph request/rate-limit overhead from 320 KiB fragments; the shared
+   10 MiB policy directly addresses that failure mode. Retain the exact 2,000,000,000-byte
+   validation/schema bound, aligned-final-remainder tests, resumability, integrity checks, and
+   no-full-file-proxy contract, but do not require a 2 GB live upload, a same-network baseline, a
+   45-minute threshold, or a percentage-of-baseline threshold for release. Any future live upload,
+   write, or deletion still requires its own exact approval and registry-safe retention/cleanup
+   decision.
 
 ### 7.3 Finalize
 
@@ -1091,8 +1069,7 @@ the local initial-timestamp refusal and cancellation, not Graph-confirmed expiry
 corrective retest after §7.2.1 through the durable producer's authenticated resume route during
 bounded Preview acceptance on a freshly approved human-created sandbox Request. The later local-
 runtime/sandbox-data Safari upload, Pause, Resume, finalize, and exact-byte verification passed;
-Production Safari Watch/long-seek/Download and near-cap throughput remain open, so Slice 0 is not
-yet complete.
+Production Safari Watch/long-seek/Download remains open, so Slice 0 is not yet complete.
 
 [VERIFIED historically via commit `bab770fe6`, 84 focused proof tests, scoped ESLint, type checking,
 and a local webpack production build] the Preview harness consumed the shared 10 MiB browser
@@ -1118,7 +1095,7 @@ The first-slice staff browser matrix covers desktop Chrome, desktop Edge, and ma
 Chrome passed the core, reload/reselect, and proof-token recovery rows; the owner accepted the
 reported Edge upload, playback, and Download actions without a further Edge run. Desktop macOS
 Safari passed the durable upload/pause/resume/finalize subpath against local runtime and sandbox
-data. Its Production Watch/long-seek/Download and near-cap rows remain unpassed; a resolver shape
+data. Its Production Watch/long-seek/Download row remains unpassed; a resolver shape
 that passes only Chromium does not complete Slice 0. iPadOS is outside the release matrix by
 owner decision.
 
@@ -1182,7 +1159,7 @@ exact prior alias target, remove only
 the approved presentation-branch settings, and redeploy the active branch if needed so future
 deployments use normal Preview `VERCEL_URL` derivation. Do not edit the Factory branch settings.
 
-**Owner decisions (2026-09-23 Session 536; updated 2026-09-24 and 2026-09-25):** Chrome and Edge are accepted as working; no further Edge runs are planned. The 2026-09-23 decision initially deferred macOS and iPadOS Safari until the Test Request Factory could create a Production test request. The owner removed iPadOS support from this staff feature on 2026-09-24, so iPadOS upload, playback, Files-app integrity, and backgrounding/memory rows no longer gate Slice 0 or release. On 2026-09-25 the owner clarified that the Factory is unfinished and must not block this work: the remaining Production Safari run uses an individually approved human-created disposable Request. It covers upload, the selected Production Watch shape with long seeking, and Download integrity. The owner kept one real near-cap upload to test the proposed 2 GB cap on desktop; [PLANNED] combine it with that macOS Safari run. Agent-run Chrome passed reload/reselect and proof-token expiry recovery; the upload-session expiry UI refusal and cleanup occurred, but Graph-confirmed expiry was not established (see §7.2.1). The final upload's Finish saving and Cleanup UI receipts were supplied by the owner after browser auto-review blocked agent access. No row waits on Edge.
+**Owner decisions (2026-09-23 Session 536; updated 2026-09-24 and 2026-09-25):** Chrome and Edge are accepted as working; no further Edge runs are planned. The 2026-09-23 decision initially deferred macOS and iPadOS Safari until the Test Request Factory could create a Production test request. The owner removed iPadOS support from this staff feature on 2026-09-24, so iPadOS upload, playback, Files-app integrity, and backgrounding/memory rows no longer gate Slice 0 or release. On 2026-09-25 the owner clarified that the Factory is unfinished and must not block this work: the remaining Production Safari media run uses an individually approved human-created disposable Request and covers the selected Watch shape with long seeking plus Download integrity. Safari upload/pause/resume/finalize has already passed locally against sandbox data. The owner subsequently removed the planned live near-cap throughput benchmark: the accepted performance correction is the code-owned 10 MiB chunk policy addressing the office network's 320 KiB request/rate-limit overhead; temporarily slow home-network upload speed is not a release signal. Agent-run Chrome passed reload/reselect and proof-token expiry recovery; the upload-session expiry UI refusal and cleanup occurred, but Graph-confirmed expiry was not established (see §7.2.1). The final upload's Finish saving and Cleanup UI receipts were supplied by the owner after browser auto-review blocked agent access. No row waits on Edge.
 
 **Chrome recovery pass preflight (2026-09-24 PT).** [VERIFIED via signed-in Production
 Grant Reporting read and the document picker] the owner-selected test copy Request `1003220`
@@ -1252,7 +1229,7 @@ exact deletion. No bearer URL or token was saved.
 | Desktop Edge | 2026-09-23 upload, playback, Download | Colleague reported these actions for 97,777,999 bytes; Graph confirmed the item. Remaining detailed Edge trace is not a Slice 0 blocker under Session 536. | Historical owner colleague; no new Edge run |
 | macOS Safari | Durable-producer upload, Pause, Resume, finalize | 2026-09-25 local-runtime/sandbox-data PASS: owner observed Pause → Resume → saved; exact retained Graph item is 100,665,703 bytes and its downloaded SHA-256 matches the source; slot version 3 is Ready and slots 1–2 are Superseded. Fragment boundary and rate/ETA were not independently recorded. | Owner by hand; agent Graph/Dataverse/Postgres verification |
 | macOS Safari | Selected Production Watch shape with long seeking and Download UI | Deferred to Production on an owner-approved human-created disposable Request; record redacted statuses/ranges and source/download size and SHA-256. Test a fallback Watch shape only if it ships. | Owner by hand |
-| macOS Safari desktop | One real near-cap MP4 upload | Deferred to the same Production human-created test-Request run; record exact size, refreshed Graph expiry, throughput, seeking, Download integrity, and exact-item disposition. Delete bytes only after approved teardown proves no registry binding. | Owner by hand |
+| macOS Safari desktop | One real near-cap MP4 upload | NOT REQUIRED by owner decision 2026-09-25. Keep the exact 2,000,000,000-byte code/schema/integrity contract and offline boundaries; do not use temporarily slow home upload speed as a release gate. | N/A |
 
 **Slice 0 cell status (updated 2026-09-25).** PASS means the stated evidence was recorded;
 it does not close a broader browser row. No current cell has a recorded unresolved FAIL.
@@ -1263,19 +1240,19 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 |---|---|---|
 | Chrome core upload, same-page pause/resume, finalize, both Watch modes, seek, Download | PASS | [VERIFIED via signed-in 2026-09-22 Chrome receipt] 100,665,703-byte MP4, 302 and one-shot Watch, 67.3-second seek, equal source/download SHA-256, exact cleanup; current-hardening fix `cdc7574e1`. |
 | Windows Edge upload, playback, Download | PASS for these reported actions; full Edge row NOT RUN | [VERIFIED via owner report] colleague reported 93.2 MB upload, playback, and Download. [VERIFIED via Graph] committed item was 97,777,999 bytes. No pause/reload, resolver trace, seek, or download hash/size comparison was recorded. |
-| macOS Safari full path | PARTIAL: LOCAL UPLOAD SUBPATH PASS; PRODUCTION MEDIA PATH DEFERRED | [VERIFIED 2026-09-25] the local durable producer passed owner-observed Pause → Resume → saved and exact Graph size/SHA-256 verification on sandbox Request `1000334`. Production Watch, >2-minute seeking, Download UI, and the near-cap run remain on an owner-approved human-created disposable Request; the unfinished Factory is not a prerequisite. |
+| macOS Safari full path | PARTIAL: LOCAL UPLOAD SUBPATH PASS; PRODUCTION MEDIA PATH DEFERRED | [VERIFIED 2026-09-25] the local durable producer passed owner-observed Pause → Resume → saved and exact Graph size/SHA-256 verification on sandbox Request `1000334`. Production Watch, >2-minute seeking, and Download UI remain on an owner-approved human-created disposable Request; the unfinished Factory is not a prerequisite. The live near-cap throughput row is removed. |
 | iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] Staff will not use iPadOS for this work; its upload, playback, Files-app, and backgrounding checks are removed from the acceptance matrix. |
 | Reload and same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] 0.9 MiB pause, reload, reselect, direct Microsoft `202` chunks, 100,665,703-byte commit/finalize, exact ETag-guarded cleanup with Graph 404 and empty folder. |
 | Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. [VERIFIED offline at `bab770fe6`] the false terminal predicate is corrected. [VERIFIED 2026-09-25 via local/sandbox durable-producer Chrome acceptance] authenticated live-status resume worked from Graph's bounded remaining range, but Graph had not expired the session. Terminal expiry/recovery still needs a separately approved wait/retest through the durable producer; the retired harness is not restored. |
 | Five-minute proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] expired old link refused after reload; Finish saving minted a fresh link from the same committed item; Watch played and End/Home seeks caused no additional resolver action. |
 | Long-duration seeking | DEFERRED | [VERIFIED via Chrome receipt] current recording is only 67.33 seconds; desktop macOS Safari Production run still needs a >2-minute recording and ten seeks. |
-| Upload and throughput near 2,000,000,000 bytes | DEFERRED | [VERIFIED via 2026-09-24 owner decision; fixture corrected 2026-09-25] one near-cap desktop Production upload remains to test the proposed 2 GB cap. [PLANNED] Run it with the macOS Safari check on the exact owner-approved human-created disposable Request. |
-| Production-sized chunk policy and measured throughput | PASS FOR REPRESENTATIVE CHROME PREVIEW BENCHMARK | [VERIFIED via `bab770fe6`, signed-in Chrome, deployment logs, and Graph on 2026-09-25] the 100,665,703-byte app run used the shared code-owned 10 MiB transport, paused at a 10.0 MiB Graph-confirmed boundary, resumed, finished at a displayed 3.22 Mbps active rate, and took 300.133 seconds begin-to-verification wall time including the pause. The separate same-machine/network direct-Graph Chrome baseline took 337.997 seconds at 2.383 Mbps. Both exact items are Graph-confirmed absent and the folder is empty. This is one comparative sample, not a general speed claim, and does not substitute for the near-cap Production gate. |
+| Upload and throughput near 2,000,000,000 bytes | NOT REQUIRED | [OWNER DECISION 2026-09-25] live near-cap timing and the 45-minute/baseline thresholds are removed. The 2,000,000,000-byte validation/schema boundary and integrity/resume behavior remain code- and test-enforced. |
+| Production-sized chunk policy and measured throughput | PASS; 10 MiB POLICY ACCEPTED | [VERIFIED via `bab770fe6`, signed-in Chrome, deployment logs, Graph, and owner decision on 2026-09-25] the shared code-owned 10 MiB transport replaces the office-rate-limited 320 KiB request pattern. The representative 100,665,703-byte app run paused/resumed and showed no apparent application penalty. Home-network Mbps is not treated as office capacity or a release threshold; no further baseline/near-cap benchmark is required. |
 
 **Owner actions:** approve each new disposable request and governed SharePoint target, each
 Preview deployment, each temporary shared-alias change, each upload, and each exact cleanup
 separately. The owner's 2026-09-24 override permits needed Dataverse reads; consult the owner
-before writes. The owner runs the remaining desktop macOS Safari Production media/near-cap checks
+before writes. The owner runs the remaining desktop macOS Safari Production media checks
 by hand on an approved human-created test Request. No Windows Edge follow-up is planned.
 Before any alias move, re-inspect its current target and presentation/Factory branch-scoped
 Preview variable names; restore and re-inspect afterward. The 2026-09-23 Edge upload approval
@@ -1288,7 +1265,7 @@ Safari run. [VERIFIED via historical branch source and Session 536 owner decisio
 harness was Preview-only. The Production-safe presentation flow is now source-built/offline-tested
 and locally Safari-tested but not deployed; the remaining Production Safari run still needs that
 flow released and an owner-approved human-created disposable Request before the owner can exercise
-the selected Watch shape, long seeking, Download, and the near-cap desktop upload. Define its
+the selected Watch shape, long seeking, and Download. Define its
 exact disposable target and cleanup receipts at that time.
 
 **Owner click sequence for macOS Safari (historical Preview procedure).**
@@ -1359,8 +1336,9 @@ the downloaded file's actual path; record both byte counts and hashes, not the f
    exact disposable item after the playback/download proof.
 5. Record Graph's expiry after each successful fragment and on authorized status reads, plus
    start/commit time and effective throughput. This historical procedure did not collect timing,
-   so its old receipt cannot support a 2 GB speed extrapolation. The current §7.2.1 benchmark
-   and near-cap gate supersede this step. A single initial expiry is not a whole-upload deadline.
+   so its old receipt cannot support a 2 GB speed extrapolation. The later §7.2.1 representative
+   benchmark superseded this step; the owner subsequently removed the live near-cap speed gate.
+   A single initial expiry is not a whole-upload deadline.
 
 #### Playback/download procedure
 
@@ -1624,7 +1602,7 @@ check; it is not inferred from mocks.
   harness is now wired into the durable producer. It accepts a status/reauthorization adapter:
   the historical Preview proof and current production intent route used the same byte/range/retry code but not authorization
   state. Any later change to that shared module requires a renewed benchmark or explicit coverage
-  in the Production gate. The deferred Production macOS Safari media, long-seek, and desktop near-cap cells remain
+  in the Production gate. The deferred Production macOS Safari media and long-seek cells remain
   in the Slice 0 matrix but block **general release**, not implementation. Keep Production access
   in `off`/`test:<GUID>` until the gate passes; iPadOS has no acceptance gate.
 - If the SharePoint-first-party fallback becomes necessary, replace the upload-session intent
@@ -1651,10 +1629,11 @@ the shared Preview or Production environments.
 also passed one signed-in Chrome pause/resume/finalize run using sandbox Dataverse and a disposable
 local Postgres store. The run found and corrected the live bounded-Graph-range incompatibility;
 focused tests now retain open-ended and exact-to-file-end forms and reject wrong ends. It did not
-deploy this branch or close expiry, reconnect/retry/watchdog, or near-cap rows. A subsequent owner-
+deploy this branch or close expiry or reconnect/retry/watchdog rows. A subsequent owner-
 operated Safari run against the same local/sandbox stack passed Pause, Resume, finalize, exact
 size/SHA-256, and slot-version supersession. It closes the Safari upload subpath, not the deferred
-Production Watch/long-seek/Download or near-cap rows.
+Production Watch/long-seek/Download row. The live near-cap performance row was later removed by
+owner decision; the 2 GB validation/integrity contract remains.
 
 ### Slice 5 — Internal and external consumers
 
@@ -1701,7 +1680,8 @@ the changed-surface suites.
 passed owner-observed Pause, Resume, and save through signed-in macOS Safari. Independent Graph
 download verified exact size/SHA-256; Dataverse readback verified slot version 3 Ready and the two
 predecessors Superseded. Graph-confirmed terminal expiry remains PARTIAL; Production Safari Watch,
-long-seek, Download UI, reconnect/retry/watchdog, and near-cap Production remain open.
+long-seek, Download UI, and reconnect/retry/watchdog remain open. Live near-cap throughput is no
+longer a release gate.
 
 **[SLICE 4 OFFLINE RESULT 2026-09-25]** The durable MP4 changed surface passes 16 Jest suites /
 307 tests, including 41 focused staff-card cases. The remaining deployed-browser rows below keep
@@ -1889,10 +1869,10 @@ Release order:
    still-open Graph-confirmed terminal-expiry row through the durable producer; do not restore the
    retired harness. A later owner-operated Safari run through the same local producer/sandbox data
    passed Pause, Resume, finalize, and exact size/SHA-256 verification, while leaving Production
-   Watch/long-seek/Download and near-cap acceptance open.
+   Watch/long-seek/Download acceptance open.
    Keep 302 as the
-   leading resolver and the one-shot URL as the bounded fallback. The deferred Production Safari media,
-   long-seek, and near-cap cells remain in the Slice 0 matrix but block general release after
+   leading resolver and the one-shot URL as the bounded fallback. The deferred Production Safari media
+   and long-seek cells remain in the Slice 0 matrix but block general release after
    the production-safe flow exists, not coding of that flow. **[SOURCE-BUILT/OFFLINE-TESTED
    2026-09-25]** that durable MP4 flow now exists on `codex/feature-request`, but has not been
    deployed, migrated, enabled, or live-tested;
@@ -1918,16 +1898,13 @@ Release order:
 6. deploy the compatible runtime to Production with schema readiness and access both off, rerun
    tolerance fixtures, then owner enables schema readiness and sets
    `POST_PRESENTATION_MATERIALS_ACCESS=test:<verified owner-approved request GUID>` for the bounded
-   Production gate. The approval list includes the same-Mac direct-Graph baseline session,
-   its exact target and cleanup, plus retention of the registry-bound near-cap MP4. Complete the
-   actual desktop Safari near-cap, long-seek, Download-integrity,
-   and performance checks before setting access to `on` for general release. If a gate fails,
+   Production gate. Complete the desktop Safari Watch, long-seek, and Download-integrity checks
+   before setting access to `on` for general release. A same-Mac baseline, live near-cap MP4, and
+   elapsed-time/throughput threshold are not required. If a gate fails,
    set access to `off` while preserving the exact intent/item for approved recovery; schema
    readiness can remain on for compatible readers. Verify D19 full-briefing access and the
-   materials-only link as separate audiences. The Production near-cap item remains a
-   registry-bound governed test artifact by default; obtain explicit retention approval before
-   the run and record its exact identity. The unfinished Factory supplies neither the Request nor
-   teardown. If the
+   materials-only link as separate audiences. The unfinished Factory supplies neither the Request
+   nor teardown. If the
    owner later wants deletion, design a separately reviewed teardown for the exact Ready and
    Superseded Request Document IDs, prove zero remaining bindings, and seek separate approval
    before an ETag-guarded exact-item deletion.
@@ -2041,9 +2018,10 @@ Two read-only Opus follow-ups checked the revisions. The final follow-up found n
 isolation, expiry, retry, CSP, or cleanup-policy blocker and asked for two final wording fixes:
 Preview disposable cleanup must be distinct from retaining a registry-bound Production test MP4,
 and the Safari speed threshold must use a same-Mac/same-network direct-Graph baseline. Both are
-now explicit in §7.2.1, the Slice 0 pass criteria, the test matrix, and §15. The reviewer stated
-those two edits were sufficient to make the plan ready for implementation; live acceptance is
-still a separate gate.
+historical review requirements that were reflected in the plan at that time. The owner's later
+2026-09-25 decision supersedes the live near-cap/baseline speed gate because the target defect was
+office-network request/rate-limit overhead, now addressed by 10 MiB chunks; the 2 GB validation and
+integrity contracts remain.
 
 **2026-09-25 implementation, read-only adversarial review, and representative benchmark:** commit `bab770fe6`
 implemented the shared transport and corrected Preview status/permit behavior; that implementation
@@ -2058,8 +2036,9 @@ proxy regression. The separately approved Chrome Preview benchmark then passed w
 100,665,703-byte app upload and same-machine/network direct-Graph baseline recorded in §7.2.1;
 both exact items were deleted and Graph confirmed the folder empty. This closes the representative
 desktop benchmark item only. The later local Safari upload receipt closes only that browser's
-upload/pause/resume/finalize subpath; Graph-confirmed expiry, Production Safari media/long-seek,
-and near-cap Production gates remain open and approval-bound.
+upload/pause/resume/finalize subpath; Graph-confirmed expiry and Production Safari media/long-seek
+remain open and approval-bound. The live near-cap throughput gate was subsequently removed by the
+owner.
 
 **2026-09-25 Slice 1 offline implementation:** Wave 30 now defines the exact optional
 `wmkf_ExternalUrl` URL field and positive Dataverse-sized `wmkf_SlotVersion` fence, with a
@@ -2131,10 +2110,10 @@ result. Nine further read-only Opus rounds reviewed the browser/UI integration; 
 CSP/navigation, stale state, retry/pause semantics, error guidance, response-contract validation,
 and boundary test evidence were fixed iteratively, and Round 9 returned exactly “No findings.”
 The changed-surface run passed 16 suites / 307 tests (focused card: 41); type checking passed and
-scoped lint had zero errors. Migration, deployment, configuration, Graph-confirmed expiry,
-Production Safari media/long-seek, and near-cap checks remain open and approval-bound. The Test Request Factory is
-still unfinished; a future bounded live gate must use an explicitly approved human-created test
-Request. No Ultrareview or other metered review product was used.
+scoped lint had zero errors. Migration, deployment, configuration, Graph-confirmed expiry, and
+Production Safari media/long-seek checks remain open and approval-bound. The Test Request Factory
+is still unfinished; a future bounded live gate must use an explicitly approved human-created
+test Request. No Ultrareview or other metered review product was used.
 
 **2026-09-25 Slice 5 offline implementation and iterative Opus review:** the Staff
 Deliberations consumer, independent 60-day presentation-link lifecycle, minimal
@@ -2178,8 +2157,8 @@ types/scoped lint/webpack build pass, and no paid or metered reviewer was used. 
 documentation-currency, documentation-symbol, fact-consistency, and build-claim-freshness gates
 pass with their self-tests run sequentially; docs-catalog and agent-invariant gates also pass.
 This is a live sandbox acceptance of the durable producer, not a deployment or release.
-Graph-confirmed terminal expiry, reconnect/retry/watchdog, Production Safari media/long-seek, and
-near-cap Production remain open.
+Graph-confirmed terminal expiry, reconnect/retry/watchdog, and Production Safari media/long-seek
+remain open.
 
 **2026-09-25 durable-producer macOS Safari upload acceptance:** under a fresh exact approval, the
 owner ran the same 100,665,703-byte MP4 through the local production producer against sandbox
@@ -2190,10 +2169,16 @@ Sandbox Request Document `aa09e166-6ab9-f111-aaad-70a8a59af221` is Ready at slot
 the retained slot-version-1/2 predecessors are Superseded. No code changed for this run, so the
 already completed iterative Opus reviews remain the code-review evidence; no new code review was
 claimed. No deletion, deployment, alias move, or Production write occurred. Production Safari
-Watch/long-seek/Download UI, near-cap throughput, Graph-confirmed terminal expiry, and live
+Watch/long-seek/Download UI, Graph-confirmed terminal expiry, and live
 retry/reconnect/watchdog remain open.
+
+**2026-09-25 owner performance decision:** stop using the temporarily constrained home uplink as
+a release proxy. The office failure mode was request/rate-limit overhead from 320 KiB fragments;
+the code-owned 10 MiB default is the accepted fix. The live near-cap upload, same-network baseline,
+45-minute threshold, and percentage-of-baseline threshold are removed. Keep the exact 2 GB
+validation/schema boundary and offline integrity/resume coverage.
 
 The product behavior remains locked. Browser-direct Graph upload is the leading MP4 transport
 after the corrected Chrome proof and local Safari upload acceptance. The remaining decision is
-whether it survives the measured Production Safari media/near-cap release gates. Failure returns to the bounded
+whether the Production Safari media resolver/long-seek path passes. Failure returns to the bounded
 SharePoint-first-party fallback and is not permission to introduce application byte proxying.
