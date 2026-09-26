@@ -27,6 +27,9 @@ const SP_DM = '<?xml version="1.0" encoding="utf-8"?><p:properties xmlns:p="http
 const SP_PROPS = '<?xml version="1.0" encoding="UTF-8" standalone="no"?><ds:datastoreItem ds:itemID="{X}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"/>';
 const SP_RELS = '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps" Target="itemProps1.xml"/></Relationships>';
 
+/** SharePoint's live `[trash]` padding shape (2026-09-25): four 0xFF bytes then zeros. */
+const spTrash = (n) => Buffer.concat([Buffer.from([0xff, 0xff, 0xff, 0xff]), Buffer.alloc(n - 4)]);
+
 describe('attestDocxPackageAgainstRender', () => {
   let render;
   beforeAll(async () => { render = await renderInitialAssessmentDocx(ARGS); });
@@ -41,7 +44,7 @@ describe('attestDocxPackageAgainstRender', () => {
     const promoted = await withParts(render, async (zip) => {
       zip.file('customXml/item1.xml', SP_SCHEMA); zip.file('customXml/item2.xml', SP_FORMS); zip.file('customXml/item3.xml', SP_DM);
       for (const n of [1, 2, 3]) { zip.file(`customXml/itemProps${n}.xml`, SP_PROPS); zip.file(`customXml/_rels/item${n}.xml.rels`, SP_RELS.replace('itemProps1', `itemProps${n}`)); }
-      zip.file('[trash]/0000.dat', Buffer.alloc(8)); zip.file('[trash]/0001.dat', Buffer.alloc(8));
+      zip.file('[trash]/0000.dat', spTrash(453)); zip.file('[trash]/0001.dat', spTrash(149));
       zip.file('docProps/custom.xml', '<Properties/>'); zip.file('docProps/core.xml', '<cp:coreProperties/>');
       const rels = await zip.file('word/_rels/document.xml.rels').async('string');
       zip.file('word/_rels/document.xml.rels', rels.replace('</Relationships>', '<Relationship Id="rId50" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/></Relationships>'));
@@ -336,19 +339,24 @@ describe('attestDocxPackageAgainstSource', () => {
       const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('[trash]/foreign-payload.dat', Buffer.from('hidden payload')); });
       await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/trash entry \[trash\]\/foreign-payload\.dat is not a canonical/);
     });
-    it('a canonically named [trash] entry carrying non-zero bytes is refused', async () => {
-      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('[trash]/0000.dat', Buffer.from([0, 0, 1, 0])); });
-      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/\[trash\]\/0000\.dat carries non-zero bytes/);
+    it.each([
+      ['a payload after the 0xFF header', Buffer.concat([Buffer.from([0xff, 0xff, 0xff, 0xff]), Buffer.from('hidden payload')])],
+      ['all zeros (the round-3 fixture guess the live bytes refuted)', Buffer.alloc(64)],
+      ['a header of three 0xFF bytes', Buffer.from([0xff, 0xff, 0xff, 0, 0, 0])],
+      ['a payload beyond the 4 KiB ceiling', Buffer.concat([Buffer.from([0xff, 0xff, 0xff, 0xff]), Buffer.alloc(5000)])],
+    ])('a canonically named [trash] entry that is not SharePoint padding is refused (%s)', async (_label, bytes) => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('[trash]/0000.dat', bytes); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/\[trash\]\/0000\.dat (is not SharePoint's 0xFFFFFFFF-then-zeros padding|exceeds 4096 bytes)/);
     });
-    it('zero-filled canonical [trash] padding is normalized on either side', async () => {
-      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('[trash]/0000.dat', Buffer.alloc(64)); zip.file('[trash]/0001.dat', Buffer.alloc(8)); });
+    it('the live [trash] padding shape (0xFFFFFFFF then zeros; 453 and 149 bytes observed) is normalized on either side', async () => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('[trash]/0000.dat', spTrash(453)); zip.file('[trash]/0001.dat', spTrash(149)); });
       const result = await attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml);
       expect(result.normalizedParts).toEqual(expect.arrayContaining(['[trash]/0000.dat', '[trash]/0001.dat']));
       await expect(attestDocxPackageAgainstSource(mutated, mutated)).resolves.toBeTruthy();
     });
     it('the render attestor applies the same [trash] rule', async () => {
       const mutated = await withParts(render, async (zip) => { zip.file('[trash]/0000.dat', Buffer.from('payload')); });
-      await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/\[trash\]\/0000\.dat carries non-zero bytes/);
+      await expect(attestDocxPackageAgainstRender(mutated, render)).rejects.toThrow(/\[trash\]\/0000\.dat is not SharePoint's 0xFFFFFFFF-then-zeros padding/);
     });
 
     // Codex reviewer-differs-from-author round: an allowed root carrying a
@@ -357,14 +365,14 @@ describe('attestDocxPackageAgainstSource', () => {
     it('an allowed p:properties root carrying a 4 KiB foreign-namespace child is refused by both attestors (the counterexample)', async () => {
       const payload = `<p:properties xmlns:p="${P_NS}"><documentManagement/><x:payload xmlns:x="urn:foreign">${'A'.repeat(4096)}</x:payload></p:properties>`;
       const mutatedSource = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item99.xml', payload); });
-      await expect(attestDocxPackageAgainstSource(mutatedSource, sourceWithOwnCustomXml)).rejects.toThrow(/item99\.xml carries element urn:foreign:payload outside the SharePoint namespace set/);
+      await expect(attestDocxPackageAgainstSource(mutatedSource, sourceWithOwnCustomXml)).rejects.toThrow(/item99\.xml carries element urn:foreign:payload outside the characterized shape/);
       const mutatedRender = await withParts(render, async (zip) => { zip.file('customXml/item99.xml', payload); });
       await expect(attestDocxPackageAgainstRender(mutatedRender, render)).rejects.toThrow(/item99\.xml carries element urn:foreign:payload/);
     });
     it('a foreign-namespace attribute inside an allowed item is refused', async () => {
-      const payload = `<p:properties xmlns:p="${P_NS}" xmlns:x="urn:foreign"><documentManagement x:data="${'B'.repeat(512)}"/></p:properties>`;
+      const payload = `<p:properties xmlns:p="${P_NS}" xmlns:x="urn:foreign"><documentManagement x:data="${'B'.repeat(64)}"/></p:properties>`;
       const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item98.xml', payload); });
-      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/item98\.xml carries attribute x:data outside the SharePoint namespace set/);
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/item98\.xml carries attribute x:data outside the characterized shape/);
     });
     it('a datastoreItem carrying a foreign child is refused', async () => {
       const payload = '<ds:datastoreItem xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"><x:p xmlns:x="urn:foreign">hidden</x:p></ds:datastoreItem>';
@@ -372,9 +380,9 @@ describe('attestDocxPackageAgainstSource', () => {
       await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/itemProps9\.xml carries element urn:foreign:p/);
     });
     it('an allowed item larger than the SharePoint-part ceiling is refused even when every namespace is allowed', async () => {
-      const payload = `<p:properties xmlns:p="${P_NS}"><documentManagement>${'C'.repeat(40 * 1024)}</documentManagement></p:properties>`;
+      const payload = `<p:properties xmlns:p="${P_NS}"><documentManagement/><!-- ${'C'.repeat(70 * 1024)} --></p:properties>`;
       const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item97.xml', payload); });
-      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/item97\.xml exceeds the 32768-byte ceiling/);
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/item97\.xml exceeds the 65536-byte ceiling/);
     });
     it('a DOCTYPE in any parsed part is refused', async () => {
       const mutated = await withRels((rels) => `<!DOCTYPE Relationships [<!ENTITY e "x">]>${rels}`);
@@ -385,6 +393,54 @@ describe('attestDocxPackageAgainstSource', () => {
       const promoted = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item5.xml', payload); });
       await expect(attestDocxPackageAgainstSource(promoted, sourceWithOwnCustomXml)).resolves.toBeTruthy();
     });
+    // Codex re-review of the namespace allowlist: shapes, not namespaces.
+    const LIVE_ITEM2 = '<?mso-contentType?><FormTemplates xmlns="http://schemas.microsoft.com/sharepoint/v3/contenttype/forms"><Display>DocumentLibraryForm</Display><Edit>DocumentLibraryForm</Edit><New>DocumentLibraryForm</New></FormTemplates>';
+    const LIVE_ITEM3 = '<?xml version="1.0" encoding="utf-8"?><p:properties xmlns:p="http://schemas.microsoft.com/office/2006/metadata/properties" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:pc="http://schemas.microsoft.com/office/infopath/2007/PartnerControls"><documentManagement><lcf76f155ced4ddcb4097134ff3c332f xmlns="fd037f0b-8df4-41f5-8fed-c3984d351918"><Terms xmlns="http://schemas.microsoft.com/office/infopath/2007/PartnerControls"></Terms></lcf76f155ced4ddcb4097134ff3c332f><TaxCatchAll xmlns="270ae82a-6903-42ec-99d1-4079863f002d" xsi:nil="true"/><TaxKeywordTaxHTField xmlns="270ae82a-6903-42ec-99d1-4079863f002d"><Terms xmlns="http://schemas.microsoft.com/office/infopath/2007/PartnerControls"></Terms></TaxKeywordTaxHTField></documentManagement></p:properties>';
+    const LIVE_ITEM1_EXCERPT = '<?xml version="1.0" encoding="utf-8"?><ct:contentTypeSchema ct:_="" ma:_="" ma:contentTypeName="Document" ma:contentTypeID="0x0101003CC1047D46B85E46831D0019F23BD8E1" ma:contentTypeVersion="18" ma:contentTypeDescription="Create a new document." ma:contentTypeScope="" ma:versionID="b059a517a4eadd1ecb3e593ffd9fe262" xmlns:ct="http://schemas.microsoft.com/office/2006/metadata/contentType" xmlns:ma="http://schemas.microsoft.com/office/2006/metadata/properties/metaAttributes"><xsd:schema targetNamespace="http://schemas.microsoft.com/office/2006/metadata/properties" ma:root="true" ma:fieldsID="fd1d941250e2eace808565d0c537d78d" ns2:_="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns2="270ae82a-6903-42ec-99d1-4079863f002d"><xsd:import namespace="270ae82a-6903-42ec-99d1-4079863f002d"/><xsd:element name="properties"><xsd:complexType><xsd:sequence><xsd:element name="documentManagement"><xsd:complexType><xsd:all><xsd:element ref="ns2:TaxCatchAll" minOccurs="0"/></xsd:all></xsd:complexType></xsd:element></xsd:sequence></xsd:complexType></xsd:element></xsd:schema><xsd:schema targetNamespace="270ae82a-6903-42ec-99d1-4079863f002d" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ma="http://schemas.microsoft.com/office/2006/metadata/properties/metaAttributes"><xsd:element name="TaxCatchAll" ma:index="10" nillable="true" ma:displayName="Taxonomy Catch All Column" ma:hidden="true" ma:list="{d86ba6b7-e28e-4a16-8290-c05c5a8f8d9f}" ma:internalName="TaxCatchAll" ma:readOnly="false"><xsd:annotation><xsd:documentation>hidden taxonomy column</xsd:documentation></xsd:annotation></xsd:element></xsd:schema></ct:contentTypeSchema>';
+    it('the three live SharePoint items (read back from sandbox Request 1000342 on 2026-09-25) pass their shapes', async () => {
+      const promoted = await withParts(sourceWithOwnCustomXml, async (zip) => {
+        zip.file('customXml/item2.xml', LIVE_ITEM1_EXCERPT); zip.file('customXml/item3.xml', LIVE_ITEM2); zip.file('customXml/item4.xml', LIVE_ITEM3);
+      });
+      await expect(attestDocxPackageAgainstSource(promoted, sourceWithOwnCustomXml)).resolves.toBeTruthy();
+      const promotedRender = await withParts(render, async (zip) => {
+        zip.file('customXml/item2.xml', LIVE_ITEM1_EXCERPT); zip.file('customXml/item3.xml', LIVE_ITEM2); zip.file('customXml/item4.xml', LIVE_ITEM3);
+      });
+      await expect(attestDocxPackageAgainstRender(promotedRender, render)).resolves.toBeTruthy();
+    });
+    it.each([
+      ['an unqualified <payload> under documentManagement', LIVE_ITEM3.replace('<documentManagement>', `<documentManagement><payload>${'D'.repeat(3000)}</payload>`), /carries element :payload outside the characterized shape/],
+      ['a GUID-namespaced element directly under the root', LIVE_ITEM3.replace('<documentManagement>', `<x:payload xmlns:x="11111111-2222-4333-8444-555555555555">${'E'.repeat(3000)}</x:payload><documentManagement>`), /carries element 11111111-2222-4333-8444-555555555555:payload outside the characterized shape/],
+      ['a site-column value longer than the column-value ceiling', LIVE_ITEM3.replace('<TaxCatchAll xmlns="270ae82a-6903-42ec-99d1-4079863f002d" xsi:nil="true"/>', `<TaxCatchAll xmlns="270ae82a-6903-42ec-99d1-4079863f002d">${'F'.repeat(2000)}</TaxCatchAll>`), /element TaxCatchAll carries 2000 characters of text, above its ceiling/],
+      ['a PartnerControls element that is not a Terms node', LIVE_ITEM3.replace('<Terms xmlns="http://schemas.microsoft.com/office/infopath/2007/PartnerControls"></Terms></TaxKeyword', '<Terms xmlns="http://schemas.microsoft.com/office/infopath/2007/PartnerControls"><Other>x</Other></Terms></TaxKeyword'), /carries element http:\/\/schemas\.microsoft\.com\/office\/infopath\/2007\/PartnerControls:Other outside/],
+      ['text directly under documentManagement', LIVE_ITEM3.replace('<documentManagement>', '<documentManagement>hidden'), /element documentManagement carries 6 characters of text, above its ceiling/],
+      ['a non-XSD element inside contentTypeSchema', LIVE_ITEM1_EXCERPT.replace('</ct:contentTypeSchema>', '<x:payload xmlns:x="urn:foreign">hidden</x:payload></ct:contentTypeSchema>'), /carries element urn:foreign:payload outside the characterized shape/],
+      ['an xsd:documentation longer than the text ceiling', LIVE_ITEM1_EXCERPT.replace('hidden taxonomy column', 'G'.repeat(300)), /element documentation carries 300 characters of text, above its ceiling/],
+      ['an attribute longer than the attribute ceiling', LIVE_ITEM1_EXCERPT.replace('ma:contentTypeDescription="Create a new document."', `ma:contentTypeDescription="${'H'.repeat(300)}"`), /attribute ma:contentTypeDescription exceeds 256 characters/],
+      ['a fourth FormTemplates child', LIVE_ITEM2.replace('</FormTemplates>', '<Extra>x</Extra></FormTemplates>'), /carries element http:\/\/schemas\.microsoft\.com\/sharepoint\/v3\/contenttype\/forms:Extra outside/],
+      ['a FormTemplates token that is not a token', LIVE_ITEM2.replace('<Display>DocumentLibraryForm</Display>', `<Display>${'I'.repeat(100)}</Display>`), /element Display carries 100 characters of text, above its ceiling/],
+    ])('a customXml item deviating from the live shape is refused (%s)', async (_label, xml, pattern) => {
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/item6.xml', xml); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(pattern);
+    });
+    it('a customXml rels part padded past the rels ceiling with a comment is refused', async () => {
+      const padded = SP_RELS.replace('<Relationship ', `<!-- ${'J'.repeat(40 * 1024)} --><Relationship `);
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/_rels/item4.xml.rels', padded); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/item4\.xml\.rels exceeds the 4096-byte ceiling/);
+    });
+    it('a customXml rels part with a second relationship or a non-itemProps target is refused', async () => {
+      const two = SP_RELS.replace('</Relationships>', '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps" Target="itemProps1.xml"/></Relationships>');
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/_rels/item4.xml.rels', two); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/non-customXmlProps relationship/);
+      const elsewhere = SP_RELS.replace('Target="itemProps1.xml"', 'Target="../word/document.xml"');
+      const mutated2 = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/_rels/item4.xml.rels', elsewhere); });
+      await expect(attestDocxPackageAgainstSource(mutated2, sourceWithOwnCustomXml)).rejects.toThrow(/non-customXmlProps relationship/);
+    });
+    it('an itemProps part larger than its ceiling is refused', async () => {
+      const big = SP_PROPS.replace('/>', `><!-- ${'K'.repeat(5000)} --></ds:datastoreItem>`);
+      const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { zip.file('customXml/itemProps8.xml', big); });
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/itemProps8\.xml exceeds the 4096-byte ceiling/);
+    });
+
     const utf16 = (text) => Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
     it('a byte-identical package whose rels and content-types parts are UTF-16 with a BOM is accepted', async () => {
       const utf16Package = await withParts(sourceWithOwnCustomXml, async (zip) => {

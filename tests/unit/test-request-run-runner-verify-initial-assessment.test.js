@@ -830,7 +830,7 @@ describe('stepVerifyInitialAssessment', () => {
       zip.file('customXml/item1.xml', SP_SCHEMA);
       zip.file('customXml/itemProps1.xml', SP_PROPS);
       zip.file('customXml/_rels/item1.xml.rels', SP_RELS);
-      zip.file('[trash]/0000.dat', Buffer.alloc(16, 0));
+      zip.file('[trash]/0000.dat', Buffer.concat([Buffer.from([0xff, 0xff, 0xff, 0xff]), Buffer.alloc(12)]));
       zip.file('docProps/custom.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"><property name="ContentTypeId"/></Properties>');
       const rels = await zip.file('word/_rels/document.xml.rels').async('string');
       zip.file('word/_rels/document.xml.rels', rels.replace('</Relationships>', '<Relationship Id="rId99" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/></Relationships>'));
