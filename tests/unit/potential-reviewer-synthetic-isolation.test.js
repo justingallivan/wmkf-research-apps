@@ -16,7 +16,6 @@ import {
   findByOrcidCandidates,
   searchByName,
   upsertByEmail,
-  findSyntheticByEmail,
   isPersonSynthetic,
 } from '../../lib/dataverse/adapters/potential-reviewer.js';
 
@@ -136,47 +135,11 @@ describe('switch ON — (a) exclude marker-true rows unconditionally', () => {
   });
 });
 
-describe('(c) findSyntheticByEmail — factory-only reservation lookup', () => {
-  beforeEach(() => { process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on'; });
-
-  it('throws fail-closed (no carve-out) when the isolation switch is off', async () => {
-    delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
-    const query = jest.spyOn(DynamicsService, 'queryRecords');
-    await expect(findSyntheticByEmail('ada@example.edu'))
-      .rejects.toMatchObject({ code: 'synthetic_reviewer_isolation_disabled' });
-    expect(query).not.toHaveBeenCalled();
-  });
-
-  it('returns the row only when marker true, active, and no Contact link', async () => {
-    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [syntheticRow()] });
-    const row = await findSyntheticByEmail('ada@example.edu');
-    expect(row.wmkf_potentialreviewersid).toBe(SYNTHETIC_ID);
-  });
-
-  it('refuses an ordinary (non-synthetic) row at the same address', async () => {
-    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [ordinaryRow()] });
-    expect(await findSyntheticByEmail('ada@example.edu')).toBeNull();
-  });
-
-  it('refuses an inactive synthetic row', async () => {
-    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [syntheticRow({ statecode: 1 })] });
-    expect(await findSyntheticByEmail('ada@example.edu')).toBeNull();
-  });
-
-  it('refuses a synthetic row already linked to a Contact', async () => {
-    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
-      records: [syntheticRow({ _wmkf_contact_value: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' })],
-    });
-    expect(await findSyntheticByEmail('ada@example.edu')).toBeNull();
-  });
-
-  it('throws on more than one match', async () => {
-    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
-      records: [syntheticRow(), syntheticRow({ wmkf_potentialreviewersid: 'other' })],
-    });
-    await expect(findSyntheticByEmail('ada@example.edu')).rejects.toMatchObject({ code: 'ambiguous_email_owner' });
-  });
-});
+// (c) findSyntheticByEmail's own describe block was removed with the
+// function (Opus round 2, decision): it had no production importer once
+// lib/services/test-requests/reviews-sandbox-deps.js#findAnyPersonByEmail
+// (an unfiltered lookup, filtered by the caller) replaced it at the one
+// call site that ever would have used it. See that module's docblock.
 
 describe('(d) upsertByEmail reuse refuses a synthetic target unconditionally', () => {
   beforeEach(() => { process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on'; });
