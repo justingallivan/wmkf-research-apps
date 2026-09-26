@@ -31,6 +31,7 @@
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-apply-measurement-artifacts-in-both-directions.md; feedback-briefs-are-snapshots-not-ship-state.md
+- Delegated builds / review cadence: feedback-orchestrator-checks-builds-before-review.md
 - Review posture: feedback-read-the-implementation-not-the-callers-docblock.md; feedback-weigh-the-risks-you-name.md; feedback-corrections-decay-unless-mechanized.md; feedback-consistency-over-preview-rationale.md; feedback-reviewer-differs-from-author.md
 - Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md; feedback-mocked-sql-hides-parameter-typing.md; feedback-fixtures-return-raw-transport-shape.md
 - Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md
