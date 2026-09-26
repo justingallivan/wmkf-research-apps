@@ -1,3 +1,83 @@
+# Session 545 Prompt: Presentation-material consumers and Board link (branch-local)
+
+## Offline Slice 5 milestone — 2026-09-25 PT
+
+**[VERIFIED via Git]** Work remained in
+`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on
+`codex/feature-request`. The turn resumed at local/origin `b1c2fe9b9`; historical
+handoff `c628d7367` was already contained. Commit `8db99b8e2` implements the
+Slice 5 staff and external consumers. The main checkout, Factory branch, and
+`main` were not edited or pushed.
+
+**[SOURCE-BUILT/OFFLINE-TESTED; NOT DEPLOYED, MIGRATED, CONFIGURED, OR
+LIVE-PROVED]** Staff Deliberations now receives a distinct current
+Recording/Transcript/Transcript Summary projection from the existing logistics
+read, independent of recipient-directory failure, with explicit loading,
+loaded-empty, unavailable, and disabled states. Meeting Tracker adds an
+independent 60-day materials-only presentation link with Generate/Copy/manual
+fallback/compare-and-swap Issue-new controls. The link has its own
+`presentation-materials` token audience, digest plus encrypted-token row,
+request/access/revocation/expiry verifier, and race-safe first mint/reissue. A
+lost reissue race refreshes the winner; monotonic link-read/mutation epochs keep
+late GETs from restoring a revoked URL or erasing a mutation error.
+
+The external presentation page exposes only institution, proposal title, link
+expiry, portal Applicant Slides/Other Materials, and the current post-
+presentation singleton winners. Every media action re-verifies the token,
+request, producer/type/status/lifecycle/current-winner membership, and fresh
+Graph drive/item/malware facts. Zoom is watch-only. SharePoint MP4 Watch and
+file Download are no-store 302 redirects to a freshly resolved Microsoft URL,
+so files over 50 MiB never traverse the application. Playback performs one
+automatic URL re-resolution with position restore, then offers manual Resume.
+Context and media actions have separate fail-closed token/IP limiter buckets;
+429/503 page-load failures receive truthful retry copy. The full deliberation
+briefing remains the separate D19/D28 superset with its existing 50 MiB
+behavior.
+
+**[VERIFIED tests/build/gates]** The final changed surface passes 40 Jest suites
+/ 555 tests; the focused staff card passes 48 tests. `npm run check:types` and
+`npm run build -- --webpack` pass; the build reports only the repository's
+existing dynamic-dependency warnings. Scoped ESLint reports zero errors and
+two existing `react-hooks/set-state-in-effect` warnings in
+`StaffDeliberationsTab.js` and `useSiteVisitContext.js`. API-route,
+route-lifecycle-auth, route-service-boundary, GUID trust-boundary,
+Dynamics-context-boundary, and fact-consistency gates each passed after their
+self-test ran sequentially. Canonical counts are 237 API route files and 146
+`requireAppAccess` endpoint files. `git diff --check` passed.
+
+**[VERIFIED iterative review]** Five completed read-only OAuth Claude Opus
+rounds reviewed Slice 5. Accepted findings added route-level Meeting Tracker
+readiness, separate fail-closed context/media limiter buckets, expiry/race/SQL
+and large-media negative tests, authoritative refresh after a lost reissue
+race, and stale-read/mutation fencing. The intentional loading/unavailable
+contract was retained because a failed shared read cannot truthfully be called
+rollout-disabled. Round 5 returned exactly `No findings.` No Ultrareview or
+other metered product was used.
+
+**[VERIFIED after reviewer reconnect]** A late transport-review concern about
+in-flight lifecycle abort was refuted against the actual contract: the shipped
+user control is graceful pause-after-fragment, while lifecycle abort retains
+the permit and deliberately defers Graph reconciliation to the next authorized
+manual Resume. The source, tests, and plan remain aligned; no transport change
+was needed.
+
+## Remaining release work
+
+- Slice 6 remains approval-bound. Migration 055 and Wave 30 are unapplied;
+  `POST_PRESENTATION_MATERIALS_SCHEMA_READY`, access, and destructive cleanup
+  remain off/unconfigured.
+- Before any deployment, migration, environment change, alias move, SharePoint
+  upload/deletion, Production/Dataverse write, or live benchmark, present a
+  fresh concrete approval list. Request 1003220 approvals are spent.
+- The Test Request Factory is unfinished. Future live checks use an individually
+  approved human-created Request; do not wait for or claim a Factory-created
+  fixture.
+- Chrome's upload-session expiry row remains PARTIAL because Graph-confirmed
+  terminal expiry was not proved. Do not attempt another Edge run or iPadOS.
+  Desktop macOS Safari, long-seek, Download integrity, and near-cap Production
+  checks remain deferred until the production-safe flow is deliberately
+  released and freshly approved.
+
 # Session 544 Prompt: Durable browser-direct presentation uploads (branch-local)
 
 ## Offline Slice 4 milestone — 2026-09-25 PT
