@@ -7,6 +7,12 @@ owner: Codex (build), Claude (review)
 
 # Integrity Screener as a Workbench tab — build brief (Codex)
 
+> **Scope expanded after the original build:** the owner now requires a
+> completed integrity screen plus recorded PD approval before an application
+> can be marked ready for the board. That workflow extension is **not built**.
+> The implementation and verification hand-back below covers the original tab
+> scope only; see the board-readiness requirements at the end before release.
+
 ## Where you are
 
 You are in `../WMKF_Apps-codex` on branch `codex/integrity-workbench-tab` (from `origin/main` at `d9311b754`). Run `/start` first. **Stay on this branch and in this directory**: other agents are working in the main checkout and on other branches. Do not check out other branches, and do not touch the main checkout. Commit to this branch in small, descriptive commits and push it (`git push -u origin codex/integrity-workbench-tab`). Pushing a feature branch does not deploy. **Never push to `main`, and never merge.**
@@ -80,7 +86,7 @@ When done, leave a short summary at the end of this file covering:
 
 Claude reviews the branch read-only before the owner decides on merge.
 
-## Build hand-back — 2026-09-26
+## Original tab build hand-back — 2026-09-26
 
 **Owner/branch:** Codex orchestrated and reviewed; Luna built the backend, UI,
 tests, and documentation; Sol reviewed the implementation and accepted the
@@ -157,15 +163,17 @@ for a bounded correction batch, along with disabling screens for nameless
 contacts, clearer uncertain-outcome recovery, and mapping real Dataverse 404
 errors before any Postgres or screening work.
 
-The following concerns are retained explicitly rather than expanding this build:
+The following concerns were retained for the original tab scope. The new
+board-readiness requirement below changes the treatment of source failures:
 
 - **Existing engine error semantics:** some SerpAPI and Retraction Watch failures
   are swallowed as empty results by the unchanged shared engine. The Workbench
   cannot distinguish these from successful empty searches using its existing
   result contract. The UI marks exposed errors/unsearched sources incomplete;
   it does not prove source health. This behavior already affected manual screens
-  and their saved history. Changing it requires a separately scoped shared-engine
-  contract correction, not treating all valid empty searches as errors.
+  and their saved history. The newly required board-readiness gate must address
+  this contract before accepting a screen as complete; valid empty searches
+  must remain distinguishable from failures.
 - **Synchronous runtime:** screening remains sequential within the existing
   300-second route budget. Ten people is a spend ceiling, not a proven runtime
   guarantee; provider latency was not live-tested. A timeout can consume credits
@@ -184,7 +192,7 @@ The following concerns are retained explicitly rather than expanding this build:
   migration, GET fails safely rather than showing partial history; POST's schema
   preflight prevents paid calls. Over-cap rosters also fail closed on GET.
 
-**Final closure [VERIFIED]:** the accepted corrections landed in `8a7e6b8a8`.
+**Original tab closure [VERIFIED]:** the accepted corrections landed in `8a7e6b8a8`.
 Sol's narrow follow-up review found no material blocker, and root reviewed the
 final source and desktop/mobile renders. After those corrections, all listed
 gates/self-tests, the production build, touched-file lint (zero errors), and the
@@ -193,7 +201,41 @@ updated fixture-only browser check passed again. Focused final tests passed
 preceded this last correction batch. No further Opus round was run; Codex
 adjudicated the findings and Sol verified their closure as authorized.
 
-The next owner action is release review of this feature branch and the named
-residual risks, followed by migration/promotion only when approved. This brief
-is the scoped branch handoff; unrelated Factory session instructions and
-production milestone history were left unchanged.
+This brief is the scoped branch handoff; unrelated Factory session instructions
+and production milestone history were left unchanged. The next work is defining
+and implementing the expanded board-readiness contract below, followed by its
+review and verification. The original tab closure does not certify that gate.
+
+## Expanded requirement — application board readiness
+
+**Owner decisions [VERIFIED via this task's owner replies]:**
+- Screening and recorded program-director approval are required **before marking
+  the application ready for the board**, ahead of the final funding decision.
+- A saved screening run alone does not satisfy the requirement.
+- This is not an earlier external-reviewer-invitation or Phase-II gate.
+
+**Proposed implementation contract [PLANNED, not built]:** retain a formal run
+history and a PD disposition linked to the exact run and screened roster, with
+the authenticated approver, timestamp, and notes. Enforce the requirement on the
+server at the authoritative application board-readiness write. Failed,
+incomplete, or unverifiable screens must not qualify. A changed roster must not
+silently inherit approval of different people. Preserve the underlying evidence
+when a run or decision is superseded. Define attempt/failure logging and the
+source-completion contract before implementation; the original completed-row
+history is not an attempt ledger or a PD decision audit.
+
+**Enforcement boundary [VERIFIED via source search]:**
+`shared/components/workbench/StatusTab.js` is read-only for the Dynamics lifecycle
+status. `lib/services/final-writeup/transition-service.js` implements group and
+leadership review transitions, and Initial Assessment/pre-site distribution
+services create document-level Board Ready snapshots. Those are not evidence of
+an application-level board-readiness action. No such action was found in the
+branch's routes, services, components, or tracked schema during the scoped search.
+
+**Required clarification:** is the application's board-readiness action an
+existing operation in Dynamics/another tool, or a new Workbench action? Do not
+substitute a document snapshot or leadership-review transition, invent a live
+Dataverse field, or claim an end-to-end hard gate until that write path and its
+authority are identified. Persistence/schema choices and rollout scope remain
+to be designed against that confirmed boundary. No new schema or runtime gate
+has been implemented or applied for this extension.
