@@ -61,6 +61,15 @@ Claude config sync, and environment-specific operating notes.
 
 ## Operating Notes
 
+- **Jest resolves extensionless imports; plain `node` does not (S544).** App modules import
+  siblings without `.js` (Next/webpack and Jest resolve them), so a raw-`node` script that
+  reaches one dies with `ERR_MODULE_NOT_FOUND` while every unit test stays green. For an ad-hoc
+  script, run `node --import ./scripts/lib/use-extensionless.mjs <script>`. The Factory CLIs
+  (`scripts/rehearse-test-request-sandbox.mjs`, `scripts/export-test-request-source-bundle.mjs`)
+  must stay loadable without the hook: keep their import graph plain-Node-safe, e.g. by moving
+  a shared helper into a light module, as `lib/services/pre-site-visit/diagnostics.js` does
+  (Factory slice 4a, PR #344). `tests/unit/test-request-factory-cli-plain-node-load.test.js` spawns both CLIs
+  to guard this (Factory slice 4a).
 - **npm-global and Homebrew share `/opt/homebrew` — the path never identifies the
   installer (S377).** npm's global prefix on this machine is `/opt/homebrew`, so
   npm-installed CLIs land in `/opt/homebrew/bin` beside Homebrew's and `which` cannot
