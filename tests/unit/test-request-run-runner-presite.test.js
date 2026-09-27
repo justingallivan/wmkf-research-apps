@@ -964,11 +964,12 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
     expect(world.rows.size).toBe(1);
   });
 
-  test('roster drift (item 4): a review landing changes the recomputed generation key before render -> the row is not found; the create branch is taken and refuses at the getBuckets sentinel, not runProposalCore', async () => {
+  test('roster drift (item 4): a review landing changes the recomputed generation key before render -> the seeded row is not found and render refuses before calling the producer (Codex round 3), never reaching runProposalCore or the create branch', async () => {
+    const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
-    world.seedRawRow({
-      _wmkf_airun_value: crypto.randomUUID(),
+    const row = world.seedRawRow({
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
@@ -976,10 +977,12 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
     // A review landed between seed and render: the referee section changes,
     // which changes the input snapshot and therefore the generation key.
     world.inputs = inputFixture({ documentFields: { refereeSection: { text: 'We received one review.', names: ['Dr. A'] } } });
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
     expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+    expect(result.errorMessage).toContain('not found by its generation key');
     expect(world.dependencies.runProposalCore).not.toHaveBeenCalled();
-    expect(world.dependencies.getBuckets).toHaveBeenCalledTimes(1);
+    expect(world.dependencies.getBuckets).not.toHaveBeenCalled();
     expect(world.dependencies.createDocument).not.toHaveBeenCalled();
     expect(world.rows.size).toBe(1);
   });
@@ -1507,6 +1510,41 @@ describe('item 9: draft/file ownership re-asserted at every boundary (Codex adve
       expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
       expect(result.errorMessage).toContain('is missing or no longer bound to the destination request');
       expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    });
+  });
+
+  // Codex adversarial round 3: the pre-render ownership check used to be
+  // conditional on the first lookup finding a row, and the producer's own
+  // generation-key lookup was unguarded. Both read-skew shapes must now fail
+  // closed before any upload or commit.
+  describe('render_presite read skew (Codex adversarial round 3)', () => {
+    test('the pre-render lookup finds no row -> refuses (presite_pointer_mismatch) without calling the producer', async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      world.dependencies.findByGenerationKey.mockImplementationOnce(async () => ({ records: [] }));
+      const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain('not found by its generation key');
+      expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+      expect(world.dependencies.commitChangeset).not.toHaveBeenCalled();
+      expect(world.dependencies.updateDocument).not.toHaveBeenCalled();
+    });
+
+    test("the producer's own lookup returns a different row than the owned one -> refuses (presite_pointer_mismatch), never uploads or commits", async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      const realLookup = world.dependencies.findByGenerationKey.getMockImplementation();
+      world.dependencies.findByGenerationKey
+        .mockImplementationOnce(realLookup)
+        .mockImplementationOnce(async (key) => ({
+          records: [{ ...row, wmkf_requestdocumentid: crypto.randomUUID(), wmkf_generationkey: key }],
+        }));
+      const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain('did not return exactly the journaled seeded draft');
+      expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+      expect(world.dependencies.commitChangeset).not.toHaveBeenCalled();
+      expect(world.dependencies.updateDocument).not.toHaveBeenCalled();
     });
   });
 
