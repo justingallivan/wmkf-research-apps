@@ -42,7 +42,7 @@ Owner decision 2026-09-27: sandbox live proofs stop after recipe 4. Deeper recip
 - The runner baselines that account (`foundationBaselineDigest`, `basic-clone-steps.js:270`), so such writes would stop a run `needs_attention`. (Neither workflow is active in production; see open question 4.)
 - The Q5 statement that nothing triggers is contradicted for the sandbox.
 
-**Production P0 run (owner-run, 2026-09-27, S545) — the sandbox definitions are NOT production's.** [VERIFIED via the owner's run of `scripts/probe-test-request-factory-production-readiness.js`]
+**Production P0 run (owner-run, 2026-09-27, S545) — the sandbox definitions are NOT production's.** [VERIFIED via the owner's run of `scripts/probe-test-request-factory-production-readiness.js`] [RECHECKED after scripts/probe-test-request-factory-production-readiness.js change: the later `--detail`, `--export-xaml` and `--history` modes are additive; sections 1–4, which produced these results, are unchanged]
 
 - Marker columns: `wmkf_istestrequest`, `wmkf_testcreationrunid` and `wmkf_issyntheticreviewer` are all absent.
 - App-suite application user `53e97fb3-a006-f111-8406-000d3a352682`, enabled. Roles: Delegate, System Customizer, WMKF AI Elevated TEMP, WMKF AI Tools, WMKF Custom Entities, WMKF Research Review App Suite - Staff, akoyaGO Team User (no accounting). It has **no System Administrator role**; the sandbox app user has one, so no sandbox run exercised the Factory's writes under production's narrower roles.
