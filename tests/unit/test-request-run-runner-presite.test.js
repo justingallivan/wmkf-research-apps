@@ -1,0 +1,812 @@
+/**
+ * Test Request Factory slice 4b -- the `pre_site_visit` recipe's four step
+ * bodies (lib/services/test-requests/run-runner.js `stepSeedPresiteAiRun`/
+ * `stepSeedPresiteDraft`/`stepRenderPresite`/`stepVerifyPresite`).
+ *
+ * `presite-sandbox-deps.js` and `loadPreSiteVisitInputs` (proposal-core-
+ * service.js) are module-mocked here: their OWN sandbox-transport/host-
+ * validation/sentinel correctness is proven directly in
+ * presite-sandbox-deps.test.js. This file drives `advanceRun` with a
+ * recording fake ledger and a small, mutable in-memory "world" (Dataverse
+ * request-document/AI-run rows, one SharePoint file) standing in for the
+ * mocked deps' return values, so every assertion here is about run-runner.js's
+ * OWN step orchestration: journal-before-write, exact-id recovery, error
+ * classification, and which step reaches which real downstream function.
+ * `generatePreSiteVisitArtifact` (artifact-service.js), its lineage/model
+ * internals, and `attestDocxPackageAgainstRender` (docx-package-
+ * attestation.js) are REAL -- not mocked -- and `renderDocx`/`hashDocx` call
+ * the real renderer/hasher, so DOCX bytes and content hashes are genuine.
+ *
+ * @jest-environment node
+ */
+// `jest` is used only as the ambient global here (never imported from
+// '@jest/globals'): importing it explicitly alongside these jest.mock()
+// factory calls breaks babel-plugin-jest-hoist's hoisting -- the hoisted
+// jest.mock() calls then run before the import binds, so the manual mock
+// factories are silently discarded and the real modules load instead
+// (confirmed empirically; neither existing sandbox-deps test file in this
+// repo combines the two, which is why this had never been hit before).
+import crypto from 'node:crypto';
+
+jest.mock('../../lib/services/test-requests/presite-sandbox-deps.js', () => ({
+  createPresiteAiRunDeps: jest.fn(),
+  createPresiteSandboxDeps: jest.fn(),
+  createPresiteInputDeps: jest.fn(),
+}));
+jest.mock('../../lib/services/pre-site-visit/proposal-core-service.js', () => ({
+  ...jest.requireActual('../../lib/services/pre-site-visit/proposal-core-service.js'),
+  loadPreSiteVisitInputs: jest.fn(),
+}));
+
+import { advanceRun, RECIPE_STEP_ORDER } from '../../lib/services/test-requests/run-runner.js';
+import {
+  createPresiteAiRunDeps, createPresiteSandboxDeps, createPresiteInputDeps,
+} from '../../lib/services/test-requests/presite-sandbox-deps.js';
+import { loadPreSiteVisitInputs } from '../../lib/services/pre-site-visit/proposal-core-service.js';
+import { assertLedgerReceipt, ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
+import { MANIFEST_V4, sha256, computeRunPlanDigest } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
+import {
+  buildPreSiteVisitIdentity,
+  buildPreSiteVisitInputSnapshot,
+  validateNarrativePrompt,
+  UNCHANGED_RETRY_BLOCKED_CODES,
+} from '../../lib/services/pre-site-visit/artifact-model.js';
+import { PRE_SITE_VISIT_CONTRACT, REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument.js';
+import { PROPOSAL_CORE_KEYS, PROMPT_VARIABLES, PROMPT_OUTPUT_SCHEMA, USER_PROMPT_TEMPLATE, REQUIRED_SYSTEM_ASSERTIONS } from '../../shared/config/prompts/pre-site-visit-proposal-core.js';
+import { PRE_SITE_SECTION_FIELDS } from '../../lib/services/test-requests/source-bundle.js';
+
+const RUN_ID = '11111111-1111-4111-8111-111111111111';
+const SOURCE_ID = '22222222-2222-4222-8222-222222222222';
+const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+const LOCATION_ID = '44444444-4444-4444-8444-444444444444';
+const PROMPT_ID = '55555555-5555-4555-8555-555555555555';
+const REQUEST_NUMBER = '1002379';
+
+function proposalCoreFixture() {
+  const core = Object.fromEntries(PROPOSAL_CORE_KEYS.map((key) => [key, `${key} test content.`]));
+  core.personnelDetails = 'Ada Principal (PI) leads modeling.';
+  return core;
+}
+
+function sectionFieldsFor(core) {
+  const SECTION_FIELD_MAP = {
+    executiveSummary: 'wmkf_presiteexecutivesummary',
+    impactOverview: 'wmkf_presiteimpactoverview',
+    methodologyOverview: 'wmkf_presitemethodologyoverview',
+    personnelOverview: 'wmkf_presitepersonneloverview',
+    keckFundingRationale: 'wmkf_presitekeckfundingrationale',
+    backgroundAndImpact: 'wmkf_presitebackgroundandimpact',
+    detailedMethodology: 'wmkf_presitedetailedmethodology',
+    personnelDetails: 'wmkf_presitepersonneldetails',
+  };
+  return Object.fromEntries(PROPOSAL_CORE_KEYS.map((key) => [SECTION_FIELD_MAP[key], core[key]]));
+}
+
+function inputFixture(overrides = {}) {
+  return {
+    context: {
+      requestId: REQUEST_ID,
+      requestNumber: REQUEST_NUMBER,
+      cycleCode: 'D26',
+      projectTitle: 'A test project',
+      applicantInstitution: 'Applicant University',
+      projectPeriod: { startDate: '2027-01-01', endDate: '2029-12-31' },
+      personnel: [{ name: 'Ada Principal', role: 'Principal Investigator' }],
+      refereeSectionDiagnostics: [],
+      documentFields: {
+        institutionName: 'Applicant University',
+        cityState: 'Atlanta, GA',
+        internalProgram: 'Medical Research',
+        projectTitle: 'A test project',
+        meetingDate: 'December 2026',
+        requestedAmount: '$900,000',
+        programDirector: 'Pat Director',
+        invitedAmount: '$1,000,000',
+        totalProjectBudget: '$3,500,000',
+        institutionalFundingHistory: 'Applicant University has received 8 awards totaling $9.15 million from WMKF.',
+        refereeSection: null,
+        ...overrides.documentFields,
+      },
+      ...overrides.context,
+    },
+    proposalNarrative: {
+      filename: `ProposalNarrative_${REQUEST_NUMBER}.pdf`,
+      text: 'Narrative text '.repeat(20),
+      siteId: 'site-id', driveId: 'drive-id', itemId: 'narrative-item', versionId: '1.0',
+      contentHash: 'a'.repeat(64),
+      ...overrides.proposalNarrative,
+    },
+  };
+}
+
+function promptFixture() {
+  return {
+    wmkf_ai_promptid: PROMPT_ID,
+    wmkf_ai_promptname: PRE_SITE_VISIT_CONTRACT.promptName,
+    wmkf_promptversion: 4,
+    wmkf_ai_promptvariables: JSON.stringify(PROMPT_VARIABLES),
+    wmkf_ai_promptoutputschema: JSON.stringify(PROMPT_OUTPUT_SCHEMA),
+    wmkf_ai_promptbody: USER_PROMPT_TEMPLATE,
+    wmkf_ai_systemprompt: REQUIRED_SYSTEM_ASSERTIONS.join('\n'),
+  };
+}
+
+const BASE_INPUTS = inputFixture();
+const BASE_IDENTITY = buildPreSiteVisitIdentity({
+  requestId: REQUEST_ID,
+  inputSnapshot: buildPreSiteVisitInputSnapshot(BASE_INPUTS),
+  promptIdentity: validateNarrativePrompt(promptFixture()),
+});
+
+function buildBundle(core = proposalCoreFixture()) {
+  return {
+    kind: 'test-request-source-bundle/v4',
+    version: 4,
+    reviewers: [],
+    documents: [],
+    preSiteVisit: {
+      requestDocumentId: 'source-doc-id',
+      sectionFields: sectionFieldsFor(core),
+      proposalCoreJson: { schemaVersion: 4, proposalCore: core, diagnostics: [] },
+    },
+  };
+}
+
+function baseManifest(bundle, overrides = {}) {
+  return {
+    kind: MANIFEST_V4,
+    recipe: 'pre_site_visit',
+    source: { requestId: SOURCE_ID, revision: '1', bundleSha256: sha256(bundle) },
+    createBodySha256: 'body-hash',
+    copyPolicy: { digest: 'policy-digest' },
+    values: { requestId: REQUEST_ID, locationId: LOCATION_ID },
+    reviewFilePolicy: { digest: reviewFileCopyPolicyDigest() },
+    ...overrides,
+  };
+}
+
+function baseRun(bundle, overrides = {}) {
+  const manifest = baseManifest(bundle);
+  return {
+    runId: RUN_ID, recipe: 'pre_site_visit', status: 'creating',
+    currentStep: 'seed_presite_ai_run', stepIndex: 14, version: 1,
+    leaseToken: null, leaseGeneration: 0, lockedUntil: null,
+    createBodySha256: 'body-hash', bundleSha256: sha256(bundle), copyPolicyDigest: 'policy-digest',
+    sourceRequestId: SOURCE_ID, sourceRequestNumber: REQUEST_NUMBER, sourceRevision: '1',
+    destinationRequestId: REQUEST_ID, destinationLocationId: LOCATION_ID, destinationRequestNumber: REQUEST_NUMBER,
+    planDigest: computeRunPlanDigest({ manifest, reviewerAddressDigests: [] }),
+    ...overrides,
+  };
+}
+
+/** Recording fake ledger (matches run-ledger.js's shape; every call runs the real receipt validator). */
+function createFakeLedger(initialRun, initialResources = []) {
+  const calls = [];
+  let run = { ...initialRun };
+  const resources = initialResources.map((r) => ({ ...r }));
+  let nextSequence = resources.length + 1;
+  let nextResourceId = resources.length + 1;
+  function fenceOk(leaseToken, leaseGeneration, expectedVersion) {
+    return run.leaseToken === leaseToken && run.leaseGeneration === leaseGeneration
+      && (expectedVersion === undefined || run.version === expectedVersion) && run.lockedUntil !== null;
+  }
+  const ledger = {
+    async getRun(runId) { return runId === run.runId ? { ...run } : null; },
+    async claimLease({ expectedVersion }) {
+      if (run.version !== expectedVersion || run.lockedUntil !== null) return null;
+      run = { ...run, leaseToken: `lease-${run.leaseGeneration + 1}`, leaseGeneration: run.leaseGeneration + 1, lockedUntil: 'future', version: run.version + 1 };
+      return { ...run };
+    },
+    async releaseLease({ leaseToken, leaseGeneration }) {
+      if (!fenceOk(leaseToken, leaseGeneration)) return null;
+      run = { ...run, leaseToken: null, lockedUntil: null };
+      return { ...run };
+    },
+    async advanceStep({ leaseToken, leaseGeneration, expectedVersion, nextStep, nextStepIndex, status, destinationRequestNumber }) {
+      calls.push({ op: 'advanceStep', nextStep });
+      if (!fenceOk(leaseToken, leaseGeneration, expectedVersion)) return null;
+      run = { ...run, currentStep: nextStep, stepIndex: nextStepIndex, status: status ?? run.status, destinationRequestNumber: destinationRequestNumber ?? run.destinationRequestNumber, version: run.version + 1 };
+      return { ...run };
+    },
+    async markReady(args) {
+      calls.push({ op: 'markReady', ...args });
+      run = { ...run, status: 'ready', leaseToken: null, lockedUntil: null, version: run.version + 1 };
+      return { ...run };
+    },
+    async markNeedsAttention({ leaseToken, leaseGeneration, expectedVersion, reason, error = null }) {
+      if (!fenceOk(leaseToken, leaseGeneration, expectedVersion)) return null;
+      const storedReason = ledgerReasonOrThrow(reason);
+      const storedError = error == null ? null : ledgerReasonOrThrow(error);
+      run = { ...run, status: 'needs_attention', needsAttentionReason: storedReason, lastError: storedError ?? run.lastError ?? null, leaseToken: null, lockedUntil: null, version: run.version + 1 };
+      return { ...run };
+    },
+    async journalPlannedResource({ runId, step, resourceKind, system, plannedIdentity }) {
+      assertLedgerReceipt(plannedIdentity ?? {}, 'plannedIdentity');
+      calls.push({ op: 'journalPlannedResource', step, resourceKind, plannedIdentity });
+      const resource = { resourceId: nextResourceId++, runId, sequence: nextSequence++, step, resourceKind, system, plannedIdentity, readback: null, outcome: 'planned' };
+      resources.push(resource);
+      return { ...resource };
+    },
+    async recordResourceReadback({ resourceId, responseStatus, readback, outcome }) {
+      if (readback != null) assertLedgerReceipt(readback, 'readback');
+      calls.push({ op: 'recordResourceReadback', resourceId, readback, outcome });
+      const resource = resources.find((row) => row.resourceId === resourceId);
+      resource.readback = readback;
+      resource.outcome = outcome;
+      resource.responseStatus = responseStatus;
+      return { ...resource };
+    },
+    async listRunResources() { return resources.map((row) => ({ ...row })); },
+    // pre_site_visit is cumulative on top of `reviews`: assertRunMatchesManifestAndBundle
+    // reads the reviewer-assignment projection for any recipe past `verify_reviews`
+    // (recipeSeedsReviewers), even though slice 4b's own steps don't journal new
+    // assignment rows. No reviewer landed in these fixtures, so both are empty --
+    // matching the shape used by test-request-run-runner-verify-reviews.test.js.
+    async listRunReviewerAssignments() { return []; },
+    async getRunReviewerAssignment() { return null; },
+  };
+  return { ledger, calls, resources };
+}
+
+/** The mutable in-memory Dataverse/Graph world stepXxx's mocked deps read/write. */
+function createWorld() {
+  const rows = new Map();
+  const aiRuns = new Map();
+  const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: null, _etag: 'request-1' };
+  let etag = 1;
+  let uploadedBytes = null;
+  let uploaded = null;
+  const flags = { forceUploadConflict: false, forceAiRunConflict: false, downloadOverrideBuffer: null };
+
+  function applyDocumentPatch(target, patch) {
+    for (const [key, value] of Object.entries(patch)) {
+      if (key === 'wmkf_AIPrompt@odata.bind') target._wmkf_aiprompt_value = value.match(/\(([^)]+)\)/)?.[1] || null;
+      else if (key === 'wmkf_AIRun@odata.bind') target._wmkf_airun_value = value.match(/\(([^)]+)\)/)?.[1] || null;
+      else if (key === 'wmkf_Request@odata.bind') target._wmkf_request_value = value.match(/\(([^)]+)\)/)?.[1] || null;
+      else target[key] = value;
+    }
+    target._etag = `row-${++etag}`;
+    target.modifiedon = new Date().toISOString();
+  }
+
+  const { renderPreSiteVisitDocx } = jest.requireActual('../../lib/services/pre-site-visit/docx-renderer.js');
+  const { hashGovernedDocxContent } = jest.requireActual('../../lib/services/documents/governed-docx-hash.js');
+  const { attestDocxPackageAgainstRender } = jest.requireActual('../../lib/services/test-requests/docx-package-attestation.js');
+
+  const dependencies = {
+    getCurrentPrompt: jest.fn(async () => promptFixture()),
+    runProposalCore: jest.fn(async () => { throw new Error('presite test double: runProposalCore must never be reached by a correctly seeded row.'); }),
+    renderDocx: jest.fn((args) => renderPreSiteVisitDocx(args)),
+    hashDocx: jest.fn((buf) => hashGovernedDocxContent(buf)),
+    getRequest: jest.fn(async () => ({ ...request })),
+    getBuckets: jest.fn(async () => { throw new Error('presite test double: getBuckets must never be reached (the seeded row is always found by generation key).'); }),
+    findByGenerationKey: jest.fn(async (key) => ({
+      records: [...rows.values()].filter((r) => r.wmkf_generationkey === key).map((r) => ({ ...r })),
+    })),
+    findByRequest: jest.fn(async () => ({ records: [...rows.values()].map((r) => ({ ...r })) })),
+    createDocument: jest.fn(async (payload) => {
+      const id = crypto.randomUUID();
+      const row = {
+        wmkf_requestdocumentid: id, wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+        wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+        _etag: `row-${etag}`, createdon: new Date().toISOString(), modifiedon: new Date().toISOString(),
+      };
+      applyDocumentPatch(row, payload);
+      rows.set(id, row);
+      return { ...row };
+    }),
+    updateDocument: jest.fn(async (id, patch, options) => {
+      const row = rows.get(id);
+      if (!row) throw new Error(`presite test double: row ${id} not found`);
+      if (options?.ifMatch && options.ifMatch !== row._etag) throw Object.assign(new Error('conflict'), { status: 412 });
+      applyDocumentPatch(row, patch);
+    }),
+    commitChangeset: jest.fn(async (operations) => {
+      for (const op of operations) {
+        if (op.entitySet === 'wmkf_requestdocuments') {
+          const target = rows.get(op.key);
+          if (!target) throw new Error(`presite test double: row ${op.key} not found`);
+          if (op.ifMatch && op.ifMatch !== target._etag) throw Object.assign(new Error('conflict'), { status: 412 });
+          applyDocumentPatch(target, op.body);
+        } else if (op.entitySet === 'akoya_requests') {
+          request._wmkf_currentpresitevisit_value = op.body['wmkf_CurrentPreSiteVisit@odata.bind'].match(/\(([^)]+)\)/)?.[1];
+          request._etag = `request-${++etag}`;
+        }
+      }
+    }),
+    ensureFolderPath: jest.fn(async () => undefined),
+    // conflictBehavior: 'fail' is asserted here -- proves the wrapper forces
+    // it regardless of what the caller (artifact-service.js, which passes
+    // only 5 positional args) supplies.
+    uploadFile: jest.fn(async (library, folder, filename, content, contentType, options) => {
+      if (options?.conflictBehavior !== 'fail') {
+        throw new Error(`presite test double: expected conflictBehavior 'fail', got ${JSON.stringify(options)}`);
+      }
+      if (flags.forceUploadConflict) throw Object.assign(new Error('SharePoint item already exists'), { status: 409 });
+      uploadedBytes = content;
+      uploaded = {
+        siteId: 'site-1', driveId: 'drive-1', id: 'item-1', webUrl: 'https://sp.test/x',
+        versionId: '1.0', eTag: '"file-1"', size: content.length, lastModified: new Date().toISOString(), name: filename,
+      };
+      return { ...uploaded };
+    }),
+    getFileMetadataByPath: jest.fn(async () => (uploaded ? { ...uploaded } : null)),
+    downloadFile: jest.fn(async () => ({ buffer: flags.downloadOverrideBuffer || uploadedBytes })),
+    deleteFile: jest.fn(async () => undefined),
+    newClaimToken: jest.fn(() => crypto.randomUUID()),
+    isGuardedReopenSchemaReady: jest.fn(() => false),
+    createAiRun: jest.fn(async (payload) => {
+      if (flags.forceAiRunConflict) throw Object.assign(new Error('duplicate primary key'), { status: 409 });
+      const row = { ...payload, _etag: 'ai-run-1' };
+      aiRuns.set(payload.wmkf_ai_runid, row);
+      return { ...row };
+    }),
+    getAiRunById: jest.fn(async (id) => (aiRuns.has(id) ? { ...aiRuns.get(id) } : null)),
+  };
+
+  return {
+    dependencies, rows, aiRuns, request, flags,
+    get uploadedBytes() { return uploadedBytes; },
+    attestDocxPackageAgainstRender,
+    seedRawRow(overrides) {
+      const id = overrides.wmkf_requestdocumentid || crypto.randomUUID();
+      const row = {
+        wmkf_requestdocumentid: id,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+        wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+        wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+        wmkf_generationkey: BASE_IDENTITY.generationKey,
+        wmkf_inputfingerprint: BASE_IDENTITY.inputFingerprint,
+        wmkf_claimtoken: null,
+        wmkf_promptname: PRE_SITE_VISIT_CONTRACT.promptName,
+        wmkf_promptversion: 4,
+        wmkf_templateid: PRE_SITE_VISIT_CONTRACT.templateId,
+        wmkf_templateversion: PRE_SITE_VISIT_CONTRACT.templateVersion,
+        wmkf_sharepointfolderpath: `Requests/${REQUEST_NUMBER}/${PRE_SITE_VISIT_CONTRACT.relativeFolder}`,
+        wmkf_filename: `${REQUEST_NUMBER} Pre-Site Visit test.docx`,
+        wmkf_attemptcount: 1,
+        _etag: 'row-1',
+        createdon: new Date().toISOString(),
+        modifiedon: new Date().toISOString(),
+        ...overrides,
+      };
+      rows.set(id, row);
+      return row;
+    },
+  };
+}
+
+function operationStatusEnum() {
+  // Real string values REQUEST_DOCUMENT_OPERATION_STATUS/LIFECYCLE_STATE map
+  // to -- read once, reused everywhere below instead of re-importing per call.
+  const { REQUEST_DOCUMENT_OPERATION_STATUS, REQUEST_DOCUMENT_LIFECYCLE_STATE } = jest.requireActual('../../shared/config/requestDocument.js');
+  return { REQUEST_DOCUMENT_OPERATION_STATUS, REQUEST_DOCUMENT_LIFECYCLE_STATE };
+}
+const { REQUEST_DOCUMENT_OPERATION_STATUS, REQUEST_DOCUMENT_LIFECYCLE_STATE } = operationStatusEnum();
+
+let world;
+let productionSentinelSpies;
+
+beforeEach(() => {
+  world = createWorld();
+  loadPreSiteVisitInputs.mockImplementation(async () => world.inputs ?? BASE_INPUTS);
+  createPresiteAiRunDeps.mockImplementation(() => ({
+    createAiRun: world.dependencies.createAiRun,
+    getAiRunById: world.dependencies.getAiRunById,
+    getCurrentPrompt: world.dependencies.getCurrentPrompt,
+  }));
+  createPresiteInputDeps.mockImplementation(() => ({}));
+  // Echoes `loadInputs` back UNCHANGED (item 8): the same seam
+  // seed_presite_draft/render_presite/verify_presite each construct.
+  createPresiteSandboxDeps.mockImplementation(({ loadInputs }) => ({
+    ...world.dependencies,
+    loadInputs,
+    // Mirrors the real presite-sandbox-deps.js wrapper's I2 forcing (item 5):
+    // artifact-service.js calls uploadFile with only 5 positional args, so the
+    // wrapper -- not the caller -- is what must supply conflictBehavior:
+    // 'fail'. presite-sandbox-deps.js itself is module-mocked in this file
+    // (its own transport/host-validation is covered directly in
+    // presite-sandbox-deps.test.js), so this replicates only that one seam;
+    // world.dependencies.uploadFile below asserts the option actually arrived.
+    uploadFile: (library, folder, filename, content, contentType) => world.dependencies.uploadFile(
+      library, folder, filename, content, contentType, { conflictBehavior: 'fail' },
+    ),
+  }));
+
+  // I9 production sentinels: if any presite step ever reached a real
+  // production Dataverse adapter/Graph/DynamicsService write, these throw.
+  productionSentinelSpies = [
+    jest.spyOn(DynamicsService, 'createRecord').mockImplementation(() => { throw new Error('DynamicsService.createRecord must never be reached by the pre_site_visit recipe'); }),
+    jest.spyOn(DynamicsService, 'updateRecord').mockImplementation(() => { throw new Error('DynamicsService.updateRecord must never be reached by the pre_site_visit recipe'); }),
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockImplementation(() => { throw new Error('DynamicsService.queryAllRecords must never be reached by the pre_site_visit recipe'); }),
+    jest.spyOn(DynamicsService, 'getRecord').mockImplementation(() => { throw new Error('DynamicsService.getRecord must never be reached by the pre_site_visit recipe'); }),
+  ];
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
+  productionSentinelSpies.forEach((spy) => spy.mockRestore());
+});
+
+const client = { baseUrl: 'https://orgd9e66399.crm.dynamics.com/api/data/v9.2' };
+const graph = {}; // forwarded verbatim by the mocked createPresiteSandboxDeps; unused directly
+
+async function runStep(currentStep, { resources = [], runOverrides = {}, bundle = buildBundle() } = {}) {
+  const run0 = baseRun(bundle, { currentStep, ...runOverrides });
+  const { ledger, calls, resources: liveResources } = createFakeLedger(run0, resources);
+  const manifest = baseManifest(bundle);
+  const result = await advanceRun({
+    runId: RUN_ID, ledger, manifest, bundle,
+    deps: { client, graph, sharePointTarget: () => ({}) },
+  });
+  return { result, calls, resources: liveResources };
+}
+
+describe('RECIPE_STEP_ORDER.pre_site_visit shape (sanity for the fixtures below)', () => {
+  test('has exactly the four new steps after verify_reviews', () => {
+    expect(RECIPE_STEP_ORDER.pre_site_visit.slice(-4)).toEqual([
+      'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite',
+    ]);
+  });
+});
+
+describe('item 1: seed_presite_ai_run -- stub run via the sandbox only', () => {
+  test('happy path: exactly one createAiRun POST with the preallocated GUID, both binds, run source 682090002, notes carrying the run id; the production sentinel is never touched', async () => {
+    const { result, resources } = await runStep('seed_presite_ai_run');
+    expect(result.outcome).toBe('advanced');
+    expect(world.dependencies.createAiRun).toHaveBeenCalledTimes(1);
+    const [payload] = world.dependencies.createAiRun.mock.calls[0];
+    expect(payload.wmkf_ai_runid).toMatch(/^[0-9a-f-]{36}$/);
+    expect(payload['wmkf_ai_Request@odata.bind']).toBe(`/akoya_requests(${REQUEST_ID})`);
+    expect(payload['wmkf_ai_Prompt@odata.bind']).toBe(`/wmkf_ai_prompts(${PROMPT_ID})`);
+    expect(payload.wmkf_ai_runsource).toBe(682090002);
+    expect(payload.wmkf_ai_notes).toContain(RUN_ID);
+    expect(world.aiRuns.size).toBe(1);
+    for (const spy of productionSentinelSpies) expect(spy).not.toHaveBeenCalled();
+    const readback = resources.find((r) => r.step === 'seed_presite_ai_run')?.readback;
+    expect(readback.confirmedRunId).toBe(payload.wmkf_ai_runid);
+  });
+
+  test('resume: journaled GUID + readback exists and matches -> recovered, no second POST', async () => {
+    const runId = crypto.randomUUID();
+    world.aiRuns.set(runId, { wmkf_ai_runid: runId, _wmkf_ai_request_value: REQUEST_ID });
+    const priorResources = [{
+      resourceId: 1, sequence: 1, step: 'seed_presite_ai_run', resourceKind: 'dataverse_ai_run', system: 'dataverse',
+      plannedIdentity: { runId }, readback: { runId }, outcome: 'dispatched',
+    }];
+    const { result } = await runStep('seed_presite_ai_run', { resources: priorResources });
+    expect(result.outcome).toBe('advanced');
+    expect(world.dependencies.createAiRun).not.toHaveBeenCalled();
+  });
+
+  test('resume: journaled GUID but readback is bound to a different request -> refuses (presite_ai_run_ambiguous)', async () => {
+    const runId = crypto.randomUUID();
+    world.aiRuns.set(runId, { wmkf_ai_runid: runId, _wmkf_ai_request_value: crypto.randomUUID() });
+    const priorResources = [{
+      resourceId: 1, sequence: 1, step: 'seed_presite_ai_run', resourceKind: 'dataverse_ai_run', system: 'dataverse',
+      plannedIdentity: { runId }, readback: { runId }, outcome: 'dispatched',
+    }];
+    const { result } = await runStep('seed_presite_ai_run', { resources: priorResources });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
+    expect(world.dependencies.createAiRun).not.toHaveBeenCalled();
+  });
+
+  test('resume: journaled GUID absent after an ambiguous POST -> refuses, never re-POSTs blind', async () => {
+    const runId = crypto.randomUUID(); // never created in world.aiRuns
+    const priorResources = [{
+      resourceId: 1, sequence: 1, step: 'seed_presite_ai_run', resourceKind: 'dataverse_ai_run', system: 'dataverse',
+      plannedIdentity: { runId }, readback: { runId }, outcome: 'dispatched',
+    }];
+    const { result } = await runStep('seed_presite_ai_run', { resources: priorResources });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
+    expect(world.dependencies.createAiRun).not.toHaveBeenCalled();
+  });
+});
+
+function seedAiRunResource(resourceId = 1) {
+  const runId = crypto.randomUUID();
+  return {
+    runId,
+    resource: {
+      resourceId, sequence: resourceId, step: 'seed_presite_ai_run', resourceKind: 'dataverse_ai_run', system: 'dataverse',
+      plannedIdentity: { runId }, readback: { confirmedRunId: runId }, outcome: 'verified',
+    },
+  };
+}
+
+describe('item 2: seed_presite_draft -- seeded row shape', () => {
+  test('creates exactly one row: FAILED, a factory code outside UNCHANGED_RETRY_BLOCKED_CODES, run + prompt bound, section fields + core envelope + snapshot present', async () => {
+    const { runId, resource } = seedAiRunResource();
+    const { result } = await runStep('seed_presite_draft', { resources: [resource] });
+    expect(result.outcome).toBe('advanced');
+    expect(world.rows.size).toBe(1);
+    const [row] = [...world.rows.values()];
+    expect(row.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
+    expect(UNCHANGED_RETRY_BLOCKED_CODES.has(row.wmkf_lasterrorcode)).toBe(false);
+    expect(row._wmkf_airun_value).toBe(runId);
+    expect(row._wmkf_aiprompt_value).toBe(PROMPT_ID);
+    for (const field of PRE_SITE_SECTION_FIELDS) expect(typeof row[field]).toBe('string');
+    expect(row.wmkf_presiteproposalcorejson).toBeTruthy();
+    expect(row.wmkf_presiteinputsnapshotjson).toBeTruthy();
+    expect(JSON.parse(row.wmkf_presiteinputsnapshotjson)).toEqual(buildPreSiteVisitInputSnapshot(BASE_INPUTS));
+  });
+
+  test('mutation: dropping the run bind at seed makes render_presite fail with pre_site_visit_draft_incomplete', async () => {
+    const { resource } = seedAiRunResource();
+    await runStep('seed_presite_draft', { resources: [resource] });
+    const [row] = [...world.rows.values()];
+    // Simulate the mutation directly on the seeded row rather than editing
+    // source: the observable is identical (a row whose core+snapshot exist
+    // but whose run bind is missing).
+    row._wmkf_airun_value = null;
+    const draftResource = {
+      resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey: row.wmkf_generationkey }, readback: { requestDocumentId: row.wmkf_requestdocumentid, claimTokenSha256: crypto.createHash('sha256').update(row.wmkf_claimtoken).digest('hex') }, outcome: 'verified',
+    };
+    const { result } = await runStep('render_presite', { resources: [resource, draftResource] });
+    expect(result.outcome).toBe('needs_attention');
+    expect(world.rows.size).toBe(1);
+    expect(row.wmkf_lasterrorcode).toBe('pre_site_visit_draft_incomplete');
+    expect(UNCHANGED_RETRY_BLOCKED_CODES.has('pre_site_visit_draft_incomplete')).toBe(true);
+  });
+
+  test('resume: row already present with a matching claim token -> recovered, no second create', async () => {
+    const { runId, resource } = seedAiRunResource();
+    await runStep('seed_presite_draft', { resources: [resource] });
+    const [row] = [...world.rows.values()];
+    world.dependencies.createDocument.mockClear();
+    const draftResource = {
+      resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey: row.wmkf_generationkey },
+      readback: { requestDocumentId: row.wmkf_requestdocumentid, claimTokenSha256: crypto.createHash('sha256').update(row.wmkf_claimtoken).digest('hex') },
+      outcome: 'verified',
+    };
+    const { result } = await runStep('seed_presite_draft', { resources: [resource, draftResource] });
+    expect(result.outcome).toBe('advanced');
+    expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(world.rows.size).toBe(1);
+  });
+
+  test('resume: row present but the journaled claim token no longer matches -> refuses (presite_pointer_mismatch)', async () => {
+    const { resource } = seedAiRunResource();
+    await runStep('seed_presite_draft', { resources: [resource] });
+    const [row] = [...world.rows.values()];
+    const draftResource = {
+      resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey: row.wmkf_generationkey },
+      readback: { requestDocumentId: row.wmkf_requestdocumentid, claimTokenSha256: 'f'.repeat(64) },
+      outcome: 'verified',
+    };
+    const { result } = await runStep('seed_presite_draft', { resources: [resource, draftResource] });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+  });
+});
+
+describe('item 3: runProposalCore never reached (three distinct fences)', () => {
+  test('I4: a seeded row already GENERATING refuses (presite_pointer_mismatch) before the producer is ever called -- seed_presite_draft always writes FAILED, so GENERATING here means a concurrent OTHER writer', async () => {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+    expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+    expect(world.rows.size).toBe(1);
+  });
+
+  test('both core and snapshot fields absent -> the throwing runProposalCore sentinel fires; needs_attention; no second row', async () => {
+    world.seedRawRow({
+      wmkf_claimtoken: null,
+      _wmkf_airun_value: crypto.randomUUID(),
+      wmkf_presiteproposalcorejson: null,
+      wmkf_presiteinputsnapshotjson: null,
+    });
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('needs_attention');
+    expect(world.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
+    expect(world.rows.size).toBe(1);
+  });
+
+  test('a drifted section field (core no longer matches the audited envelope) -> pre_site_visit_core_reconciliation_required; runProposalCore is never reached', async () => {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_presiteexecutivesummary: 'a drifted value that does not match the envelope',
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('needs_attention');
+    expect(world.dependencies.runProposalCore).not.toHaveBeenCalled();
+    // The fence fires BEFORE the row is ever claimed to GENERATING, so
+    // markFailedIfOwned (artifact-lineage.js) intentionally no-ops -- it only
+    // patches an owned, in-flight (GENERATING) row -- and the seeded row's own
+    // fields are untouched. The specific inner code survives only in the
+    // run's surfaced error message; the ledger's own ambient reason always
+    // collapses to 'presite_verification_failed' (stepRenderPresite's catch).
+    expect(result.errorMessage).toContain('do not match the audited envelope');
+    expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+    expect(world.rows.size).toBe(1);
+  });
+
+  test('roster drift (item 4): a review landing changes the recomputed generation key before render -> the row is not found; the create branch is taken and refuses at the getBuckets sentinel, not runProposalCore', async () => {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+    // A review landed between seed and render: the referee section changes,
+    // which changes the input snapshot and therefore the generation key.
+    world.inputs = inputFixture({ documentFields: { refereeSection: { text: 'We received one review.', names: ['Dr. A'] } } });
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('needs_attention');
+    expect(world.dependencies.runProposalCore).not.toHaveBeenCalled();
+    expect(world.dependencies.getBuckets).toHaveBeenCalledTimes(1);
+    expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(world.rows.size).toBe(1);
+  });
+
+  test('happy path (matching draft): reaches render/upload/commit without ever calling runProposalCore', async () => {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('advanced');
+    expect(world.dependencies.runProposalCore).not.toHaveBeenCalled();
+    const [row] = [...world.rows.values()];
+    expect(row.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
+    expect(row.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT);
+    expect(world.request._wmkf_currentpresitevisit_value).toBe(row.wmkf_requestdocumentid);
+    expect(world.rows.size).toBe(1);
+  });
+});
+
+describe('item 5: upload create-only', () => {
+  function seedMatchingRow() {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    return world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+  }
+
+  test('every upload call carries conflictBehavior: fail (asserted inside the fake itself; a mismatch throws)', async () => {
+    seedMatchingRow();
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('advanced');
+    expect(world.dependencies.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('a conflict (409) refuses and never replaces: needs_attention, no updateDocument call after the throw', async () => {
+    seedMatchingRow();
+    world.flags.forceUploadConflict = true;
+    world.dependencies.updateDocument.mockClear();
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('needs_attention');
+    // artifact-service.js's own catch writes the FAILED patch through
+    // updateDocument (markFailedIfOwned) -- that write is expected. What
+    // must never happen is a SECOND successful upload/commit: the row stays
+    // un-activated.
+    const [row] = [...world.rows.values()];
+    expect(row.wmkf_operationstatus).not.toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
+    expect(world.rows.size).toBe(1);
+  });
+
+  // recoverUploadedFile/prepareFreshFilename (artifact-upload-recovery.js,
+  // artifact-lineage.js) are the producer's own "crash between upload and
+  // commit" resume path, keyed off the persisted filename/contentHash, not
+  // the claim token -- so fail-on-conflict (above) never blocks a
+  // legitimate resume there. That path is PROVABLY UNREACHABLE from
+  // render_presite specifically: stepRenderPresite's own pre-render fence
+  // (I4, just above in run-runner.js) refuses outright the moment it finds
+  // the seeded row GENERATING, before ever calling generatePreSiteVisitArtifact
+  // -- seed_presite_draft always writes FAILED, so a GENERATING row here can
+  // only mean a concurrent OTHER writer, which this recipe always refuses
+  // rather than silently reusing. A test seeding a GENERATING row to reach
+  // recoverUploadedFile therefore documents a wrong premise, not real
+  // behavior; see the "GENERATING (claimed by another writer)" refusal
+  // above for that fence's own coverage. presite-sandbox-deps.test.js proves
+  // uploadFile's unconditional 'fail' forcing directly.
+});
+
+describe('item 6: verify_presite attestation fail-closed', () => {
+  function seedReadyRowAndRender() {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+  }
+
+  test('identical promoted bytes: verify_presite reaches markReady', async () => {
+    seedReadyRowAndRender();
+    const rendered = await runStep('render_presite');
+    expect(rendered.result.outcome).toBe('advanced');
+    const { result, calls } = await runStep('verify_presite');
+    expect(result.outcome).toBe('ready');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  test('a promoted DOCX that differs from the render in an uncharacterized part -> presite_promotion_uncharacterized', async () => {
+    seedReadyRowAndRender();
+    await runStep('render_presite');
+    // Corrupt the "downloaded" (promoted) bytes so they no longer match a
+    // fresh render byte-for-byte -- JSZip will see a differing/garbled part.
+    const corrupted = Buffer.from(world.uploadedBytes);
+    corrupted[corrupted.length - 10] ^= 0xff;
+    world.flags.downloadOverrideBuffer = corrupted;
+    const { result } = await runStep('verify_presite');
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
+  });
+});
+
+describe('item 7: only verify_presite marks ready (behavioral)', () => {
+  test('seed_presite_ai_run -> seed_presite_draft -> render_presite each advance; verify_presite is the only markReady', async () => {
+    const seed1 = await runStep('seed_presite_ai_run');
+    expect(seed1.result.outcome).toBe('advanced');
+    expect(seed1.calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+
+    const aiRunResource = seed1.resources.find((r) => r.step === 'seed_presite_ai_run');
+    const seed2 = await runStep('seed_presite_draft', { resources: [aiRunResource] });
+    expect(seed2.result.outcome).toBe('advanced');
+    expect(seed2.calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+
+    const render = await runStep('render_presite');
+    expect(render.result.outcome).toBe('advanced');
+    expect(render.calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+
+    const verify = await runStep('verify_presite');
+    expect(verify.result.outcome).toBe('ready');
+    expect(verify.calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+});
+
+describe('item 8: seed/render share the same loadInputs seam (snapshot determinism)', () => {
+  test('createPresiteSandboxDeps echoes the loadInputs closure back unchanged at every call site (proven directly in presite-sandbox-deps.test.js); here, an unmutated world produces byte-identical snapshots at seed and render time', async () => {
+    const { resource } = seedAiRunResource();
+    await runStep('seed_presite_draft', { resources: [resource] });
+    const [row] = [...world.rows.values()];
+    const storedSnapshot = JSON.parse(row.wmkf_presiteinputsnapshotjson);
+    const { result } = await runStep('render_presite', {
+      resources: [resource, {
+        resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+        plannedIdentity: { generationKey: row.wmkf_generationkey },
+        readback: { requestDocumentId: row.wmkf_requestdocumentid, claimTokenSha256: crypto.createHash('sha256').update(row.wmkf_claimtoken).digest('hex') },
+        outcome: 'verified',
+      }],
+    });
+    expect(result.outcome).toBe('advanced');
+    const freshSnapshot = buildPreSiteVisitInputSnapshot(BASE_INPUTS);
+    expect(storedSnapshot).toEqual(freshSnapshot);
+  });
+});
