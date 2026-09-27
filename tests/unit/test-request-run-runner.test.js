@@ -10,7 +10,8 @@ import { jest } from '@jest/globals';
 import {
   advanceRun, nextStepFor, recipeIncludesStep, recipeLeaseSeconds, RECIPE_STEP_ORDER,
 } from '../../lib/services/test-requests/run-runner.js';
-import { sha256, MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { sha256, MANIFEST_V4, computeRunPlanDigest } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -197,6 +198,47 @@ describe('advanceRun: caller-error digest refusal', () => {
     })).rejects.toThrow('createBodySha256');
     expect(calls.filter((call) => call.op === 'claimLease')).toHaveLength(0);
     expect(calls.filter((call) => call.op === 'markNeedsAttention')).toHaveLength(0);
+  });
+
+  // Opus round-1 P3-1: a run reserved under a LEDGER_RECIPES token with no
+  // built RECIPE_STEP_ORDER entry (pre_site_visit, slice 4a) must fail
+  // BEFORE any lease claim or client call, not merely later inside a step
+  // handler's own nextStepFor call (which would already have run
+  // create_request -- a real Dataverse write -- by then).
+  test('refuses before claiming any lease or touching the client when the run\'s recipe has no built step order', async () => {
+    // pre_site_visit's recipeSeedsReviewers is true (rank >= 'reviews'), so
+    // assertRunMatchesManifestAndBundle's reviewer-plan-digest recheck runs
+    // first (as it does for a real `reviews` run); the manifest/run pair
+    // below is built to pass that recheck cleanly so the NEW
+    // stepOrderForRecipe fail-closed check (not a digest mismatch) is what
+    // actually fires.
+    const bundle = { reviewers: [] };
+    const bundleSha256 = sha256(bundle);
+    const manifest = baseManifest({
+      recipe: 'pre_site_visit',
+      reviewFilePolicy: { digest: reviewFileCopyPolicyDigest() },
+      source: {
+        requestId: SOURCE_ID, revision: 'rev-1', requestType: 100000000, bundleSha256,
+      },
+    });
+    const planDigest = computeRunPlanDigest({ manifest, reviewerAddressDigests: [] });
+    const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'pre_site_visit', planDigest, bundleSha256 }));
+    const client = { get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn() };
+    const graph = fakeGraph({
+      getSiteId: jest.fn(async () => 'site-1'), getDriveId: jest.fn(async () => 'drive-1'),
+    });
+    await expect(advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph, sharePointTarget: () => ({}) },
+    })).rejects.toThrow('Unknown Test Request Factory recipe: pre_site_visit.');
+    expect(calls.filter((call) => call.op === 'claimLease')).toHaveLength(0);
+    expect(calls.filter((call) => call.op === 'markNeedsAttention')).toHaveLength(0);
+    expect(client.get).not.toHaveBeenCalled();
+    expect(client.post).not.toHaveBeenCalled();
+    expect(client.patch).not.toHaveBeenCalled();
+    expect(client.delete).not.toHaveBeenCalled();
+    expect(graph.getSiteId).not.toHaveBeenCalled();
+    expect(graph.getDriveId).not.toHaveBeenCalled();
   });
 });
 
@@ -488,6 +530,60 @@ describe('slice 6c-i: reviews recipe step order (cumulative on initial_assessmen
       expect(nextStepFor('reviews', from)).toEqual({ step: to, index });
     }
     expect(nextStepFor('reviews', 'verify_reviews')).toBeNull();
+  });
+});
+
+// Slice 4a: verify_reviews must ADVANCE when it is not its recipe's last
+// step, exactly mirroring verify/verify_initial_assessment, so a later
+// cumulative recipe (pre_site_visit and beyond) can continue past it. No
+// such recipe has a built RECIPE_STEP_ORDER entry yet, so this proves the
+// generic mechanism (shared by all three verifiers) with a synthetic order
+// injected through nextStepFor's optional third argument -- the one clean
+// seam into the frozen, module-internal RECIPE_STEP_ORDER (see nextStepFor's
+// own doc comment).
+describe('slice 4a: nextStepFor advance-vs-markReady mechanism (verify_reviews\'s new branch)', () => {
+  const SYNTHETIC_ORDERS = Object.freeze({
+    reviews: Object.freeze([...RECIPE_STEP_ORDER.reviews]), // real 'reviews': verify_reviews stays terminal
+    pre_site_visit: Object.freeze([...RECIPE_STEP_ORDER.reviews, 'seed_presite_ai_run']), // synthetic: verify_reviews is NOT last
+  });
+
+  test('terminal branch: real "reviews" order has verify_reviews last -> null (markReady)', () => {
+    expect(nextStepFor('reviews', 'verify_reviews', SYNTHETIC_ORDERS)).toBeNull();
+  });
+
+  test('advance branch: a synthetic cumulative order continuing past verify_reviews -> the next step', () => {
+    expect(nextStepFor('pre_site_visit', 'verify_reviews', SYNTHETIC_ORDERS))
+      .toEqual({ step: 'seed_presite_ai_run', index: RECIPE_STEP_ORDER.reviews.length });
+  });
+
+  test('the optional third argument defaults to the real, frozen RECIPE_STEP_ORDER (no production call site passes it)', () => {
+    expect(nextStepFor('reviews', 'verify_reviews')).toBeNull();
+    expect(nextStepFor('basic', 'verify')).toBeNull();
+  });
+
+  // Structural, source-inspection check: no real later recipe exists yet
+  // (4b builds pre_site_visit's steps), so stepVerifyReviews's OWN
+  // advance-vs-markReady wiring cannot be driven behaviorally through
+  // advanceRun with real data in this slice -- the nextStepFor tests above
+  // prove the shared mechanism, but not that stepVerifyReviews actually
+  // calls it instead of unconditionally marking ready. This proves the
+  // wiring itself: stepVerifyReviews's terminal branch is now the SAME
+  // `nextStepFor(...) === null ? markReady : advance` shape as
+  // stepVerify/stepVerifyInitialAssessment, not the old "must be terminal or
+  // throw" code.
+  test('stepVerifyReviews is wired through nextStepFor + completeCurrentStep, not an unconditional markReady', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '..', '..', 'lib', 'services', 'test-requests', 'run-runner.js'),
+      'utf8',
+    );
+    const start = source.indexOf('async function stepVerifyReviews(');
+    const end = source.indexOf('\nfunction notBuiltStep', start);
+    const body = source.slice(start, end);
+    expect(body).toMatch(/nextStepFor\(run\.recipe,\s*VERIFY_REVIEWS_STEP\)\s*===\s*null/);
+    expect(body).toMatch(/completeCurrentStep\(ledger,\s*run,\s*VERIFY_REVIEWS_STEP/);
+    expect(body).not.toMatch(/must be the terminal step/);
   });
 });
 

@@ -128,8 +128,10 @@ reserved for a `reviews` recipe run (`run_id`, `sequence`,
   reservation of a given `(actor_id, idempotency_key)` (`created === true`);
   there is no UPDATE path anywhere in run-ledger.js, so a row is immutable
   once written. `assertReviewerAssignments` (private to run-ledger.js)
-  validates before any SQL: non-empty for `reviews`, none for any other
-  recipe, no two assignments sharing a source reviewer or a normalized
+  validates before any SQL: non-empty when `recipeSeedsReviewers(recipe)` is
+  true (`reviews` and every later cumulative recipe — slice 4a,
+  `lib/services/test-requests/recipe-capabilities.js`), none otherwise, no
+  two assignments sharing a source reviewer or a normalized
   (trim+lowercase) address. The CLI's `--reserve --recipe=reviews` is the only
   caller today; each bundle reviewer's address comes from its
   `--reviewer-address=<sourcePersonGuid>=<address>` flag, else its synthetic
@@ -151,6 +153,32 @@ reserved for a `reviews` recipe run (`run_id`, `sequence`,
   steps (`seed_reviewers`, `copy_review_file`, `seed_review_answers`,
   `verify_reviews`) stop cleanly with `needs_attention` /
   `recipe_step_not_built` until then.
+
+## Recipe tokens (slice 4a, 2026-09-26)
+
+**[VERIFIED via source, 2026-09-26]** `test_request_runs.recipe`'s CHECK
+(migration 054 and its `scripts/setup-database.js` mirror) and
+`LEDGER_RECIPES` (now defined in
+`lib/services/test-requests/recipe-capabilities.js`, re-exported unchanged
+from `run-ledger.js`) both accept three additional cumulative tokens:
+`pre_site_visit`, `final_writeup`, `site_visit_materials` (recipes 4, 5 and 3
+of the Recipes 3-5 plan, in that build order). `LEDGER_RECIPES` is ordered
+(`basic`, `initial_assessment`, `reviews`, `pre_site_visit`,
+`final_writeup`, `site_visit_materials`); `recipeSeedsReviewers(recipe)` and
+`recipeSeedsPreSite(recipe)` (same module) are rank-based capability
+predicates over that order, replacing every `recipe === 'reviews'` /
+`!== 'reviews'` comparison across the Factory. Both throw on an
+unrecognized recipe.
+
+**The ledger's own enum accepts these three tokens; `RECIPE_STEP_ORDER`
+(`lib/services/test-requests/run-runner.js`) does NOT yet have an entry for
+any of them** — that is deliberate for this slice (their steps are built in
+4b/5/3). `stepOrderForRecipe`/`nextStepFor` fail closed (throw) on a recipe
+with no step order, so the CLI's `--recipe` validation
+(`scripts/rehearse-test-request-sandbox.mjs`) accepts only a recipe that
+BOTH is in `LEDGER_RECIPES` AND has a `RECIPE_STEP_ORDER` entry, refusing
+`pre_site_visit`/`final_writeup`/`site_visit_materials` before any Dataverse
+read or ledger write, not merely before their (not-yet-built) steps run.
 
 ## Limits
 

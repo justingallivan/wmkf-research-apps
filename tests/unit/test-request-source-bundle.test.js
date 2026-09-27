@@ -8,6 +8,7 @@ import {
   readSourceBundle,
   summarizeSourceBundle,
 } from '../../lib/services/test-requests/source-bundle.js';
+import { PROPOSAL_CORE_KEYS, PRE_SITE_VISIT_CONTENT_POLICY } from '../../shared/config/prompts/pre-site-visit-proposal-core.js';
 
 const REQUEST_ID = 'E43AE6EA-698F-F111-8076-6045BD018A07';
 const PURPOSE = 'Confidential source purpose text';
@@ -286,6 +287,353 @@ test('rejects duplicate document kinds', () => {
 
 test('rejects a missing request number', () => {
   expect(() => build({ sourceRow: sourceRow({ akoya_requestnum: null }) })).toThrow(/Request number/);
+});
+
+// ───────── Bundle v3 golden digest (slice 4a) ─────────
+// Same method as the v2 golden above, run against the module as it existed
+// immediately before this slice's edits (git HEAD at branch creation,
+// `_golden_orig_source_bundle.js` scratch copy, deleted after use) and
+// confirmed byte-identical against the CURRENT module with these same
+// fixtures -- proving slice 4a's v4 additions do not perturb the v3
+// projection or its digest.
+const reviewerFixture = (over = {}) => ({
+  suggestionId: 'aaaaaaaa-0000-0000-0000-000000000001',
+  personId: 'bbbbbbbb-0000-0000-0000-000000000001',
+  person: {
+    wmkf_name: 'Jane Reviewer',
+    wmkf_firstname: 'Jane',
+    wmkf_lastname: 'Reviewer',
+    wmkf_areaofexpertise: 'Genomics',
+    wmkf_primaryaffiliation: 'Test University',
+    wmkf_academicrank: 'Professor',
+    wmkf_primarydepartment: 'Biology',
+    wmkf_maininstitution: 'Test University',
+  },
+  personIsSynthetic: false,
+  suggestion: {
+    wmkf_suggestionlabel: 'A',
+    wmkf_programarea: 'Science',
+    wmkf_relevancescore: 90,
+    wmkf_matchreason: 'expertise',
+    wmkf_sources: 'manual',
+    wmkf_selected: true,
+    wmkf_invited: true,
+    wmkf_accepted: true,
+    wmkf_declined: false,
+    wmkf_responsetype: 100000000,
+    wmkf_emailsentat: '2026-09-01T00:00:00Z',
+    wmkf_responsereceivedat: '2026-09-02T00:00:00Z',
+    wmkf_materialssentat: '2026-09-03T00:00:00Z',
+    wmkf_reviewreceivedat: '2026-09-10T00:00:00Z',
+    wmkf_completedat: '2026-09-10T00:00:00Z',
+    wmkf_thankyousentat: '2026-09-11T00:00:00Z',
+    wmkf_reviewstatus: 100000001,
+    wmkf_revieweraffiliation: 'Test University',
+    wmkf_reviewuploadedbystaff: false,
+    wmkf_reviewerfirstname: 'Jane',
+    wmkf_reviewerlastname: 'Reviewer',
+    wmkf_reviewernickname: null,
+    wmkf_reviewertitle: 'Dr.',
+    wmkf_applicantdisposition: null,
+  },
+  answers: [],
+  reviewForm: 'unreceived',
+  files: [],
+  ...over,
+});
+
+test('golden digest: a v3 bundle from these fixtures is byte- and digest-identical to the module before slice 4a', () => {
+  const bundle = build({ reviewers: [reviewerFixture()] });
+  expect(bundle.version).toBe(3);
+  const json = JSON.stringify(bundle);
+  const sha256 = require('crypto').createHash('sha256').update(json).digest('hex');
+  expect(sha256).toBe('f9dab4bfe3f86c409676587be3611797268b03bb160e04c3e77d631653a3f325');
+});
+
+// ───────── Bundle v4 (slice 4a, "Recipe 4") ─────────
+
+const preSiteSectionFields = (over = {}) => ({
+  wmkf_presiteexecutivesummary: 'Executive summary text.',
+  wmkf_presiteimpactoverview: 'Impact overview text.',
+  wmkf_presitemethodologyoverview: 'Methodology overview text.',
+  wmkf_presitepersonneloverview: 'Personnel overview text.',
+  wmkf_presitekeckfundingrationale: 'Keck funding rationale text.',
+  wmkf_presitebackgroundandimpact: 'Background and impact text.',
+  wmkf_presitedetailedmethodology: 'Detailed methodology text.',
+  wmkf_presitepersonneldetails: 'Personnel details text.',
+  ...over,
+});
+// Codex adversarial round-1 finding 2: a canonical, REAL-shaped proposalCore
+// (exactly PROPOSAL_CORE_KEYS, the app's own key set) -- {a: 1}/{someField}
+// no longer round-trips, by design.
+const realProposalCore = (over = {}) => ({
+  executiveSummary: 'A concise executive summary paragraph.',
+  impactOverview: 'A concise impact overview paragraph.',
+  methodologyOverview: 'A concise methodology overview paragraph.',
+  personnelOverview: 'A concise personnel overview paragraph.',
+  keckFundingRationale: 'A concise Keck funding rationale paragraph.',
+  backgroundAndImpact: 'A concise background and impact paragraph.',
+  detailedMethodology: 'A concise detailed methodology paragraph.',
+  personnelDetails: 'A concise personnel details paragraph.',
+  ...over,
+});
+const proposalCoreJson = (over = {}) => ({
+  schemaVersion: 4,
+  proposalCore: realProposalCore(),
+  diagnostics: [{ code: 'referee_section_manual' }],
+  ...over,
+});
+const preSiteVisitFixture = (over = {}) => ({
+  requestDocumentId: 'cccccccc-0000-0000-0000-000000000001',
+  sectionFields: preSiteSectionFields(),
+  proposalCoreJson: proposalCoreJson(),
+  ...over,
+});
+
+describe('bundle v4: preSiteVisit section + abstract', () => {
+  test('a bundle with preSiteVisit is version 4 and carries preSiteVisit + abstract', () => {
+    const bundle = build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: preSiteVisitFixture(),
+      abstract: 'The source abstract text.',
+    });
+    expect(bundle.version).toBe(4);
+    expect(bundle.preSiteVisit).toEqual(preSiteVisitFixture());
+    expect(bundle.abstract).toBe('The source abstract text.');
+  });
+
+  test('abstract may be null', () => {
+    const bundle = build({ reviewers: [reviewerFixture()], preSiteVisit: preSiteVisitFixture(), abstract: null });
+    expect(bundle.abstract).toBeNull();
+  });
+
+  test('preSiteVisit requires reviewers too (v4 extends v3)', () => {
+    expect(() => build({ preSiteVisit: preSiteVisitFixture() }))
+      .toThrow(/requires a reviewers\[\] section/);
+  });
+
+  test('round-trips a v4 bundle through JSON and readSourceBundle unchanged', () => {
+    const bundle = build({ reviewers: [reviewerFixture()], preSiteVisit: preSiteVisitFixture(), abstract: 'abs' });
+    expect(readSourceBundle(JSON.parse(JSON.stringify(bundle)))).toEqual(bundle);
+  });
+
+  test('rejects an unknown top-level preSiteVisit key', () => {
+    expect(() => build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), extra: 'nope' },
+    })).toThrow(/unknown key/);
+  });
+
+  test('rejects an unknown sectionFields key', () => {
+    expect(() => build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), sectionFields: { ...preSiteSectionFields(), bogus: 'x' } },
+    })).toThrow(/unknown key/);
+  });
+
+  test('rejects a sectionFields value over the per-field cap', () => {
+    expect(() => build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: {
+        ...preSiteVisitFixture(),
+        sectionFields: { ...preSiteSectionFields(), wmkf_presiteexecutivesummary: 'x'.repeat(30001) },
+      },
+    })).toThrow(/section field\(s\) invalid/);
+  });
+
+  test('rejects an unknown proposalCoreJson envelope key', () => {
+    expect(() => build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), extra: 'nope' } },
+    })).toThrow(/envelope carries unknown key/);
+  });
+
+  test.each([1, 5, 'four', null])('rejects an unsupported proposalCoreJson schemaVersion (%p)', (schemaVersion) => {
+    expect(() => build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), schemaVersion } },
+    })).toThrow(/unsupported schemaVersion/);
+  });
+
+  test.each([2, 3, 4])('accepts every schemaVersion artifact-model.js itself accepts (%d)', (schemaVersion) => {
+    const bundle = build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), schemaVersion } },
+    });
+    expect(bundle.preSiteVisit.proposalCoreJson.schemaVersion).toBe(schemaVersion);
+  });
+
+  // Codex adversarial round-1 finding 2: proposalCore is canonicalized
+  // through the app's OWN key set/validator, never passed through unchanged.
+  describe('proposalCore canonicalization (Codex adversarial round-1 finding 2)', () => {
+    test('refuses an unknown key inside proposalCore', () => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: { ...proposalCoreJson(), proposalCore: realProposalCore({ forbiddenExtra: 'smuggled' }) },
+        },
+      })).toThrow(/proposal core is invalid/);
+    });
+
+    test.each(PROPOSAL_CORE_KEYS)('refuses a missing %s key', (missingKey) => {
+      const { [missingKey]: _omit, ...incomplete } = realProposalCore();
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), proposalCore: incomplete } },
+      })).toThrow(/proposal core is invalid/);
+    });
+
+    test.each(PROPOSAL_CORE_KEYS)('refuses a wrong-type (non-string) %s value', (key) => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: { ...proposalCoreJson(), proposalCore: realProposalCore({ [key]: 12345 }) },
+        },
+      })).toThrow(/proposal core is invalid/);
+    });
+
+    // The Dataverse-column-size ceiling: PRE_SITE_VISIT_CONTENT_POLICY.
+    // sinkMaxChars (30000), the SAME cap the app enforces on generated
+    // section content and on each Pre-Site section field in this bundle.
+    test.each(PROPOSAL_CORE_KEYS)('refuses an oversize %s value (over the sinkMaxChars ceiling)', (key) => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: {
+            ...proposalCoreJson(),
+            proposalCore: realProposalCore({ [key]: 'x'.repeat(PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars + 1) }),
+          },
+        },
+      })).toThrow(/proposal core is invalid/);
+    });
+
+    test('a value exactly at the sinkMaxChars ceiling is accepted', () => {
+      const bundle = build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: {
+            ...proposalCoreJson(),
+            proposalCore: realProposalCore({ executiveSummary: 'x'.repeat(PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars) }),
+          },
+        },
+      });
+      expect(bundle.preSiteVisit.proposalCoreJson.proposalCore.executiveSummary).toHaveLength(
+        PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars,
+      );
+    });
+
+    test('a canonical real-shaped proposalCore round-trips byte-identical (never re-normalized)', () => {
+      const core = realProposalCore();
+      const bundle = build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), proposalCore: core } },
+      });
+      expect(bundle.preSiteVisit.proposalCoreJson.proposalCore).toEqual(core);
+      // And the whole bundle round-trips through JSON + readSourceBundle too.
+      expect(readSourceBundle(JSON.parse(JSON.stringify(bundle))).preSiteVisit.proposalCoreJson.proposalCore)
+        .toEqual(core);
+    });
+  });
+
+  // Codex adversarial round-1 finding 2: diagnostics is canonicalized through
+  // artifact-model.js's own `validateDiagnostics` (unknown per-entry keys are
+  // dropped by that function's own established allowlist behavior; malformed
+  // entries and a non-array/over-length array are refused).
+  describe('diagnostics canonicalization (Codex adversarial round-1 finding 2)', () => {
+    test('refuses a malformed diagnostic entry (missing code)', () => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), diagnostics: [{ section: 'x' }] } },
+      })).toThrow(/diagnostics require reconciliation/);
+    });
+
+    test('refuses a diagnostics value that is not an array', () => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), diagnostics: { code: 'x' } } },
+      })).toThrow(/diagnostics must be an array/);
+    });
+
+    test('drops an unknown key inside a diagnostic entry (artifact-model.js\'s own established allowlist behavior)', () => {
+      const bundle = build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: { ...proposalCoreJson(), diagnostics: [{ code: 'personnel_name_not_matched', smuggled: 'nope' }] },
+        },
+      });
+      expect(bundle.preSiteVisit.proposalCoreJson.diagnostics).toEqual([{ code: 'personnel_name_not_matched' }]);
+    });
+  });
+
+  // Opus round-1: preserve the source envelope's own keys rather than
+  // fabricating `diagnostics: []` for an envelope that never had the key.
+  test('proposalCoreJson omits diagnostics when the source envelope never had it (does not fabricate [])', () => {
+    const { diagnostics, ...envelopeWithoutDiagnostics } = proposalCoreJson();
+    const bundle = build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: envelopeWithoutDiagnostics },
+    });
+    expect(Object.prototype.hasOwnProperty.call(bundle.preSiteVisit.proposalCoreJson, 'diagnostics')).toBe(false);
+  });
+
+  test('proposalCoreJson preserves an explicit diagnostics value (including an empty array) unchanged', () => {
+    const bundle = build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), diagnostics: [] } },
+    });
+    expect(bundle.preSiteVisit.proposalCoreJson.diagnostics).toEqual([]);
+  });
+
+  test('an abstract over the cap is rejected', () => {
+    expect(() => build({
+      reviewers: [reviewerFixture()], preSiteVisit: preSiteVisitFixture(), abstract: 'x'.repeat(30001),
+    })).toThrow(/abstract is invalid/);
+  });
+
+  // Opus round-1 P3-2: the previous version of this test built its bundle
+  // from a fixture that never contained the forbidden fields in the first
+  // place, so it passed vacuously regardless of whether the schema actually
+  // excludes them. This version puts each forbidden field INTO the fixture
+  // (as a caller would if it tried to smuggle a raw row's field through, at
+  // the level where each one would actually land: top-level preSiteVisit for
+  // the request-document-scoped fields, sectionFields for a field name
+  // collision there) and asserts `build` REFUSES it (unknown key) rather
+  // than merely checking the successful output's JSON for absence.
+  test.each([
+    ['wmkf_presiteinputsnapshotjson', 'preSiteVisit'],
+    ['wmkf_inputfingerprint', 'preSiteVisit'],
+    ['wmkf_generationkey', 'preSiteVisit'],
+    ['wmkf_lifecyclestate', 'preSiteVisit'],
+    ['wmkf_claimtoken', 'preSiteVisit'],
+    ['_wmkf_airun_value', 'preSiteVisit'],
+    ['wmkf_presiteinputsnapshotjson', 'sectionFields'],
+    ['wmkf_lifecyclestate', 'sectionFields'],
+    ['wmkf_claimtoken', 'sectionFields'],
+  ])('the bundle validator refuses the forbidden field %s if smuggled into %s', (field, location) => {
+    const preSiteVisit = location === 'preSiteVisit'
+      ? { ...preSiteVisitFixture(), [field]: 'smuggled-value' }
+      : { ...preSiteVisitFixture(), sectionFields: { ...preSiteSectionFields(), [field]: 'smuggled-value' } };
+    expect(() => build({ reviewers: [reviewerFixture()], preSiteVisit, abstract: 'abs' }))
+      .toThrow(/unknown key/);
+  });
+
+  test.each([2, 3])('version %d bundle must not carry a preSiteVisit section or abstract', (version) => {
+    const legacyBundle = version === 2 ? build() : build({ reviewers: [reviewerFixture()] });
+    expect(() => readSourceBundle({ ...legacyBundle, preSiteVisit: preSiteVisitFixture() }))
+      .toThrow(/must not carry a preSiteVisit section/);
+    expect(() => readSourceBundle({ ...legacyBundle, abstract: 'x' }))
+      .toThrow(/must not carry an abstract/);
+  });
+
+  test('version 4 bundle missing its preSiteVisit section is refused', () => {
+    const v3 = build({ reviewers: [reviewerFixture()] });
+    expect(() => readSourceBundle({ ...v3, version: 4 })).toThrow(/missing its preSiteVisit section/);
+  });
 });
 
 test('summary carries identities and hash prefixes but never source text', () => {
