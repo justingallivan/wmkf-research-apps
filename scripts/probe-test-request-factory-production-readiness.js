@@ -19,6 +19,8 @@
  *
  * Usage:
  *   DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-test-request-factory-production-readiness.js --director=<sign-in name>
+ *   Add --detail to also print what each create-triggered workflow writes and
+ *   each matching cloud flow's triggers and record actions (names only).
  */
 
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client');
@@ -42,6 +44,46 @@ function parseDirector(argv) {
   return value;
 }
 
+/** Labelled steps, `entity.attribute` targets set, entities created, and whether the workflow sends email. */
+function summarizeWorkflowXaml(xaml) {
+  const uniq = (values) => [...new Set(values)].sort();
+  const steps = [...xaml.matchAll(/DisplayName="([^"]*Step\d+: [^"]*)"/g)].map((m) => m[1]);
+  const sets = [...xaml.matchAll(/<mxswa:SetEntityProperty Attribute="([a-z0-9_]+)"[^>]*EntityName="([a-z0-9_]+)"/g)]
+    .map((m) => `${m[2]}.${m[1]}`);
+  const creates = [...xaml.matchAll(/<mxswa:CreateEntity[^>]*EntityName="([a-z0-9_]+)"/g)].map((m) => m[1]);
+  return { steps: uniq(steps), sets: uniq(sets), creates: uniq(creates), sendsEmail: /SendEmail/.test(xaml) };
+}
+
+const FLOW_MESSAGE = { 1: 'create', 2: 'delete', 3: 'update', 4: 'create or update', 5: 'create or delete', 6: 'update or delete', 7: 'create, update or delete' };
+
+/** A flow's Dataverse triggers and the record operations its actions perform (entity names only, no values). */
+function summarizeFlow(clientdata) {
+  let definition;
+  try {
+    definition = JSON.parse(clientdata || '{}')?.properties?.definition || {};
+  } catch {
+    return { triggers: ['(clientdata did not parse)'], actions: [] };
+  }
+  const triggers = Object.entries(definition.triggers || {}).map(([name, t]) => {
+    const p = t?.inputs?.parameters || {};
+    const entity = p['subscriptionRequest/entityname'];
+    const message = FLOW_MESSAGE[p['subscriptionRequest/message']] || p['subscriptionRequest/message'];
+    const filter = p['subscriptionRequest/filteringattributes'] ? ` on ${p['subscriptionRequest/filteringattributes']}` : '';
+    const recurrence = t?.recurrence ? ` every ${t.recurrence.interval} ${t.recurrence.frequency}` : '';
+    return `${name} [${t?.type || '?'}${entity ? ` ${entity} ${message}${filter}` : ''}${recurrence}]`;
+  });
+  const actions = [];
+  const walk = (node) => {
+    if (!node || typeof node !== 'object') return;
+    const op = node?.inputs?.host?.operationId;
+    const entity = node?.inputs?.parameters?.entityName;
+    if (op && entity) actions.push(`${op} ${entity}`);
+    for (const value of Object.values(node)) if (value && typeof value === 'object') walk(value);
+  };
+  walk(definition.actions);
+  return { triggers, actions: [...new Set(actions)].sort() };
+}
+
 async function getAll(client, path) {
   const rows = [];
   let next = path;
@@ -56,6 +98,7 @@ async function getAll(client, path) {
 
 (async () => {
   const director = parseDirector(process.argv.slice(2));
+  const detail = process.argv.includes('--detail');
   const clientId = process.env.DYNAMICS_CLIENT_ID;
   if (!clientId) throw new Error('DYNAMICS_CLIENT_ID is not set.');
   const token = await getAccessToken(PRODUCTION_URL);
@@ -111,6 +154,27 @@ async function getAll(client, path) {
   const matching = flows.filter((f) => String(f.clientdata || '').includes('akoya_request'));
   console.log(`   cloud flows (activated) mentioning akoya_request: ${matching.length} of ${flows.length}`);
   for (const f of matching) console.log(`   - ${f.name}`);
+
+  if (!detail) return;
+
+  console.log('\n5. Detail: what each create-triggered workflow writes');
+  for (const w of workflows.filter((row) => row.triggeroncreate === true)) {
+    const resp = await client.get(`/workflows(${w.workflowid})?$select=xaml`);
+    if (!resp.ok) throw new Error(`GET workflow xaml failed (${resp.status})`);
+    const summary = summarizeWorkflowXaml(resp.body?.xaml || '');
+    console.log(`   - ${w.name}`);
+    console.log(`     steps: ${summary.steps.join(' | ') || '(none labelled)'}`);
+    console.log(`     sets: ${summary.sets.join(', ') || '(none)'}`);
+    console.log(`     creates: ${summary.creates.join(', ') || '(none)'}  sends email: ${summary.sendsEmail}`);
+  }
+
+  console.log('\n6. Detail: cloud flows mentioning akoya_request');
+  for (const f of matching) {
+    const summary = summarizeFlow(f.clientdata);
+    console.log(`   - ${f.name}`);
+    for (const t of summary.triggers) console.log(`     trigger: ${t}`);
+    console.log(`     record actions: ${summary.actions.join(', ') || '(none found)'}`);
+  }
 })().catch((error) => {
   console.error(`Probe failed: ${error.message}`);
   process.exit(1);

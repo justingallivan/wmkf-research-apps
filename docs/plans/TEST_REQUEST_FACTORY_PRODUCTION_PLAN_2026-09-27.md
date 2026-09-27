@@ -40,7 +40,20 @@ Owner decision 2026-09-27: sandbox live proofs stop after recipe 4. Deeper recip
 - The seven real-time create workflows ran on every clone. Six update only the Request. *GOverify- check Publication 78* updates the **applicant account**.
 - **The clone's applicant is always the W. M. Keck Foundation account** (`FOUNDATION_NAME`, `basic-clone-steps.js:49,245-253`). So in production two workflows write the Foundation's own account on every Factory create: GoVerify (accepted, Q3) and the CA FTB workflow.
 - The runner baselines that account (`foundationBaselineDigest`, `basic-clone-steps.js:270`), so a production run would stop `needs_attention` on those writes. That is safe, but no run could reach `ready`. P1 must decide this (open question 4).
-- The Q5 statement that nothing triggers is therefore contradicted for background workflows. This census is from the sandbox's parity copy of the definitions. P0 re-lists production's own registrations.
+- The Q5 statement that nothing triggers is contradicted for the sandbox.
+
+**Production P0 run (owner-run, 2026-09-27, S545) — the sandbox definitions are NOT production's.** [VERIFIED via the owner's run of `scripts/probe-test-request-factory-production-readiness.js`]
+
+- Marker columns: `wmkf_istestrequest`, `wmkf_testcreationrunid` and `wmkf_issyntheticreviewer` are all absent.
+- App-suite application user `53e97fb3-a006-f111-8406-000d3a352682`, enabled. Roles: Delegate, System Customizer, WMKF AI Elevated TEMP, WMKF AI Tools, WMKF Custom Entities, WMKF Research Review App Suite - Staff, akoyaGO Team User (no accounting). It has **no System Administrator role**; the sandbox app user has one, so no sandbox run exercised the Factory's writes under production's narrower roles.
+- The program director (the owner, `29b0de0d-4ff7-ee11-a1fd-000d3a3621c7`) is enabled.
+- 68 activated workflows, business rules and dialogs on `akoya_request` (sandbox 62). 8 are create-triggered (sandbox 12):
+  - background: *WMKF_Set Payee Payment Contact from Request*, *WMKF_Set Request Status for Discretionary*, *WMKF_Set Co-PI Field on Contact*, *WMKF_Create SoCal draft Phase II Ack*, *WMK_Set Type for Roll up Field*;
+  - real-time: *WMKF_Update Payment Contact from Org*, *Default a Request Title*, *Set GOapply Settings on Request*.
+- **Not active in production:** *GOverify- check Publication 78*, *Copy Applicant to Payee when Grant is Entered* and *WMKF_Update CA FTB Status on Org*, so neither Foundation-account write in the sandbox census happens there. *WMKF_Research Application Received Email Flow* triggers on update of `akoya_submissionaccepted`, not on create. Production's GoVerify warning therefore comes from another mechanism [ASSUMED: possibly an AkoyaGo plug-in].
+- 67 enabled Create/Update plug-in steps, including four vendor plug-ins the sandbox lacks: `AkoyaGo.RequestSetGrantAndStatus` (sync create and update), `AkoyaGo.CalculatedFieldsAsync` (async create and update), `AkoyaGo.AsyncRequestGoApplyRequirementsUpdate` (async update) and `AkoyaGo.AsyncEntityCreated` (async create). Their effects cannot be read from metadata.
+- 4 of 14 activated cloud flows mention `akoya_request`: *Bill.com - Push Payments*, *Bill.com Pull Payments*, *GOapply Add Request to Review Group (Deprecated)*, *GOapply AutoFill Next Phase (Deprecated)*. Their triggers are not yet read; the probe's `--detail` mode prints them.
+- Consequence: the sandbox is not a reliable model of production automation in either direction, and every sandbox-derived automation claim above is sandbox-only.
 
 ## New hazards in production
 
@@ -65,8 +78,6 @@ The owner runs it with `DATAVERSE_ALLOW_PROD_READS=yes` set inline on that one c
 - The three dependency builders become target-bound builders. The host and token binding shrinks to the app's defaults for production; the Factory wrappers listed above stay.
 - The GoVerify bypass is unreachable in production: the CLI refuses `--bypass-goverify` with a production target, and `create_request` refuses a journaled bypass intent for one. Tests cover both.
 - The stub AI run is replaced by binding the source's own `wmkf_ai_run` for production (recipe 4). Whether copying the link is enough, or the Final Writeup forward-copy needs anything else, is checked in the build.
-
-The Foundation baseline check moves from `versionnumber` to a field projection with a reviewed exclusion list (open question 4, decided).
 
 ### P2 — Run-scoped write fence at the transport
 
@@ -124,5 +135,6 @@ It needs the Q2 shared ledger, and it replaces P4's attestation with a server ch
 1. Q2, the ledger database for the form phase.
 2. Whether the 1000338 folder provisioner exists in production, and what it is (P0's workflow listing may answer it).
 3. Retire semantics for production residue: which rows can be deleted versus deactivated, given append-only tables such as `wmkf_ai_run`.
-4. **DECIDED 2026-09-27 (owner, S545): accept the Foundation-account writes and narrow the check.** The two workflows set `account.akoya_goverifytrigger` (GoVerify) and `account.wmkf_caftb` (CA FTB) [VERIFIED S545 from the sandbox XAML `SetEntityProperty` targets]. `foundationBaselineDigest` (`basic-clone-steps.js:270-277`) hashes the account's `versionnumber`, which any write moves. For production it becomes a digest over a fixed projection of the Foundation account's columns minus an explicit, reviewed exclusion list, starting with those two fields. Any other change still stops the run `needs_attention`. `akoya_goverifytrigger` is a trigger field, so the vendor's GoVerify integration may write further account fields afterwards [ASSUMED]. The first production `basic` run (P5) characterizes them, the way recipe 4 characterized SharePoint's DOCX rewrite. Each addition to the exclusion list is a reviewed commit, never a runtime relaxation. The Foundation's Contacts stay on the `versionnumber` digest.
+4. **Foundation-account writes: decided on sandbox evidence, then MOOT for production (2026-09-27, S545).** The owner accepted the two sandbox workflows' account writes (`akoya_goverifytrigger`, `wmkf_caftb`) and a narrowed baseline check. The production P0 run then showed neither workflow is active in production. The Foundation baseline check stays on `versionnumber` unless the first production `basic` run (P5) shows a production mechanism writing the Foundation account, most likely an AkoyaGo plug-in. If it does, the same approach applies: a field projection with a reviewed exclusion list.
+6. **Production create automation still to characterize before the first create:** what the five production-only background workflows and the four AkoyaGo plug-ins write, and the four flows' triggers, above all the two Bill.com payment flows (probe `--detail`). No production create happens until the Bill.com triggers are known.
 5. Whether any other create workflow's condition can become true through a later recipe's writes (for example the email flow's wait on submit date, or Co-PI fields), which would re-trigger it mid-run.
