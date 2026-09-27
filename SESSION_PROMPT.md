@@ -1,4 +1,75 @@
-# Session 544 Prompt: Factory item 6 recipes 3–5 (plan one paragraph, one Codex plan review), then item 7
+# Session 545 Prompt: Factory recipe 5 (Pre-RP brief, site-visit start, Final Writeup), then recipe 3; review the Integrity branch
+
+## Session 544 Summary — 2026-09-26/27 PT (Opus; reviewer-address defaults, recipes 3–5 plan, recipe 4 built and live-proven)
+
+### What Was Completed
+
+1. **Reviewer addresses are never minted** (PR #343, `9b6fea389`): a local-only `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS` base inbox is plus-tagged per source reviewer when no `--reviewer-address` flag is given (flag wins). Live-checked on sandbox Request 1000346.
+2. **Recipes 3–5 planned**: owner decisions P1–P6 and invariant classes I1–I10 (design doc *Recipes 3–5 plan*), two Codex plan reviews. Order: 4 → 5 → 3. Recipe 4 copies 1003222's Pre-Site draft verbatim over a stub `wmkf_ai_run`; the sandbox app user is the Final Writeup actor; the abstract is seeded in recipe 5; consultant feedback dropped; materials collection is production-phase only.
+3. **Recipe 4 (`pre_site_visit`) built in three slices, each reviewed**: 4a (PR #344), 4b (PR #345: the four Pre-Site steps, sandbox deps, ledger dimension), 4c (PR #346: PI and Co-PI names from bundle v4, `TEST · ` prefixed in the sandbox loader; owner accepted that copied draft prose keeps the source names verbatim).
+4. **GoVerify bypass diagnostics** (PR #347, `d0c0b90d1`): the deactivation error now reaches the manual-recheck reason, ledger failure text and sidecar; the existing test had passed on a TypeError (mocked `patch`, code calls `patchWithOptions`). Runs `a1dd008d…`/`99c92d35…` failed the bypass for an unknown cause; it did not recur.
+5. **Recipe 4 live-proven** (PR #348, `f678b1d60`): run `a410efe2…` → sandbox Request 1000348 reached `ready`. The Pre-Site v6 template carries another library's SharePoint customXml, which SharePoint rewrites in place on upload (item1 schema, item3 properties, itemProps1). `validateSharePointRewrite` accepts that for the render baseline only; Codex round 1 needs-attention (narrowed: observed roots only, itemProps paired with its schema item, bytes counted; failure detail sanitized and bounded), round 2 approve.
+6. **Integrity Screener Workbench tab handed to Codex** (owner request; branch `codex/integrity-workbench-tab`), logged in main's docs (`6c4546afc`).
+
+### Commits (all on `main` via merged PRs)
+- PR #343 (reviewer default address) · #344 (4a) · #345 (4b) · #346 (4c) · #347 `d0c0b90d1` (bypass diagnostics) · #348 `f678b1d60` (promotion re-promotion rule, first `ready` run).
+
+## Next Items
+
+### Verified Open
+
+1. **Recipe 5 — Pre-RP brief, site-visit start, Final Writeup (next build).** Plan and owner decisions: design doc *Recipes 3–5 plan* (P3 sandbox app user as Final Writeup actor, P4 abstract seeded here). Build as slices with the S543/S544 process: invariant table and orchestrator mutation checks before any review, Codex capped at three rounds per slice, weigh findings as safety vs fidelity (`feedback-factory-safe-not-full-fidelity`).
+   Evidence: design doc; `RECIPE_STEP_ORDER` in `lib/services/test-requests/run-runner.js` has no recipe-5 entry yet.
+2. **Recipe 3 — site-visit materials (files only in the sandbox)**, after recipe 5.
+3. **Integrity Screener Workbench tab — review the Codex branch.** `origin/codex/integrity-workbench-tab` at `b1086302b`, not merged [VERIFIED `git merge-base`, 2026-09-27]. Next: Claude's read-only review → owner merge/release decision → the open Dataverse flag design. Migrations 056–057 unapplied; recheck numbering first.
+   Evidence: the branch's `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` (read with `git show`).
+4. **Item 7** (admin form, resume/retire, first shared apply of migration 054 and wave30 to production, production release). Carried requirement: deterministic reservation identity per actor + idempotency key.
+
+### Owner Decision Needed
+
+1. **6d (reviewer email exception)**: own slice, own plan review; not started.
+
+### Parked
+
+1. **Uploaded-review branch live pass** — re-open on the first clone of a source Request with an uploaded review (owner: no hand uploads to force it).
+2. **GoVerify bypass intermittent failure** (runs `a1dd008d…`, `99c92d35…`): the PATCH never committed (workflow `modifiedon` unchanged). Re-open trigger: the next occurrence, whose sidecar will now name the error.
+3. **Live-ledger suite flake** (unchanged from S543): re-open on a recurrence with a captured test name.
+
+### Verify Before Acting
+
+1. **Sandbox residue**: Requests 1000341–1000348 (IA rows, synthetic reviewers, suggestions, answers; the 1000347/1000348 stub AI runs and Pre-Site rows). Local ledger runs: `a410efe2…` ready; `126881bc…` (PI refusal, pre-4c), `a1dd008d…`, `99c92d35…` (bypass unverified) parked needs_attention [VERIFIED ledger query 2026-09-27]. First candidates for item 7's retire path; nothing to clean now.
+2. **Scratch database `ledger_test`** was created in `wmkf-ledger-pg` for the integration suites (`TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_test`); never point those suites at `ledger`, which holds the real runs.
+
+### Do Not Reopen Without New Decision
+
+1. Recipe 4 draft names copied verbatim (owner accepted limit, 4c review).
+2. Share-click Postgres issue on the clone is not a prerequisite (owner: esoteric).
+3. Stub `wmkf_ai_run` stays (owner: safe, not full fidelity).
+4. Migration 054 edited in place until item 7; wave30 production apply is item 7's.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Design, recipes 3–5 plan, every slice/review/live record |
+| `lib/services/test-requests/run-runner.js` | Recipe step order and step bodies (4b: `seed_presite_ai_run` … `verify_presite`) |
+| `lib/services/test-requests/presite-sandbox-deps.js` | Sandbox-bound Pre-Site deps, `TEST · ` personnel synthesis |
+| `lib/services/test-requests/docx-package-attestation.js` | Promotion attestor incl. `validateSharePointRewrite` (render only) |
+| `lib/services/test-requests/basic-clone-steps.js` | `createRequestWithGoverifyBypass` (now keeps `deactivationError`) |
+| `scripts/rehearse-test-request-sandbox.mjs`, `scripts/export-test-request-source-bundle.mjs` | Reserve/advance/inspect; bundle export (`--with-pre-site`, owner runs prod exports) |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|docx-package|presite|source-bundle|seed-synthetic).*"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_test npx jest tests/integration/test-request-run-runner   # scratch DB, not `ledger`
+```
+
+Live runs: run the rehearsal CLI from a checkout of the code under test, with the allow-rule prefix (`project-sandbox-rehearsal-bypass-allow-rule`); `--bypass-goverify` on the advance that reaches `create_request`.
+
+---
+
+## Prior Session 544 Prompt: Factory item 6 recipes 3–5 (plan one paragraph, one Codex plan review), then item 7
 
 ## Session 543 Summary — 2026-09-25/26 PT (Fable; slices 6c-i and 6c-ii built, reviewed, merged, live-proven)
 
