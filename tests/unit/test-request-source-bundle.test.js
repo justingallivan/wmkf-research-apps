@@ -383,10 +383,18 @@ const proposalCoreJson = (over = {}) => ({
   diagnostics: [{ code: 'referee_section_manual' }],
   ...over,
 });
+// Slice 4c: draft.personnel is required by projectPreSiteVisitSection's
+// validation.
+const preSitePersonnel = (over = {}) => ({
+  principalInvestigator: 'Dr. PI Name',
+  coPrincipalInvestigators: ['Beau CoPI'],
+  ...over,
+});
 const preSiteVisitFixture = (over = {}) => ({
   requestDocumentId: 'cccccccc-0000-0000-0000-000000000001',
   sectionFields: preSiteSectionFields(),
   proposalCoreJson: proposalCoreJson(),
+  personnel: preSitePersonnel(),
   ...over,
 });
 
@@ -633,6 +641,113 @@ describe('bundle v4: preSiteVisit section + abstract', () => {
   test('version 4 bundle missing its preSiteVisit section is refused', () => {
     const v3 = build({ reviewers: [reviewerFixture()] });
     expect(() => readSourceBundle({ ...v3, version: 4 })).toThrow(/missing its preSiteVisit section/);
+  });
+
+  // Slice 4c: projectPreSitePersonnel's own validation, each bad shape
+  // refused on its own (never inferred from the happy-path fixture).
+  describe('personnel validation (Slice 4c)', () => {
+    function buildWithPersonnel(personnel) {
+      return build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), personnel },
+      });
+    }
+
+    test('rejects a non-object personnel value', () => {
+      expect(() => buildWithPersonnel('Dr. PI Name')).toThrow(/personnel is invalid/);
+    });
+
+    test('rejects an array personnel value', () => {
+      expect(() => buildWithPersonnel(['Dr. PI Name'])).toThrow(/personnel is invalid/);
+    });
+
+    test('rejects a null personnel value', () => {
+      expect(() => buildWithPersonnel(null)).toThrow(/personnel is invalid/);
+    });
+
+    test('rejects an unknown personnel key', () => {
+      expect(() => buildWithPersonnel({ ...preSitePersonnel(), extra: 'nope' }))
+        .toThrow(/unknown key/);
+    });
+
+    test('rejects a missing principalInvestigator', () => {
+      const { principalInvestigator, ...rest } = preSitePersonnel();
+      expect(() => buildWithPersonnel(rest)).toThrow(/missing a valid principal investigator/);
+    });
+
+    test('rejects an empty-string principalInvestigator', () => {
+      expect(() => buildWithPersonnel(preSitePersonnel({ principalInvestigator: '' })))
+        .toThrow(/missing a valid principal investigator/);
+    });
+
+    test('rejects a whitespace-only principalInvestigator', () => {
+      expect(() => buildWithPersonnel(preSitePersonnel({ principalInvestigator: '   ' })))
+        .toThrow(/missing a valid principal investigator/);
+    });
+
+    test('rejects a non-string principalInvestigator', () => {
+      expect(() => buildWithPersonnel(preSitePersonnel({ principalInvestigator: 42 })))
+        .toThrow(/missing a valid principal investigator/);
+    });
+
+    test('rejects a principalInvestigator over the 300-char cap', () => {
+      expect(() => buildWithPersonnel(preSitePersonnel({ principalInvestigator: 'x'.repeat(301) })))
+        .toThrow(/missing a valid principal investigator/);
+    });
+
+    test('accepts a principalInvestigator at exactly the 300-char cap', () => {
+      const bundle = buildWithPersonnel(preSitePersonnel({ principalInvestigator: 'x'.repeat(300) }));
+      expect(bundle.preSiteVisit.personnel.principalInvestigator).toHaveLength(300);
+    });
+
+    test('rejects coPrincipalInvestigators that is not an array', () => {
+      expect(() => buildWithPersonnel(preSitePersonnel({ coPrincipalInvestigators: 'Beau CoPI' })))
+        .toThrow(/co-principal-investigators must be an array/);
+    });
+
+    test('rejects more than 20 coPrincipalInvestigators', () => {
+      const coPrincipalInvestigators = Array.from({ length: 21 }, (_, i) => `Co-PI ${i}`);
+      expect(() => buildWithPersonnel(preSitePersonnel({ coPrincipalInvestigators })))
+        .toThrow(/count exceeds 20/);
+    });
+
+    test('accepts exactly 20 coPrincipalInvestigators', () => {
+      const coPrincipalInvestigators = Array.from({ length: 20 }, (_, i) => `Co-PI ${i}`);
+      const bundle = buildWithPersonnel(preSitePersonnel({ coPrincipalInvestigators }));
+      expect(bundle.preSiteVisit.personnel.coPrincipalInvestigators).toHaveLength(20);
+    });
+
+    test('rejects a non-string entry in coPrincipalInvestigators', () => {
+      expect(() => buildWithPersonnel(preSitePersonnel({ coPrincipalInvestigators: ['Beau CoPI', 42] })))
+        .toThrow(/co-principal-investigator #2 is invalid/);
+    });
+
+    test('rejects an empty-string entry in coPrincipalInvestigators', () => {
+      expect(() => buildWithPersonnel(preSitePersonnel({ coPrincipalInvestigators: [''] })))
+        .toThrow(/co-principal-investigator #1 is invalid/);
+    });
+
+    test('rejects a coPrincipalInvestigators entry over the 300-char cap', () => {
+      expect(() => buildWithPersonnel(preSitePersonnel({ coPrincipalInvestigators: ['x'.repeat(301)] })))
+        .toThrow(/co-principal-investigator #1 is invalid/);
+    });
+
+    test('defaults coPrincipalInvestigators to an empty array when omitted', () => {
+      const { coPrincipalInvestigators, ...rest } = preSitePersonnel();
+      const bundle = buildWithPersonnel(rest);
+      expect(bundle.preSiteVisit.personnel.coPrincipalInvestigators).toEqual([]);
+    });
+
+    test('trims principalInvestigator and each coPrincipalInvestigators entry', () => {
+      const bundle = buildWithPersonnel(preSitePersonnel({
+        principalInvestigator: '  Dr. PI Name  ',
+        coPrincipalInvestigators: ['  Beau CoPI  '],
+      }));
+      expect(bundle.preSiteVisit.personnel).toEqual({
+        principalInvestigator: 'Dr. PI Name',
+        coPrincipalInvestigators: ['Beau CoPI'],
+      });
+    });
   });
 });
 
