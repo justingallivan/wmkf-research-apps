@@ -145,6 +145,11 @@ function createFakeLedger(initialRun) {
   return { ledger, calls, getRun: () => run, getResources: () => resources };
 }
 
+// create_request re-hashes the body it POSTs (MVP slice 1), so the fixture
+// carries a real body and its real hash.
+const FIXTURE_CREATE_BODY = { akoya_requestid: REQUEST_ID, akoya_title: 'TEST: fixture' };
+const FIXTURE_BODY_HASH = sha256(FIXTURE_CREATE_BODY);
+
 function baseRun(overrides = {}) {
   return {
     runId: RUN_ID,
@@ -156,7 +161,7 @@ function baseRun(overrides = {}) {
     leaseToken: null,
     leaseGeneration: 0,
     lockedUntil: null,
-    createBodySha256: 'body-hash',
+    createBodySha256: FIXTURE_BODY_HASH,
     bundleSha256: 'bundle-hash',
     copyPolicyDigest: 'policy-digest',
     sourceRequestId: SOURCE_ID,
@@ -177,7 +182,8 @@ function baseManifest(overrides = {}) {
     kind: MANIFEST_V4,
     values: { requestId: REQUEST_ID, runId: RUN_ID, locationId: LOCATION_ID, meetingDate: '2026-12-01' },
     source: { requestId: SOURCE_ID, revision: 'rev-1', requestType: 100000000, bundleSha256: 'bundle-hash' },
-    createBodySha256: 'body-hash',
+    createBody: FIXTURE_CREATE_BODY,
+    createBodySha256: FIXTURE_BODY_HASH,
     copyPolicy: { digest: 'policy-digest' },
     expectedRequestType: { value: 100000000 },
     expectedAppUserId: APP_USER_ID,
@@ -291,6 +297,46 @@ describe('advanceRun: needs_attention on a thrown step', () => {
     });
     const serialized = JSON.stringify(calls);
     expect(serialized).not.toContain('CONFIDENTIAL GRANT PURPOSE TEXT');
+  });
+});
+
+describe('advanceRun: create_request dispatch-time checks (MVP slice 1, Codex)', () => {
+  const PD_ID = '66666666-6666-4666-8666-666666666666';
+  const PROD = 'https://wmkf.crm.dynamics.com';
+
+  test('an edited create body with its hash field left unchanged never reaches Dataverse', async () => {
+    const run = baseRun({ currentStep: 'create_request', stepIndex: 1 });
+    const { ledger } = createFakeLedger(run);
+    const manifest = baseManifest({ createBody: { ...FIXTURE_CREATE_BODY, akoya_requeststatus: 'Approved' } });
+    const client = { get: jest.fn(), postWithOptions: jest.fn(), patch: jest.fn() };
+    const result = await advanceRun({ runId: RUN_ID, ledger, manifest, bundle: null, deps: { client, graph: fakeGraph(), sharePointTarget: () => ({}) } });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.errorMessage).toMatch(/does not hash to the reserved run body/);
+    expect(client.get).not.toHaveBeenCalled();
+    expect(client.postWithOptions).not.toHaveBeenCalled();
+  });
+
+  test('a program director disabled after fence_source stops the production create before any other call', async () => {
+    const run = baseRun({
+      currentStep: 'create_request', stepIndex: 1, destinationEnvironment: 'production', destinationDataverseHost: 'wmkf.crm.dynamics.com',
+    });
+    const { ledger } = createFakeLedger(run);
+    const manifest = baseManifest({
+      target: PROD, targetEnvironment: 'production',
+      values: { ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: ORG_ID },
+    });
+    const get = jest.fn(async (requestPath) => {
+      if (requestPath.startsWith(`/systemusers(${PD_ID})`)) {
+        return ok({ systemuserid: PD_ID, fullname: 'Staff', isdisabled: true, accessmode: 0, internalemailaddress: 'pd@wmkeck.org' });
+      }
+      throw new Error(`unexpected call: ${requestPath}`);
+    });
+    const client = { baseUrl: `${PROD}/api/data/v9.2`, get, postWithOptions: jest.fn() };
+    const result = await advanceRun({ runId: RUN_ID, ledger, manifest, bundle: null, deps: { client, graph: fakeGraph(), sharePointTarget: () => ({}) } });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.errorMessage).toMatch(/not an enabled staff user/);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(client.postWithOptions).not.toHaveBeenCalled();
   });
 });
 
