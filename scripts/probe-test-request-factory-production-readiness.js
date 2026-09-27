@@ -21,6 +21,8 @@
  *   DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-test-request-factory-production-readiness.js --director=<sign-in name>
  *   Add --detail to also print what each create-triggered workflow writes and
  *   each matching cloud flow's triggers and record actions (names only).
+ *   Add --export-xaml=<dir> to also save each create-triggered workflow's
+ *   definition (process logic only, no record data) for local review.
  */
 
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client');
@@ -99,6 +101,8 @@ async function getAll(client, path) {
 (async () => {
   const director = parseDirector(process.argv.slice(2));
   const detail = process.argv.includes('--detail');
+  const exportArg = process.argv.find((arg) => arg.startsWith('--export-xaml='));
+  const exportDir = exportArg ? exportArg.slice('--export-xaml='.length) : null;
   const clientId = process.env.DYNAMICS_CLIENT_ID;
   if (!clientId) throw new Error('DYNAMICS_CLIENT_ID is not set.');
   const token = await getAccessToken(PRODUCTION_URL);
@@ -155,13 +159,19 @@ async function getAll(client, path) {
   console.log(`   cloud flows (activated) mentioning akoya_request: ${matching.length} of ${flows.length}`);
   for (const f of matching) console.log(`   - ${f.name}`);
 
-  if (!detail) return;
+  if (!detail && !exportDir) return;
 
   console.log('\n5. Detail: what each create-triggered workflow writes');
   for (const w of workflows.filter((row) => row.triggeroncreate === true)) {
     const resp = await client.get(`/workflows(${w.workflowid})?$select=xaml`);
     if (!resp.ok) throw new Error(`GET workflow xaml failed (${resp.status})`);
     const summary = summarizeWorkflowXaml(resp.body?.xaml || '');
+    if (exportDir) {
+      const file = require('path').join(exportDir, `${w.name.replace(/[^A-Za-z0-9]+/g, '_')}.xaml`);
+      require('fs').mkdirSync(exportDir, { recursive: true });
+      require('fs').writeFileSync(file, resp.body?.xaml || '');
+      console.log(`     exported: ${file}`);
+    }
     console.log(`   - ${w.name}`);
     console.log(`     steps: ${summary.steps.join(' | ') || '(none labelled)'}`);
     console.log(`     sets: ${summary.sets.join(', ') || '(none)'}`);
