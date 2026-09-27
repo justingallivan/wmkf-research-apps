@@ -75,6 +75,23 @@ Owner decision 2026-09-27: sandbox live proofs stop after recipe 4. Deeper recip
 2. **The isolation switches live on Vercel; the CLI runs locally.** A marked Request created while Vercel's switches are off is treated as ordinary by cron jobs, email and reports. The CLI cannot see Vercel's environment.
 3. **The daily ack is blanket.** The interlock no longer narrows anything for the process that holds it.
 
+## MVP build list (owner, S546, 2026-09-27) — supersedes P1–P5 scope where they differ
+
+Accepted by the owner. The basic clone writes one Request (preallocated GUID), one SharePoint folder, one document location and the copied proposal files; the list is sized to that.
+
+**Build (in order):**
+1. **P1 core + program director** (~1 session): pinned `target` with every host check derived from it; `--bypass-goverify` refused and a journaled bypass intent refused for production; `correct_meeting_date` never writes in production; `wmkf_programdirector` = the cloning admin (the `--director` sign-in, resolved and checked enabled).
+2. **P2 simplified fence** (~0.5–1): in a production run the Factory's writes may target only the destination Request, its journaled folder and location, and its destination file paths; the source Request's ID and its document IDs are refused outright; end-of-run source re-check (`versionnumber`, `modifiedon`).
+3. **P4 marker preflight** (small): reservation refuses unless the wave29 columns are present in production.
+4. **Test-Request email recipient allowlist** (~1–2): the *Owner decisions* rule, with its admin page.
+5. **P5 trimmed first run** (~0.5 + owner read): snapshot and value comparison of the Foundation account (open questions 4 and 7) and the source; one check about an hour after the create; the owner's Audit History read.
+
+**Deferred (to the recipe that needs it):** the P4 readiness endpoint (replaced by an owner checklist step: set `TEST_REQUEST_ISOLATION=on`, redeploy, confirm); parameterizing the three dependency builders (IA, reviews, Pre-Site); P3's `REQUIRED` actor and writer-gate edit (IA); P2's general exact-identity create admission; P5's 24-hour watch; P6, P7 and slice 5a.
+
+**Process:** one Codex review per slice; the owner decides each finding. No invariant-table or multi-round loop unless the owner asks.
+
+**Open check before building:** that the reviewer-invite path works on a basic clone (status, triage and phase fields are not copied).
+
 ## Phases
 
 ### P0 — Owner-run read-only production probe (DONE 2026-09-27; results above)
