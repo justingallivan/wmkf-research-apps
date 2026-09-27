@@ -9,7 +9,7 @@ Owner decision 2026-09-27: sandbox live proofs stop after recipe 4. Deeper recip
 ## Owner decisions this plan builds on
 
 - **Q1** Local CLI first, under a daily `DATAVERSE_PROD_WRITE_ACK`; the admin form follows.
-- **Q2** Ledger: local container for the CLI phase; shared Postgres when the form lands (recommended, owner undecided).
+- **Q2** Ledger: local container for the CLI phase; shared Postgres when the form lands. **DECIDED 2026-09-27 (owner, S546): shared Postgres for the form phase.**
 - **Q3** GoVerify is not bypassed in production; its warning is accepted.
 - **Q4** Schema applies and isolation switches are done when a production run first needs them.
 - **Q5** Platform owner reports no off-platform triggers. The production census below lists what does run on create; as the clone's create body stands, none of it writes outside the new Request except possibly the four AkoyaGo plug-ins, which P5 observes.
@@ -176,7 +176,7 @@ It needs the Q2 shared ledger, and it replaces P4's attestation with a server ch
 
 ## Open questions
 
-1. Q2, the ledger database for the form phase.
+1. ~~Q2, the ledger database for the form phase.~~ Decided 2026-09-27 (owner, S546): shared Postgres.
 2. Whether the 1000338 folder provisioner exists in production, and what it is (P0's workflow listing may answer it).
 3. Retire semantics for production residue: which rows can be deleted versus deactivated, given append-only tables such as `wmkf_ai_run`.
 4. **Foundation-account writes: live in production; a transition contract, not an exclusion list (2026-09-27, S545; Codex round 2).** The owner's decision (accept the GoVerify refresh's writes) was first made on sandbox evidence, then looked moot, and is now confirmed by production's audit history (P0b). `foundationBaselineDigest` (`basic-clone-steps.js:270-277`) hashes the account's `versionnumber`, which the refresh moves. For production it is replaced by a **transition contract** over the Foundation account:
