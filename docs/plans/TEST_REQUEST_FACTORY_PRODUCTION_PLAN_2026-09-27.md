@@ -8,6 +8,9 @@ Owner decision 2026-09-27: sandbox live proofs stop after recipe 4. Deeper recip
 
 ## Owner decisions this plan builds on
 
+- **MVP scope (owner, S546, 2026-09-27).** The original ask (2026-09-19): "It is very hard for me to create requests from scratch for testing. Could you design a system that could create a new request based on an existing one?" — admin-only test requests. The first usable delivery is a production `basic` clone that lands before reviewer invite, with the two rules below; nothing else (admin form, deeper recipes) until the owner has used it. Deeper recipes resume only on the owner's request.
+- **Program director = the cloning admin (owner, S546).** The clone's create body sets `wmkf_programdirector` to the authenticated actor's systemuser, never to a request-supplied value. This supersedes "program director copied by GUID". To verify at build: the lookup's target entity, and its create-time consumers (no classic workflow triggers on it per probe section 4; `CalculatedFieldsAsync` fires on any column).
+- **Test-Request email recipient allowlist (owner, S546).** Email regarding a marked test Request is allowed when **every** recipient (to, cc, bcc) is allowed, and refused otherwise, at both existing checks: create-time `assertRequestEmailAllowed` and the dispatch recheck, which rereads the activity's own parties. Allowed means an `@wmkeck.org` address (a fixed rule in code) or an address on a superuser-editable list stored as an app system setting (the `wmkf_appsystemsettings` pattern behind `/api/admin/models`) with an admin page to view, add and remove entries. For testing and training. This supersedes the design's D-R4 / 6d suggestion-bound binding contract.
 - **Q1** Local CLI first, under a daily `DATAVERSE_PROD_WRITE_ACK`; the admin form follows.
 - **Post-cap Codex check (S546):** round-3 finding 1 closed; finding 2 partly closed, the remaining gap accepted and deferred to recipe 5 (open question 5).
 - **Q2** Ledger: local container for the CLI phase; shared Postgres when the form lands. **DECIDED 2026-09-27 (owner, S546): shared Postgres for the form phase.**
@@ -155,7 +158,7 @@ One mandatory checklist, recorded in evidence (field names, statuses, counts and
 
 Any unexpected row stops the programme before a deeper recipe, and it is analysed first.
 
-Deeper recipes follow one at a time: IA, reviews, Pre-Site, then recipe 5 (slice 5a rebased onto this plan, with the program director copied by GUID), then recipe 3 with its materials collection.
+Deeper recipes follow one at a time: IA, reviews, Pre-Site, then recipe 5 (slice 5a rebased onto this plan; the program director is the cloning admin, set at create), then recipe 3 with its materials collection.
 
 ### P6 — Migration 054 sequencing
 
