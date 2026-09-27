@@ -95,6 +95,82 @@ describe('attestDocxPackageAgainstRender', () => {
   it('rejects a changed docProps/app.xml (SharePoint promotion leaves it untouched)', () => rejects(async (zip) => { zip.file('docProps/app.xml', '<Properties/>'); }, /part docProps\/app\.xml differs from the render/));
 });
 
+// A template that already carries SharePoint customXml from its origin
+// library (the Pre-Site v6 template), re-promoted in place on upload
+// (characterized live 2026-09-27, sandbox Request 1000348).
+const TEMPLATE_SCHEMA = SP_SCHEMA.replace('ma:contentTypeName="Document"', 'ma:contentTypeName="Document" ma:contentTypeVersion="14"');
+const TEMPLATE_DM = SP_DM.replace('<documentManagement/>', '<documentManagement></documentManagement>');
+// The template's itemProps carries schemaRefs, outside the characterized
+// added shape: the baseline copy is root-matched only, never shape-checked.
+const TEMPLATE_PROPS = '<?xml version="1.0" encoding="UTF-8" standalone="no"?><ds:datastoreItem ds:itemID="{T}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"><ds:schemaRefs><ds:schemaRef ds:uri="http://schemas.microsoft.com/office/2006/metadata/contentType"/></ds:schemaRefs></ds:datastoreItem>';
+
+describe('attestDocxPackageAgainstRender: SharePoint re-promotion of a template\'s own customXml', () => {
+  let templateRender;
+  beforeAll(async () => {
+    const render = await renderInitialAssessmentDocx(ARGS);
+    templateRender = await withParts(render, async (zip) => {
+      await promoteItems(zip, [[1, TEMPLATE_SCHEMA], [2, SP_FORMS], [3, TEMPLATE_DM]]);
+      zip.file('customXml/itemProps1.xml', TEMPLATE_PROPS);
+    });
+  });
+  const rePromote = (overrides = {}) => withParts(templateRender, async (zip) => {
+    const parts = {
+      'customXml/item1.xml': SP_SCHEMA,
+      'customXml/item3.xml': SP_DM,
+      'customXml/itemProps1.xml': SP_PROPS.replace('{X}', '{Y}'),
+      ...overrides,
+    };
+    for (const [name, xml] of Object.entries(parts)) zip.file(name, xml);
+    zip.file('[trash]/0000.dat', spTrash(453));
+  });
+
+  it('accepts the live shape: item1, item3 and itemProps1 rewritten in place, everything else untouched', async () => {
+    const result = await attestDocxPackageAgainstRender(await rePromote(), templateRender);
+    expect(result.normalizedParts).toEqual(expect.arrayContaining(['customXml/item1.xml', 'customXml/item3.xml', 'customXml/itemProps1.xml']));
+  });
+  it('rejects a rewrite to a foreign root', async () => {
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/item1.xml': '<payload xmlns="urn:foreign"/>' }), templateRender))
+      .rejects.toThrow(/customXml\/item1\.xml differs from the render and is not a SharePoint re-promotion of the same root/);
+  });
+  it('rejects a rewrite that swaps one SharePoint root for another', async () => {
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/item1.xml': SP_DM }), templateRender))
+      .rejects.toThrow(/customXml\/item1\.xml differs from the render and is not a SharePoint re-promotion of the same root/);
+  });
+  it('rejects a same-root rewrite whose content is outside the characterized shape', async () => {
+    const foreignChild = SP_DM.replace('<documentManagement/>', '<documentManagement/><smuggled xmlns="urn:foreign">x</smuggled>');
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/item3.xml': foreignChild }), templateRender))
+      .rejects.toThrow(/customXml part customXml\/item3\.xml/);
+  });
+  it('rejects a SharePoint-shaped rewrite of a baseline item that was not itself a SharePoint root', async () => {
+    const foreignBaseline = await withParts(templateRender, async (zip) => { await promoteItems(zip, [[4, '<payload xmlns="urn:foreign"/>']]); });
+    const rewritten = await withParts(foreignBaseline, async (zip) => { zip.file('customXml/item4.xml', SP_SCHEMA); });
+    await expect(attestDocxPackageAgainstRender(rewritten, foreignBaseline))
+      .rejects.toThrow(/customXml\/item4\.xml differs from the render and is not a SharePoint re-promotion of the same root/);
+  });
+  // Codex PR #348 round 1: only the live pairs may be rewritten.
+  it('keeps the FormTemplates item byte-identical (observed unchanged live)', async () => {
+    const forms = SP_FORMS.replace('<Display>DocumentLibraryForm</Display>', '<Display>OtherForm</Display>');
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/item2.xml': forms }), templateRender))
+      .rejects.toThrow(/customXml\/item2\.xml differs from the render and is not a SharePoint re-promotion of the same root/);
+  });
+  it('rejects a rewritten itemProps paired with a properties item, not a contentTypeSchema item', async () => {
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/itemProps3.xml': SP_PROPS.replace('{X}', '{Z}') }), templateRender))
+      .rejects.toThrow(/itemProps3\.xml was rewritten without its contentTypeSchema item customXml\/item3\.xml/);
+  });
+  it('rejects a rewritten itemProps whose contentTypeSchema item was left unchanged', async () => {
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/item1.xml': TEMPLATE_SCHEMA }), templateRender))
+      .rejects.toThrow(/itemProps1\.xml was rewritten without its contentTypeSchema item customXml\/item1\.xml/);
+  });
+  it('keeps a pre-existing customXml rels part byte-identical', async () => {
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/_rels/item1.xml.rels': SP_RELS.replace('rId1', 'rId2') }), templateRender))
+      .rejects.toThrow(/customXml\/_rels\/item1\.xml\.rels differs from the render/);
+  });
+  it('never applies to an uploader-supplied source: the same package fails source attestation', async () => {
+    await expect(attestDocxPackageAgainstSource(await rePromote(), templateRender))
+      .rejects.toThrow(/part customXml\/item1\.xml differs from the source/);
+  });
+});
+
 describe('attestDocxPackageAgainstSource', () => {
   let render;
   let sourceWithOwnCustomXml;
@@ -464,7 +540,7 @@ describe('attestDocxPackageAgainstSource', () => {
       const big = LIVE_ITEM3.replace('<TaxCatchAll xmlns="270ae82a-6903-42ec-99d1-4079863f002d" xsi:nil="true"/>', Array.from({ length: 60 }, (_, i) => `<C${i} xmlns="270ae82a-6903-42ec-99d1-4079863f002d">${'v'.repeat(1000)}</C${i}>`).join(''));
       expect(big.length).toBeLessThan(64 * 1024);
       const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { await promoteItems(zip, [[6, big], [7, big], [8, big]]); });
-      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/added \d+ bytes of customXml parts, above the 131072-byte ceiling/);
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/added or rewrote \d+ bytes of customXml parts, above the 131072-byte ceiling/);
     });
     it.each([
       ['an orphan itemProps part', async (zip) => { zip.file('customXml/itemProps6.xml', SP_PROPS); }],
