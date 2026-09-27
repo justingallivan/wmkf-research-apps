@@ -1546,6 +1546,63 @@ describe('item 9: draft/file ownership re-asserted at every boundary (Codex adve
       expect(world.dependencies.commitChangeset).not.toHaveBeenCalled();
       expect(world.dependencies.updateDocument).not.toHaveBeenCalled();
     });
+
+    // Codex review of the round-3 closure: an id match is not ownership.
+    // Same-id rereads inside the producer are re-validated in full, and the
+    // upload/commit side effects are fenced independently of the row.
+    test("a same-id producer reread whose request binding drifted -> refuses (presite_pointer_mismatch), never uploads or commits", async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      const realLookup = world.dependencies.findByGenerationKey.getMockImplementation();
+      world.dependencies.findByGenerationKey
+        .mockImplementationOnce(realLookup)
+        .mockImplementation(async (key) => {
+          const found = await realLookup(key);
+          return { records: found.records.map((r) => ({ ...r, _wmkf_request_value: crypto.randomUUID() })) };
+        });
+      const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain('not bound to the destination request');
+      expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+      expect(world.dependencies.commitChangeset).not.toHaveBeenCalled();
+    });
+
+    test('a same-id producer reread whose SharePoint folder drifted -> the destination fence refuses before any folder creation or upload', async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      const realLookup = world.dependencies.findByGenerationKey.getMockImplementation();
+      world.dependencies.findByGenerationKey
+        .mockImplementationOnce(realLookup)
+        .mockImplementation(async (key) => {
+          const found = await realLookup(key);
+          return { records: found.records.map((r) => ({ ...r, wmkf_sharepointfolderpath: 'Some/Other/Request/Artifacts/Pre-Site Visit' })) };
+        });
+      const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      // The producer wraps the fence's error as a generic 500 (its message is
+      // generic); the reason code is carried through body.code.
+      expect(world.dependencies.ensureFolderPath).not.toHaveBeenCalled();
+      expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+      expect(world.dependencies.commitChangeset).not.toHaveBeenCalled();
+    });
+
+    // The commit fence's refusal side is unreachable through the producer:
+    // the per-read ownership check fixes the target row's request binding,
+    // and the app's own lineage guards refuse before building a changeset
+    // that supersedes another row ("no longer current" / "no current request
+    // pointer"). It stays as a backstop; this test pins its allow side.
+    test('the happy-path commit passes the commit fence and targets only the owned draft and the destination request', async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
+      expect(result.outcome).toBe('advanced');
+      expect(world.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+      const [operations] = world.dependencies.commitChangeset.mock.calls[0];
+      expect(operations.length).toBeGreaterThan(0);
+      for (const operation of operations) {
+        const target = String(operation.key).toLowerCase();
+        expect([String(row.wmkf_requestdocumentid).toLowerCase(), String(REQUEST_ID).toLowerCase()]).toContain(target);
+      }
+    });
   });
 
   // Two checks are "by construction" at every current call site (the row is
