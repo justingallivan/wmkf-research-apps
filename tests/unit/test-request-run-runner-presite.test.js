@@ -1307,6 +1307,21 @@ describe('item 9: draft/file ownership re-asserted at every boundary (Codex adve
     return { runId, resource, row };
   }
 
+  // isOwnedStubAiRun's own field list (assertOwnedStubAiRun, called last
+  // inside assertOwnedPresiteDraft) -- mutates the fake AI-RUN row itself
+  // (world.aiRuns), not the draft row, so these are independent of
+  // DRAFT_FIELD_MUTATIONS above and of item 6's own I4 coverage (which only
+  // exercises request/prompt-bind/prompt-version at render+verify, via a
+  // different fixture path, and never status/runsource/notes at all).
+  const RUN_FIELD_MUTATIONS = [
+    ['request bind', (aiRun) => { aiRun._wmkf_ai_request_value = crypto.randomUUID(); }],
+    ['prompt bind', (aiRun) => { aiRun._wmkf_ai_prompt_value = crypto.randomUUID(); }],
+    ['prompt version', (aiRun) => { aiRun.wmkf_ai_promptversion = 999; }],
+    ['status', (aiRun) => { aiRun.wmkf_ai_status = 999999999; }],
+    ['run source', (aiRun) => { aiRun.wmkf_ai_runsource = 999999999; }],
+    ['notes', (aiRun) => { aiRun.wmkf_ai_notes = 'Test Request Factory run some-other-run'; }],
+  ];
+
   describe('at render_presite (pre-call, before generatePreSiteVisitArtifact)', () => {
     test.each(DRAFT_FIELD_MUTATIONS)('%s -> refuses (presite_pointer_mismatch), never uploads or commits', async (_label, mutate, messageContains) => {
       const { resource, row } = seedFullyOwnedRow();
@@ -1315,6 +1330,18 @@ describe('item 9: draft/file ownership re-asserted at every boundary (Codex adve
       expect(result.outcome).toBe('needs_attention');
       expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
       expect(result.errorMessage).toContain(messageContains);
+      expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+      expect(world.dependencies.commitChangeset).not.toHaveBeenCalled();
+      expect(world.dependencies.updateDocument).not.toHaveBeenCalled();
+    });
+
+    test.each(RUN_FIELD_MUTATIONS)('bound AI-run %s -> refuses (presite_pointer_mismatch) via assertOwnedStubAiRun, never uploads or commits', async (_label, mutate) => {
+      const { runId, resource, row } = seedFullyOwnedRow();
+      mutate(world.aiRuns.get(runId));
+      const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain('no longer the owned stub');
       expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
       expect(world.dependencies.commitChangeset).not.toHaveBeenCalled();
       expect(world.dependencies.updateDocument).not.toHaveBeenCalled();
@@ -1331,6 +1358,18 @@ describe('item 9: draft/file ownership re-asserted at every boundary (Codex adve
       expect(result.outcome).toBe('needs_attention');
       expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
       expect(result.errorMessage).toContain(messageContains);
+      expect(world.dependencies.downloadFile).not.toHaveBeenCalled();
+    });
+
+    test.each(RUN_FIELD_MUTATIONS)('bound AI-run %s -> refuses (presite_verification_failed) via assertOwnedStubAiRun', async (_label, mutate) => {
+      const { runId, resource, row } = seedFullyOwnedRow();
+      const resources = [resource, seedDraftResourceFor(row)];
+      await runStep('render_presite', { resources });
+      mutate(world.aiRuns.get(runId));
+      const { result } = await runStep('verify_presite', { resources });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+      expect(result.errorMessage).toContain('no longer the owned stub');
       expect(world.dependencies.downloadFile).not.toHaveBeenCalled();
     });
 
@@ -1410,6 +1449,62 @@ describe('item 9: draft/file ownership re-asserted at every boundary (Codex adve
       expect(result.outcome).toBe('needs_attention');
       expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
       expect(result.errorMessage).toContain(messageContains);
+      expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    });
+
+    // At both resume branches, seed_presite_draft's own PRE-BRANCH check
+    // (before any of the three branches -- the round-1 fix) rereads the
+    // journaled AI-run first, so a mutated aiRun row refuses there with its
+    // own code (presite_ai_run_ambiguous), before either branch's B call is
+    // ever reached. Proven at both boundaries: the guard fires regardless of
+    // which branch would otherwise have been taken.
+    test.each(RUN_FIELD_MUTATIONS)('P2c ambiguous-create adopt: bound AI-run %s -> refuses at the pre-branch check (presite_ai_run_ambiguous), never re-POSTs', async (_label, mutate) => {
+      const { runId, resource } = seedAiRunResource();
+      const claimToken = crypto.randomUUID();
+      const core = proposalCoreFixture();
+      const fields = sectionFieldsFor(core);
+      world.seedRawRow({
+        wmkf_generationkey: BASE_IDENTITY.generationKey,
+        wmkf_claimtoken: claimToken,
+        _wmkf_airun_value: runId,
+        ...fields,
+        wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+        wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+      });
+      mutate(world.aiRuns.get(runId));
+      const draftResource = {
+        resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+        plannedIdentity: { generationKey: BASE_IDENTITY.generationKey },
+        readback: {
+          generationKey: BASE_IDENTITY.generationKey,
+          claimTokenSha256: crypto.createHash('sha256').update(claimToken).digest('hex'),
+          createAttemptedAt: new Date().toISOString(),
+        },
+        outcome: 'dispatched',
+      };
+      const { result } = await runStep('seed_presite_draft', { resources: [resource, draftResource] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
+      expect(result.errorMessage).toContain('is missing or no longer bound to the destination request');
+      expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    });
+
+    test.each(RUN_FIELD_MUTATIONS)('requestDocumentId resume: bound AI-run %s -> refuses at the pre-branch check (presite_ai_run_ambiguous), never re-POSTs', async (_label, mutate) => {
+      const { runId, resource } = seedAiRunResource();
+      await runStep('seed_presite_draft', { resources: [resource] });
+      const [row] = [...world.rows.values()];
+      const draftResource = {
+        resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+        plannedIdentity: { generationKey: row.wmkf_generationkey },
+        readback: { requestDocumentId: row.wmkf_requestdocumentid, claimTokenSha256: crypto.createHash('sha256').update(row.wmkf_claimtoken).digest('hex') },
+        outcome: 'verified',
+      };
+      mutate(world.aiRuns.get(runId));
+      world.dependencies.createDocument.mockClear();
+      const { result } = await runStep('seed_presite_draft', { resources: [resource, draftResource] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
+      expect(result.errorMessage).toContain('is missing or no longer bound to the destination request');
       expect(world.dependencies.createDocument).not.toHaveBeenCalled();
     });
   });
