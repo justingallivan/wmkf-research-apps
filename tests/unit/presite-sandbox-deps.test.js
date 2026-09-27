@@ -82,6 +82,44 @@ describe('createPresiteSandboxDeps (I9: complete against artifact-dependencies.j
     const withSentinel = createPresiteSandboxDeps({ resourceUrl: SANDBOX_URL, loadInputs: sentinel, graph: NOOP_GRAPH });
     expect(withSentinel.loadInputs).toBe(sentinel);
   });
+
+  // Item 5 (create-only): artifact-service.js calls `dependencies.uploadFile(
+  // library, folder, filename, content, contentType)` with only 5 positional
+  // args -- no options object -- so GraphService.uploadFile would otherwise
+  // default to conflictBehavior 'replace'. The wrapper, not the caller, must
+  // supply 'fail'. A legitimate resume never reaches this call with a
+  // colliding name in the first place: fileNameFor (artifact-model.js)
+  // suffixes every filename with the claim token, so each claim owns a
+  // unique name, and recoverUploadedFile (artifact-upload-recovery.js) does
+  // getFileMetadataByPath first and skips a fresh upload when the item is
+  // already there -- only a TRUE name collision (a bug, or two independent
+  // claims racing) ever reaches uploadFile at all, and that must refuse,
+  // never silently replace.
+  it('uploadFile always forces conflictBehavior "fail", regardless of what the caller passes (or omits)', async () => {
+    const uploadFile = jest.fn(async () => ({ id: 'item-1' }));
+    const deps = createPresiteSandboxDeps({
+      resourceUrl: SANDBOX_URL,
+      loadInputs: async () => null,
+      graph: { ...NOOP_GRAPH, uploadFile },
+    });
+    await deps.uploadFile('akoya_request', 'folder', 'name.docx', Buffer.from('x'), 'application/vnd.docx');
+    expect(uploadFile).toHaveBeenCalledTimes(1);
+    expect(uploadFile.mock.calls[0][5]).toEqual({ conflictBehavior: 'fail' });
+  });
+
+  it('uploadFile ignores a caller-supplied 6th argument -- "fail" is not merged with or overridden by it', async () => {
+    const uploadFile = jest.fn(async () => ({ id: 'item-1' }));
+    const deps = createPresiteSandboxDeps({
+      resourceUrl: SANDBOX_URL,
+      loadInputs: async () => null,
+      graph: { ...NOOP_GRAPH, uploadFile },
+    });
+    await deps.uploadFile(
+      'akoya_request', 'folder', 'name.docx', Buffer.from('x'), 'application/vnd.docx',
+      { conflictBehavior: 'replace' },
+    );
+    expect(uploadFile.mock.calls[0][5]).toEqual({ conflictBehavior: 'fail' });
+  });
 });
 
 describe('createPresiteInputDeps (I9: complete against proposal-core-service.js DEFAULT_DEPENDENCIES)', () => {
