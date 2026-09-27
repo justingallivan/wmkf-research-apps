@@ -9,11 +9,13 @@ import { readPreSiteVisitDraftForExport } from '../../lib/services/test-requests
 import {
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
+  REQUEST_DOCUMENT_OPERATION_STATUS,
   PRE_SITE_VISIT_CONTRACT,
   PRE_SITE_DISTRIBUTION_CONTRACT,
 } from '../../shared/config/requestDocument.js';
 
 const REQUEST_ID = 'e43ae6ea-698f-f111-8076-6045bd018a07';
+const OTHER_REQUEST_ID = 'ffffffff-698f-f111-8076-6045bd018a07';
 const WORD_ROW_ID = 'cccccccc-0000-0000-0000-000000000001';
 
 /**
@@ -28,6 +30,7 @@ function fullRow(over = {}) {
     _wmkf_request_value: REQUEST_ID,
     wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
     wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL,
     wmkf_producer: 'request-workbench',
     wmkf_presiteexecutivesummary: 'Executive summary.',
@@ -176,5 +179,67 @@ describe('readPreSiteVisitDraftForExport', () => {
     const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: null };
     await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [wrongArtifact] })))
       .rejects.toThrow(/no Pre-Site Word artifact/);
+  });
+
+  // Opus round-1 P2: the app itself treats only a READY Word row as current
+  // (artifact-lineage.js verifyReadyLineage's pointer check AND its
+  // activeReadyWords fallback census both require
+  // wmkf_operationstatus === READY); the same rule must hold on BOTH paths
+  // here.
+  describe('wmkf_operationstatus gating (Opus round-1 P2)', () => {
+    test('a lone Pending (GENERATING) row is refused by the pointer-null fallback', async () => {
+      const pending = fullRow({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING });
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: null };
+      await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [pending] })))
+        .rejects.toThrow(/no Pre-Site Word artifact/);
+    });
+
+    test('a pointer to a Failed row is refused', async () => {
+      const failed = fullRow({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED });
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
+      await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [failed] })))
+        .rejects.toThrow(/current Pre-Site pointer does not resolve/);
+    });
+
+    test('a pointer to a Ready row is accepted', async () => {
+      const ready = fullRow({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY });
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
+      const draft = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [ready] }));
+      expect(draft.requestDocumentId).toBe(WORD_ROW_ID);
+    });
+  });
+
+  // Opus round-1 P3-3: refusal paths isCandidateRow already enforces but
+  // that had no direct test -- SUPERSEDED/distribution-snapshot on the
+  // POINTER path (not just the fallback path, already covered above), and
+  // cross-request rows on both paths.
+  describe('isCandidateRow refusal paths not previously tested (Opus round-1 P3-3)', () => {
+    test('a pointer to a SUPERSEDED row is refused', async () => {
+      const superseded = fullRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED });
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
+      await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [superseded] })))
+        .rejects.toThrow(/current Pre-Site pointer does not resolve/);
+    });
+
+    test('a pointer to a distribution snapshot is refused', async () => {
+      const snapshot = fullRow({ wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx` });
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
+      await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [snapshot] })))
+        .rejects.toThrow(/current Pre-Site pointer does not resolve/);
+    });
+
+    test('a pointer to a row belonging to a DIFFERENT request is refused', async () => {
+      const otherRequestRow = fullRow({ _wmkf_request_value: OTHER_REQUEST_ID });
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
+      await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [otherRequestRow] })))
+        .rejects.toThrow(/current Pre-Site pointer does not resolve/);
+    });
+
+    test('a pointer-null fallback candidate belonging to a DIFFERENT request is excluded (refuses with zero candidates)', async () => {
+      const otherRequestRow = fullRow({ _wmkf_request_value: OTHER_REQUEST_ID });
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: null };
+      await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [otherRequestRow] })))
+        .rejects.toThrow(/no Pre-Site Word artifact to export/);
+    });
   });
 });

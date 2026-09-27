@@ -182,7 +182,7 @@ export function buildReviewerDependencies(args, { client, graph }) {
 // own projection is boundary #2, defense-in-depth).
 const PRE_SITE_DOCUMENT_SELECT = [
   'wmkf_requestdocumentid', '_wmkf_request_value', 'wmkf_artifacttype', 'wmkf_contenttype',
-  'wmkf_lifecyclestate', 'wmkf_producer', 'wmkf_presiteproposalcorejson',
+  'wmkf_operationstatus', 'wmkf_lifecyclestate', 'wmkf_producer', 'wmkf_presiteproposalcorejson',
   ...PRE_SITE_SECTION_FIELDS,
 ].join(',');
 
@@ -194,15 +194,28 @@ async function getRequestForPreSite(client, requestId) {
   return body;
 }
 
+// Bounded, unpaged read (Opus round-1 P3-4): a source request legitimately
+// has only a handful of Pre-Site rows across its reopen/correction history,
+// so hitting the page cap or seeing a continuation link means the read is
+// no longer complete -- refuse rather than silently choose a candidate from
+// a partial page.
+const PRE_SITE_DOCUMENT_READ_CAP = 50;
+
 async function listPreSiteDocuments(client, requestId) {
   const filter = encodeURIComponent(
     `_wmkf_request_value eq ${requestId} and wmkf_artifacttype eq ${REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT}`,
   );
   const body = bodyOrThrow(
     'source Pre-Site request-document read',
-    await client.get(`/wmkf_requestdocuments?$select=${PRE_SITE_DOCUMENT_SELECT}&$filter=${filter}&$top=50`),
+    await client.get(`/wmkf_requestdocuments?$select=${PRE_SITE_DOCUMENT_SELECT}&$filter=${filter}&$top=${PRE_SITE_DOCUMENT_READ_CAP}`),
   );
-  return body.value || [];
+  const rows = body.value || [];
+  if (rows.length >= PRE_SITE_DOCUMENT_READ_CAP || body['@odata.nextLink']) {
+    throw new Error(
+      `Source Pre-Site request-document read is not complete (reached the ${PRE_SITE_DOCUMENT_READ_CAP}-row cap or a continuation link exists); refusing rather than choosing from a partial page.`,
+    );
+  }
+  return rows;
 }
 
 /**
