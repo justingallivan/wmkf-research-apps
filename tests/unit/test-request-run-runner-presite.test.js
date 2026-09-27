@@ -1311,8 +1311,9 @@ describe('item 9: draft/file ownership re-asserted at every boundary (Codex adve
   // inside assertOwnedPresiteDraft) -- mutates the fake AI-RUN row itself
   // (world.aiRuns), not the draft row, so these are independent of
   // DRAFT_FIELD_MUTATIONS above and of item 6's own I4 coverage (which only
-  // exercises request/prompt-bind/prompt-version at render+verify, via a
-  // different fixture path, and never status/runsource/notes at all).
+  // exercises request/prompt-bind/prompt-version AT VERIFY -- render always
+  // runs clean there, then the mutation is applied before verify_presite --
+  // via a different fixture path, and never status/runsource/notes at all).
   const RUN_FIELD_MUTATIONS = [
     ['request bind', (aiRun) => { aiRun._wmkf_ai_request_value = crypto.randomUUID(); }],
     ['prompt bind', (aiRun) => { aiRun._wmkf_ai_prompt_value = crypto.randomUUID(); }],
