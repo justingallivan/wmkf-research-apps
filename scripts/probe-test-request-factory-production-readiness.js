@@ -344,13 +344,14 @@ async function getAll(client, path) {
   }
 
   const steps = await getAll(client,
-    '/sdkmessageprocessingsteps?$select=name,stage,mode,statecode' +
+    '/sdkmessageprocessingsteps?$select=name,stage,mode,statecode,filteringattributes' +
     '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename)' +
     "&$filter=sdkmessagefilterid/primaryobjecttypecode eq 'akoya_request' and statecode eq 0");
   const relevant = steps.filter((s) => ['Create', 'Update'].includes(s.sdkmessageid?.name));
   console.log(`   plug-in steps (enabled, Create/Update): ${relevant.length}`);
   for (const s of relevant) {
-    console.log(`   - [${s.sdkmessageid.name}, stage ${s.stage}, ${s.mode === 0 ? 'sync' : 'async'}] ${s.name || '(unnamed)'}  type=${s.plugintypeid?.typename || '?'}`);
+    const filter = s.sdkmessageid.name === 'Update' ? `  fires on: ${s.filteringattributes || 'ANY column'}` : '';
+    console.log(`   - [${s.sdkmessageid.name}, stage ${s.stage}, ${s.mode === 0 ? 'sync' : 'async'}] ${s.name || '(unnamed)'}  type=${s.plugintypeid?.typename || '?'}${filter}`);
   }
 
   const flows = await getAll(client, '/workflows?$select=name,clientdata&$filter=category eq 5 and statecode eq 1');
