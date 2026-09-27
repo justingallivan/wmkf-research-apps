@@ -55,6 +55,9 @@ function draftResult(over = {}) {
         wmkf_presitepersonneldetails: 'Personnel details.',
       },
       proposalCoreJson: { schemaVersion: 4, proposalCore: realProposalCore(), diagnostics: [] },
+      // Slice 4c: draft.personnel is required by projectPreSiteVisitSection's
+      // validation; every fixture needs a valid one.
+      personnel: { principalInvestigator: 'Dr. PI Name', coPrincipalInvestigators: ['Beau CoPI'] },
     },
     identity: {
       requestDocumentId: WORD_ROW_ID,
@@ -150,6 +153,40 @@ describe('exportTestRequestSourceBundle re-fences the Pre-Site document row (Cod
       draft: {
         ...first.draft,
         sectionFields: { ...first.draft.sectionFields, wmkf_presiteexecutivesummary: 'Edited mid-export.' },
+      },
+    });
+    let error;
+    try {
+      await runExport(depsWithPreSite(first, second));
+    } catch (e) { error = e; }
+    expect(error?.code).toBe('pre_site_visit_source_changed');
+  });
+
+  // Slice 4c: the Co-PI junction and PI lookup are not covered by the
+  // request-document eTag (they live on separate Dataverse rows), so the
+  // fence must catch drift in draft.personnel too, exactly like any other
+  // section-field drift above.
+  test('refuses when the PI name changed between the two reads (identity and section fields unchanged)', async () => {
+    const first = draftResult();
+    const second = draftResult({
+      draft: {
+        ...first.draft,
+        personnel: { ...first.draft.personnel, principalInvestigator: 'Dr. Someone Else' },
+      },
+    });
+    let error;
+    try {
+      await runExport(depsWithPreSite(first, second));
+    } catch (e) { error = e; }
+    expect(error?.code).toBe('pre_site_visit_source_changed');
+  });
+
+  test('refuses when a Co-PI was added between the two reads (identity and section fields unchanged)', async () => {
+    const first = draftResult();
+    const second = draftResult({
+      draft: {
+        ...first.draft,
+        personnel: { ...first.draft.personnel, coPrincipalInvestigators: ['Beau CoPI', 'Charlie CoPI'] },
       },
     });
     let error;

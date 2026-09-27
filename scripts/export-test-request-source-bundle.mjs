@@ -35,7 +35,12 @@
  * The Pre-Site section (bundle v4, slice 4a "Recipe 4") is likewise OFF by
  * default and requires `--with-reviewers` too (v4 extends v3). Pass
  * `--with-pre-site` to include the source's current Pre-Site draft (eight
- * section fields plus the parsed proposal-core envelope) and its abstract:
+ * section fields plus the parsed proposal-core envelope), its abstract, and
+ * (slice 4c) `personnel` (the Principal Investigator display name and the
+ * Co-PI display names, read from the parent Request and its Co-PI junction,
+ * never from the document row) -- a source Request with no resolvable PI
+ * refuses the export outright, since a Pre-Site clone cannot render without
+ * one (owner decision 2026-09-27: names only, no Contact write):
  *
  *   DATAVERSE_ALLOW_PROD_READS=yes node --env-file=/absolute/.env.local \
  *     scripts/export-test-request-source-bundle.mjs \
@@ -63,6 +68,17 @@ import {
 import { createReviewerSourceDependencies } from '../lib/services/test-requests/source-bundle-reviewers.js';
 import { readPreSiteVisitDraftForExport } from '../lib/services/test-requests/source-bundle-presite.js';
 import { PRE_SITE_SECTION_FIELDS } from '../lib/services/test-requests/source-bundle.js';
+// Pure, dependency-free formatter (no `this`, calls no DynamicsService/
+// adapter code, issues no reads) -- turns the raw
+// `_wmkf_projectleader_value@OData.Community.Display.V1.FormattedValue`
+// annotation this script's own client.get() returns into
+// `_wmkf_projectleader_value_formatted`, the SAME field name
+// personnelRoster/requireIdentity read production-side
+// (proposal-core-service.js:151-163,288). Reusing this formatter (rather
+// than hand-rolling the same annotation-suffix-stripping logic here) keeps
+// the field name in sync with the app's own convention without adopting
+// DynamicsService/the adapter layer's read path.
+import { processAnnotations } from '../lib/services/dynamics/annotations.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../shared/config/requestDocument.js';
 
 const require = createRequire(import.meta.url);
@@ -186,12 +202,68 @@ const PRE_SITE_DOCUMENT_SELECT = [
   ...PRE_SITE_SECTION_FIELDS,
 ].join(',');
 
+// Codex round (slice 4c): also selects _wmkf_projectleader_value, with the
+// annotation header so the Web API returns its own
+// `@OData.Community.Display.V1.FormattedValue` -- the SAME field
+// `personnelRoster`/`requireIdentity` read production-side
+// (proposal-core-service.js:151-163,288), never a separate PI lookup this
+// script would have to keep in sync with the app's own.
 async function getRequestForPreSite(client, requestId) {
   const body = bodyOrThrow(
     'source Request Pre-Site pointer read',
-    await client.get(`/akoya_requests(${requestId})?$select=akoya_requestid,_wmkf_currentpresitevisit_value`),
+    await client.get(
+      `/akoya_requests(${requestId})?$select=akoya_requestid,_wmkf_currentpresitevisit_value,_wmkf_projectleader_value`,
+      { Prefer: 'odata.include-annotations="*"' },
+    ),
   );
-  return body;
+  return processAnnotations(body);
+}
+
+// wmkf_apprequestperson.wmkf_role option value for Co-PI. Byte-mirrors
+// lib/dataverse/adapters/app-request-person.js's local ROLE_COPI constant
+// (that adapter's own doc: "the same constant proposal-participants.js used
+// inline") -- kept local here too, for the same reason: this script never
+// calls DynamicsService/the adapter (every read here goes through its OWN
+// verified-production `client`, not the env-configured DAL), so the query
+// shape is byte-mirrored instead of reused by reference.
+const CO_PI_ROLE = 100000001;
+
+// Byte-mirrors app-request-person.js's queryCoPIs: same select/expand/
+// filter/orderby/top, executed through this script's own client.
+async function listCoPIRecords(client, requestId) {
+  const filter = encodeURIComponent(`_wmkf_request_value eq ${requestId} and wmkf_role eq ${CO_PI_ROLE}`);
+  const params = [
+    '$select=_wmkf_contact_value,wmkf_authorposition',
+    `$expand=${encodeURIComponent('wmkf_Contact($select=fullname,firstname,lastname)')}`,
+    `$filter=${filter}`,
+    `$orderby=${encodeURIComponent('wmkf_authorposition asc,createdon asc')}`,
+    '$top=50',
+  ].join('&');
+  const body = bodyOrThrow(
+    'source Co-PI junction read',
+    await client.get(`/wmkf_apprequestpersons?${params}`),
+  );
+  return body.value || [];
+}
+
+// Byte-mirrors proposal-participants.js's fetchCoPIs dedupe/name-join logic
+// (dedupe by contact id, fullname else firstname+lastname, drop unnamed).
+function coPiNamesFromRecords(records) {
+  const byContactId = new Map();
+  for (const row of records || []) {
+    const contactId = row._wmkf_contact_value;
+    if (!contactId || byContactId.has(contactId)) continue;
+    const contact = row.wmkf_Contact;
+    const name = contact?.fullname
+      || [contact?.firstname, contact?.lastname].filter(Boolean).join(' ').trim();
+    if (!name) continue;
+    byContactId.set(contactId, name);
+  }
+  return Array.from(byContactId.values());
+}
+
+async function getCoPIsForPreSite(client, requestId) {
+  return coPiNamesFromRecords(await listCoPIRecords(client, requestId));
 }
 
 // Bounded, unpaged read (Opus round-1 P3-4): a source request legitimately
@@ -233,6 +305,7 @@ export function buildPreSiteDependencies(args, { client }) {
       {
         getRequest: (requestId) => getRequestForPreSite(client, requestId),
         listPreSiteDocuments: (requestId) => listPreSiteDocuments(client, requestId),
+        getCoPIs: (requestId) => getCoPIsForPreSite(client, requestId),
       },
     ),
     readAbstract: async (source) => {

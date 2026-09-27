@@ -140,6 +140,7 @@ describe('createPresiteInputDeps (I9: complete against proposal-core-service.js 
     resourceUrl: SANDBOX_URL,
     graph: NOOP_GRAPH,
     findProposalNarrativeLocation: async () => null,
+    personnel: { principalInvestigator: 'Ada Principal', coPrincipalInvestigators: ['Beau CoPI'] },
   });
 
   it('declares every key proposal-core-service.js DEFAULT_DEPENDENCIES declares', () => {
@@ -156,8 +157,21 @@ describe('createPresiteInputDeps (I9: complete against proposal-core-service.js 
     await expect(deps.runPrompt()).rejects.toThrow(/must never be reached/);
   });
 
-  it('getCoPIs resolves to an empty, deterministic list (documented simplification: no wmkf_apprequestperson rows on a sandbox clone)', async () => {
-    await expect(deps.getCoPIs('any-request-id')).resolves.toEqual([]);
+  // Slice 4c: getCoPIs now synthesizes TEST-prefixed names from the bundle's
+  // personnel (no wmkf_apprequestperson rows exist on a sandbox clone, so
+  // this can never be a REAL read) instead of an unconditional [].
+  it('getCoPIs resolves to the bundle\'s Co-PI names, each TEST-prefixed, same order', async () => {
+    await expect(deps.getCoPIs('any-request-id')).resolves.toEqual(['TEST · Beau CoPI']);
+  });
+
+  it('createPresiteInputDeps refuses without a principalInvestigator (missing personnel)', () => {
+    expect(() => createPresiteInputDeps({
+      resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, findProposalNarrativeLocation: async () => null,
+    })).toThrow(/requires bundle personnel/);
+    expect(() => createPresiteInputDeps({
+      resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, findProposalNarrativeLocation: async () => null,
+      personnel: { principalInvestigator: '   ' },
+    })).toThrow(/requires bundle personnel/);
   });
 });
 
@@ -202,7 +216,7 @@ describe('createPresiteInputDeps + loadPreSiteVisitInputs (P1: the real program-
   }
 
   /** Wires the REAL createPresiteInputDeps over a fake TRANSPORT client (dataverse/client.js is module-mocked above); grantRows/applicant are the only per-test variables. */
-  function buildDeps({ grantRows, applicant }) {
+  function buildDeps({ grantRows, applicant, personnel }) {
     const capturedGrantUrls = [];
     createClient.mockReturnValue({
       get: jest.fn(async (url) => {
@@ -217,6 +231,7 @@ describe('createPresiteInputDeps + loadPreSiteVisitInputs (P1: the real program-
       resourceUrl: SANDBOX_URL,
       graph: { downloadFile: async () => ({ buffer: Buffer.from('narrative bytes') }) },
       findProposalNarrativeLocation: async () => ({ driveId: 'd1', itemId: 'i1', filename: 'ProposalNarrative_1000342.pdf', siteId: 's1', versionId: 'v1' }),
+      personnel: personnel || { principalInvestigator: 'Dr. PI Name', coPrincipalInvestigators: [] },
     });
     return { deps, capturedGrantUrls };
   }
@@ -241,6 +256,99 @@ describe('createPresiteInputDeps + loadPreSiteVisitInputs (P1: the real program-
     await expect(
       withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps)),
     ).rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable' });
+  });
+
+  // Slice 4c live-proof finding (sandbox run 126881bc…, Request 1000347):
+  // seed_presite_draft stopped at requireIdentity (proposal-core-
+  // service.js:151-163) with "missing required Pre-Site Visit context:
+  // principal investigator" -- the clone's Request has no project-leader
+  // Contact to look up, and every 4b test mocked loadPreSiteVisitInputs
+  // itself, so nothing ever ran requireIdentity for real over the sandbox
+  // deps. This test runs the REAL loadPreSiteVisitInputs -> requireIdentity
+  // chain over createPresiteInputDeps and proves it now succeeds.
+  it('requireIdentity passes with the bundle personnel: context.personnel is [TEST-prefixed PI, then Co-PIs, in bundle order]', async () => {
+    const { deps } = buildDeps({ grantRows: [CONSISTENT_GRANT_ROW], applicant: applicantRow({ count: 1, sum: 10000 }) });
+    const result = await withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps));
+    expect(result.context.personnel).toEqual([
+      { name: 'TEST · Dr. PI Name', role: 'Principal Investigator' },
+    ]);
+  });
+
+  it('requireIdentity passes with Co-PIs too, in the same order the bundle supplied them', async () => {
+    const capturedGrantUrls = [];
+    createClient.mockReturnValue({
+      get: jest.fn(async (url) => {
+        if (url.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: true, status: 200, body: REQUEST_ROW };
+        if (url.startsWith(`/accounts(${APPLICANT_ID})`)) return { ok: true, status: 200, body: applicantRow({ count: 1, sum: 10000 }) };
+        if (url.startsWith('/akoya_requests?')) { capturedGrantUrls.push(url); return { ok: true, status: 200, body: { value: [CONSISTENT_GRANT_ROW] } }; }
+        if (url.startsWith('/wmkf_appreviewersuggestions?')) return { ok: true, status: 200, body: { value: [] } };
+        throw new Error(`unexpected sandbox GET ${url}`);
+      }),
+    });
+    const deps = createPresiteInputDeps({
+      resourceUrl: SANDBOX_URL,
+      graph: { downloadFile: async () => ({ buffer: Buffer.from('narrative bytes') }) },
+      findProposalNarrativeLocation: async () => ({ driveId: 'd1', itemId: 'i1', filename: 'ProposalNarrative_1000342.pdf', siteId: 's1', versionId: 'v1' }),
+      personnel: { principalInvestigator: 'Dr. PI Name', coPrincipalInvestigators: ['Ada Co', 'Beau Co'] },
+    });
+    const result = await withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps));
+    expect(result.context.personnel).toEqual([
+      { name: 'TEST · Dr. PI Name', role: 'Principal Investigator' },
+      { name: 'TEST · Ada Co', role: 'Co-Principal Investigator' },
+      { name: 'TEST · Beau Co', role: 'Co-Principal Investigator' },
+    ]);
+  });
+
+  // Reproduces the EXACT live-proof failure directly: a sandbox getRequest
+  // that returns no formatted project-leader name (the clone's genuine
+  // state -- no Contact to look up) and a getCoPIs returning [] (no
+  // wmkf_apprequestperson rows), fed straight into the REAL
+  // loadPreSiteVisitInputs with none of createPresiteInputDeps's own
+  // synthesis. Confirms requireIdentity really did (and, without the
+  // synthesis, still would) refuse this exact way -- the specific defect
+  // this slice closes, not a hypothetical one.
+  it('reproduces the live-proof failure directly: no PI name at all -> pre_site_visit_context_incomplete mentioning principal investigator', async () => {
+    createClient.mockReturnValue({
+      get: jest.fn(async (url) => {
+        if (url.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: true, status: 200, body: { ...REQUEST_ROW, _wmkf_projectleader_value_formatted: undefined } };
+        if (url.startsWith(`/accounts(${APPLICANT_ID})`)) return { ok: true, status: 200, body: applicantRow({ count: 1, sum: 10000 }) };
+        if (url.startsWith('/akoya_requests?')) return { ok: true, status: 200, body: { value: [CONSISTENT_GRANT_ROW] } };
+        if (url.startsWith('/wmkf_appreviewersuggestions?')) return { ok: true, status: 200, body: { value: [] } };
+        throw new Error(`unexpected sandbox GET ${url}`);
+      }),
+    });
+    const bareDeps = {
+      getRequest: async (requestId) => {
+        const resp = await createClient().get(`/akoya_requests(${requestId})`);
+        return resp.body;
+      },
+      getApplicant: async (applicantId) => (await createClient().get(`/accounts(${applicantId})`)).body,
+      getCoPIs: async () => [],
+      getProposalNarrative: async () => ({ text: 'Narrative text '.repeat(20) }),
+      getProgramGrants: async () => ({ records: [CONSISTENT_GRANT_ROW], capped: false }),
+      getWriteupRoster: async () => ({ reviewers: [], blockers: [] }),
+      composeRefereeSection: () => null,
+    };
+    await expect(
+      withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, bareDeps)),
+    ).rejects.toMatchObject({
+      code: 'pre_site_visit_context_incomplete',
+      message: expect.stringContaining('principal investigator'),
+    });
+  });
+
+  // Slice 4c item 4: "same bundle => same snapshot bytes" -- two
+  // independently constructed createPresiteInputDeps({...personnel}) calls,
+  // fed the same fake transport, must produce byte-identical
+  // loadPreSiteVisitInputs results (deterministic across seed and render,
+  // which each build their own deps object from the same bundle).
+  it('two independently built deps objects (same bundle personnel) produce byte-identical loadPreSiteVisitInputs results', async () => {
+    const personnel = { principalInvestigator: 'Dr. PI Name', coPrincipalInvestigators: ['Ada Co', 'Beau Co'] };
+    const { deps: depsA } = buildDeps({ grantRows: [CONSISTENT_GRANT_ROW], applicant: applicantRow({ count: 1, sum: 10000 }), personnel });
+    const resultA = await withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, depsA));
+    const { deps: depsB } = buildDeps({ grantRows: [CONSISTENT_GRANT_ROW], applicant: applicantRow({ count: 1, sum: 10000 }), personnel });
+    const resultB = await withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, depsB));
+    expect(JSON.stringify(resultA)).toEqual(JSON.stringify(resultB));
   });
 });
 
@@ -272,7 +380,10 @@ describe('sandboxGetWriteupRoster (P2b, Opus round 1: deterministic reviewer ord
         throw new Error(`unexpected sandbox GET ${url}`);
       }),
     });
-    return createPresiteInputDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, findProposalNarrativeLocation: async () => null });
+    return createPresiteInputDeps({
+      resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, findProposalNarrativeLocation: async () => null,
+      personnel: { principalInvestigator: 'Ada Principal', coPrincipalInvestigators: [] },
+    });
   }
 
   it('a fake returning suggestion rows in different orders on "seed" vs "render" still produces the same reviewer order and byte-identical roster', async () => {

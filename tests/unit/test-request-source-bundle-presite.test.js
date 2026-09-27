@@ -56,10 +56,17 @@ function fullRow(over = {}) {
   };
 }
 
-function deps({ request, rows }) {
+const PI_NAME = 'Dr. PI Name';
+
+// Slice 4c: every test in this file that isn't specifically about personnel
+// gets a default, valid PI so the reader's now-mandatory personnel read
+// never masks the assertion under test; getCoPIs defaults to [] (the app's
+// own default when a request has no Co-PIs).
+function deps({ request, rows, coPIs = [] }) {
   return {
-    getRequest: jest.fn(async () => request),
+    getRequest: jest.fn(async () => (request ? { _wmkf_projectleader_value_formatted: PI_NAME, ...request } : request)),
     listPreSiteDocuments: jest.fn(async () => rows),
+    getCoPIs: jest.fn(async () => coPIs),
   };
 }
 
@@ -269,6 +276,61 @@ describe('readPreSiteVisitDraftForExport', () => {
         operationstatus: row.wmkf_operationstatus,
         lifecyclestate: row.wmkf_lifecyclestate,
       });
+    });
+  });
+
+  // Slice 4c: the live-proof finding (sandbox run 126881bc..., Request
+  // 1000347) -- the clone had no PI name because the exporter never read one.
+  // The reader now must, and must refuse to export a request with none.
+  describe('personnel (Slice 4c: PI + Co-PIs read alongside the draft)', () => {
+    test('draft.personnel carries the principal investigator and Co-PIs, Co-PIs in the order getCoPIs returned them', async () => {
+      const row = fullRow();
+      const request = {
+        akoya_requestid: REQUEST_ID,
+        _wmkf_currentpresitevisit_value: WORD_ROW_ID,
+        _wmkf_projectleader_value_formatted: 'Dr. Ada Lovelace',
+      };
+      const { draft } = await readPreSiteVisitDraftForExport(
+        { requestId: REQUEST_ID },
+        deps({ request, rows: [row], coPIs: ['Beau CoPI', 'Charlie CoPI'] }),
+      );
+      expect(draft.personnel).toEqual({
+        principalInvestigator: 'Dr. Ada Lovelace',
+        coPrincipalInvestigators: ['Beau CoPI', 'Charlie CoPI'],
+      });
+    });
+
+    test('refuses to export when the source request has no project-leader (PI) name', async () => {
+      const row = fullRow();
+      const request = {
+        akoya_requestid: REQUEST_ID,
+        _wmkf_currentpresitevisit_value: WORD_ROW_ID,
+        _wmkf_projectleader_value_formatted: undefined,
+      };
+      await expect(readPreSiteVisitDraftForExport(
+        { requestId: REQUEST_ID },
+        deps({ request, rows: [row] }),
+      )).rejects.toThrow(/cannot render requireIdentity without one/);
+    });
+
+    test('refuses to export when the project-leader name is whitespace-only', async () => {
+      const row = fullRow();
+      const request = {
+        akoya_requestid: REQUEST_ID,
+        _wmkf_currentpresitevisit_value: WORD_ROW_ID,
+        _wmkf_projectleader_value_formatted: '   ',
+      };
+      await expect(readPreSiteVisitDraftForExport(
+        { requestId: REQUEST_ID },
+        deps({ request, rows: [row] }),
+      )).rejects.toThrow(/cannot render requireIdentity without one/);
+    });
+
+    test('draft.personnel has an empty coPrincipalInvestigators array when getCoPIs resolves to none', async () => {
+      const row = fullRow();
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
+      const { draft } = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [row], coPIs: [] }));
+      expect(draft.personnel).toEqual({ principalInvestigator: PI_NAME, coPrincipalInvestigators: [] });
     });
   });
 });
