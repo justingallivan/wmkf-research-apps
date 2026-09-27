@@ -375,7 +375,7 @@ async function getSourceRequestByNumber(client, requestNumber) {
 }
 
 /** Build the injected GraphService-shaped object and SharePoint target getter once per process. */
-async function buildGraphContext() {
+export async function buildGraphContext() {
   const { GraphService } = await import('../lib/services/graph-service.js');
   const { configuredSharePointTargetInfo } = await import('../lib/services/sharepoint-target-registry.js');
   const graph = {
@@ -389,6 +389,12 @@ async function buildGraphContext() {
     // site, matching ensureFolderPath/uploadFile's existing options passthrough.
     getFileMetadataById: (driveId, itemId, options) => GraphService.getFileMetadataById(driveId, itemId, options),
     downloadFile: (driveId, itemId) => GraphService.downloadFile(driveId, itemId),
+    // P3 (Opus round 1): the Pre-Site Visit recipe's steps (via
+    // presite-sandbox-deps.js's own passthrough wrapper) can call
+    // deleteFile -- upload-recovery's orphan cleanup on a create-only
+    // conflict -- so it must be reachable through this CLI's Graph object
+    // like every other Graph method the sandbox deps forward.
+    deleteFile: (driveId, itemId) => GraphService.deleteFile(driveId, itemId),
     getFileMetadataByPath: (library, folder, filename, options) => GraphService.getFileMetadataByPath(library, folder, filename, options),
     // Stage C: forwarded so the sandbox-bound Initial Assessment Board
     // snapshot step (ia-sandbox-deps.js createIaSandboxDeps) can be driven
