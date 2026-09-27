@@ -19,10 +19,26 @@ export default async function handler(req, res) {
   const rawRequestId = req.query.requestId;
   const requestId = typeof rawRequestId === 'string' ? rawRequestId.trim() : '';
   if (!isGuid(requestId)) return res.status(400).json({ error: 'requestId must be a GUID' });
+  const rawBeforeRunId = req.query.beforeRunId;
+  let beforeRunId = null;
+  if (rawBeforeRunId !== undefined) {
+    if (typeof rawBeforeRunId !== 'string' || !/^[1-9]\d*$/.test(rawBeforeRunId)) {
+      return res.status(400).json({ error: 'beforeRunId must be a positive screening id' });
+    }
+    beforeRunId = Number(rawBeforeRunId);
+    if (!Number.isSafeInteger(beforeRunId)) {
+      return res.status(400).json({ error: 'beforeRunId must be a positive screening id' });
+    }
+  }
 
   return withDalContext('workbench-integrity-latest', async () => {
     try {
-      const result = await getWorkbenchIntegrityContext({ requestId });
+      const result = await getWorkbenchIntegrityContext({
+        requestId,
+        profileId: access.profileId,
+        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+        beforeRunId,
+      });
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ServiceHttpError) {

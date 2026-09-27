@@ -101,5 +101,18 @@ test('GET requires the exact Integrity Screener grant and forwards only the rout
   await getHandler(req, res);
   expect(requireAppAccess).toHaveBeenCalledWith(req, res, 'integrity-screener');
   expect(withDalContext).toHaveBeenCalledWith('workbench-integrity-latest', expect.any(Function));
-  expect(getWorkbenchIntegrityContext).toHaveBeenCalledWith({ requestId });
+  expect(getWorkbenchIntegrityContext).toHaveBeenCalledWith({
+    requestId, profileId: 77, actingUserSystemId: null, beforeRunId: null,
+  });
+});
+
+test('GET parses a scalar history cursor and rejects array cursors', async () => {
+  const req = { method: 'GET', query: { requestId: '11111111-1111-4111-8111-111111111111', beforeRunId: '9' } };
+  await getHandler(req, response());
+  expect(getWorkbenchIntegrityContext).toHaveBeenCalledWith(expect.objectContaining({ beforeRunId: 9 }));
+
+  const res = response();
+  await getHandler({ method: 'GET', query: { requestId: req.query.requestId, beforeRunId: ['9'] } }, res);
+  expect(res.statusCode).toBe(400);
+  expect(getWorkbenchIntegrityContext).toHaveBeenCalledTimes(1);
 });

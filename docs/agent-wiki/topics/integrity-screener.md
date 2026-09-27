@@ -15,6 +15,7 @@ source_files:
   - pages/api/integrity-screener/dismiss.js
   - pages/api/workbench/integrity/[requestId].js
   - pages/api/workbench/integrity/[requestId]/run.js
+  - pages/api/workbench/integrity/[requestId]/review.js
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md
@@ -23,6 +24,8 @@ watch_paths:
   - lib/services/workbench/integrity-service.js
   - pages/api/integrity-screener/**
   - pages/api/workbench/integrity/**
+  - lib/db/migrations/056_integrity_screenings_request_id.sql
+  - lib/db/migrations/057_integrity_screening_reviews.sql
   - shared/components/workbench/IntegrityTab.js
 update_triggers:
   - integrity screening source/provider changes
@@ -54,10 +57,11 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 - The standalone `/integrity-screener` remains the manual-name screening page. The Workbench request page has a separate Integrity tab gated by the `integrity-screener` app grant.
 - In the Workbench flow, the server loads the request's Project Leader and PI/Co-PI junction contacts from Dataverse, deduplicates by contact, and supplies names and institutions to the existing screening engine. The route accepts the request GUID and does not use browser-supplied people or identities.
 - The tab shows the server-resolved people before a confirmation that screening uses Claude and SerpAPI credits per person. The request-scoped service refuses an empty list, missing names, or more than 10 people; the cap is a defensive spend bound.
-- Completed Workbench runs are saved with a nullable `integrity_screenings.request_id`; the tab loads the latest linked run on reload. Migration 056 supplies that column and its latest-by-request index. This feature is **source-built on `codex/integrity-workbench-tab`; migration 056 is not applied, and the branch is not merged or deployed**.
-- The screen service saves completed runs when it receives a user profile ID, and
-  authenticated history and dismissal API primitives exist.
-- The current page has no History tab and does not call the history API.
+- The Workbench opts into the engine's version-1 strict source-coverage reporting. The standalone screen keeps its existing fail-soft default; this opt-in does not change that behavior.
+- Completed Workbench runs are saved with a nullable `integrity_screenings.request_id`. GET returns the latest run plus newest-first history pages of 20. `beforeRunId` is a request-scoped cursor. Migration 056 supplies the linkage column and latest-by-request index; migration 057 adds append-only review decisions.
+- The Workbench review endpoint allows the request's lead Program Director or a fresh-role superuser to record `approved` or `hold` on the latest run. Approval requires an unchanged current roster and complete version-1 coverage for Retraction Watch, PubPeer, and News; hold requires a note. The UI shows earlier decisions read-only. Approval means **Integrity review complete**; it records a human review after staff recommend funding and is not a funding decision or progression gate. Do not add automatic screening or an earlier gate.
+- Migrations 056 and 057 and the Workbench history/review surfaces are **source-built on `codex/integrity-workbench-tab`; unapplied, unmerged, and undeployed**.
+- Standalone history and dismissal API primitives exist. The standalone page's Dismiss handler remains a placeholder: it logs and alerts but does not call the dismissal API. `screenApplicants` does not read prior dismissals, so future-screen suppression is not implemented.
 - Since PR #151 (2026-09-05) the source descriptions on the page no longer say
   "(requires SERP API)" for PubPeer and News; both are still gated behind
   `effectiveSerpKey` server-side, so the label removal is copy, not a gating change.

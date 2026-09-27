@@ -7,11 +7,12 @@ owner: Codex (build), Claude (review)
 
 # Integrity Screener as a Workbench tab — build brief (Codex)
 
-> **Scope expanded after the original build:** the owner now requires a
-> completed integrity screen plus recorded PD approval before an application
-> can be marked ready for the board. That workflow extension is **not built**.
-> The implementation and verification hand-back below covers the original tab
-> scope only; see the board-readiness requirements at the end before release.
+> **Current owner-approved extension:** add screening history, recorded PD
+> approval, and a visible Integrity review complete status. Applications are
+> normally screened after staff recommend funding. The hard board-readiness
+> gate is **deferred** until that application workflow exists; do not invent a
+> readiness action or gate earlier review steps. The extension is source-built;
+> final review closure is recorded below. Migrations 056–057 remain unapplied.
 
 ## Where you are
 
@@ -28,7 +29,7 @@ Bring the Integrity Screener into the Workbench so a request's people are screen
 3. **Persistence:** the **latest run per request** is saved and shown again on reload. Earlier runs may remain in the table, but the tab shows the latest.
 4. **The standalone `/integrity-screener` page stays** for ad-hoc manual names. Its behavior must not change.
 
-## Ground truth to build from (derive every field name from source; never invent identifiers)
+## Original pre-build baseline (historical; implementation and extension below supersede it)
 
 - **Screening engine:** `IntegrityService.screenApplicants(applicants, claudeApiKey, serpApiKey, userProfileId)` is an async generator (`lib/services/integrity-service.js:35`) that yields progress and results. The existing route `pages/api/integrity-screener/screen.js` shows how it is called, streamed, authorized, and given its keys. Reuse the service; don't fork its logic. Read what shape `applicants` must have from the service and the standalone page.
 - **History store:** Postgres `integrity_screenings` (fresh-install shape in `scripts/setup-database.js:151-163`; writer `saveScreening` at `integrity-service.js:579`; readers ~:607-626). It has **no request column today**.
@@ -164,16 +165,16 @@ contacts, clearer uncertain-outcome recovery, and mapping real Dataverse 404
 errors before any Postgres or screening work.
 
 The following concerns were retained for the original tab scope. The new
-board-readiness requirement below changes the treatment of source failures:
+PD-approval contract below changes the treatment of source failures:
 
 - **Existing engine error semantics:** some SerpAPI and Retraction Watch failures
   are swallowed as empty results by the unchanged shared engine. The Workbench
   cannot distinguish these from successful empty searches using its existing
   result contract. The UI marks exposed errors/unsearched sources incomplete;
   it does not prove source health. This behavior already affected manual screens
-  and their saved history. The newly required board-readiness gate must address
-  this contract before accepting a screen as complete; valid empty searches
-  must remain distinguishable from failures.
+  and their saved history. The PD-approval extension must address this contract before accepting a
+  screen as complete; valid empty searches must remain distinguishable from
+  failures. Legacy standalone behavior remains the default.
 - **Synchronous runtime:** screening remains sequential within the existing
   300-second route budget. Ten people is a spend ceiling, not a proven runtime
   guarantee; provider latency was not live-tested. A timeout can consume credits
@@ -202,40 +203,120 @@ preceded this last correction batch. No further Opus round was run; Codex
 adjudicated the findings and Sol verified their closure as authorized.
 
 This brief is the scoped branch handoff; unrelated Factory session instructions
-and production milestone history were left unchanged. The next work is defining
-and implementing the expanded board-readiness contract below, followed by its
-review and verification. The original tab closure does not certify that gate.
+and production milestone history were left unchanged. The original tab closure
+above does not certify the PD-approval extension below.
 
-## Expanded requirement — application board readiness
+## Current extension — screening history and PD approval
 
 **Owner decisions [VERIFIED via this task's owner replies]:**
-- Screening and recorded program-director approval are required **before marking
-  the application ready for the board**, ahead of the final funding decision.
-- A saved screening run alone does not satisfy the requirement.
-- This is not an earlier external-reviewer-invitation or Phase-II gate.
+- Normal sequence: staff recommend funding, then run the integrity screen, then
+  record PD approval, before marking the application ready for the board.
+- Staff ordinarily do not screen applicants they have not recommended for funding.
+- The recommendation/board-readiness checkpoint is not yet built. Build the audit
+  and approval capability now; defer the hard progression gate until that
+  workflow exists. Do not create a disconnected readiness action.
+- A saved screening run alone is not PD approval. Expose a distinct visible
+  **Integrity review complete** status.
 
-**Proposed implementation contract [PLANNED, not built]:** retain a formal run
-history and a PD disposition linked to the exact run and screened roster, with
-the authenticated approver, timestamp, and notes. Enforce the requirement on the
-server at the authoritative application board-readiness write. Failed,
-incomplete, or unverifiable screens must not qualify. A changed roster must not
-silently inherit approval of different people. Preserve the underlying evidence
-when a run or decision is superseded. Define attempt/failure logging and the
-source-completion contract before implementation; the original completed-row
-history is not an attempt ledger or a PD decision audit.
+**Implementation contract [SOURCE-BUILT on this branch; not deployed]:**
+- Keep request-linked screening evidence in `integrity_screenings`; expose paged
+  historical runs and their decisions, while retaining the latest result view.
+- Add an append-only `integrity_screening_reviews` audit table in migration 057,
+  after 056. Each event records the exact screening/request, authenticated
+  reviewer profile and Dynamics identity, decision (`approved` or `hold`), notes,
+  and time. Hold requires notes. This operational audit does not set a Dataverse
+  funding recommendation, final decision, or board-readiness field.
+- Require the Integrity Screener grant plus the request's current lead PD or a
+  superuser with an attributable staff identity to record a disposition. Use the
+  existing Workbench lead-PD authorization convention; other authorized readers
+  can inspect evidence/history but cannot approve it.
+- Permit approval only for the latest request-linked run, with the same current
+  contact IDs, names, roles, and institutions, and a result for every screened
+  person with all three sources successfully searched. Retain old approvals as
+  history, but a new run or changed roster requires review again. A hold can be
+  recorded for the latest incomplete run, but is never a completion signal.
+- Workbench calls opt into explicit strict source-error reporting in the shared
+  engine. Each result records `sourceCoverageVersion: 1`; older unversioned
+  results remain visible but require rerunning before approval. Strict handling
+  must expose Retraction Watch SQL errors, SerpAPI transport/API/parse failures,
+  and summary failures. Valid empty searches remain valid. Standalone callers
+  keep existing default behavior. SerpAPI's documented successful-empty response
+  is distinguished from operational errors using metadata and empty-result state
+  ([provider reference](https://serpapi.com/blog/fix-serpapi-errors-guide/)).
+  Strict mode also rejects unusable result items and retains articles from
+  documented News highlight/story groups before validation.
+- Show reviewer/time/notes and historical findings. Historical run panels are
+  read-only. Refresh review state after a new screen; never retain an old green
+  completion indicator when refreshed context is unknown. All asynchronous
+  screen/review/history operations must remain request-generation guarded.
+- No automatic screening, live screen, Dataverse write, schema apply, funding
+  decision, or readiness gate is part of this extension. Failed/aborted attempts
+  without persisted results are not a durable attempt ledger in this scope;
+  persisted partial-source runs remain inspectable and cannot be approved.
+
+| Invariant | Changed surfaces | Verification |
+|---|---|---|
+| A run is not a human approval | Service, review table, tab | No event means needs review even with zero findings |
+| Review actor and authority are server-owned | Review route/service | Spoofed body, non-lead PD, missing identity rejected |
+| Approval cannot bless different or incomplete evidence | Service + strict engine | Wrong request/run, new run, roster drift, source failures, old marker rejected |
+| Review events preserve prior decisions | Migration/service/history | Append-only writer, latest-event derivation, old events remain visible |
+| Stale UI cannot confer apparent completion | Tab and pagination | Deferred responses across request changes ignored; refresh failure not green |
+| Standalone default behavior is preserved | Optional engine argument | Legacy failure behavior tests plus strict-mode mutation check |
+| No disconnected progression gate | Routes/services/docs | No changes to triage, leadership transitions, lifecycle status, or snapshot writers |
 
 **Enforcement boundary [VERIFIED via source search]:**
 `shared/components/workbench/StatusTab.js` is read-only for the Dynamics lifecycle
-status. `lib/services/final-writeup/transition-service.js` implements group and
-leadership review transitions, and Initial Assessment/pre-site distribution
-services create document-level Board Ready snapshots. Those are not evidence of
-an application-level board-readiness action. No such action was found in the
-branch's routes, services, components, or tracked schema during the scoped search.
+status. Final Writeup group/leadership review and document-level Board Ready
+snapshots are different contracts. The eventual application-readiness writer
+must be identified and integrated in its own scoped work; this extension makes
+no claim that recording a funding or board decision is blocked.
 
-**Required clarification:** is the application's board-readiness action an
-existing operation in Dynamics/another tool, or a new Workbench action? Do not
-substitute a document snapshot or leadership-review transition, invent a live
-Dataverse field, or claim an end-to-end hard gate until that write path and its
-authority are identified. Persistence/schema choices and rollout scope remain
-to be designed against that confirmed boundary. No new schema or runtime gate
-has been implemented or applied for this extension.
+## Extension validation and handoff — 2026-09-27
+
+**Changed surfaces [VERIFIED via source and tests]:** request-scoped history and
+review service/GET, new POST `/api/workbench/integrity/[requestId]/review`,
+migration 057 and fresh-install mirror/manifest, opt-in strict source reporting,
+Integrity tab history/decision UI, tests, route matrix, Atlas, service catalog,
+canonical counts, and Integrity wiki. Codex orchestrated; Luna built the
+backend/UI/docs; Sol reviewed; Codex tightened strict provider parsing and
+reviewed desktop/mobile renders. Strict source reporting is committed in
+`ef7b9cca6`.
+
+**Validation [VERIFIED via local commands, offline fixtures]:**
+- Production build passed; repository lint passed with zero errors and 122
+  existing warnings. All 31 scoped gate/self-test invocations passed, each gate
+  preceding its self-test.
+- All 1,094 unit suites passed as part of the broader Jest run. That run had
+  1,118 passing suites and nine failing integration suites (27 tests). Running
+  those nine suites against the pre-extension `e3d17710f` snapshot reproduced
+  the same 27 failures; they are baseline failures, not an all-green suite claim.
+- Strict engine tests passed 20/20, including transport/parse/provider/SQL/summary
+  failures, successful empty searches, malformed items, grouped News articles,
+  and legacy defaults. Removing the strict failure propagation made its test
+  fail; restoring the guard restored green.
+- UI tests passed 24/24. The Chromium fixture test passed at desktop and 390px
+  mobile width; root inspected both renders. All application API requests were
+  intercepted; unexpected requests abort. No live screen or database write ran.
+- Backend tests exercised exact actor/run/request binding, roster and coverage
+  rejection, hold notes, history cursor scoping, and post-write refresh. Removing
+  each authorization, roster, or coverage guard made its corresponding test fail.
+
+**Sol/root review closure [VERIFIED]:** Sol found an append-time latest-run race.
+The review INSERT now conditionally checks the latest request run within the
+write statement and returns 409 if a newer run was saved before that statement.
+A new run saved afterward is handled by the post-write context refresh; its
+completion is not inherited from the previous run. The final review service and
+route tests passed 11/11. Removing the SQL predicate made the regression test
+fail, and restoring it restored green. Sol then reported no remaining material
+blocker. Root verified the correction. No production database probe is claimed.
+
+**Supplemental Opus review:** awaiting owner authorization for one additional
+read-only OAuth review of the completed extension. The original two approved
+Opus reviews cover the original tab, not this later extension.
+
+**Release boundary:** apply both 056 and 057 through `scripts/apply-migrations.js`
+only as part of an owner-authorized release. Confirm migration numbering against
+other unmerged branches first. No merge, schema apply, live screening, or
+deployment occurred. Hard application progression enforcement and a durable log
+of failed/aborted attempts remain outside this extension. No production milestone
+entry is required; this brief is the scoped branch handoff.

@@ -295,7 +295,7 @@ If you're touching a service or utility, read its header before this catalog. If
 ### Integrity Screener
 
 - **`integrity-service.js`** — Retraction Watch + PubPeer + News + Haiku summarization.
-- **`workbench/integrity-service.js`** — Request-scoped Workbench entry point: loads PI/Co-PI people from Dataverse inside the caller's trusted DAL context, enforces a 10-person spend cap, and saves completed runs to `integrity_screenings.request_id` (migration 056). **[SOURCE-BUILT on `codex/integrity-workbench-tab`; migration not applied, branch not merged or deployed.]**
+- **`workbench/integrity-service.js`** — Request-scoped Workbench entry point: loads PI/Co-PI people from Dataverse inside the caller's trusted DAL context, enforces a 10-person spend cap, saves completed runs to `integrity_screenings.request_id` (migration 056), pages 20 screening runs with their append-only recorded reviews, and authorizes the latest-screen lead-PD/superuser approval or hold (migration 057). Approval requires an exact current roster and complete strict-source coverage; it records integrity-review completion only, not a funding decision or progression gate. **[SOURCE-BUILT on `codex/integrity-workbench-tab`; migrations 056–057 not applied, branch not merged or deployed.]**
 - **`integrity-matching-service.js`** — Multi-tier name matching + Retraction Watch optimization.
 
 ### Admin / monitoring

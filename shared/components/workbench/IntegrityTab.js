@@ -27,6 +27,55 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleString();
 }
 
+function normalizeContext(data) {
+  return {
+    ...data,
+    history: Array.isArray(data?.history) ? data.history : (data?.latestRun ? [data.latestRun] : []),
+    historyHasMore: data?.historyHasMore === true,
+    historyNextBeforeId: Number.isFinite(data?.historyNextBeforeId) ? data.historyNextBeforeId : null,
+    review: data?.review && typeof data.review === 'object' ? data.review : null,
+  };
+}
+
+function isFullContext(data, requestId) {
+  return data?.requestId === requestId
+    && Array.isArray(data.people)
+    && (data.latestRun === null || (data.latestRun && typeof data.latestRun === 'object'))
+    && Array.isArray(data.history)
+    && data.review && typeof data.review === 'object'
+    && typeof data.review.status === 'string';
+}
+
+function reviewStatusLabel(status) {
+  const labels = {
+    not_screened: 'Not reviewed',
+    needs_review: 'Needs staff review',
+    incomplete: 'Incomplete screen',
+    roster_changed: 'People roster changed',
+    approved: 'Integrity review complete',
+    hold: 'Review on hold',
+  };
+  return labels[status] || 'Review status unavailable';
+}
+
+function DecisionNote({ decision }) {
+  if (!decision) return null;
+  return (
+    <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+      <p className="font-medium text-gray-900">{decision.decision === 'approved' ? 'Integrity review approved' : 'Integrity review placed on hold'}</p>
+      <p className="mt-1">Recorded by {decision.reviewerName || 'staff reviewer'} · {formatDate(decision.createdAt)}</p>
+      {decision.notes && <p className="mt-2 whitespace-pre-wrap">{decision.notes}</p>}
+    </div>
+  );
+}
+
+function RunFindings({ run }) {
+  const results = Array.isArray(run?.results) ? run.results : [];
+  return results.length ? (
+    <ul className="mt-3">{results.map((result, index) => <PersonResult key={`${result.name || 'person'}-${index}`} result={result} />)}</ul>
+  ) : <p className="mt-3 text-sm text-amber-800">This saved run has no person results to display.</p>;
+}
+
 function SourceSummary({ sourceKey, label, source }) {
   const searched = source?.searched === true;
   const matches = sourceKey === 'retraction_watch' && Array.isArray(source?.matches) ? source.matches : [];
@@ -111,6 +160,10 @@ export default function IntegrityTab({ requestId }) {
   const [reloadTick, setReloadTick] = useState(0);
   const [uncertainRun, setUncertainRun] = useState(false);
   const [refreshingRun, setRefreshingRun] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewUncertain, setReviewUncertain] = useState(false);
   const generation = useRef(0);
   const mounted = useRef(false);
   const activeRequest = useRef(requestId);
@@ -124,6 +177,11 @@ export default function IntegrityTab({ requestId }) {
     setError(null);
     setRunningRequestId(null);
     setUncertainRun(false);
+    setReviewNotes('');
+    setRefreshingRun(false);
+    setHistoryLoading(false);
+    setReviewSubmitting(false);
+    setReviewUncertain(false);
     setRecord(null);
     setLoadedRequestId(null);
     if (!id) {
@@ -135,11 +193,10 @@ export default function IntegrityTab({ requestId }) {
         const response = await requestEnvelope(`/api/workbench/integrity/${encodeURIComponent(id)}`, { tolerantBody: true });
         if (!response.ok) throw new Error(response.data?.error || `Could not load integrity screen (${response.status})`);
         if (generation.current !== current || activeRequest.current !== id) return;
-        if (response.data?.requestId !== id || !Array.isArray(response.data.people)
-          || !(response.data.latestRun === null || (response.data.latestRun && typeof response.data.latestRun === 'object'))) {
+        if (!isFullContext(response.data, id)) {
           throw new Error('Integrity information did not match the requested request. Retry loading.');
         }
-        setRecord(response.data);
+        setRecord(normalizeContext(response.data));
         setLoadedRequestId(id);
       } catch (loadError) {
         if (generation.current === current && activeRequest.current === id) setError(loadError.message);
@@ -160,12 +217,15 @@ export default function IntegrityTab({ requestId }) {
   const missingNames = people.filter((person) => !String(person?.name || '').trim());
 
   const runScreen = async () => {
-    if (!requestId || running || uncertainRun || people.length === 0 || missingNames.length > 0) return;
+    if (!requestId || running || reviewSubmitting || refreshingRun || uncertainRun || reviewUncertain || people.length === 0 || missingNames.length > 0) return;
     const confirmed = window.confirm(`Run an integrity screen for ${people.length} ${people.length === 1 ? 'person' : 'people'}? This uses Claude and SerpAPI credits for each person.`);
     if (!confirmed) return;
     const id = requestId;
     const current = generation.current;
+    let screenSaved = false;
     setRunningRequestId(id);
+    setReviewUncertain(true);
+    setRecord((existing) => existing ? { ...existing, review: null } : existing);
     setError(null);
     try {
       const response = await requestEnvelope(`/api/workbench/integrity/${encodeURIComponent(id)}/run`, {
@@ -178,13 +238,35 @@ export default function IntegrityTab({ requestId }) {
         throw new Error('The returned screen did not match this request. The previous saved screen is still shown.');
       }
       if (!mounted.current || generation.current !== current || activeRequest.current !== id) return;
-      setRecord({ requestId: id, people: response.data.people, latestRun: response.data.run });
+      setRecord((currentRecord) => normalizeContext({
+        ...currentRecord,
+        requestId: id,
+        people: response.data.people,
+        latestRun: response.data.run,
+        history: [response.data.run, ...(currentRecord?.history || []).filter((run) => String(run.id) !== String(response.data.run.id))],
+        review: null,
+      }));
       setLoadedRequestId(id);
+      screenSaved = true;
       setUncertainRun(false);
+      setReviewUncertain(true);
+      const refreshed = await requestEnvelope(`/api/workbench/integrity/${encodeURIComponent(id)}`, { tolerantBody: true });
+      if (!refreshed.ok || !isFullContext(refreshed.data, id)
+        || String(refreshed.data.latestRun?.id) !== String(response.data.run.id)) {
+        throw new Error('The screen was saved, but its staff review status could not be refreshed.');
+      }
+      if (!mounted.current || generation.current !== current || activeRequest.current !== id) return;
+      setRecord(normalizeContext(refreshed.data));
+      setReviewUncertain(false);
     } catch (runError) {
       if (mounted.current && generation.current === current && activeRequest.current === id) {
-        setUncertainRun(true);
-        setError(`${runError.message} Completion may be uncertain. The previous saved screen is still shown; reload it before running again.`);
+        if (!screenSaved) {
+          setUncertainRun(true);
+          setError(`${runError.message} Completion may be uncertain. The previous saved screen is still shown; reload it before running again.`);
+        } else {
+          setReviewUncertain(true);
+          setError(`${runError.message} The screen may be saved, but its staff review status is unknown. Reload the review context before approval.`);
+        }
       }
     } finally {
       if (mounted.current && generation.current === current && activeRequest.current === id) setRunningRequestId(null);
@@ -192,21 +274,21 @@ export default function IntegrityTab({ requestId }) {
   };
 
   const reloadSavedRun = async () => {
-    if (!requestId || refreshingRun) return;
+    if (!requestId || refreshingRun || runningRequestId === requestId || reviewSubmitting) return;
     const id = requestId;
     const current = generation.current;
     setRefreshingRun(true);
     try {
       const response = await requestEnvelope(`/api/workbench/integrity/${encodeURIComponent(id)}`, { tolerantBody: true });
       if (!response.ok) throw new Error(response.data?.error || `Reload failed (${response.status})`);
-      if (response.data?.requestId !== id || !Array.isArray(response.data.people)
-        || !(response.data.latestRun === null || (response.data.latestRun && typeof response.data.latestRun === 'object'))) {
+      if (!isFullContext(response.data, id)) {
         throw new Error('The reloaded integrity information did not match this request.');
       }
       if (!mounted.current || generation.current !== current || activeRequest.current !== id) return;
-      setRecord(response.data);
+      setRecord(normalizeContext(response.data));
       setLoadedRequestId(id);
       setUncertainRun(false);
+      setReviewUncertain(false);
       setError(null);
     } catch (reloadError) {
       if (mounted.current && generation.current === current && activeRequest.current === id) {
@@ -214,6 +296,67 @@ export default function IntegrityTab({ requestId }) {
       }
     } finally {
       if (mounted.current && generation.current === current && activeRequest.current === id) setRefreshingRun(false);
+    }
+  };
+
+  const loadMoreHistory = async () => {
+    if (!requestId || historyLoading || !currentRecord?.historyHasMore || !currentRecord?.historyNextBeforeId) return;
+    const id = requestId;
+    const beforeId = currentRecord.historyNextBeforeId;
+    const current = generation.current;
+    setHistoryLoading(true);
+    try {
+      const response = await requestEnvelope(`/api/workbench/integrity/${encodeURIComponent(id)}?beforeRunId=${encodeURIComponent(beforeId)}`, { tolerantBody: true });
+      if (!response.ok) throw new Error(response.data?.error || `Could not load earlier screens (${response.status})`);
+      if (response.data?.requestId !== id || !Array.isArray(response.data.history)) throw new Error('Earlier screens did not match this request.');
+      if (!mounted.current || generation.current !== current || activeRequest.current !== id) return;
+      const page = normalizeContext(response.data);
+      setRecord((existing) => normalizeContext({
+        ...existing,
+        history: [...(existing?.history || []), ...page.history.filter((run) => !(existing?.history || []).some((known) => String(known.id) === String(run.id)))],
+        historyHasMore: page.historyHasMore,
+        historyNextBeforeId: page.historyNextBeforeId,
+      }));
+      setError(null);
+    } catch (historyError) {
+      if (mounted.current && generation.current === current && activeRequest.current === id) setError(historyError.message);
+    } finally {
+      if (mounted.current && generation.current === current && activeRequest.current === id) setHistoryLoading(false);
+    }
+  };
+
+  const submitReview = async (decision) => {
+    const screeningId = Number(latestRun?.id);
+    if (!requestId || running || refreshingRun || reviewUncertain || !record?.review?.canReview || !Number.isFinite(screeningId) || reviewSubmitting) return;
+    if (decision === 'approved' && !record.review.canApprove) return;
+    if (decision === 'hold' && !reviewNotes.trim()) return;
+    const id = requestId;
+    const current = generation.current;
+    setReviewSubmitting(true);
+    setReviewUncertain(true);
+    setRecord((existing) => ({ ...existing, review: null }));
+    setError(null);
+    try {
+      const response = await requestEnvelope(`/api/workbench/integrity/${encodeURIComponent(id)}/review`, {
+        method: 'POST',
+        body: { screeningId, decision, notes: reviewNotes },
+        tolerantBody: true,
+      });
+      if (!response.ok) throw new Error(response.data?.error || `Could not record integrity review (${response.status})`);
+      if (response.data?.requestId !== id || !Array.isArray(response.data.people)
+        || !Array.isArray(response.data.history) || !response.data.review) {
+        throw new Error('The review response did not match this request.');
+      }
+      if (!mounted.current || generation.current !== current || activeRequest.current !== id) return;
+      setRecord(normalizeContext(response.data));
+      setReviewNotes('');
+      setReviewUncertain(false);
+    } catch (reviewError) {
+      if (mounted.current && generation.current === current && activeRequest.current === id) {
+        setError(`${reviewError.message} The decision outcome may be uncertain; reload the review context before acting again.`);
+      }
+    } finally {
+      if (mounted.current && generation.current === current && activeRequest.current === id) setReviewSubmitting(false);
     }
   };
 
@@ -236,7 +379,7 @@ export default function IntegrityTab({ requestId }) {
             <h2 className="text-lg font-semibold text-gray-900">Integrity screen</h2>
             <p className="mt-1 max-w-3xl text-sm text-gray-600">Screens the request’s PI and Co-PIs using public integrity sources. Results support human review and are not a determination of misconduct.</p>
           </div>
-          <Button onClick={runScreen} disabled={!people.length || !requestId || missingNames.length > 0 || uncertainRun} loading={running}>
+          <Button onClick={runScreen} disabled={!people.length || !requestId || missingNames.length > 0 || uncertainRun || reviewUncertain || reviewSubmitting || refreshingRun} loading={running}>
             {running ? 'Screening…' : 'Run screen'}
           </Button>
         </div>
@@ -264,15 +407,100 @@ export default function IntegrityTab({ requestId }) {
         ) : (
           <>
             <p className="mt-1 text-sm text-gray-600">Run {formatDate(latestRun.createdAt)} · {latestRun.matchCount || 0} items reported</p>
-            {Array.isArray(latestRun.results) && latestRun.results.length > 0 ? (
-              <ul className="mt-4">
-                {latestRun.results.map((result, index) => <PersonResult key={`${result.name || 'person'}-${index}`} result={result} />)}
-              </ul>
-            ) : <p className="mt-3 text-sm text-amber-800">This saved run has no person results to display.</p>}
+            <RunFindings run={latestRun} />
           </>
+        )}
+        {latestRun && (
+          <div className="mt-5 border-t border-gray-200 pt-4" aria-labelledby="integrity-review-heading">
+            <h3 id="integrity-review-heading" className="text-base font-semibold text-gray-900">PD integrity review</h3>
+            {reviewUncertain ? (
+              <div className="mt-2" role="status">
+                <p className="text-sm text-amber-800">{running ? 'Screening is in progress; the previous approval is hidden until review status refreshes.' : 'Review status is unknown until the saved context is reloaded. No approval is shown as complete.'}</p>
+                {!running && <Button className="mt-2" variant="outline" onClick={reloadSavedRun} loading={refreshingRun} disabled={reviewSubmitting}>Reload review context</Button>}
+              </div>
+            ) : record?.review ? (
+              <>
+                <p className={`mt-1 text-sm ${record.review.status === 'approved' ? 'font-semibold text-green-800' : record.review.status === 'hold' ? 'font-semibold text-amber-800' : 'text-gray-700'}`}>
+                  {reviewStatusLabel(record.review.status)}
+                </p>
+                {record.review.reason && <p className="mt-1 text-sm text-gray-600">{record.review.reason}</p>}
+                <DecisionNote decision={record.review.latestDecision} />
+                {(() => {
+                  const latestHistoryRun = (record.history || []).find((run) => String(run.id) === String(latestRun.id));
+                  const decisions = Array.isArray(latestHistoryRun?.reviews) ? latestHistoryRun.reviews : [];
+                  if (decisions.length < 2) return null;
+                  return (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-sm font-medium text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">Earlier decisions for this screen ({decisions.length - 1})</summary>
+                      {decisions.slice(1).map((decision) => <DecisionNote key={decision.id} decision={decision} />)}
+                    </details>
+                  );
+                })()}
+                {record.review.canReview && (
+                  <div className="mt-4 space-y-2">
+                    <label htmlFor="integrity-review-notes" className="block text-sm font-medium text-gray-900">Staff-only review notes</label>
+                    <textarea
+                      id="integrity-review-notes"
+                      value={reviewNotes}
+                      onChange={(event) => setReviewNotes(event.target.value.slice(0, 2000))}
+                      maxLength={2000}
+                      rows={3}
+                      disabled={reviewSubmitting}
+                      className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+                      aria-describedby="integrity-review-note-help"
+                    />
+                    <p id="integrity-review-note-help" className="text-xs text-gray-500">Visible to staff only. Required to place this review on hold. An approval records integrity review only; it is not a funding decision. {reviewNotes.length}/2000</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={() => submitReview('approved')} disabled={!record.review.canApprove || reviewSubmitting || running || refreshingRun || reviewUncertain} loading={reviewSubmitting}>
+                        Record approval
+                      </Button>
+                      <Button variant="outline" onClick={() => submitReview('hold')} disabled={!reviewNotes.trim() || reviewSubmitting || running || refreshingRun || reviewUncertain} loading={reviewSubmitting}>
+                        Place on hold
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-gray-600">Review status is unavailable. Reload the saved context before recording a decision.</p>
+            )}
+          </div>
         )}
         <p className="mt-4 text-xs text-gray-500">Staff should review the cited source material and context before drawing conclusions.</p>
       </Card>
+      {latestRun && (() => {
+        const earlierRuns = (Array.isArray(record?.history) ? record.history : [])
+          .filter((run) => String(run.id) !== String(latestRun.id));
+        if (!earlierRuns.length && !record?.historyHasMore) return null;
+        return (
+          <Card hover={false}>
+            <details>
+              <summary className="cursor-pointer text-base font-semibold text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">Earlier screens ({earlierRuns.length}{record?.historyHasMore ? '+' : ''})</summary>
+              <ul className="mt-3 divide-y divide-gray-200">
+                {earlierRuns.map((run) => (
+                  <li key={run.id} className="py-3 first:pt-0">
+                    <details>
+                      <summary className="cursor-pointer text-sm font-medium text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">Screen from {formatDate(run.createdAt)} · {run.matchCount || 0} items · read only</summary>
+                      <RunFindings run={run} />
+                      {Array.isArray(run.reviews) && run.reviews.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-900">Recorded review decisions</p>
+                          {run.reviews.map((decision) => <DecisionNote key={decision.id} decision={decision} />)}
+                        </div>
+                      )}
+                    </details>
+                  </li>
+                ))}
+              </ul>
+              {record?.historyHasMore && (
+                <Button className="mt-3" variant="outline" onClick={loadMoreHistory} loading={historyLoading}>
+                  {historyLoading ? 'Loading earlier screens…' : 'Load earlier screens'}
+                </Button>
+              )}
+            </details>
+          </Card>
+        );
+      })()}
       </>}
     </div>
   );

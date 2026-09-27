@@ -128,9 +128,10 @@ test('empty people and over-limit people are rejected before the paid engine', a
 });
 
 test('schema preflight and linked persistence are awaited; insert failures fail the run', async () => {
-  const engine = { screenApplicants: jest.fn(async function* (applicants, key, serpKey, actorId) {
+  const engine = { screenApplicants: jest.fn(async function* (applicants, key, serpKey, actorId, options) {
     expect(applicants).toEqual([{ name: 'Priya Investigator', role: 'PI', institution: 'PI Institution' }]);
     expect(actorId).toBeNull();
+    expect(options).toEqual({ strictSourceErrors: true });
     yield { type: 'complete', results: [{ matchCount: 2 }] };
   }) };
   const sqlCalls = [];
