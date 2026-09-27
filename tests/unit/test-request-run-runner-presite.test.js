@@ -59,6 +59,7 @@ import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/rev
 import {
   buildPreSiteVisitIdentity,
   buildPreSiteVisitInputSnapshot,
+  documentFieldsFromSnapshot,
   validateNarrativePrompt,
   UNCHANGED_RETRY_BLOCKED_CODES,
 } from '../../lib/services/pre-site-visit/artifact-model.js';
@@ -377,6 +378,13 @@ function createWorld() {
     dependencies, rows, aiRuns, request, flags,
     get uploadedBytes() { return uploadedBytes; },
     attestDocxPackageAgainstRender,
+    // Simulates a completed prior upload (a crash between upload and commit):
+    // getFileMetadataByPath/downloadFile read this back without a new
+    // uploadFile call, matching what recoverUploadedFile requires.
+    seedUploaded(metadata, bytes) {
+      uploaded = { ...metadata };
+      uploadedBytes = bytes;
+    },
     seedRawRow(overrides) {
       const id = overrides.wmkf_requestdocumentid || crypto.randomUUID();
       const row = {
@@ -575,6 +583,19 @@ describe('item 1: seed_presite_ai_run -- stub run via the sandbox only', () => {
     expect(retried.result.outcome).toBe('advanced');
     expect(world.dependencies.createAiRun).toHaveBeenCalledTimes(1);
   });
+
+  test('P3 follow-up (Opus round 2): a prompt that FAILS validation (no promptId) journals NOTHING, refuses before createAiRun, and stays cleanly retryable', async () => {
+    world.dependencies.getCurrentPrompt.mockImplementationOnce(async () => ({ ...promptFixture(), wmkf_ai_promptid: null }));
+    const failed = await runStep('seed_presite_ai_run');
+    expect(failed.result.outcome).toBe('needs_attention');
+    expect(failed.result.run.needsAttentionReason).not.toBe('presite_ai_run_ambiguous');
+    expect(failed.resources).toHaveLength(0);
+    expect(world.dependencies.createAiRun).not.toHaveBeenCalled();
+
+    const retried = await runStep('seed_presite_ai_run');
+    expect(retried.result.outcome).toBe('advanced');
+    expect(world.dependencies.createAiRun).toHaveBeenCalledTimes(1);
+  });
 });
 
 function seedAiRunResource(resourceId = 1) {
@@ -733,7 +754,7 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
     expect(world.rows.size).toBe(1);
   });
 
-  test('P2a: a seeded row GENERATING under an EXPIRED lease (this recipe\'s own crashed prior attempt) resumes and completes, not a permanent refusal', async () => {
+  test('P2a: a seeded row GENERATING under an EXPIRED lease (this recipe\'s own crashed prior attempt, no prior upload) reclaims and regenerates, not a permanent refusal', async () => {
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
     const claimToken = crypto.randomUUID();
@@ -754,6 +775,45 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
     // Reclaimed with a FRESH claim token (claimExisting always mints a new
     // one on reclaim), never left carrying the stale, crashed attempt's token.
     expect(row.wmkf_claimtoken).not.toBe(claimToken);
+    // No prior upload existed (world.uploaded starts unset), so this path
+    // reclaims and re-renders/re-uploads -- recoverUploadedFile runs but
+    // returns null at its own first guard (no persisted contentHash yet).
+    expect(world.dependencies.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('P2a: a seeded row GENERATING under an EXPIRED lease WITH a prior completed upload (crash between upload and commit) recovers it -- recoverUploadedFile actually recovers, no second upload', async () => {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    const claimToken = crypto.randomUUID();
+    const snapshot = buildPreSiteVisitInputSnapshot(BASE_INPUTS);
+    const documentFields = documentFieldsFromSnapshot(snapshot);
+    const { docx } = await world.dependencies.renderDocx({
+      documentFields,
+      proposalCore: core,
+      personnelNames: (snapshot.request?.personnel || []).map((p) => p.name),
+      refereeSection: documentFields.refereeSection ?? null,
+    });
+    const contentHash = await world.dependencies.hashDocx(docx);
+    const row = world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      wmkf_claimtoken: claimToken,
+      wmkf_contenthash: contentHash,
+      modifiedon: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(snapshot),
+    });
+    world.seedUploaded({
+      siteId: 'site-1', driveId: 'drive-1', id: 'item-1', webUrl: 'https://sp.test/x',
+      versionId: '1.0', eTag: '"file-1"', size: docx.length, lastModified: new Date().toISOString(),
+      name: row.wmkf_filename,
+    }, docx);
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('advanced');
+    expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+    const [recovered] = [...world.rows.values()];
+    expect(recovered.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
   });
 
   test('both core and snapshot fields absent -> the throwing runProposalCore sentinel fires; needs_attention; no second row', async () => {
