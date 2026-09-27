@@ -13,6 +13,11 @@ This is an investigation, not an implemented or deployed flag. The existing
 [Workbench brief](INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md) remains
 the implementation handoff; its board-readiness gate remains deferred.
 
+**Owner decision:** Yes means **complete screen + PD approval**. The proposed
+display label is **Integrity review complete**, logical name
+`wmkf_integrityreviewcomplete`. This is a current-state indicator, not a
+permanent marker that a screen once occurred. Implementation remains pending.
+
 ## Evidence
 
 - [VERIFIED via `node scripts/probe-request-integrity-metadata.cjs --target=prod`]
@@ -40,17 +45,15 @@ the implementation handoff; its board-readiness gate remains deferred.
 
 ## Proposed mechanics
 
-1. Settle the meaning before implementation. A historical **Integrity screen
-   completed** flag can become Yes after a request-linked, fully covered screen
-   is saved. Findings do not prevent completion; missing sources do. It says
-   neither “no concerns” nor “PD approved.” It remains Yes after a later roster
-   change because it records a historical event. Default No must mean “no
-   recorded qualifying screen,” not proof no screening ever occurred.
-2. If the flag instead means **Integrity review complete**, it must follow the
+1. Default No means current completion and approval have not been established;
+   it does not prove no screening ever occurred. A saved run alone cannot set
+   Yes. Findings do not automatically preclude PD approval; missing required
+   sources do.
+2. The **Integrity review complete** flag must follow the
    latest fully covered screen, matching current roster, and latest PD approval.
    Hold, replacement runs and roster changes can invalidate it. The current
    Workbench derives that state on reads; copying it only at approval time
-   would leave stale Yes values for Dynamics-only users. This stronger meaning
+   would leave stale Yes values for Dynamics-only users. The selected meaning
    needs an explicit invalidation/reconciliation mechanism, including edits
    made outside our apps. A request-row ETag does not cover contact/junction edits.
 3. Provision one Boolean in an isolated schema wave after a type/default/name
@@ -63,8 +66,7 @@ the implementation handoff; its board-readiness gate remains deferred.
    even if Dataverse fails. Show “saved; Dataverse update pending” separately;
    retry the flag update without rerunning paid screening or duplicating a PD
    decision. Persist pending synchronization durably and provide a bounded retry
-   path. For a historical true-only flag, repeating the PATCH is harmless; for
-   mutable approval state, retries must recompute and serialize current state
+   path. For this mutable approval state, retries must recompute and serialize current state
    rather than replay old values.
 5. Verify permissions under the chosen runtime identity. Attribute PD decisions
    to their authenticated actors in Postgres; do not imply a background sync
@@ -74,11 +76,13 @@ the implementation handoff; its board-readiness gate remains deferred.
 
 ## Remaining checks before release
 
-Flag semantics await the owner's answer. Neither live form placement nor
-runtime write permissions were tested. Confirm sandbox configuration, exact
+Neither live form placement nor runtime write permissions were tested.
+Confirm sandbox configuration, exact
 form/view, column security and organization auditing. Test partial success and
-retry without another screen; test stale-state handling if choosing the mutable
-approval flag. Existing Postgres migrations 056–057 remain unapplied under the
+retry without another screen and stale-state handling for the mutable approval
+flag. Resolve how changes outside our apps invalidate Yes, and the acceptable
+delay; periodic reconciliation alone can leave a stale-Yes interval. Existing
+Postgres migrations 056–057 remain unapplied under the
 original release boundary. Do not infer historical completion from legacy
 standalone name-only screens during any backfill.
 
