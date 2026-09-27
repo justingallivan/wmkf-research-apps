@@ -23,6 +23,9 @@
  *   each matching cloud flow's triggers and record actions (names only).
  *   Add --export-xaml=<dir> to also save each create-triggered workflow's
  *   definition (process logic only, no record data) for local review.
+ *   Add --history[=N] (default 10, max 50) to print what happened around the
+ *   creation of the N most recent Foundation-applicant (test) Requests: jobs,
+ *   emails, and audited field names on the Request and the Foundation account.
  */
 
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client');
@@ -86,6 +89,74 @@ function summarizeFlow(clientdata) {
   return { triggers, actions: [...new Set(actions)].sort() };
 }
 
+const FOUNDATION_NAME = 'W. M. Keck Foundation';
+const HISTORY_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/** Changed attribute names from an audit row's `changedata` (values are never printed). */
+function changedAttributeNames(changedata) {
+  try {
+    return (JSON.parse(changedata || '{}').changedAttributes || []).map((a) => a.logicalName).filter(Boolean);
+  } catch {
+    return ['(changedata did not parse)'];
+  }
+}
+
+function countBy(rows, keyOf) {
+  const counts = new Map();
+  for (const row of rows) counts.set(keyOf(row), (counts.get(keyOf(row)) || 0) + 1);
+  return [...counts.entries()].map(([key, n]) => `${key} x${n}`).sort();
+}
+
+/**
+ * What happened around the creation of existing Foundation-applicant test
+ * Requests (the legacy test-record convention the Factory's clones follow):
+ * background jobs and emails regarding each, audit rows on it within two
+ * hours of its creation, and audit rows on the Foundation account in the same
+ * window. Names, users, statuses and counts only.
+ */
+async function printCreationHistory(client, limit) {
+  const F = '@OData.Community.Display.V1.FormattedValue';
+  const foundation = await getAll(client,
+    `/accounts?$select=accountid,name&$filter=name eq '${FOUNDATION_NAME}' and statecode eq 0`);
+  if (foundation.length !== 1) throw new Error(`Expected one active ${FOUNDATION_NAME} account; found ${foundation.length}.`);
+  const accountId = foundation[0].accountid;
+  const resp = await client.get(
+    '/akoya_requests?$select=akoya_requestid,akoya_requestnum,createdon,_createdby_value,_akoya_payee_value,_wmkf_grantprogram_value,akoya_requeststatus' +
+    `&$filter=_akoya_applicantid_value eq ${accountId}&$orderby=createdon desc&$top=${limit}`,
+    { Prefer: 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"' },
+  );
+  if (!resp.ok) throw new Error(`GET test Requests failed (${resp.status})`);
+  const requests = resp.body?.value || [];
+  console.log(`\n7. Creation history of the ${requests.length} most recent Foundation-applicant Requests`);
+  for (const r of requests) {
+    const created = new Date(r.createdon);
+    const until = new Date(created.getTime() + HISTORY_WINDOW_MS).toISOString();
+    const from = new Date(created.getTime() - 10 * 60 * 1000).toISOString();
+    console.log(`   - ${r.akoya_requestnum} created ${r.createdon} by ${r[`_createdby_value${F}`] || r._createdby_value}` +
+      `  program=${r[`_wmkf_grantprogram_value${F}`] || 'none'} payee=${r._akoya_payee_value ? 'set' : 'none'} status=${r[`akoya_requeststatus${F}`] || r.akoya_requeststatus}`);
+    const jobs = await getAll(client,
+      `/asyncoperations?$select=name,statuscode&$filter=_regardingobjectid_value eq ${r.akoya_requestid}`);
+    console.log(`     background jobs: ${countBy(jobs, (j) => `${j.name} [${j.statuscode}]`).join('; ') || 'none'}`);
+    const emails = await getAll(client,
+      `/emails?$select=statuscode,directioncode&$filter=_regardingobjectid_value eq ${r.akoya_requestid}`);
+    console.log(`     emails: ${countBy(emails, (e) => `status ${e.statuscode} ${e.directioncode ? 'outgoing' : 'incoming'}`).join('; ') || 'none'}`);
+    const audits = await getAll(client,
+      '/audits?$select=createdon,_userid_value,operation,changedata' +
+      `&$filter=_objectid_value eq ${r.akoya_requestid} and createdon le ${until}&$orderby=createdon asc`);
+    console.log(`     audit rows on the Request within 2h: ${audits.length}`);
+    for (const a of audits) {
+      console.log(`       ${a.createdon} op=${a.operation} user=${a[`_userid_value${F}`] || a._userid_value}: ${changedAttributeNames(a.changedata).join(', ') || '-'}`);
+    }
+    const accountAudits = await getAll(client,
+      '/audits?$select=createdon,_userid_value,changedata' +
+      `&$filter=_objectid_value eq ${accountId} and createdon ge ${from} and createdon le ${until}`);
+    console.log(`     Foundation account audit rows in the window: ${accountAudits.length}`);
+    for (const a of accountAudits) {
+      console.log(`       ${a.createdon} user=${a[`_userid_value${F}`] || a._userid_value}: ${changedAttributeNames(a.changedata).join(', ') || '-'}`);
+    }
+  }
+}
+
 async function getAll(client, path) {
   const rows = [];
   let next = path;
@@ -103,6 +174,8 @@ async function getAll(client, path) {
   const detail = process.argv.includes('--detail');
   const exportArg = process.argv.find((arg) => arg.startsWith('--export-xaml='));
   const exportDir = exportArg ? exportArg.slice('--export-xaml='.length) : null;
+  const historyArg = process.argv.find((arg) => arg === '--history' || arg.startsWith('--history='));
+  const historyLimit = historyArg ? Math.min(Math.max(parseInt(historyArg.split('=')[1] || '10', 10) || 10, 1), 50) : 0;
   const clientId = process.env.DYNAMICS_CLIENT_ID;
   if (!clientId) throw new Error('DYNAMICS_CLIENT_ID is not set.');
   const token = await getAccessToken(PRODUCTION_URL);
@@ -159,6 +232,7 @@ async function getAll(client, path) {
   console.log(`   cloud flows (activated) mentioning akoya_request: ${matching.length} of ${flows.length}`);
   for (const f of matching) console.log(`   - ${f.name}`);
 
+  if (historyLimit) await printCreationHistory(client, historyLimit);
   if (!detail && !exportDir) return;
 
   console.log('\n5. Detail: what each create-triggered workflow writes');

@@ -1,6 +1,6 @@
 # Test Request Factory: production enablement plan (item 7)
 
-Status: **DRAFT (2026-09-27, Session 545). Contract-reconciled (verdict READY WITH NAMED CHANGES, applied below); Codex plan review pending; nothing built.** Parent design: `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`; its *Item 7 owner decisions* paragraph (Q1–Q5) and the slice 5a parking record are the inputs. Where this plan and the design disagree, the design's owner decisions win until this plan is reviewed and accepted.
+Status: **DRAFT (2026-09-27, Session 545). Contract-reconciled; Codex plan review round 1 needs-attention (four highs), revised below; round 2 pending; nothing built.** Parent design: `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`; its *Item 7 owner decisions* paragraph (Q1–Q5) and the slice 5a parking record are the inputs. Where this plan and the design disagree, the design's owner decisions win until this plan is reviewed and accepted.
 
 ## Why now
 
@@ -67,7 +67,7 @@ Owner decision 2026-09-27: sandbox live proofs stop after recipe 4. Deeper recip
 
 ## New hazards in production
 
-1. **Source and destination are the same org.** In the sandbox, "never write to the source" (decision 10) held because there were two orgs. In production it holds only because of ID checks.
+1. **Source and destination are the same org.** In the sandbox, "never write to the source" (decision 10) held because there were two orgs. In production it holds for the Factory's own writes only because of ID checks (P2). **Writes made by Dataverse automation that a Factory create triggers are outside any Factory fence** (Codex plan review round 1): they run server-side after the call. They are controlled only by characterization before the first create (the census above, P0b) and observation after it (P5).
 2. **The isolation switches live on Vercel; the CLI runs locally.** A marked Request created while Vercel's switches are off is treated as ordinary by cron jobs, email and reports. The CLI cannot see Vercel's environment.
 3. **The daily ack is blanket.** The interlock no longer narrows anything for the process that holds it.
 
@@ -81,6 +81,16 @@ The owner ran it with `DATAVERSE_ALLOW_PROD_READS=yes` set inline on that one co
 - that the owner's systemuser (1003222's program director) is enabled;
 - the classic workflows and Power Automate flows registered on `akoya_request` create and update (name, mode sync/async, state), so the Q5 list is complete rather than inferred from one sandbox failure.
 
+### P0b — Owner-run history of existing production test Requests (before the first create)
+
+The code's existing test-record convention is a Request whose applicant is the W. M. Keck Foundation account (`TEST_RECORD_APPLICANT_NAME`, `lib/services/dataverse-export/compiler.js:436-458`); the Factory's clones use exactly that applicant (`basic-clone-steps.js:49`). Staff already create such Requests by hand in production (source 1003222 is one) [ASSUMED how many and how often; P0b counts them]. So the four AkoyaGo plug-ins have already run on Requests shaped like a clone. `--history[=N]` on the probe reads, for the N most recent:
+- background jobs regarding each Request, by name and status;
+- emails regarding it, by status and direction;
+- audit rows on it within two hours of creation: user and changed field names (never values);
+- audit rows on the Foundation account in the same window.
+
+If nothing outside the Request changes on those, the plug-ins' observed behaviour on a clone-shaped create is characterized from production evidence without a new create. If something does, it is analysed before P5. **Owner decision needed:** whether this evidence satisfies the parent design's rule that production cloning stays disabled unless vendor create logic is shown safe (`TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`, *Isolation before the first create*).
+
 ### P1 — Target parameterization (sandbox path kept)
 
 - One `target` value (`sandbox` | `production`) chosen at reservation, pinned in the manifest and plan digest, and re-checked at every lease. Every host check derives from it; nothing infers it from the environment.
@@ -91,10 +101,11 @@ The owner ran it with `DATAVERSE_ALLOW_PROD_READS=yes` set inline on that one co
 
 ### P2 — Run-scoped write fence at the transport
 
-Replaces the two-org guarantee. The fence wraps the Factory's three write seams: the raw `createClient` (`lib/dataverse/client.js`), the Factory-built `svc` passed to `_writeFetch` and `executeChangeset` (`ia-sandbox-deps.js:55-56,202`; `presite-sandbox-deps.js:273-284`), and the runner's Graph object. That these are the only seams is [ASSUMED] until the build enumerates every write call site. Every write through them in a production run must target:
+**Defense in depth for the Factory's own writes only** (see hazard 1: it cannot see server-side automation). The fence wraps the Factory's three write seams: the raw `createClient` (`lib/dataverse/client.js`), the Factory-built `svc` passed to `_writeFetch` and `executeChangeset` (`ia-sandbox-deps.js:55-56,202`; `presite-sandbox-deps.js:273-284`), and the runner's Graph object. That these are the only seams is [ASSUMED] until the build enumerates every write call site. Every write through them in a production run must target:
 - the destination Request;
-- a row or item this run journaled before the write (I1);
-- or a create on an entity set the recipe declares.
+- or a row or item whose exact identity (preallocated GUID, generation key, or destination path) this run journaled before the write (I1).
+
+There is no entity-set-level allowance (Codex round 1): a create is admitted only when its identity matches a journaled intent. Its body's lookups must match the run plan (destination Request, owned rows, the Foundation account, the app user), and an exact readback confirms it before any dependent write.
 
 The fence refuses the source Request's ID and every source document's ID outright, even if something else allowed them. A **new** end-of-run source re-check (not `fence_source`, which is the first, pre-create step, `run-runner.js:481-509`) re-reads the source's `versionnumber` and `modifiedon` and fails the run if either moved. The bundle-vs-live source check still runs even though export and clone now read the same org.
 
@@ -107,17 +118,23 @@ Production writes use `REQUIRED` with the production app user `53e97fb3-a006-f11
 A production reservation refuses unless all of these hold, each recorded in the manifest and plan digest:
 - the marker columns are present, read live at reservation (production read);
 - for recipes that seed reviewers, the wave30 column is present;
-- an operator attestation flag that `TEST_REQUEST_ISOLATION=on` (and, for reviewer recipes, `SYNTHETIC_REVIEWER_ISOLATION=on`) is set in Vercel production. The CLI cannot read Vercel env, so this is an attestation; the form phase replaces it with a server-side check.
+- **the serving production deployment reports the isolation switches on.** A Vercel environment change reaches only new deployments (Codex round 1), so setting the variable is not enough. A small superuser-only readiness endpoint reports whether `TEST_REQUEST_ISOLATION` (and, for reviewer recipes, `SYNTHETIC_REVIEWER_ISOLATION`) resolves to `on` in the deployment answering it, with that deployment's ID. The CLI reads it (the owner supplies a session or token; mechanism settled in the build) immediately before reservation and again before the `create_request` lease, and refuses unless both reads say `on` for the same deployment ID. The admin form later reads the same state server-side.
 
-Order for the owner (Q4): apply the schema, set the switch, then run.
+Order for the owner (Q4): apply the schema, set the switches, redeploy production, confirm the readiness endpoint, then run.
 
 ### P5 — First production run: `basic` only, then observe
 
-This is Q5's disconfirming test. It is also the first test of the Factory's writes under the production app user's roles, which lack System Administrator (P0): a refusal on the location create, the marker write or any later row is expected to surface here and stop the run. After the run, before any deeper recipe, check and record in evidence:
-- email activities regarding the new Request (expect none);
-- classic workflow and Power Automate run history on it (expect only the P0-listed create workflows);
-- its `modifiedon` and vendor-touched fields over the following day;
-- its appearance in AkoyaGO, and in Workbench with the TEST badge.
+This confirms, on the first Factory create, what P0b characterized from existing test Requests. It is also the first test of the Factory's writes under the production app user's roles, which lack System Administrator (P0): a refusal on the location create, the marker write or any later row is expected to surface here and stop the run.
+
+One mandatory checklist, recorded in evidence (field names, statuses, counts and digests; no values):
+- **Before the create** (snapshot): the Foundation account's `versionnumber` and audited-field state, its Contacts' `versionnumber`s, the source Request's `versionnumber` and `modifiedon`.
+- **After the create, through quiescence:** every background job regarding the new Request reaches a terminal state (succeeded, failed or cancelled), then the observation continues for **24 hours** with no new job or audit row. Waiting jobs (a workflow waiting on a condition) are listed by name and accepted only if their wait condition cannot be met by later recipes (open question 5).
+- **The Request itself:** audit rows by user and field name; its grant program, payee, payment contact and Co-PI fields (expected empty, since the create workflows' conditions read them).
+- **Outside the Request:** audit rows on the Foundation account and its Contacts in the window (expected none); emails regarding the Request (expected none, draft or sent); `akoya_requestpayments` regarding it (expected none).
+- **The source:** `versionnumber` and `modifiedon` unchanged.
+- **Visibility:** the Request in AkoyaGO, and in Workbench with the TEST badge.
+
+Any unexpected row stops the programme before a deeper recipe, and it is analysed first.
 
 Deeper recipes follow one at a time: IA, reviews, Pre-Site, then recipe 5 (slice 5a rebased onto this plan, with the program director copied by GUID), then recipe 3 with its materials collection.
 
