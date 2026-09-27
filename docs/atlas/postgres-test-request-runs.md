@@ -172,13 +172,61 @@ unrecognized recipe.
 
 **The ledger's own enum accepts these three tokens; `RECIPE_STEP_ORDER`
 (`lib/services/test-requests/run-runner.js`) does NOT yet have an entry for
-any of them** — that is deliberate for this slice (their steps are built in
-4b/5/3). `stepOrderForRecipe`/`nextStepFor` fail closed (throw) on a recipe
-with no step order, so the CLI's `--recipe` validation
-(`scripts/rehearse-test-request-sandbox.mjs`) accepts only a recipe that
-BOTH is in `LEDGER_RECIPES` AND has a `RECIPE_STEP_ORDER` entry, refusing
-`pre_site_visit`/`final_writeup`/`site_visit_materials` before any Dataverse
-read or ledger write, not merely before their (not-yet-built) steps run.
+`final_writeup`/`site_visit_materials`** (built in 5/3). `pre_site_visit`
+gained its step order in slice 4b (below). `stepOrderForRecipe`/`nextStepFor`
+fail closed (throw) on a recipe with no step order, so the CLI's `--recipe`
+validation (`scripts/rehearse-test-request-sandbox.mjs`) accepts only a
+recipe that BOTH is in `LEDGER_RECIPES` AND has a `RECIPE_STEP_ORDER` entry,
+refusing `final_writeup`/`site_visit_materials` before any Dataverse read or
+ledger write, not merely before their (not-yet-built) steps run.
+
+## Recipe 4 — `pre_site_visit` (slice 4b, 2026-09-26)
+
+**[VERIFIED via source]** `RECIPE_STEP_ORDER.pre_site_visit` is the `reviews`
+order plus four new steps: `seed_presite_ai_run`, `seed_presite_draft`,
+`render_presite`, `verify_presite` (`run-runner.js`). `verify_reviews`
+advances rather than marks ready for this recipe (its own
+`nextStepFor(...) === null ? markReady : advance` branch, built in 4a);
+`verify_presite` is the recipe's only `markReady`.
+
+New ledger dimension additions (migration 054, edited in place, and its
+`scripts/setup-database.js` mirror stay byte-parallel):
+- `LEDGER_STEPS`: the four steps above.
+- `LEDGER_RESOURCE_KINDS`: `dataverse_ai_run` (the stub `wmkf_ai_run` bound at
+  `seed_presite_ai_run`; `seed_presite_draft`'s registry row reuses the
+  existing `dataverse_request_document` kind).
+- `LEDGER_REASON_CODES`: `presite_claim_lost`, `presite_pointer_mismatch`,
+  `presite_upload_ambiguous`, `presite_snapshot_stale`,
+  `presite_verification_failed`, `presite_promotion_uncharacterized`,
+  `presite_ai_run_ambiguous`.
+- `LEDGER_RECEIPT_KEYS` (`KEY_RULES`/`NUMERIC_KEYS`): `promptId` (GUID),
+  `inputFingerprint`/`renderInputFingerprint` (HEX64), `promptVersion`
+  (numeric) — the `test_request_receipt_ok` SQL function's own enumerated
+  grammar carries the same additions.
+
+`lib/services/test-requests/presite-sandbox-deps.js` is the sandbox-bound
+dependency seam (mirrors `ia-sandbox-deps.js`/`reviews-sandbox-deps.js`;
+exempt from `check:dataverse-access-layer` by name): `createPresiteSandboxDeps`
+builds the COMPLETE, sandbox-bound dependency object for
+`generatePreSiteVisitArtifact` (`lib/services/pre-site-visit/artifact-
+service.js`) and `createPresiteInputDeps` the matching object for
+`loadPreSiteVisitInputs` (`proposal-core-service.js`) — every key either
+sandbox-bound or a throwing sentinel (`runProposalCore`, `getBuckets`,
+`getExecutorBudget`, `runPrompt`), never a production `DEFAULT_DEPENDENCIES`
+fallback. Owner decision P2 (design doc): the draft is copied from the
+source bundle's `preSiteVisit` section, never regenerated, so a correctly
+seeded row (FAILED, a factory-owned `wmkf_lasterrorcode` outside
+`UNCHANGED_RETRY_BLOCKED_CODES`, the stub run bound) never reaches
+`runProposalCore`. `--reserve --recipe=pre_site_visit` requires a bundle v4
+`preSiteVisit` section (`assertBundleHasPreSiteSectionForRecipe`,
+`source-bundle.js`), refused before any Dataverse read; reviewer-address
+requirements are unchanged (`recipeSeedsReviewers(pre_site_visit)` is already
+true by rank). `getCoPIs`/roster `blockers` are simplified to an empty,
+deterministic result for the sandbox clone (documented in
+`presite-sandbox-deps.js`) — this narrows the rendered Personnel roster and
+referee diagnostics relative to a real staff generation, `[ASSUMED]`
+acceptable for the sandbox rehearsal phase; revisit before any live-proof
+claim about rendered content fidelity.
 
 ## Limits
 
