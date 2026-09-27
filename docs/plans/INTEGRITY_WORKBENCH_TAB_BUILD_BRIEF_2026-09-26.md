@@ -79,3 +79,121 @@ When done, leave a short summary at the end of this file covering:
 - anything you decided differently from this brief, and why.
 
 Claude reviews the branch read-only before the owner decides on merge.
+
+## Build hand-back — 2026-09-26
+
+**Owner/branch:** Codex orchestrated and reviewed; Luna built the backend, UI,
+tests, and documentation; Sol reviewed the implementation and accepted the
+corrected source with no remaining material finding. Work stayed in
+`WMKF_Apps-codex` on `codex/integrity-workbench-tab`, starting at `a09a75932`.
+This is branch implementation evidence, not a production deployment claim.
+
+**Commits:**
+- `7cf4c2ec5` — request-scoped service, GET/POST routes, migration 056, schema
+  mirror, and backend tests.
+- `95358498b` — gated Integrity tab, UI/browser tests, Atlas, route matrix,
+  canonical counts, service catalog, and Integrity Screener wiki updates.
+- `8a7e6b8a8` — Opus-driven evidence rendering and error-path corrections.
+
+**Changed surfaces:** `lib/services/workbench/integrity-service.js` resolves the
+UNION roster, deduplicates contacts, caps it at ten, reuses the existing engine,
+and awaits a request-linked insert. `shared/components/workbench/IntegrityTab.js`
+shows the current roster, credit confirmation, latest saved results, source
+status/errors, and evidence links. `pages/workbench/[requestId].js` gates the tab
+on `integrity-screener`. The standalone engine, page, and routes are unchanged.
+
+**Migration/routes:** `056_integrity_screenings_request_id.sql` adds nullable
+UUID linkage and a partial `(request_id, created_at DESC, id DESC)` index. The
+manifest and fresh-install schema match. New endpoints are GET
+`/api/workbench/integrity/[requestId]` and POST
+`/api/workbench/integrity/[requestId]/run`; both require the Integrity Screener
+grant and a scalar valid request GUID. POST uses the authenticated profile and
+ignores client-supplied identities.
+
+**Verification [VERIFIED via local commands, source review, and fixture browser]:**
+- All required gates and available paired self-tests passed sequentially;
+  OData escaping and Dynamics context boundary checks also passed.
+- Full unit suite: **1,091 suites / 16,318 tests passed**, one snapshot passed.
+  The old migration-054 test now verifies its ordering after 053 instead of
+  forbidding all later migrations.
+- Lint passed with zero errors (122 warnings repository-wide, including two
+  hook-pattern warnings in the new tab); final touched-file lint also passed.
+- Final production build passed. The fixture-only Chromium test passed,
+  including loading, cancel/confirm, body shape, incomplete-source rendering,
+  evidence links, desktop, and 390px mobile with no horizontal overflow. Every
+  API request was mocked; unexpected API requests were blocked and none occurred.
+- Builder mutation checks demonstrated red tests when dedupe, the person cap,
+  save-error propagation, stale-response protection, or incomplete-source
+  detection were removed, then passed after restoration. Root inspected the
+  implementation and desktop/mobile renders; the design detector reported no
+  findings.
+
+**Implementation decisions:** the defensive cap is ten people, not a business
+rule. Request affiliation fallback applies only to the current Project Leader;
+unknown contact affiliations remain blank. A schema read precedes paid calls,
+and a Workbench-owned `INSERT RETURNING` makes persistence failure visible while
+leaving the standalone engine's existing save behavior unchanged. GET carries
+the model-warming gate's documented read-only annotation because its shared
+module also exports the POST runner; GET never resolves a model. Run failures
+preserve previous results and ambiguous server failures advise reloading before
+another run.
+
+**Release boundary:** migration 056 was not applied; no live screen, Dataverse
+write, merge, or production deployment was performed. The owner must coordinate
+migration numbering with the parallel 055 branch, apply the existing-database
+migration through `scripts/apply-migrations.js`, and deliberately promote the
+feature. No production milestone entry is required for this unmerged build.
+
+### Opus adversarial review and adjudication
+
+Two read-only Claude Opus reviews ran through the host OAuth session after the
+owner explicitly approved source egress and subscription/credit usage. The
+backend review accepted the core authorization, roster, and persistence
+contracts with no high-severity finding. The UI review found a real source-shape
+bug: Retraction Watch URLs are semicolon-separated text, not arrays. Its related
+findings identified hidden concern labels on incomplete screens and missing
+per-source flags when result counts were present. These findings were accepted
+for a bounded correction batch, along with disabling screens for nameless
+contacts, clearer uncertain-outcome recovery, and mapping real Dataverse 404
+errors before any Postgres or screening work.
+
+The following concerns are retained explicitly rather than expanding this build:
+
+- **Existing engine error semantics:** some SerpAPI and Retraction Watch failures
+  are swallowed as empty results by the unchanged shared engine. The Workbench
+  cannot distinguish these from successful empty searches using its existing
+  result contract. The UI marks exposed errors/unsearched sources incomplete;
+  it does not prove source health. This behavior already affected manual screens
+  and their saved history. Changing it requires a separately scoped shared-engine
+  contract correction, not treating all valid empty searches as errors.
+- **Synchronous runtime:** screening remains sequential within the existing
+  300-second route budget. Ten people is a spend ceiling, not a proven runtime
+  guarantee; provider latency was not live-tested. A timeout can consume credits
+  without saving a complete run. Streaming or durable per-person jobs are outside
+  this brief. Reload saved history before retrying an uncertain run.
+- **Explicit repeat/concurrent runs:** the server does not serialize runs across
+  tabs or staff sessions. Leaving the tab and confirming a second run can spend
+  again. The cap, confirmation, and rate limiter are not an idempotency guarantee;
+  a recent completed-run check would not prevent concurrent in-flight calls.
+- **Access and history scope:** the exact `integrity-screener` grant is retained
+  as the owner's explicit contract, including direct route access. Request
+  history is shared with authorized Integrity users. Existing actor-scoped manual
+  history APIs also see the new `workbench` rows because they share the table;
+  the standalone page does not call that history API and remains unchanged.
+- **Release order:** apply migration 056 before promoting the runtime. Before
+  migration, GET fails safely rather than showing partial history; POST's schema
+  preflight prevents paid calls. Over-cap rosters also fail closed on GET.
+
+**Final closure [VERIFIED]:** the accepted corrections landed in `8a7e6b8a8`.
+Sol's narrow follow-up review found no material blocker, and root reviewed the
+final source and desktop/mobile renders. After those corrections, all listed
+gates/self-tests, the production build, touched-file lint (zero errors), and the
+updated fixture-only browser check passed again. Focused final tests passed
+15/15 for service/routes and 15/15 for the tab/gate; the full-suite result above
+preceded this last correction batch. No further Opus round was run; Codex
+adjudicated the findings and Sol verified their closure as authorized.
+
+The next owner action is release review of this feature branch and the named
+residual risks, followed by migration/promotion only when approved. This brief
+is the scoped branch handoff; unrelated Factory session instructions and
+production milestone history were left unchanged.
