@@ -45,9 +45,17 @@ import {
 } from '../../lib/services/test-requests/presite-sandbox-deps.js';
 import { loadPreSiteVisitInputs } from '../../lib/services/pre-site-visit/proposal-core-service.js';
 import { assertLedgerReceipt, ledgerReasonOrThrow } from '../../lib/services/test-requests/run-ledger.js';
-import { MANIFEST_V4, sha256, computeRunPlanDigest } from '../../lib/services/test-requests/basic-clone-steps.js';
+// P3 (Opus round 1): a PARTIAL mock -- runPreflight defaults to a fake
+// resolved value matching baseRun()'s expectedGraphSiteId/expectedGraphDriveId
+// below (never the real, network-calling implementation, which none of this
+// file's fake client/graph objects can satisfy); every other export
+// (MANIFEST_V4/sha256/computeRunPlanDigest) stays real.
+jest.mock('../../lib/services/test-requests/basic-clone-steps.js', () => ({
+  ...jest.requireActual('../../lib/services/test-requests/basic-clone-steps.js'),
+  runPreflight: jest.fn(async () => ({ siteId: 'SITE-1', driveId: 'DRIVE-1' })),
+}));
+import { MANIFEST_V4, sha256, computeRunPlanDigest, runPreflight } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
-import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
   buildPreSiteVisitIdentity,
   buildPreSiteVisitInputSnapshot,
@@ -57,6 +65,19 @@ import {
 import { PRE_SITE_VISIT_CONTRACT, REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument.js';
 import { PROPOSAL_CORE_KEYS, PROMPT_VARIABLES, PROMPT_OUTPUT_SCHEMA, USER_PROMPT_TEMPLATE, REQUIRED_SYSTEM_ASSERTIONS } from '../../shared/config/prompts/pre-site-visit-proposal-core.js';
 import { PRE_SITE_SECTION_FIELDS } from '../../lib/services/test-requests/source-bundle.js';
+
+// P3 (Opus round 1): a PARTIAL mock -- generatePreSiteVisitArtifact defaults
+// to calling straight through to the REAL implementation (every other test
+// in this file exercises the genuine producer, unmocked), so only the P3
+// describe block below, which explicitly overrides it per test with
+// mockImplementationOnce, ever sees synthetic behavior. Named ESM exports
+// compile to non-configurable getters, so jest.spyOn on a namespace import
+// cannot redefine this function directly; a module mock is the only seam.
+jest.mock('../../lib/services/pre-site-visit/artifact-service.js', () => {
+  const actual = jest.requireActual('../../lib/services/pre-site-visit/artifact-service.js');
+  return { ...actual, generatePreSiteVisitArtifact: jest.fn(actual.generatePreSiteVisitArtifact) };
+});
+import { generatePreSiteVisitArtifact } from '../../lib/services/pre-site-visit/artifact-service.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const SOURCE_ID = '22222222-2222-4222-8222-222222222222';
@@ -178,6 +199,11 @@ function baseRun(bundle, overrides = {}) {
     sourceRequestId: SOURCE_ID, sourceRequestNumber: REQUEST_NUMBER, sourceRevision: '1',
     destinationRequestId: REQUEST_ID, destinationLocationId: LOCATION_ID, destinationRequestNumber: REQUEST_NUMBER,
     planDigest: computeRunPlanDigest({ manifest, reviewerAddressDigests: [] }),
+    // P3 (Opus round 1): matches the mocked runPreflight's default resolved
+    // value below, so the new site/drive identity fence in all four presite
+    // steps passes by default; individual tests override one side to prove
+    // the fence itself.
+    expectedGraphSiteId: 'SITE-1', expectedGraphDriveId: 'DRIVE-1',
     ...overrides,
   };
 }
@@ -390,7 +416,6 @@ function operationStatusEnum() {
 const { REQUEST_DOCUMENT_OPERATION_STATUS, REQUEST_DOCUMENT_LIFECYCLE_STATE } = operationStatusEnum();
 
 let world;
-let productionSentinelSpies;
 
 beforeEach(() => {
   world = createWorld();
@@ -418,19 +443,22 @@ beforeEach(() => {
     ),
   }));
 
-  // I9 production sentinels: if any presite step ever reached a real
-  // production Dataverse adapter/Graph/DynamicsService write, these throw.
-  productionSentinelSpies = [
-    jest.spyOn(DynamicsService, 'createRecord').mockImplementation(() => { throw new Error('DynamicsService.createRecord must never be reached by the pre_site_visit recipe'); }),
-    jest.spyOn(DynamicsService, 'updateRecord').mockImplementation(() => { throw new Error('DynamicsService.updateRecord must never be reached by the pre_site_visit recipe'); }),
-    jest.spyOn(DynamicsService, 'queryAllRecords').mockImplementation(() => { throw new Error('DynamicsService.queryAllRecords must never be reached by the pre_site_visit recipe'); }),
-    jest.spyOn(DynamicsService, 'getRecord').mockImplementation(() => { throw new Error('DynamicsService.getRecord must never be reached by the pre_site_visit recipe'); }),
-  ];
+  // P3 (Opus round 1): a prior version of this file spied on DynamicsService
+  // here and asserted "not called" -- vacuous, since none of this file's REAL
+  // (unmocked) call graph (generatePreSiteVisitArtifact and its
+  // artifact-model.js/artifact-lineage.js helpers, attestDocxPackageAgainstRender,
+  // renderPreSiteVisitDocx, hashGovernedDocxContent) references
+  // DynamicsService at all -- every Dataverse call in this file's own steps
+  // goes through the module-mocked presite-sandbox-deps.js/proposal-core-
+  // service.js instead. No mutation in these steps could ever have made that
+  // spy fire, so it was removed rather than kept as false confidence; I9 is
+  // proven directly in presite-sandbox-deps.test.js's own sandbox-host-
+  // validation/throwing-sentinel tests, where a real production call would
+  // actually be reachable if presite-sandbox-deps.js's own guards failed.
 });
 
 afterEach(() => {
   jest.clearAllMocks();
-  productionSentinelSpies.forEach((spy) => spy.mockRestore());
 });
 
 const client = { baseUrl: 'https://orgd9e66399.crm.dynamics.com/api/data/v9.2' };
@@ -467,14 +495,16 @@ describe('item 1: seed_presite_ai_run -- stub run via the sandbox only', () => {
     expect(payload.wmkf_ai_runsource).toBe(682090002);
     expect(payload.wmkf_ai_notes).toContain(RUN_ID);
     expect(world.aiRuns.size).toBe(1);
-    for (const spy of productionSentinelSpies) expect(spy).not.toHaveBeenCalled();
     const readback = resources.find((r) => r.step === 'seed_presite_ai_run')?.readback;
     expect(readback.confirmedRunId).toBe(payload.wmkf_ai_runid);
   });
 
   test('resume: journaled GUID + readback exists and matches -> recovered, no second POST', async () => {
     const runId = crypto.randomUUID();
-    world.aiRuns.set(runId, { wmkf_ai_runid: runId, _wmkf_ai_request_value: REQUEST_ID });
+    world.aiRuns.set(runId, {
+      wmkf_ai_runid: runId, _wmkf_ai_request_value: REQUEST_ID, _wmkf_ai_prompt_value: PROMPT_ID,
+      wmkf_ai_runsource: 682090002, wmkf_ai_status: 682090000, wmkf_ai_notes: `Test Request Factory run ${RUN_ID}`,
+    });
     const priorResources = [{
       resourceId: 1, sequence: 1, step: 'seed_presite_ai_run', resourceKind: 'dataverse_ai_run', system: 'dataverse',
       plannedIdentity: { runId }, readback: { runId }, outcome: 'dispatched',
@@ -497,6 +527,28 @@ describe('item 1: seed_presite_ai_run -- stub run via the sandbox only', () => {
     expect(world.dependencies.createAiRun).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['no prompt bound', { _wmkf_ai_prompt_value: null }],
+    ['wrong run source', { wmkf_ai_runsource: 999999999 }],
+    ['wrong status', { wmkf_ai_status: 999999999 }],
+    ['notes do not carry this run\'s id', { wmkf_ai_notes: 'Test Request Factory run some-other-run' }],
+  ])('P3: resume with every OTHER field matching but %s -> refuses (presite_ai_run_ambiguous), not silently adopted', async (_label, badField) => {
+    const runId = crypto.randomUUID();
+    world.aiRuns.set(runId, {
+      wmkf_ai_runid: runId, _wmkf_ai_request_value: REQUEST_ID, _wmkf_ai_prompt_value: PROMPT_ID,
+      wmkf_ai_runsource: 682090002, wmkf_ai_status: 682090000, wmkf_ai_notes: `Test Request Factory run ${RUN_ID}`,
+      ...badField,
+    });
+    const priorResources = [{
+      resourceId: 1, sequence: 1, step: 'seed_presite_ai_run', resourceKind: 'dataverse_ai_run', system: 'dataverse',
+      plannedIdentity: { runId }, readback: { confirmedRunId: runId }, outcome: 'verified',
+    }];
+    const { result } = await runStep('seed_presite_ai_run', { resources: priorResources });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
+    expect(world.dependencies.createAiRun).not.toHaveBeenCalled();
+  });
+
   test('resume: journaled GUID absent after an ambiguous POST -> refuses, never re-POSTs blind', async () => {
     const runId = crypto.randomUUID(); // never created in world.aiRuns
     const priorResources = [{
@@ -507,6 +559,21 @@ describe('item 1: seed_presite_ai_run -- stub run via the sandbox only', () => {
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
     expect(world.dependencies.createAiRun).not.toHaveBeenCalled();
+  });
+
+  test('P3: a failed prompt read journals NOTHING and stays cleanly retryable (not conflated with an ambiguous POST)', async () => {
+    world.dependencies.getCurrentPrompt.mockImplementationOnce(async () => { throw new Error('synthetic prompt read failure'); });
+    const failed = await runStep('seed_presite_ai_run');
+    expect(failed.result.outcome).toBe('needs_attention');
+    expect(failed.result.run.needsAttentionReason).not.toBe('presite_ai_run_ambiguous');
+    expect(failed.resources).toHaveLength(0);
+    expect(world.dependencies.createAiRun).not.toHaveBeenCalled();
+
+    // Retry with the SAME (empty) resource list, as a real re-invocation
+    // would see: succeeds cleanly, not refused as ambiguous.
+    const retried = await runStep('seed_presite_ai_run');
+    expect(retried.result.outcome).toBe('advanced');
+    expect(world.dependencies.createAiRun).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -588,16 +655,74 @@ describe('item 2: seed_presite_draft -- seeded row shape', () => {
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
   });
+
+  test('P2c: ambiguous create (createAttemptedAt journaled, requestDocumentId never confirmed) -> the row IS found by generationKey and its claim token matches -> adopted, no second create', async () => {
+    const { resource } = seedAiRunResource();
+    const claimToken = crypto.randomUUID();
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    const row = world.seedRawRow({
+      wmkf_generationkey: BASE_IDENTITY.generationKey,
+      wmkf_claimtoken: claimToken,
+      ...fields,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+    const draftResource = {
+      resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey: BASE_IDENTITY.generationKey },
+      readback: {
+        generationKey: BASE_IDENTITY.generationKey,
+        claimTokenSha256: crypto.createHash('sha256').update(claimToken).digest('hex'),
+        createAttemptedAt: new Date().toISOString(),
+      },
+      outcome: 'dispatched',
+    };
+    const { result } = await runStep('seed_presite_draft', { resources: [resource, draftResource] });
+    expect(result.outcome).toBe('advanced');
+    expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(world.rows.size).toBe(1);
+    expect(row.wmkf_requestdocumentid).toBeTruthy();
+  });
+
+  test('P2c: ambiguous create with a row found by generationKey but a non-matching claim token -> refuses (presite_pointer_mismatch), never re-POSTs blind', async () => {
+    const { resource } = seedAiRunResource();
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    world.seedRawRow({
+      wmkf_generationkey: BASE_IDENTITY.generationKey,
+      wmkf_claimtoken: crypto.randomUUID(), // a DIFFERENT claim token than the journaled digest below
+      ...fields,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+    const draftResource = {
+      resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+      plannedIdentity: { generationKey: BASE_IDENTITY.generationKey },
+      readback: {
+        generationKey: BASE_IDENTITY.generationKey,
+        claimTokenSha256: 'f'.repeat(64),
+        createAttemptedAt: new Date().toISOString(),
+      },
+      outcome: 'dispatched',
+    };
+    const { result } = await runStep('seed_presite_draft', { resources: [resource, draftResource] });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+    expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(world.rows.size).toBe(1);
+  });
 });
 
 describe('item 3: runProposalCore never reached (three distinct fences)', () => {
-  test('I4: a seeded row already GENERATING refuses (presite_pointer_mismatch) before the producer is ever called -- seed_presite_draft always writes FAILED, so GENERATING here means a concurrent OTHER writer', async () => {
+  test('P2a: a seeded row GENERATING under a LIVE lease refuses (presite_pointer_mismatch) before the producer is ever called -- seed_presite_draft always writes FAILED, so a live-leased GENERATING row here means a concurrent OTHER writer', async () => {
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
     world.seedRawRow({
       _wmkf_airun_value: crypto.randomUUID(),
       ...fields,
       wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      modifiedon: new Date().toISOString(), // lease live (just claimed)
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
     });
@@ -606,6 +731,29 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
     expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
     expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
     expect(world.rows.size).toBe(1);
+  });
+
+  test('P2a: a seeded row GENERATING under an EXPIRED lease (this recipe\'s own crashed prior attempt) resumes and completes, not a permanent refusal', async () => {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    const claimToken = crypto.randomUUID();
+    world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      wmkf_claimtoken: claimToken,
+      // GENERATING_LEASE_MS (artifact-model.js) is well under a day.
+      modifiedon: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('advanced');
+    const [row] = [...world.rows.values()];
+    expect(row.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
+    // Reclaimed with a FRESH claim token (claimExisting always mints a new
+    // one on reclaim), never left carrying the stale, crashed attempt's token.
+    expect(row.wmkf_claimtoken).not.toBe(claimToken);
   });
 
   test('both core and snapshot fields absent -> the throwing runProposalCore sentinel fires; needs_attention; no second row', async () => {
@@ -743,17 +891,18 @@ describe('item 5: upload create-only', () => {
   // artifact-lineage.js) are the producer's own "crash between upload and
   // commit" resume path, keyed off the persisted filename/contentHash, not
   // the claim token -- so fail-on-conflict (above) never blocks a
-  // legitimate resume there. That path is PROVABLY UNREACHABLE from
-  // render_presite specifically: stepRenderPresite's own pre-render fence
-  // (I4, just above in run-runner.js) refuses outright the moment it finds
-  // the seeded row GENERATING, before ever calling generatePreSiteVisitArtifact
-  // -- seed_presite_draft always writes FAILED, so a GENERATING row here can
-  // only mean a concurrent OTHER writer, which this recipe always refuses
-  // rather than silently reusing. A test seeding a GENERATING row to reach
-  // recoverUploadedFile therefore documents a wrong premise, not real
-  // behavior; see the "GENERATING (claimed by another writer)" refusal
-  // above for that fence's own coverage. presite-sandbox-deps.test.js proves
-  // uploadFile's unconditional 'fail' forcing directly.
+  // legitimate resume there. CORRECTION (P2a, Opus round 1): an earlier
+  // version of this comment called that path "provably unreachable from
+  // render_presite" -- true only while a live lease is held. Since P2a,
+  // stepRenderPresite's own pre-render fence (I4, run-runner.js) refuses
+  // outright ONLY while the seeded row's lease is still LIVE (a genuine
+  // concurrent other writer); an EXPIRED lease (this recipe's own crashed
+  // prior attempt) now falls through to generatePreSiteVisitArtifact, which
+  // reclaims via claimExisting and DOES reach recoverUploadedFile -- see
+  // "item 3: ... P2a: a seeded row GENERATING under an EXPIRED lease ...
+  // resumes and completes" above for that path's own coverage.
+  // presite-sandbox-deps.test.js proves uploadFile's unconditional 'fail'
+  // forcing directly.
 });
 
 describe('item 6: verify_presite attestation fail-closed', () => {
@@ -861,4 +1010,61 @@ describe('item 8: seed/render share the same loadInputs seam (snapshot determini
     const freshSnapshot = buildPreSiteVisitInputSnapshot(BASE_INPUTS);
     expect(storedSnapshot).toEqual(freshSnapshot);
   });
+});
+
+describe('P3 (Opus round 1): render_presite maps specific producer codes to their OWN ledger reason instead of collapsing everything to presite_verification_failed', () => {
+  function seedMatchingRowP3() {
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    return world.seedRawRow({
+      _wmkf_airun_value: crypto.randomUUID(),
+      ...fields,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+    });
+  }
+
+  const MAPPINGS = [
+    ['claim_lost', 'presite_claim_lost'],
+    ['pre_site_visit_snapshot_mismatch', 'presite_snapshot_stale'],
+    ['pre_site_visit_upload_identity_incomplete', 'presite_upload_ambiguous'],
+  ];
+
+  for (const [producerCode, ledgerReason] of MAPPINGS) {
+    test(`producer code "${producerCode}" -> ledger reason "${ledgerReason}"`, async () => {
+      seedMatchingRowP3();
+      generatePreSiteVisitArtifact.mockImplementationOnce(async () => {
+        const error = new Error(`synthetic ${producerCode}`);
+        error.code = producerCode;
+        throw error;
+      });
+      const { result } = await runStep('render_presite');
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe(ledgerReason);
+    });
+  }
+
+  test('an unrecognized producer code still falls back to presite_verification_failed', async () => {
+    seedMatchingRowP3();
+    generatePreSiteVisitArtifact.mockImplementationOnce(async () => {
+      const error = new Error('synthetic unmapped');
+      error.code = 'some_other_producer_code';
+      throw error;
+    });
+    const { result } = await runStep('render_presite');
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+  });
+});
+
+describe('P3 (Opus round 1): every one of the four presite steps runs the same site/drive identity preflight before any write, mirroring every other writing step', () => {
+  test.each(['seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'])(
+    '%s refuses (preflight_identity_changed) when the resolved Graph site/drive has drifted from run.expectedGraphSiteId/expectedGraphDriveId',
+    async (step) => {
+      runPreflight.mockImplementationOnce(async () => ({ siteId: 'A-DIFFERENT-SITE', driveId: 'DRIVE-1' }));
+      const { result } = await runStep(step);
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('preflight_identity_changed');
+    },
+  );
 });

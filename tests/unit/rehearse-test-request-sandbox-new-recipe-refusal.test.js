@@ -13,7 +13,7 @@
  *
  * @jest-environment node
  */
-import { parseArgs } from '../../scripts/rehearse-test-request-sandbox.mjs';
+import { parseArgs, buildGraphContext } from '../../scripts/rehearse-test-request-sandbox.mjs';
 
 function reserveArgv(recipe) {
   return [
@@ -55,5 +55,12 @@ describe('slice 4a/4b: --recipe fails closed for a not-yet-built recipe', () => 
 
   test('an unrecognized recipe token is refused by the LEDGER_RECIPES check first', () => {
     expect(() => parseArgs(reserveArgv('not_a_real_recipe'))).toThrow(/--recipe must be one of/);
+  });
+});
+
+describe('slice 4b P3 (Opus round 1): the CLI Graph object includes deleteFile through the sandbox-bound wrapper', () => {
+  test('buildGraphContext() returns a deleteFile function alongside every other Graph method', async () => {
+    const { graph } = await buildGraphContext();
+    expect(typeof graph.deleteFile).toBe('function');
   });
 });

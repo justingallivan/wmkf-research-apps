@@ -14,12 +14,25 @@
  * I8 (no LLM call reachable): `runProposalCore`, `getExecutorBudget` and
  * `runPrompt` throw rather than fall through to a production default.
  */
+// P1 (Opus round 1): a fake Dataverse TRANSPORT client only -- never a
+// wholesale mock of loadPreSiteVisitInputs or createPresiteInputDeps, both
+// of which stay real below so the REAL program-grant select/filter (and
+// every other real read) is what gets exercised.
+jest.mock('../../lib/dataverse/client.js', () => ({
+  getAccessToken: jest.fn(async () => 'fake-sandbox-token'),
+  createClient: jest.fn(),
+}));
+
 import { DEFAULT_DEPENDENCIES as ARTIFACT_SERVICE_DEFAULT_DEPENDENCIES } from '../../lib/services/pre-site-visit/artifact-dependencies.js';
 import {
   createPresiteAiRunDeps,
   createPresiteInputDeps,
   createPresiteSandboxDeps,
 } from '../../lib/services/test-requests/presite-sandbox-deps.js';
+import { loadPreSiteVisitInputs } from '../../lib/services/pre-site-visit/proposal-core-service.js';
+import { PROGRAM_GRANT_SELECT, programGrantFilter } from '../../lib/services/pre-site-visit/funding-history.js';
+import { withDalContext } from '../../lib/dataverse/core/context.js';
+import { createClient } from '../../lib/dataverse/client.js';
 
 // proposal-core-service.js's own DEFAULT_DEPENDENCIES is not exported (it is
 // a module-private const); this is the exact key list read from source
@@ -145,6 +158,130 @@ describe('createPresiteInputDeps (I9: complete against proposal-core-service.js 
 
   it('getCoPIs resolves to an empty, deterministic list (documented simplification: no wmkf_apprequestperson rows on a sandbox clone)', async () => {
     await expect(deps.getCoPIs('any-request-id')).resolves.toEqual([]);
+  });
+});
+
+describe('createPresiteInputDeps + loadPreSiteVisitInputs (P1: the real program-grant select/filter, not a hand-copied one)', () => {
+  const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+  const APPLICANT_ID = '22222222-2222-2222-2222-222222222222';
+
+  const REQUEST_ROW = {
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1000342',
+    akoya_title: 'A Study of Something',
+    _akoya_applicantid_value: APPLICANT_ID,
+    _wmkf_projectleader_value_formatted: 'Dr. PI Name',
+    _akoya_programid_value_formatted: 'Science',
+    _wmkf_programdirector_value_formatted: 'Director Name',
+    wmkf_meetingdate: '2026-09-01',
+    akoya_request: 50000,
+    wmkf_invitedamount: 50000,
+    akoya_expenses: 60000,
+    akoya_begindate: '2026-01-01',
+    akoya_enddate: '2026-12-31',
+  };
+  const CONSISTENT_GRANT_ROW = {
+    akoya_requestid: '33333333-3333-3333-3333-333333333333',
+    akoya_requestnum: '900001',
+    akoya_fiscalyear: '2025',
+    akoya_decisiondate: '2025-01-01',
+    wmkf_meetingdate: '2025-01-01',
+    akoya_grant: 10000,
+    _wmkf_grantprogram_value_formatted: 'Research',
+    wmkf_wmkfprojectdescription: 'A prior award.',
+  };
+  function applicantRow({ count, sum }) {
+    return {
+      akoya_aka: 'Test University',
+      name: 'Test University Inc',
+      address1_city: 'Testville',
+      address1_stateorprovince: 'CA',
+      wmkf_countofprogramgrants: count,
+      wmkf_sumofprogramgrants: sum,
+    };
+  }
+
+  /** Wires the REAL createPresiteInputDeps over a fake TRANSPORT client (dataverse/client.js is module-mocked above); grantRows/applicant are the only per-test variables. */
+  function buildDeps({ grantRows, applicant }) {
+    const capturedGrantUrls = [];
+    createClient.mockReturnValue({
+      get: jest.fn(async (url) => {
+        if (url.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: true, status: 200, body: REQUEST_ROW };
+        if (url.startsWith(`/accounts(${APPLICANT_ID})`)) return { ok: true, status: 200, body: applicant };
+        if (url.startsWith('/akoya_requests?')) { capturedGrantUrls.push(url); return { ok: true, status: 200, body: { value: grantRows } }; }
+        if (url.startsWith('/wmkf_appreviewersuggestions?')) return { ok: true, status: 200, body: { value: [] } };
+        throw new Error(`unexpected sandbox GET ${url}`);
+      }),
+    });
+    const deps = createPresiteInputDeps({
+      resourceUrl: SANDBOX_URL,
+      graph: { downloadFile: async () => ({ buffer: Buffer.from('narrative bytes') }) },
+      findProposalNarrativeLocation: async () => ({ driveId: 'd1', itemId: 'i1', filename: 'ProposalNarrative_1000342.pdf', siteId: 's1', versionId: 'v1' }),
+    });
+    return { deps, capturedGrantUrls };
+  }
+
+  it('queries program grants with production\'s own select and filter (PROGRAM_GRANT_SELECT/programGrantFilter from funding-history.js), not a hand-copied definition', async () => {
+    const { deps, capturedGrantUrls } = buildDeps({ grantRows: [CONSISTENT_GRANT_ROW], applicant: applicantRow({ count: 1, sum: 10000 }) });
+    await withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps));
+    expect(capturedGrantUrls).toHaveLength(1);
+    const url = new URL(`https://x${capturedGrantUrls[0]}`);
+    expect(url.searchParams.get('$select')).toBe(PROGRAM_GRANT_SELECT);
+    expect(url.searchParams.get('$filter')).toBe(programGrantFilter(APPLICANT_ID));
+  });
+
+  it('rollup reconciliation passes for consistent fake data (count/sum agree with the live row)', async () => {
+    const { deps } = buildDeps({ grantRows: [CONSISTENT_GRANT_ROW], applicant: applicantRow({ count: 1, sum: 10000 }) });
+    const result = await withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps));
+    expect(result.context.documentFields.institutionalFundingHistory).toEqual(expect.stringContaining('Test University'));
+  });
+
+  it('fails closed for inconsistent fake data (rollup count disagrees with the live row)', async () => {
+    const { deps } = buildDeps({ grantRows: [CONSISTENT_GRANT_ROW], applicant: applicantRow({ count: 2, sum: 10000 }) });
+    await expect(
+      withDalContext('presite-sandbox-deps-test', () => loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps)),
+    ).rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable' });
+  });
+});
+
+describe('sandboxGetWriteupRoster (P2b, Opus round 1: deterministic reviewer order regardless of Dataverse list order)', () => {
+  const REQUEST_ID = '44444444-4444-4444-4444-444444444444';
+  const SUGGESTION_A = '55555555-5555-5555-5555-555555555555'; // -> Alpha Adams
+  const SUGGESTION_B = '66666666-6666-6666-6666-666666666666'; // -> Zeta Zimmer
+  const PERSON_A = '77777777-7777-7777-7777-777777777777';
+  const PERSON_B = '88888888-8888-8888-8888-888888888888';
+
+  function buildDeps(suggestionOrder) {
+    createClient.mockReturnValue({
+      get: jest.fn(async (url) => {
+        if (url.startsWith('/wmkf_appreviewersuggestions?')) {
+          return { ok: true, status: 200, body: { value: suggestionOrder.map((id) => ({ wmkf_appreviewersuggestionid: id })) } };
+        }
+        if (url.startsWith(`/wmkf_appreviewersuggestions(${SUGGESTION_A})`)) {
+          return { ok: true, status: 200, body: { wmkf_appreviewersuggestionid: SUGGESTION_A, wmkf_accepted: true, wmkf_reviewreceivedat: null, _wmkf_potentialreviewer_value: PERSON_A, wmkf_revieweraffiliation: null } };
+        }
+        if (url.startsWith(`/wmkf_appreviewersuggestions(${SUGGESTION_B})`)) {
+          return { ok: true, status: 200, body: { wmkf_appreviewersuggestionid: SUGGESTION_B, wmkf_accepted: true, wmkf_reviewreceivedat: null, _wmkf_potentialreviewer_value: PERSON_B, wmkf_revieweraffiliation: null } };
+        }
+        if (url.startsWith(`/wmkf_potentialreviewerses(${PERSON_A})`)) {
+          return { ok: true, status: 200, body: { wmkf_potentialreviewersid: PERSON_A, wmkf_name: 'Alpha Adams' } };
+        }
+        if (url.startsWith(`/wmkf_potentialreviewerses(${PERSON_B})`)) {
+          return { ok: true, status: 200, body: { wmkf_potentialreviewersid: PERSON_B, wmkf_name: 'Zeta Zimmer' } };
+        }
+        throw new Error(`unexpected sandbox GET ${url}`);
+      }),
+    });
+    return createPresiteInputDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, findProposalNarrativeLocation: async () => null });
+  }
+
+  it('a fake returning suggestion rows in different orders on "seed" vs "render" still produces the same reviewer order and byte-identical roster', async () => {
+    const seedDeps = buildDeps([SUGGESTION_B, SUGGESTION_A]);
+    const seedRoster = await withDalContext('presite-sandbox-deps-test', () => seedDeps.getWriteupRoster(REQUEST_ID));
+    const renderDeps = buildDeps([SUGGESTION_A, SUGGESTION_B]);
+    const renderRoster = await withDalContext('presite-sandbox-deps-test', () => renderDeps.getWriteupRoster(REQUEST_ID));
+    expect(seedRoster.reviewers.map((r) => r.name)).toEqual(['Alpha Adams', 'Zeta Zimmer']);
+    expect(JSON.stringify(seedRoster)).toBe(JSON.stringify(renderRoster));
   });
 });
 
