@@ -248,6 +248,7 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`.
 - OData null filters do not behave like SQL.
 - The sandbox is not drop-in prod parity.
+- **The sandbox org runs with background processing disabled** [VERIFIED 2026-09-27 via sandbox `asyncoperations`]: every background classic workflow is queued and then Canceled ("skipped because the org is in Disable Background Processing mode"). Real-time workflows and sync plug-ins do run. A sandbox proof therefore says nothing about background automation. Six background create workflows on `akoya_request` (two write the applicant account or Contacts) run in production but never in the sandbox; see `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` *Sandbox automation census*.
 - Do not rebuild Explorer behavior when the Power Tools surface should be reused.
 - Treat any Dataverse/Power Automate/Azure claim as external-platform state; verify before asserting.
 - **Frozen Pre-Site email uses granular Dynamics steps, not the composed helper
