@@ -138,22 +138,32 @@ async function printCreationHistory(client, limit) {
       `/asyncoperations?$select=name,statuscode&$filter=_regardingobjectid_value eq ${r.akoya_requestid}`);
     console.log(`     background jobs: ${countBy(jobs, (j) => `${j.name} [${j.statuscode}]`).join('; ') || 'none'}`);
     const emails = await getAll(client,
-      `/emails?$select=statuscode,directioncode&$filter=_regardingobjectid_value eq ${r.akoya_requestid}`);
-    console.log(`     emails: ${countBy(emails, (e) => `status ${e.statuscode} ${e.directioncode ? 'outgoing' : 'incoming'}`).join('; ') || 'none'}`);
-    const audits = await getAll(client,
+      `/emails?$select=statuscode,directioncode&$filter=_regardingobjectid_value eq ${r.akoya_requestid} and createdon le ${until}`);
+    console.log(`     emails created within 2h: ${countBy(emails, (e) => `status ${e.statuscode} ${e.directioncode ? 'outgoing' : 'incoming'}`).join('; ') || 'none'}`);
+    const audits = await getAllOrForbidden(client,
       '/audits?$select=createdon,_userid_value,operation,changedata' +
-      `&$filter=_objectid_value eq ${r.akoya_requestid} and createdon le ${until}&$orderby=createdon asc`);
-    console.log(`     audit rows on the Request within 2h: ${audits.length}`);
-    for (const a of audits) {
+      `&$filter=objecttypecode eq 'akoya_request' and _objectid_value eq ${r.akoya_requestid} and createdon le ${until}&$orderby=createdon asc`);
+    console.log(`     audit rows on the Request within 2h: ${audits ? audits.length : 'not readable (403, no audit privilege)'}`);
+    for (const a of audits || []) {
       console.log(`       ${a.createdon} op=${a.operation} user=${a[`_userid_value${F}`] || a._userid_value}: ${changedAttributeNames(a.changedata).join(', ') || '-'}`);
     }
-    const accountAudits = await getAll(client,
+    const accountAudits = await getAllOrForbidden(client,
       '/audits?$select=createdon,_userid_value,changedata' +
-      `&$filter=_objectid_value eq ${accountId} and createdon ge ${from} and createdon le ${until}`);
-    console.log(`     Foundation account audit rows in the window: ${accountAudits.length}`);
-    for (const a of accountAudits) {
+      `&$filter=objecttypecode eq 'account' and _objectid_value eq ${accountId} and createdon ge ${from} and createdon le ${until}`);
+    console.log(`     Foundation account audit rows in the window: ${accountAudits ? accountAudits.length : 'not readable (403, no audit privilege)'}`);
+    for (const a of accountAudits || []) {
       console.log(`       ${a.createdon} user=${a[`_userid_value${F}`] || a._userid_value}: ${changedAttributeNames(a.changedata).join(', ') || '-'}`);
     }
+  }
+}
+
+/** Like getAll, but a 403 (missing audit privilege) returns null instead of failing the probe. */
+async function getAllOrForbidden(client, path) {
+  try {
+    return await getAll(client, path);
+  } catch (error) {
+    if (/\(403\)/.test(error.message)) return null;
+    throw error;
   }
 }
 
