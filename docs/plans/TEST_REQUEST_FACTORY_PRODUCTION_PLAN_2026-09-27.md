@@ -66,6 +66,8 @@ The owner runs it with `DATAVERSE_ALLOW_PROD_READS=yes` set inline on that one c
 - The GoVerify bypass is unreachable in production: the CLI refuses `--bypass-goverify` with a production target, and `create_request` refuses a journaled bypass intent for one. Tests cover both.
 - The stub AI run is replaced by binding the source's own `wmkf_ai_run` for production (recipe 4). Whether copying the link is enough, or the Final Writeup forward-copy needs anything else, is checked in the build.
 
+The Foundation baseline check moves from `versionnumber` to a field projection with a reviewed exclusion list (open question 4, decided).
+
 ### P2 — Run-scoped write fence at the transport
 
 Replaces the two-org guarantee. Every write the Factory's client, changeset or Graph wrapper sends in a production run must target:
@@ -122,5 +124,5 @@ It needs the Q2 shared ledger, and it replaces P4's attestation with a server ch
 1. Q2, the ledger database for the form phase.
 2. Whether the 1000338 folder provisioner exists in production, and what it is (P0's workflow listing may answer it).
 3. Retire semantics for production residue: which rows can be deleted versus deactivated, given append-only tables such as `wmkf_ai_run`.
-4. **The Foundation-account writes on create** (census above): accept them and narrow the Foundation baseline check to exclude exactly the fields those two workflows write; or also create with `wmkf_caftb` explicitly null, if Dataverse keeps an explicit null over the column default, so the CA FTB workflow has nothing to act on. GoVerify's account write cannot be avoided without the bypass (Q3). Owner decision.
+4. **DECIDED 2026-09-27 (owner, S545): accept the Foundation-account writes and narrow the check.** The two workflows set `account.akoya_goverifytrigger` (GoVerify) and `account.wmkf_caftb` (CA FTB) [VERIFIED S545 from the sandbox XAML `SetEntityProperty` targets]. `foundationBaselineDigest` (`basic-clone-steps.js:270-277`) hashes the account's `versionnumber`, which any write moves. For production it becomes a digest over a fixed projection of the Foundation account's columns minus an explicit, reviewed exclusion list, starting with those two fields. Any other change still stops the run `needs_attention`. `akoya_goverifytrigger` is a trigger field, so the vendor's GoVerify integration may write further account fields afterwards [ASSUMED]. The first production `basic` run (P5) characterizes them, the way recipe 4 characterized SharePoint's DOCX rewrite. Each addition to the exclusion list is a reviewed commit, never a runtime relaxation. The Foundation's Contacts stay on the `versionnumber` digest.
 5. Whether any other create workflow's condition can become true through a later recipe's writes (for example the email flow's wait on submit date, or Co-PI fields), which would re-trigger it mid-run.
