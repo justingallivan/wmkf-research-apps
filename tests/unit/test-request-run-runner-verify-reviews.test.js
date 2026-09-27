@@ -346,7 +346,7 @@ function fakeGraph({ includeReview = false, docxReview = null, extraFiles = [], 
   };
 }
 
-function createFakeLedger(initialRun, initialResources = [], assignments = []) {
+function createFakeLedger(initialRun, initialResources = [], assignments = [], { allowAdvance = false } = {}) {
   let run = { ...initialRun };
   const resources = initialResources.map((r) => ({ ...r }));
   const calls = [];
@@ -371,7 +371,21 @@ function createFakeLedger(initialRun, initialResources = [], assignments = []) {
       run = { ...run, status: 'ready', leaseToken: null, lockedUntil: null, version: run.version + 1 };
       return { ...run };
     },
-    async advanceStep() { throw new Error('verify_reviews must never advance -- it is always terminal'); },
+    // slice 4b (behavioral carry-over): `pre_site_visit` continues past
+    // verify_reviews, so its own advance branch (not just markReady) must be
+    // exercisable; `allowAdvance` opts a test into that instead of the
+    // `reviews`-recipe "must never advance" trap below.
+    async advanceStep(args) {
+      if (!allowAdvance) throw new Error('verify_reviews must never advance -- it is always terminal');
+      calls.push({ op: 'advanceStep', ...args });
+      if (!fenceOk(args.leaseToken, args.leaseGeneration, args.expectedVersion)) return null;
+      run = {
+        ...run, currentStep: args.nextStep, stepIndex: args.nextStepIndex, status: args.status,
+        destinationRequestNumber: args.destinationRequestNumber ?? run.destinationRequestNumber,
+        leaseToken: null, lockedUntil: null, version: run.version + 1,
+      };
+      return { ...run };
+    },
     async markNeedsAttention({ leaseToken, leaseGeneration, expectedVersion, reason, error = null }) {
       if (!fenceOk(leaseToken, leaseGeneration, expectedVersion)) return null;
       const storedReason = ledgerReasonOrThrow(reason);
@@ -601,13 +615,14 @@ function mockDataverse({
 
 async function runStep({
   bundle, resources, assignments = [ASSIGNMENT], requestRow = requestReadback(), deps = {}, manifestOverrides = {},
+  runOverrides = {}, ledgerOptions = {},
 } = {}) {
   const manifest = baseManifest(bundle, manifestOverrides);
   // F2: the pre-lease check recomputes planDigest from the manifest plus
   // the ledger's own reviewer-assignment addressSha256 values.
   const planDigest = computeRunPlanDigest({ manifest, reviewerAddressDigests: assignments.map((a) => a.addressSha256) });
-  const run0 = baseRun({ planDigest }, bundle);
-  const { ledger, calls } = createFakeLedger(run0, resources, assignments);
+  const run0 = baseRun({ planDigest, ...runOverrides }, bundle);
+  const { ledger, calls } = createFakeLedger(run0, resources, assignments, ledgerOptions);
   const result = await bypassDynamicsRestrictions('test:verify-reviews', () => advanceRun({
     runId: RUN_ID, ledger, manifest, bundle,
     deps: { client: fakeClient({ requestRow }), graph: fakeGraph(), sharePointTarget: SHARE_POINT_TARGET, ...deps },
@@ -1373,5 +1388,31 @@ describe('stepVerifyReviews', () => {
     });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
+  });
+
+  // Slice 4b behavioral carry-over (design doc "Slice 4a built and merged":
+  // "Carried to 4b: a behavioral test of verify_reviews's advance branch
+  // once pre_site_visit has steps"). 4a only proved the mechanism
+  // structurally (nextStepFor with a synthetic order, test-request-run-
+  // runner.test.js "slice 4a: nextStepFor advance-vs-markReady mechanism").
+  // pre_site_visit now has a REAL step order continuing past verify_reviews,
+  // so this drives the SAME happy-path fixture as the 'reviews' markReady
+  // test above through advanceRun with recipe: 'pre_site_visit' and asserts
+  // it ADVANCES to seed_presite_ai_run instead of marking ready.
+  it('pre_site_visit: verify_reviews ADVANCES to seed_presite_ai_run instead of markReady (behavioral)', async () => {
+    const bundle = buildBundle({ reviewForm: 'received_no_file' });
+    const bundleReviewer = bundle.reviewers[0];
+    mockDataverse({ person: personRow(bundleReviewer), suggestion: suggestionRowFor(bundleReviewer) });
+    const { result, calls } = await runStep({
+      bundle,
+      resources: [baselineResource(validBaseline()), seedResourceRow(), snapshotResourceRow(), basicFileCopyResource(), personResource(), suggestionResource(), answersResource()],
+      manifestOverrides: { recipe: 'pre_site_visit' },
+      runOverrides: { recipe: 'pre_site_visit' },
+      ledgerOptions: { allowAdvance: true },
+    });
+    expect(result.outcome).toBe('advanced');
+    expect(result.run.currentStep).toBe('seed_presite_ai_run');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+    expect(calls.filter((c) => c.op === 'advanceStep')).toHaveLength(1);
   });
 });
