@@ -238,7 +238,7 @@ test('history cursor is scoped to the request and pages with the timestamp/id tu
     if (query.includes('SELECT id, created_at FROM integrity_screenings')) {
       return { rows: [{ id: 10, created_at: RUN.created_at }] };
     }
-    if (query.includes('(created_at, id) <')) return { rows: [] };
+    if (query.includes('CROSS JOIN ( SELECT created_at, id')) return { rows: [] };
     if (query.includes('SELECT id, created_at, screened_names')) return { rows: [RUN] };
     return { rows: [] };
   };
@@ -250,7 +250,10 @@ test('history cursor is scoped to the request and pages with the timestamp/id tu
   const cursorCall = calls.find((call) => call.query.includes('SELECT id, created_at FROM integrity_screenings'));
   expect(cursorCall.query).toContain('request_id = ? AND id = ?');
   expect(cursorCall.values).toEqual([REQUEST_ID, 10]);
-  expect(calls.some((call) => call.query.includes('(created_at, id) <'))).toBe(true);
+  const pageCall = calls.find((call) => call.query.includes('CROSS JOIN ( SELECT created_at, id'));
+  expect(pageCall.query).toContain('(screening.created_at, screening.id) < (cursor.created_at, cursor.id)');
+  expect(pageCall.values).toEqual([REQUEST_ID, 10, REQUEST_ID, 21]);
+  expect(pageCall.values).not.toContain(RUN.created_at);
 });
 
 test('migration 057 and fresh-install setup preserve append-only review rows and constraints', () => {

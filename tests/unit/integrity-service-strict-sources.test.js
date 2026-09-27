@@ -13,7 +13,10 @@ beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
   jest.spyOn(IntegrityMatchingService, 'buildDatabaseSearchTerms').mockReturnValue(['example']);
   jest.spyOn(IntegrityMatchingService, 'buildTextSearchPatterns').mockReturnValue(['%example%']);
-  mockSql.mockReset().mockResolvedValue({ rows: [] });
+  mockSql.mockReset().mockImplementation((parts) => {
+    const query = Array.isArray(parts) ? parts.join('?') : String(parts);
+    return Promise.resolve({ rows: query.includes('SELECT EXISTS') ? [{ available: true }] : [] });
+  });
   mockComplete.mockReset().mockResolvedValue({ text: 'No concerns found.' });
   global.fetch = jest.fn().mockImplementation(emptyResponse);
 });
@@ -33,8 +36,10 @@ test('strict source coverage is explicit and successful empty searches are compl
   expect(Object.keys(result.sources)).toHaveLength(3);
   for (const source of Object.values(result.sources)) expect(source).toMatchObject({ searched: true, error: null });
   expect(global.fetch).toHaveBeenCalledTimes(4);
+  expect(mockSql.mock.calls.filter(([parts]) => parts.join('?').includes('SELECT EXISTS'))).toHaveLength(1);
   expect(mockComplete).not.toHaveBeenCalled();
   expect((await screen({})).sourceCoverageVersion).toBeUndefined();
+  expect(mockSql.mock.calls.filter(([parts]) => parts.join('?').includes('SELECT EXISTS'))).toHaveLength(1);
 });
 
 test.each([
@@ -85,7 +90,33 @@ test('strict news search retains grouped highlight and story articles', async ()
   await expect(IntegrityService.serpSearch('fixture', 'fixture', 10, 'google_news', strict)).resolves.toMatchObject([article, story]);
 });
 
+test('strict mode checks corpus availability once for a multi-person screen', async () => {
+  const applicants = [
+    { name: 'Ada Example', institution: 'Example University' },
+    { name: 'Bea Example', institution: 'Another University' },
+  ];
+  for await (const _event of IntegrityService.screenApplicants(applicants, 'fixture-claude', 'fixture-serp', null, strict)) { /* consume */ }
+  expect(mockSql.mock.calls.filter(([parts]) => parts.join('?').includes('SELECT EXISTS'))).toHaveLength(1);
+});
+
+test.each([
+  ['empty corpus', { rows: [{ available: false }] }],
+  ['missing health result', { rows: [] }],
+  ['health query failure', new Error('database unavailable')],
+])('strict screening fails closed when Retraction Watch corpus is unavailable: %s', async (_label, outcome) => {
+  mockSql.mockReset();
+  if (outcome instanceof Error) mockSql.mockRejectedValue(outcome);
+  else mockSql.mockResolvedValue(outcome);
+  const result = await screen();
+  expect(result.sources.retraction_watch).toMatchObject({
+    searched: true, matches: [], error: 'Retraction Watch corpus unavailable',
+  });
+  expect(mockSql).toHaveBeenCalledTimes(1);
+  expect(mockSql.mock.calls[0][0].join('?')).toContain('SELECT EXISTS');
+});
+
 test.each([1, 2])('Retraction Watch query failure at query %i cannot become clean empty results', async (query) => {
+  mockSql.mockResolvedValueOnce({ rows: [{ available: true }] });
   if (query === 2) mockSql.mockResolvedValueOnce({ rows: [] });
   mockSql.mockRejectedValueOnce(new Error('database unavailable'));
   const result = await screen();

@@ -244,7 +244,9 @@ above does not certify the PD-approval extension below.
   is distinguished from operational errors using metadata and empty-result state
   ([provider reference](https://serpapi.com/blog/fix-serpapi-errors-guide/)).
   Strict mode also rejects unusable result items and retains articles from
-  documented News highlight/story groups before validation.
+  documented News highlight/story groups before validation. A once-per-screen
+  check rejects an empty or unavailable Retraction Watch corpus; it does not
+  establish corpus completeness or freshness.
 - Show reviewer/time/notes and historical findings. Historical run panels are
   read-only. Refresh review state after a new screen; never retain an old green
   completion indicator when refreshed context is unknown. All asynchronous
@@ -280,7 +282,8 @@ Integrity tab history/decision UI, tests, route matrix, Atlas, service catalog,
 canonical counts, and Integrity wiki. Codex orchestrated; Luna built the
 backend/UI/docs; Sol reviewed; Codex tightened strict provider parsing and
 reviewed desktop/mobile renders. Strict source reporting is committed in
-`ef7b9cca6`.
+`ef7b9cca6`; history, PD decisions, migration 057, and extension documentation
+are committed in `74e783b0e`.
 
 **Validation [VERIFIED via local commands, offline fixtures]:**
 - Production build passed; repository lint passed with zero errors and 122
@@ -310,9 +313,33 @@ route tests passed 11/11. Removing the SQL predicate made the regression test
 fail, and restoring it restored green. Sol then reported no remaining material
 blocker. Root verified the correction. No production database probe is claimed.
 
-**Supplemental Opus review:** awaiting owner authorization for one additional
-read-only OAuth review of the completed extension. The original two approved
-Opus reviews cover the original tab, not this later extension.
+**Supplemental Opus review and adjudication [VERIFIED]:** after separate owner
+approval, one read-only Claude Opus review ran through host OAuth against
+`74e783b0e`. It reported one Medium finding and nothing High: a successful query
+against an empty Retraction Watch table could be recorded as complete coverage.
+It also identified a concrete history-pagination risk from round-tripping a
+microsecond database timestamp through a JavaScript Date. Codex accepted both
+for one bounded Luna correction batch:
+- Strict screening checks corpus availability once for the whole screen. An
+  empty/missing/error response becomes a sanitized per-person source error,
+  making approval unavailable. Standalone behavior remains unchanged.
+- History pagination compares against the cursor row inside Postgres, scoped to
+  the request. The page query no longer interpolates a JavaScript timestamp.
+- Root's final focused run passed 51/51 tests across five suites. Tests cover
+  successful zero matches with an available corpus, unavailable corpus cases,
+  one availability check for multiple people, and database-side cursor bindings.
+  Removing the corpus guard made its tests fail, then passed after restoration.
+  Sol reviewed both corrections and found no remaining material blocker.
+
+**Residual review limits:** the corpus check proves nonempty, not a full or
+current import. `scripts/import-retraction-watch.js --clear` deletes then imports
+in batches without an atomic swap; screening must not overlap a destructive
+reload, and corpus initialization/completeness must be verified at release.
+Changing that importer is outside this extension. Conditional INSERT typing,
+array binding, and cursor SQL were source-reviewed and mock-tested, not exercised
+against a real Postgres instance; retain a database integration check before
+release. No second supplemental Opus call was made: Codex adjudicated and Sol
+verified the bounded fixes as the owner requested.
 
 **Release boundary:** apply both 056 and 057 through `scripts/apply-migrations.js`
 only as part of an owner-authorized release. Confirm migration numbering against
