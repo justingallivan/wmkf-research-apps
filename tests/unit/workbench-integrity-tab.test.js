@@ -21,7 +21,7 @@ const completeResult = {
   sources: {
     retraction_watch: { searched: true, matches: [], error: null },
     pubpeer: { searched: true, summary: 'No relevant results.', hasConcerns: false, error: null },
-    news: { searched: true, summary: 'No relevant results.', hasConcerns: false, error: null },
+    news: { searched: true, summary: 'No relevant results.', hasConcerns: false, resultCount: 0, error: null },
   },
 };
 const savedRun = { id: 'run-a', createdAt: '2026-09-26T18:00:00Z', matchCount: 0, results: [completeResult] };
@@ -29,7 +29,7 @@ const loaded = { requestId, people: [person], latestRun: savedRun };
 const ok = (data) => ({ ok: true, status: 200, data });
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  requestEnvelope.mockReset();
   window.confirm = jest.fn(() => true);
   requestEnvelope.mockResolvedValue(ok(loaded));
 });
@@ -48,8 +48,51 @@ test('shows current PI/Co-PI list and latest result, marking errors or unsearche
   expect((await screen.findAllByText('Ada Example')).length).toBeGreaterThan(0);
   expect(screen.getByText('North University')).toBeInTheDocument();
   expect(screen.getByText('Incomplete screen')).toBeInTheDocument();
-  expect(screen.getByText('Not searched')).toBeInTheDocument();
+  expect(screen.getByText('Not searched · error')).toBeInTheDocument();
   expect(screen.queryByText('No concerns reported')).toBeNull();
+});
+
+test('renders Retraction Watch persisted fields and safe semicolon-separated source links', async () => {
+  const match = {
+    title: 'A retracted study', authors: 'Ada Example; Coauthor', matchedAuthor: 'Ada Example',
+    doi: '10.1000/example', confidence: 92, confidenceLevel: 'high', retractionNature: 'Retraction',
+    reasons: ['Data issues', 'Image concern'], urls: 'https://retraction.example/one; javascript:alert(1);https://retraction.example/two',
+  };
+  const result = {
+    ...completeResult,
+    isCommonName: true,
+    hasConcerns: true,
+    matchCount: 1,
+    sources: { ...completeResult.sources, retraction_watch: { searched: true, matches: [match], error: null } },
+  };
+  requestEnvelope.mockResolvedValue(ok({ ...loaded, latestRun: { ...savedRun, matchCount: 1, results: [result] } }));
+  render(<IntegrityTab requestId={requestId} />);
+  expect(await screen.findByText('A retracted study')).toBeInTheDocument();
+  expect(screen.getByText(/Match confidence: high \(92%\)/)).toBeInTheDocument();
+  expect(screen.getByText('Matched author: Ada Example')).toBeInTheDocument();
+  expect(screen.getByText('Action: Retraction')).toBeInTheDocument();
+  expect(screen.getByText('Reasons: Data issues, Image concern')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '10.1000/example' })).toHaveAttribute('href', 'https://doi.org/10.1000/example');
+  expect(screen.getByText('Common name — verify identity carefully')).toBeInTheDocument();
+  expect(screen.getAllByRole('link', { name: 'View Source' })).toHaveLength(2);
+  expect(screen.getByText('1 item for human review')).toBeInTheDocument();
+});
+
+test('keeps concerns visible on incomplete results and honors source concerns without a result count', async () => {
+  const result = {
+    ...completeResult,
+    hasConcerns: true,
+    matchCount: 2,
+    sources: {
+      ...completeResult.sources,
+      pubpeer: { searched: true, hasConcerns: true, resultCount: 0, summary: 'Review flag', error: null },
+      news: { searched: false, hasConcerns: true, error: 'Source unavailable' },
+    },
+  };
+  requestEnvelope.mockResolvedValue(ok({ ...loaded, latestRun: { ...savedRun, results: [result] } }));
+  render(<IntegrityTab requestId={requestId} />);
+  expect(await screen.findByText('2 items for human review · Incomplete screen')).toBeInTheDocument();
+  expect(screen.getByText('Flagged for human review · 0 search results')).toBeInTheDocument();
 });
 
 test('empty request people are explained and cannot be screened', async () => {
@@ -70,14 +113,18 @@ test('canceling the credit confirmation makes no run request', async () => {
 
 test('failed rerun preserves the saved result and exposes an error', async () => {
   requestEnvelope.mockResolvedValueOnce(ok(loaded)).mockResolvedValueOnce({
-    ok: false, status: 500, data: { error: 'Temporary screening failure' },
-  });
+    ok: false, status: 504, data: { error: 'Gateway timeout' },
+  }).mockResolvedValueOnce(ok({ ...loaded, latestRun: savedRun }));
   render(<IntegrityTab requestId={requestId} />);
   expect(await screen.findByText('No concerns reported')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Run screen' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Temporary screening failure');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Gateway timeout Completion may be uncertain. The previous saved screen is still shown; reload it before running again.');
   expect(screen.getByText('Latest saved screen')).toBeInTheDocument();
   expect(screen.getByText('No concerns reported')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run screen' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Reload saved screen' }));
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  expect(screen.getByRole('button', { name: 'Run screen' })).toBeEnabled();
 });
 
 test('load failure is shown as unknown and can be retried', async () => {
@@ -96,8 +143,16 @@ test('a malformed or mismatched successful rerun keeps the previous saved screen
   render(<IntegrityTab requestId={requestId} />);
   expect(await screen.findByText('No concerns reported')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Run screen' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('previous saved screen is still shown');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Completion may be uncertain. The previous saved screen is still shown');
   expect(screen.getByText('No concerns reported')).toBeInTheDocument();
+});
+
+test('a person without a usable name is clearly identified and blocks screening', async () => {
+  requestEnvelope.mockResolvedValue(ok({ requestId, people: [{ ...person, name: '   ' }], latestRun: null }));
+  render(<IntegrityTab requestId={requestId} />);
+  expect(await screen.findByText('Name unavailable')).toBeInTheDocument();
+  expect(screen.getByText(/one person has no usable name/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run screen' })).toBeDisabled();
 });
 
 test('a deferred response cannot replace fresh state after A to B to A navigation', async () => {

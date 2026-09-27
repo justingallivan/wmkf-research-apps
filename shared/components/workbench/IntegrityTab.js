@@ -9,6 +9,7 @@ const SOURCES = [
 ];
 
 function sourceState(source) {
+  if (source?.error && source.searched !== true) return 'Not searched · error';
   if (!source || source.searched !== true) return 'Not searched';
   if (source.error) return 'Error';
   return 'Searched';
@@ -30,6 +31,7 @@ function SourceSummary({ sourceKey, label, source }) {
   const searched = source?.searched === true;
   const matches = sourceKey === 'retraction_watch' && Array.isArray(source?.matches) ? source.matches : [];
   const hasConcerns = source?.hasConcerns === true || matches.length > 0;
+  const hasResultCount = typeof source?.resultCount === 'number' && Number.isFinite(source.resultCount);
   const summary = typeof source?.summary === 'string' && source.summary.trim() ? source.summary : null;
   const sourceItems = Array.isArray(source?.rawResults) ? source.rawResults : [];
   return (
@@ -40,18 +42,26 @@ function SourceSummary({ sourceKey, label, source }) {
         {searched && !source?.error && (
           sourceKey === 'retraction_watch'
             ? <span className="text-gray-600">{hasConcerns ? `${matches.length} match${matches.length === 1 ? '' : 'es'}` : 'No matches reported'}</span>
-            : Number.isFinite(Number(source?.resultCount))
-              ? <span className="text-gray-600">{source.resultCount} search result{Number(source.resultCount) === 1 ? '' : 's'}</span>
-              : hasConcerns ? <span className="text-gray-600">Flagged for human review</span> : <span className="text-gray-600">No concerns reported by this source</span>
+            : hasConcerns
+              ? <span className="text-gray-600">Flagged for human review{hasResultCount ? ` · ${source.resultCount} search results` : ''}</span>
+              : hasResultCount
+                ? <span className="text-gray-600">{source.resultCount} search result{source.resultCount === 1 ? '' : 's'}</span>
+                : <span className="text-gray-600">No concerns reported by this source</span>
         )}
       </div>
       {summary && <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{summary}</p>}
       {matches.map((match, index) => (
         <div key={`${match.sourceIdentifier || match.doi || match.title || 'match'}-${index}`} className="mt-1 text-sm text-gray-700">
-          {match.title || match.summary || match.doi || 'Retraction Watch match'}
+          <p className="font-medium text-gray-900">{match.title || 'Retraction Watch match'}</p>
+          {match.confidenceLevel && <p className="mt-0.5 text-xs text-gray-600">Match confidence: {match.confidenceLevel}{typeof match.confidence === 'number' && Number.isFinite(match.confidence) ? ` (${match.confidence}%)` : ''}</p>}
+          {match.matchedAuthor && <p className="mt-0.5 text-sm">Matched author: {match.matchedAuthor}</p>}
           {match.source && <span className="text-gray-500"> · {match.source}</span>}
-          {match.doi && <span className="text-gray-500"> · DOI {match.doi}</span>}
-          {Array.isArray(match.urls) && match.urls.map((url) => /^https?:\/\//i.test(url) && <a key={url} className="ml-2 text-blue-700 underline underline-offset-2" href={url} target="_blank" rel="noopener noreferrer">Source</a>)}
+          {match.retractionNature && <p className="mt-1">Action: {match.retractionNature}</p>}
+          {Array.isArray(match.reasons) && match.reasons.length > 0 && <p className="mt-1">Reasons: {match.reasons.join(', ')}</p>}
+          {match.doi && <p className="mt-1">DOI: <a className="text-blue-700 underline underline-offset-2" href={`https://doi.org/${match.doi.split('/').map(encodeURIComponent).join('/')}`} target="_blank" rel="noopener noreferrer">{match.doi}</a></p>}
+          {(typeof match.urls === 'string' ? match.urls.split(';') : (Array.isArray(match.urls) ? match.urls : []))
+            .map((rawUrl) => rawUrl.trim()).filter((url) => /^https?:\/\//i.test(url))
+            .map((url) => <a key={url} className="ml-2 text-blue-700 underline underline-offset-2" href={url} target="_blank" rel="noopener noreferrer">View Source</a>)}
         </div>
       ))}
       {sourceItems.map((item, index) => /^https?:\/\//i.test(item?.link || '') && (
@@ -69,15 +79,17 @@ function SourceSummary({ sourceKey, label, source }) {
 function PersonResult({ result }) {
   const incomplete = isIncomplete(result);
   const matches = Number.isFinite(Number(result?.matchCount)) ? Number(result.matchCount) : 0;
+  const hasConcerns = result?.hasConcerns === true || matches > 0;
   return (
     <li className="border-t border-gray-200 py-4 first:border-0 first:pt-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold text-gray-900">{result?.name || 'Unnamed person'}</h3>
+          {result?.isCommonName && <p className="mt-0.5 text-xs font-medium text-blue-800">Common name — verify identity carefully</p>}
           {result?.institution && <p className="mt-0.5 text-sm text-gray-600">{result.institution}</p>}
         </div>
-        <p className={incomplete ? 'text-sm font-medium text-amber-800' : (result?.hasConcerns ? 'text-sm font-medium text-amber-800' : 'text-sm text-gray-600')}>
-          {incomplete ? 'Incomplete screen' : result?.hasConcerns ? `${matches} item${matches === 1 ? '' : 's'} for human review` : 'No concerns reported'}
+        <p className={hasConcerns || incomplete ? 'text-sm font-medium text-amber-800' : 'text-sm text-gray-600'}>
+          {hasConcerns ? `${matches > 0 ? `${matches} item${matches === 1 ? '' : 's'}` : 'Concerns flagged'} for human review${incomplete ? ' · Incomplete screen' : ''}` : incomplete ? 'Incomplete screen' : 'No concerns reported'}
         </p>
       </div>
       <ul className="mt-3 divide-y divide-gray-100">
@@ -97,6 +109,8 @@ export default function IntegrityTab({ requestId }) {
   const [error, setError] = useState(null);
   const [loadedRequestId, setLoadedRequestId] = useState(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [uncertainRun, setUncertainRun] = useState(false);
+  const [refreshingRun, setRefreshingRun] = useState(false);
   const generation = useRef(0);
   const mounted = useRef(false);
   const activeRequest = useRef(requestId);
@@ -109,6 +123,7 @@ export default function IntegrityTab({ requestId }) {
     setLoadingRequestId(id || null);
     setError(null);
     setRunningRequestId(null);
+    setUncertainRun(false);
     setRecord(null);
     setLoadedRequestId(null);
     if (!id) {
@@ -142,9 +157,10 @@ export default function IntegrityTab({ requestId }) {
   const people = Array.isArray(currentRecord?.people) ? currentRecord.people : [];
   const latestRun = currentRecord?.latestRun || null;
   const running = runningRequestId === requestId;
+  const missingNames = people.filter((person) => !String(person?.name || '').trim());
 
   const runScreen = async () => {
-    if (!requestId || running || people.length === 0) return;
+    if (!requestId || running || uncertainRun || people.length === 0 || missingNames.length > 0) return;
     const confirmed = window.confirm(`Run an integrity screen for ${people.length} ${people.length === 1 ? 'person' : 'people'}? This uses Claude and SerpAPI credits for each person.`);
     if (!confirmed) return;
     const id = requestId;
@@ -164,10 +180,40 @@ export default function IntegrityTab({ requestId }) {
       if (!mounted.current || generation.current !== current || activeRequest.current !== id) return;
       setRecord({ requestId: id, people: response.data.people, latestRun: response.data.run });
       setLoadedRequestId(id);
+      setUncertainRun(false);
     } catch (runError) {
-      if (mounted.current && generation.current === current && activeRequest.current === id) setError(runError.message);
+      if (mounted.current && generation.current === current && activeRequest.current === id) {
+        setUncertainRun(true);
+        setError(`${runError.message} Completion may be uncertain. The previous saved screen is still shown; reload it before running again.`);
+      }
     } finally {
       if (mounted.current && generation.current === current && activeRequest.current === id) setRunningRequestId(null);
+    }
+  };
+
+  const reloadSavedRun = async () => {
+    if (!requestId || refreshingRun) return;
+    const id = requestId;
+    const current = generation.current;
+    setRefreshingRun(true);
+    try {
+      const response = await requestEnvelope(`/api/workbench/integrity/${encodeURIComponent(id)}`, { tolerantBody: true });
+      if (!response.ok) throw new Error(response.data?.error || `Reload failed (${response.status})`);
+      if (response.data?.requestId !== id || !Array.isArray(response.data.people)
+        || !(response.data.latestRun === null || (response.data.latestRun && typeof response.data.latestRun === 'object'))) {
+        throw new Error('The reloaded integrity information did not match this request.');
+      }
+      if (!mounted.current || generation.current !== current || activeRequest.current !== id) return;
+      setRecord(response.data);
+      setLoadedRequestId(id);
+      setUncertainRun(false);
+      setError(null);
+    } catch (reloadError) {
+      if (mounted.current && generation.current === current && activeRequest.current === id) {
+        setError(`${reloadError.message} The previous saved screen remains visible; retry loading before running again.`);
+      }
+    } finally {
+      if (mounted.current && generation.current === current && activeRequest.current === id) setRefreshingRun(false);
     }
   };
 
@@ -190,10 +236,12 @@ export default function IntegrityTab({ requestId }) {
             <h2 className="text-lg font-semibold text-gray-900">Integrity screen</h2>
             <p className="mt-1 max-w-3xl text-sm text-gray-600">Screens the request’s PI and Co-PIs using public integrity sources. Results support human review and are not a determination of misconduct.</p>
           </div>
-          <Button onClick={runScreen} disabled={!people.length || !requestId} loading={running}>
+          <Button onClick={runScreen} disabled={!people.length || !requestId || missingNames.length > 0 || uncertainRun} loading={running}>
             {running ? 'Screening…' : 'Run screen'}
           </Button>
         </div>
+        {missingNames.length > 0 && <p className="mt-2 text-sm text-amber-800">A screen cannot run because {missingNames.length === 1 ? 'one person has' : `${missingNames.length} people have`} no usable name. Reload the request people details before screening.</p>}
+        {uncertainRun && <Button className="mt-2" variant="outline" onClick={reloadSavedRun} loading={refreshingRun}>Reload saved screen</Button>}
         <h3 className="mt-5 text-base font-semibold text-gray-900">People to be screened</h3>
         {people.length === 0 ? (
           <p className="mt-2 text-sm text-gray-600">No PI or Co-PI contacts were found for this request.</p>
@@ -201,7 +249,7 @@ export default function IntegrityTab({ requestId }) {
           <ul className="mt-2 divide-y divide-gray-200" aria-label="People to be screened">
             {people.map((person) => (
               <li key={person.contactId} className="py-3 first:pt-0">
-                <p className="text-sm font-medium text-gray-900">{person.name || 'Name unavailable'}</p>
+                <p className="text-sm font-medium text-gray-900">{String(person.name || '').trim() || 'Name unavailable'}</p>
                 <p className="mt-0.5 text-sm text-gray-600">{[person.role || 'Role unavailable', person.institution || 'Institution unavailable'].join(' · ')}</p>
               </li>
             ))}

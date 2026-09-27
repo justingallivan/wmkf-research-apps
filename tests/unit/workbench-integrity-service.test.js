@@ -164,10 +164,23 @@ test('schema preflight and linked persistence are awaited; insert failures fail 
   expect(engine.screenApplicants).toHaveBeenCalledTimes(2);
 });
 
-test('missing request fails before querying Postgres', async () => {
+test('real-shaped Dataverse 404 maps to request 404 before Postgres or screening', async () => {
+  const dataverse404 = Object.assign(new Error('dataverse failed (404): not found'), {
+    serviceName: 'dataverse', status: 404, isTransient: false,
+  });
   const sql = jest.fn();
-  const deps = peopleDependencies({ grantRequestAdapter: { getById: jest.fn().mockResolvedValue(null) } });
+  const engine = { screenApplicants: jest.fn() };
+  const deps = peopleDependencies({ grantRequestAdapter: { getById: jest.fn().mockRejectedValue(dataverse404) } });
   await expect(getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...deps, sql }))
+    .rejects.toMatchObject({ httpStatus: 404, message: 'Request not found' });
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 7, claudeApiKey: 'key' }, {
+    ...deps, sql, IntegrityService: engine,
+  })).rejects.toMatchObject({ httpStatus: 404, message: 'Request not found' });
+  expect(sql).not.toHaveBeenCalled();
+  expect(engine.screenApplicants).not.toHaveBeenCalled();
+
+  const nullRequest = peopleDependencies({ grantRequestAdapter: { getById: jest.fn().mockResolvedValue(null) } });
+  await expect(getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...nullRequest, sql }))
     .rejects.toMatchObject({ httpStatus: 404 });
   expect(sql).not.toHaveBeenCalled();
 });
