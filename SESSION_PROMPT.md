@@ -1,4 +1,77 @@
-# Session 545 Prompt: Factory recipe 5 (Pre-RP brief, site-visit start, Final Writeup), then recipe 3; review the Integrity branch
+# Session 546 Prompt: Factory item 7 — owner accepts the production plan, then build P1–P4; review the Integrity branch
+
+## Session 545 Summary — 2026-09-27 PT (Opus; recipe 5a built and parked, sandbox proofs stopped, production enablement planned and reviewed)
+
+### What Was Completed
+
+1. **Slice 5a built, then parked** on `claude/factory-recipe5a` (`3b86d7df4`, pushed, not merged, not reviewed). It builds `seed_abstract` and `render_pre_rp_brief` with complete sandbox dependencies, and `verify_presite` now advances when not last. It adds no `final_writeup` step order, and it edits migration 054 in place (two steps, three reason codes, a receipt key). The focused glob passed 57 suites / 1,656 tests (orchestrator re-run). It found that the Pre-RP brief needs a program director, which the clone does not copy.
+2. **Owner decision: sandbox live proofs stop after recipe 4.** Item 7 (production enablement) comes next; recipes 5 and 3 are finished as production runs. Recorded in the design doc (*Slice 5a built, then PARKED*; *Item 7 owner decisions* Q1–Q5).
+3. **Production enablement plan written and reviewed:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`. It went through contract-reconcile (named changes applied), then Codex plan review with `gpt-5.6-sol`: round 1 four highs, round 2 three highs, round 3 two highs. Every finding was revised except one, recorded as a dissent beside the owner decision. The loop closed at the cap.
+4. **Owner-run probe `scripts/probe-test-request-factory-production-readiness.js`** (GET-only; `--detail`, `--export-xaml`, `--history`) established:
+   - production lacks the marker columns;
+   - the production app user `53e97fb3-…` has **no System Administrator** role;
+   - production create automation (8 workflows, 4 flows, 4 AkoyaGo plug-ins) differs from the sandbox's;
+   - the **sandbox org has background processing disabled** (agent-wiki Dataverse note).
+5. **The Foundation account's audit history** (owner-read) shows that a Foundation-applicant create triggers the GoVerify refresh (`akoya_goverifytrigger`, `akoya_dexempt`, `akoya_taxstatus`, `wmkf_bmf509`), plus a primary-contact copy by an update workflow. Nothing else changed.
+6. **Owner decision: the evidence meets the design's "vendor create logic shown safe" rule** for a first production `basic` run under P5 (plan P0b).
+
+### Commits (all on `main` unless noted)
+- `3b86d7df4` slice 5a (branch `claude/factory-recipe5a`) · `aca4c07a0` decisions + draft plan · `5f4f439be` probe + sandbox census · `bdf4e54f4` wiki · `4acbf7448` production P0 · `efc399d33` automation characterized · `10e0c535e` contract-reconcile · `53d977686` / `47d213f36` / `ed25310de` Codex rounds 1–3 · `bada8e03a`, `4b9ec0220`, `52cbbfe94`, `870513946` P0b evidence and the evidence-bar decision.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Accept the production plan as reviewed**, or first run the default post-cap Codex check of the round-3 closures (S543 practice).
+   Evidence: plan Status line; `ed25310de`.
+2. **Confirm that staff set `wmkf_meetingdate` in AkoyaGO on real Requests.** It is the basic run's one post-create update; plan open question 5 marks it `[ASSUMED]`.
+3. **Q2, the ledger database for the form phase.** Recorded as the local container for the CLI and the shared Postgres for the form; owner undecided.
+4. **6d (reviewer email exception)**: not started.
+
+### Verified Open (after acceptance)
+
+1. **Build item 7 P1–P4** as slices with the S543/S544 process: target parameterization (Factory-built dependency seams, GoVerify bypass unreachable in production, stub AI run kept); the P2 exact-identity write fence at the three seams; P3 `REQUIRED` actor with the production app user plus the writer-gate edit; the P4 readiness endpoint. Then the P5 first `basic` run, with the owner running every production command.
+   Evidence: plan phases P1–P5.
+2. **Integrity Screener Workbench tab: review the Codex branch** `origin/codex/integrity-workbench-tab` at `b1086302b`, not merged. Migrations 056–057 are unapplied; recheck numbering.
+
+### Parked
+
+1. **Slice 5a** (`claude/factory-recipe5a`): its steps are the starting point for production recipe 5. Re-open trigger: the recipe-5 slice after P5. Plan P6 decides whether its 054 edits land before 054's first shared apply or become 055.
+2. **Uploaded-review live pass**, **GoVerify bypass intermittent failure** (sandbox-only now), **live-ledger flake**: unchanged from S544.
+
+### Verify Before Acting
+
+1. Sandbox residue from Requests 1000341–1000348 and local ledger runs (unchanged). The local ledger's 054 lacks 5a's steps; re-apply it before any 5a step runs.
+2. **Production schema:** wave29 and wave30 are absent in production [VERIFIED P0 2026-09-27]. The production order is apply, set the switches, redeploy, confirm the readiness endpoint, then run.
+
+### Do Not Reopen Without New Decision
+
+1. Sandbox live proofs stop after recipe 4 (owner, S545).
+2. GoVerify is not bypassed in production; its Foundation-account refresh is accepted (Q3; plan open question 4 transition contract).
+3. The stub `wmkf_ai_run` stays, in production too (`assertOwnedStubAiRun`).
+4. The evidence meets the vendor-create rule for a first basic run (owner, S545). Codex's dissent is recorded and not reopened.
+5. Program director: in production it is copied by GUID; the sandbox reserve-flag idea is moot.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Item 7 plan, evidence, decisions, open questions |
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Parent design; *Item 7 owner decisions*; 5a parking record |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run production probe (`--detail`, `--export-xaml=<dir>`, `--history[=N]`) |
+| `lib/services/test-requests/basic-clone-steps.js` | `CREATE_FIELDS`, `foundationBaselineDigest`, GoVerify bypass |
+| `lib/services/test-requests/run-runner.js` | Step bodies; `stepFenceSource`; `assertOwnedStubAiRun` |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|docx-package|presite|pre-rp|source-bundle|seed-synthetic).*"
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-test-request-factory-production-readiness.js --director=<sign-in> [--detail] [--history=10]   # owner-run only
+```
+
+---
+
+## Prior Session 545 Prompt: Factory recipe 5 (Pre-RP brief, site-visit start, Final Writeup), then recipe 3; review the Integrity branch
 
 ## Session 544 Summary — 2026-09-26/27 PT (Opus; reviewer-address defaults, recipes 3–5 plan, recipe 4 built and live-proven)
 
