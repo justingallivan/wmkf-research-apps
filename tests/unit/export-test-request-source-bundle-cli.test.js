@@ -8,7 +8,9 @@
  * (guarded by an argv[1]/import.meta.url entrypoint check), so these pure
  * helpers can be exercised directly.
  */
-import { parseArgs, buildReviewerDependencies } from '../../scripts/export-test-request-source-bundle.mjs';
+import {
+  parseArgs, buildReviewerDependencies, buildPreSiteDependencies,
+} from '../../scripts/export-test-request-source-bundle.mjs';
 
 const OUT = '/tmp/does-not-exist-source-bundle-cli-test.json';
 
@@ -77,5 +79,41 @@ describe('buildReviewerDependencies', () => {
     const args = parseArgs(baseArgv(['--with-reviewers', '--source-marker-column=present']));
     const deps = buildReviewerDependencies(args, { client, graph });
     expect(deps).not.toBeNull();
+  });
+});
+
+// Slice 4a: --with-pre-site (bundle v4) requires --with-reviewers (v4
+// extends v3), off by default, mirroring --with-reviewers's own posture.
+describe('parseArgs: --with-pre-site (slice 4a)', () => {
+  test('--with-pre-site defaults off', () => {
+    const args = parseArgs(baseArgv());
+    expect(args.withPreSite).toBe(false);
+  });
+
+  test('--with-pre-site without --with-reviewers is rejected', () => {
+    expect(() => parseArgs(baseArgv(['--with-pre-site'])))
+      .toThrow(/--with-pre-site requires --with-reviewers/);
+  });
+
+  test('--with-pre-site --with-reviewers --source-marker-column=absent parses cleanly', () => {
+    const args = parseArgs(baseArgv(['--with-reviewers', '--source-marker-column=absent', '--with-pre-site']));
+    expect(args.withPreSite).toBe(true);
+  });
+});
+
+describe('buildPreSiteDependencies', () => {
+  const client = { get: jest.fn() };
+
+  test('returns null (no Pre-Site dependencies at all) when --with-pre-site is not set', () => {
+    const args = parseArgs(baseArgv(['--with-reviewers', '--source-marker-column=absent']));
+    expect(buildPreSiteDependencies(args, { client })).toBeNull();
+  });
+
+  test('returns the readPreSiteVisitDraft/readAbstract pair when --with-pre-site is set', () => {
+    const args = parseArgs(baseArgv(['--with-reviewers', '--source-marker-column=absent', '--with-pre-site']));
+    const deps = buildPreSiteDependencies(args, { client });
+    expect(deps).not.toBeNull();
+    expect(typeof deps.readPreSiteVisitDraft).toBe('function');
+    expect(typeof deps.readAbstract).toBe('function');
   });
 });
