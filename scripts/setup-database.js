@@ -1319,7 +1319,9 @@ $receipt$`,
       'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
       'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews'
     )),
-    CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN ('basic', 'initial_assessment', 'reviews')),
+    CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN (
+      'basic', 'initial_assessment', 'reviews', 'pre_site_visit', 'final_writeup', 'site_visit_materials'
+    )),
     CONSTRAINT test_request_runs_host_shapes CHECK (
       source_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
       AND destination_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
