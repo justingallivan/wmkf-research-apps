@@ -32,6 +32,11 @@ const WRITERS = Object.freeze([
   ['lib/services/consultant-feedback-attachment-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/pre-rp-brief/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/test-requests/run-runner.js', 'dependencies.createDocument(', 'SANDBOX_REHEARSAL'],
+  // seed_presite_draft (slice 4b): a second, distinct call site in the same
+  // file -- named `presiteDeps` (not `dependencies`) so this row's needle
+  // does not double-count the IA row above. Same sandbox-only, SANDBOX_REHEARSAL
+  // rationale (presite-sandbox-deps.js `sandboxCreateDocument`).
+  ['lib/services/test-requests/run-runner.js', 'presiteDeps.createDocument(', 'SANDBOX_REHEARSAL'],
 ]);
 
 const ALLOWED_ORIGIN_FIELD_FILES = new Set([

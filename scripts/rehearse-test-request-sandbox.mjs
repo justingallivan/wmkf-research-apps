@@ -54,6 +54,7 @@ import {
 import {
   readSourceBundle,
   summarizeSourceBundle,
+  assertBundleHasPreSiteSectionForRecipe,
   assertBundleHasReviewerSectionForRecipe,
 } from '../lib/services/test-requests/source-bundle.js';
 import {
@@ -97,7 +98,7 @@ import {
   verifyClone,
 } from '../lib/services/test-requests/basic-clone-steps.js';
 import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
-import { recipeSeedsReviewers } from '../lib/services/test-requests/recipe-capabilities.js';
+import { recipeSeedsPreSite, recipeSeedsReviewers } from '../lib/services/test-requests/recipe-capabilities.js';
 import {
   LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
 } from '../lib/services/test-requests/run-ledger.js';
@@ -810,6 +811,7 @@ export async function runReserve(client, args, ledgerUrl) {
   const preflight = await runPreflight(client, graph, sharePointTarget);
   const bundle = readSourceBundle(readJson(args.bundle));
   assertBundleHasReviewerSectionForRecipe(args.recipe, bundle);
+  assertBundleHasPreSiteSectionForRecipe(args.recipe, bundle);
   const source = bundle.source.request;
   if (source.akoya_requestnum !== args.sourceRequestNumber) {
     throw new Error(`Bundle source is Request ${source.akoya_requestnum}; --source-request-number attests ${args.sourceRequestNumber}. Refusing.`);
@@ -1029,6 +1031,24 @@ export function summarizeReviewResources(resources, reviewerAssignments) {
   });
 }
 
+/**
+ * Slice 4b: a curated Pre-Site summary for `--run-inspect` -- ids, the
+ * generation-key digest and content hash, never section text/prompt bodies
+ * (every value here already passed run-ledger.js's no-text-invariant
+ * receipt validation at write time, same rationale as
+ * summarizeReviewResources above).
+ */
+export function summarizePresiteResources(resources) {
+  const aiRun = resources.find((r) => r.step === 'seed_presite_ai_run' && r.resourceKind === 'dataverse_ai_run');
+  const draft = resources.find((r) => r.step === 'seed_presite_draft' && r.resourceKind === 'dataverse_request_document');
+  if (!aiRun && !draft) return null;
+  return {
+    aiRunId: aiRun?.readback?.confirmedRunId ?? null,
+    requestDocumentId: draft?.readback?.requestDocumentId ?? null,
+    generationKeyDigest: draft?.plannedIdentity?.generationKey ?? null,
+  };
+}
+
 async function runRunInspect(runInspect, ledgerUrl) {
   const db = pgLedgerDb(ledgerUrl);
   try {
@@ -1040,8 +1060,9 @@ async function runRunInspect(runInspect, ledgerUrl) {
     // never selects the `address` column, so there is nothing to redact here.
     const reviewerAssignments = recipeSeedsReviewers(run.recipe) ? await ledger.listRunReviewerAssignments(runInspect) : [];
     const reviewsSummary = recipeSeedsReviewers(run.recipe) ? summarizeReviewResources(resources, reviewerAssignments) : [];
+    const presiteSummary = recipeSeedsPreSite(run.recipe) ? summarizePresiteResources(resources) : null;
     console.log(JSON.stringify({
-      mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments, reviewsSummary,
+      mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments, reviewsSummary, presiteSummary,
     }, null, 2));
   } finally {
     await db.end();

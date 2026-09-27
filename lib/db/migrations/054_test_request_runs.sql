@@ -36,7 +36,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
         FROM jsonb_each(receipt) AS e(key, value)
         CROSS JOIN LATERAL (SELECT e.value #>> '{}' AS v, jsonb_typeof(e.value) AS t) AS s
        WHERE NOT (
-         (e.key IN ('size', 'itemSize', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount', 'assignmentSequence') AND s.t = 'number')
+         (e.key IN ('size', 'itemSize', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount', 'assignmentSequence', 'promptVersion') AND s.t = 'number')
          OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
          OR (e.key IN ('requestIds', 'locationIds') AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
@@ -50,7 +50,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
            AND s.v !~ '(://|[[:cntrl:]])'
            AND s.v !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
            AND CASE
-             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId', 'promptId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
              WHEN e.key IN ('itemId', 'folderItemId', 'graphItemId', 'sourceGraphItemId') THEN s.v ~ '^01[A-Z2-7]{32}$'
              WHEN e.key IN ('driveId', 'sourceDriveId') THEN s.v ~ '^b![A-Za-z0-9_-]{16,120}$'
@@ -62,7 +62,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
              WHEN e.key IN ('eTag', 'eTagBefore', 'eTagAfter') THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
              WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
              WHEN e.key IN ('versionNumber', 'versionNumberBefore', 'versionNumberAfter') THEN s.v ~ '^[0-9]{1,20}$'
-             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'bytesSha256', 'addressSha256', 'attestedDigest') THEN s.v ~ '^[0-9a-f]{64}$'
+             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'bytesSha256', 'addressSha256', 'attestedDigest', 'inputFingerprint', 'renderInputFingerprint') THEN s.v ~ '^[0-9a-f]{64}$'
              WHEN e.key IN ('outcome', 'kind') THEN s.v ~ '^[a-z][a-z0-9_-]{0,39}$'
              WHEN e.key = 'reviewForm' THEN s.v ~ '^(uploaded|received_no_file|unreceived)$'
              WHEN e.key = 'field' THEN s.v ~ '^[a-z][a-z0-9_]{0,63}$'
@@ -155,7 +155,8 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
     'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
     'copy_file', 'observe', 'verify', 'ready',
     'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
-    'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews'
+    'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
+    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'
   )),
   CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN (
     'basic', 'initial_assessment', 'reviews', 'pre_site_visit', 'final_writeup', 'site_visit_materials'
@@ -205,7 +206,10 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
       'recipe_step_not_built',
       'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
       'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
-      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed'
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
     ))
     AND (last_error IS NULL OR regexp_replace(last_error, ' [(]http [0-9]{3}[)]$', '') IN (
       'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
@@ -226,7 +230,10 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
       'recipe_step_not_built',
       'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
       'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
-      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed'
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
     ))
   )
 );
@@ -247,7 +254,8 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
                       'sharepoint_folder', 'dataverse_document_location',
                       'sharepoint_file', 'workflow_bypass', 'dataverse_request_document',
                       'foundation_baseline',
-                      'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set'
+                      'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set',
+                      'dataverse_ai_run'
                     )),
   system            TEXT NOT NULL CHECK (system IN ('dataverse', 'sharepoint')),
 
@@ -272,7 +280,8 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
     'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
     'copy_file', 'observe', 'verify', 'ready',
     'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
-    'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews'
+    'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
+    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'
   )),
   CONSTRAINT test_request_run_resources_error_code CHECK (
     error IS NULL OR regexp_replace(error, ' [(]http [0-9]{3}[)]$', '') IN (
@@ -294,7 +303,10 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
       'recipe_step_not_built',
       'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
       'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
-      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed'
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
     )
   )
 );
