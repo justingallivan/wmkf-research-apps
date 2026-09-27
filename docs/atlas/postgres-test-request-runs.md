@@ -199,10 +199,18 @@ New ledger dimension additions (migration 054, edited in place, and its
   `presite_upload_ambiguous`, `presite_snapshot_stale`,
   `presite_verification_failed`, `presite_promotion_uncharacterized`,
   `presite_ai_run_ambiguous`.
-- `LEDGER_RECEIPT_KEYS` (`KEY_RULES`/`NUMERIC_KEYS`): `promptId` (GUID),
+- `LEDGER_RECEIPT_KEYS` (`KEY_RULES`/`NUMERIC_KEYS`): `promptId`,
+  `confirmedRunId` (GUID — the stub AI-run id re-asserted by
+  `stepSeedPresiteAiRun`'s I3 exact-id recovery; a distinct key from `runId`
+  because a resource can carry both, planned vs. confirmed),
   `inputFingerprint`/`renderInputFingerprint` (HEX64), `promptVersion`
   (numeric) — the `test_request_receipt_ok` SQL function's own enumerated
-  grammar carries the same additions.
+  grammar carries the same additions. [VERIFIED via
+  lib/services/test-requests/run-ledger.js KEY_RULES and
+  lib/db/migrations/054_test_request_runs.sql:53 / scripts/setup-database.js:1248,
+  slice 4b follow-up 2026-09-26 — `confirmedRunId` was missing from all three
+  before this pass, which would have rejected every real recovery/confirm
+  write as an unsafe ledger value.]
 
 `lib/services/test-requests/presite-sandbox-deps.js` is the sandbox-bound
 dependency seam (mirrors `ia-sandbox-deps.js`/`reviews-sandbox-deps.js`;
