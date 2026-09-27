@@ -26,6 +26,10 @@
  *   Add --history[=N] (default 10, max 50) to print what happened around the
  *   creation of the N most recent Foundation-applicant (test) Requests: jobs,
  *   emails, and audited field names on the Request and the Foundation account.
+ *   Add --meeting-date[=N] (default 50, max 200) to report whether the meeting
+ *   date is written by an update after create on the N most recent Requests
+ *   that carry one, by whom, and every audited meeting-date update on a
+ *   Foundation-applicant Request with what followed it (plan open question 5).
  */
 
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client');
@@ -91,6 +95,7 @@ function summarizeFlow(clientdata) {
 
 const FOUNDATION_NAME = 'W. M. Keck Foundation';
 const HISTORY_WINDOW_MS = 2 * 60 * 60 * 1000;
+const MEETING_DATE = 'wmkf_meetingdate';
 
 /** Changed attribute names from an audit row's `changedata` (values are never printed). */
 function changedAttributeNames(changedata) {
@@ -157,6 +162,115 @@ async function printCreationHistory(client, limit) {
   }
 }
 
+/** The meeting-date change in an audit row's `changedata`, or null (values are never printed). */
+function meetingDateChange(changedata) {
+  try {
+    const change = (JSON.parse(changedata || '{}').changedAttributes || []).find((a) => a.logicalName === MEETING_DATE);
+    if (!change) return null;
+    return change.oldValue === undefined || change.oldValue === null || change.oldValue === '' ? 'first set' : 'changed';
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Plan open question 5: do staff set `wmkf_meetingdate` after a Request is
+ * created, and has a Foundation-applicant Request already received that write
+ * with nothing outside it changing? Part A reads update audits on the N most
+ * recent Requests that carry a meeting date; part B lists every audited
+ * meeting-date update on Foundation-applicant Requests with the jobs regarding
+ * the Request and the Foundation account's audit rows in the two hours after.
+ * Request numbers, users, timestamps, field names and counts only.
+ */
+async function printMeetingDateWrites(client, limit, appUserId) {
+  const F = '@OData.Community.Display.V1.FormattedValue';
+  const formatted = { Prefer: 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"' };
+  console.log(`\n8. Meeting-date writes after create (${MEETING_DATE})`);
+  const attr = await client.get(
+    `/EntityDefinitions(LogicalName='akoya_request')/Attributes(LogicalName='${MEETING_DATE}')?$select=IsAuditEnabled`);
+  const entity = await client.get("/EntityDefinitions(LogicalName='akoya_request')?$select=IsAuditEnabled");
+  if (!attr.ok || !entity.ok) throw new Error(`GET audit settings failed (${attr.status}/${entity.status})`);
+  console.log(`   auditing: akoya_request=${entity.body?.IsAuditEnabled?.Value} ${MEETING_DATE}=${attr.body?.IsAuditEnabled?.Value}` +
+    ' (if either is false, "no update seen" below means nothing)');
+
+  const foundation = await getAll(client,
+    `/accounts?$select=accountid&$filter=name eq '${FOUNDATION_NAME}' and statecode eq 0`);
+  if (foundation.length !== 1) throw new Error(`Expected one active ${FOUNDATION_NAME} account; found ${foundation.length}.`);
+  const accountId = foundation[0].accountid;
+
+  const recent = await client.get(
+    `/akoya_requests?$select=akoya_requestid,akoya_requestnum,createdon,_akoya_applicantid_value` +
+    `&$filter=${MEETING_DATE} ne null&$orderby=createdon desc&$top=${limit}`, formatted);
+  if (!recent.ok) throw new Error(`GET Requests with a meeting date failed (${recent.status})`);
+  const rows = recent.body?.value || [];
+  let laterUpdates = 0;
+  let auditReadable = 0;
+  const byUser = new Map();
+  console.log(`   A. ${rows.length} most recent Requests with a meeting date:`);
+  for (const r of rows) {
+    const audits = await getAllOrForbidden(client,
+      '/audits?$select=createdon,_userid_value,changedata' +
+      `&$filter=objecttypecode eq 'akoya_request' and _objectid_value eq ${r.akoya_requestid} and operation eq 2&$orderby=createdon asc`);
+    if (!audits) {
+      console.log('      audit rows not readable (403, no audit privilege); stopping part A');
+      break;
+    }
+    auditReadable += 1;
+    const writes = audits.map((a) => ({ a, kind: meetingDateChange(a.changedata) })).filter((w) => w.kind);
+    if (writes.length) laterUpdates += 1;
+    const foundationTag = r._akoya_applicantid_value === accountId ? ' [Foundation applicant]' : '';
+    const summary = writes.map(({ a, kind }) => {
+      const user = a._userid_value === appUserId ? 'APP USER' : (a[`_userid_value${F}`] || a._userid_value);
+      byUser.set(user, (byUser.get(user) || 0) + 1);
+      return `${a.createdon} ${kind} by ${user}`;
+    });
+    console.log(`      ${r.akoya_requestnum}${foundationTag} created ${r.createdon}: ${summary.join('; ') || 'no audited update to the meeting date (set at create, or before auditing)'}`);
+  }
+  console.log(`      => ${laterUpdates} of ${auditReadable} audit-readable Requests had the meeting date written by a later update`);
+  console.log(`      => writes by user: ${[...byUser.entries()].map(([u, n]) => `${u} x${n}`).sort().join('; ') || 'none'}`);
+
+  const foundationRequests = await getAll(client,
+    `/akoya_requests?$select=akoya_requestid,akoya_requestnum&$filter=_akoya_applicantid_value eq ${accountId}`);
+  console.log(`   B. Audited meeting-date updates on the ${foundationRequests.length} Foundation-applicant Requests:`);
+  let precedents = 0;
+  for (const r of foundationRequests) {
+    const audits = await getAllOrForbidden(client,
+      '/audits?$select=createdon,_userid_value,changedata' +
+      `&$filter=objecttypecode eq 'akoya_request' and _objectid_value eq ${r.akoya_requestid} and operation eq 2&$orderby=createdon asc`);
+    if (!audits) {
+      console.log('      audit rows not readable (403, no audit privilege); stopping part B');
+      return;
+    }
+    for (const a of audits) {
+      const kind = meetingDateChange(a.changedata);
+      if (!kind) continue;
+      precedents += 1;
+      const at = new Date(a.createdon);
+      const until = new Date(at.getTime() + HISTORY_WINDOW_MS).toISOString();
+      const user = a._userid_value === appUserId ? 'APP USER' : (a[`_userid_value${F}`] || a._userid_value);
+      const others = changedAttributeNames(a.changedata).filter((n) => n !== MEETING_DATE);
+      console.log(`      ${r.akoya_requestnum} ${a.createdon} ${kind} by ${user}; same audit row also changed: ${others.join(', ') || 'nothing else'}`);
+      const jobs = await getAll(client,
+        `/asyncoperations?$select=name,statuscode&$filter=_regardingobjectid_value eq ${r.akoya_requestid}` +
+        ` and createdon ge ${a.createdon} and createdon le ${until}`);
+      console.log(`        background jobs regarding the Request in the next 2h: ${countBy(jobs, (j) => `${j.name} [${j.statuscode}]`).join('; ') || 'none'}`);
+      const requestAudits = await getAll(client,
+        '/audits?$select=createdon,_userid_value,changedata' +
+        `&$filter=objecttypecode eq 'akoya_request' and _objectid_value eq ${r.akoya_requestid}` +
+        ` and createdon gt ${a.createdon} and createdon le ${until}`);
+      console.log(`        later audit rows on the Request in the next 2h: ${requestAudits.map((x) => changedAttributeNames(x.changedata).join('+') || '-').join('; ') || 'none'}`);
+      const accountAudits = await getAll(client,
+        '/audits?$select=createdon,_userid_value,changedata' +
+        `&$filter=objecttypecode eq 'account' and _objectid_value eq ${accountId} and createdon ge ${a.createdon} and createdon le ${until}`);
+      console.log(`        Foundation account audit rows in the next 2h: ${accountAudits.length}`);
+      for (const x of accountAudits) {
+        console.log(`          ${x.createdon} user=${x[`_userid_value${F}`] || x._userid_value}: ${changedAttributeNames(x.changedata).join(', ') || '-'}`);
+      }
+    }
+  }
+  console.log(`      => ${precedents} audited meeting-date update(s) on Foundation-applicant Requests`);
+}
+
 /** Like getAll, but a 403 (missing audit privilege) returns null instead of failing the probe. */
 async function getAllOrForbidden(client, path) {
   try {
@@ -186,6 +300,8 @@ async function getAll(client, path) {
   const exportDir = exportArg ? exportArg.slice('--export-xaml='.length) : null;
   const historyArg = process.argv.find((arg) => arg === '--history' || arg.startsWith('--history='));
   const historyLimit = historyArg ? Math.min(Math.max(parseInt(historyArg.split('=')[1] || '10', 10) || 10, 1), 50) : 0;
+  const meetingArg = process.argv.find((arg) => arg === '--meeting-date' || arg.startsWith('--meeting-date='));
+  const meetingLimit = meetingArg ? Math.min(Math.max(parseInt(meetingArg.split('=')[1] || '50', 10) || 50, 1), 200) : 0;
   const clientId = process.env.DYNAMICS_CLIENT_ID;
   if (!clientId) throw new Error('DYNAMICS_CLIENT_ID is not set.');
   const token = await getAccessToken(PRODUCTION_URL);
@@ -243,6 +359,7 @@ async function getAll(client, path) {
   for (const f of matching) console.log(`   - ${f.name}`);
 
   if (historyLimit) await printCreationHistory(client, historyLimit);
+  if (meetingLimit) await printMeetingDateWrites(client, meetingLimit, appUsers.length === 1 ? appUsers[0].systemuserid : null);
   if (!detail && !exportDir) return;
 
   console.log('\n5. Detail: what each create-triggered workflow writes');
