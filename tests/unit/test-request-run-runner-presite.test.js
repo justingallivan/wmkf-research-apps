@@ -56,6 +56,12 @@ jest.mock('../../lib/services/test-requests/basic-clone-steps.js', () => ({
 }));
 import { MANIFEST_V4, sha256, computeRunPlanDigest, runPreflight } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
+// Codex adversarial round 2 (finding 3): assertOwnedPresiteFile independently
+// recomputes the expected Pre-Site folder via this SAME function -- fixture
+// rows must use its real output, never a hand-typed approximation, or the
+// new check refuses every fixture regardless of whether anything actually
+// drifted.
+import { expectedRequestFolder } from '../../lib/services/test-requests/sandbox-clone.js';
 import {
   buildPreSiteVisitIdentity,
   buildPreSiteVisitInputSnapshot,
@@ -355,7 +361,12 @@ function createWorld() {
       if (flags.forceUploadConflict) throw Object.assign(new Error('SharePoint item already exists'), { status: 409 });
       uploadedBytes = content;
       uploaded = {
-        siteId: 'site-1', driveId: 'drive-1', id: 'item-1', webUrl: 'https://sp.test/x',
+        // Codex adversarial round 2 (finding 3): must equal baseRun's
+        // expectedGraphSiteId/expectedGraphDriveId ('SITE-1'/'DRIVE-1') --
+        // assertOwnedPresiteFile requires the row's OWN bound site/drive
+        // (set from this exact response by commitReadyLineage) to equal the
+        // run's prepared Graph target.
+        siteId: 'SITE-1', driveId: 'DRIVE-1', id: 'item-1', webUrl: 'https://sp.test/x',
         versionId: '1.0', eTag: '"file-1"', size: content.length, lastModified: new Date().toISOString(), name: filename,
       };
       return { ...uploaded };
@@ -411,11 +422,15 @@ function createWorld() {
         wmkf_generationkey: BASE_IDENTITY.generationKey,
         wmkf_inputfingerprint: BASE_IDENTITY.inputFingerprint,
         wmkf_claimtoken: null,
+        // Codex adversarial round 2 (finding 2): assertOwnedPresiteDraft
+        // requires the row's bound prompt id (never just name/version) to
+        // equal the freshly validated sandbox promptIdentity.
+        _wmkf_aiprompt_value: PROMPT_ID,
         wmkf_promptname: PRE_SITE_VISIT_CONTRACT.promptName,
         wmkf_promptversion: 4,
         wmkf_templateid: PRE_SITE_VISIT_CONTRACT.templateId,
         wmkf_templateversion: PRE_SITE_VISIT_CONTRACT.templateVersion,
-        wmkf_sharepointfolderpath: `Requests/${REQUEST_NUMBER}/${PRE_SITE_VISIT_CONTRACT.relativeFolder}`,
+        wmkf_sharepointfolderpath: `${expectedRequestFolder(REQUEST_NUMBER, REQUEST_ID)}/${PRE_SITE_VISIT_CONTRACT.relativeFolder}`,
         wmkf_filename: `${REQUEST_NUMBER} Pre-Site Visit test.docx`,
         wmkf_attemptcount: 1,
         _etag: 'row-1',
@@ -632,6 +647,24 @@ function seedAiRunResource(resourceId = 1) {
   };
 }
 
+// Codex adversarial round 2 (findings 1/2): render_presite/verify_presite now
+// require a confirmed seed_presite_draft ledger resource (cross-checked
+// against the row's own id) before trusting a row found by generation key --
+// every test that seeds a raw row directly (rather than going through a real
+// seed_presite_draft step) must also journal this resource, or the new fence
+// refuses before ever reaching the producer/verification logic under test.
+function seedDraftResourceFor(row, resourceId = 2) {
+  return {
+    resourceId, sequence: resourceId, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+    plannedIdentity: { generationKey: row.wmkf_generationkey },
+    readback: {
+      requestDocumentId: row.wmkf_requestdocumentid,
+      claimTokenSha256: crypto.createHash('sha256').update(row.wmkf_claimtoken || '').digest('hex'),
+    },
+    outcome: 'verified',
+  };
+}
+
 describe('item 2: seed_presite_draft -- seeded row shape', () => {
   test('creates exactly one row: FAILED, a factory code outside UNCHANGED_RETRY_BLOCKED_CODES, run + prompt bound, section fields + core envelope + snapshot present', async () => {
     const { runId, resource } = seedAiRunResource();
@@ -649,7 +682,16 @@ describe('item 2: seed_presite_draft -- seeded row shape', () => {
     expect(JSON.parse(row.wmkf_presiteinputsnapshotjson)).toEqual(buildPreSiteVisitInputSnapshot(BASE_INPUTS));
   });
 
-  test('mutation: dropping the run bind at seed makes render_presite fail with pre_site_visit_draft_incomplete', async () => {
+  // Codex adversarial round 2 (finding 1/2): before this round, dropping the
+  // run bind at seed reached render_presite's producer call and failed
+  // there, via `persistedDraft`'s own `!row._wmkf_airun_value` completeness
+  // check (`pre_site_visit_draft_incomplete`). The NEW ownership pre-check
+  // (`assertOwnedPresiteDraft`, which asserts the bound AI-run BEFORE
+  // calling the producer at all) now catches this exact condition earlier,
+  // with its own code -- `pre_site_visit_draft_incomplete` remains reachable
+  // for a row missing ONLY its core/snapshot pair (item 3's own coverage),
+  // just no longer for a missing run bind specifically.
+  test('mutation: dropping the run bind at seed now refuses at the NEW ownership pre-check (presite_pointer_mismatch), never reaching the producer', async () => {
     const { resource } = seedAiRunResource();
     await runStep('seed_presite_draft', { resources: [resource] });
     const [row] = [...world.rows.values()];
@@ -657,15 +699,15 @@ describe('item 2: seed_presite_draft -- seeded row shape', () => {
     // source: the observable is identical (a row whose core+snapshot exist
     // but whose run bind is missing).
     row._wmkf_airun_value = null;
-    const draftResource = {
-      resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
-      plannedIdentity: { generationKey: row.wmkf_generationkey }, readback: { requestDocumentId: row.wmkf_requestdocumentid, claimTokenSha256: crypto.createHash('sha256').update(row.wmkf_claimtoken).digest('hex') }, outcome: 'verified',
-    };
+    const draftResource = seedDraftResourceFor(row);
     const { result } = await runStep('render_presite', { resources: [resource, draftResource] });
     expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
     expect(world.rows.size).toBe(1);
-    expect(row.wmkf_lasterrorcode).toBe('pre_site_visit_draft_incomplete');
-    expect(UNCHANGED_RETRY_BLOCKED_CODES.has('pre_site_visit_draft_incomplete')).toBe(true);
+    // Never reached the producer, so the row's own lasterrorcode is
+    // untouched (still the factory seed code from seed_presite_draft), not
+    // the producer's own completeness code.
+    expect(row.wmkf_lasterrorcode).not.toBe('pre_site_visit_draft_incomplete');
   });
 
   test('resume: row already present with a matching claim token -> recovered, no second create', async () => {
@@ -701,13 +743,14 @@ describe('item 2: seed_presite_draft -- seeded row shape', () => {
   });
 
   test('P2c: ambiguous create (createAttemptedAt journaled, requestDocumentId never confirmed) -> the row IS found by generationKey and its claim token matches -> adopted, no second create', async () => {
-    const { resource } = seedAiRunResource();
+    const { runId, resource } = seedAiRunResource();
     const claimToken = crypto.randomUUID();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
     const row = world.seedRawRow({
       wmkf_generationkey: BASE_IDENTITY.generationKey,
       wmkf_claimtoken: claimToken,
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
@@ -819,11 +862,12 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
   });
 
   test('P2a: a seeded row GENERATING under an EXPIRED lease (this recipe\'s own crashed prior attempt, no prior upload) reclaims and regenerates, not a permanent refusal', async () => {
+    const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
     const claimToken = crypto.randomUUID();
-    world.seedRawRow({
-      _wmkf_airun_value: crypto.randomUUID(),
+    const row = world.seedRawRow({
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
       wmkf_claimtoken: claimToken,
@@ -832,13 +876,13 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
     });
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
     expect(result.outcome).toBe('advanced');
-    const [row] = [...world.rows.values()];
-    expect(row.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
+    const [reclaimed] = [...world.rows.values()];
+    expect(reclaimed.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
     // Reclaimed with a FRESH claim token (claimExisting always mints a new
     // one on reclaim), never left carrying the stale, crashed attempt's token.
-    expect(row.wmkf_claimtoken).not.toBe(claimToken);
+    expect(reclaimed.wmkf_claimtoken).not.toBe(claimToken);
     // No prior upload existed (world.uploaded starts unset), so this path
     // reclaims and re-renders/re-uploads -- recoverUploadedFile runs but
     // returns null at its own first guard (no persisted contentHash yet).
@@ -846,6 +890,7 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
   });
 
   test('P2a: a seeded row GENERATING under an EXPIRED lease WITH a prior completed upload (crash between upload and commit) recovers it -- recoverUploadedFile actually recovers, no second upload', async () => {
+    const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
     const claimToken = crypto.randomUUID();
@@ -859,7 +904,7 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
     });
     const contentHash = await world.dependencies.hashDocx(docx);
     const row = world.seedRawRow({
-      _wmkf_airun_value: crypto.randomUUID(),
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
       wmkf_claimtoken: claimToken,
@@ -869,11 +914,11 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
       wmkf_presiteinputsnapshotjson: JSON.stringify(snapshot),
     });
     world.seedUploaded({
-      siteId: 'site-1', driveId: 'drive-1', id: 'item-1', webUrl: 'https://sp.test/x',
+      siteId: 'SITE-1', driveId: 'DRIVE-1', id: 'item-1', webUrl: 'https://sp.test/x',
       versionId: '1.0', eTag: '"file-1"', size: docx.length, lastModified: new Date().toISOString(),
       name: row.wmkf_filename,
     }, docx);
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
     expect(result.outcome).toBe('advanced');
     expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
     const [recovered] = [...world.rows.values()];
@@ -881,29 +926,31 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
   });
 
   test('both core and snapshot fields absent -> the throwing runProposalCore sentinel fires; needs_attention; no second row', async () => {
-    world.seedRawRow({
+    const { runId, resource } = seedAiRunResource();
+    const row = world.seedRawRow({
       wmkf_claimtoken: null,
-      _wmkf_airun_value: crypto.randomUUID(),
+      _wmkf_airun_value: runId,
       wmkf_presiteproposalcorejson: null,
       wmkf_presiteinputsnapshotjson: null,
     });
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
     expect(result.outcome).toBe('needs_attention');
     expect(world.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
     expect(world.rows.size).toBe(1);
   });
 
   test('a drifted section field (core no longer matches the audited envelope) -> pre_site_visit_core_reconciliation_required; runProposalCore is never reached', async () => {
+    const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
-    world.seedRawRow({
-      _wmkf_airun_value: crypto.randomUUID(),
+    const row = world.seedRawRow({
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_presiteexecutivesummary: 'a drifted value that does not match the envelope',
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
     });
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
     expect(result.outcome).toBe('needs_attention');
     expect(world.dependencies.runProposalCore).not.toHaveBeenCalled();
     // The fence fires BEFORE the row is ever claimed to GENERATING, so
@@ -938,35 +985,38 @@ describe('item 3: runProposalCore never reached (three distinct fences)', () => 
   });
 
   test('happy path (matching draft): reaches render/upload/commit without ever calling runProposalCore', async () => {
+    const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
-    world.seedRawRow({
-      _wmkf_airun_value: crypto.randomUUID(),
+    const row = world.seedRawRow({
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
     });
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
     expect(result.outcome).toBe('advanced');
     expect(world.dependencies.runProposalCore).not.toHaveBeenCalled();
-    const [row] = [...world.rows.values()];
-    expect(row.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
-    expect(row.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT);
-    expect(world.request._wmkf_currentpresitevisit_value).toBe(row.wmkf_requestdocumentid);
+    const [rendered] = [...world.rows.values()];
+    expect(rendered.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
+    expect(rendered.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT);
+    expect(world.request._wmkf_currentpresitevisit_value).toBe(rendered.wmkf_requestdocumentid);
     expect(world.rows.size).toBe(1);
   });
 });
 
 describe('item 5: upload create-only', () => {
   function seedMatchingRow() {
+    const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
-    return world.seedRawRow({
-      _wmkf_airun_value: crypto.randomUUID(),
+    const row = world.seedRawRow({
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
     });
+    return { row, resources: [resource, seedDraftResourceFor(row)] };
   }
 
   // Not tautological: this swaps in the REAL (unmocked) createPresiteSandboxDeps's
@@ -977,7 +1027,7 @@ describe('item 5: upload create-only', () => {
   // in this file; see presite-sandbox-deps.test.js for the isolated unit
   // proof of this same wrapper).
   test('every upload call carries conflictBehavior: fail, proven through the REAL sandbox uploadFile wrapper (not the mock)', async () => {
-    seedMatchingRow();
+    const { resources } = seedMatchingRow();
     const { createPresiteSandboxDeps: realCreatePresiteSandboxDeps } = jest.requireActual(
       '../../lib/services/test-requests/presite-sandbox-deps.js',
     );
@@ -990,18 +1040,22 @@ describe('item 5: upload create-only', () => {
     createPresiteSandboxDeps.mockImplementationOnce(({ loadInputs }) => ({
       ...world.dependencies, loadInputs, uploadFile: realDeps.uploadFile,
     }));
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources });
     expect(result.outcome).toBe('advanced');
     expect(fakeGraph.uploadFile).toHaveBeenCalledTimes(1);
     expect(fakeGraph.uploadFile.mock.calls[0][5]).toEqual({ conflictBehavior: 'fail' });
   });
 
   test('a conflict (409) refuses and never replaces: needs_attention, no updateDocument call after the throw', async () => {
-    seedMatchingRow();
+    const { resources } = seedMatchingRow();
     world.flags.forceUploadConflict = true;
     world.dependencies.updateDocument.mockClear();
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
+    // The new ownership pre-check (Codex round 2) passes cleanly here, so
+    // this proves the 409 is actually reached, not masked by an earlier
+    // refusal that would produce the same needs_attention outcome.
+    expect(world.dependencies.uploadFile).toHaveBeenCalled();
     // artifact-service.js's own catch writes the FAILED patch through
     // updateDocument (markFailedIfOwned) -- that write is expected. What
     // must never happen is a SECOND successful upload/commit: the row stays
@@ -1039,20 +1093,24 @@ describe('item 6: verify_presite attestation fail-closed', () => {
     const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
-    world.seedRawRow({
+    const row = world.seedRawRow({
       _wmkf_airun_value: runId,
       ...fields,
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
     });
-    return { runId, resource };
+    // Codex adversarial round 2 (findings 1/2): render_presite/verify_presite
+    // both now require a confirmed seed_presite_draft resource cross-checked
+    // against the row's own id -- thread it alongside the ai-run resource at
+    // every call site below.
+    return { runId, resources: [resource, seedDraftResourceFor(row)] };
   }
 
   test('identical promoted bytes: verify_presite reaches markReady', async () => {
-    const { resource } = seedReadyRowAndRender();
-    const rendered = await runStep('render_presite', { resources: [resource] });
+    const { resources } = seedReadyRowAndRender();
+    const rendered = await runStep('render_presite', { resources });
     expect(rendered.result.outcome).toBe('advanced');
-    const { result, calls } = await runStep('verify_presite', { resources: [resource] });
+    const { result, calls } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('ready');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
   });
@@ -1063,12 +1121,12 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // uncharacterized PART delta" -- the two valid-package tests below cover
   // that distinct claim with a package JSZip can actually open.
   test('a corrupted (unparseable) promoted package -> presite_promotion_uncharacterized', async () => {
-    const { resource } = seedReadyRowAndRender();
-    await runStep('render_presite', { resources: [resource] });
+    const { resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
     const corrupted = Buffer.from(world.uploadedBytes);
     corrupted[corrupted.length - 10] ^= 0xff;
     world.flags.downloadOverrideBuffer = corrupted;
-    const { result } = await runStep('verify_presite', { resources: [resource] });
+    const { result } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
   });
@@ -1078,12 +1136,12 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // with a foreign root (mirrors docx-package-attestation.test.js's own
   // "rejects a foreign customXml item that is not a SharePoint root").
   test('a valid promoted package differing from the render in one customXml part -> presite_promotion_uncharacterized', async () => {
-    const { resource } = seedReadyRowAndRender();
-    await runStep('render_presite', { resources: [resource] });
+    const { resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
     const zip = await JSZip.loadAsync(world.uploadedBytes);
     zip.file('customXml/item9.xml', '<payload xmlns="urn:foreign"/>');
     world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-    const { result } = await runStep('verify_presite', { resources: [resource] });
+    const { result } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
   });
@@ -1091,12 +1149,12 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // A VALID, JSZip-openable promoted package carrying one extra part that
   // is not any characterized SharePoint addition at all.
   test('a valid promoted package carrying an extra unknown part -> presite_promotion_uncharacterized', async () => {
-    const { resource } = seedReadyRowAndRender();
-    await runStep('render_presite', { resources: [resource] });
+    const { resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
     const zip = await JSZip.loadAsync(world.uploadedBytes);
     zip.file('word/media/hidden.bin', Buffer.alloc(4));
     world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-    const { result } = await runStep('verify_presite', { resources: [resource] });
+    const { result } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
   });
@@ -1107,10 +1165,10 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // verify_presite now rereads and reverifies full ownership too, not only
   // a shape check.
   test('I4: the journaled AI-run\'s request binding no longer matches -> verify_presite refuses (presite_verification_failed)', async () => {
-    const { runId, resource } = seedReadyRowAndRender();
-    await runStep('render_presite', { resources: [resource] });
+    const { runId, resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
     world.aiRuns.get(runId)._wmkf_ai_request_value = crypto.randomUUID();
-    const { result } = await runStep('verify_presite', { resources: [resource] });
+    const { result } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
   });
@@ -1120,19 +1178,19 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // isOwnedStubAiRun now compares id/version against THIS run's own
   // validated promptIdentity.
   test('I4: the journaled AI-run is bound to a different, validly-shaped prompt guid -> verify_presite refuses (presite_verification_failed)', async () => {
-    const { runId, resource } = seedReadyRowAndRender();
-    await runStep('render_presite', { resources: [resource] });
+    const { runId, resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
     world.aiRuns.get(runId)._wmkf_ai_prompt_value = crypto.randomUUID();
-    const { result } = await runStep('verify_presite', { resources: [resource] });
+    const { result } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
   });
 
   test('I4: the journaled AI-run\'s prompt version no longer matches -> verify_presite refuses (presite_verification_failed)', async () => {
-    const { runId, resource } = seedReadyRowAndRender();
-    await runStep('render_presite', { resources: [resource] });
+    const { runId, resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
     world.aiRuns.get(runId).wmkf_ai_promptversion = 999;
-    const { result } = await runStep('verify_presite', { resources: [resource] });
+    const { result } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
   });
@@ -1144,8 +1202,8 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // check (row._wmkf_airun_value === aiRunResource.readback.confirmedRunId)
   // must refuse it before ownership is even reread.
   test('I4: the document is bound to a different, independently-valid run GUID than the journaled one -> verify_presite refuses (presite_verification_failed)', async () => {
-    const { resource } = seedReadyRowAndRender();
-    await runStep('render_presite', { resources: [resource] });
+    const { resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
     const otherRunId = crypto.randomUUID();
     world.aiRuns.set(otherRunId, {
       wmkf_ai_runid: otherRunId, _wmkf_ai_request_value: REQUEST_ID, _wmkf_ai_prompt_value: PROMPT_ID, wmkf_ai_promptversion: 4,
@@ -1153,7 +1211,7 @@ describe('item 6: verify_presite attestation fail-closed', () => {
     });
     const [row] = [...world.rows.values()];
     row._wmkf_airun_value = otherRunId;
-    const { result } = await runStep('verify_presite', { resources: [resource] });
+    const { result } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
   });
@@ -1170,11 +1228,15 @@ describe('item 7: only verify_presite marks ready (behavioral)', () => {
     expect(seed2.result.outcome).toBe('advanced');
     expect(seed2.calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
 
-    const render = await runStep('render_presite');
+    // Codex adversarial round 2 (findings 1/2): render_presite/verify_presite
+    // both now require the confirmed seed_presite_draft resource too -- reuse
+    // seed2's own full, live resource list (ai-run + draft) rather than
+    // hand-rebuilding it.
+    const render = await runStep('render_presite', { resources: seed2.resources });
     expect(render.result.outcome).toBe('advanced');
     expect(render.calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
 
-    const verify = await runStep('verify_presite', { resources: [aiRunResource] });
+    const verify = await runStep('verify_presite', { resources: seed2.resources });
     expect(verify.result.outcome).toBe('ready');
     expect(verify.calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
   });
@@ -1200,16 +1262,227 @@ describe('item 8: seed/render share the same loadInputs seam (snapshot determini
   });
 });
 
-describe('P3 (Opus round 1): render_presite maps specific producer codes to their OWN ledger reason instead of collapsing everything to presite_verification_failed', () => {
-  function seedMatchingRowP3() {
+// Codex adversarial round 2: round 1 fixed seed_presite_draft/verify_presite,
+// but left the SAME class of gap (I4) at three more boundaries --
+// render_presite never reasserted ownership of the row OR its bound stub
+// AI-run before calling the producer (findings 1/2); seed_presite_draft's
+// own RESUME branches (both P2c-adopt and requestDocumentId-recovery) only
+// checked a claim-token digest, never the row's other bound fields (finding
+// 2); nothing ever rereads the uploaded FILE's identity before trusting it
+// (finding 3). Three shared validators (isOwnedStubAiRun/
+// assertOwnedPresiteDraft/assertOwnedPresiteFile, run-runner.js) now close
+// all three, applied at every boundary that relies on a previously-seeded
+// resource. This block proves each field independently at each boundary.
+describe('item 9: draft/file ownership re-asserted at every boundary (Codex adversarial round 2)', () => {
+  // assertOwnedPresiteDraft's own field list (the row's OWN bound fields,
+  // never the ai-run's -- item 6's own I4 tests already cover the ai-run's
+  // fields at render/verify; these are additionally exercised at every
+  // boundary via assertOwnedStubAiRun, which assertOwnedPresiteDraft calls
+  // last). One mutation per field, each asserted against the SPECIFIC
+  // substring the failing check's own message carries, proving which check
+  // fired -- not merely that something refused.
+  const DRAFT_FIELD_MUTATIONS = [
+    ['request bind', (row) => { row._wmkf_request_value = crypto.randomUUID(); }, 'not bound to the destination request'],
+    ['artifact type', (row) => { row.wmkf_artifacttype = 999999999; }, 'artifact type or content type'],
+    ['content type', (row) => { row.wmkf_contenttype = 'text/plain'; }, 'artifact type or content type'],
+    ['prompt bind', (row) => { row._wmkf_aiprompt_value = crypto.randomUUID(); }, 'bound prompt does not equal'],
+    ['prompt name', (row) => { row.wmkf_promptname = 'a different prompt name'; }, 'bound prompt does not equal'],
+    ['prompt version', (row) => { row.wmkf_promptversion = 999; }, 'bound prompt does not equal'],
+    ['template id', (row) => { row.wmkf_templateid = 'a-different-template'; }, 'template id/version'],
+    ['template version', (row) => { row.wmkf_templateversion = '999'; }, 'template id/version'],
+    ['run link', (row) => { row._wmkf_airun_value = crypto.randomUUID(); }, 'bound AI run does not equal the run journaled'],
+  ];
+
+  function seedFullyOwnedRow(overrides = {}) {
+    const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
-    return world.seedRawRow({
-      _wmkf_airun_value: crypto.randomUUID(),
+    const row = world.seedRawRow({
+      _wmkf_airun_value: runId,
+      ...fields,
+      wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+      wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+      ...overrides,
+    });
+    return { runId, resource, row };
+  }
+
+  describe('at render_presite (pre-call, before generatePreSiteVisitArtifact)', () => {
+    test.each(DRAFT_FIELD_MUTATIONS)('%s -> refuses (presite_pointer_mismatch), never uploads or commits', async (_label, mutate, messageContains) => {
+      const { resource, row } = seedFullyOwnedRow();
+      mutate(row);
+      const { result } = await runStep('render_presite', { resources: [resource, seedDraftResourceFor(row)] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain(messageContains);
+      expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+      expect(world.dependencies.commitChangeset).not.toHaveBeenCalled();
+      expect(world.dependencies.updateDocument).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('at verify_presite', () => {
+    test.each(DRAFT_FIELD_MUTATIONS)('%s -> refuses (presite_verification_failed)', async (_label, mutate, messageContains) => {
+      const { resource, row } = seedFullyOwnedRow();
+      const resources = [resource, seedDraftResourceFor(row)];
+      await runStep('render_presite', { resources });
+      mutate(row);
+      const { result } = await runStep('verify_presite', { resources });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+      expect(result.errorMessage).toContain(messageContains);
+      expect(world.dependencies.downloadFile).not.toHaveBeenCalled();
+    });
+
+    // assertOwnedPresiteFile's own field list -- checked only once B has
+    // already passed, immediately before downloadFile/attestation.
+    const FILE_FIELD_MUTATIONS = [
+      ['site id', (row) => { row.wmkf_sharepointsiteid = 'A-DIFFERENT-SITE'; }, 'SharePoint site/drive'],
+      ['drive id', (row) => { row.wmkf_sharepointdriveid = 'A-DIFFERENT-DRIVE'; }, 'SharePoint site/drive'],
+      ['folder path', (row) => { row.wmkf_sharepointfolderpath = 'a/different/folder'; }, 'folder path'],
+      // The test fake's getFileMetadataByPath ignores its query args and
+      // always returns the last real upload's metadata (it does not model a
+      // genuine path-keyed lookup) -- a mutated filename is therefore caught
+      // by the found.name !== row.wmkf_filename equality check, not a
+      // not-found result; a real Graph read would 404 on the wrong path.
+      ['filename', (row) => { row.wmkf_filename = 'a-different-filename.docx'; }, 'file name at the registered path does not equal'],
+      ['item id', (row) => { row.wmkf_sharepointitemid = 'a-different-item-id'; }, 'not the item id registered'],
+      ['version id', (row) => { row.wmkf_sharepointversionid = 'a-different-version'; }, 'version/eTag'],
+    ];
+    test.each(FILE_FIELD_MUTATIONS)('file %s -> refuses (presite_verification_failed)', async (_label, mutate, messageContains) => {
+      const { resource, row } = seedFullyOwnedRow();
+      const resources = [resource, seedDraftResourceFor(row)];
+      await runStep('render_presite', { resources });
+      mutate(row);
+      const { result } = await runStep('verify_presite', { resources });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+      expect(result.errorMessage).toContain(messageContains);
+      expect(world.dependencies.downloadFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('at seed_presite_draft resume branches', () => {
+    test.each(DRAFT_FIELD_MUTATIONS)('P2c ambiguous-create adopt: %s -> refuses (presite_pointer_mismatch), never re-POSTs', async (_label, mutate, messageContains) => {
+      const { runId, resource } = seedAiRunResource();
+      const claimToken = crypto.randomUUID();
+      const core = proposalCoreFixture();
+      const fields = sectionFieldsFor(core);
+      const row = world.seedRawRow({
+        wmkf_generationkey: BASE_IDENTITY.generationKey,
+        wmkf_claimtoken: claimToken,
+        _wmkf_airun_value: runId,
+        ...fields,
+        wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
+        wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
+      });
+      mutate(row);
+      const draftResource = {
+        resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+        plannedIdentity: { generationKey: BASE_IDENTITY.generationKey },
+        readback: {
+          generationKey: BASE_IDENTITY.generationKey,
+          claimTokenSha256: crypto.createHash('sha256').update(claimToken).digest('hex'),
+          createAttemptedAt: new Date().toISOString(),
+        },
+        outcome: 'dispatched',
+      };
+      const { result } = await runStep('seed_presite_draft', { resources: [resource, draftResource] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain(messageContains);
+      expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    });
+
+    test.each(DRAFT_FIELD_MUTATIONS)('requestDocumentId resume: %s -> refuses (presite_pointer_mismatch), never re-POSTs', async (_label, mutate, messageContains) => {
+      const { resource } = seedAiRunResource();
+      await runStep('seed_presite_draft', { resources: [resource] });
+      const [row] = [...world.rows.values()];
+      const draftResource = {
+        resourceId: 2, sequence: 2, step: 'seed_presite_draft', resourceKind: 'dataverse_request_document', system: 'dataverse',
+        plannedIdentity: { generationKey: row.wmkf_generationkey },
+        readback: { requestDocumentId: row.wmkf_requestdocumentid, claimTokenSha256: crypto.createHash('sha256').update(row.wmkf_claimtoken).digest('hex') },
+        outcome: 'verified',
+      };
+      mutate(row);
+      world.dependencies.createDocument.mockClear();
+      const { result } = await runStep('seed_presite_draft', { resources: [resource, draftResource] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain(messageContains);
+      expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    });
+  });
+
+  // Two checks are "by construction" at every current call site (the row is
+  // always FOUND by generationKey, or matched by an exact-id .find()), so a
+  // direct row mutation can never reach them there -- proven instead via a
+  // one-off stale/misbehaving read, modeling the actual risk (a read that
+  // returns a row whose OWN key doesn't match what was asked for).
+  describe('generationKey/requestDocumentId cross-checks (not reachable by direct row mutation at existing call sites)', () => {
+    test('render_presite: a findByGenerationKey read that returns a row with a DIFFERENT generation key -> refuses (presite_pointer_mismatch)', async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      const resources = [resource, seedDraftResourceFor(row)];
+      row.wmkf_generationkey = crypto.randomUUID();
+      world.dependencies.findByGenerationKey.mockImplementationOnce(async () => ({ records: [{ ...row }] }));
+      const { result } = await runStep('render_presite', { resources });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain('generation key does not equal');
+      expect(world.dependencies.uploadFile).not.toHaveBeenCalled();
+    });
+
+    test('verify_presite: a findByGenerationKey read that returns a row with a DIFFERENT generation key -> refuses (presite_verification_failed)', async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      const resources = [resource, seedDraftResourceFor(row)];
+      await runStep('render_presite', { resources });
+      const staleRow = { ...row, wmkf_generationkey: crypto.randomUUID() };
+      world.dependencies.findByGenerationKey.mockImplementationOnce(async () => ({ records: [staleRow] }));
+      const { result } = await runStep('verify_presite', { resources });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+      expect(result.errorMessage).toContain('generation key does not equal');
+    });
+
+    // render_presite/verify_presite both cross-check the row's own id
+    // against seed_presite_draft's INDEPENDENTLY journaled requestDocumentId
+    // (the row is found by generation key/request pointer, NOT by that
+    // marker) -- mutate the journaled marker itself, not the row.
+    test('render_presite: the journaled seed_presite_draft requestDocumentId no longer matches the row found by generation key -> refuses (presite_pointer_mismatch)', async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      const draftResource = seedDraftResourceFor(row);
+      draftResource.readback.requestDocumentId = crypto.randomUUID();
+      const { result } = await runStep('render_presite', { resources: [resource, draftResource] });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
+      expect(result.errorMessage).toContain('id does not equal the journaled seed_presite_draft requestDocumentId');
+    });
+
+    test('verify_presite: the journaled seed_presite_draft requestDocumentId no longer matches the row found by request pointer -> refuses (presite_verification_failed)', async () => {
+      const { resource, row } = seedFullyOwnedRow();
+      const resources = [resource, seedDraftResourceFor(row)];
+      await runStep('render_presite', { resources });
+      resources[1].readback.requestDocumentId = crypto.randomUUID();
+      const { result } = await runStep('verify_presite', { resources });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+      expect(result.errorMessage).toContain('id does not equal the journaled seed_presite_draft requestDocumentId');
+    });
+  });
+});
+
+describe('P3 (Opus round 1): render_presite maps specific producer codes to their OWN ledger reason instead of collapsing everything to presite_verification_failed', () => {
+  function seedMatchingRowP3() {
+    const { runId, resource } = seedAiRunResource();
+    const core = proposalCoreFixture();
+    const fields = sectionFieldsFor(core);
+    const row = world.seedRawRow({
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
     });
+    return [resource, seedDraftResourceFor(row)];
   }
 
   const MAPPINGS = [
@@ -1220,26 +1493,26 @@ describe('P3 (Opus round 1): render_presite maps specific producer codes to thei
 
   for (const [producerCode, ledgerReason] of MAPPINGS) {
     test(`producer code "${producerCode}" -> ledger reason "${ledgerReason}"`, async () => {
-      seedMatchingRowP3();
+      const resources = seedMatchingRowP3();
       generatePreSiteVisitArtifact.mockImplementationOnce(async () => {
         const error = new Error(`synthetic ${producerCode}`);
         error.code = producerCode;
         throw error;
       });
-      const { result } = await runStep('render_presite');
+      const { result } = await runStep('render_presite', { resources });
       expect(result.outcome).toBe('needs_attention');
       expect(result.run.needsAttentionReason).toBe(ledgerReason);
     });
   }
 
   test('an unrecognized producer code still falls back to presite_verification_failed', async () => {
-    seedMatchingRowP3();
+    const resources = seedMatchingRowP3();
     generatePreSiteVisitArtifact.mockImplementationOnce(async () => {
       const error = new Error('synthetic unmapped');
       error.code = 'some_other_producer_code';
       throw error;
     });
-    const { result } = await runStep('render_presite');
+    const { result } = await runStep('render_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
   });
