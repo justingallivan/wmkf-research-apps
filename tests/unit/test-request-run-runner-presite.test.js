@@ -1149,6 +1149,35 @@ describe('item 6: verify_presite attestation fail-closed', () => {
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
   });
 
+  // Live 2026-09-27 (sandbox Request 1000348): SharePoint re-promotes the v6
+  // template's own customXml in place (item1 schema, item3 properties,
+  // itemProps1), which the render-baseline attestation now accepts.
+  test('SharePoint re-promotion of the template\'s own customXml in place -> ready', async () => {
+    const { resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
+    const zip = await JSZip.loadAsync(world.uploadedBytes);
+    for (const name of ['customXml/item1.xml', 'customXml/item3.xml', 'customXml/itemProps1.xml']) {
+      expect(zip.file(name)).not.toBeNull();
+    }
+    zip.file('customXml/item1.xml', '<?xml version="1.0" encoding="utf-8"?><ct:contentTypeSchema ct:_="" ma:_="" ma:contentTypeName="Document" xmlns:ct="http://schemas.microsoft.com/office/2006/metadata/contentType" xmlns:ma="http://schemas.microsoft.com/office/2006/metadata/properties/metaAttributes"></ct:contentTypeSchema>');
+    zip.file('customXml/item3.xml', '<?xml version="1.0" encoding="utf-8"?><p:properties xmlns:p="http://schemas.microsoft.com/office/2006/metadata/properties"><documentManagement/></p:properties>');
+    zip.file('customXml/itemProps1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="no"?><ds:datastoreItem ds:itemID="{D1C8FE5D-9651-4E40-959E-1FD4F370C70B}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"/>');
+    world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const { result } = await runStep('verify_presite', { resources });
+    expect(result.outcome).toBe('ready');
+  });
+
+  test('a foreign rewrite of the template\'s own customXml item -> presite_promotion_uncharacterized, naming the part', async () => {
+    const { resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
+    const zip = await JSZip.loadAsync(world.uploadedBytes);
+    zip.file('customXml/item1.xml', '<payload xmlns="urn:foreign"/>');
+    world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const { result } = await runStep('verify_presite', { resources });
+    expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
+    expect(result.errorMessage).toContain('customXml/item1.xml differs from the render and is not a SharePoint re-promotion of the same root');
+  });
+
   // A VALID, JSZip-openable promoted package carrying one extra part that
   // is not any characterized SharePoint addition at all.
   test('a valid promoted package carrying an extra unknown part -> presite_promotion_uncharacterized', async () => {
@@ -1160,6 +1189,8 @@ describe('item 6: verify_presite attestation fail-closed', () => {
     const { result } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
+    // The CLI-facing message names the offending part (structure only).
+    expect(result.errorMessage).toContain('Failures: unexpected part word/media/hidden.bin');
   });
 
   // Codex adversarial round 1 (I4 gap): verify_presite used to accept any
