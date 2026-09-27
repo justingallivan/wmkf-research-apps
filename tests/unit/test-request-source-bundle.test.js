@@ -448,27 +448,56 @@ describe('bundle v4: preSiteVisit section + abstract', () => {
     expect(bundle.preSiteVisit.proposalCoreJson.schemaVersion).toBe(schemaVersion);
   });
 
+  // Opus round-1: preserve the source envelope's own keys rather than
+  // fabricating `diagnostics: []` for an envelope that never had the key.
+  test('proposalCoreJson omits diagnostics when the source envelope never had it (does not fabricate [])', () => {
+    const { diagnostics, ...envelopeWithoutDiagnostics } = proposalCoreJson();
+    const bundle = build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: envelopeWithoutDiagnostics },
+    });
+    expect(Object.prototype.hasOwnProperty.call(bundle.preSiteVisit.proposalCoreJson, 'diagnostics')).toBe(false);
+  });
+
+  test('proposalCoreJson preserves an explicit diagnostics value (including an empty array) unchanged', () => {
+    const bundle = build({
+      reviewers: [reviewerFixture()],
+      preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), diagnostics: [] } },
+    });
+    expect(bundle.preSiteVisit.proposalCoreJson.diagnostics).toEqual([]);
+  });
+
   test('an abstract over the cap is rejected', () => {
     expect(() => build({
       reviewers: [reviewerFixture()], preSiteVisit: preSiteVisitFixture(), abstract: 'x'.repeat(30001),
     })).toThrow(/abstract is invalid/);
   });
 
-  test('never carries the source input snapshot, fingerprint, generation key, lifecycle, claim token or AI-run link', () => {
-    // The bundle schema's `preSiteVisit` section is a fixed shape (exactly
-    // requestDocumentId/sectionFields/proposalCoreJson); this proves the
-    // SCHEMA itself has no room for those fields even if a caller tried to
-    // smuggle them in via sectionFields or the envelope (both are allowlists
-    // above), independent of source-bundle-presite.js's own reader-side
-    // allowlist test.
-    const bundle = build({ reviewers: [reviewerFixture()], preSiteVisit: preSiteVisitFixture(), abstract: 'abs' });
-    const json = JSON.stringify(bundle);
-    for (const forbidden of [
-      'wmkf_presiteinputsnapshotjson', 'wmkf_inputfingerprint', 'wmkf_generationkey',
-      'wmkf_lifecyclestate', 'wmkf_claimtoken', '_wmkf_airun_value', 'wmkf_airun',
-    ]) {
-      expect(json).not.toContain(forbidden);
-    }
+  // Opus round-1 P3-2: the previous version of this test built its bundle
+  // from a fixture that never contained the forbidden fields in the first
+  // place, so it passed vacuously regardless of whether the schema actually
+  // excludes them. This version puts each forbidden field INTO the fixture
+  // (as a caller would if it tried to smuggle a raw row's field through, at
+  // the level where each one would actually land: top-level preSiteVisit for
+  // the request-document-scoped fields, sectionFields for a field name
+  // collision there) and asserts `build` REFUSES it (unknown key) rather
+  // than merely checking the successful output's JSON for absence.
+  test.each([
+    ['wmkf_presiteinputsnapshotjson', 'preSiteVisit'],
+    ['wmkf_inputfingerprint', 'preSiteVisit'],
+    ['wmkf_generationkey', 'preSiteVisit'],
+    ['wmkf_lifecyclestate', 'preSiteVisit'],
+    ['wmkf_claimtoken', 'preSiteVisit'],
+    ['_wmkf_airun_value', 'preSiteVisit'],
+    ['wmkf_presiteinputsnapshotjson', 'sectionFields'],
+    ['wmkf_lifecyclestate', 'sectionFields'],
+    ['wmkf_claimtoken', 'sectionFields'],
+  ])('the bundle validator refuses the forbidden field %s if smuggled into %s', (field, location) => {
+    const preSiteVisit = location === 'preSiteVisit'
+      ? { ...preSiteVisitFixture(), [field]: 'smuggled-value' }
+      : { ...preSiteVisitFixture(), sectionFields: { ...preSiteSectionFields(), [field]: 'smuggled-value' } };
+    expect(() => build({ reviewers: [reviewerFixture()], preSiteVisit, abstract: 'abs' }))
+      .toThrow(/unknown key/);
   });
 
   test.each([2, 3])('version %d bundle must not carry a preSiteVisit section or abstract', (version) => {
