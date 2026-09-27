@@ -8,6 +8,7 @@ import {
   readSourceBundle,
   summarizeSourceBundle,
 } from '../../lib/services/test-requests/source-bundle.js';
+import { PROPOSAL_CORE_KEYS, PRE_SITE_VISIT_CONTENT_POLICY } from '../../shared/config/prompts/pre-site-visit-proposal-core.js';
 
 const REQUEST_ID = 'E43AE6EA-698F-F111-8076-6045BD018A07';
 const PURPOSE = 'Confidential source purpose text';
@@ -362,9 +363,23 @@ const preSiteSectionFields = (over = {}) => ({
   wmkf_presitepersonneldetails: 'Personnel details text.',
   ...over,
 });
+// Codex adversarial round-1 finding 2: a canonical, REAL-shaped proposalCore
+// (exactly PROPOSAL_CORE_KEYS, the app's own key set) -- {a: 1}/{someField}
+// no longer round-trips, by design.
+const realProposalCore = (over = {}) => ({
+  executiveSummary: 'A concise executive summary paragraph.',
+  impactOverview: 'A concise impact overview paragraph.',
+  methodologyOverview: 'A concise methodology overview paragraph.',
+  personnelOverview: 'A concise personnel overview paragraph.',
+  keckFundingRationale: 'A concise Keck funding rationale paragraph.',
+  backgroundAndImpact: 'A concise background and impact paragraph.',
+  detailedMethodology: 'A concise detailed methodology paragraph.',
+  personnelDetails: 'A concise personnel details paragraph.',
+  ...over,
+});
 const proposalCoreJson = (over = {}) => ({
   schemaVersion: 4,
-  proposalCore: { someField: 'value' },
+  proposalCore: realProposalCore(),
   diagnostics: [{ code: 'referee_section_manual' }],
   ...over,
 });
@@ -446,6 +461,113 @@ describe('bundle v4: preSiteVisit section + abstract', () => {
       preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), schemaVersion } },
     });
     expect(bundle.preSiteVisit.proposalCoreJson.schemaVersion).toBe(schemaVersion);
+  });
+
+  // Codex adversarial round-1 finding 2: proposalCore is canonicalized
+  // through the app's OWN key set/validator, never passed through unchanged.
+  describe('proposalCore canonicalization (Codex adversarial round-1 finding 2)', () => {
+    test('refuses an unknown key inside proposalCore', () => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: { ...proposalCoreJson(), proposalCore: realProposalCore({ forbiddenExtra: 'smuggled' }) },
+        },
+      })).toThrow(/proposal core is invalid/);
+    });
+
+    test.each(PROPOSAL_CORE_KEYS)('refuses a missing %s key', (missingKey) => {
+      const { [missingKey]: _omit, ...incomplete } = realProposalCore();
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), proposalCore: incomplete } },
+      })).toThrow(/proposal core is invalid/);
+    });
+
+    test.each(PROPOSAL_CORE_KEYS)('refuses a wrong-type (non-string) %s value', (key) => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: { ...proposalCoreJson(), proposalCore: realProposalCore({ [key]: 12345 }) },
+        },
+      })).toThrow(/proposal core is invalid/);
+    });
+
+    // The Dataverse-column-size ceiling: PRE_SITE_VISIT_CONTENT_POLICY.
+    // sinkMaxChars (30000), the SAME cap the app enforces on generated
+    // section content and on each Pre-Site section field in this bundle.
+    test.each(PROPOSAL_CORE_KEYS)('refuses an oversize %s value (over the sinkMaxChars ceiling)', (key) => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: {
+            ...proposalCoreJson(),
+            proposalCore: realProposalCore({ [key]: 'x'.repeat(PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars + 1) }),
+          },
+        },
+      })).toThrow(/proposal core is invalid/);
+    });
+
+    test('a value exactly at the sinkMaxChars ceiling is accepted', () => {
+      const bundle = build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: {
+            ...proposalCoreJson(),
+            proposalCore: realProposalCore({ executiveSummary: 'x'.repeat(PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars) }),
+          },
+        },
+      });
+      expect(bundle.preSiteVisit.proposalCoreJson.proposalCore.executiveSummary).toHaveLength(
+        PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars,
+      );
+    });
+
+    test('a canonical real-shaped proposalCore round-trips byte-identical (never re-normalized)', () => {
+      const core = realProposalCore();
+      const bundle = build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), proposalCore: core } },
+      });
+      expect(bundle.preSiteVisit.proposalCoreJson.proposalCore).toEqual(core);
+      // And the whole bundle round-trips through JSON + readSourceBundle too.
+      expect(readSourceBundle(JSON.parse(JSON.stringify(bundle))).preSiteVisit.proposalCoreJson.proposalCore)
+        .toEqual(core);
+    });
+  });
+
+  // Codex adversarial round-1 finding 2: diagnostics is canonicalized through
+  // artifact-model.js's own `validateDiagnostics` (unknown per-entry keys are
+  // dropped by that function's own established allowlist behavior; malformed
+  // entries and a non-array/over-length array are refused).
+  describe('diagnostics canonicalization (Codex adversarial round-1 finding 2)', () => {
+    test('refuses a malformed diagnostic entry (missing code)', () => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), diagnostics: [{ section: 'x' }] } },
+      })).toThrow(/diagnostics require reconciliation/);
+    });
+
+    test('refuses a diagnostics value that is not an array', () => {
+      expect(() => build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: { ...preSiteVisitFixture(), proposalCoreJson: { ...proposalCoreJson(), diagnostics: { code: 'x' } } },
+      })).toThrow(/diagnostics must be an array/);
+    });
+
+    test('drops an unknown key inside a diagnostic entry (artifact-model.js\'s own established allowlist behavior)', () => {
+      const bundle = build({
+        reviewers: [reviewerFixture()],
+        preSiteVisit: {
+          ...preSiteVisitFixture(),
+          proposalCoreJson: { ...proposalCoreJson(), diagnostics: [{ code: 'personnel_name_not_matched', smuggled: 'nope' }] },
+        },
+      });
+      expect(bundle.preSiteVisit.proposalCoreJson.diagnostics).toEqual([{ code: 'personnel_name_not_matched' }]);
+    });
   });
 
   // Opus round-1: preserve the source envelope's own keys rather than
