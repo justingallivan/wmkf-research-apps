@@ -21,6 +21,14 @@
    Process for the slices: the S543 process (invariant table + mutations checked by the orchestrator before any Opus round; Codex capped at three rounds per slice). Weigh review findings as safety versus fidelity (memory `feedback-factory-safe-not-full-fidelity`).
 2. **Item 7** (admin form, resume/retire, first shared apply of migration 054 and of wave30 to production, production release). Requirement carried: deterministic reservation identity per actor + idempotency key so retries reach the ledger's assignment comparison.
    Evidence: design doc slice 6c-i record (Codex round 1 declined finding 1).
+3. **Integrity Screener Workbench tab + PD approval — Codex branch, awaiting review and release (handed over 2026-09-27).**
+   `codex/integrity-workbench-tab` at `b1086302b`: built, not merged or deployed. Migrations 056–057 are unapplied; recheck numbering against `codex/feature-request`'s 055 before release.
+   - **Next, in order:**
+     1. Claude's read-only review of the branch.
+     2. The owner's merge and release decision.
+     3. The open Dataverse flag design: **Integrity review complete** means a complete screen plus PD approval for the current roster. The design needs invalidation for replacement screens, holds and roster changes (including edits outside our apps), plus durable sync retries. Sandbox metadata is still unchecked.
+   - **Deferred:** the board-readiness gate, until the staff recommendation/readiness workflow exists.
+   Evidence: the branch's `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` and `docs/plans/INTEGRITY_DATAVERSE_FLAG_INVESTIGATION_2026-09-26.md` (read with `git show origin/codex/integrity-workbench-tab:<path>`); queue entry in `docs/CURRENT_WORK_QUEUE.md` (Owner-requested product follow-ups).
 
 ### Owner Decision Needed
 
