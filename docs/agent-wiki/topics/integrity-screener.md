@@ -1,21 +1,29 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-26
+last_verified: 2026-09-26
 stale_after_days: 90
 owner: integrity-screener
 source_files:
   - lib/services/integrity-service.js
+  - lib/services/workbench/integrity-service.js
   - pages/integrity-screener.js
+  - pages/workbench/[requestId].js
+  - shared/components/workbench/IntegrityTab.js
   - pages/api/integrity-screener/screen.js
   - pages/api/integrity-screener/history.js
   - pages/api/integrity-screener/dismiss.js
+  - pages/api/workbench/integrity/[requestId].js
+  - pages/api/workbench/integrity/[requestId]/run.js
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md
 watch_paths:
   - lib/services/integrity-service.js
+  - lib/services/workbench/integrity-service.js
   - pages/api/integrity-screener/**
+  - pages/api/workbench/integrity/**
+  - shared/components/workbench/IntegrityTab.js
 update_triggers:
   - integrity screening source/provider changes
   - PubPeer API access status changes (the parked future item below)
@@ -43,6 +51,10 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 
 ## Current UI boundaries
 
+- The standalone `/integrity-screener` remains the manual-name screening page. The Workbench request page has a separate Integrity tab gated by the `integrity-screener` app grant.
+- In the Workbench flow, the server loads the request's Project Leader and PI/Co-PI junction contacts from Dataverse, deduplicates by contact, and supplies names and institutions to the existing screening engine. The route accepts the request GUID and does not use browser-supplied people or identities.
+- The tab shows the server-resolved people before a confirmation that screening uses Claude and SerpAPI credits per person. The request-scoped service refuses an empty list, missing names, or more than 10 people; the cap is a defensive spend bound.
+- Completed Workbench runs are saved with a nullable `integrity_screenings.request_id`; the tab loads the latest linked run on reload. Migration 056 supplies that column and its latest-by-request index. This feature is **source-built on `codex/integrity-workbench-tab`; migration 056 is not applied, and the branch is not merged or deployed**.
 - The screen service saves completed runs when it receives a user profile ID, and
   authenticated history and dismissal API primitives exist.
 - The current page has no History tab and does not call the history API.

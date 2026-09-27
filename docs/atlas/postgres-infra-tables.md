@@ -118,6 +118,14 @@ future-cycle reconciliation; see the roster Contact-link plan F5.
 ### `integrity_screenings` (41 rows), `screening_dismissals` (0 rows)
 **Source of truth:** Postgres.
 Per-applicant screening history. `retractions` (68,248 rows) is the Retraction Watch dataset (org-wide).
+**Request linkage:** Migration 056 adds nullable `request_id UUID` plus the
+`idx_integrity_screenings_request_latest` partial index for newest-first lookup.
+The Workbench integrity service reads the request's PI/Co-PI identities from
+Dataverse and saves completed runs with this request ID; the GET route returns
+those people and the latest linked run. **[SOURCE-BUILT on
+`codex/integrity-workbench-tab`; migration 056 is not applied, and the branch
+is not merged or deployed.]** Existing standalone/manual runs remain
+request-unlinked. The fresh-install schema includes the column and index.
 
 ### `retractions` (68,248 rows)
 **Source of truth:** Postgres (manually refreshed via script — no live cron).
