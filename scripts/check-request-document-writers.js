@@ -32,6 +32,11 @@ const WRITERS = Object.freeze([
   ['lib/services/consultant-feedback-attachment-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/pre-rp-brief/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/test-requests/run-runner.js', 'dependencies.createDocument(', 'SANDBOX_REHEARSAL'],
+  // seed_presite_draft (slice 4b): a second, distinct call site in the same
+  // file -- named `presiteDeps` (not `dependencies`) so this row's needle
+  // does not double-count the IA row above. Same sandbox-only, SANDBOX_REHEARSAL
+  // rationale (presite-sandbox-deps.js `sandboxCreateDocument`).
+  ['lib/services/test-requests/run-runner.js', 'presiteDeps.createDocument(', 'SANDBOX_REHEARSAL'],
 ]);
 
 const ALLOWED_ORIGIN_FIELD_FILES = new Set([
@@ -123,11 +128,16 @@ function liveSources() {
 
 function runSelfTest() {
   const goodCall = (needle, policy) => `${needle}{}, { actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.${policy}, actorContext: {} });`;
-  const base = new Map(WRITERS.map(([relative, needle, policy]) => [
-    relative,
-    `${needle === 'dependencies.createDocument(' ? 'createDocument: requestDocumentAdapter.create; ' : ''}`
-      + goodCall(needle, policy),
-  ]));
+  // Two WRITERS rows can share one file (run-runner.js has the IA and the
+  // Pre-Site seed writers), so fixture sources are concatenated per path, and
+  // every writer that reaches the adapter through a dependency contributes
+  // one create-seam binding, as the real files do.
+  const base = new Map();
+  for (const [relative, needle, policy] of WRITERS) {
+    const fragment = `${needle === 'requestDocumentAdapter.create(' ? '' : 'createDocument: requestDocumentAdapter.create; '}`
+      + goodCall(needle, policy);
+    base.set(relative, base.has(relative) ? `${base.get(relative)}\n${fragment}` : fragment);
+  }
   base.set('lib/dataverse/adapters/request-document.js', 'export async function create() {}');
   base.set('lib/services/request-document-actor-service.js', "const f = 'wmkf_initiatedat';");
   let errors = validateSources(base);

@@ -43,7 +43,7 @@
  * only formatting signal.
  */
 
-import { labelForReviewRating } from '../../lib/external/review-form-schema';
+import { labelForReviewRating } from '../../lib/external/review-form-schema.js';
 
 const NUMBER_WORDS = [
   null, 'one', 'two', 'three', 'four', 'five', 'six',

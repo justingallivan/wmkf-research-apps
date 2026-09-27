@@ -15,6 +15,7 @@ import {
   exportTestRequestSourceBundle,
   assertReviewerSourceUnchanged,
   assertBundleHasReviewerSectionForRecipe,
+  assertBundleHasPreSiteSectionForRecipe,
   classifyReviewerForm,
 } from '../../lib/services/test-requests/source-bundle.js';
 
@@ -433,6 +434,21 @@ describe('assertBundleHasReviewerSectionForRecipe', () => {
 
   test.each(['basic', 'initial_assessment'])('%s recipe accepts a bundle with no reviewers section', (recipe) => {
     expect(() => assertBundleHasReviewerSectionForRecipe(recipe, { reviewers: undefined })).not.toThrow();
+  });
+});
+
+describe('assertBundleHasPreSiteSectionForRecipe (slice 4b)', () => {
+  test('pre_site_visit recipe refuses a bundle with no preSiteVisit section', () => {
+    expect(() => assertBundleHasPreSiteSectionForRecipe('pre_site_visit', { preSiteVisit: undefined }))
+      .toThrow(/requires a source bundle with a preSiteVisit section/);
+  });
+
+  test('pre_site_visit recipe accepts a bundle carrying a preSiteVisit section', () => {
+    expect(() => assertBundleHasPreSiteSectionForRecipe('pre_site_visit', { preSiteVisit: {} })).not.toThrow();
+  });
+
+  test.each(['basic', 'initial_assessment', 'reviews'])('%s recipe accepts a bundle with no preSiteVisit section', (recipe) => {
+    expect(() => assertBundleHasPreSiteSectionForRecipe(recipe, { preSiteVisit: undefined })).not.toThrow();
   });
 });
 
