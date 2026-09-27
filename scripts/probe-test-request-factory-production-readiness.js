@@ -11,8 +11,11 @@
  *   3. Whether the given staff sign-in name is an enabled systemuser (the
  *      source Request's program director).
  *   4. Everything registered to run on akoya_request create or update:
- *      activated classic workflows and business rules, plug-in steps, and
- *      activated cloud flows whose definition mentions akoya_request.
+ *      activated classic workflows and business rules, plug-in steps (with
+ *      each update step's filtering columns), and activated cloud flows whose
+ *      definition mentions akoya_request.
+ *   9. Rollup columns on account and contact whose definition aggregates
+ *      akoya_request (a Request create or update can recalculate them).
  *
  * SAFETY: GET requests only, through the interlocked raw client. Production
  * reads are owner-run behind the interlock override; nothing is written.
@@ -96,6 +99,7 @@ function summarizeFlow(clientdata) {
 const FOUNDATION_NAME = 'W. M. Keck Foundation';
 const HISTORY_WINDOW_MS = 2 * 60 * 60 * 1000;
 const MEETING_DATE = 'wmkf_meetingdate';
+const ROLLUP_ATTRIBUTE_TYPES = ['IntegerAttributeMetadata', 'DecimalAttributeMetadata', 'MoneyAttributeMetadata', 'DateTimeAttributeMetadata'];
 
 /** Changed attribute names from an audit row's `changedata` (values are never printed). */
 function changedAttributeNames(changedata) {
@@ -358,6 +362,19 @@ async function getAll(client, path) {
   const matching = flows.filter((f) => String(f.clientdata || '').includes('akoya_request'));
   console.log(`   cloud flows (activated) mentioning akoya_request: ${matching.length} of ${flows.length}`);
   for (const f of matching) console.log(`   - ${f.name}`);
+
+  console.log('\n9. Rollup columns on account and contact (a Request create/update can trigger their recalculation)');
+  for (const entityName of ['account', 'contact']) {
+    const rollups = [];
+    for (const type of ROLLUP_ATTRIBUTE_TYPES) {
+      const attrs = await getAll(client,
+        `/EntityDefinitions(LogicalName='${entityName}')/Attributes/Microsoft.Dynamics.CRM.${type}?$select=LogicalName,SourceType,FormulaDefinition`);
+      rollups.push(...attrs.filter((a) => a.SourceType === 2));
+    }
+    const fromRequests = rollups.filter((a) => String(a.FormulaDefinition || '').includes('akoya_request'));
+    console.log(`   ${entityName}: ${rollups.length} rollup column(s); ${fromRequests.length} aggregate akoya_request`);
+    for (const a of fromRequests) console.log(`   - ${entityName}.${a.LogicalName} (with ${a.LogicalName}_state and ${a.LogicalName}_date)`);
+  }
 
   if (historyLimit) await printCreationHistory(client, historyLimit);
   if (meetingLimit) await printMeetingDateWrites(client, meetingLimit, appUsers.length === 1 ? appUsers[0].systemuserid : null);
