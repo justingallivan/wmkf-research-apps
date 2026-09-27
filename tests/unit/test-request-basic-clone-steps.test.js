@@ -240,7 +240,7 @@ describe('createRequestWithGoverifyBypass', () => {
         }
         return ok(sourceRow());
       }),
-      patch: jest.fn(async () => {
+      patchWithOptions: jest.fn(async () => {
         // The deactivation PATCH itself throws (simulating a network drop
         // AFTER the patch attempt was journaled but before any confirmation).
         throw new Error('socket hang up');
@@ -251,13 +251,50 @@ describe('createRequestWithGoverifyBypass', () => {
     const journal = jest.fn(async (patch) => { journalPatches.push(patch); });
     await expect(createRequestWithGoverifyBypass({
       client, manifest, preflightBefore: preflightBefore(), bypassGoverify: true, journal,
-    })).rejects.toThrow('Manually recheck the workflow before resuming');
+    })).rejects.toThrow('Manually recheck the workflow before resuming. Deactivation error: socket hang up');
+    expect(client.patchWithOptions).toHaveBeenCalledTimes(1);
     // The create POST must never have been attempted once deactivation is uncertain.
     expect(client.postWithOptions).not.toHaveBeenCalled();
     const manualRecheck = journalPatches.find((patch) => patch.goverifyBypass?.restoreManualRecheckRequired === true);
     expect(manualRecheck).toBeDefined();
     // createAttempted never happened, so postCreateStepsSkipped must not be set.
     expect(manualRecheck.postCreateStepsSkipped).toBeUndefined();
+    expect(manualRecheck.goverifyBypass.restoreManualRecheckReason).toContain('Deactivation error: socket hang up');
+  });
+
+  test('a rejected deactivation PATCH keeps its status and body in the manual-recheck reason', async () => {
+    const workflowRow = {
+      workflowid: 'a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb',
+      name: 'GOverify- check Publication 78 on create of a request record',
+      category: 0, type: 1, mode: 1, primaryentity: 'akoya_request',
+      componentstate: 0, triggeroncreate: true, statecode: 1, statuscode: 2,
+      versionnumber: 100,
+      '@odata.etag': 'W/"100"',
+    };
+    const client = {
+      get: jest.fn(async (requestPath) => {
+        if (requestPath.startsWith('/workflows(')) return ok(workflowRow);
+        if (requestPath.startsWith('/workflows?')) {
+          return ok({ value: [{
+            workflowid: 'activation-1', name: workflowRow.name, type: 2, primaryentity: 'akoya_request',
+            statecode: 1, statuscode: 2, _parentworkflowid_value: workflowRow.workflowid,
+          }] });
+        }
+        return ok(sourceRow());
+      }),
+      patchWithOptions: jest.fn(async () => ({
+        ok: false, status: 412, text: '{"error":{"message":"precondition failed"}}', body: null,
+      })),
+      postWithOptions: jest.fn(),
+    };
+    const journalPatches = [];
+    await expect(createRequestWithGoverifyBypass({
+      client, manifest: baseManifest(), preflightBefore: preflightBefore(), bypassGoverify: true,
+      journal: async (patch) => { journalPatches.push(patch); },
+    })).rejects.toThrow('Deactivation error: GoVerify workflow state change failed (412)');
+    expect(client.postWithOptions).not.toHaveBeenCalled();
+    const manualRecheck = journalPatches.find((patch) => patch.goverifyBypass?.restoreManualRecheckRequired === true);
+    expect(manualRecheck.goverifyBypass.deactivationError).toContain('precondition failed');
   });
 });
 
