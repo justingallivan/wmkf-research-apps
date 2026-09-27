@@ -194,7 +194,12 @@ New ledger dimension additions (migration 054, edited in place, and its
 - `LEDGER_STEPS`: the four steps above.
 - `LEDGER_RESOURCE_KINDS`: `dataverse_ai_run` (the stub `wmkf_ai_run` bound at
   `seed_presite_ai_run`; `seed_presite_draft`'s registry row reuses the
-  existing `dataverse_request_document` kind).
+  existing `dataverse_request_document` kind). `render_presite` (Opus round
+  1 P2a fix) also journals its own `dataverse_request_document`-kind
+  resource marking the step's own start (journal-before-write), keyed by
+  `step: 'render_presite'` so it never collides with `seed_presite_draft`'s
+  same-kind resource in `summarizePresiteResources` (CLI), which filters by
+  `step` in addition to `resourceKind`.
 - `LEDGER_REASON_CODES`: `presite_claim_lost`, `presite_pointer_mismatch`,
   `presite_upload_ambiguous`, `presite_snapshot_stale`,
   `presite_verification_failed`, `presite_promotion_uncharacterized`,
