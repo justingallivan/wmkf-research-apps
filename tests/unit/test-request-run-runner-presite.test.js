@@ -367,7 +367,21 @@ function createWorld() {
     isGuardedReopenSchemaReady: jest.fn(() => false),
     createAiRun: jest.fn(async (payload) => {
       if (flags.forceAiRunConflict) throw Object.assign(new Error('duplicate primary key'), { status: 409 });
+      // Codex adversarial round 1: isOwnedStubAiRun rereads by
+      // _wmkf_ai_request_value/_wmkf_ai_prompt_value (the readback field
+      // names), never the create payload's own bind keys -- translate here
+      // exactly like applyDocumentPatch does for the request-document rows,
+      // so a REAL seed_presite_ai_run flow produces a row later steps can
+      // actually re-verify ownership against.
       const row = { ...payload, _etag: 'ai-run-1' };
+      if (row['wmkf_ai_Request@odata.bind']) {
+        row._wmkf_ai_request_value = row['wmkf_ai_Request@odata.bind'].match(/\(([^)]+)\)/)?.[1] || null;
+        delete row['wmkf_ai_Request@odata.bind'];
+      }
+      if (row['wmkf_ai_Prompt@odata.bind']) {
+        row._wmkf_ai_prompt_value = row['wmkf_ai_Prompt@odata.bind'].match(/\(([^)]+)\)/)?.[1] || null;
+        delete row['wmkf_ai_Prompt@odata.bind'];
+      }
       aiRuns.set(payload.wmkf_ai_runid, row);
       return { ...row };
     }),
@@ -598,8 +612,17 @@ describe('item 1: seed_presite_ai_run -- stub run via the sandbox only', () => {
   });
 });
 
+// Codex adversarial round 1: seed_presite_draft/verify_presite now REREAD
+// and re-verify full stub-AI-run ownership (isOwnedStubAiRun) against the
+// journaled confirmedRunId, not merely trust the marker -- so this fixture
+// must also seed a matching, genuinely owned world.aiRuns row, exactly what
+// seed_presite_ai_run's own create would have produced.
 function seedAiRunResource(resourceId = 1) {
   const runId = crypto.randomUUID();
+  world.aiRuns.set(runId, {
+    wmkf_ai_runid: runId, _wmkf_ai_request_value: REQUEST_ID, _wmkf_ai_prompt_value: PROMPT_ID,
+    wmkf_ai_runsource: 682090002, wmkf_ai_status: 682090000, wmkf_ai_notes: `Test Request Factory run ${RUN_ID}`,
+  });
   return {
     runId,
     resource: {
@@ -732,6 +755,33 @@ describe('item 2: seed_presite_draft -- seeded row shape', () => {
     expect(result.run.needsAttentionReason).toBe('presite_pointer_mismatch');
     expect(world.dependencies.createDocument).not.toHaveBeenCalled();
     expect(world.rows.size).toBe(1);
+  });
+
+  // Codex adversarial round 1 (I4 gap): seed_presite_draft used to trust the
+  // journaled confirmedRunId marker at face value, never rereading the
+  // actual wmkf_ai_run row -- these two tests mutate the world's copy of
+  // that row (exactly what a since-reassigned or corrupted stub AI-run
+  // would look like) and prove the NEW reread-and-reverify guard
+  // (isOwnedStubAiRun, called before all three seed_presite_draft branches)
+  // refuses rather than proceeding on stale trust.
+  test('I4: the journaled AI-run\'s request binding no longer matches the destination request -> seed_presite_draft refuses (presite_ai_run_ambiguous)', async () => {
+    const { runId, resource } = seedAiRunResource();
+    world.aiRuns.get(runId)._wmkf_ai_request_value = crypto.randomUUID();
+    const { result } = await runStep('seed_presite_draft', { resources: [resource] });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
+    expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(world.rows.size).toBe(0);
+  });
+
+  test('I4: the journaled AI-run\'s prompt binding is no longer a guid -> seed_presite_draft refuses (presite_ai_run_ambiguous)', async () => {
+    const { runId, resource } = seedAiRunResource();
+    world.aiRuns.get(runId)._wmkf_ai_prompt_value = 'not-a-guid';
+    const { result } = await runStep('seed_presite_draft', { resources: [resource] });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_ai_run_ambiguous');
+    expect(world.dependencies.createDocument).not.toHaveBeenCalled();
+    expect(world.rows.size).toBe(0);
   });
 });
 
@@ -967,21 +1017,28 @@ describe('item 5: upload create-only', () => {
 
 describe('item 6: verify_presite attestation fail-closed', () => {
   function seedReadyRowAndRender() {
+    // The row's own _wmkf_airun_value must equal a REAL, owned stub AI-run
+    // journaled as a seed_presite_ai_run resource, now that verify_presite
+    // re-asserts ownership (Codex adversarial round 1, I4) instead of only
+    // checking the bind field is A guid -- seed a matching world.aiRuns
+    // entry and return the resource so callers can thread it through.
+    const { runId, resource } = seedAiRunResource();
     const core = proposalCoreFixture();
     const fields = sectionFieldsFor(core);
     world.seedRawRow({
-      _wmkf_airun_value: crypto.randomUUID(),
+      _wmkf_airun_value: runId,
       ...fields,
       wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore: core, diagnostics: [] }),
       wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(BASE_INPUTS)),
     });
+    return { runId, resource };
   }
 
   test('identical promoted bytes: verify_presite reaches markReady', async () => {
-    seedReadyRowAndRender();
-    const rendered = await runStep('render_presite');
+    const { resource } = seedReadyRowAndRender();
+    const rendered = await runStep('render_presite', { resources: [resource] });
     expect(rendered.result.outcome).toBe('advanced');
-    const { result, calls } = await runStep('verify_presite');
+    const { result, calls } = await runStep('verify_presite', { resources: [resource] });
     expect(result.outcome).toBe('ready');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
   });
@@ -992,12 +1049,12 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // uncharacterized PART delta" -- the two valid-package tests below cover
   // that distinct claim with a package JSZip can actually open.
   test('a corrupted (unparseable) promoted package -> presite_promotion_uncharacterized', async () => {
-    seedReadyRowAndRender();
-    await runStep('render_presite');
+    const { resource } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources: [resource] });
     const corrupted = Buffer.from(world.uploadedBytes);
     corrupted[corrupted.length - 10] ^= 0xff;
     world.flags.downloadOverrideBuffer = corrupted;
-    const { result } = await runStep('verify_presite');
+    const { result } = await runStep('verify_presite', { resources: [resource] });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
   });
@@ -1007,12 +1064,12 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // with a foreign root (mirrors docx-package-attestation.test.js's own
   // "rejects a foreign customXml item that is not a SharePoint root").
   test('a valid promoted package differing from the render in one customXml part -> presite_promotion_uncharacterized', async () => {
-    seedReadyRowAndRender();
-    await runStep('render_presite');
+    const { resource } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources: [resource] });
     const zip = await JSZip.loadAsync(world.uploadedBytes);
     zip.file('customXml/item9.xml', '<payload xmlns="urn:foreign"/>');
     world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-    const { result } = await runStep('verify_presite');
+    const { result } = await runStep('verify_presite', { resources: [resource] });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
   });
@@ -1020,14 +1077,58 @@ describe('item 6: verify_presite attestation fail-closed', () => {
   // A VALID, JSZip-openable promoted package carrying one extra part that
   // is not any characterized SharePoint addition at all.
   test('a valid promoted package carrying an extra unknown part -> presite_promotion_uncharacterized', async () => {
-    seedReadyRowAndRender();
-    await runStep('render_presite');
+    const { resource } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources: [resource] });
     const zip = await JSZip.loadAsync(world.uploadedBytes);
     zip.file('word/media/hidden.bin', Buffer.alloc(4));
     world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-    const { result } = await runStep('verify_presite');
+    const { result } = await runStep('verify_presite', { resources: [resource] });
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
+  });
+
+  // Codex adversarial round 1 (I4 gap): verify_presite used to accept any
+  // bound run whose bind field was merely a GUID -- these mutate the same
+  // fake AI-run row seed_presite_ai_run would have produced, proving
+  // verify_presite now rereads and reverifies full ownership too, not only
+  // a shape check.
+  test('I4: the journaled AI-run\'s request binding no longer matches -> verify_presite refuses (presite_verification_failed)', async () => {
+    const { runId, resource } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources: [resource] });
+    world.aiRuns.get(runId)._wmkf_ai_request_value = crypto.randomUUID();
+    const { result } = await runStep('verify_presite', { resources: [resource] });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+  });
+
+  test('I4: the journaled AI-run\'s prompt binding is no longer a guid -> verify_presite refuses (presite_verification_failed)', async () => {
+    const { runId, resource } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources: [resource] });
+    world.aiRuns.get(runId)._wmkf_ai_prompt_value = 'not-a-guid';
+    const { result } = await runStep('verify_presite', { resources: [resource] });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
+  });
+
+  // Distinct from the two above: this document row is bound to a run GUID
+  // that is itself a perfectly valid, fully-owned stub AI-run -- just not
+  // the ONE journaled as this run's own seed_presite_ai_run resource. A
+  // bare isGuid check would have waved this through; the new equality
+  // check (row._wmkf_airun_value === aiRunResource.readback.confirmedRunId)
+  // must refuse it before ownership is even reread.
+  test('I4: the document is bound to a different, independently-valid run GUID than the journaled one -> verify_presite refuses (presite_verification_failed)', async () => {
+    const { resource } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources: [resource] });
+    const otherRunId = crypto.randomUUID();
+    world.aiRuns.set(otherRunId, {
+      wmkf_ai_runid: otherRunId, _wmkf_ai_request_value: REQUEST_ID, _wmkf_ai_prompt_value: PROMPT_ID,
+      wmkf_ai_runsource: 682090002, wmkf_ai_status: 682090000, wmkf_ai_notes: `Test Request Factory run ${RUN_ID}`,
+    });
+    const [row] = [...world.rows.values()];
+    row._wmkf_airun_value = otherRunId;
+    const { result } = await runStep('verify_presite', { resources: [resource] });
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_verification_failed');
   });
 });
 
@@ -1046,7 +1147,7 @@ describe('item 7: only verify_presite marks ready (behavioral)', () => {
     expect(render.result.outcome).toBe('advanced');
     expect(render.calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
 
-    const verify = await runStep('verify_presite');
+    const verify = await runStep('verify_presite', { resources: [aiRunResource] });
     expect(verify.result.outcome).toBe('ready');
     expect(verify.calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
   });
