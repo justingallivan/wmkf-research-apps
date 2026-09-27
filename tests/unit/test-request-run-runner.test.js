@@ -10,7 +10,8 @@ import { jest } from '@jest/globals';
 import {
   advanceRun, nextStepFor, recipeIncludesStep, recipeLeaseSeconds, RECIPE_STEP_ORDER,
 } from '../../lib/services/test-requests/run-runner.js';
-import { sha256, MANIFEST_V4 } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { sha256, MANIFEST_V4, computeRunPlanDigest } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -197,6 +198,47 @@ describe('advanceRun: caller-error digest refusal', () => {
     })).rejects.toThrow('createBodySha256');
     expect(calls.filter((call) => call.op === 'claimLease')).toHaveLength(0);
     expect(calls.filter((call) => call.op === 'markNeedsAttention')).toHaveLength(0);
+  });
+
+  // Opus round-1 P3-1: a run reserved under a LEDGER_RECIPES token with no
+  // built RECIPE_STEP_ORDER entry (pre_site_visit, slice 4a) must fail
+  // BEFORE any lease claim or client call, not merely later inside a step
+  // handler's own nextStepFor call (which would already have run
+  // create_request -- a real Dataverse write -- by then).
+  test('refuses before claiming any lease or touching the client when the run\'s recipe has no built step order', async () => {
+    // pre_site_visit's recipeSeedsReviewers is true (rank >= 'reviews'), so
+    // assertRunMatchesManifestAndBundle's reviewer-plan-digest recheck runs
+    // first (as it does for a real `reviews` run); the manifest/run pair
+    // below is built to pass that recheck cleanly so the NEW
+    // stepOrderForRecipe fail-closed check (not a digest mismatch) is what
+    // actually fires.
+    const bundle = { reviewers: [] };
+    const bundleSha256 = sha256(bundle);
+    const manifest = baseManifest({
+      recipe: 'pre_site_visit',
+      reviewFilePolicy: { digest: reviewFileCopyPolicyDigest() },
+      source: {
+        requestId: SOURCE_ID, revision: 'rev-1', requestType: 100000000, bundleSha256,
+      },
+    });
+    const planDigest = computeRunPlanDigest({ manifest, reviewerAddressDigests: [] });
+    const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'pre_site_visit', planDigest, bundleSha256 }));
+    const client = { get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn() };
+    const graph = fakeGraph({
+      getSiteId: jest.fn(async () => 'site-1'), getDriveId: jest.fn(async () => 'drive-1'),
+    });
+    await expect(advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph, sharePointTarget: () => ({}) },
+    })).rejects.toThrow('Unknown Test Request Factory recipe: pre_site_visit.');
+    expect(calls.filter((call) => call.op === 'claimLease')).toHaveLength(0);
+    expect(calls.filter((call) => call.op === 'markNeedsAttention')).toHaveLength(0);
+    expect(client.get).not.toHaveBeenCalled();
+    expect(client.post).not.toHaveBeenCalled();
+    expect(client.patch).not.toHaveBeenCalled();
+    expect(client.delete).not.toHaveBeenCalled();
+    expect(graph.getSiteId).not.toHaveBeenCalled();
+    expect(graph.getDriveId).not.toHaveBeenCalled();
   });
 });
 
