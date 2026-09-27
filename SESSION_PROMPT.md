@@ -16,9 +16,9 @@
 
 ### Verified Open
 
-1. **Item 6, recipes 3–5 — PLANNED 2026-09-26 (S544); build next, in the order recipe 4 (Pre-Site) → 5 (Pre-RP brief, site-visit start, Final Writeup) → 3 (site-visit materials, files only in the sandbox).** Plan, owner decisions P1–P6, invariant classes I1–I10, contract-reconcile pass and the one Codex plan review (six findings; five folded in, one declined with reasons): design doc *Recipes 3–5 plan*. Start with its read-only Step 0 schema probe in the sandbox.
-   Evidence: `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` build order; nothing planned for these yet.
-   Recommendation carried from S543: one plan paragraph covering all three, ONE Codex plan review (the 6c plan took fifteen rounds because findings were closed one at a time; canonicalize each finding's class on the first hit), then slices with the S543 process (invariant table + mutations checked by the orchestrator before any Opus round; Codex capped at three rounds per slice).
+1. **Item 6, recipes 3–5 — PLANNED 2026-09-26 (S544); build next, in the order recipe 4 (Pre-Site) → 5 (Pre-RP brief, site-visit start, Final Writeup) → 3 (site-visit materials, files only in the sandbox).** Plan, owner decisions P1–P6, invariant classes I1–I10, contract-reconcile pass and two Codex plan reviews (the second at the owner's request; provenance kept by owner decision): design doc *Recipes 3–5 plan*. Start with its read-only Step 0 schema probe in the sandbox.
+   Evidence: design doc *Recipes 3–5 plan*.
+   Process for the slices: the S543 process (invariant table + mutations checked by the orchestrator before any Opus round; Codex capped at three rounds per slice). Weigh review findings as safety versus fidelity (memory `feedback-factory-safe-not-full-fidelity`).
 2. **Item 7** (admin form, resume/retire, first shared apply of migration 054 and of wave30 to production, production release). Requirement carried: deterministic reservation identity per actor + idempotency key so retries reach the ledger's assignment comparison.
    Evidence: design doc slice 6c-i record (Codex round 1 declined finding 1).
 
