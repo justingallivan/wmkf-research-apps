@@ -146,7 +146,7 @@ Each stage is a separate commit with a Codex adversarial review before acceptanc
 
 ### Recipes 3–5 plan (2026-09-26, Session 544)
 
-*Status: plan, awaiting one Codex plan review. Nothing below is built.*
+*Status (2026-09-27): planned and plan-reviewed 2026-09-26; recipe 4 built as slice 4a (merged, PR #344) and slice 4b (PR #345); its live proof, recipe 5 and recipe 3 are not built.*
 
 [RECHECKED after lib/services/pre-site-visit/artifact-model.js change: slice 4a moved `validateDiagnostics` to `lib/services/pre-site-visit/diagnostics.js` and re-exports it; the cited symbols are unchanged but their line numbers shifted: `UNCHANGED_RETRY_BLOCKED_CODES` :37, `SECTION_FIELDS` :50, `validateNarrativePrompt` :122, `buildPreSiteVisitIdentity` :239, `persistedDraft` :527 (2026-09-27)]
 
