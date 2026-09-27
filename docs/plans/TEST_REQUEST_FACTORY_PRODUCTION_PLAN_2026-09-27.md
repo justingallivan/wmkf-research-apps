@@ -26,6 +26,22 @@ Owner decision 2026-09-27: sandbox live proofs stop after recipe 4. Deeper recip
 - Every Factory document write uses the `SANDBOX_REHEARSAL` actor policy (`request-document-actor-service.js:97-116`; `run-runner.js:1245,3611`) [REPORTED S545]. The production default `REQUIRED` would refuse an unattributed write.
 - Neither `TEST_REQUEST_ISOLATION` nor `SYNTHETIC_REVIEWER_ISOLATION` is set in production (`vercel env ls production`). The wave29 marker columns and wave30 are absent in production (`TEST_REQUEST_FACTORY_SCHEMA_PROPOSAL_2026-09-19.md:49-52`) [REPORTED; re-check by the owner-run probe in P0].
 
+## Sandbox automation census (2026-09-27, S545)
+
+[VERIFIED S545 by read-only sandbox queries: the P0 probe's queries run against the sandbox, `asyncoperations` on clones 1000338–1000348, and the exported workflow XAML]
+
+- The sandbox has **62 activated classic workflows and business rules on `akoya_request`**, 12 of them triggered on create, plus 59 enabled Create/Update plug-in steps (including the vendor's `AkoyaGo.RequestUpdate`, sync). No activated cloud flows are visible to the app user (0 of 0 in category 5).
+- **The sandbox org is in "Disable Background Processing" mode.** Every background workflow queued by the clones ended Canceled with "The async operation was skipped because the org is in Disable Background Processing mode". So the sandbox proofs exercised only the real-time workflows and sync plug-ins. The six background create workflows have **never run on a Factory Request**. In production they will.
+- The six background create workflows:
+  - *WMKF_Research Application Received Email Flow* creates a **draft** acknowledgment email (never sends). It does so only when status is Pending, Phase I received has a value, the program is Research and it is not yet acknowledged. Otherwise it waits until the submit date has a value.
+  - *WMKF_Set Co-PI Field on Contact* updates **Contact** rows only when the Request's Co-PI fields have values. The clone sets none.
+  - *WMKF_Update CA FTB Status on Org* writes the **applicant account**: Yes when the Request's `wmkf_caftb` is Yes, otherwise No when it equals No. New Requests default `wmkf_caftb` to `false` (column default, and every sandbox clone), so this write fires on every production create.
+  - *wmkf_set Write Up Type on Create*, *WMKF_Set Request Status for Discretionary* and *WMKF_Set Concept Call to Yes* update only the Request.
+- The seven real-time create workflows ran on every clone. Six update only the Request. *GOverify- check Publication 78* updates the **applicant account**.
+- **The clone's applicant is always the W. M. Keck Foundation account** (`FOUNDATION_NAME`, `basic-clone-steps.js:49,245-253`). So in production two workflows write the Foundation's own account on every Factory create: GoVerify (accepted, Q3) and the CA FTB workflow.
+- The runner baselines that account (`foundationBaselineDigest`, `basic-clone-steps.js:270`), so a production run would stop `needs_attention` on those writes. That is safe, but no run could reach `ready`. P1 must decide this (open question 4).
+- The Q5 statement that nothing triggers is therefore contradicted for background workflows. This census is from the sandbox's parity copy of the definitions. P0 re-lists production's own registrations.
+
 ## New hazards in production
 
 1. **Source and destination are the same org.** In the sandbox, "never write to the source" (decision 10) held because there were two orgs. In production it holds only because of ID checks.
@@ -106,3 +122,5 @@ It needs the Q2 shared ledger, and it replaces P4's attestation with a server ch
 1. Q2, the ledger database for the form phase.
 2. Whether the 1000338 folder provisioner exists in production, and what it is (P0's workflow listing may answer it).
 3. Retire semantics for production residue: which rows can be deleted versus deactivated, given append-only tables such as `wmkf_ai_run`.
+4. **The Foundation-account writes on create** (census above): accept them and narrow the Foundation baseline check to exclude exactly the fields those two workflows write; or also create with `wmkf_caftb` explicitly null, if Dataverse keeps an explicit null over the column default, so the CA FTB workflow has nothing to act on. GoVerify's account write cannot be avoided without the bypass (Q3). Owner decision.
+5. Whether any other create workflow's condition can become true through a later recipe's writes (for example the email flow's wait on submit date, or Co-PI fields), which would re-trigger it mid-run.
