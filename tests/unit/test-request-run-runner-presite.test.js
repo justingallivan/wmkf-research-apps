@@ -27,6 +27,7 @@
 // (confirmed empirically; neither existing sandbox-deps test file in this
 // repo combines the two, which is why this had never been hit before).
 import crypto from 'node:crypto';
+import JSZip from 'jszip';
 
 jest.mock('../../lib/services/test-requests/presite-sandbox-deps.js', () => ({
   createPresiteAiRunDeps: jest.fn(),
@@ -696,11 +697,31 @@ describe('item 5: upload create-only', () => {
     });
   }
 
-  test('every upload call carries conflictBehavior: fail (asserted inside the fake itself; a mismatch throws)', async () => {
+  // Not tautological: this swaps in the REAL (unmocked) createPresiteSandboxDeps's
+  // own uploadFile wrapper for this one test, wired over a fake Graph object
+  // this test controls directly -- so the assertion is on what the REAL
+  // production wrapper forwards to Graph, not on the mock's own self-check
+  // (presite-sandbox-deps.js is otherwise module-mocked for every other test
+  // in this file; see presite-sandbox-deps.test.js for the isolated unit
+  // proof of this same wrapper).
+  test('every upload call carries conflictBehavior: fail, proven through the REAL sandbox uploadFile wrapper (not the mock)', async () => {
     seedMatchingRow();
+    const { createPresiteSandboxDeps: realCreatePresiteSandboxDeps } = jest.requireActual(
+      '../../lib/services/test-requests/presite-sandbox-deps.js',
+    );
+    const fakeGraph = { uploadFile: jest.fn((...args) => world.dependencies.uploadFile(...args)) };
+    const realDeps = realCreatePresiteSandboxDeps({
+      resourceUrl: 'https://orgd9e66399.crm.dynamics.com',
+      loadInputs: async () => BASE_INPUTS,
+      graph: fakeGraph,
+    });
+    createPresiteSandboxDeps.mockImplementationOnce(({ loadInputs }) => ({
+      ...world.dependencies, loadInputs, uploadFile: realDeps.uploadFile,
+    }));
     const { result } = await runStep('render_presite');
     expect(result.outcome).toBe('advanced');
-    expect(world.dependencies.uploadFile).toHaveBeenCalledTimes(1);
+    expect(fakeGraph.uploadFile).toHaveBeenCalledTimes(1);
+    expect(fakeGraph.uploadFile.mock.calls[0][5]).toEqual({ conflictBehavior: 'fail' });
   });
 
   test('a conflict (409) refuses and never replaces: needs_attention, no updateDocument call after the throw', async () => {
@@ -756,14 +777,45 @@ describe('item 6: verify_presite attestation fail-closed', () => {
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
   });
 
-  test('a promoted DOCX that differs from the render in an uncharacterized part -> presite_promotion_uncharacterized', async () => {
+  // Flipping a byte this close to the end of the file lands in the ZIP
+  // end-of-central-directory record, so this proves "refuses an unparseable
+  // package" (packagePartsBudgeted/JSZip itself throws), not "refuses an
+  // uncharacterized PART delta" -- the two valid-package tests below cover
+  // that distinct claim with a package JSZip can actually open.
+  test('a corrupted (unparseable) promoted package -> presite_promotion_uncharacterized', async () => {
     seedReadyRowAndRender();
     await runStep('render_presite');
-    // Corrupt the "downloaded" (promoted) bytes so they no longer match a
-    // fresh render byte-for-byte -- JSZip will see a differing/garbled part.
     const corrupted = Buffer.from(world.uploadedBytes);
     corrupted[corrupted.length - 10] ^= 0xff;
     world.flags.downloadOverrideBuffer = corrupted;
+    const { result } = await runStep('verify_presite');
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
+  });
+
+  // A VALID, JSZip-openable promoted package whose only difference from the
+  // fresh render is one customXml part shaped like a SharePoint item but
+  // with a foreign root (mirrors docx-package-attestation.test.js's own
+  // "rejects a foreign customXml item that is not a SharePoint root").
+  test('a valid promoted package differing from the render in one customXml part -> presite_promotion_uncharacterized', async () => {
+    seedReadyRowAndRender();
+    await runStep('render_presite');
+    const zip = await JSZip.loadAsync(world.uploadedBytes);
+    zip.file('customXml/item9.xml', '<payload xmlns="urn:foreign"/>');
+    world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const { result } = await runStep('verify_presite');
+    expect(result.outcome).toBe('needs_attention');
+    expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
+  });
+
+  // A VALID, JSZip-openable promoted package carrying one extra part that
+  // is not any characterized SharePoint addition at all.
+  test('a valid promoted package carrying an extra unknown part -> presite_promotion_uncharacterized', async () => {
+    seedReadyRowAndRender();
+    await runStep('render_presite');
+    const zip = await JSZip.loadAsync(world.uploadedBytes);
+    zip.file('word/media/hidden.bin', Buffer.alloc(4));
+    world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
     const { result } = await runStep('verify_presite');
     expect(result.outcome).toBe('needs_attention');
     expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
