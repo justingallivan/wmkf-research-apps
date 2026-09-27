@@ -1,4 +1,40 @@
-# Session 550 Prompt: Shared schema applied; bounded Preview Safari gate passed and closed (branch-local)
+# Session 551 Prompt: Replace expiry proof with user-controlled cancel/retry UX (branch-local)
+
+## Session 550 Summary
+
+The bounded Preview presentation-media acceptance work is closed. The remaining Graph expiry
+probe was not advanced: repeated status-only checks continued to report HTTP 200 with the exact
+20 MiB remaining range, and no Graph-confirmed terminal 410 was observed. The Chrome DevTools
+console later became unavailable, so no further probe should be claimed without a newly opened
+console. No runtime, database, deployment, alias, Production, SharePoint, or deletion changes
+were made in this handoff.
+
+### Next session direction — owner decision
+
+Replace the low-value passive expiry wait with a concrete user-recovery milestone: add a visible
+**Cancel** action and a bounded **Retry upload** action for unfinished presentation-media uploads.
+The intended contract is to stop retrying on terminal Graph/session failure, preserve the last
+Graph-confirmed range, mark the durable intent failed/expired, let Cancel abandon the unfinished
+intent without creating a candidate or Request Document, and let Retry create a fresh Graph
+session and resume from the last confirmed range when integrity checks permit. Use
+`/contract-reconcile` before implementation, and obtain iterative read-only Claude Opus reviews
+for the code changes as before. Add focused tests for state transitions, bounded retry, cancel,
+fresh-session creation, and the no-candidate/no-Request-Document invariant.
+
+The Chrome upload-session expiry row remains **PARTIAL**. Do not claim Graph-confirmed `410`
+evidence, and do not restore the retired Preview proof harness merely to obtain it. Do not run
+another live upload, deploy Production, change Production configuration, move the Preview alias,
+or delete any retained item without a new concrete approval list.
+
+### Graceful stop instructions
+
+Leave the current Chrome page and retained records untouched. To stop this task, let the current
+turn finish, then close or archive the Codex task from the sidebar; do not click Resume, upload,
+finalize, cancel an existing item, or delete anything. The next session should begin with
+`/start`, verify the branch and clean state, then read this note and the presentation-materials
+plan before making changes.
+
+## Session 550 Summary (prior)
 
 ## Authorized rollout progress — 2026-09-25/26 PT
 
