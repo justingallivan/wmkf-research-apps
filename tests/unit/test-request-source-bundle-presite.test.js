@@ -5,7 +5,9 @@
  *
  * @jest-environment node
  */
-import { readPreSiteVisitDraftForExport } from '../../lib/services/test-requests/source-bundle-presite.js';
+import {
+  readPreSiteVisitDraftForExport, preSiteVisitRowIdentity,
+} from '../../lib/services/test-requests/source-bundle-presite.js';
 import {
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
@@ -27,6 +29,7 @@ const WORD_ROW_ID = 'cccccccc-0000-0000-0000-000000000001';
 function fullRow(over = {}) {
   return {
     wmkf_requestdocumentid: WORD_ROW_ID,
+    '@odata.etag': 'W/"12345678"',
     _wmkf_request_value: REQUEST_ID,
     wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
     wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
@@ -64,7 +67,7 @@ describe('readPreSiteVisitDraftForExport', () => {
   test('uses the current-pointer row when set and it is a Pre-Site Word artifact', async () => {
     const row = fullRow();
     const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
-    const draft = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [row] }));
+    const { draft } = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [row] }));
     expect(draft.requestDocumentId).toBe(WORD_ROW_ID);
     expect(draft.sectionFields.wmkf_presiteexecutivesummary).toBe('Executive summary.');
     expect(draft.proposalCoreJson).toEqual({ schemaVersion: 4, proposalCore: { a: 1 }, diagnostics: [] });
@@ -73,7 +76,7 @@ describe('readPreSiteVisitDraftForExport', () => {
   test('falls back to the single candidate when the pointer is null (e.g. the Pre-Site has moved to Final Writeup)', async () => {
     const row = fullRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL });
     const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: null };
-    const draft = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [row] }));
+    const { draft } = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [row] }));
     expect(draft.requestDocumentId).toBe(WORD_ROW_ID);
   });
 
@@ -103,7 +106,7 @@ describe('readPreSiteVisitDraftForExport', () => {
     });
     const real = fullRow();
     const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: null };
-    const draft = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [snapshot, real] }));
+    const { draft } = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [snapshot, real] }));
     expect(draft.requestDocumentId).toBe(WORD_ROW_ID);
   });
 
@@ -114,7 +117,7 @@ describe('readPreSiteVisitDraftForExport', () => {
     });
     const real = fullRow();
     const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: null };
-    const draft = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [superseded, real] }));
+    const { draft } = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [superseded, real] }));
     expect(draft.requestDocumentId).toBe(WORD_ROW_ID);
   });
 
@@ -141,7 +144,7 @@ describe('readPreSiteVisitDraftForExport', () => {
   test('never carries the source input snapshot, fingerprint, generation key, claim token or AI-run link even when the row has them', async () => {
     const row = fullRow();
     const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
-    const draft = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [row] }));
+    const { draft } = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [row] }));
     const json = JSON.stringify(draft);
     expect(json).not.toContain('do-not-export');
     expect(json).not.toContain(row.wmkf_inputfingerprint);
@@ -204,7 +207,7 @@ describe('readPreSiteVisitDraftForExport', () => {
     test('a pointer to a Ready row is accepted', async () => {
       const ready = fullRow({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY });
       const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
-      const draft = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [ready] }));
+      const { draft } = await readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [ready] }));
       expect(draft.requestDocumentId).toBe(WORD_ROW_ID);
     });
   });
@@ -240,6 +243,32 @@ describe('readPreSiteVisitDraftForExport', () => {
       const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: null };
       await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [otherRequestRow] })))
         .rejects.toThrow(/no Pre-Site Word artifact to export/);
+    });
+  });
+
+  // Codex adversarial round-1 finding 1: an eTag-less row fails closed
+  // (mirrors the reviewer fence's assertNonEmptyEtag -- a comparison with no
+  // eTag on either side proves nothing about whether the row changed).
+  describe('preSiteVisitRowIdentity (Codex adversarial round-1 finding 1)', () => {
+    test('refuses a row with no @odata.etag', async () => {
+      const row = fullRow({ '@odata.etag': undefined });
+      const request = { akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: WORD_ROW_ID };
+      await expect(readPreSiteVisitDraftForExport({ requestId: REQUEST_ID }, deps({ request, rows: [row] })))
+        .rejects.toThrow(/no readable eTag/);
+    });
+
+    test('refuses a row with an empty-string @odata.etag', () => {
+      expect(() => preSiteVisitRowIdentity(fullRow({ '@odata.etag': '' }))).toThrow(/no readable eTag/);
+    });
+
+    test('returns requestDocumentId/eTag/operationstatus/lifecyclestate for a well-formed row', () => {
+      const row = fullRow();
+      expect(preSiteVisitRowIdentity(row)).toEqual({
+        requestDocumentId: WORD_ROW_ID,
+        eTag: row['@odata.etag'],
+        operationstatus: row.wmkf_operationstatus,
+        lifecyclestate: row.wmkf_lifecyclestate,
+      });
     });
   });
 });
