@@ -281,14 +281,16 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
   });
 });
 
-describe('migrations manifest lists 054 last and its setup-database.js mirror matches', () => {
+describe('migrations manifest includes 054 in order and its setup-database.js mirror matches', () => {
   const manifest = JSON.parse(fs.readFileSync(
     path.join(process.cwd(), 'lib/db/migrations-manifest.json'),
     'utf8',
   ));
 
-  it('has 054_test_request_runs.sql as the last entry', () => {
-    expect(manifest.files[manifest.files.length - 1]).toBe('054_test_request_runs.sql');
+  it('includes 054_test_request_runs.sql immediately after 053, allowing later migrations', () => {
+    const index = manifest.files.indexOf('054_test_request_runs.sql');
+    expect(index).toBeGreaterThan(0);
+    expect(manifest.files[index - 1]).toBe('053_pre_site_distribution_review_bundle.sql');
   });
 
   function normalize(sql) {

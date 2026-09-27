@@ -159,7 +159,8 @@ const v13Statements = [
     status VARCHAR(50) DEFAULT 'pending',
     reviewed_at TIMESTAMP,
     notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    request_id UUID
   )`,
 
   // Table: screening_dismissals (false positive tracking)
@@ -183,6 +184,7 @@ const v13Statements = [
   `CREATE INDEX IF NOT EXISTS idx_integrity_screenings_user ON integrity_screenings(user_profile_id)`,
   `CREATE INDEX IF NOT EXISTS idx_integrity_screenings_status ON integrity_screenings(status)`,
   `CREATE INDEX IF NOT EXISTS idx_integrity_screenings_created ON integrity_screenings(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_integrity_screenings_request_latest ON integrity_screenings(request_id, created_at DESC, id DESC) WHERE request_id IS NOT NULL`,
 
   // Indexes for screening_dismissals
   `CREATE INDEX IF NOT EXISTS idx_screening_dismissals_screening ON screening_dismissals(screening_id)`,
