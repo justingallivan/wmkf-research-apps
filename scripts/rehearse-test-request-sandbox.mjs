@@ -96,7 +96,8 @@ import {
   validateCloneManifest,
   verifyClone,
 } from '../lib/services/test-requests/basic-clone-steps.js';
-import { advanceRun, recipeLeaseSeconds } from '../lib/services/test-requests/run-runner.js';
+import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
+import { recipeSeedsReviewers } from '../lib/services/test-requests/recipe-capabilities.js';
 import {
   LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
 } from '../lib/services/test-requests/run-ledger.js';
@@ -153,7 +154,7 @@ export function defaultReviewerAddressFor(base, sourcePersonId) {
  * .env.local) and before any Dataverse read, so a bad value fails fast.
  */
 export function applyDefaultReviewerAddress(args, env = process.env) {
-  if (!args.reserve || args.recipe !== 'reviews') return;
+  if (!args.reserve || !recipeSeedsReviewers(args.recipe)) return;
   const base = env[DEFAULT_REVIEWER_ADDRESS_ENV];
   if (base) {
     defaultReviewerAddressFor(base, '00000000-0000-4000-8000-000000000000');
@@ -170,7 +171,10 @@ function resolveActorId(actor) {
   throw new Error('--actor must be admin:<guid>, user:<guid>, or an OS username (stored as its cli:<16 hex> digest).');
 }
 
-function parseArgs(argv) {
+// Exported (slice 4a) so a test can prove --recipe fails closed for a
+// LEDGER_RECIPES token with no built RECIPE_STEP_ORDER entry, before any
+// Dataverse read or ledger write.
+export function parseArgs(argv) {
   const parsed = {
     prepare: null,
     execute: null,
@@ -250,11 +254,21 @@ function parseArgs(argv) {
   if (!LEDGER_RECIPES.includes(parsed.recipe)) {
     throw new Error(`--recipe must be one of: ${LEDGER_RECIPES.join(', ')}.`);
   }
+  // Slice 4a: pre_site_visit/final_writeup/site_visit_materials are valid
+  // LEDGER_RECIPES tokens (the ledger's enum accepts them so a future slice
+  // can build their steps without touching the migration/enum again), but
+  // RECIPE_STEP_ORDER (run-runner.js) has no entry for any of them yet --
+  // stepOrderForRecipe/nextStepFor would throw on first use. Refuse here,
+  // before any Dataverse read or ledger write, rather than let a run get
+  // reserved and immediately stick at recipe_step_not_built.
+  if (!Object.prototype.hasOwnProperty.call(RECIPE_STEP_ORDER, parsed.recipe)) {
+    throw new Error(`--recipe=${parsed.recipe} has no built step order yet; supported recipes are: ${Object.keys(RECIPE_STEP_ORDER).join(', ')}.`);
+  }
   // --reviewer-address is valid only with --reserve --recipe=reviews (D-R2/decision 4);
   // the reviews recipe requires at least one, since a run with zero
   // assignments is refused by the ledger.
-  if (parsed.reviewerAddress.length > 0 && (!parsed.reserve || parsed.recipe !== 'reviews')) {
-    throw new Error('--reviewer-address is valid only with --reserve --recipe=reviews.');
+  if (parsed.reviewerAddress.length > 0 && (!parsed.reserve || !recipeSeedsReviewers(parsed.recipe))) {
+    throw new Error('--reviewer-address is valid only with --reserve --recipe=reviews (or a later recipe that seeds reviewers).');
   }
   if (parsed.reserve) {
     parsed.actorId = resolveActorId(parsed.actor);
@@ -263,7 +277,7 @@ function parseArgs(argv) {
     } catch {
       throw new Error('--idempotency-key must be 1-200 printable ASCII characters (no spaces); the ledger stores only its SHA-256.');
     }
-    if (parsed.recipe === 'reviews') {
+    if (recipeSeedsReviewers(parsed.recipe)) {
       const SOURCE_PERSON_GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const parsedFlags = parsed.reviewerAddress.map((raw) => {
         const eq = raw.indexOf('=');
@@ -662,7 +676,7 @@ function requireLedgerUrl() {
  * the synthetic-only lookup) and `--advance` of a `reviews` run.
  */
 export function assertSyntheticReviewerIsolationOnForReviews(recipe) {
-  if (recipe !== 'reviews') return;
+  if (!recipeSeedsReviewers(recipe)) return;
   if (!syntheticReviewerIsolationEnabled()) {
     throw new Error(
       'SYNTHETIC_REVIEWER_ISOLATION must be "on" in this process to reserve or advance a reviews-recipe run '
@@ -785,7 +799,7 @@ export async function resolveReviewerAssignments({
 
 export async function runReserve(client, args, ledgerUrl) {
   assertSyntheticReviewerIsolationOnForReviews(args.recipe);
-  if (args.recipe === 'reviews') {
+  if (recipeSeedsReviewers(args.recipe)) {
     // Same script-only precedent as runAdvance: a single-process,
     // single-invocation CLI, entered narrowly before the first sandbox-bound
     // dependency call this recipe needs.
@@ -810,7 +824,7 @@ export async function runReserve(client, args, ledgerUrl) {
 
   const { actorId } = args;
   let reviewerAssignments = [];
-  if (manifest.recipe === 'reviews') {
+  if (recipeSeedsReviewers(manifest.recipe)) {
     const resolutionDb = pgLedgerDb(ledgerUrl);
     try {
       const ledgerForResolution = createRunLedger(resolutionDb);
@@ -831,7 +845,7 @@ export async function runReserve(client, args, ledgerUrl) {
   // validate the review-file policy against the bundle's uploaded
   // reviewers BEFORE anything is written -- no manifest, no ledger row --
   // so a policy violation never strands a half-reserved run.
-  if (manifest.recipe === 'reviews') {
+  if (recipeSeedsReviewers(manifest.recipe)) {
     validateReviewFilePlan(bundle, reviewerAssignments.map((a) => a.sourcePersonId));
   }
   // The plan digest binds the ledger-relevant identities/hashes, never
@@ -1024,8 +1038,8 @@ async function runRunInspect(runInspect, ledgerUrl) {
     const resources = await ledger.listRunResources(runInspect);
     // Never the plaintext address, only its digest (D-R2): listRunReviewerAssignments
     // never selects the `address` column, so there is nothing to redact here.
-    const reviewerAssignments = run.recipe === 'reviews' ? await ledger.listRunReviewerAssignments(runInspect) : [];
-    const reviewsSummary = run.recipe === 'reviews' ? summarizeReviewResources(resources, reviewerAssignments) : [];
+    const reviewerAssignments = recipeSeedsReviewers(run.recipe) ? await ledger.listRunReviewerAssignments(runInspect) : [];
+    const reviewsSummary = recipeSeedsReviewers(run.recipe) ? summarizeReviewResources(resources, reviewerAssignments) : [];
     console.log(JSON.stringify({
       mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments, reviewsSummary,
     }, null, 2));

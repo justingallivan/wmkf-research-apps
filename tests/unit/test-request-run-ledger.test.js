@@ -482,12 +482,30 @@ describe('slice 6a: IA attempt-marker timestamp keys', () => {
 
 describe('slice 6c-i: reviews recipe token', () => {
   it('LEDGER_RECIPES includes reviews alongside basic and initial_assessment', () => {
-    expect(LEDGER_RECIPES).toEqual(['basic', 'initial_assessment', 'reviews']);
+    expect(LEDGER_RECIPES).toEqual([
+      'basic', 'initial_assessment', 'reviews', 'pre_site_visit', 'final_writeup', 'site_visit_materials',
+    ]);
   });
 
   it('assertReservePlan accepts the reviews recipe', () => {
     expect(assertReservePlan({
       actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: { ...BASE_PLAN, recipe: 'reviews' },
+    })).toBeTruthy();
+  });
+});
+
+// Slice 4a: pre_site_visit/final_writeup/site_visit_materials are accepted as
+// LEDGER RECIPE TOKENS (the ledger's finite enum), but have no built step
+// order yet (RECIPE_STEP_ORDER in run-runner.js) -- reservation of one of
+// these recipes must still fail closed before any Dataverse call. That
+// refusal lives in the CLI's --recipe validation (scripts/rehearse-test-
+// request-sandbox.mjs), not here; assertReservePlan alone (the ledger's own
+// gate) accepts any LEDGER_RECIPES token, by design, since a future slice
+// builds their step order without touching this file again.
+describe('slice 4a: new cumulative recipe tokens accepted by the ledger enum', () => {
+  it.each(['pre_site_visit', 'final_writeup', 'site_visit_materials'])('assertReservePlan accepts %s', (recipe) => {
+    expect(assertReservePlan({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: { ...BASE_PLAN, recipe },
     })).toBeTruthy();
   });
 });

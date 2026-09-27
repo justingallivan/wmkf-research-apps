@@ -491,6 +491,60 @@ describe('slice 6c-i: reviews recipe step order (cumulative on initial_assessmen
   });
 });
 
+// Slice 4a: verify_reviews must ADVANCE when it is not its recipe's last
+// step, exactly mirroring verify/verify_initial_assessment, so a later
+// cumulative recipe (pre_site_visit and beyond) can continue past it. No
+// such recipe has a built RECIPE_STEP_ORDER entry yet, so this proves the
+// generic mechanism (shared by all three verifiers) with a synthetic order
+// injected through nextStepFor's optional third argument -- the one clean
+// seam into the frozen, module-internal RECIPE_STEP_ORDER (see nextStepFor's
+// own doc comment).
+describe('slice 4a: nextStepFor advance-vs-markReady mechanism (verify_reviews\'s new branch)', () => {
+  const SYNTHETIC_ORDERS = Object.freeze({
+    reviews: Object.freeze([...RECIPE_STEP_ORDER.reviews]), // real 'reviews': verify_reviews stays terminal
+    pre_site_visit: Object.freeze([...RECIPE_STEP_ORDER.reviews, 'seed_presite_ai_run']), // synthetic: verify_reviews is NOT last
+  });
+
+  test('terminal branch: real "reviews" order has verify_reviews last -> null (markReady)', () => {
+    expect(nextStepFor('reviews', 'verify_reviews', SYNTHETIC_ORDERS)).toBeNull();
+  });
+
+  test('advance branch: a synthetic cumulative order continuing past verify_reviews -> the next step', () => {
+    expect(nextStepFor('pre_site_visit', 'verify_reviews', SYNTHETIC_ORDERS))
+      .toEqual({ step: 'seed_presite_ai_run', index: RECIPE_STEP_ORDER.reviews.length });
+  });
+
+  test('the optional third argument defaults to the real, frozen RECIPE_STEP_ORDER (no production call site passes it)', () => {
+    expect(nextStepFor('reviews', 'verify_reviews')).toBeNull();
+    expect(nextStepFor('basic', 'verify')).toBeNull();
+  });
+
+  // Structural, source-inspection check: no real later recipe exists yet
+  // (4b builds pre_site_visit's steps), so stepVerifyReviews's OWN
+  // advance-vs-markReady wiring cannot be driven behaviorally through
+  // advanceRun with real data in this slice -- the nextStepFor tests above
+  // prove the shared mechanism, but not that stepVerifyReviews actually
+  // calls it instead of unconditionally marking ready. This proves the
+  // wiring itself: stepVerifyReviews's terminal branch is now the SAME
+  // `nextStepFor(...) === null ? markReady : advance` shape as
+  // stepVerify/stepVerifyInitialAssessment, not the old "must be terminal or
+  // throw" code.
+  test('stepVerifyReviews is wired through nextStepFor + completeCurrentStep, not an unconditional markReady', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '..', '..', 'lib', 'services', 'test-requests', 'run-runner.js'),
+      'utf8',
+    );
+    const start = source.indexOf('async function stepVerifyReviews(');
+    const end = source.indexOf('\nfunction notBuiltStep', start);
+    const body = source.slice(start, end);
+    expect(body).toMatch(/nextStepFor\(run\.recipe,\s*VERIFY_REVIEWS_STEP\)\s*===\s*null/);
+    expect(body).toMatch(/completeCurrentStep\(ledger,\s*run,\s*VERIFY_REVIEWS_STEP/);
+    expect(body).not.toMatch(/must be the terminal step/);
+  });
+});
+
 describe('slice 6c-i: verify_initial_assessment terminal branch is per-recipe', () => {
   // The full behavioral test (markReady vs. advance, driven through a real
   // stepVerifyInitialAssessment happy path) lives in
