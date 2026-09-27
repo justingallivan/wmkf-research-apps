@@ -1178,6 +1178,19 @@ describe('item 6: verify_presite attestation fail-closed', () => {
     expect(result.errorMessage).toContain('customXml/item1.xml differs from the render and is not a SharePoint re-promotion of the same root');
   });
 
+  test('the failure detail strips control characters from package-controlled part names and stays bounded', async () => {
+    const { resources } = seedReadyRowAndRender();
+    await runStep('render_presite', { resources });
+    const zip = await JSZip.loadAsync(world.uploadedBytes);
+    zip.file('word/media/x\u001b[31mred\u0007.bin', Buffer.alloc(4));
+    for (let i = 0; i < 40; i += 1) zip.file(`word/media/${'n'.repeat(300)}${i}.bin`, Buffer.alloc(1));
+    world.flags.downloadOverrideBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const { result } = await runStep('verify_presite', { resources });
+    expect(result.run.needsAttentionReason).toBe('presite_promotion_uncharacterized');
+    expect(result.errorMessage).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    expect(result.errorMessage.length).toBeLessThan(2300);
+  });
+
   // A VALID, JSZip-openable promoted package carrying one extra part that
   // is not any characterized SharePoint addition at all.
   test('a valid promoted package carrying an extra unknown part -> presite_promotion_uncharacterized', async () => {

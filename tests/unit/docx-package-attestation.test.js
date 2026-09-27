@@ -147,6 +147,20 @@ describe('attestDocxPackageAgainstRender: SharePoint re-promotion of a template\
     await expect(attestDocxPackageAgainstRender(rewritten, foreignBaseline))
       .rejects.toThrow(/customXml\/item4\.xml differs from the render and is not a SharePoint re-promotion of the same root/);
   });
+  // Codex PR #348 round 1: only the live pairs may be rewritten.
+  it('keeps the FormTemplates item byte-identical (observed unchanged live)', async () => {
+    const forms = SP_FORMS.replace('<Display>DocumentLibraryForm</Display>', '<Display>OtherForm</Display>');
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/item2.xml': forms }), templateRender))
+      .rejects.toThrow(/customXml\/item2\.xml differs from the render and is not a SharePoint re-promotion of the same root/);
+  });
+  it('rejects a rewritten itemProps paired with a properties item, not a contentTypeSchema item', async () => {
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/itemProps3.xml': SP_PROPS.replace('{X}', '{Z}') }), templateRender))
+      .rejects.toThrow(/itemProps3\.xml was rewritten without its contentTypeSchema item customXml\/item3\.xml/);
+  });
+  it('rejects a rewritten itemProps whose contentTypeSchema item was left unchanged', async () => {
+    await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/item1.xml': TEMPLATE_SCHEMA }), templateRender))
+      .rejects.toThrow(/itemProps1\.xml was rewritten without its contentTypeSchema item customXml\/item1\.xml/);
+  });
   it('keeps a pre-existing customXml rels part byte-identical', async () => {
     await expect(attestDocxPackageAgainstRender(await rePromote({ 'customXml/_rels/item1.xml.rels': SP_RELS.replace('rId1', 'rId2') }), templateRender))
       .rejects.toThrow(/customXml\/_rels\/item1\.xml\.rels differs from the render/);
@@ -526,7 +540,7 @@ describe('attestDocxPackageAgainstSource', () => {
       const big = LIVE_ITEM3.replace('<TaxCatchAll xmlns="270ae82a-6903-42ec-99d1-4079863f002d" xsi:nil="true"/>', Array.from({ length: 60 }, (_, i) => `<C${i} xmlns="270ae82a-6903-42ec-99d1-4079863f002d">${'v'.repeat(1000)}</C${i}>`).join(''));
       expect(big.length).toBeLessThan(64 * 1024);
       const mutated = await withParts(sourceWithOwnCustomXml, async (zip) => { await promoteItems(zip, [[6, big], [7, big], [8, big]]); });
-      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/added \d+ bytes of customXml parts, above the 131072-byte ceiling/);
+      await expect(attestDocxPackageAgainstSource(mutated, sourceWithOwnCustomXml)).rejects.toThrow(/added or rewrote \d+ bytes of customXml parts, above the 131072-byte ceiling/);
     });
     it.each([
       ['an orphan itemProps part', async (zip) => { zip.file('customXml/itemProps6.xml', SP_PROPS); }],
