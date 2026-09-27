@@ -54,6 +54,7 @@ import {
 import {
   readSourceBundle,
   summarizeSourceBundle,
+  assertBundleHasAbstractForRecipe,
   assertBundleHasPreSiteSectionForRecipe,
   assertBundleHasReviewerSectionForRecipe,
 } from '../lib/services/test-requests/source-bundle.js';
@@ -818,6 +819,7 @@ export async function runReserve(client, args, ledgerUrl) {
   const bundle = readSourceBundle(readJson(args.bundle));
   assertBundleHasReviewerSectionForRecipe(args.recipe, bundle);
   assertBundleHasPreSiteSectionForRecipe(args.recipe, bundle);
+  assertBundleHasAbstractForRecipe(args.recipe, bundle);
   const source = bundle.source.request;
   if (source.akoya_requestnum !== args.sourceRequestNumber) {
     throw new Error(`Bundle source is Request ${source.akoya_requestnum}; --source-request-number attests ${args.sourceRequestNumber}. Refusing.`);

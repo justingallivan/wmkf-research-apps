@@ -1,6 +1,6 @@
 /** @jest-environment node */
 import {
-  LEDGER_RECIPES, recipeSeedsReviewers, recipeSeedsPreSite,
+  LEDGER_RECIPES, recipeSeedsReviewers, recipeSeedsPreSite, recipeSeedsFinalWriteup,
 } from '../../lib/services/test-requests/recipe-capabilities.js';
 
 describe('LEDGER_RECIPES (slice 4a)', () => {
@@ -46,5 +46,22 @@ describe('recipeSeedsPreSite', () => {
 
   test('throws (fails closed) on an unrecognized recipe', () => {
     expect(() => recipeSeedsPreSite('bogus')).toThrow(/Unknown Test Request Factory recipe/);
+  });
+});
+
+describe('recipeSeedsFinalWriteup (slice 5a)', () => {
+  test.each([
+    ['basic', false],
+    ['initial_assessment', false],
+    ['reviews', false],
+    ['pre_site_visit', false],
+    ['final_writeup', true],
+    ['site_visit_materials', true],
+  ])('%s -> %s', (recipe, expected) => {
+    expect(recipeSeedsFinalWriteup(recipe)).toBe(expected);
+  });
+
+  test('throws (fails closed) on an unrecognized recipe', () => {
+    expect(() => recipeSeedsFinalWriteup('bogus')).toThrow(/Unknown Test Request Factory recipe/);
   });
 });

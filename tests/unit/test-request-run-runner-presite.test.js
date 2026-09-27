@@ -501,13 +501,15 @@ afterEach(() => {
 const client = { baseUrl: 'https://orgd9e66399.crm.dynamics.com/api/data/v9.2' };
 const graph = {}; // forwarded verbatim by the mocked createPresiteSandboxDeps; unused directly
 
-async function runStep(currentStep, { resources = [], runOverrides = {}, bundle = buildBundle() } = {}) {
+async function runStep(currentStep, {
+  resources = [], runOverrides = {}, bundle = buildBundle(), stepOrders,
+} = {}) {
   const run0 = baseRun(bundle, { currentStep, ...runOverrides });
   const { ledger, calls, resources: liveResources } = createFakeLedger(run0, resources);
   const manifest = baseManifest(bundle);
   const result = await advanceRun({
     runId: RUN_ID, ledger, manifest, bundle,
-    deps: { client, graph, sharePointTarget: () => ({}) },
+    deps: { client, graph, sharePointTarget: () => ({}), ...(stepOrders ? { stepOrders } : {}) },
   });
   return { result, calls, resources: liveResources };
 }
@@ -1116,6 +1118,23 @@ describe('item 6: verify_presite attestation fail-closed', () => {
     const { result, calls } = await runStep('verify_presite', { resources });
     expect(result.outcome).toBe('ready');
     expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(1);
+  });
+
+  // Slice 5a: verify_presite is advance-or-markReady via nextStepFor. The
+  // real pre_site_visit order keeps it terminal (above); a cumulative order
+  // continuing past it (final_writeup's shape, supplied through advanceRun's
+  // post-lease `stepOrders` seam until slice 5b adds the real order) makes
+  // the SAME verifier advance instead.
+  test('slice 5a: with a successor after verify_presite, the same verifier ADVANCES to seed_abstract instead of markReady', async () => {
+    const { resources } = seedReadyRowAndRender();
+    const rendered = await runStep('render_presite', { resources });
+    expect(rendered.result.outcome).toBe('advanced');
+    const stepOrders = { pre_site_visit: [...RECIPE_STEP_ORDER.pre_site_visit, 'seed_abstract', 'render_pre_rp_brief'] };
+    const { result, calls } = await runStep('verify_presite', { resources, stepOrders });
+    expect(result.outcome).toBe('advanced');
+    expect(result.run.currentStep).toBe('seed_abstract');
+    expect(calls.filter((c) => c.op === 'markReady')).toHaveLength(0);
+    expect(calls.filter((c) => c.op === 'advanceStep')).toEqual([{ op: 'advanceStep', nextStep: 'seed_abstract' }]);
   });
 
   // Flipping a byte this close to the end of the file lands in the ZIP

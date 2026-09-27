@@ -16,6 +16,7 @@ import {
   assertReviewerSourceUnchanged,
   assertBundleHasReviewerSectionForRecipe,
   assertBundleHasPreSiteSectionForRecipe,
+  assertBundleHasAbstractForRecipe,
   classifyReviewerForm,
 } from '../../lib/services/test-requests/source-bundle.js';
 
@@ -449,6 +450,39 @@ describe('assertBundleHasPreSiteSectionForRecipe (slice 4b)', () => {
 
   test.each(['basic', 'initial_assessment', 'reviews'])('%s recipe accepts a bundle with no preSiteVisit section', (recipe) => {
     expect(() => assertBundleHasPreSiteSectionForRecipe(recipe, { preSiteVisit: undefined })).not.toThrow();
+  });
+});
+
+// Slice 5a: the final_writeup reservation refuses a null/blank abstract
+// before any lease or write. Unreachable through the CLI until 5b (the CLI
+// refuses final_writeup at parse time for want of a step order), so the
+// function is proven directly here.
+describe('assertBundleHasAbstractForRecipe (slice 5a)', () => {
+  test.each([
+    ['null', null],
+    ['absent', undefined],
+    ['empty', ''],
+    ['whitespace only', '  \n\t '],
+    ['a non-string', 42],
+  ])('final_writeup refuses a bundle whose abstract is %s', (_label, abstract) => {
+    expect(() => assertBundleHasAbstractForRecipe('final_writeup', { abstract }))
+      .toThrow(/requires a source bundle with a non-blank abstract/);
+  });
+
+  test('site_visit_materials (a later cumulative recipe) refuses a null abstract too', () => {
+    expect(() => assertBundleHasAbstractForRecipe('site_visit_materials', { abstract: null })).toThrow(/non-blank abstract/);
+  });
+
+  test('final_writeup accepts a bundle carrying a non-blank abstract', () => {
+    expect(() => assertBundleHasAbstractForRecipe('final_writeup', { abstract: 'An abstract.' })).not.toThrow();
+  });
+
+  test.each(['basic', 'initial_assessment', 'reviews', 'pre_site_visit'])('%s accepts a bundle with a null abstract', (recipe) => {
+    expect(() => assertBundleHasAbstractForRecipe(recipe, { abstract: null })).not.toThrow();
+  });
+
+  test('fails closed on an unrecognized recipe', () => {
+    expect(() => assertBundleHasAbstractForRecipe('bogus', { abstract: 'x' })).toThrow(/Unknown Test Request Factory recipe/);
   });
 });
 

@@ -1257,7 +1257,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
              WHEN e.key IN ('eTag', 'eTagBefore', 'eTagAfter') THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
              WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
              WHEN e.key IN ('versionNumber', 'versionNumberBefore', 'versionNumberAfter') THEN s.v ~ '^[0-9]{1,20}$'
-             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'bytesSha256', 'addressSha256', 'attestedDigest', 'inputFingerprint', 'renderInputFingerprint') THEN s.v ~ '^[0-9a-f]{64}$'
+             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'bytesSha256', 'addressSha256', 'attestedDigest', 'inputFingerprint', 'renderInputFingerprint', 'clientOperationId') THEN s.v ~ '^[0-9a-f]{64}$'
              WHEN e.key IN ('outcome', 'kind') THEN s.v ~ '^[a-z][a-z0-9_-]{0,39}$'
              WHEN e.key = 'reviewForm' THEN s.v ~ '^(uploaded|received_no_file|unreceived)$'
              WHEN e.key = 'field' THEN s.v ~ '^[a-z][a-z0-9_]{0,63}$'
@@ -1318,7 +1318,8 @@ $receipt$`,
       'copy_file', 'observe', 'verify', 'ready',
       'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
       'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
-    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'
+    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite',
+    'seed_abstract', 'render_pre_rp_brief'
     )),
     CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN (
       'basic', 'initial_assessment', 'reviews', 'pre_site_visit', 'final_writeup', 'site_visit_materials'
@@ -1371,7 +1372,8 @@ $receipt$`,
         'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
       'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
       'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
-      'presite_ai_run_ambiguous'
+      'presite_ai_run_ambiguous',
+      'abstract_conflict', 'pre_rp_brief_ownership_mismatch', 'pre_rp_brief_verification_failed'
       ))
       AND (last_error IS NULL OR regexp_replace(last_error, ' [(]http [0-9]{3}[)]$', '') IN (
         'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
@@ -1395,7 +1397,8 @@ $receipt$`,
         'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
       'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
       'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
-      'presite_ai_run_ambiguous'
+      'presite_ai_run_ambiguous',
+      'abstract_conflict', 'pre_rp_brief_ownership_mismatch', 'pre_rp_brief_verification_failed'
       ))
     )
   )`,
@@ -1426,7 +1429,8 @@ $receipt$`,
       'copy_file', 'observe', 'verify', 'ready',
       'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
       'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
-    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'
+    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite',
+    'seed_abstract', 'render_pre_rp_brief'
     )),
     CONSTRAINT test_request_run_resources_error_code CHECK (
       error IS NULL OR regexp_replace(error, ' [(]http [0-9]{3}[)]$', '') IN (
@@ -1451,7 +1455,8 @@ $receipt$`,
         'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
       'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
       'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
-      'presite_ai_run_ambiguous'
+      'presite_ai_run_ambiguous',
+      'abstract_conflict', 'pre_rp_brief_ownership_mismatch', 'pre_rp_brief_verification_failed'
       )
     )
   )`,

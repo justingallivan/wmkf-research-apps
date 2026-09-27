@@ -44,7 +44,10 @@ function targetFiles() {
 // (either quote style), in either operand order.
 const IDENT = String.raw`\(?[A-Za-z_$][\w.]*(?:\s*\?\?\s*['"]basic['"])?\)?`;
 const OP = String.raw`[=!]==?`;
-const LIT = String.raw`['"]reviews['"]`;
+// Slice 5a: the later cumulative recipes' names are guarded the same way --
+// their inputs go through one capability predicate each (recipeSeedsPreSite,
+// recipeSeedsFinalWriteup), never a recipe-name comparison.
+const LIT = String.raw`['"](?:reviews|pre_site_visit|final_writeup|site_visit_materials)['"]`;
 const FORWARD = new RegExp(String.raw`${IDENT}\s*${OP}\s*${LIT}`);
 const BACKWARD = new RegExp(String.raw`${LIT}\s*${OP}\s*${IDENT}`);
 
@@ -67,6 +70,9 @@ describe('static guard: no recipe === \'reviews\' comparison outside recipe-capa
       "run.recipe === 'reviews'",
       "args.recipe === 'reviews'",
       "parsed.recipe !== 'reviews'",
+      "run.recipe === 'final_writeup'",
+      "'pre_site_visit' !== manifest.recipe",
+      "args.recipe === \"site_visit_materials\"",
     ];
     for (const line of positives) {
       expect(isRecipeComparisonLine(line)).toBe(true);

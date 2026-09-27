@@ -242,6 +242,34 @@ describe('advanceRun: caller-error digest refusal', () => {
     expect(graph.getSiteId).not.toHaveBeenCalled();
     expect(graph.getDriveId).not.toHaveBeenCalled();
   });
+
+  // Slice 5a: `deps.stepOrders` is a POST-LEASE successor seam only. Even a
+  // caller that supplies a `final_writeup` order through it cannot get the
+  // recipe admitted -- the pre-lease check reads the real frozen
+  // RECIPE_STEP_ORDER unconditionally.
+  test('slice 5a: a deps.stepOrders carrying a final_writeup order still refuses final_writeup before any lease', async () => {
+    const bundle = { reviewers: [] };
+    const bundleSha256 = sha256(bundle);
+    const manifest = baseManifest({
+      recipe: 'final_writeup',
+      reviewFilePolicy: { digest: reviewFileCopyPolicyDigest() },
+      source: {
+        requestId: SOURCE_ID, revision: 'rev-1', requestType: 100000000, bundleSha256,
+      },
+    });
+    const planDigest = computeRunPlanDigest({ manifest, reviewerAddressDigests: [] });
+    const { ledger, calls } = createFakeLedger(baseRun({ recipe: 'final_writeup', planDigest, bundleSha256 }));
+    const client = { get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn() };
+    const stepOrders = { final_writeup: [...RECIPE_STEP_ORDER.pre_site_visit, 'seed_abstract', 'render_pre_rp_brief'] };
+    await expect(advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client, graph: fakeGraph(), sharePointTarget: () => ({}), stepOrders },
+    })).rejects.toThrow('Unknown Test Request Factory recipe: final_writeup.');
+    expect(calls.filter((call) => call.op === 'claimLease')).toHaveLength(0);
+    expect(client.get).not.toHaveBeenCalled();
+    expect(client.patch).not.toHaveBeenCalled();
+    expect(Object.prototype.hasOwnProperty.call(RECIPE_STEP_ORDER, 'final_writeup')).toBe(false);
+  });
 });
 
 describe('advanceRun: lease claim', () => {

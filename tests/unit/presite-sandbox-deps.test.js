@@ -23,11 +23,22 @@ jest.mock('../../lib/dataverse/client.js', () => ({
   createClient: jest.fn(),
 }));
 
+// Slice 5a (I10): only `create` is replaced, so the brief builder's
+// createDocument can be observed forcing SANDBOX_REHEARSAL one layer below
+// the producer's own ALLOW_UNATTRIBUTED call. No other test here creates.
+jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/request-document.js'),
+  create: jest.fn(async () => ({ wmkf_requestdocumentid: 'created-id' })),
+}));
+
+import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
+import { REQUEST_DOCUMENT_ACTOR_POLICY } from '../../lib/services/request-document-actor-service.js';
 import { DEFAULT_DEPENDENCIES as ARTIFACT_SERVICE_DEFAULT_DEPENDENCIES } from '../../lib/services/pre-site-visit/artifact-dependencies.js';
 import {
   createPresiteAiRunDeps,
   createPresiteInputDeps,
   createPresiteSandboxDeps,
+  createPreRpBriefSandboxDeps,
 } from '../../lib/services/test-requests/presite-sandbox-deps.js';
 import { loadPreSiteVisitInputs } from '../../lib/services/pre-site-visit/proposal-core-service.js';
 import { PROGRAM_GRANT_SELECT, programGrantFilter } from '../../lib/services/pre-site-visit/funding-history.js';
@@ -404,5 +415,124 @@ describe('createPresiteAiRunDeps', () => {
     expect(typeof deps.getCurrentPrompt).toBe('function');
     expect(() => createPresiteAiRunDeps({ resourceUrl: 'https://wmkf.crm.dynamics.com' }))
       .toThrow(/refusing non-sandbox Dataverse host/);
+  });
+});
+
+// Slice 5a (render_pre_rp_brief). pre-rp-brief/artifact-service.js's
+// DEFAULT_DEPENDENCIES is module-private and used WHOLE (no per-key
+// fallback), so every key is pinned as a literal read from source
+// (artifact-service.js:51-71): a new default added there without a sandbox
+// key here would otherwise be `undefined` at its call site.
+const PRE_RP_BRIEF_DEFAULT_DEPENDENCY_KEYS = [
+  'loadInputs', 'renderDocx', 'hashDocx', 'getRequest', 'getBuckets', 'findByGenerationKey', 'findByRequest',
+  'hasSentAttemptForSource', 'listDistributionAttempts', 'createDocument', 'updateDocument', 'commitChangeset',
+  'ensureFolderPath', 'uploadFile', 'downloadFile', 'deleteFile', 'newClaimToken',
+];
+
+describe('createPreRpBriefSandboxDeps (slice 5a; I9: complete against pre-rp-brief artifact-service DEFAULT_DEPENDENCIES)', () => {
+  const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+  const getBuckets = async () => [{ library: 'akoya_request', folder: 'F', source: 'dynamics' }];
+  const PERSONNEL = { principalInvestigator: 'Ada Principal', coPrincipalInvestigators: [] };
+
+  beforeEach(() => {
+    createClient.mockReset();
+    createClient.mockImplementation(() => { throw new Error('no sandbox transport expected in this test'); });
+  });
+
+  it('declares every generatePreRpBrief dependency key as a function', () => {
+    const deps = createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, getBuckets, personnel: PERSONNEL });
+    for (const key of PRE_RP_BRIEF_DEFAULT_DEPENDENCY_KEYS) {
+      expect(typeof deps[key]).toBe('function');
+    }
+  });
+
+  it('requires a caller-built getBuckets and forwards that exact reference (the env-bound default is never reachable)', () => {
+    expect(() => createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, personnel: PERSONNEL })).toThrow(/requires getBuckets/);
+    expect(() => createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, getBuckets })).toThrow(/requires bundle personnel/);
+    const deps = createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, getBuckets, personnel: PERSONNEL });
+    expect(deps.getBuckets).toBe(getBuckets);
+  });
+
+  it('refuses a non-sandbox Dataverse host', () => {
+    expect(() => createPreRpBriefSandboxDeps({
+      resourceUrl: 'https://wmkf.crm.dynamics.com', graph: NOOP_GRAPH, getBuckets, personnel: PERSONNEL,
+    })).toThrow(/refusing non-sandbox Dataverse host/);
+  });
+
+  it('distribution-attempt readers are deterministic stubs (false / []) and never open a transport (owner decision; I9)', async () => {
+    const deps = createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, getBuckets, personnel: PERSONNEL });
+    await expect(deps.hasSentAttemptForSource(REQUEST_ID, REQUEST_ID)).resolves.toBe(false);
+    await expect(deps.listDistributionAttempts(REQUEST_ID, { limit: 100 })).resolves.toEqual([]);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it('downloadFile is a throwing sentinel (generatePreRpBrief never downloads)', async () => {
+    const deps = createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, getBuckets, personnel: PERSONNEL });
+    await expect(deps.downloadFile('d', 'i')).rejects.toThrow(/never reached by generatePreRpBrief/);
+  });
+
+  it('uploadFile always forces conflictBehavior "fail" (I2), even against a caller-supplied 6th argument', async () => {
+    const uploadFile = jest.fn(async () => ({ driveId: 'drive-1', id: 'item-1', versionId: '1.0' }));
+    const deps = createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: { ...NOOP_GRAPH, uploadFile }, getBuckets, personnel: PERSONNEL });
+    await deps.uploadFile('akoya_request', 'folder', 'name.docx', Buffer.from('x'), 'application/vnd.docx', { conflictBehavior: 'replace' });
+    expect(uploadFile.mock.calls[0][5]).toEqual({ conflictBehavior: 'fail' });
+  });
+
+  it('deleteFile deletes only the exact item this deps object uploaded', async () => {
+    const deleteFile = jest.fn(async () => undefined);
+    const uploadFile = jest.fn(async () => ({ driveId: 'drive-1', id: 'item-1', versionId: '1.0' }));
+    const deps = createPreRpBriefSandboxDeps({
+      resourceUrl: SANDBOX_URL, graph: { ...NOOP_GRAPH, uploadFile, deleteFile }, getBuckets, personnel: PERSONNEL,
+    });
+    await expect(deps.deleteFile('drive-1', 'item-1')).rejects.toThrow(/did not upload/);
+    await deps.uploadFile('akoya_request', 'folder', 'name.docx', Buffer.from('x'), 'application/vnd.docx');
+    await expect(deps.deleteFile('drive-1', 'item-2')).rejects.toThrow(/did not upload/);
+    await expect(deps.deleteFile('drive-2', 'item-1')).rejects.toThrow(/did not upload/);
+    expect(deleteFile).not.toHaveBeenCalled();
+    await deps.deleteFile('drive-1', 'item-1');
+    expect(deleteFile).toHaveBeenCalledWith('drive-1', 'item-1');
+  });
+
+  it('I10: createDocument forces SANDBOX_REHEARSAL and drops the acting user, over the sandbox svc, whatever policy the producer passes', async () => {
+    const deps = createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, getBuckets, personnel: PERSONNEL });
+    await withDalContext('presite-sandbox-deps-test', () => deps.createDocument({ wmkf_name: 'x' }, {
+      actingUserSystemId: REQUEST_ID,
+      actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED,
+      actorContext: { operation: 'pre-rp-brief-generation' },
+    }));
+    expect(requestDocumentAdapter.create).toHaveBeenCalledTimes(1);
+    const [, options] = requestDocumentAdapter.create.mock.calls[0];
+    expect(options.actorPolicy).toBe(REQUEST_DOCUMENT_ACTOR_POLICY.SANDBOX_REHEARSAL);
+    expect(options).not.toHaveProperty('actingUserSystemId');
+    expect(options.svc.baseUrl).toBe(`${SANDBOX_URL}/api/data/v9.2`);
+    expect(options.actorContext).toEqual({ operation: 'pre-rp-brief-generation' });
+  });
+
+  it('loadInputs reads the abstract through the sandbox transport (real loadPreRpBriefInputs over the sandbox request select)', async () => {
+    const urls = [];
+    createClient.mockReset();
+    createClient.mockReturnValue({
+      get: jest.fn(async (url) => {
+        urls.push(url);
+        if (url.startsWith(`/akoya_requests(${REQUEST_ID})`)) {
+          return {
+            ok: true, status: 200,
+            body: {
+              akoya_requestid: REQUEST_ID, akoya_requestnum: '1000342', akoya_title: 'T',
+              wmkf_meetingdate: '2026-12-01', wmkf_abstract: 'A sandbox abstract.',
+            },
+          };
+        }
+        if (url.startsWith('/wmkf_appreviewersuggestions?')) return { ok: true, status: 200, body: { value: [] } };
+        throw new Error(`unexpected sandbox GET ${url}`);
+      }),
+    });
+    const deps = createPreRpBriefSandboxDeps({ resourceUrl: SANDBOX_URL, graph: NOOP_GRAPH, getBuckets, personnel: PERSONNEL });
+    const inputs = await withDalContext('presite-sandbox-deps-test', () => deps.loadInputs({ requestId: REQUEST_ID }));
+    expect(inputs.envelope.request.abstract).toBe('A sandbox abstract.');
+    expect(inputs.envelope.request.principalInvestigator).toBe('TEST · Ada Principal');
+    expect(inputs.envelope.reviews).toEqual([]);
+    expect(decodeURIComponent(urls[0])).toContain('wmkf_abstract');
+    expect(createClient.mock.calls.every(([options]) => options.resourceUrl === SANDBOX_URL)).toBe(true);
   });
 });
