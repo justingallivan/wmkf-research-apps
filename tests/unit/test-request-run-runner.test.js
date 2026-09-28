@@ -453,6 +453,8 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       akoya_goverifytrigger: '2026-08-03T18:15:12Z', akoya_dexempt: '2026-08-03',
       akoya_countofrequests: 10, akoya_countofawards: 0, wmkf_countofdiscretionarygrant: 0, wmkf_countofprogramgrants: 0,
       akoya_totalgrants: 0, wmkf_sumofdiscretionarygrants: 0, wmkf_sumofprogramgrants: 0, akoya_mostrecentgrant: null,
+      akoya_guidestarcode: 'G1', akoya_guidestardescription: 'Private foundation', akoya_guidestarirsbmfsubsection: '03',
+      akoya_guidestarorganizationname: 'Keck',
       ...overrides,
     });
 
