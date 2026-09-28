@@ -357,6 +357,29 @@ describe('journalPlannedResource', () => {
   });
 });
 
+describe('MVP item 5: the production Foundation transition resources', () => {
+  const baseline = {
+    kind: 'foundation_transition', organizationId: BASE_PLAN.destinationRequestId,
+    foundationProjectionSha256: 'a'.repeat(64), foundationGoverifyResultSha256: 'b'.repeat(64), foundationContactsSha256: 'c'.repeat(64),
+    count: 10, capturedAt: '2026-09-28T18:00:00.000Z', goverifyTriggerAt: '2026-08-03T18:15:12Z', exemptionCheckedAt: '2026-08-03',
+  };
+  it.each([
+    ['the fence_source baseline', 'fence_source', baseline],
+    ['the verify outcome', 'verify', { kind: 'foundation_transition', outcome: 'not_refreshed' }],
+  ])('the real ledger journals %s', async (_label, step, plannedIdentity) => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([runRow({ lease_token: 'tok-1', lease_generation: 1, locked_until: new Date(Date.now() + 60000).toISOString(), lease_live: true })]);
+    queueRows([{ next_sequence: 1 }]);
+    queueRows([{ resource_id: 1, run_id: BASE_PLAN.runId, sequence: 1, step, resource_kind: 'foundation_transition', system: 'dataverse', planned_identity: plannedIdentity, outcome: 'planned' }]);
+    const ledger = createRunLedger(db);
+    await ledger.journalPlannedResource({
+      runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1,
+      step, resourceKind: 'foundation_transition', system: 'dataverse', plannedIdentity,
+    });
+    expect(calls[2].text).toContain('INSERT INTO test_request_run_resources');
+  });
+});
+
 describe('slice 6a: initial_assessment recipe token', () => {
   it('assertReservePlan accepts both basic and initial_assessment', () => {
     expect(assertReservePlan({

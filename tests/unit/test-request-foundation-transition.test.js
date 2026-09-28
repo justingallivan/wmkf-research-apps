@@ -101,6 +101,12 @@ describe('evaluateFoundationTransition', () => {
     expect(evaluate(account({ akoya_countofrequests: 11, versionnumber: 101 }))).toEqual({ failures: [], outcome: 'not_refreshed' });
   });
 
+  test('an exemption date returned as a midnight timestamp is compared by day', () => {
+    expect(evaluate(refreshed({ akoya_dexempt: '2026-09-28T07:00:00Z' })).outcome).toBe('refreshed');
+    expect(evaluate(refreshed({ akoya_dexempt: '2026-09-28T00:00:00Z' })).outcome).toBe('refreshed');
+    expect(evaluate(refreshed({ akoya_dexempt: '2026-09-30T07:00:00Z' })).failures).toEqual(['Foundation akoya_dexempt changed to a value outside the run window']);
+  });
+
   test('a same-day refresh that leaves the date-only exemption stamp unchanged passes', () => {
     expect(evaluate(refreshed({ akoya_dexempt: '2026-08-03' })).outcome).toBe('refreshed');
   });
