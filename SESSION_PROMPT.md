@@ -1,4 +1,75 @@
-# Session 547 Prompt: Factory MVP item 5 — verify transition contract, then the first production basic run
+# Session 548 Prompt: Factory synthetic cast (after the Business Central answer), probe hardening, wave30 in production
+
+## Session 547 Summary — 2026-09-28 PT (Opus; MVP item 5 complete; status setter built, merged and characterized in production)
+
+### What Was Completed
+
+1. **MVP item 5 complete.** Verify now checks the Foundation account against a digest-only pre-create baseline journaled at `fence_source` (transition contract: protected projection, Tax Status/BMF 509, GoVerify stamps in the run window, Request count unchanged or +1, all 15 rollups' `_date` free and `_state` Calculated, GuideStar digest, Contacts), plus a read-only `--run-recheck` (PR #352, #354). First production run (Request 1003301, run `25b392a0`) stopped at verify on two explained causes: the create plug-in rewrites Request Status to `Pending`, and non-Request rollups' `_date` companions moved. Second run (Request **1003302**, run `7293496e`) reached `ready` (`not_refreshed`) and passed the one-hour recheck [VERIFIED: owner-run output, 21:11Z].
+2. **Status setter (slice C) built, reviewed, merged (PR #355, `466b23fb9`).** `--target=production --set-status=<runId> --field=phase1|phase2 --option="<label>" [--rerun]` and `--status-recheck`. Transition table from the workflow definitions, payment/tracking-producing edges only from listed states, `If-Match` fence, ≥ 90 s quiet completion, replay guard, ledger table `test_request_status_changes` (054 in place). **Characterized in production:** 1003302 Phase II → Pending Committee Review set Request Status `Phase II Pending` (the business rules run on API updates), 0 emails/tracking/payments; owner's Audit History shows only those two fields; 1003302 visible in Workbench with the TEST badge.
+3. **Probes (owner-run, read-only):** sections 10 (Foundation unaudited columns), 11 (status fields, options, update-triggered workflows, exported definitions), 12 (cast readiness: contact/person/suggestion create automation, lookups, Request Status rules).
+4. **Plans:** `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (revision 2 after one Codex round); production plan records both runs, the platform owner's answers and the status-field findings.
+5. **Owner decisions:** accept `Pending` at create (now moved by the status setter); free all rollup companions; Liaison copy onto the Foundation's Primary Contact accepted (overwrites the 9/19 value); wave30 in production; owner-created synthetic addresses on the allowlist; test Requests are deactivated, not deleted (platform owner).
+6. **Codex config:** reviews run `--model gpt-5.6-sol` with `model_reasoning_effort = "high"` in `~/.codex/config.toml` (owner, S547; memory `feedback-codex-model-gpt56-sol`).
+
+### Commits
+All on `main` (merged PRs #352, #354, #355 and direct Tier 0 commits), from `dc571513d` through `73507229e`, and this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Probe section 12 hardening** (cast plan *Order* 2): fail as incomplete on a missing or unreadable activated flow definition, list Create steps registered for all entities, write a sanitized dated receipt.
+   Evidence: cast plan *Probe results → Limits*; Codex plan-review round 1 (medium).
+2. **wave30 in production** (cast plan *Order* 3; owner-run): apply `wave30-synthetic-reviewer-marker`, set `SYNTHETIC_REVIEWER_ISOLATION=on`, redeploy, confirm.
+   Evidence: cast plan owner decision 2; probe section 1 (wave30 absent).
+3. **Board Meeting date shows one day early in Workbench** (Dec 10 vs the Request's 12/11/2026 meeting date on 1003302): likely a date-only value rendered through UTC in the Workbench header [ASSUMED; not investigated]. Check whether it affects every Request.
+   Evidence: owner screenshot, 2026-09-28.
+
+### Owner Decision Needed
+
+1. **Platform owner: what `AkoyaGo.Sync_BusinessCentral` does on contact create**, and whether a new contact joins a mailing list. Blocks cast slices A + B (synthetic PI, Liaison, suggested reviewer).
+   Evidence: cast plan *Open questions* 1; probe section 12.
+2. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 unapplied, recheck numbering; latest on-disk migration is 054).
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a — unchanged from the MVP cut.
+2. Seven late-2026 `expiresAt` test fixtures (earliest 2026-10-08) — `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Verify Before Acting
+
+1. **Production test residue:** 1003301 (run `25b392a0`, `needs_attention`) and 1003302 (run `7293496e`, `ready`, Phase II Pending Committee Review) in `ledger_prod`. Deactivate (not delete) in AkoyaGO when finished; 1003301 can go now.
+2. **Local ledger databases** in `wmkf-ledger-pg`: `ledger` (sandbox runs, keep), `ledger_prod` (production runs), `ledger_ci_s547` (throwaway scratch from this session's PG suite run; safe to drop). 054 is edited in place: re-apply it with `psql -f` to `ledger_prod` after any 054 change.
+3. The create POST can exceed the client's 30 s timeout in production (first run); the resume path recovered it. If it recurs, consider a longer create timeout.
+
+### Do Not Reopen Without New Decision
+
+1. MVP cut and deferrals; program director = cloning admin; allowlist replaces D-R4/6d (owner, S546).
+2. `Pending` accepted at create; all rollup companions freed; Liaison copy onto the Foundation accepted; wave30 in production (owner, S547).
+3. GoVerify not bypassed in production; stub `wmkf_ai_run` stays.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` | Cast + status setter plan, probe results, decisions, order |
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Production plan: both runs, platform-owner answers, status-field reactions |
+| `lib/services/test-requests/foundation-transition.js` | Foundation transition contract |
+| `lib/services/test-requests/status-transitions.js` / `status-change-runner.js` | Status setter rules and runner |
+| `lib/services/test-requests/production-write-fence.js` | Basic-run fence and `fenceStatusChangeClient` |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe, sections 1–12 |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI: `--reserve`, `--advance`, `--run-recheck`, `--set-status`, `--status-recheck` |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|docx-package|presite|pre-rp|source-bundle|seed-synthetic|migration-054).*"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<fresh scratch db> TEST_REQUEST_LEDGER_REQUIRE=1 npx jest --runInBand "tests/integration/.*\.pg\.test\.js"
+```
+
+---
+
+## Prior Session 547 Prompt: Factory MVP item 5 — verify transition contract, then the first production basic run
 
 ## Session 546 Summary — 2026-09-27/28 PT (Opus; owner cut item 7 to an MVP; slices 1, 2, 4 built, reviewed, merged; production enabled)
 

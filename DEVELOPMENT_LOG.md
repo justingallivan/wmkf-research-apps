@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Test Request Factory: first production clone verified; status setter live (Session 547)
+
+**Milestone:** The Factory produced its first verified production test Request (1003302), checked against a Foundation-account transition contract at creation and an hour later, and gained a status setter that moves a test Request's Phase I/II Status with the platform's reactions recorded; its first change made the clone visible in Workbench.
+**Sessions:** 547 (Opus; one Codex adversarial round per slice; owner decided every finding; two owner-run production runs).
+**Ship state:**
+- PR #352, #354: pre-create Foundation baseline and transition contract in `verify`, read-only `--run-recheck`; the first run (1003301) stopped on two explained causes (create plug-in sets `Pending`; all 15 rollups recalculate together).
+- Second run 1003302 `ready`, one-hour recheck passed; MVP item 5 complete.
+- PR #355 (`466b23fb9`): `--set-status` / `--status-recheck` with a transition table from the workflow definitions, `If-Match` fence, quiet completion, replay guard; first production change confirmed Request Status follows on API updates.
+**Why it matters:** a staff-usable production test Request now exists end to end; the next step, a synthetic PI/Liaison/suggested reviewer, waits only on the platform owner's Business Central answer.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`; `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`; `lib/services/test-requests/foundation-transition.js`, `status-change-runner.js`.
+
 ## September 2026 — Test Request Factory production enablement: MVP scope, write fence, email allowlist; isolation live (Session 546)
 
 **Milestone:** After eight days of sandbox-first hardening, the owner cut item 7 to a production MVP (a basic clone that lands before reviewer invite, the cloning admin as program director, an email recipient allowlist) and production enablement shipped: wave29 applied in production and `TEST_REQUEST_ISOLATION=on` live.
