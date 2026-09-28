@@ -13,7 +13,7 @@ related:
   - lib/db/migrations/054_test_request_runs.sql
 ---
 
-# Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` (Postgres)
+# Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` / `test_request_status_changes` (Postgres)
 
 **[VERIFIED via source, 2026-09-23]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
@@ -254,6 +254,15 @@ deterministic result for the sandbox clone (documented in
 referee diagnostics relative to a real staff generation, `[ASSUMED]`
 acceptable for the sandbox rehearsal phase; revisit before any live-proof
 claim about rendered content fidelity.
+
+## `test_request_status_changes` (status setter, 2026-09-28)
+
+**[VERIFIED via lib/db/migrations/054_test_request_runs.sql and lib/services/test-requests/run-ledger.js, 2026-09-28]**
+A fourth table, added in place to migration 054 (and its `scripts/setup-database.js` V55 mirror): one row per Phase I or Phase II Status change the Factory makes on a ready production test Request (`docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`, slice C).
+
+- **Columns:** `change_id` (the CLI's own GUID), `run_id`, per-run `sequence`, `field` (`wmkf_phaseistatus` or `wmkf_phaseiistatus`), `option_before`, `option_after`, `etag_before` (the row version the PATCH's `If-Match` carried), `status` (`planned` → `dispatched` → `applied` → `complete`, or `needs_attention`), `rerun`, `dispatched_at`, `effects` (a receipt under `test_request_receipt_ok`: effect IDs, a digest of the Request Status readback, counts), `error` (sanitized), timestamps.
+- **Writer:** `createRunLedger(db)` `planStatusChange`, `markStatusChangeDispatched`, `markStatusChangeApplied`, `completeStatusChange`, `markStatusChangeNeedsAttention`. No lease: the CLI is owner-run, and a partial unique index (`status IN ('planned','dispatched','applied')`) admits one open change per run.
+- **Reader:** `listStatusChanges(runId)` (the runner's replay and resume checks; `--run-inspect`).
 
 ## Limits
 

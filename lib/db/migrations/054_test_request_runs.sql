@@ -38,7 +38,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
        WHERE NOT (
          (e.key IN ('size', 'itemSize', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount', 'assignmentSequence', 'promptVersion') AND s.t = 'number')
          OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
-         OR (e.key IN ('requestIds', 'locationIds') AND s.t = 'array' AND NOT EXISTS (
+         OR (e.key IN ('requestIds', 'locationIds', 'emailIds', 'trackingIds', 'paymentIds', 'jobIds') AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
          OR (e.key = 'itemIds' AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~ '^01[A-Z2-7]{32}$'))
@@ -62,7 +62,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
              WHEN e.key IN ('eTag', 'eTagBefore', 'eTagAfter') THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
              WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
              WHEN e.key IN ('versionNumber', 'versionNumberBefore', 'versionNumberAfter') THEN s.v ~ '^[0-9]{1,20}$'
-             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'foundationProjectionSha256', 'foundationGoverifyResultSha256', 'foundationGuidestarSha256', 'foundationContactsSha256', 'bytesSha256', 'addressSha256', 'attestedDigest', 'inputFingerprint', 'renderInputFingerprint') THEN s.v ~ '^[0-9a-f]{64}$'
+             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'foundationProjectionSha256', 'foundationGoverifyResultSha256', 'foundationGuidestarSha256', 'foundationContactsSha256', 'requestStatusSha256', 'bytesSha256', 'addressSha256', 'attestedDigest', 'inputFingerprint', 'renderInputFingerprint') THEN s.v ~ '^[0-9a-f]{64}$'
              WHEN e.key IN ('outcome', 'kind') THEN s.v ~ '^[a-z][a-z0-9_-]{0,39}$'
              WHEN e.key = 'reviewForm' THEN s.v ~ '^(uploaded|received_no_file|unreceived)$'
              WHEN e.key = 'field' THEN s.v ~ '^[a-z][a-z0-9_]{0,63}$'
@@ -370,3 +370,31 @@ CREATE TABLE IF NOT EXISTS test_request_run_reviewer_assignments (
 -- No separate (run_id) index: every UNIQUE constraint above (sequence,
 -- source_person_id, address) already leads with run_id, so Postgres can use
 -- any of their backing btrees for a run_id lookup (Opus round 1, P3).
+
+-- Status setter (cast-and-status plan, slice C, 2026-09-28): one row per
+-- Phase I or Phase II Status change the Factory makes on a ready production
+-- test Request. An owner-run CLI writes it, so there is no lease: the partial
+-- unique index allows one open change per run. `etag_before` is the If-Match
+-- the PATCH carried; `effects` is a receipt (IDs, digests, counts only).
+CREATE TABLE IF NOT EXISTS test_request_status_changes (
+  change_id      UUID PRIMARY KEY,
+  run_id         UUID NOT NULL REFERENCES test_request_runs (run_id),
+  sequence       INTEGER NOT NULL,
+  field          TEXT NOT NULL CHECK (field IN ('wmkf_phaseistatus', 'wmkf_phaseiistatus')),
+  option_before  INTEGER NULL,
+  option_after   INTEGER NOT NULL,
+  etag_before    TEXT NOT NULL CHECK (etag_before ~ '^W/"[0-9]{1,20}"$'),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'applied', 'complete', 'needs_attention')),
+  rerun          BOOLEAN NOT NULL DEFAULT FALSE,
+  dispatched_at  TIMESTAMPTZ NULL,
+  effects        JSONB NULL CHECK (test_request_receipt_ok(effects)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at   TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_status_changes_run_sequence UNIQUE (run_id, sequence),
+  CONSTRAINT test_request_status_changes_distinct CHECK (option_before IS NULL OR option_before <> option_after)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS test_request_status_changes_one_open_idx
+  ON test_request_status_changes (run_id) WHERE status IN ('planned', 'dispatched', 'applied');
