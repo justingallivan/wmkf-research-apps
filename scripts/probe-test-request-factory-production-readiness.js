@@ -38,7 +38,14 @@
  *      they look up; the count of contacts with no parent account (a count
  *      only); and each business rule on akoya_request whose name mentions
  *      Request Status, with its scope and labelled steps (definitions saved
- *      to <dir> when given).
+ *      to <dir> when given). Flows are matched on their Dataverse triggers and
+ *      record actions (a substring match is printed as a superset); enabled
+ *      Create steps with no entity filter are counted (hidden Microsoft
+ *      platform steps) or listed (everything else). If any activated flow's
+ *      definition is unreadable, or the contact count cannot be read, section
+ *      12 prints INCOMPLETE and the probe exits 1 after its other sections.
+ *      With <dir>, a dated create-only JSON receipt (names, labels, counts,
+ *      booleans; no ids, no raw definitions) is written there.
  *
  * SAFETY: GET requests only, through the interlocked raw client. Production
  * reads are owner-run behind the interlock override; nothing is written.
@@ -62,8 +69,6 @@
  */
 
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client');
-
-loadEnvLocal();
 
 const PRODUCTION_URL = 'https://wmkf.crm.dynamics.com';
 const MARKERS = [
@@ -425,35 +430,124 @@ async function printStatusFields(client, exportDir) {
 const CAST_ENTITIES = ['contact', 'wmkf_potentialreviewers', 'wmkf_appreviewersuggestion'];
 const CAST_REQUEST_LOOKUPS = ['wmkf_projectleader', 'akoya_primarycontactid'];
 
-/** Section 12: synthetic-cast readiness. Metadata, names and one count only. */
+/**
+ * Whether a cloud flow's definition can be read: `clientdata` present, valid
+ * JSON, with a `properties.definition` object. Without one the flow's triggers
+ * and actions are unknown, so section 12 cannot rule it out.
+ */
+function classifyFlowDefinition(clientdata) {
+  if (clientdata == null || String(clientdata).trim() === '') return { readable: false, reason: 'no clientdata' };
+  let parsed;
+  try {
+    parsed = JSON.parse(clientdata);
+  } catch {
+    return { readable: false, reason: 'clientdata did not parse' };
+  }
+  const definition = parsed?.properties?.definition;
+  if (!definition || typeof definition !== 'object') return { readable: false, reason: 'no definition' };
+  return { readable: true, definition };
+}
+
+/**
+ * Whether a readable flow definition names the entity in a Dataverse trigger
+ * (`subscriptionRequest/entityname`, a logical name) or a record action
+ * (`entityName`, usually the entity set name).
+ */
+function flowNamesEntity(definition, names) {
+  const wanted = new Set(names.filter(Boolean));
+  for (const t of Object.values(definition.triggers || {})) {
+    if (wanted.has(t?.inputs?.parameters?.['subscriptionRequest/entityname'])) return true;
+  }
+  let found = false;
+  const walk = (node) => {
+    if (found || !node || typeof node !== 'object') return;
+    if (wanted.has(node?.inputs?.parameters?.entityName)) { found = true; return; }
+    for (const value of Object.values(node)) if (value && typeof value === 'object') walk(value);
+  };
+  walk(definition.actions);
+  return found;
+}
+
+/** Enabled Create steps with no entity filter: they run on every entity's create. */
+function unfilteredCreateSteps(steps) {
+  return steps.filter((st) => st.sdkmessageid?.name === 'Create'
+    && (!st.sdkmessagefilterid || !st.sdkmessagefilterid.primaryobjecttypecode || st.sdkmessagefilterid.primaryobjecttypecode === 'none'));
+}
+
+/** A hidden step whose plug-in type is in the Microsoft namespace: platform plumbing, counted rather than listed. */
+function isPlatformStep(st) {
+  const hidden = typeof st.ishidden === 'object' ? st.ishidden?.Value : st.ishidden;
+  return hidden === true && /^Microsoft\./.test(st.plugintypeid?.typename || '');
+}
+
+const stepLabel = (st) => `[stage ${st.stage}, ${st.mode === 0 ? 'sync' : 'async'}] ${st.name || '(unnamed)'}  type=${st.plugintypeid?.typename || '?'}`;
+
+/**
+ * Section 12: synthetic-cast readiness. Metadata, names and one count only.
+ * Returns the receipt: names, labels, counts and booleans (no ids, no raw
+ * definitions). `complete: false` with reasons when something it relies on
+ * could not be read.
+ */
 async function printCastReadiness(client, exportDir) {
   console.log('\n12. Synthetic cast readiness (PI, Liaison, suggested reviewer)');
+  const receipt = { section: 12, target: PRODUCTION_URL, generatedAt: new Date().toISOString(), complete: true, incompleteReasons: [], entities: {} };
   const flows = await getAll(client, '/workflows?$select=name,clientdata&$filter=category eq 5 and statecode eq 1');
+  const classified = flows.map((f) => ({ name: f.name, clientdata: f.clientdata, ...classifyFlowDefinition(f.clientdata) }));
+  const unreadable = classified.filter((f) => !f.readable);
+  receipt.flows = { activated: flows.length, readable: flows.length - unreadable.length, unreadable: unreadable.map((f) => ({ name: f.name, reason: f.reason })) };
+  console.log(`   activated cloud flows: ${flows.length}; readable definitions: ${flows.length - unreadable.length}; unreadable: ${unreadable.length}`);
+  for (const f of unreadable) console.log(`   - UNREADABLE ${f.name} (${f.reason})`);
+  if (unreadable.length) receipt.incompleteReasons.push(`${unreadable.length} activated cloud flow definition(s) unreadable`);
+
+  const allCreate = await getAll(client,
+    '/sdkmessageprocessingsteps?$select=name,stage,mode,statecode,ishidden' +
+    '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename)' +
+    "&$filter=sdkmessageid/name eq 'Create' and statecode eq 0");
+  const unfiltered = unfilteredCreateSteps(allCreate);
+  const listed = unfiltered.filter((st) => !isPlatformStep(st));
+  receipt.createStepsForAllEntities = {
+    enabledCreateSteps: allCreate.length,
+    unfiltered: unfiltered.length,
+    hiddenMicrosoftPlatformSteps: unfiltered.length - listed.length,
+    otherUnfiltered: listed.map(stepLabel),
+  };
+  console.log(`   enabled Create steps (all entities): ${allCreate.length}; registered for every entity: ${unfiltered.length}` +
+    ` (${unfiltered.length - listed.length} hidden Microsoft platform steps; ${listed.length} other, listed)`);
+  for (const st of listed) console.log(`   - ${stepLabel(st)}`);
+
   for (const entity of CAST_ENTITIES) {
     console.log(`   ${entity}:`);
+    const entry = {};
+    receipt.entities[entity] = entry;
     const workflows = await getAll(client,
       "/workflows?$select=name,category,mode,triggeroncreate,triggeronupdateattributelist" +
       `&$filter=primaryentity eq '${entity}' and type eq 1 and statecode eq 1`);
     const onCreate = workflows.filter((w) => w.triggeroncreate === true);
+    entry.workflowsActivated = workflows.length;
+    entry.workflowsOnCreate = onCreate.map((w) => `[${WORKFLOW_CATEGORY[w.category] || w.category}, ${w.mode === 1 ? 'real-time' : 'background'}] ${w.name}`);
     console.log(`     classic workflows / business rules (activated): ${workflows.length}; on create: ${onCreate.length}`);
-    for (const w of onCreate) console.log(`     - [${WORKFLOW_CATEGORY[w.category] || w.category}, ${w.mode === 1 ? 'real-time' : 'background'}] ${w.name}`);
+    for (const label of entry.workflowsOnCreate) console.log(`     - ${label}`);
     const steps = await getAll(client,
       '/sdkmessageprocessingsteps?$select=name,stage,mode,statecode' +
       '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename)' +
       `&$filter=sdkmessagefilterid/primaryobjecttypecode eq '${entity}' and statecode eq 0`);
     const createSteps = steps.filter((st) => st.sdkmessageid?.name === 'Create');
-    console.log(`     plug-in steps on Create (enabled): ${createSteps.length}`);
-    for (const st of createSteps) {
-      console.log(`     - [stage ${st.stage}, ${st.mode === 0 ? 'sync' : 'async'}] ${st.name || '(unnamed)'}  type=${st.plugintypeid?.typename || '?'}`);
-    }
+    entry.createSteps = createSteps.map(stepLabel);
+    console.log(`     plug-in steps on Create (enabled, entity-registered): ${createSteps.length}`);
+    for (const label of entry.createSteps) console.log(`     - ${label}`);
+    const def = await client.get(`/EntityDefinitions(LogicalName='${entity}')?$select=EntitySetName`);
+    if (!def.ok) throw new Error(`GET ${entity} EntitySetName failed (${def.status})`);
+    const names = [entity, def.body?.EntitySetName];
+    const structured = classified.filter((f) => f.readable && flowNamesEntity(f.definition, names));
     const mentioning = flows.filter((f) => String(f.clientdata || '').includes(`"${entity}`) || String(f.clientdata || '').includes(`${entity}s"`));
-    console.log(`     cloud flows (activated) mentioning it: ${mentioning.length}`);
-    for (const f of mentioning) {
-      const summary = summarizeFlow(f.clientdata);
-      console.log(`     - ${f.name}  triggers: ${summary.triggers.join('; ') || '(none)'}`);
-    }
+    entry.flowsNamingIt = structured.map((f) => ({ name: f.name, ...summarizeFlow(f.clientdata) }));
+    entry.flowsMentioningItBySubstring = mentioning.map((f) => f.name);
+    console.log(`     cloud flows naming it in a trigger or record action: ${structured.length}; mentioning it anywhere: ${mentioning.length}`);
+    for (const f of entry.flowsNamingIt) console.log(`     - ${f.name}  triggers: ${f.triggers.join('; ') || '(none)'}  actions: ${f.actions.join(', ') || '(none)'}`);
+    for (const name of entry.flowsMentioningItBySubstring.filter((n) => !structured.some((f) => f.name === n))) console.log(`     - (mention only) ${name}`);
   }
 
+  receipt.requestLookups = {};
   console.log('   akoya_request lookups the clone would set:');
   for (const field of CAST_REQUEST_LOOKUPS) {
     const attrs = await getAll(client,
@@ -462,11 +556,15 @@ async function printCastReadiness(client, exportDir) {
       "/EntityDefinitions(LogicalName='akoya_request')/ManyToOneRelationships?$select=ReferencedEntity,ReferencingEntityNavigationPropertyName" +
       `&$filter=ReferencingAttribute eq '${field}'`);
     const a = attrs[0];
-    console.log(`   - ${field}: ${a ? `create=${a.IsValidForCreate} update=${a.IsValidForUpdate}` : '(absent)'}  looks up: ${rels.map((r) => `${r.ReferencedEntity} via ${r.ReferencingEntityNavigationPropertyName}`).join(', ') || '(none)'}`);
+    const line = `${a ? `create=${a.IsValidForCreate} update=${a.IsValidForUpdate}` : '(absent)'}  looks up: ${rels.map((r) => `${r.ReferencedEntity} via ${r.ReferencingEntityNavigationPropertyName}`).join(', ') || '(none)'}`;
+    receipt.requestLookups[field] = line;
+    console.log(`   - ${field}: ${line}`);
   }
 
   const orphanResp = await client.get("/contacts?$apply=filter(_parentcustomerid_value eq null and statecode eq 0)/aggregate($count as n)");
   const orphans = orphanResp.ok ? orphanResp.body?.value?.[0]?.n : `unreadable (${orphanResp.status})`;
+  receipt.activeContactsWithoutParentAccount = orphans;
+  if (!orphanResp.ok) receipt.incompleteReasons.push('parentless-contact count unreadable');
   console.log(`   active contacts with no parent account (count only): ${orphans}`);
 
   const ruleFilter = "&$filter=primaryentity eq 'akoya_request' and category eq 2 and type eq 1 and statecode eq 1";
@@ -479,6 +577,7 @@ async function printCastReadiness(client, exportDir) {
   }
   const statusRules = rules.filter((r) => /request status/i.test(r.name));
   const SCOPE = { 1: 'form', 2: 'entity' };
+  receipt.requestStatusRules = [];
   console.log(`   business rules naming Request Status: ${statusRules.length}`);
   for (const r of statusRules) {
     const resp = await client.get(`/workflows(${r.workflowid})?$select=xaml`);
@@ -491,6 +590,7 @@ async function printCastReadiness(client, exportDir) {
     console.log(`   - ${r.name}  scope: ${scope}${r._processtriggerformid_value ? ' (one form)' : ''}`);
     console.log(`     reads: ${reads.join(', ') || '(none)'}  sets: ${summary.sets.join(', ') || '(none)'}`);
     console.log(`     steps: ${summary.steps.join(' | ') || '(none labelled)'}`);
+    receipt.requestStatusRules.push({ name: r.name, scope, oneForm: Boolean(r._processtriggerformid_value), reads, sets: summary.sets, steps: summary.steps });
     if (exportDir) {
       const file = require('path').join(exportDir, `${r.name.replace(/[^A-Za-z0-9]+/g, '_')}.xaml`);
       require('fs').mkdirSync(exportDir, { recursive: true });
@@ -498,6 +598,19 @@ async function printCastReadiness(client, exportDir) {
       console.log(`     exported: ${file}`);
     }
   }
+
+  receipt.complete = receipt.incompleteReasons.length === 0;
+  console.log(`   section 12: ${receipt.complete ? 'COMPLETE' : `INCOMPLETE (${receipt.incompleteReasons.join('; ')})`}`);
+  if (exportDir) {
+    const fs = require('fs');
+    fs.mkdirSync(exportDir, { recursive: true });
+    const file = require('path').join(exportDir, `cast-readiness-receipt-${receipt.generatedAt.replace(/[:.]/g, '-')}.json`);
+    fs.writeFileSync(file, `${JSON.stringify(receipt, null, 2)}\n`, { flag: 'wx' });
+    console.log(`   receipt: ${file}`);
+  } else {
+    console.log('   receipt: not written (pass --cast=<dir>)');
+  }
+  return receipt;
 }
 
 async function getAllOrForbidden(client, path) {
@@ -521,7 +634,8 @@ async function getAll(client, path) {
   return rows;
 }
 
-(async () => {
+async function main() {
+  loadEnvLocal();
   const director = parseDirector(process.argv.slice(2));
   const detail = process.argv.includes('--detail');
   const exportArg = process.argv.find((arg) => arg.startsWith('--export-xaml='));
@@ -609,7 +723,10 @@ async function getAll(client, path) {
 
   if (foundationSince) await printFoundationUnauditedChanges(client, foundationSince);
   if (statusArg) await printStatusFields(client, statusExportDir);
-  if (castArg) await printCastReadiness(client, castExportDir);
+  if (castArg) {
+    const castReceipt = await printCastReadiness(client, castExportDir);
+    if (!castReceipt.complete) process.exitCode = 1;
+  }
   if (historyLimit) await printCreationHistory(client, historyLimit);
   if (meetingLimit) await printMeetingDateWrites(client, meetingLimit, appUsers.length === 1 ? appUsers[0].systemuserid : null);
   if (!detail && !exportDir) return;
@@ -638,7 +755,13 @@ async function getAll(client, path) {
     for (const t of summary.triggers) console.log(`     trigger: ${t}`);
     console.log(`     record actions: ${summary.actions.join(', ') || '(none found)'}`);
   }
-})().catch((error) => {
-  console.error(`Probe failed: ${error.message}`);
-  process.exit(1);
-});
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`Probe failed: ${error.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { classifyFlowDefinition, flowNamesEntity, unfilteredCreateSteps, isPlatformStep, printCastReadiness };
