@@ -54,6 +54,42 @@ describe('fenceProductionClient', () => {
     expect(calls).toEqual([]);
   });
 
+  test.each([
+    ['a nested related record', '/akoya_requests', { akoya_requestid: DEST, akoya_request_emails: [{ subject: 'x' }] }],
+    ['an unapproved column', '/akoya_requests', { akoya_requestid: DEST, akoya_payee: 'x' }],
+    ['a bind to an unapproved entity set', '/akoya_requests', { akoya_requestid: DEST, 'akoya_payee@odata.bind': `/contacts(${LOC})` }],
+    ['a bind that is not a GUID reference', '/akoya_requests', { akoya_requestid: DEST, 'wmkf_ProgramDirector@odata.bind': '/systemusers?$filter=x' }],
+    ['a location with an extra bind', '/sharepointdocumentlocations', {
+      sharepointdocumentlocationid: LOC, 'regardingobjectid_akoya_request@odata.bind': `/akoya_requests(${DEST})`,
+      'ownerid@odata.bind': `/systemusers(${LOC})`,
+    }],
+    ['a location with a nested object', '/sharepointdocumentlocations', {
+      sharepointdocumentlocationid: LOC, 'regardingobjectid_akoya_request@odata.bind': `/akoya_requests(${DEST})`, name: { x: 1 },
+    }],
+  ])('refuses a closed-shape violation: %s', (_label, path, body) => {
+    const { client, calls } = fakeClient();
+    expect(() => fenceProductionClient(client, fence).post(path, body)).toThrow(/Production write fence/);
+    expect(calls).toEqual([]);
+  });
+
+  test('admits the real compiled shapes: Request with its three binds, location with its parent bind', async () => {
+    const { client, calls } = fakeClient();
+    const fenced = fenceProductionClient(client, fence);
+    await fenced.postWithOptions('/akoya_requests', {
+      akoya_requestid: DEST, 'akoya_applicantid@odata.bind': `/accounts(${LOC})`, akoya_title: 'TEST: x', akoya_purpose: 'p',
+      akoya_request: 5, akoya_fiscalyear: 'F', akoya_requesttype: 1, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: true,
+      wmkf_testcreationrunid: LOC, wmkf_respondreminderenabled: false, wmkf_reviewduereminderenabled: false,
+      akoya_requeststatus: 'Phase II Pending', 'wmkf_ProgramDirector@odata.bind': `/systemusers(${LOC})`,
+      'wmkf_GrantProgram@odata.bind': `/wmkf_grantprograms(${LOC})`,
+    }, {}, {});
+    await fenced.post('/sharepointdocumentlocations', {
+      sharepointdocumentlocationid: LOC, name: 'Documents on Default Site 1', relativeurl: FOLDER, servicetype: 0, locationtype: 0,
+      'regardingobjectid_akoya_request@odata.bind': `/akoya_requests(${DEST})`,
+      'parentsiteorlocation_sharepointdocumentlocation@odata.bind': `/sharepointdocumentlocations(${LOC})`,
+    }, {});
+    expect(calls.map((c) => c[0])).toEqual(['postWithOptions', 'post']);
+  });
+
   test.each(['patch', 'patchWithOptions', 'delete_', 'raw'])('refuses %s outright', (method) => {
     const { client, calls } = fakeClient();
     expect(() => fenceProductionClient(client, fence)[method](`/akoya_requests(${DEST})`, {})).toThrow(/not allowed in a production run/);

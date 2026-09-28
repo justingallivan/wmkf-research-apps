@@ -347,7 +347,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
   const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
   const PROD = 'https://wmkf.crm.dynamics.com';
 
-  function productionClient(postWithOptions) {
+  function productionClient(postWithOptions, liveSourceVersion = 42) {
     return {
       baseUrl: `${PROD}/api/data/v9.2`,
       postWithOptions,
@@ -372,7 +372,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         }
         if (requestPath.startsWith('/wmkf_grantprograms')) return ok({ value: [{ wmkf_grantprogramid: PROGRAM_ID, wmkf_name: 'Research' }] });
         if (requestPath.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: false, status: 404, body: null };
-        if (requestPath.startsWith(`/akoya_requests(${SOURCE_ID})`)) return ok({ akoya_requestid: SOURCE_ID, versionnumber: 42 });
+        if (requestPath.startsWith(`/akoya_requests(${SOURCE_ID})`)) return ok({ akoya_requestid: SOURCE_ID, versionnumber: liveSourceVersion });
         if (requestPath.startsWith('/accounts')) return ok({ value: [{ accountid: ORG_ID, name: 'W. M. Keck Foundation', statecode: 0 }] });
         if (requestPath.startsWith('/sharepointsites')) return ok({ value: [{ sharepointsiteid: 'site-x', absoluteurl: 'https://example.sharepoint.com/sites/akoyago' }] });
         if (requestPath.startsWith('/sharepointdocumentlocations')) return ok({ value: [{ sharepointdocumentlocationid: 'parent-1', _parentsiteorlocation_value: 'site-x' }] });
@@ -383,9 +383,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     };
   }
 
-  test('a create body the fence does not admit never reaches the transport', async () => {
-    // Hash-consistent but naming another Request GUID: only the fence stops it.
-    const body = { akoya_requestid: SOURCE_ID, akoya_title: 'TEST: fixture', akoya_purpose: 'Synthetic purpose', akoya_request: 5000 };
+  async function runProductionCreate({ body, liveSourceVersion = 42 }) {
     const bundle = buildSourceBundle({
       sourceRow: {
         akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
@@ -412,11 +410,31 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     const postWithOptions = jest.fn();
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
-      deps: { client: productionClient(postWithOptions), graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
+      deps: { client: productionClient(postWithOptions, liveSourceVersion), graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
     });
+    return { result, postWithOptions };
+  }
+
+  const legitBody = { akoya_requestid: REQUEST_ID, akoya_title: 'TEST: fixture', akoya_purpose: 'Synthetic purpose', akoya_request: 5000 };
+
+  test('a create body the fence does not admit never reaches the transport', async () => {
+    // Hash-consistent but naming another Request GUID: only the fence stops it.
+    const { result, postWithOptions } = await runProductionCreate({ body: { ...legitBody, akoya_requestid: SOURCE_ID } });
     expect(result.errorMessage).toMatch(/Production write fence/);
     expect(result.outcome).toBe('needs_attention');
     expect(postWithOptions).not.toHaveBeenCalled();
+  });
+
+  test('a source edited between fence_source and create_request stops the create before the POST (Codex, slice 2)', async () => {
+    const { result, postWithOptions } = await runProductionCreate({ body: legitBody, liveSourceVersion: 43 });
+    expect(result.errorMessage).toMatch(/changed since the bundle export/);
+    expect(result.outcome).toBe('needs_attention');
+    expect(postWithOptions).not.toHaveBeenCalled();
+  });
+
+  test('with the source unchanged, the same setup reaches the transport (the two refusals above are not vacuous)', async () => {
+    const { postWithOptions } = await runProductionCreate({ body: legitBody });
+    expect(postWithOptions).toHaveBeenCalledTimes(1);
   });
 });
 
