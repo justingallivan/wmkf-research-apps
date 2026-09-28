@@ -9,6 +9,8 @@ import { MANIFEST_V4, PRODUCTION_URL, fenceSource, sha256 } from '../../lib/serv
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
 import { PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
+import { COPY_DESTINATION_LIBRARY } from '../../lib/services/test-requests/bundle-file-copy.js';
+import { expectedRequestFolder } from '../../lib/services/test-requests/sandbox-clone.js';
 
 const DEST = '11111111-1111-4111-8111-111111111111';
 const LOC = '55555555-5555-4555-8555-555555555555';
@@ -139,6 +141,20 @@ describe('fenceProductionGraph', () => {
       .toThrow(/before the Request has its number/);
     expect(g.deleteFile).not.toHaveBeenCalled();
     expect(g.ensureFolderPath).not.toHaveBeenCalled();
+  });
+});
+
+describe('fence folder rule matches the real copy destinations', () => {
+  test('the copy step\'s library and request-folder builder are exactly what the fence admits', async () => {
+    const g = { ensureFolderPath: jest.fn(async () => ({})), uploadFile: jest.fn(async () => ({})) };
+    const fenced = fenceProductionGraph(g, fence);
+    // run-runner.js stepCopyFile: requestFolder = expectedRequestFolder(number, id) from the readback
+    // (lowercase GUID); bundle-file-copy.js requireResolvedDestination: `${requestFolder}/${sub}` in COPY_DESTINATION_LIBRARY.
+    const requestFolder = expectedRequestFolder('1003300', DEST.toLowerCase());
+    await fenced.ensureFolderPath(COPY_DESTINATION_LIBRARY, `${requestFolder}/AI Materials`);
+    await fenced.uploadFile(COPY_DESTINATION_LIBRARY, `${requestFolder}/Reviewer Materials`, 'Proposal_1003300.pdf', Buffer.from('x'), 'application/pdf');
+    expect(g.ensureFolderPath).toHaveBeenCalledTimes(1);
+    expect(g.uploadFile).toHaveBeenCalledTimes(1);
   });
 });
 
