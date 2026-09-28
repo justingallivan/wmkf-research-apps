@@ -44,6 +44,10 @@
  *      platform steps) or listed (everything else). If any activated flow's
  *      definition is unreadable, or the contact count cannot be read, section
  *      12 prints INCOMPLETE and the probe exits 1 after its other sections.
+ *      Each create-triggered workflow's definition is summarized (records it
+ *      creates, columns it sets, email, non-Microsoft code activities); counts
+ *      of marketing lists, marketing list members and AkoyaGo custom marketing
+ *      list items show whether a new contact could join a mailing list.
  *      With <dir>, a dated create-only JSON receipt (names, labels, counts,
  *      booleans; no ids, no raw definitions) is written there.
  *
@@ -480,6 +484,20 @@ function isPlatformStep(st) {
   return hidden === true && /^Microsoft\./.test(st.plugintypeid?.typename || '');
 }
 
+const MAILING_LIST_COUNTS = [
+  ['marketing lists (list, all)', '/lists?$apply=aggregate($count as n)'],
+  ['marketing lists (list, active)', '/lists?$apply=filter(statecode eq 0)/aggregate($count as n)'],
+  ['marketing list members (listmember, contacts)', "/listmembers?$apply=filter(entitytype eq 'contact')/aggregate($count as n)"],
+  ['AkoyaGo custom marketing list items (all)', '/akoya_custommarketinglistitems?$apply=aggregate($count as n)'],
+  ['AkoyaGo custom marketing list items (active)', '/akoya_custommarketinglistitems?$apply=filter(statecode eq 0)/aggregate($count as n)'],
+];
+
+/** Non-Microsoft code activities a workflow calls (their writes are not visible in the XAML). */
+function customWorkflowActivities(xaml) {
+  const names = [...String(xaml).matchAll(/AssemblyQualifiedName="([^",]+)/g)].map((m) => m[1]);
+  return [...new Set(names.filter((n) => !/^(Microsoft|System)\./.test(n)))].sort();
+}
+
 const stepLabel = (st) => `[stage ${st.stage}, ${st.mode === 0 ? 'sync' : 'async'}] ${st.name || '(unnamed)'}  type=${st.plugintypeid?.typename || '?'}`;
 
 /**
@@ -521,13 +539,33 @@ async function printCastReadiness(client, exportDir) {
     const entry = {};
     receipt.entities[entity] = entry;
     const workflows = await getAll(client,
-      "/workflows?$select=name,category,mode,triggeroncreate,triggeronupdateattributelist" +
+      "/workflows?$select=name,category,mode,triggeroncreate,triggeronupdateattributelist,workflowid" +
       `&$filter=primaryentity eq '${entity}' and type eq 1 and statecode eq 1`);
     const onCreate = workflows.filter((w) => w.triggeroncreate === true);
     entry.workflowsActivated = workflows.length;
-    entry.workflowsOnCreate = onCreate.map((w) => `[${WORKFLOW_CATEGORY[w.category] || w.category}, ${w.mode === 1 ? 'real-time' : 'background'}] ${w.name}`);
+    entry.workflowsOnCreate = [];
     console.log(`     classic workflows / business rules (activated): ${workflows.length}; on create: ${onCreate.length}`);
-    for (const label of entry.workflowsOnCreate) console.log(`     - ${label}`);
+    for (const w of onCreate) {
+      const label = `[${WORKFLOW_CATEGORY[w.category] || w.category}, ${w.mode === 1 ? 'real-time' : 'background'}] ${w.name}`;
+      const resp = await client.get(`/workflows(${w.workflowid})?$select=xaml`);
+      if (!resp.ok || !resp.body?.xaml) {
+        entry.workflowsOnCreate.push({ label, readable: false });
+        receipt.incompleteReasons.push(`${entity} create workflow "${w.name}" definition unreadable`);
+        console.log(`     - ${label}  (definition UNREADABLE)`);
+        continue;
+      }
+      const summary = summarizeWorkflowXaml(resp.body.xaml);
+      const customActivities = customWorkflowActivities(resp.body.xaml);
+      entry.workflowsOnCreate.push({ label, readable: true, creates: summary.creates, sets: summary.sets, sendsEmail: summary.sendsEmail, customActivities });
+      console.log(`     - ${label}`);
+      console.log(`       creates: ${summary.creates.join(', ') || '(none)'}  sends email: ${summary.sendsEmail}  custom activities: ${customActivities.join(', ') || '(none)'}`);
+      console.log(`       sets: ${summary.sets.join(', ') || '(none)'}`);
+      if (exportDir) {
+        const file = require('path').join(exportDir, `${entity}_${w.name.replace(/[^A-Za-z0-9]+/g, '_')}.xaml`);
+        require('fs').mkdirSync(exportDir, { recursive: true });
+        require('fs').writeFileSync(file, resp.body.xaml);
+      }
+    }
     const steps = await getAll(client,
       '/sdkmessageprocessingsteps?$select=name,stage,mode,statecode' +
       '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename)' +
@@ -565,6 +603,17 @@ async function printCastReadiness(client, exportDir) {
   const orphanResp = await client.get("/contacts?$apply=filter(_parentcustomerid_value eq null and statecode eq 0)/aggregate($count as n)");
   const orphans = orphanResp.ok ? orphanResp.body?.value?.[0]?.n : `unreadable (${orphanResp.status})`;
   receipt.activeContactsWithoutParentAccount = orphans;
+
+  // Whether a new contact could join a mailing list: Dynamics marketing lists
+  // and AkoyaGo's custom marketing list items. Counts only.
+  receipt.mailingLists = {};
+  for (const [label, path] of MAILING_LIST_COUNTS) {
+    const resp = await client.get(path);
+    const n = resp.ok ? resp.body?.value?.[0]?.n : `unreadable (${resp.status})`;
+    receipt.mailingLists[label] = n;
+    if (!resp.ok) receipt.incompleteReasons.push(`${label} count unreadable`);
+    console.log(`   ${label} (count only): ${n}`);
+  }
   if (!orphanResp.ok) receipt.incompleteReasons.push('parentless-contact count unreadable');
   console.log(`   active contacts with no parent account (count only): ${orphans}`);
 
@@ -765,4 +814,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { classifyFlowDefinition, flowNamesEntity, unfilteredCreateSteps, isPlatformStep, printCastReadiness };
+module.exports = { classifyFlowDefinition, flowNamesEntity, unfilteredCreateSteps, isPlatformStep, customWorkflowActivities, printCastReadiness };

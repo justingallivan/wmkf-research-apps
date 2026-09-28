@@ -9,6 +9,7 @@ const {
   flowNamesEntity,
   unfilteredCreateSteps,
   isPlatformStep,
+  customWorkflowActivities,
 } = require('../../scripts/probe-test-request-factory-production-readiness.js');
 
 const flow = (definition) => JSON.stringify({ properties: { definition } });
@@ -75,5 +76,18 @@ describe('isPlatformStep', () => {
     expect(isPlatformStep(step('Microsoft.Crm.ObjectModel.X', { Value: false }))).toBe(false);
     expect(isPlatformStep(step('AkoyaGo.Sync_BusinessCentral', { Value: true }))).toBe(false);
     expect(isPlatformStep(step(undefined, { Value: true }))).toBe(false);
+  });
+});
+
+describe('customWorkflowActivities', () => {
+  test('lists non-Microsoft code activities once, ignoring platform activities', () => {
+    const xaml = [
+      '<mxswa:ActivityReference AssemblyQualifiedName="Microsoft.Crm.Workflow.Activities.Composite, Microsoft.Crm.Workflow">',
+      '<mxswa:ActivityReference AssemblyQualifiedName="System.Activities.Statements.Sequence, System.Activities">',
+      '<mxswa:ActivityReference AssemblyQualifiedName="AkoyaGo.Workflows.UpdateMailingListMember, AkoyaGo.Workflows">',
+      '<mxswa:ActivityReference AssemblyQualifiedName="AkoyaGo.Workflows.UpdateMailingListMember, AkoyaGo.Workflows">',
+    ].join('');
+    expect(customWorkflowActivities(xaml)).toEqual(['AkoyaGo.Workflows.UpdateMailingListMember']);
+    expect(customWorkflowActivities('')).toEqual([]);
   });
 });
