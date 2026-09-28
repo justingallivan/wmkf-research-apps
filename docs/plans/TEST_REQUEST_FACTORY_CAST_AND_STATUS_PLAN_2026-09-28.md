@@ -43,7 +43,7 @@ A production test Request must be usable for the workflows staff test, which mea
 - Also accepted at clone time, applied as a step after create.
 - One field write per change, then a bounded observation that records what the platform did: Request Status readback, background jobs regarding the Request, new draft emails, GoApply status-tracking rows, payment rows. Names, states and counts only.
 - Refuses any Request not carrying the test marker (`wmkf_istestrequest = true` with a run ID).
-- Setting Phase I = Invited is also how a clone reaches `Phase II Pending` and becomes visible in Workbench and My Proposals [ASSUMED until the first status change confirms the business rule].
+- Setting Phase II Status = Phase II Pending Committee Review is how a clone reaches `Phase II Pending` and becomes visible in Workbench and My Proposals (see *Probe results*; confirmed on the first status change).
 
 ## Probes needed before building
 
@@ -51,6 +51,14 @@ A production test Request must be usable for the workflows staff test, which mea
 2. Plug-in steps and flows on `wmkf_potentialreviewers` and `wmkf_appreviewersuggestion` create in production.
 3. Whether `wmkf_projectleader` and `akoya_primarycontactid` are valid for create on `akoya_request`.
 4. The business rules that set Request Status: scope (entity or form) and the Phase I/II values they map.
+
+## Probe results (section 12, owner-run, 2026-09-28) [VERIFIED via the probe output and the exported rule definitions]
+
+- **Contact create** runs 4 classic workflows (*Alternate Address 2*, *Alternate Address 3*, *WMKF_Update Saluation* real-time, *Update Mailing List Member Info (Contact)*) and 20 plug-in steps, among them `AkoyaGo.Sync_BusinessCentral` (async), `AkoyaGo.AsyncContactCoupling` (async), `AkoyaGo.CalculatedFields`, `AkoyaGo.AddressPopulationByZipCode`, `AkoyaGo.Populate990Region` and `AkoyaGo.AsyncEntityCreated`. **`Sync_BusinessCentral` suggests a new contact is pushed to Business Central** [ASSUMED from its name]; this is the one reaction that may leave the platform, and it blocks the cast until the platform owner says what it does. Contact flows are all manual or monthly (*Bill.com Sync Vendor* is manual).
+- **`wmkf_potentialreviewers` create:** one real-time workflow (*WMKF_Set Full Name on Potential Reviewer*); no flows. **`wmkf_appreviewersuggestion` create:** no workflows or flows.
+- **Lookups:** `wmkf_projectleader` and `akoya_primarycontactid` are both valid for create and update and both look up `contact` (navigation properties `wmkf_ProjectLeader`, `akoya_primarycontactid`), so both can be set in the create body.
+- **Parentless contacts are normal:** 4,628 active contacts have no parent account.
+- **Request Status business rules** (6; scope not readable through the API, `processtriggerscope` absent, so entity scope stays [ASSUMED] from the synchronous rule steps in section 4). Value mapping read from the definitions, in branch order: *Program Phase II*: Phase II Pending Committee Review → `Phase II Pending`; Phase II Declined → `Phase II Declined`; Phase II Deferred → `Phase II Deferred`; Approved → `Approved` (another Approved branch with a second condition → `Closed`); Recommended → `Phase II Pending`. *Program Phase I Invite/Do Not Invite*: Phase I Invited → `Proposal Invited`; Not Invited → `Proposal Not Invited`. **Correction to the design above:** Phase I = Invited gives `Proposal Invited`, not `Phase II Pending`; a clone reaches `Phase II Pending`, and Workbench visibility, through Phase II Status = Phase II Pending Committee Review (no payment: *Create Payment* needs Recommended).
 
 ## Owner decisions (2026-09-28, S547)
 
