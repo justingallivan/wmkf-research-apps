@@ -230,7 +230,7 @@ describe('Foundation Primary Contact and the cast Liaison (cast-and-status plan,
       .toEqual(['Foundation account protected columns changed during the run']);
   });
 
-  test('a baseline without the journaled Primary Contact (every one journaled today) fails any change to it, Liaison or not', () => {
+  test('a baseline without the journaled Primary Contact (runs before S548) fails any change to it, Liaison or not', () => {
     const legacy = captureFoundationBaseline(before(), CONTACTS, CAPTURED);
     expect(legacy).not.toHaveProperty('primaryContactId');
     const after = refreshed({ _primarycontactid_value: LIAISON });
@@ -240,9 +240,9 @@ describe('Foundation Primary Contact and the cast Liaison (cast-and-status plan,
       .toEqual({ failures: [], outcome: 'refreshed' });
   });
 
-  test('the journaled Primary Contact is not yet a ledger receipt key (spine change needed to activate)', () => {
+  test('the journaled Primary Contact is an allowlisted ledger receipt key', () => {
     expect(journaled().primaryContactId).toBe(PRIOR);
-    expect(() => assertLedgerReceipt(journaled())).toThrow(/primaryContactId is not an allowlisted receipt key/);
+    expect(() => assertLedgerReceipt(journaled())).not.toThrow();
   });
 
   test('recheckFoundationTransition threads the Liaison to the contract', async () => {
