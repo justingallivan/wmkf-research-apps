@@ -16,6 +16,12 @@
  *      definition mentions akoya_request.
  *   9. Rollup columns on account and contact whose definition aggregates
  *      akoya_request (a Request create or update can recalculate them).
+ *  10. With --foundation-since=<ISO UTC>: the Foundation account's columns
+ *      that change without an audit row (MVP item 5 verify diagnosis): every
+ *      rollup column's `_date`/`_state` (flagged when recalculated after the
+ *      given time), every calculated column and the columns its formula
+ *      reads, and the names of non-audited columns. Timestamps, states and
+ *      names only; no rollup, calculated or other column values.
  *
  * SAFETY: GET requests only, through the interlocked raw client. Production
  * reads are owner-run behind the interlock override; nothing is written.
@@ -29,6 +35,8 @@
  *   Add --history[=N] (default 10, max 50) to print what happened around the
  *   creation of the N most recent Foundation-applicant (test) Requests: jobs,
  *   emails, and audited field names on the Request and the Foundation account.
+ *   Add --foundation-since=<ISO UTC> for section 10 (run it with the time just
+ *   before a production run's fence_source).
  *   Add --meeting-date[=N] (default 50, max 200) to report whether the meeting
  *   date is written by an update after create on the N most recent Requests
  *   that carry one, by whom, and every audited meeting-date update on a
@@ -276,6 +284,53 @@ async function printMeetingDateWrites(client, limit, appUserId) {
 }
 
 /** Like getAll, but a 403 (missing audit privilege) returns null instead of failing the probe. */
+const SOURCE_TYPED_ATTRIBUTE_TYPES = [
+  ...ROLLUP_ATTRIBUTE_TYPES, 'StringAttributeMetadata', 'MemoAttributeMetadata', 'BooleanAttributeMetadata', 'PicklistAttributeMetadata',
+  'DoubleAttributeMetadata',
+];
+
+/** Section 10: Foundation columns that can change without an audit row. Names, timestamps and states only. */
+async function printFoundationUnauditedChanges(client, since) {
+  console.log(`\n10. Foundation account: columns that change without an audit row (since ${since.toISOString()})`);
+  const foundation = await getAll(client,
+    `/accounts?$select=accountid,modifiedon,versionnumber&$filter=name eq '${FOUNDATION_NAME}' and statecode eq 0`);
+  if (foundation.length !== 1) throw new Error(`Expected one active ${FOUNDATION_NAME} account; found ${foundation.length}.`);
+  const resp = await client.get(`/accounts(${foundation[0].accountid})`);
+  if (!resp.ok) throw new Error(`GET Foundation account failed (${resp.status})`);
+  const row = resp.body;
+  console.log(`   modifiedon ${row.modifiedon}  versionnumber ${row.versionnumber}`);
+
+  const sourced = [];
+  for (const type of SOURCE_TYPED_ATTRIBUTE_TYPES) {
+    const attrs = await getAll(client,
+      `/EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.${type}?$select=LogicalName,SourceType,FormulaDefinition`);
+    sourced.push(...attrs.filter((a) => a.SourceType === 1 || a.SourceType === 2));
+  }
+  const rollups = sourced.filter((a) => a.SourceType === 2).sort((a, b) => a.LogicalName.localeCompare(b.LogicalName));
+  console.log(`   rollup columns: ${rollups.length}`);
+  for (const a of rollups) {
+    const date = row[`${a.LogicalName}_date`] ?? null;
+    const moved = date && Date.parse(date) > since.getTime();
+    console.log(`   - ${a.LogicalName}  _date ${date ?? '(none)'}  _state ${row[`${a.LogicalName}_state`] ?? '(none)'}${moved ? '  RECALCULATED SINCE' : ''}`);
+  }
+  const calculated = sourced.filter((a) => a.SourceType === 1).sort((a, b) => a.LogicalName.localeCompare(b.LogicalName));
+  console.log(`   calculated columns: ${calculated.length}`);
+  for (const a of calculated) {
+    const reads = [...new Set(String(a.FormulaDefinition || '').match(/\b(?:akoya|wmkf|msdyn)_[a-z0-9_]+|\b(?:modifiedon|createdon|now)\b/gi) || [])]
+      .filter((name) => name.toLowerCase() !== a.LogicalName.toLowerCase());
+    console.log(`   - ${a.LogicalName}  reads: ${reads.join(', ') || '(none found)'}`);
+  }
+
+  const all = await getAll(client,
+    "/EntityDefinitions(LogicalName='account')/Attributes?$select=LogicalName,IsAuditEnabled,AttributeOf,IsValidForRead");
+  const derived = new Set(sourced.flatMap((a) => [a.LogicalName, `${a.LogicalName}_date`, `${a.LogicalName}_state`]));
+  const unaudited = all
+    .filter((a) => a.IsValidForRead && !a.AttributeOf && a.IsAuditEnabled?.Value === false && !derived.has(a.LogicalName))
+    .map((a) => a.LogicalName).sort();
+  console.log(`   non-audited plain columns (a change to these leaves no audit row): ${unaudited.length}`);
+  console.log(`   ${unaudited.join(', ')}`);
+}
+
 async function getAllOrForbidden(client, path) {
   try {
     return await getAll(client, path);
@@ -306,6 +361,9 @@ async function getAll(client, path) {
   const historyLimit = historyArg ? Math.min(Math.max(parseInt(historyArg.split('=')[1] || '10', 10) || 10, 1), 50) : 0;
   const meetingArg = process.argv.find((arg) => arg === '--meeting-date' || arg.startsWith('--meeting-date='));
   const meetingLimit = meetingArg ? Math.min(Math.max(parseInt(meetingArg.split('=')[1] || '50', 10) || 50, 1), 200) : 0;
+  const sinceArg = process.argv.find((arg) => arg.startsWith('--foundation-since='));
+  const foundationSince = sinceArg ? new Date(sinceArg.slice('--foundation-since='.length)) : null;
+  if (foundationSince && Number.isNaN(foundationSince.getTime())) throw new Error('--foundation-since must be an ISO timestamp.');
   const clientId = process.env.DYNAMICS_CLIENT_ID;
   if (!clientId) throw new Error('DYNAMICS_CLIENT_ID is not set.');
   const token = await getAccessToken(PRODUCTION_URL);
@@ -376,6 +434,7 @@ async function getAll(client, path) {
     for (const a of fromRequests) console.log(`   - ${entityName}.${a.LogicalName} (with ${a.LogicalName}_state and ${a.LogicalName}_date)`);
   }
 
+  if (foundationSince) await printFoundationUnauditedChanges(client, foundationSince);
   if (historyLimit) await printCreationHistory(client, historyLimit);
   if (meetingLimit) await printMeetingDateWrites(client, meetingLimit, appUsers.length === 1 ? appUsers[0].systemuserid : null);
   if (!detail && !exportDir) return;
