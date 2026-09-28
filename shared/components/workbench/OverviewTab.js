@@ -22,12 +22,14 @@ import { StatusBadge } from './StatusTab';
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const money = (n) => (typeof n === 'number' && Number.isFinite(n) ? USD.format(n) : '—');
 
+// wmkf_meetingdate is DateOnly: it parses as UTC midnight, so format in UTC
+// or viewers west of UTC see the day before.
 function formatMeetingDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? '—'
-    : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 function Field({ label, children }) {
