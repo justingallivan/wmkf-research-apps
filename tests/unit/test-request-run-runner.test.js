@@ -25,6 +25,11 @@ const LOCATION_ID = '33333333-3333-4333-8333-333333333333';
 const SOURCE_ID = '44444444-4444-4444-8444-444444444444';
 const APP_USER_ID = '55555555-5555-4555-8555-555555555555';
 const ORG_ID = '66666666-6666-4666-8666-666666666666';
+// Slice B: the production cast PI and Liaison contacts.
+const PI_ID = '88888888-8888-4888-8888-888888888888';
+const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
+const castMember = (role, memberId, overrides = {}) => ({ memberId, environment: 'production', role, entity: 'contact', status: 'verified', ...overrides });
+const VERIFIED_CAST = [castMember('liaison', LIAISON_ID), castMember('pi', PI_ID)];
 
 function ok(body, status = 200) {
   return { ok: true, status, body };
@@ -40,7 +45,7 @@ function fakeGraph(overrides = {}) {
 }
 
 /** A recording fake ledger: satisfies the run-ledger.js shape and records every call. */
-function createFakeLedger(initialRun) {
+function createFakeLedger(initialRun, { castMembers = VERIFIED_CAST } = {}) {
   const calls = [];
   let run = { ...initialRun };
   const resources = [];
@@ -146,6 +151,10 @@ function createFakeLedger(initialRun) {
     },
     async getRunReviewerAssignment() {
       return null;
+    },
+    async listCastMembers({ environment }) {
+      calls.push({ op: 'listCastMembers', environment });
+      return castMembers.filter((member) => member.environment === environment).map((member) => ({ ...member }));
     },
   };
   return { ledger, calls, getRun: () => run, getResources: () => resources };
@@ -351,7 +360,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
   const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
   const PROD = 'https://wmkf.crm.dynamics.com';
 
-  function productionClient(postWithOptions, liveSourceVersion = 42, extraRoutes = null) {
+  function productionClient(postWithOptions, liveSourceVersion = 42, extraRoutes = null, castContactState = 0) {
     return {
       baseUrl: `${PROD}/api/data/v9.2`,
       postWithOptions,
@@ -365,6 +374,8 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         if (requestPath.includes('ManyToOneRelationships')) {
           if (requestPath.includes("'wmkf_programdirector'")) return ok({ value: [{ ReferencedEntity: 'systemuser', ReferencingEntityNavigationPropertyName: 'wmkf_ProgramDirector' }] });
           if (requestPath.includes("'wmkf_grantprogram'")) return ok({ value: [{ ReferencedEntity: 'wmkf_grantprogram', ReferencingEntityNavigationPropertyName: 'wmkf_GrantProgram' }] });
+          if (requestPath.includes("'wmkf_projectleader'")) return ok({ value: [{ ReferencedEntity: 'contact', ReferencingEntityNavigationPropertyName: 'wmkf_ProjectLeader' }] });
+          if (requestPath.includes("'akoya_primarycontactid'")) return ok({ value: [{ ReferencedEntity: 'contact', ReferencingEntityNavigationPropertyName: 'akoya_primarycontactid' }] });
           return ok({ value: [{ ReferencedEntity: 'account' }] });
         }
         if (requestPath.includes('PicklistAttributeMetadata')) {
@@ -383,13 +394,15 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         if (requestPath.startsWith('/sharepointsites')) return ok({ value: [{ sharepointsiteid: 'site-x', absoluteurl: 'https://example.sharepoint.com/sites/akoyago' }] });
         if (requestPath.startsWith('/sharepointdocumentlocations')) return ok({ value: [{ sharepointdocumentlocationid: 'parent-1', _parentsiteorlocation_value: 'site-x' }] });
         if (requestPath.startsWith('/systemusers')) return ok({ value: [{ systemuserid: APP_USER_ID, fullname: '# WMK: Research Review App Suite', accessmode: 4, isdisabled: false }] });
-        if (requestPath.startsWith('/contacts')) return ok({ value: [] });
+        const castContact = /^\/contacts\(([0-9a-f-]{36})\)/.exec(requestPath);
+        if (castContact && [PI_ID, LIAISON_ID].includes(castContact[1])) return ok({ contactid: castContact[1], statecode: castContactState });
+        if (requestPath.startsWith('/contacts?')) return ok({ value: [] });
         throw new Error(`unexpected path: ${requestPath}`);
       },
     };
   }
 
-  async function runProductionCreate({ body, liveSourceVersion = 42 }) {
+  async function runProductionCreate({ body, liveSourceVersion = 42, castMembers = VERIFIED_CAST, castContactState = 0 }) {
     const bundle = buildSourceBundle({
       sourceRow: {
         akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
@@ -402,7 +415,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       copyPolicyDigest: copyPolicyDigest(), sourceRevision: bundle.source.request.revision,
       destinationEnvironment: 'production', destinationDataverseHost: 'wmkf.crm.dynamics.com',
     });
-    const { ledger } = createFakeLedger(run);
+    const { ledger } = createFakeLedger(run, { castMembers });
     const manifest = baseManifest({
       target: PROD, targetEnvironment: 'production', createBody: body, createBodySha256: sha256(body), bundle,
       source: {
@@ -410,13 +423,13 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         dataverseHost: bundle.source.dataverseHost, exportedAt: bundle.exportedAt, requestNumber: '1003222',
       },
       copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
-      values: { ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID },
+      values: { ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, piContactId: PI_ID, liaisonContactId: LIAISON_ID },
     });
     process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
     const postWithOptions = jest.fn();
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
-      deps: { client: productionClient(postWithOptions, liveSourceVersion), graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
+      deps: { client: productionClient(postWithOptions, liveSourceVersion, null, castContactState), graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
     });
     return { result, postWithOptions };
   }
@@ -443,6 +456,41 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     expect(postWithOptions).toHaveBeenCalledTimes(1);
   });
 
+  describe('cast PI and Liaison (slice B)', () => {
+    const OTHER_CONTACT = '12121212-1212-4121-8121-121212121212';
+    const castBody = {
+      ...legitBody,
+      'wmkf_ProjectLeader@odata.bind': `/contacts(${PI_ID})`,
+      'akoya_primarycontactid@odata.bind': `/contacts(${LIAISON_ID})`,
+    };
+
+    test('the fence admits the create binding exactly the manifest cast contacts', async () => {
+      // The fake transport returns nothing, so the step fails after the POST; the POST itself is the assertion.
+      const { postWithOptions } = await runProductionCreate({ body: castBody });
+      expect(postWithOptions).toHaveBeenCalledTimes(1);
+      expect(postWithOptions.mock.calls[0][1]).toEqual(castBody);
+    });
+
+    test('the fence refuses a contact bind outside the manifest cast (castContactIds reach the fence)', async () => {
+      const { result, postWithOptions } = await runProductionCreate({ body: { ...castBody, 'akoya_primarycontactid@odata.bind': `/contacts(${OTHER_CONTACT})` } });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.errorMessage).toMatch(/Production write fence: Request bind akoya_primarycontactid@odata.bind is not approved/);
+      expect(postWithOptions).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['the ledger Liaison is not verified', { castMembers: [castMember('pi', PI_ID), castMember('liaison', LIAISON_ID, { status: 'dispatched' })] }, /cast liaison is not the journaled, verified/],
+      ['the ledger PI is a different contact', { castMembers: [castMember('pi', OTHER_CONTACT), castMember('liaison', LIAISON_ID)] }, /cast pi is not the journaled, verified/],
+      ['the ledger has no production cast', { castMembers: [] }, /cast pi is not the journaled, verified/],
+      ['a cast contact is inactive', { castContactState: 1 }, /cast pi contact is not active/],
+    ])('the create lease refuses before the POST when %s', async (_label, options, message) => {
+      const { result, postWithOptions } = await runProductionCreate({ body: castBody, ...options });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.errorMessage).toMatch(message);
+      expect(postWithOptions).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Foundation transition contract (MVP item 5)', () => {
     const SP_TARGET = () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' });
     const REQUEST_NUMBER = '1009001';
@@ -454,7 +502,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       akoya_countofrequests: 10, akoya_countofawards: 0, wmkf_countofdiscretionarygrant: 0, wmkf_countofprogramgrants: 0,
       akoya_totalgrants: 0, wmkf_sumofdiscretionarygrants: 0, wmkf_sumofprogramgrants: 0, akoya_mostrecentgrant: null,
       akoya_guidestarcode: 'G1', akoya_guidestardescription: 'Private foundation', akoya_guidestarirsbmfsubsection: '03',
-      akoya_guidestarorganizationname: 'Keck',
+      akoya_guidestarorganizationname: 'Keck', _primarycontactid_value: '13131313-1313-4131-8131-131313131313',
       ...overrides,
     });
 
@@ -462,7 +510,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       akoya_requestid: 'Uniqueidentifier', akoya_applicantid: 'Lookup', akoya_purpose: 'Memo', akoya_request: 'Money',
       akoya_requesttype: 'Picklist', wmkf_meetingdate: 'DateOnly', wmkf_istestrequest: 'Boolean',
       wmkf_respondreminderenabled: 'Boolean', wmkf_reviewduereminderenabled: 'Boolean',
-      wmkf_programdirector: 'Lookup', wmkf_grantprogram: 'Lookup',
+      wmkf_programdirector: 'Lookup', wmkf_grantprogram: 'Lookup', wmkf_projectleader: 'Lookup', akoya_primarycontactid: 'Lookup',
     };
 
     function fixture({ step, account, requestRow = null }) {
@@ -505,6 +553,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
         values: {
           ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, testLabel: 'TEST fixture', fiscalYear: 'December 2026',
+          piContactId: PI_ID, liaisonContactId: LIAISON_ID,
         },
         invariants: { expectedSharePointFiles: 0 },
       });
@@ -536,6 +585,9 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       const setup = fixture({ step: 'fence_source', account: () => foundation() });
       const preflight = await runPreflight(setup.client, fakeGraph(), SP_TARGET);
       const body = compileBody(preflight, setup.manifest.values, bundleSourceOf(setup.manifest).request);
+      // Slice B: the cast binds use the navigation properties live metadata resolved.
+      expect(body['wmkf_ProjectLeader@odata.bind']).toBe(`/contacts(${PI_ID})`);
+      expect(body['akoya_primarycontactid@odata.bind']).toBe(`/contacts(${LIAISON_ID})`);
       setup.manifest.createBody = body;
       setup.manifest.createBodySha256 = sha256(body);
       setup.run.createBodySha256 = sha256(body);
@@ -545,6 +597,18 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       expect(result.outcome).toBe('advanced');
       expect(getRun().currentStep).toBe('create_request');
       expect(getResources().map((row) => [row.step, row.resourceKind])).toEqual([['fence_source', 'foundation_transition']]);
+    });
+
+    test('a production preflight refuses a cast lookup whose live relationship is not exactly one to contact (slice B)', async () => {
+      process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
+      const setup = fixture({ step: 'fence_source', account: () => foundation() });
+      const wrongTarget = {
+        ...setup.client,
+        get: (rawPath) => (decodeURIComponent(rawPath).includes("ReferencingAttribute eq 'wmkf_projectleader'")
+          ? ok({ value: [{ ReferencedEntity: 'account', ReferencingEntityNavigationPropertyName: 'wmkf_ProjectLeader' }] })
+          : setup.client.get(rawPath)),
+      };
+      await expect(runPreflight(wrongTarget, fakeGraph(), SP_TARGET)).rejects.toThrow(/wmkf_projectleader is not exactly one lookup to contact/);
     });
 
     test('the pre-create baseline is one digest-only receipt the ledger accepts', async () => {
@@ -581,7 +645,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       expect(getResources()).toHaveLength(0);
     });
 
-    function verifyFixture(accountAfter) {
+    function verifyFixture(accountAfter, requestOverrides = {}) {
       const body = {
         akoya_requestid: REQUEST_ID, akoya_title: 'TEST: fixture', akoya_fiscalyear: 'December 2026', akoya_requesttype: 100000000,
         akoya_purpose: 'Synthetic purpose', akoya_request: 5000, akoya_requeststatus: 'Phase II Pending',
@@ -591,15 +655,16 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         _createdby_value: APP_USER_ID, _ownerid_value: APP_USER_ID, wmkf_istestrequest: true, wmkf_testcreationrunid: RUN_ID,
         wmkf_respondreminderenabled: false, wmkf_reviewduereminderenabled: false, akoya_submissionaccepted: false,
         _wmkf_programdirector_value: PD_ID, _wmkf_grantprogram_value: PROGRAM_ID,
+        _wmkf_projectleader_value: PI_ID, _akoya_primarycontactid_value: LIAISON_ID, ...requestOverrides,
       };
       const withRequest = fixture({ step: 'verify', account: () => accountAfter, requestRow });
       withRequest.manifest.createBody = body;
       return withRequest;
     }
 
-    async function verifyWith(accountAfter, baseline) {
+    async function verifyWith(accountAfter, baseline, requestOverrides = {}) {
       process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
-      const setup = verifyFixture(accountAfter);
+      const setup = verifyFixture(accountAfter, requestOverrides);
       const { ledger, getResources } = createFakeLedger(setup.run);
       if (baseline) {
         await ledger.journalPlannedResource({ step: 'fence_source', resourceKind: 'foundation_transition', system: 'dataverse', plannedIdentity: baseline });
@@ -625,6 +690,28 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       expect(result.outcome).toBe('needs_attention');
       expect(result.errorMessage).toMatch(/Foundation account protected columns changed during the run/);
       expect(result.errorMessage).not.toMatch(/555-0199/);
+    });
+
+    test('verify fails when a cast lookup reads back different from the manifest (slice B)', async () => {
+      const { result } = await verifyWith(foundation(), baselineFor(foundation()), { _wmkf_projectleader_value: LIAISON_ID });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.errorMessage).toMatch(/cast PI mismatch/);
+      const passing = await verifyWith(foundation(), baselineFor(foundation()));
+      expect(passing.result.outcome).toBe('ready');
+    });
+
+    // The Liaison-copy allowance needs a baseline journaling the pre-run
+    // Primary Contact, which the ledger grammar cannot hold yet (the runner
+    // never journals one); built directly here to prove the runner threads
+    // the manifest Liaison into the contract.
+    test('verify threads the manifest Liaison into the transition contract', async () => {
+      const journaled = captureFoundationBaseline(foundation(), [], new Date(Date.now() - 60_000), { journalPrimaryContact: true });
+      const copied = await verifyWith(foundation({ _primarycontactid_value: LIAISON_ID }), journaled);
+      expect(copied.result.errorMessage).toBeUndefined();
+      expect(copied.result.outcome).toBe('ready');
+      const other = await verifyWith(foundation({ _primarycontactid_value: PI_ID }), journaled);
+      expect(other.result.outcome).toBe('needs_attention');
+      expect(other.result.errorMessage).toMatch(/Primary Contact changed to a contact other than the run's cast Liaison/);
     });
 
     test('verify fails closed without a pre-create baseline', async () => {

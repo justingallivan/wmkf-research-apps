@@ -30,6 +30,8 @@ const ORG_ID = '33333333-3333-4333-8333-333333333333';
 const APP_USER_ID = '44444444-4444-4444-8444-444444444444';
 const PD_ID = '66666666-6666-4666-8666-666666666666';
 const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
+const PI_ID = '88888888-8888-4888-8888-888888888888';
+const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
 
 const BASE_FIELDS = [
   'akoya_requestid', 'akoya_title', 'akoya_purpose', 'akoya_request', 'akoya_fiscalyear',
@@ -63,6 +65,12 @@ function metadata({ production = true, overrides = {} } = {}) {
     fields.wmkf_grantprogram = {
       createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity: 'wmkf_grantprogram', navigationProperty: 'wmkf_GrantProgram',
     };
+    fields.wmkf_projectleader = {
+      createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity: 'contact', navigationProperty: 'wmkf_ProjectLeader',
+    };
+    fields.akoya_primarycontactid = {
+      createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity: 'contact', navigationProperty: 'akoya_primarycontactid',
+    };
   }
   return { entity: 'akoya_request', fields: { ...fields, ...overrides } };
 }
@@ -77,7 +85,9 @@ function draftInput(overrides = {}) {
   };
 }
 
-const production = { requestStatus: 'Phase II Pending', programDirectorId: PD_ID, grantProgramId: PROGRAM_ID };
+const production = {
+  requestStatus: 'Phase II Pending', programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, piContactId: PI_ID, liaisonContactId: LIAISON_ID,
+};
 
 describe('policy: production create-body additions', () => {
   test('binds the program director and grant program through the metadata navigation properties', () => {
@@ -86,6 +96,38 @@ describe('policy: production create-body additions', () => {
     expect(result.createBody.akoya_requeststatus).toBe('Phase II Pending');
     expect(result.createBody['wmkf_ProgramDirector@odata.bind']).toBe(`/systemusers(${PD_ID})`);
     expect(result.createBody['wmkf_GrantProgram@odata.bind']).toBe(`/wmkf_grantprograms(${PROGRAM_ID})`);
+  });
+
+  test('binds exactly the cast PI and Liaison contacts through the metadata navigation properties (slice B)', () => {
+    const md = metadata();
+    // Nav property names come from live metadata, never a constant in the compiler.
+    md.fields.wmkf_projectleader = { ...md.fields.wmkf_projectleader, navigationProperty: 'Resolved_PI_Nav' };
+    md.fields.akoya_primarycontactid = { ...md.fields.akoya_primarycontactid, navigationProperty: 'Resolved_Liaison_Nav' };
+    const result = compileTestRequestDraft(draftInput({ metadata: md, production }));
+    expect(result.blockers).toEqual([]);
+    const contactBinds = Object.entries(result.createBody).filter(([, value]) => String(value).startsWith('/contacts('));
+    expect(contactBinds).toEqual([
+      ['Resolved_PI_Nav@odata.bind', `/contacts(${PI_ID})`],
+      ['Resolved_Liaison_Nav@odata.bind', `/contacts(${LIAISON_ID})`],
+    ]);
+  });
+
+  test.each([
+    ['without a PI', { ...production, piContactId: undefined }, 'wmkf_projectleader'],
+    ['without a Liaison', { ...production, liaisonContactId: undefined }, 'akoya_primarycontactid'],
+    ['with the same contact as PI and Liaison', { ...production, liaisonContactId: PI_ID.toUpperCase() }, 'akoya_primarycontactid'],
+  ])('refuses a production draft %s', (_label, value, field) => {
+    const result = compileTestRequestDraft(draftInput({ production: value }));
+    expect(result.createBody).toBeNull();
+    expect(result.blockers.map((b) => b.field)).toContain(field);
+  });
+
+  test('refuses a cast lookup whose live target is not contact', () => {
+    const md = metadata();
+    md.fields.wmkf_projectleader = { ...md.fields.wmkf_projectleader, lookupEntity: 'account' };
+    const result = compileTestRequestDraft(draftInput({ metadata: md, production }));
+    expect(result.createBody).toBeNull();
+    expect(result.blockers).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'LOOKUP_TARGET_UNKNOWN', field: 'wmkf_projectleader' })]));
   });
 
   test('a sandbox draft (no production input) carries none of the additions', () => {
@@ -125,7 +167,10 @@ function productionManifest(overrides = {}) {
     target: PRODUCTION_URL,
     targetEnvironment: 'production',
     recipe: 'basic',
-    values: { requestId: REQUEST_ID, runId: RUN_ID, meetingDate: '2026-12-01', programDirectorId: PD_ID, grantProgramId: PROGRAM_ID },
+    values: {
+      requestId: REQUEST_ID, runId: RUN_ID, meetingDate: '2026-12-01', programDirectorId: PD_ID, grantProgramId: PROGRAM_ID,
+      piContactId: PI_ID, liaisonContactId: LIAISON_ID,
+    },
     createBody: { akoya_requeststatus: 'Phase II Pending' },
     expectedAppUserId: APP_USER_ID,
     ...overrides,
@@ -140,6 +185,33 @@ describe('manifest target', () => {
     expect(() => buildCloneManifest(preflight, { bundle: {}, programDirector: director, recipe: 'reviews' })).toThrow(/only the basic recipe/);
     expect(() => buildCloneManifest(preflight, { bundle: {} })).toThrow(/program director and grant program/);
     expect(() => buildCloneManifest({ targetEnvironment: 'sandbox' }, { programDirector: director })).toThrow(/only on a production target/);
+  });
+
+  test('buildCloneManifest refuses a production target without two distinct cast contacts, and a sandbox target with any', () => {
+    const preflight = { targetEnvironment: 'production', grantProgram: { grantprogramid: PROGRAM_ID } };
+    const base = { bundle: {}, programDirector: { systemuserid: PD_ID } };
+    expect(() => buildCloneManifest(preflight, base)).toThrow(/requires the cast PI and Liaison/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { piContactId: PI_ID } })).toThrow(/requires the cast PI and Liaison/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { piContactId: PI_ID, liaisonContactId: 'nope' } })).toThrow(/requires the cast PI and Liaison/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { piContactId: PI_ID, liaisonContactId: PI_ID.toUpperCase() } }))
+      .toThrow(/must be different contacts/);
+    expect(() => buildCloneManifest({ targetEnvironment: 'sandbox' }, { cast: { piContactId: PI_ID, liaisonContactId: LIAISON_ID } }))
+      .toThrow(/bound only on a production target/);
+  });
+
+  test.each([
+    ['no PI', { piContactId: undefined }],
+    ['no Liaison', { liaisonContactId: undefined }],
+    ['a non-GUID Liaison', { liaisonContactId: 'me@wmkeck.org' }],
+    ['the same contact twice', { liaisonContactId: PI_ID.toUpperCase() }],
+  ])('validateCloneManifest refuses a production manifest with %s', (_label, change) => {
+    const manifest = productionManifest({ values: { ...productionManifest().values, ...change } });
+    expect(() => validateCloneManifest(manifest)).toThrow(/two different cast contacts/);
+  });
+
+  test('validateCloneManifest refuses a sandbox manifest that carries a cast contact', () => {
+    const manifest = { kind: MANIFEST_V3, target: SANDBOX_URL, values: { piContactId: PI_ID } };
+    expect(() => validateCloneManifest(manifest)).toThrow(/never binds cast contacts/);
   });
 
   test('validateCloneManifest refuses a production manifest on the legacy one-shot execute path', () => {
@@ -314,6 +386,16 @@ describe('verifyClone on a production target', () => {
     const message = failures.find((failure) => failure.startsWith('created 1 regarding email'));
     expect(message).toBe(`created 1 regarding email row(s): outgoing status 0/1 unsent, created 2026-09-28T18:10:00Z by ${APP_USER_ID}`);
     expect(failures.join(' ')).not.toMatch(/Private subject/);
+  });
+
+  test('confirms the cast PI and Liaison read back on the created Request (slice B)', () => {
+    const readback = (request) => verifyClone(manifest(), preflightBefore, { ...observation([]), request }, [], preflightBefore.foundation, []).failures;
+    const bound = { _wmkf_projectleader_value: PI_ID.toUpperCase(), _akoya_primarycontactid_value: LIAISON_ID };
+    expect(readback(bound)).not.toEqual(expect.arrayContaining([expect.stringMatching(/^cast /)]));
+    expect(readback({ ...bound, _wmkf_projectleader_value: LIAISON_ID })).toContain('cast PI mismatch');
+    expect(readback({ ...bound, _akoya_primarycontactid_value: null })).toContain('cast Liaison mismatch');
+    const sandbox = verifyClone(manifest({ targetEnvironment: 'sandbox' }), preflightBefore, observation([]), [], preflightBefore.foundation, []);
+    expect(sandbox.failures.filter((failure) => failure.startsWith('cast '))).toEqual([]);
   });
 
   test('leaves the Foundation comparison to the runner pre-create baseline', () => {
