@@ -8,9 +8,13 @@
  */
 import { jest } from '@jest/globals';
 import {
-  advanceRun, nextStepFor, recipeIncludesStep, recipeLeaseSeconds, RECIPE_STEP_ORDER,
+  advanceRun, nextStepFor, recipeIncludesStep, recipeLeaseSeconds, recordFoundationTransitionBaseline, RECIPE_STEP_ORDER,
 } from '../../lib/services/test-requests/run-runner.js';
-import { sha256, MANIFEST_V4, computeRunPlanDigest } from '../../lib/services/test-requests/basic-clone-steps.js';
+import {
+  bundleSourceOf, compileBody, computeRunPlanDigest, MANIFEST_V4, runPreflight, sha256,
+} from '../../lib/services/test-requests/basic-clone-steps.js';
+import { captureFoundationBaseline } from '../../lib/services/test-requests/foundation-transition.js';
+import { assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
@@ -347,12 +351,14 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
   const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
   const PROD = 'https://wmkf.crm.dynamics.com';
 
-  function productionClient(postWithOptions, liveSourceVersion = 42) {
+  function productionClient(postWithOptions, liveSourceVersion = 42, extraRoutes = null) {
     return {
       baseUrl: `${PROD}/api/data/v9.2`,
       postWithOptions,
       async get(rawPath) {
         const requestPath = decodeURIComponent(rawPath);
+        const extra = extraRoutes?.(requestPath);
+        if (extra) return extra;
         if (requestPath.startsWith(`/systemusers(${PD_ID})`)) {
           return ok({ systemuserid: PD_ID, fullname: 'Staff', isdisabled: false, accessmode: 0, internalemailaddress: 'pd@wmkeck.org' });
         }
@@ -435,6 +441,195 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
   test('with the source unchanged, the same setup reaches the transport (the two refusals above are not vacuous)', async () => {
     const { postWithOptions } = await runProductionCreate({ body: legitBody });
     expect(postWithOptions).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Foundation transition contract (MVP item 5)', () => {
+    const SP_TARGET = () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' });
+    const REQUEST_NUMBER = '1009001';
+    const nowIso = (offsetMs = 0) => new Date(Date.now() + offsetMs).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const foundation = (overrides = {}) => ({
+      accountid: ORG_ID, name: 'W. M. Keck Foundation', statecode: 0, versionnumber: 100, telephone1: '555-0100',
+      akoya_taxstatus: 100000001, wmkf_bmf509: 'Undetermined',
+      akoya_goverifytrigger: '2026-08-03T18:15:12Z', akoya_dexempt: '2026-08-03',
+      akoya_countofrequests: 10, akoya_countofawards: 0, wmkf_countofdiscretionarygrant: 0, wmkf_countofprogramgrants: 0,
+      akoya_totalgrants: 0, wmkf_sumofdiscretionarygrants: 0, wmkf_sumofprogramgrants: 0, akoya_mostrecentgrant: null,
+      ...overrides,
+    });
+
+    const ATTRIBUTE_TYPES = {
+      akoya_requestid: 'Uniqueidentifier', akoya_applicantid: 'Lookup', akoya_purpose: 'Memo', akoya_request: 'Money',
+      akoya_requesttype: 'Picklist', wmkf_meetingdate: 'DateOnly', wmkf_istestrequest: 'Boolean',
+      wmkf_respondreminderenabled: 'Boolean', wmkf_reviewduereminderenabled: 'Boolean',
+      wmkf_programdirector: 'Lookup', wmkf_grantprogram: 'Lookup',
+    };
+
+    function fixture({ step, account, requestRow = null }) {
+      const bundle = buildSourceBundle({
+        sourceRow: {
+          akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+          akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 42,
+        },
+        documents: [], dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date(), reviewers: [],
+      });
+      const routes = (requestPath) => {
+        if (requestPath === `/accounts(${ORG_ID})`) return ok(account());
+        if (requestPath.includes('MoneyAttributeMetadata')) return ok({ MinValue: 0, MaxValue: 1_000_000_000 });
+        if (requestPath.includes('/Attributes?') && requestPath.includes('$filter')) {
+          const names = [...requestPath.matchAll(/LogicalName eq '([a-z_]+)'/g)].map((m) => m[1]);
+          return ok({ value: names.map((field) => ({
+            LogicalName: field, AttributeType: ATTRIBUTE_TYPES[field] || 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' },
+          })) });
+        }
+        if (requestRow && requestPath.startsWith(`/akoya_requests(${REQUEST_ID})`)) return ok(requestRow);
+        if (requestRow && requestPath.startsWith('/sharepointdocumentlocations(parent-1)')) {
+          return ok({ sharepointdocumentlocationid: 'parent-1', relativeurl: 'akoya_request', _parentsiteorlocation_value: 'site-x' });
+        }
+        if (requestRow && requestPath.startsWith('/sharepointdocumentlocations?') && requestPath.includes('_regardingobjectid_value')) {
+          return ok({ value: [{
+            sharepointdocumentlocationid: LOCATION_ID, relativeurl: `${REQUEST_NUMBER}_${REQUEST_ID.replace(/-/g, '').toUpperCase()}`,
+            _parentsiteorlocation_value: 'parent-1', _createdby_value: APP_USER_ID, _ownerid_value: APP_USER_ID,
+          }] });
+        }
+        if (requestPath.startsWith('/akoya_requestpayments') || requestPath.startsWith('/emails')) return ok({ value: [] });
+        return null;
+      };
+      const client = productionClient(jest.fn(), 42, routes);
+      const manifest = baseManifest({
+        target: PROD, targetEnvironment: 'production', bundle,
+        source: {
+          requestId: SOURCE_ID, revision: bundle.source.request.revision, requestType: 100000000, bundleSha256: sha256(bundle),
+          dataverseHost: bundle.source.dataverseHost, exportedAt: bundle.exportedAt, requestNumber: '1003222',
+        },
+        copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
+        values: {
+          ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, testLabel: 'TEST fixture', fiscalYear: 'December 2026',
+        },
+        invariants: { expectedSharePointFiles: 0 },
+      });
+      const run = baseRun({
+        currentStep: step, stepIndex: RECIPE_STEP_ORDER.basic.indexOf(step), bundleSha256: sha256(bundle),
+        copyPolicyDigest: copyPolicyDigest(), sourceRevision: bundle.source.request.revision,
+        destinationEnvironment: 'production', destinationDataverseHost: 'wmkf.crm.dynamics.com',
+      });
+      return { client, manifest, run, bundle };
+    }
+
+    const advance = ({ client, manifest, bundle }, ledger) => advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle, deps: { client, graph: fakeGraph({ listFiles: async () => [] }), sharePointTarget: SP_TARGET },
+    });
+
+    // The recorder runs at the end of a production fence_source (after the
+    // body re-hash and absence check); called directly here because the
+    // fixture metadata cannot compile a create body.
+    async function recordBaseline(account, ledgerFixture = createFakeLedger(baseRun({ leaseToken: 'lease', leaseGeneration: 1, lockedUntil: 'x' }))) {
+      const { client, run } = fixture({ step: 'fence_source', account });
+      const leased = { ...run, leaseToken: 'lease', leaseGeneration: 1 };
+      const outcome = await recordFoundationTransitionBaseline({ run: leased, ledger: ledgerFixture.ledger, client })
+        .then((resources) => ({ resources }), (error) => ({ error }));
+      return { ...outcome, getResources: ledgerFixture.getResources, ledgerFixture };
+    }
+
+    test('a production fence_source journals the baseline before advancing to the create', async () => {
+      process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
+      const setup = fixture({ step: 'fence_source', account: () => foundation() });
+      const preflight = await runPreflight(setup.client, fakeGraph(), SP_TARGET);
+      const body = compileBody(preflight, setup.manifest.values, bundleSourceOf(setup.manifest).request);
+      setup.manifest.createBody = body;
+      setup.manifest.createBodySha256 = sha256(body);
+      setup.run.createBodySha256 = sha256(body);
+      const { ledger, getResources, getRun } = createFakeLedger(setup.run);
+      const result = await advance(setup, ledger);
+      expect(result.errorMessage).toBeUndefined();
+      expect(result.outcome).toBe('advanced');
+      expect(getRun().currentStep).toBe('create_request');
+      expect(getResources().map((row) => [row.step, row.resourceKind])).toEqual([['fence_source', 'foundation_transition']]);
+    });
+
+    test('the pre-create baseline is one digest-only receipt the ledger accepts', async () => {
+      const { resources, getResources } = await recordBaseline(() => foundation());
+      expect(resources).toHaveLength(1);
+      const rows = getResources().filter((row) => row.resourceKind === 'foundation_transition');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ step: 'fence_source', outcome: 'verified' });
+      expect(rows[0].plannedIdentity).toMatchObject({ kind: 'foundation_transition', count: 10, organizationId: ORG_ID });
+      expect(() => assertLedgerReceipt(rows[0].plannedIdentity)).not.toThrow();
+      expect(JSON.stringify(rows[0].plannedIdentity)).not.toMatch(/555-0100|Undetermined/);
+    });
+
+    test('a repeated fence_source reuses a matching baseline and refuses a changed one', async () => {
+      let phone = '555-0100';
+      const first = await recordBaseline(() => foundation({ telephone1: phone }));
+      const reused = await recordBaseline(() => foundation({ telephone1: phone }), first.ledgerFixture);
+      expect(reused.resources).toEqual([]);
+      expect(first.getResources()).toHaveLength(1);
+
+      phone = '555-0199';
+      const refused = await recordBaseline(() => foundation({ telephone1: phone }), first.ledgerFixture);
+      expect(refused.error.message).toMatch(/changed since this run recorded its pre-create baseline/);
+      expect(first.getResources()).toHaveLength(1);
+    });
+
+    test('a contract column missing from the read stops the step', async () => {
+      const { error, getResources } = await recordBaseline(() => {
+        const row = foundation();
+        delete row.akoya_goverifytrigger;
+        return row;
+      });
+      expect(error.message).toMatch(/lacks transition-contract column\(s\): akoya_goverifytrigger/);
+      expect(getResources()).toHaveLength(0);
+    });
+
+    function verifyFixture(accountAfter) {
+      const body = {
+        akoya_requestid: REQUEST_ID, akoya_title: 'TEST: fixture', akoya_fiscalyear: 'December 2026', akoya_requesttype: 100000000,
+        akoya_purpose: 'Synthetic purpose', akoya_request: 5000, akoya_requeststatus: 'Phase II Pending',
+      };
+      const requestRow = {
+        ...body, akoya_requestnum: REQUEST_NUMBER, wmkf_meetingdate: '2026-12-01', _akoya_applicantid_value: ORG_ID,
+        _createdby_value: APP_USER_ID, _ownerid_value: APP_USER_ID, wmkf_istestrequest: true, wmkf_testcreationrunid: RUN_ID,
+        wmkf_respondreminderenabled: false, wmkf_reviewduereminderenabled: false, akoya_submissionaccepted: false,
+        _wmkf_programdirector_value: PD_ID, _wmkf_grantprogram_value: PROGRAM_ID,
+      };
+      const withRequest = fixture({ step: 'verify', account: () => accountAfter, requestRow });
+      withRequest.manifest.createBody = body;
+      return withRequest;
+    }
+
+    async function verifyWith(accountAfter, baseline) {
+      process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
+      const setup = verifyFixture(accountAfter);
+      const { ledger, getResources } = createFakeLedger(setup.run);
+      if (baseline) {
+        await ledger.journalPlannedResource({ step: 'fence_source', resourceKind: 'foundation_transition', system: 'dataverse', plannedIdentity: baseline });
+      }
+      const result = await advance(setup, ledger);
+      return { result, resources: getResources() };
+    }
+
+    const baselineFor = (row) => captureFoundationBaseline(row, [], new Date(Date.now() - 60_000));
+
+    test('verify passes the observed GoVerify refresh and records the outcome', async () => {
+      const after = foundation({ versionnumber: 140, akoya_goverifytrigger: nowIso(-30_000), akoya_dexempt: nowIso().slice(0, 10), akoya_countofrequests: 11 });
+      const { result, resources } = await verifyWith(after, baselineFor(foundation()));
+      expect(result.errorMessage).toBeUndefined();
+      expect(result.outcome).toBe('ready');
+      const outcomeRow = resources.find((row) => row.step === 'verify' && row.resourceKind === 'foundation_transition');
+      expect(outcomeRow.readback).toEqual({ kind: 'foundation_transition', outcome: 'refreshed' });
+      expect(() => assertLedgerReceipt(outcomeRow.readback)).not.toThrow();
+    });
+
+    test('verify fails a protected-column change the sandbox comparison would not see', async () => {
+      const { result } = await verifyWith(foundation({ telephone1: '555-0199' }), baselineFor(foundation()));
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.errorMessage).toMatch(/Foundation account protected columns changed during the run/);
+      expect(result.errorMessage).not.toMatch(/555-0199/);
+    });
+
+    test('verify fails closed without a pre-create baseline', async () => {
+      const { result } = await verifyWith(foundation(), null);
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.errorMessage).toMatch(/pre-create baseline is missing/);
+    });
   });
 });
 

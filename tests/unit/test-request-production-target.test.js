@@ -18,6 +18,7 @@ import {
   correctMeetingDate,
   createRequestWithGoverifyBypass,
   validateCloneManifest,
+  verifyClone,
 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { verifyCloneRequestReadback } from '../../lib/services/test-requests/sandbox-clone.js';
 import { assertRunTarget } from '../../lib/services/test-requests/run-runner.js';
@@ -265,8 +266,40 @@ describe('CLI --target', () => {
     expect(() => parseArgs(['node', 'x', '--advance=r', '--manifest=/a', '--bundle=/b', '--target=production', '--bypass-goverify'])).toThrow(/never valid/);
     expect(() => parseArgs(['node', 'x', '--execute=/a', '--receipt=/b', '--target=production'])).toThrow(/sandbox-only/);
   });
+  test('--run-recheck is production-only, takes a run GUID, and is its own mode', () => {
+    const runId = '11111111-1111-4111-8111-111111111111';
+    expect(parseArgs(['node', 'x', `--run-recheck=${runId}`, '--target=production']).runRecheck).toBe(runId);
+    expect(() => parseArgs(['node', 'x', `--run-recheck=${runId}`])).toThrow(/only with --target=production/);
+    expect(() => parseArgs(['node', 'x', '--run-recheck=nope', '--target=production'])).toThrow(/run ID GUID/);
+    expect(() => parseArgs(['node', 'x', `--run-recheck=${runId}`, `--run-inspect=${runId}`, '--target=production'])).toThrow(/Choose exactly one/);
+  });
+
   test('--director is refused outside a production reserve, and unknown targets are refused', () => {
     expect(() => parseArgs(['node', 'x', '--reserve', '--source-request-number=1', '--bundle=/a', '--manifest-out=/m', '--idempotency-key=k', '--director=me@wmkeck.org'])).toThrow(/--director is valid only/);
     expect(() => parseArgs(['node', 'x', '--target=staging'])).toThrow(/sandbox or production/);
+  });
+});
+
+describe('verifyClone on a production target', () => {
+  const manifest = (overrides = {}) => productionManifest({ expectedOrganization: { accountid: 'a' }, invariants: { expectedSharePointFiles: 0 }, ...overrides });
+  const observation = (emails) => ({ request: {}, payments: [], emails, locations: [], locationParents: [] });
+  const preflightBefore = { foundation: { accountid: 'a', versionnumber: 1 }, contacts: [] };
+
+  test('names each regarding email by state, direction, creator and time, never by subject', () => {
+    const { failures } = verifyClone(manifest(), preflightBefore, observation([{
+      activityid: 'e1', subject: 'Private subject', statecode: 0, statuscode: 1, directioncode: true, senton: null,
+      createdon: '2026-09-28T18:10:00Z', _createdby_value: APP_USER_ID,
+    }]), [], preflightBefore.foundation, []);
+    const message = failures.find((failure) => failure.startsWith('created 1 regarding email'));
+    expect(message).toBe(`created 1 regarding email row(s): outgoing status 0/1 unsent, created 2026-09-28T18:10:00Z by ${APP_USER_ID}`);
+    expect(failures.join(' ')).not.toMatch(/Private subject/);
+  });
+
+  test('leaves the Foundation comparison to the runner pre-create baseline', () => {
+    const result = verifyClone(manifest(), preflightBefore, observation([]), [], { accountid: 'a', versionnumber: 2 }, [{ contactid: 'c', versionnumber: 1 }]);
+    expect(result.failures).not.toContain('Foundation account changed during rehearsal');
+    expect(result.accountChanges).toEqual([]);
+    const sandbox = verifyClone(manifest({ targetEnvironment: 'sandbox' }), preflightBefore, observation([]), [], { accountid: 'a', versionnumber: 2 }, []);
+    expect(sandbox.failures).toContain('Foundation account changed during rehearsal');
   });
 });
