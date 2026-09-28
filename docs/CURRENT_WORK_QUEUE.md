@@ -64,6 +64,20 @@ sequence.
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).**
+  `reviewer-roster-endpoint.test.js` failed on `main` when its fixed
+  `2026-09-28T00:00Z` expiry passed; fixed in `5ced59d3b` (far-future date).
+  Seven more files hard-code `expiresAt` dates in late 2026 and may fail the
+  same way when those dates pass: `pre-site-distribution-panel` (10-08, 12-17),
+  `reviewer-institution-evidence-attestation` (09-28, 10-14; uses fake timers),
+  `external-briefing-page` (10-08), `workbench-briefing-link-route` (10-08),
+  `reviewer-institution-auto-resolution-policy` (09-28, 09-29; passed on
+  09-28 UTC, so it may not compare against the clock),
+  `pre-site-distribution-service` (10-08, 11-14, 12-18) and
+  `meeting-tracker-session-service` (12-18), all under `tests/unit/`. Not
+  checked whether each value is compared with the current time. Next: per file,
+  confirm clock dependence; replace clock-compared values with a far-future
+  date or a fake clock. Earliest risk date: 2026-10-08.
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
   smoke).** `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
   `VERCEL_URL` (the immutable deployment host), so any state-changing request made

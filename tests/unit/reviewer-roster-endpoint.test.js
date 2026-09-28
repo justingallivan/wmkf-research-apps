@@ -272,7 +272,7 @@ describe('POST recordSurfaced', () => {
     verifyInstitutionEvidenceAttestation.mockResolvedValueOnce({
       valid: true,
       candidateKey,
-      expiresAt: '2026-09-28T00:00:00.000Z',
+      expiresAt: '2099-12-31T00:00:00.000Z',
     });
 
     const r = res();
@@ -289,7 +289,7 @@ describe('POST recordSurfaced', () => {
     verifyInstitutionEvidenceAttestation.mockResolvedValueOnce({
       valid: true,
       candidateKey: 'candidate:existing-victim',
-      expiresAt: '2026-09-28T00:00:00.000Z',
+      expiresAt: '2099-12-31T00:00:00.000Z',
     });
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
@@ -331,7 +331,7 @@ describe('POST recordSurfaced', () => {
     stored.serverInstitutionEvidenceReceipt = createServerInstitutionEvidenceReceipt({
       requestId: REQ,
       candidate: stored,
-      expiresAt: '2026-09-28T00:00:00.000Z',
+      expiresAt: '2099-12-31T00:00:00.000Z',
     });
     store.findCandidatesByKeys.mockResolvedValueOnce([stored]);
 
