@@ -926,3 +926,64 @@ describe('slice 6c-i: listRunReviewerAssignments never selects the plaintext add
     expect(rows[0].addressSha256).toBe('a'.repeat(64));
   });
 });
+
+describe('status setter journal (cast-and-status plan, slice C)', () => {
+  const CHANGE_ID = '99999999-9999-4999-8999-999999999999';
+  const plan = (overrides = {}) => ({
+    runId: BASE_PLAN.runId, changeId: CHANGE_ID, field: 'wmkf_phaseiistatus',
+    optionBefore: null, optionAfter: 100000002, etagBefore: 'W/"12345"', ...overrides,
+  });
+  const row = (overrides = {}) => ({
+    change_id: CHANGE_ID, run_id: BASE_PLAN.runId, sequence: 1, field: 'wmkf_phaseiistatus', option_before: null,
+    option_after: 100000002, etag_before: 'W/"12345"', status: 'planned', rerun: false, effects: null, error: null, ...overrides,
+  });
+
+  it('plans a change with the next per-run sequence and maps the row', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row()]);
+    const change = await createRunLedger(db).planStatusChange(plan());
+    expect(change).toMatchObject({ changeId: CHANGE_ID, sequence: 1, field: 'wmkf_phaseiistatus', optionAfter: 100000002, status: 'planned' });
+    expect(calls[0].text).toContain('INSERT INTO test_request_status_changes');
+    expect(calls[0].text).toContain('COALESCE(MAX(sequence), 0) + 1');
+  });
+
+  it.each([
+    ['a non-status field', { field: 'akoya_requeststatus' }],
+    ['a non-integer option', { optionAfter: '100000002' }],
+    ['a weak or wildcard ETag', { etagBefore: '*' }],
+    ['a non-GUID change ID', { changeId: 'x' }],
+  ])('refuses %s before any SQL', async (_label, overrides) => {
+    const { db, calls } = createFakeDb();
+    await expect(createRunLedger(db).planStatusChange(plan(overrides))).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('completes only from applied and validates the effects receipt', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'complete' })]);
+    const effects = { kind: 'status_change', emailIds: [CHANGE_ID], requestStatusSha256: 'a'.repeat(64), count: 1 };
+    await createRunLedger(db).completeStatusChange({ changeId: CHANGE_ID, effects });
+    expect(calls[0].text).toContain("WHERE change_id = $1::uuid AND status = 'applied'");
+    await expect(createRunLedger(createFakeDb().db).completeStatusChange({ changeId: CHANGE_ID, effects: { requestStatus: 'Phase II Pending' } }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    await expect(createRunLedger(createFakeDb().db).completeStatusChange({ changeId: CHANGE_ID, effects: { emailIds: ['not-a-guid'] } }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
+  it('records late recheck effects only on a finished change, validating the receipt', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'complete' })]);
+    await createRunLedger(db).recordLateStatusChangeEffects({ changeId: CHANGE_ID, effects: { kind: 'status_change', paymentIds: [CHANGE_ID] } });
+    expect(calls[0].text).toContain("status IN ('complete', 'needs_attention')");
+    await expect(createRunLedger(createFakeDb().db).recordLateStatusChangeEffects({ changeId: CHANGE_ID, effects: { note: 'x' } }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
+  it('records needs_attention with sanitized error text from any open state', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'needs_attention' })]);
+    await createRunLedger(db).markStatusChangeNeedsAttention({ changeId: CHANGE_ID, error: new Error('Authorization: Bearer abc.def') });
+    expect(calls[0].text).toContain("status IN ('planned', 'dispatched', 'applied')");
+    expect(calls[0].params[1]).not.toContain('abc.def');
+  });
+});

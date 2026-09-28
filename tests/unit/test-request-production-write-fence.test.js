@@ -4,7 +4,7 @@
  * @jest-environment node
  */
 import { jest } from '@jest/globals';
-import { fenceProductionClient, fenceProductionGraph } from '../../lib/services/test-requests/production-write-fence.js';
+import { fenceProductionClient, fenceProductionGraph, fenceStatusChangeClient } from '../../lib/services/test-requests/production-write-fence.js';
 import { MANIFEST_V4, PRODUCTION_URL, fenceSource, sha256 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
@@ -200,5 +200,53 @@ describe('fenceSource on a production target', () => {
     const client = { get: jest.fn() };
     await expect(fenceSource(client, manifest, 100000000)).resolves.toBeDefined();
     expect(client.get).not.toHaveBeenCalled();
+  });
+});
+
+describe('fenceStatusChangeClient (status setter)', () => {
+  const DEST = '83162701-82da-4669-94f7-6648bc9abbd3';
+  const SRC = 'e43ae6ea-698f-f111-8076-6045bd018a07';
+  const fence = { destinationRequestId: DEST, sourceRequestId: SRC, field: 'wmkf_phaseiistatus', optionValue: 100000002 };
+  const make = () => {
+    const calls = [];
+    const record = (name) => (...args) => { calls.push([name, ...args]); return { ok: true, status: 204 }; };
+    const client = { baseUrl: 'https://wmkf.crm.dynamics.com/api/data/v9.2', get: record('get'), getWithOptions: record('getWithOptions'),
+      post: record('post'), postWithOptions: record('postWithOptions'), patch: record('patch'), patchWithOptions: record('patchWithOptions'),
+      delete_: record('delete_'), raw: record('raw') };
+    return { fenced: fenceStatusChangeClient(client, fence), calls };
+  };
+  const good = () => [`/akoya_requests(${DEST})`, { wmkf_phaseiistatus: 100000002 }, { 'If-Match': 'W/"98622844"' }];
+
+  test('admits exactly the one status PATCH with a concrete If-Match, and reads', async () => {
+    const { fenced, calls } = make();
+    await fenced.patchWithOptions(...good());
+    await fenced.get('/akoya_requests');
+    expect(calls.map((c) => c[0])).toEqual(['patchWithOptions', 'get']);
+  });
+
+  test.each([
+    ['another Request', [`/akoya_requests(${SRC.replace('e4', 'f4')})`, { wmkf_phaseiistatus: 100000002 }, { 'If-Match': 'W/"1"' }], /not the destination/],
+    ['the source Request', [`/akoya_requests(${SRC})`, { wmkf_phaseiistatus: 100000002 }, { 'If-Match': 'W/"1"' }], /names the source/],
+    ['a second field', [`/akoya_requests(${DEST})`, { wmkf_phaseiistatus: 100000002, akoya_title: 'x' }, { 'If-Match': 'W/"1"' }], /exactly wmkf_phaseiistatus/],
+    ['the other status field', [`/akoya_requests(${DEST})`, { wmkf_phaseistatus: 100000002 }, { 'If-Match': 'W/"1"' }], /exactly wmkf_phaseiistatus/],
+    ['a different option', [`/akoya_requests(${DEST})`, { wmkf_phaseiistatus: 100000004 }, { 'If-Match': 'W/"1"' }], /option 100000002/],
+    ['no If-Match (an upsert)', [`/akoya_requests(${DEST})`, { wmkf_phaseiistatus: 100000002 }, {}], /concrete If-Match/],
+    ['a wildcard If-Match', [`/akoya_requests(${DEST})`, { wmkf_phaseiistatus: 100000002 }, { 'If-Match': '*' }], /concrete If-Match/],
+  ])('refuses a PATCH of %s before the transport', (_label, args, message) => {
+    const { fenced, calls } = make();
+    expect(() => fenced.patchWithOptions(...args)).toThrow(message);
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each(['post', 'postWithOptions', 'patch', 'delete_', 'raw'])('refuses %s outright', (name) => {
+    const { fenced, calls } = make();
+    expect(() => fenced[name](`/akoya_requests(${DEST})`, {})).toThrow(/not allowed in a status change/);
+    expect(calls).toHaveLength(0);
+  });
+
+  test('the basic-run fence still refuses every PATCH', () => {
+    const { calls } = make();
+    const basic = fenceProductionClient({ patchWithOptions: () => calls.push('x') }, { destinationRequestId: DEST, destinationLocationId: DEST, sourceRequestId: SRC });
+    expect(() => basic.patchWithOptions(...good())).toThrow(/not allowed in a production run/);
   });
 });

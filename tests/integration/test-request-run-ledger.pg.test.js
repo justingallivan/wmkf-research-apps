@@ -36,7 +36,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
     `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
-       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments')`,
+       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments', 'test_request_status_changes')`,
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
@@ -98,6 +98,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
 
   afterAll(async () => {
     if (createdRunIds.length) {
+      await db.query(`DELETE FROM test_request_status_changes WHERE run_id = ANY($1::uuid[])`, [createdRunIds]);
       await db.query(
         `DELETE FROM test_request_run_reviewer_assignments WHERE run_id = ANY($1::uuid[])`,
         [createdRunIds],
@@ -311,6 +312,31 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       // A well-shaped 64-hex digest that is simply the WRONG hash of the address.
       [plan.runId, crypto.randomUUID(), crypto.randomUUID(), reviewerAddressSha256('someone-else@example.test').addressSha256],
     )).rejects.toThrow();
+  });
+
+  it('status setter: one open change per run, sequenced, completes with a receipt; a second open plan is refused', async () => {
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    const plan = basePlan();
+    createdRunIds.push(plan.runId);
+    const { run } = await ledger.reserveRun({ actorId, idempotencyKey: 'key-status', plan });
+    const change = (after) => ({
+      runId: run.runId, changeId: crypto.randomUUID(), field: 'wmkf_phaseiistatus', optionBefore: null, optionAfter: after, etagBefore: 'W/"100"',
+    });
+    const first = await ledger.planStatusChange(change(100000002));
+    expect(first.sequence).toBe(1);
+    await expect(ledger.planStatusChange(change(100000004))).rejects.toThrow(/test_request_status_changes_one_open_idx|duplicate key/);
+    await ledger.markStatusChangeDispatched({ changeId: first.changeId });
+    await ledger.markStatusChangeApplied({ changeId: first.changeId });
+    const done = await ledger.completeStatusChange({
+      changeId: first.changeId, effects: { kind: 'status_change', emailIds: [crypto.randomUUID()], requestStatusSha256: 'a'.repeat(64) },
+    });
+    expect(done).toMatchObject({ status: 'complete' });
+    expect(done.dispatchedAt).not.toBeNull();
+    const second = await ledger.planStatusChange(change(100000004));
+    expect(second.sequence).toBe(2);
+    await expect(db.query(
+      `UPDATE test_request_status_changes SET effects = '{"requestStatus":"Phase II Pending"}'::jsonb WHERE change_id = $1::uuid`, [second.changeId],
+    )).rejects.toThrow(/check constraint/i);
   });
 
   it('claimLease succeeds once; a second claim with the stale version returns null', async () => {

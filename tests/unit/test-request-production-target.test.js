@@ -274,6 +274,19 @@ describe('CLI --target', () => {
     expect(() => parseArgs(['node', 'x', '--advance=r', '--manifest=/a', '--bundle=/b', '--target=production', '--bypass-goverify'])).toThrow(/never valid/);
     expect(() => parseArgs(['node', 'x', '--execute=/a', '--receipt=/b', '--target=production'])).toThrow(/sandbox-only/);
   });
+  test('--set-status needs production, a run GUID, --field and --option; --rerun only with it', () => {
+    const runId = '11111111-1111-4111-8111-111111111111';
+    const parsed = parseArgs(['node', 'x', `--set-status=${runId}`, '--target=production', '--field=phase2', '--option=Phase II Pending Committee Review', '--rerun']);
+    expect(parsed).toMatchObject({ setStatus: runId, statusField: 'phase2', statusOption: 'Phase II Pending Committee Review', rerun: true });
+    expect(() => parseArgs(['node', 'x', `--set-status=${runId}`, '--field=phase2', '--option=X'])).toThrow(/only with --target=production/);
+    expect(() => parseArgs(['node', 'x', `--set-status=${runId}`, '--target=production', '--field=phase3', '--option=X'])).toThrow(/--field=phase1\|phase2/);
+    expect(() => parseArgs(['node', 'x', `--set-status=${runId}`, '--target=production', '--field=phase1'])).toThrow(/--option/);
+    expect(() => parseArgs(['node', 'x', '--set-status=nope', '--target=production', '--field=phase1', '--option=X'])).toThrow(/run ID GUID/);
+    expect(() => parseArgs(['node', 'x', `--run-inspect=${runId}`, '--rerun'])).toThrow(/only with --set-status/);
+    expect(() => parseArgs(['node', 'x', `--set-status=${runId}`, `--status-recheck=${runId}`, '--target=production', '--field=phase1', '--option=X'])).toThrow(/Choose exactly one/);
+    expect(parseArgs(['node', 'x', `--status-recheck=${runId}`, '--target=production']).statusRecheck).toBe(runId);
+  });
+
   test('--run-recheck is production-only, takes a run GUID, and is its own mode', () => {
     const runId = '11111111-1111-4111-8111-111111111111';
     expect(parseArgs(['node', 'x', `--run-recheck=${runId}`, '--target=production']).runRecheck).toBe(runId);
