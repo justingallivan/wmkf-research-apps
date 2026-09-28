@@ -103,6 +103,7 @@ import {
 } from '../lib/services/test-requests/basic-clone-steps.js';
 import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
 import { recheckFoundationTransition } from '../lib/services/test-requests/foundation-transition.js';
+import { fieldFor, recheckStatusChange, runStatusChange } from '../lib/services/test-requests/status-change-runner.js';
 import { recipeSeedsPreSite, recipeSeedsReviewers } from '../lib/services/test-requests/recipe-capabilities.js';
 import {
   LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
@@ -205,6 +206,11 @@ export function parseArgs(argv) {
     steps: 1,
     runInspect: null,
     runRecheck: null,
+    setStatus: null,
+    statusField: null,
+    statusOption: null,
+    rerun: false,
+    statusRecheck: null,
     target: 'sandbox',
     director: null,
   };
@@ -230,14 +236,19 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--steps=')) parsed.steps = Number(arg.slice('--steps='.length));
     else if (arg.startsWith('--run-inspect=')) parsed.runInspect = arg.slice('--run-inspect='.length);
     else if (arg.startsWith('--run-recheck=')) parsed.runRecheck = arg.slice('--run-recheck='.length);
+    else if (arg.startsWith('--set-status=')) parsed.setStatus = arg.slice('--set-status='.length);
+    else if (arg.startsWith('--field=')) parsed.statusField = arg.slice('--field='.length);
+    else if (arg.startsWith('--option=')) parsed.statusOption = arg.slice('--option='.length);
+    else if (arg === '--rerun') parsed.rerun = true;
+    else if (arg.startsWith('--status-recheck=')) parsed.statusRecheck = arg.slice('--status-recheck='.length);
     else if (arg.startsWith('--target=')) parsed.target = arg.slice('--target='.length);
     else if (arg.startsWith('--director=')) parsed.director = arg.slice('--director='.length);
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
-  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck];
+  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck];
   if (modes.filter(Boolean).length > 1) {
-    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, --run-inspect, or --run-recheck.');
+    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, --run-inspect, --run-recheck, --set-status, or --status-recheck.');
   }
   // Production plan P1 / MVP list item 1: the destination is an explicit
   // operator choice, never inferred from the environment.
@@ -250,6 +261,15 @@ export function parseArgs(argv) {
     if (parsed.reserve && (parsed.recipe !== 'basic' || !parsed.director)) {
       throw new Error('--target=production --reserve requires --recipe=basic (the default) and --director=<your sign-in>.');
     }
+  }
+  if ((parsed.setStatus || parsed.statusRecheck) && parsed.target !== 'production') {
+    throw new Error('--set-status and --status-recheck are valid only with --target=production.');
+  }
+  if (parsed.setStatus && (!['phase1', 'phase2'].includes(parsed.statusField) || !String(parsed.statusOption || '').trim())) {
+    throw new Error('--set-status requires --field=phase1|phase2 and --option="<live option label>".');
+  }
+  if (!parsed.setStatus && (parsed.statusField || parsed.statusOption || parsed.rerun)) {
+    throw new Error('--field, --option and --rerun are valid only with --set-status.');
   }
   if (parsed.runRecheck && parsed.target !== 'production') {
     throw new Error('--run-recheck is valid only with --target=production.');
@@ -340,7 +360,7 @@ export function parseArgs(argv) {
       parsed.reviewerAddressFlags = parsedFlags;
     }
   }
-  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck].filter(Boolean)) {
+  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck].filter(Boolean)) {
     if (!RUN_ID.test(runId)) throw new Error('--advance/--run-inspect/--run-recheck take a run ID GUID.');
   }
   if (parsed.advance && (!parsed.manifest || !parsed.bundle)) {
@@ -371,6 +391,8 @@ function printHelp() {
   console.log('  --actor: admin:<guid> or user:<guid>, or an OS username; a username (default: the current OS user) is stored only as cli:<16 hex digest>.');
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
   console.log('Inspect a ledger run (read-only, no Dataverse): ... --run-inspect=<runId>');
+  console.log('Set Phase I or II Status on a ready production test Request (owner-run; writes need DATAVERSE_PROD_WRITE_ACK): ... --target=production --set-status=<runId> --field=phase1|phase2 --option="<live option label>" [--rerun]');
+  console.log('Recheck a status change for late effects (read-only): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --status-recheck=<runId>');
   console.log('Recheck a production run\'s Foundation account against its pre-create baseline (read-only; plan P5\'s later check): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --run-recheck=<runId>');
   console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
   console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL, which must not be the shared Production/Preview database.');
@@ -1117,6 +1139,25 @@ async function runRunInspect(runInspect, ledgerUrl) {
 }
 
 /**
+ * Status setter (cast-and-status plan, slice C): --set-status makes one Phase I
+ * or Phase II Status change (or resumes the run's open one); --status-recheck
+ * reports effects that arrived after the last change. Writes need
+ * DATAVERSE_PROD_WRITE_ACK inline; the recheck only reads.
+ */
+export async function runStatusMode(client, args, ledgerUrl) {
+  const db = pgLedgerDb(ledgerUrl);
+  try {
+    const ledger = createRunLedger(db);
+    const result = args.setStatus
+      ? await runStatusChange({ client, ledger, runId: args.setStatus, field: fieldFor(args.statusField), optionLabel: args.statusOption, rerun: args.rerun })
+      : await recheckStatusChange({ client, ledger, runId: args.statusRecheck });
+    console.log(JSON.stringify({ mode: args.setStatus ? 'STATUS_CHANGED' : 'READ_ONLY_STATUS_RECHECK', runId: args.setStatus || args.statusRecheck, ...result }, null, 2));
+  } finally {
+    await db.end();
+  }
+}
+
+/**
  * Read-only: re-evaluates a production run's Foundation account and Contacts
  * against its journaled pre-create baseline (foundation-transition.js). No
  * ledger or Dataverse write. Prints outcome and failure text only.
@@ -1155,6 +1196,13 @@ async function main() {
   }
 
   const targetUrl = TARGET_URLS[args.target];
+  if (args.setStatus || args.statusRecheck) {
+    const ledgerUrl = requireLedgerUrl();
+    // No marker writes: a status change never touches the Test Request marker.
+    const statusClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
+    await runStatusMode(statusClient, args, ledgerUrl);
+    return;
+  }
   if (args.runRecheck) {
     const ledgerUrl = requireLedgerUrl();
     const readClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });

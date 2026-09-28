@@ -1,6 +1,6 @@
 # Test Request Factory: synthetic cast and status setter (production)
 
-Status: **DRAFT, revision 2 (2026-09-28, Session 547). Codex plan review round 1: needs-attention (four high, one medium) [DERIVED-FROM: the round-1 review output]; revised below; owner decisions recorded. Not built.** Follows MVP item 5: run `7293496e`, Request 1003302, `ready` under the Foundation transition contract (`TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`, MVP build list item 5). Scope below is the owner's, S547.
+Status: **DRAFT, revision 2 (2026-09-28, Session 547). Codex plan review round 1: needs-attention (four high, one medium) [DERIVED-FROM: the round-1 review output]; revised below; owner decisions recorded. Slice C (status setter) built on `claude/factory-status-setter` (S547), not merged; slices A + B not built.** Follows MVP item 5: run `7293496e`, Request 1003302, `ready` under the Foundation transition contract (`TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`, MVP build list item 5). Scope below is the owner's, S547.
 
 ## What the owner needs (S547)
 
@@ -78,7 +78,7 @@ The cast record, the status-change journal and the new resource kinds (contact, 
 
 ## Order
 
-1. **Slice C, status setter** (does not create contacts): transition matrix, guarded write, journal, completion; one Codex review; the characterization change under snapshot and Audit History read.
+1. **Slice C, status setter** (does not create contacts): transition matrix, guarded write, journal, completion; one Codex review; the characterization change under snapshot and Audit History read. **BUILT 2026-09-28 (S547) on `claude/factory-status-setter`, not merged:** ledger table `test_request_status_changes` (054 in place); `lib/services/test-requests/status-transitions.js` (every current Phase I/II option by value with its allowed effect classes, from the workflow definitions: invite and not-invited draft emails, GoApply status tracking on Invited, a payment on Recommended with Phase I Invited); `fenceStatusChangeClient` (one PATCH shape, concrete `If-Match` required, since a PATCH without it is an upsert); `lib/services/test-requests/status-change-runner.js`; CLI `--target=production --set-status=<runId> --field=phase1|phase2 --option="<label>" [--rerun]` and `--status-recheck=<runId>`. Completion waits up to 10 minutes for background jobs; jobs still running leave the change `applied` so the same command re-checks. Before its first use, 054 is re-applied to `ledger_prod`.
 2. **Probe section 12 strengthened:** fail as incomplete when an activated flow definition is missing or unreadable, list Create steps registered for all entities, and write a sanitized dated receipt.
 3. **wave30 in production** (owner-run apply, switch, redeploy).
 4. **Slice A + B, cast and binding,** after open question 1 is answered: cast ledger and mode, create-body binding, Factory-only suggestion writer, transition-contract change; one Codex review; first use under snapshot and Audit History read.

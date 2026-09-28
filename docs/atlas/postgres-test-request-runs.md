@@ -263,6 +263,7 @@ A fourth table, added in place to migration 054 (and its `scripts/setup-database
 - **Columns:** `change_id` (the CLI's own GUID), `run_id`, per-run `sequence`, `field` (`wmkf_phaseistatus` or `wmkf_phaseiistatus`), `option_before`, `option_after`, `etag_before` (the row version the PATCH's `If-Match` carried), `status` (`planned` → `dispatched` → `applied` → `complete`, or `needs_attention`), `rerun`, `dispatched_at`, `effects` (a receipt under `test_request_receipt_ok`: effect IDs, a digest of the Request Status readback, counts), `error` (sanitized), timestamps.
 - **Writer:** `createRunLedger(db)` `planStatusChange`, `markStatusChangeDispatched`, `markStatusChangeApplied`, `completeStatusChange`, `markStatusChangeNeedsAttention`. No lease: the CLI is owner-run, and a partial unique index (`status IN ('planned','dispatched','applied')`) admits one open change per run.
 - **Reader:** `listStatusChanges(runId)` (the runner's replay and resume checks; `--run-inspect`).
+- **Dataverse reads by the runner** (`lib/services/test-requests/status-change-runner.js`, read-only): `asyncoperations` regarding the Request (completion waits until every job since the write is terminal), `akoya_goapplystatustrackings` by `_akoya_request_value`, regarding `emails`, `akoya_requestpayments`, and the Request's own status fields. Its one write is the fenced `akoya_requests` status PATCH.
 
 ## Limits
 
