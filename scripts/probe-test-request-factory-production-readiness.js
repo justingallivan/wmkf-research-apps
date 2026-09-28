@@ -47,7 +47,10 @@
  *      Each create-triggered workflow's definition is summarized (records it
  *      creates, columns it sets, email, non-Microsoft code activities); counts
  *      of marketing lists, marketing list members and AkoyaGo custom marketing
- *      list items show whether a new contact could join a mailing list.
+ *      list items show whether a new contact could join a mailing list;
+ *      each marketing list's name, static/dynamic type and member type, and
+ *      the akoya_mailinglistmember count and lookups, show whether one could
+ *      join without create-time automation.
  *      With <dir>, a dated create-only JSON receipt (names, labels, counts,
  *      booleans; no ids, no raw definitions) is written there.
  *
@@ -492,6 +495,9 @@ const MAILING_LIST_COUNTS = [
   ['AkoyaGo custom marketing list items (active)', '/akoya_custommarketinglistitems?$apply=filter(statecode eq 0)/aggregate($count as n)'],
 ];
 
+const LIST_MEMBER_TYPE = { 1: 'account', 2: 'contact', 4: 'lead' };
+const OWNERSHIP_LOOKUPS = new Set(['createdby', 'createdonbehalfby', 'modifiedby', 'modifiedonbehalfby', 'ownerid', 'owninguser', 'owningteam', 'owningbusinessunit', 'organizationid']);
+
 /** Non-Microsoft code activities a workflow calls (their writes are not visible in the XAML). */
 function customWorkflowActivities(xaml) {
   const names = [...String(xaml).matchAll(/AssemblyQualifiedName="([^",]+)/g)].map((m) => m[1]);
@@ -613,6 +619,40 @@ async function printCastReadiness(client, exportDir) {
     receipt.mailingLists[label] = n;
     if (!resp.ok) receipt.incompleteReasons.push(`${label} count unreadable`);
     console.log(`   ${label} (count only): ${n}`);
+  }
+
+  // A dynamic list takes members from a saved query, so a new contact can join
+  // one without any create-time automation. Names, type and member type only.
+  const lists = await getAll(client, '/lists?$select=listname,type,createdfromcode,statecode');
+  receipt.mailingLists.lists = lists.map((l) => ({
+    name: l.listname, dynamic: l.type === true, memberType: LIST_MEMBER_TYPE[l.createdfromcode] || String(l.createdfromcode), active: l.statecode === 0,
+  }));
+  for (const l of receipt.mailingLists.lists) {
+    console.log(`   - list "${l.name}": ${l.dynamic ? 'DYNAMIC (query-based)' : 'static'}, members: ${l.memberType}, ${l.active ? 'active' : 'inactive'}`);
+  }
+
+  // akoya_mailinglistmember: what "Update Mailing List Member Info (Contact)" writes to.
+  const mlm = await client.get("/EntityDefinitions(LogicalName='akoya_mailinglistmember')?$select=EntitySetName");
+  if (mlm.status === 404) {
+    receipt.mailingLists.akoyaMailingListMember = 'absent';
+    console.log('   akoya_mailinglistmember: absent');
+  } else if (!mlm.ok) {
+    receipt.mailingLists.akoyaMailingListMember = `unreadable (${mlm.status})`;
+    receipt.incompleteReasons.push('akoya_mailinglistmember metadata unreadable');
+    console.log(`   akoya_mailinglistmember: unreadable (${mlm.status})`);
+  } else {
+    const countResp = await client.get(`/${mlm.body.EntitySetName}?$apply=aggregate($count as n)`);
+    const count = countResp.ok ? countResp.body?.value?.[0]?.n : `unreadable (${countResp.status})`;
+    if (!countResp.ok) receipt.incompleteReasons.push('akoya_mailinglistmember count unreadable');
+    const lookups = await getAll(client,
+      "/EntityDefinitions(LogicalName='akoya_mailinglistmember')/ManyToOneRelationships?$select=ReferencingAttribute,ReferencedEntity");
+    const fromContact = await getAll(client,
+      "/EntityDefinitions(LogicalName='contact')/ManyToOneRelationships?$select=ReferencingAttribute,ReferencedEntity&$filter=ReferencedEntity eq 'akoya_mailinglistmember'");
+    const own = lookups.filter((r) => !OWNERSHIP_LOOKUPS.has(r.ReferencingAttribute)).map((r) => `${r.ReferencingAttribute} -> ${r.ReferencedEntity}`).sort();
+    receipt.mailingLists.akoyaMailingListMember = { count, lookups: own, contactLookupsToIt: fromContact.map((r) => r.ReferencingAttribute).sort() };
+    console.log(`   akoya_mailinglistmember (count only): ${count}`);
+    console.log(`     its lookups: ${own.join(', ') || '(none)'}`);
+    console.log(`     contact lookups to it: ${receipt.mailingLists.akoyaMailingListMember.contactLookupsToIt.join(', ') || '(none)'}`);
   }
   if (!orphanResp.ok) receipt.incompleteReasons.push('parentless-contact count unreadable');
   console.log(`   active contacts with no parent account (count only): ${orphans}`);
