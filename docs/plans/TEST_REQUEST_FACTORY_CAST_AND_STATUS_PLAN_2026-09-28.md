@@ -1,6 +1,6 @@
 # Test Request Factory: synthetic cast and status setter (production)
 
-Status: **DRAFT (2026-09-28, Session 547). Not reviewed; not built.** Follows MVP item 5, which is proven: run `7293496e`, Request 1003302, `ready` under the Foundation transition contract (`TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`, MVP build list item 5). Scope below is the owner's, S547.
+Status: **DRAFT (2026-09-28, Session 547). Owner decisions recorded; not reviewed; not built.** Follows MVP item 5, which is proven: run `7293496e`, Request 1003302, `ready` under the Foundation transition contract (`TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`, MVP build list item 5). Scope below is the owner's, S547.
 
 ## What the owner needs (S547)
 
@@ -52,11 +52,11 @@ A production test Request must be usable for the workflows staff test, which mea
 3. Whether `wmkf_projectleader` and `akoya_primarycontactid` are valid for create on `akoya_request`.
 4. The business rules that set Request Status: scope (entity or form) and the Phase I/II values they map.
 
-## Open questions for the owner
+## Owner decisions (2026-09-28, S547)
 
-1. The Foundation Primary Contact copy (B, Liaison): (i), (ii) or (iii).
-2. The suggested reviewer: apply wave30 in production, or an unmarked synthetic person.
-3. The synthetic addresses to use.
+1. **Foundation Primary Contact copy: accepted (option i).** The transition contract allows exactly one change to the Foundation's `_primarycontactid_value`: to the synthetic Liaison contact the run bound. Any other value still fails.
+2. **Suggested reviewer: apply wave30 in production** and set `SYNTHETIC_REVIEWER_ISOLATION=on`, then redeploy (the wave29 sequence). With the switch on, identity resolution excludes synthetic persons, every ordinary suggestion-creating adapter operation refuses to bind one, and reviewer merge refuses one [VERIFIED `lib/dataverse/adapters/potential-reviewer.js` `isPersonSynthetic` and read fence; `lib/services/reviewer-merge.js:249-252`]. That every production reviewer read path passes through these fences rests on the sandbox 6c audit [ASSUMED for production until re-checked in the build].
+3. **Synthetic addresses: the owner has created them.** They are supplied to the cast-creation mode at run time, not committed to the repository.
 
 ## Order
 
