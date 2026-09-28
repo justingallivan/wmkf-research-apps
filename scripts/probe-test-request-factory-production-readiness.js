@@ -30,6 +30,15 @@
  *      every activated classic workflow triggered by an update of one of them.
  *      With <dir>, each such workflow's definition (process logic, no record
  *      data) is saved there for review of its conditions.
+ *  12. With --cast[=<dir>]: what the synthetic-cast plan needs
+ *      (TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md): workflows,
+ *      plug-in steps and cloud flows that run on contact, wmkf_potentialreviewers
+ *      and wmkf_appreviewersuggestion create; whether wmkf_projectleader and
+ *      akoya_primarycontactid are valid for create on akoya_request and what
+ *      they look up; the count of contacts with no parent account (a count
+ *      only); and each business rule on akoya_request whose name mentions
+ *      Request Status, with its scope and labelled steps (definitions saved
+ *      to <dir> when given).
  *
  * SAFETY: GET requests only, through the interlocked raw client. Production
  * reads are owner-run behind the interlock override; nothing is written.
@@ -45,7 +54,7 @@
  *   emails, and audited field names on the Request and the Foundation account.
  *   Add --foundation-since=<ISO UTC> for section 10 (run it with the time just
  *   before a production run's fence_source).
- *   Add --status-fields[=<dir>] for section 11.
+ *   Add --status-fields[=<dir>] for section 11; --cast[=<dir>] for section 12.
  *   Add --meeting-date[=N] (default 50, max 200) to report whether the meeting
  *   date is written by an update after create on the N most recent Requests
  *   that carry one, by whom, and every audited meeting-date update on a
@@ -413,6 +422,84 @@ async function printStatusFields(client, exportDir) {
   }
 }
 
+const CAST_ENTITIES = ['contact', 'wmkf_potentialreviewers', 'wmkf_appreviewersuggestion'];
+const CAST_REQUEST_LOOKUPS = ['wmkf_projectleader', 'akoya_primarycontactid'];
+
+/** Section 12: synthetic-cast readiness. Metadata, names and one count only. */
+async function printCastReadiness(client, exportDir) {
+  console.log('\n12. Synthetic cast readiness (PI, Liaison, suggested reviewer)');
+  const flows = await getAll(client, '/workflows?$select=name,clientdata&$filter=category eq 5 and statecode eq 1');
+  for (const entity of CAST_ENTITIES) {
+    console.log(`   ${entity}:`);
+    const workflows = await getAll(client,
+      "/workflows?$select=name,category,mode,triggeroncreate,triggeronupdateattributelist" +
+      `&$filter=primaryentity eq '${entity}' and type eq 1 and statecode eq 1`);
+    const onCreate = workflows.filter((w) => w.triggeroncreate === true);
+    console.log(`     classic workflows / business rules (activated): ${workflows.length}; on create: ${onCreate.length}`);
+    for (const w of onCreate) console.log(`     - [${WORKFLOW_CATEGORY[w.category] || w.category}, ${w.mode === 1 ? 'real-time' : 'background'}] ${w.name}`);
+    const steps = await getAll(client,
+      '/sdkmessageprocessingsteps?$select=name,stage,mode,statecode' +
+      '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename)' +
+      `&$filter=sdkmessagefilterid/primaryobjecttypecode eq '${entity}' and statecode eq 0`);
+    const createSteps = steps.filter((st) => st.sdkmessageid?.name === 'Create');
+    console.log(`     plug-in steps on Create (enabled): ${createSteps.length}`);
+    for (const st of createSteps) {
+      console.log(`     - [stage ${st.stage}, ${st.mode === 0 ? 'sync' : 'async'}] ${st.name || '(unnamed)'}  type=${st.plugintypeid?.typename || '?'}`);
+    }
+    const mentioning = flows.filter((f) => String(f.clientdata || '').includes(`"${entity}`) || String(f.clientdata || '').includes(`${entity}s"`));
+    console.log(`     cloud flows (activated) mentioning it: ${mentioning.length}`);
+    for (const f of mentioning) {
+      const summary = summarizeFlow(f.clientdata);
+      console.log(`     - ${f.name}  triggers: ${summary.triggers.join('; ') || '(none)'}`);
+    }
+  }
+
+  console.log('   akoya_request lookups the clone would set:');
+  for (const field of CAST_REQUEST_LOOKUPS) {
+    const attrs = await getAll(client,
+      `/EntityDefinitions(LogicalName='akoya_request')/Attributes?$select=LogicalName,IsValidForCreate,IsValidForUpdate&$filter=LogicalName eq '${field}'`);
+    const rels = await getAll(client,
+      "/EntityDefinitions(LogicalName='akoya_request')/ManyToOneRelationships?$select=ReferencedEntity,ReferencingEntityNavigationPropertyName" +
+      `&$filter=ReferencingAttribute eq '${field}'`);
+    const a = attrs[0];
+    console.log(`   - ${field}: ${a ? `create=${a.IsValidForCreate} update=${a.IsValidForUpdate}` : '(absent)'}  looks up: ${rels.map((r) => `${r.ReferencedEntity} via ${r.ReferencingEntityNavigationPropertyName}`).join(', ') || '(none)'}`);
+  }
+
+  const orphanResp = await client.get("/contacts?$apply=filter(_parentcustomerid_value eq null and statecode eq 0)/aggregate($count as n)");
+  const orphans = orphanResp.ok ? orphanResp.body?.value?.[0]?.n : `unreadable (${orphanResp.status})`;
+  console.log(`   active contacts with no parent account (count only): ${orphans}`);
+
+  const ruleFilter = "&$filter=primaryentity eq 'akoya_request' and category eq 2 and type eq 1 and statecode eq 1";
+  let rules;
+  try {
+    rules = await getAll(client, `/workflows?$select=name,workflowid,scope,processtriggerscope,_processtriggerformid_value${ruleFilter}`);
+  } catch (error) {
+    console.log(`   (scope columns unreadable: ${String(error.message).slice(0, 120)}; listing without them)`);
+    rules = await getAll(client, `/workflows?$select=name,workflowid${ruleFilter}`);
+  }
+  const statusRules = rules.filter((r) => /request status/i.test(r.name));
+  const SCOPE = { 1: 'form', 2: 'entity' };
+  console.log(`   business rules naming Request Status: ${statusRules.length}`);
+  for (const r of statusRules) {
+    const resp = await client.get(`/workflows(${r.workflowid})?$select=xaml`);
+    if (!resp.ok) throw new Error(`GET business rule xaml failed (${resp.status})`);
+    const xaml = resp.body?.xaml || '';
+    const summary = summarizeWorkflowXaml(xaml);
+    const reads = ['wmkf_phaseistatus', 'wmkf_phaseiistatus', 'wmkf_grantprogram', 'akoya_requeststatus']
+      .filter((f) => xaml.includes(`"${f}"`));
+    const scope = SCOPE[r.processtriggerscope] || `processtriggerscope=${r.processtriggerscope ?? 'null'}`;
+    console.log(`   - ${r.name}  scope: ${scope}${r._processtriggerformid_value ? ' (one form)' : ''}`);
+    console.log(`     reads: ${reads.join(', ') || '(none)'}  sets: ${summary.sets.join(', ') || '(none)'}`);
+    console.log(`     steps: ${summary.steps.join(' | ') || '(none labelled)'}`);
+    if (exportDir) {
+      const file = require('path').join(exportDir, `${r.name.replace(/[^A-Za-z0-9]+/g, '_')}.xaml`);
+      require('fs').mkdirSync(exportDir, { recursive: true });
+      require('fs').writeFileSync(file, xaml);
+      console.log(`     exported: ${file}`);
+    }
+  }
+}
+
 async function getAllOrForbidden(client, path) {
   try {
     return await getAll(client, path);
@@ -445,6 +532,8 @@ async function getAll(client, path) {
   const meetingLimit = meetingArg ? Math.min(Math.max(parseInt(meetingArg.split('=')[1] || '50', 10) || 50, 1), 200) : 0;
   const statusArg = process.argv.find((arg) => arg === '--status-fields' || arg.startsWith('--status-fields='));
   const statusExportDir = statusArg && statusArg.includes('=') ? statusArg.slice('--status-fields='.length) : null;
+  const castArg = process.argv.find((arg) => arg === '--cast' || arg.startsWith('--cast='));
+  const castExportDir = castArg && castArg.includes('=') ? castArg.slice('--cast='.length) : null;
   const sinceArg = process.argv.find((arg) => arg.startsWith('--foundation-since='));
   const foundationSince = sinceArg ? new Date(sinceArg.slice('--foundation-since='.length)) : null;
   if (foundationSince && Number.isNaN(foundationSince.getTime())) throw new Error('--foundation-since must be an ISO timestamp.');
@@ -520,6 +609,7 @@ async function getAll(client, path) {
 
   if (foundationSince) await printFoundationUnauditedChanges(client, foundationSince);
   if (statusArg) await printStatusFields(client, statusExportDir);
+  if (castArg) await printCastReadiness(client, castExportDir);
   if (historyLimit) await printCreationHistory(client, historyLimit);
   if (meetingLimit) await printMeetingDateWrites(client, meetingLimit, appUsers.length === 1 ? appUsers[0].systemuserid : null);
   if (!detail && !exportDir) return;
