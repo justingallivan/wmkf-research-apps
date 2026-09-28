@@ -313,6 +313,14 @@ describe('runCastCreate', () => {
     expect(ledger.rows[0].status).toBe('needs_attention');
   });
 
+  test('a concurrent run that journaled the role first stops with a coded conflict and no POST', async () => {
+    const client = fakeClient();
+    const ledger = memoryLedger();
+    ledger.planCastMember.mockRejectedValueOnce(new Error('duplicate key value violates unique constraint'));
+    await expect(run(client, ledger)).rejects.toMatchObject({ code: 'cast_ledger_conflict', role: 'pi' });
+    expect(client.posts).toHaveLength(0);
+  });
+
   test('refusals before any write: allowlist, duplicate address, wrong org, name without prefix', async () => {
     const ledger = memoryLedger();
     const client = fakeClient();
