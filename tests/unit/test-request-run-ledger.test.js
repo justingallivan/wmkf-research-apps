@@ -360,7 +360,7 @@ describe('journalPlannedResource', () => {
 describe('MVP item 5: the production Foundation transition resources', () => {
   const baseline = {
     kind: 'foundation_transition', organizationId: BASE_PLAN.destinationRequestId,
-    foundationProjectionSha256: 'a'.repeat(64), foundationGoverifyResultSha256: 'b'.repeat(64), foundationContactsSha256: 'c'.repeat(64),
+    foundationProjectionSha256: 'a'.repeat(64), foundationGoverifyResultSha256: 'b'.repeat(64), foundationGuidestarSha256: 'd'.repeat(64), foundationContactsSha256: 'c'.repeat(64),
     count: 10, capturedAt: '2026-09-28T18:00:00.000Z', goverifyTriggerAt: '2026-08-03T18:15:12Z', exemptionCheckedAt: '2026-08-03',
   };
   it.each([

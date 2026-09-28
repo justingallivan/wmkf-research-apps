@@ -109,8 +109,9 @@ not perform.
 - **Production Foundation baseline (MVP item 5, 2026-09-28):** a production
   `basic` run journals one `foundation_transition` resource at
   `fence_source`, before the create: digests of the Foundation account's
-  protected projection, its Tax Status/BMF 509 pair and its Contacts'
-  versions (`foundationProjectionSha256`, `foundationGoverifyResultSha256`,
+  protected projection, its Tax Status/BMF 509 pair, its four non-audited
+  GuideStar columns and its Contacts' versions (`foundationProjectionSha256`,
+  `foundationGoverifyResultSha256`, `foundationGuidestarSha256`,
   `foundationContactsSha256`), the pre-run `akoya_countofrequests` (`count`),
   the two GoVerify timestamps and `capturedAt`. No other account value is
   stored. `verify` evaluates the account against it

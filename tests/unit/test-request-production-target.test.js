@@ -212,6 +212,14 @@ describe('GoVerify bypass on a production target', () => {
 });
 
 describe('verifyCloneRequestReadback on a production target', () => {
+  test('accepts the status production\'s create plug-in leaves ("Pending"), refuses any other', () => {
+    const manifest = productionManifest({ expectedOrganization: { accountid: 'a' } });
+    const failuresFor = (status) => verifyCloneRequestReadback(manifest, { akoya_requeststatus: status });
+    expect(failuresFor('Pending')).not.toContain('request status mismatch');
+    expect(failuresFor('Phase II Pending')).not.toContain('request status mismatch');
+    expect(failuresFor('Declined')).toContain('request status mismatch');
+  });
+
   test('flags a status, program director or grant program the platform changed', () => {
     const manifest = {
       ...productionManifest(),

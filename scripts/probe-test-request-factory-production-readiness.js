@@ -16,6 +16,20 @@
  *      definition mentions akoya_request.
  *   9. Rollup columns on account and contact whose definition aggregates
  *      akoya_request (a Request create or update can recalculate them).
+ *  10. With --foundation-since=<ISO UTC>: the Foundation account's columns
+ *      that change without an audit row (MVP item 5 verify diagnosis): every
+ *      rollup column's `_date`/`_state` (flagged when recalculated after the
+ *      given time), every calculated column and the columns its formula
+ *      reads, and the names of non-audited columns. Timestamps, states and
+ *      names only; no rollup, calculated or other column values.
+ *  11. With --status-fields[=<dir>]: how the three status fields a test
+ *      Request will need to move are defined and what reacts to them
+ *      (akoya_requeststatus, wmkf_phaseistatus, wmkf_phaseiistatus): each
+ *      field's type and, for picklists, its live options; the Request forms'
+ *      control for akoya_requeststatus (where its dropdown comes from); and
+ *      every activated classic workflow triggered by an update of one of them.
+ *      With <dir>, each such workflow's definition (process logic, no record
+ *      data) is saved there for review of its conditions.
  *
  * SAFETY: GET requests only, through the interlocked raw client. Production
  * reads are owner-run behind the interlock override; nothing is written.
@@ -29,6 +43,9 @@
  *   Add --history[=N] (default 10, max 50) to print what happened around the
  *   creation of the N most recent Foundation-applicant (test) Requests: jobs,
  *   emails, and audited field names on the Request and the Foundation account.
+ *   Add --foundation-since=<ISO UTC> for section 10 (run it with the time just
+ *   before a production run's fence_source).
+ *   Add --status-fields[=<dir>] for section 11.
  *   Add --meeting-date[=N] (default 50, max 200) to report whether the meeting
  *   date is written by an update after create on the N most recent Requests
  *   that carry one, by whom, and every audited meeting-date update on a
@@ -276,6 +293,126 @@ async function printMeetingDateWrites(client, limit, appUserId) {
 }
 
 /** Like getAll, but a 403 (missing audit privilege) returns null instead of failing the probe. */
+const SOURCE_TYPED_ATTRIBUTE_TYPES = [
+  ...ROLLUP_ATTRIBUTE_TYPES, 'StringAttributeMetadata', 'BooleanAttributeMetadata', 'PicklistAttributeMetadata', 'DoubleAttributeMetadata',
+];
+
+/** Section 10: Foundation columns that can change without an audit row. Names, timestamps and states only. */
+async function printFoundationUnauditedChanges(client, since) {
+  console.log(`\n10. Foundation account: columns that change without an audit row (since ${since.toISOString()})`);
+  const foundation = await getAll(client,
+    `/accounts?$select=accountid,modifiedon,versionnumber&$filter=name eq '${FOUNDATION_NAME}' and statecode eq 0`);
+  if (foundation.length !== 1) throw new Error(`Expected one active ${FOUNDATION_NAME} account; found ${foundation.length}.`);
+  const resp = await client.get(`/accounts(${foundation[0].accountid})`);
+  if (!resp.ok) throw new Error(`GET Foundation account failed (${resp.status})`);
+  const row = resp.body;
+  console.log(`   modifiedon ${row.modifiedon}  versionnumber ${row.versionnumber}`);
+
+  const sourced = [];
+  for (const type of SOURCE_TYPED_ATTRIBUTE_TYPES) {
+    let attrs;
+    try {
+      attrs = await getAll(client,
+        `/EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.${type}?$select=LogicalName,SourceType,FormulaDefinition`);
+    } catch (error) {
+      console.log(`   (skipped ${type}: ${String(error.message).slice(0, 120)})`);
+      continue;
+    }
+    sourced.push(...attrs.filter((a) => a.SourceType === 1 || a.SourceType === 2));
+  }
+  const rollups = sourced.filter((a) => a.SourceType === 2).sort((a, b) => a.LogicalName.localeCompare(b.LogicalName));
+  console.log(`   rollup columns: ${rollups.length}`);
+  for (const a of rollups) {
+    const date = row[`${a.LogicalName}_date`] ?? null;
+    const moved = date && Date.parse(date) > since.getTime();
+    console.log(`   - ${a.LogicalName}  _date ${date ?? '(none)'}  _state ${row[`${a.LogicalName}_state`] ?? '(none)'}${moved ? '  RECALCULATED SINCE' : ''}`);
+  }
+  const calculated = sourced.filter((a) => a.SourceType === 1).sort((a, b) => a.LogicalName.localeCompare(b.LogicalName));
+  console.log(`   calculated columns: ${calculated.length}`);
+  for (const a of calculated) {
+    const reads = [...new Set(String(a.FormulaDefinition || '').match(/\b(?:akoya|wmkf|msdyn)_[a-z0-9_]+|\b(?:modifiedon|createdon|now)\b/gi) || [])]
+      .filter((name) => name.toLowerCase() !== a.LogicalName.toLowerCase());
+    console.log(`   - ${a.LogicalName}  reads: ${reads.join(', ') || '(none found)'}`);
+  }
+
+  const all = await getAll(client,
+    "/EntityDefinitions(LogicalName='account')/Attributes?$select=LogicalName,IsAuditEnabled,AttributeOf,IsValidForRead");
+  const derived = new Set(sourced.flatMap((a) => [a.LogicalName, `${a.LogicalName}_date`, `${a.LogicalName}_state`]));
+  const unaudited = all
+    .filter((a) => a.IsValidForRead && !a.AttributeOf && a.IsAuditEnabled?.Value === false && !derived.has(a.LogicalName))
+    .map((a) => a.LogicalName).sort();
+  console.log(`   non-audited plain columns (a change to these leaves no audit row): ${unaudited.length}`);
+  console.log(`   ${unaudited.join(', ')}`);
+}
+
+const STATUS_FIELDS = ['akoya_requeststatus', 'wmkf_phaseistatus', 'wmkf_phaseiistatus'];
+const CONTROL_CLASSES = {
+  '{4273EDBD-AC1D-40D3-9FB2-095C621B552D}': 'text box',
+  '{3EF39988-22BB-4F0B-BBBE-64B5A3748AEE}': 'option set',
+};
+
+/** Section 11: status field definitions, the requeststatus form control, and update-triggered workflows. Metadata only. */
+async function printStatusFields(client, exportDir) {
+  console.log('\n11. Status fields a test Request will need to move');
+  for (const field of STATUS_FIELDS) {
+    const rows = await getAll(client,
+      `/EntityDefinitions(LogicalName='akoya_request')/Attributes?$select=LogicalName,AttributeType&$filter=LogicalName eq '${field}'`);
+    const type = rows[0]?.AttributeType || '(absent)';
+    console.log(`   ${field}: ${type}`);
+    if (type === 'Picklist') {
+      const resp = await client.get(
+        `/EntityDefinitions(LogicalName='akoya_request')/Attributes(LogicalName='${field}')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options),GlobalOptionSet($select=Name,Options)`);
+      if (!resp.ok) throw new Error(`GET ${field} options failed (${resp.status})`);
+      const set = resp.body?.OptionSet?.Options?.length ? resp.body.OptionSet : resp.body?.GlobalOptionSet;
+      if (resp.body?.GlobalOptionSet?.Name) console.log(`     global option set: ${resp.body.GlobalOptionSet.Name}`);
+      for (const o of set?.Options || []) console.log(`     ${o.Value}  ${o.Label?.UserLocalizedLabel?.Label ?? '(no label)'}`);
+    }
+  }
+
+  const forms = await getAll(client,
+    "/systemforms?$select=name,type,formxml&$filter=objecttypecode eq 'akoya_request' and type eq 2");
+  console.log(`   Request main forms: ${forms.length}`);
+  for (const form of forms) {
+    const xml = String(form.formxml || '');
+    const controls = [...xml.matchAll(/<control\b[^>]*datafieldname="akoya_requeststatus"[^>]*>/gi)].map((m) => m[0]);
+    if (!controls.length) continue;
+    console.log(`   - form "${form.name}": ${controls.length} akoya_requeststatus control(s)`);
+    for (const control of controls) {
+      const classid = (control.match(/classid="([^"]+)"/i)?.[1] || '').toUpperCase();
+      const id = control.match(/\bid="([^"]+)"/i)?.[1];
+      console.log(`     classid ${classid} (${CONTROL_CLASSES[classid] || 'custom or other'})  id ${id || '?'}`);
+    }
+    const custom = [...xml.matchAll(/<controlDescription\b[\s\S]*?<\/controlDescription>/gi)].map((m) => m[0])
+      .filter((block) => /akoya_requeststatus/i.test(block));
+    for (const block of custom) {
+      const names = [...new Set([...block.matchAll(/<customControl\b[^>]*name="([^"]+)"/gi)].map((m) => m[1]))];
+      console.log(`     custom control(s): ${names.join(', ') || '(unnamed)'}`);
+      console.log(`     parameters: ${block.replace(/\s+/g, ' ').slice(0, 800)}`);
+    }
+  }
+
+  const workflows = await getAll(client,
+    "/workflows?$select=name,workflowid,mode,triggeronupdateattributelist&$filter=primaryentity eq 'akoya_request' and category eq 0 and statecode eq 1 and type eq 1");
+  const triggered = workflows.filter((w) => STATUS_FIELDS.some((f) => String(w.triggeronupdateattributelist || '').split(',').includes(f)));
+  console.log(`   classic workflows triggered by an update of a status field: ${triggered.length}`);
+  for (const w of triggered) {
+    const resp = await client.get(`/workflows(${w.workflowid})?$select=xaml`);
+    if (!resp.ok) throw new Error(`GET workflow xaml failed (${resp.status})`);
+    const xaml = resp.body?.xaml || '';
+    const summary = summarizeWorkflowXaml(xaml);
+    const reads = STATUS_FIELDS.filter((f) => xaml.includes(`"${f}"`));
+    console.log(`   - ${w.name}  on update(${w.triggeronupdateattributelist})  ${w.mode === 1 ? 'real-time' : 'background'}`);
+    console.log(`     reads: ${reads.join(', ') || '(none)'}  creates: ${summary.creates.join(', ') || '(none)'}  sends email: ${summary.sendsEmail}`);
+    console.log(`     sets: ${summary.sets.join(', ') || '(none)'}`);
+    if (exportDir) {
+      const file = require('path').join(exportDir, `${w.name.replace(/[^A-Za-z0-9]+/g, '_')}.xaml`);
+      require('fs').mkdirSync(exportDir, { recursive: true });
+      require('fs').writeFileSync(file, xaml);
+      console.log(`     exported: ${file}`);
+    }
+  }
+}
+
 async function getAllOrForbidden(client, path) {
   try {
     return await getAll(client, path);
@@ -306,6 +443,11 @@ async function getAll(client, path) {
   const historyLimit = historyArg ? Math.min(Math.max(parseInt(historyArg.split('=')[1] || '10', 10) || 10, 1), 50) : 0;
   const meetingArg = process.argv.find((arg) => arg === '--meeting-date' || arg.startsWith('--meeting-date='));
   const meetingLimit = meetingArg ? Math.min(Math.max(parseInt(meetingArg.split('=')[1] || '50', 10) || 50, 1), 200) : 0;
+  const statusArg = process.argv.find((arg) => arg === '--status-fields' || arg.startsWith('--status-fields='));
+  const statusExportDir = statusArg && statusArg.includes('=') ? statusArg.slice('--status-fields='.length) : null;
+  const sinceArg = process.argv.find((arg) => arg.startsWith('--foundation-since='));
+  const foundationSince = sinceArg ? new Date(sinceArg.slice('--foundation-since='.length)) : null;
+  if (foundationSince && Number.isNaN(foundationSince.getTime())) throw new Error('--foundation-since must be an ISO timestamp.');
   const clientId = process.env.DYNAMICS_CLIENT_ID;
   if (!clientId) throw new Error('DYNAMICS_CLIENT_ID is not set.');
   const token = await getAccessToken(PRODUCTION_URL);
@@ -376,6 +518,8 @@ async function getAll(client, path) {
     for (const a of fromRequests) console.log(`   - ${entityName}.${a.LogicalName} (with ${a.LogicalName}_state and ${a.LogicalName}_date)`);
   }
 
+  if (foundationSince) await printFoundationUnauditedChanges(client, foundationSince);
+  if (statusArg) await printStatusFields(client, statusExportDir);
   if (historyLimit) await printCreationHistory(client, historyLimit);
   if (meetingLimit) await printMeetingDateWrites(client, meetingLimit, appUsers.length === 1 ? appUsers[0].systemuserid : null);
   if (!detail && !exportDir) return;
