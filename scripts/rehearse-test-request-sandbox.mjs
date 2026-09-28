@@ -419,8 +419,8 @@ function printHelp() {
   console.log('Set Phase I or II Status on a ready production test Request (owner-run; writes need DATAVERSE_PROD_WRITE_ACK): ... --target=production --set-status=<runId> --field=phase1|phase2 --option="<live option label>" [--rerun]');
   console.log('Recheck a status change for late effects (read-only): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --status-recheck=<runId>');
   console.log('Recheck a production run\'s Foundation account against its pre-create baseline (read-only; plan P5\'s later check): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --run-recheck=<runId>');
-  console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; writes need DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> [--confirm]');
-  console.log('Bind the cast suggested reviewer to a ready production test Request (owner-run; writes need DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer=<runId>');
+  console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> [--confirm]');
+  console.log('Bind the cast suggested reviewer to a ready production test Request (owner-run; needs DATAVERSE_ALLOW_PROD_READS=yes and DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer=<runId>');
   console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
   console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL, which must not be the shared Production/Preview database.');
 }
