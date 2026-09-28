@@ -102,6 +102,7 @@ import {
   verifyClone,
 } from '../lib/services/test-requests/basic-clone-steps.js';
 import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
+import { recheckFoundationTransition } from '../lib/services/test-requests/foundation-transition.js';
 import { recipeSeedsPreSite, recipeSeedsReviewers } from '../lib/services/test-requests/recipe-capabilities.js';
 import {
   LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
@@ -203,6 +204,7 @@ export function parseArgs(argv) {
     manifest: null,
     steps: 1,
     runInspect: null,
+    runRecheck: null,
     target: 'sandbox',
     director: null,
   };
@@ -227,14 +229,15 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--manifest=')) parsed.manifest = arg.slice('--manifest='.length);
     else if (arg.startsWith('--steps=')) parsed.steps = Number(arg.slice('--steps='.length));
     else if (arg.startsWith('--run-inspect=')) parsed.runInspect = arg.slice('--run-inspect='.length);
+    else if (arg.startsWith('--run-recheck=')) parsed.runRecheck = arg.slice('--run-recheck='.length);
     else if (arg.startsWith('--target=')) parsed.target = arg.slice('--target='.length);
     else if (arg.startsWith('--director=')) parsed.director = arg.slice('--director='.length);
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
-  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect];
+  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck];
   if (modes.filter(Boolean).length > 1) {
-    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, or --run-inspect.');
+    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, --run-inspect, or --run-recheck.');
   }
   // Production plan P1 / MVP list item 1: the destination is an explicit
   // operator choice, never inferred from the environment.
@@ -247,6 +250,9 @@ export function parseArgs(argv) {
     if (parsed.reserve && (parsed.recipe !== 'basic' || !parsed.director)) {
       throw new Error('--target=production --reserve requires --recipe=basic (the default) and --director=<your sign-in>.');
     }
+  }
+  if (parsed.runRecheck && parsed.target !== 'production') {
+    throw new Error('--run-recheck is valid only with --target=production.');
   }
   if (parsed.director && !(parsed.reserve && parsed.target === 'production')) {
     throw new Error('--director is valid only with --target=production --reserve.');
@@ -334,8 +340,8 @@ export function parseArgs(argv) {
       parsed.reviewerAddressFlags = parsedFlags;
     }
   }
-  for (const runId of [parsed.advance, parsed.runInspect].filter(Boolean)) {
-    if (!RUN_ID.test(runId)) throw new Error('--advance/--run-inspect take a run ID GUID.');
+  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck].filter(Boolean)) {
+    if (!RUN_ID.test(runId)) throw new Error('--advance/--run-inspect/--run-recheck take a run ID GUID.');
   }
   if (parsed.advance && (!parsed.manifest || !parsed.bundle)) {
     throw new Error('--advance requires --manifest and --bundle.');
@@ -365,6 +371,7 @@ function printHelp() {
   console.log('  --actor: admin:<guid> or user:<guid>, or an OS username; a username (default: the current OS user) is stored only as cli:<16 hex digest>.');
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
   console.log('Inspect a ledger run (read-only, no Dataverse): ... --run-inspect=<runId>');
+  console.log('Recheck a production run\'s Foundation account against its pre-create baseline (read-only; plan P5\'s later check): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --run-recheck=<runId>');
   console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
   console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL, which must not be the shared Production/Preview database.');
 }
@@ -1109,6 +1116,28 @@ async function runRunInspect(runInspect, ledgerUrl) {
   }
 }
 
+/**
+ * Read-only: re-evaluates a production run's Foundation account and Contacts
+ * against its journaled pre-create baseline (foundation-transition.js). No
+ * ledger or Dataverse write. Prints outcome and failure text only.
+ */
+export async function runRecheck(client, runId, ledgerUrl) {
+  const db = pgLedgerDb(ledgerUrl);
+  try {
+    const ledger = createRunLedger(db);
+    const run = await ledger.getRun(runId);
+    if (!run) throw new Error(`No test request run found for ${runId}.`);
+    if (run.destinationEnvironment !== 'production') throw new Error(`Run ${runId} is not a production run.`);
+    const resources = await ledger.listRunResources(runId);
+    const { failures, outcome } = await recheckFoundationTransition({ client, organizationId: run.expectedOrganizationId, resources });
+    console.log(JSON.stringify({
+      mode: 'READ_ONLY_FOUNDATION_RECHECK', runId, status: run.status, ok: failures.length === 0, outcome, failures,
+    }, null, 2));
+  } finally {
+    await db.end();
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   if (args.help) {
@@ -1126,6 +1155,12 @@ async function main() {
   }
 
   const targetUrl = TARGET_URLS[args.target];
+  if (args.runRecheck) {
+    const ledgerUrl = requireLedgerUrl();
+    const readClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
+    await runRecheck(readClient, args.runRecheck, ledgerUrl);
+    return;
+  }
   if (args.target === 'sandbox' && process.env.DYNAMICS_SANDBOX_URL !== SANDBOX_URL) {
     throw new Error(`DYNAMICS_SANDBOX_URL must equal the registered sandbox ${SANDBOX_URL}.`);
   }

@@ -266,6 +266,14 @@ describe('CLI --target', () => {
     expect(() => parseArgs(['node', 'x', '--advance=r', '--manifest=/a', '--bundle=/b', '--target=production', '--bypass-goverify'])).toThrow(/never valid/);
     expect(() => parseArgs(['node', 'x', '--execute=/a', '--receipt=/b', '--target=production'])).toThrow(/sandbox-only/);
   });
+  test('--run-recheck is production-only, takes a run GUID, and is its own mode', () => {
+    const runId = '11111111-1111-4111-8111-111111111111';
+    expect(parseArgs(['node', 'x', `--run-recheck=${runId}`, '--target=production']).runRecheck).toBe(runId);
+    expect(() => parseArgs(['node', 'x', `--run-recheck=${runId}`])).toThrow(/only with --target=production/);
+    expect(() => parseArgs(['node', 'x', '--run-recheck=nope', '--target=production'])).toThrow(/run ID GUID/);
+    expect(() => parseArgs(['node', 'x', `--run-recheck=${runId}`, `--run-inspect=${runId}`, '--target=production'])).toThrow(/Choose exactly one/);
+  });
+
   test('--director is refused outside a production reserve, and unknown targets are refused', () => {
     expect(() => parseArgs(['node', 'x', '--reserve', '--source-request-number=1', '--bundle=/a', '--manifest-out=/m', '--idempotency-key=k', '--director=me@wmkeck.org'])).toThrow(/--director is valid only/);
     expect(() => parseArgs(['node', 'x', '--target=staging'])).toThrow(/sandbox or production/);

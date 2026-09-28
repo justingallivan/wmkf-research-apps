@@ -116,7 +116,9 @@ not perform.
   stored. `verify` evaluates the account against it
   (`lib/services/test-requests/foundation-transition.js`) and, on a pass,
   journals a second `foundation_transition` row at `verify` whose `outcome`
-  is `refreshed` or `not_refreshed`. Sandbox runs write neither row.
+  is `refreshed` or `not_refreshed`. Sandbox runs write neither row. The
+  read-only CLI mode `--target=production --run-recheck=<runId>` re-reads the
+  account and evaluates it against the same baseline (no ledger write).
 
 ## `test_request_run_reviewer_assignments` (slice 6c-i, D-R2 owner decision, 2026-09-25)
 

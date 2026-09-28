@@ -3,7 +3,8 @@
  * open questions 4 and 7): lib/services/test-requests/foundation-transition.js.
  */
 import {
-  PROJECTION_EXCLUSIONS, captureFoundationBaseline, evaluateFoundationTransition, readFoundationAccount, sameFoundationBaseline,
+  PROJECTION_EXCLUSIONS, captureFoundationBaseline, evaluateFoundationTransition, readFoundationAccount, recheckFoundationTransition,
+  sameFoundationBaseline,
 } from '../../lib/services/test-requests/foundation-transition.js';
 import { assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 
@@ -171,5 +172,34 @@ describe('readFoundationAccount', () => {
     expect(paths).toEqual([`/accounts(${ORG_ID})`]);
     await expect(readFoundationAccount(client, '99999999-9999-4999-8999-999999999999')).rejects.toThrow(/different row/);
     await expect(readFoundationAccount(client, "x' or 1")).rejects.toThrow(/not a GUID/);
+  });
+});
+
+describe('recheckFoundationTransition', () => {
+  const client = (row) => ({
+    get: async (path) => {
+      if (path === `/accounts(${ORG_ID})`) return { ok: true, status: 200, body: row };
+      if (path.startsWith('/contacts')) return { ok: true, status: 200, body: { value: CONTACTS } };
+      throw new Error(`unexpected path ${path}`);
+    },
+  });
+  const resources = (identity) => [
+    { step: 'fence_source', resourceKind: 'foundation_transition', plannedIdentity: identity },
+    { step: 'verify', resourceKind: 'foundation_transition', plannedIdentity: { kind: 'foundation_transition', outcome: 'not_refreshed' } },
+  ];
+
+  test('evaluates fresh reads against the fence_source baseline, not the verify outcome row', async () => {
+    await expect(recheckFoundationTransition({ client: client(refreshed()), organizationId: ORG_ID, resources: resources(baseline()), verifiedAt: VERIFIED }))
+      .resolves.toEqual({ failures: [], outcome: 'refreshed' });
+    const late = await recheckFoundationTransition({ client: client(refreshed({ telephone1: '555-0199' })), organizationId: ORG_ID, resources: resources(baseline()), verifiedAt: VERIFIED });
+    expect(late.failures).toEqual(['Foundation account protected columns changed during the run']);
+  });
+
+  test('fails closed with no baseline or two baselines', async () => {
+    const none = await recheckFoundationTransition({ client: client(account()), organizationId: ORG_ID, resources: [], verifiedAt: VERIFIED });
+    expect(none.failures).toEqual(['Foundation pre-create baseline is missing or unreadable']);
+    const two = [...resources(baseline()), { step: 'fence_source', resourceKind: 'foundation_transition', plannedIdentity: baseline() }];
+    const doubled = await recheckFoundationTransition({ client: client(account()), organizationId: ORG_ID, resources: two, verifiedAt: VERIFIED });
+    expect(doubled.outcome).toBeNull();
   });
 });
