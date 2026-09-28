@@ -12,6 +12,8 @@ import {
 } from '../../lib/services/test-requests/run-runner.js';
 import { sha256, MANIFEST_V4, computeRunPlanDigest } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
+import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
+import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -337,6 +339,84 @@ describe('advanceRun: create_request dispatch-time checks (MVP slice 1, Codex)',
     expect(result.errorMessage).toMatch(/not an enabled staff user/);
     expect(get).toHaveBeenCalledTimes(1);
     expect(client.postWithOptions).not.toHaveBeenCalled();
+  });
+});
+
+describe('advanceRun: production runs write only through the fence (MVP slice 2)', () => {
+  const PD_ID = '66666666-6666-4666-8666-666666666666';
+  const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
+  const PROD = 'https://wmkf.crm.dynamics.com';
+
+  function productionClient(postWithOptions) {
+    return {
+      baseUrl: `${PROD}/api/data/v9.2`,
+      postWithOptions,
+      async get(rawPath) {
+        const requestPath = decodeURIComponent(rawPath);
+        if (requestPath.startsWith(`/systemusers(${PD_ID})`)) {
+          return ok({ systemuserid: PD_ID, fullname: 'Staff', isdisabled: false, accessmode: 0, internalemailaddress: 'pd@wmkeck.org' });
+        }
+        if (requestPath.includes('ManyToOneRelationships')) {
+          if (requestPath.includes("'wmkf_programdirector'")) return ok({ value: [{ ReferencedEntity: 'systemuser', ReferencingEntityNavigationPropertyName: 'wmkf_ProgramDirector' }] });
+          if (requestPath.includes("'wmkf_grantprogram'")) return ok({ value: [{ ReferencedEntity: 'wmkf_grantprogram', ReferencingEntityNavigationPropertyName: 'wmkf_GrantProgram' }] });
+          return ok({ value: [{ ReferencedEntity: 'account' }] });
+        }
+        if (requestPath.includes('PicklistAttributeMetadata')) {
+          return ok({ OptionSet: { Options: [{ Value: 100000000, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } });
+        }
+        if (requestPath.includes('MoneyAttributeMetadata')) return ok({ MinValue: 0, MaxValue: 1 });
+        if (requestPath.includes('StringAttributeMetadata') || requestPath.includes('MemoAttributeMetadata')) return ok({ MaxLength: 100 });
+        if (requestPath.includes('EntityDefinitions')) {
+          const names = [...requestPath.matchAll(/LogicalName eq '([a-z_]+)'/g)].map((m) => m[1]);
+          return ok({ value: names.map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })) });
+        }
+        if (requestPath.startsWith('/wmkf_grantprograms')) return ok({ value: [{ wmkf_grantprogramid: PROGRAM_ID, wmkf_name: 'Research' }] });
+        if (requestPath.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: false, status: 404, body: null };
+        if (requestPath.startsWith(`/akoya_requests(${SOURCE_ID})`)) return ok({ akoya_requestid: SOURCE_ID, versionnumber: 42 });
+        if (requestPath.startsWith('/accounts')) return ok({ value: [{ accountid: ORG_ID, name: 'W. M. Keck Foundation', statecode: 0 }] });
+        if (requestPath.startsWith('/sharepointsites')) return ok({ value: [{ sharepointsiteid: 'site-x', absoluteurl: 'https://example.sharepoint.com/sites/akoyago' }] });
+        if (requestPath.startsWith('/sharepointdocumentlocations')) return ok({ value: [{ sharepointdocumentlocationid: 'parent-1', _parentsiteorlocation_value: 'site-x' }] });
+        if (requestPath.startsWith('/systemusers')) return ok({ value: [{ systemuserid: APP_USER_ID, fullname: '# WMK: Research Review App Suite', accessmode: 4, isdisabled: false }] });
+        if (requestPath.startsWith('/contacts')) return ok({ value: [] });
+        throw new Error(`unexpected path: ${requestPath}`);
+      },
+    };
+  }
+
+  test('a create body the fence does not admit never reaches the transport', async () => {
+    // Hash-consistent but naming another Request GUID: only the fence stops it.
+    const body = { akoya_requestid: SOURCE_ID, akoya_title: 'TEST: fixture', akoya_purpose: 'Synthetic purpose', akoya_request: 5000 };
+    const bundle = buildSourceBundle({
+      sourceRow: {
+        akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+        akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 42,
+      },
+      documents: [], dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date(), reviewers: [],
+    });
+    const run = baseRun({
+      currentStep: 'create_request', stepIndex: 1, createBodySha256: sha256(body), bundleSha256: sha256(bundle),
+      copyPolicyDigest: copyPolicyDigest(), sourceRevision: bundle.source.request.revision,
+      destinationEnvironment: 'production', destinationDataverseHost: 'wmkf.crm.dynamics.com',
+    });
+    const { ledger } = createFakeLedger(run);
+    const manifest = baseManifest({
+      target: PROD, targetEnvironment: 'production', createBody: body, createBodySha256: sha256(body), bundle,
+      source: {
+        requestId: SOURCE_ID, revision: bundle.source.request.revision, requestType: 100000000, bundleSha256: sha256(bundle),
+        dataverseHost: bundle.source.dataverseHost, exportedAt: bundle.exportedAt, requestNumber: '1003222',
+      },
+      copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
+      values: { ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID },
+    });
+    process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
+    const postWithOptions = jest.fn();
+    const result = await advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle,
+      deps: { client: productionClient(postWithOptions), graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
+    });
+    expect(result.errorMessage).toMatch(/Production write fence/);
+    expect(result.outcome).toBe('needs_attention');
+    expect(postWithOptions).not.toHaveBeenCalled();
   });
 });
 
