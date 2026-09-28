@@ -226,7 +226,7 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
   });
 
   it('uses IF NOT EXISTS for every table and index', () => {
-    expect((migration.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(4);
+    expect((migration.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(6);
     expect((migration.match(/CREATE UNIQUE INDEX IF NOT EXISTS/g) || []).length).toBe(2);
     expect((migration.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(3);
   });
@@ -331,6 +331,8 @@ describe('migrations manifest lists 054 last and its setup-database.js mirror ma
       'test_request_run_resources',
       'test_request_run_reviewer_assignments',
       'test_request_status_changes',
+      'test_request_cast_members',
+      'test_request_cast_bindings',
     ]);
 
     // Isolate the v55Statements array text in setup-database.js so we don't
@@ -346,6 +348,8 @@ describe('migrations manifest lists 054 last and its setup-database.js mirror ma
       'test_request_run_resources',
       'test_request_run_reviewer_assignments',
       'test_request_status_changes',
+      'test_request_cast_members',
+      'test_request_cast_bindings',
     ]);
 
     for (let i = 0; i < migrationTables.length; i++) {

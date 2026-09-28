@@ -1491,6 +1491,37 @@ $receipt$`,
     CONSTRAINT test_request_status_changes_distinct CHECK (option_before IS NULL OR option_before <> option_after)
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS test_request_status_changes_one_open_idx ON test_request_status_changes (run_id) WHERE status IN ('planned', 'dispatched', 'applied')`,
+  `CREATE TABLE IF NOT EXISTS test_request_cast_members (
+  member_id      UUID PRIMARY KEY,
+  environment    TEXT NOT NULL CHECK (environment IN ('sandbox', 'production')),
+  role           TEXT NOT NULL CHECK (role IN ('pi', 'liaison', 'suggested_reviewer')),
+  entity         TEXT NOT NULL CHECK (entity IN ('contact', 'wmkf_potentialreviewers')),
+  first_name     TEXT NOT NULL CHECK (length(first_name) BETWEEN 1 AND 50 AND first_name !~ '[[:cntrl:]]'),
+  last_name      TEXT NOT NULL CHECK (length(last_name) BETWEEN 1 AND 50 AND last_name !~ '[[:cntrl:]]'),
+  address_sha256 TEXT NOT NULL CHECK (address_sha256 ~ '^[0-9a-f]{64}$'),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'verified', 'needs_attention')),
+  dispatched_at  TIMESTAMPTZ NULL,
+  readback       JSONB NULL CHECK (test_request_receipt_ok(readback)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at    TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_cast_members_one_per_role UNIQUE (environment, role),
+  CONSTRAINT test_request_cast_members_role_entity CHECK ((role = 'suggested_reviewer') = (entity = 'wmkf_potentialreviewers'))
+)`,
+  `CREATE TABLE IF NOT EXISTS test_request_cast_bindings (
+  binding_id     UUID PRIMARY KEY,
+  run_id         UUID NOT NULL REFERENCES test_request_runs (run_id),
+  member_id      UUID NOT NULL REFERENCES test_request_cast_members (member_id),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'verified', 'needs_attention')),
+  dispatched_at  TIMESTAMPTZ NULL,
+  readback       JSONB NULL CHECK (test_request_receipt_ok(readback)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at    TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_cast_bindings_one_per_run UNIQUE (run_id, member_id)
+)`,
 ];
 
 // V54: review bundle PDF retention (plan §11, Step C1). Ten nullable
