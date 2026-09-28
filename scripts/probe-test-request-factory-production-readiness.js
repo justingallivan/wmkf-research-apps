@@ -285,8 +285,7 @@ async function printMeetingDateWrites(client, limit, appUserId) {
 
 /** Like getAll, but a 403 (missing audit privilege) returns null instead of failing the probe. */
 const SOURCE_TYPED_ATTRIBUTE_TYPES = [
-  ...ROLLUP_ATTRIBUTE_TYPES, 'StringAttributeMetadata', 'MemoAttributeMetadata', 'BooleanAttributeMetadata', 'PicklistAttributeMetadata',
-  'DoubleAttributeMetadata',
+  ...ROLLUP_ATTRIBUTE_TYPES, 'StringAttributeMetadata', 'BooleanAttributeMetadata', 'PicklistAttributeMetadata', 'DoubleAttributeMetadata',
 ];
 
 /** Section 10: Foundation columns that can change without an audit row. Names, timestamps and states only. */
@@ -302,8 +301,14 @@ async function printFoundationUnauditedChanges(client, since) {
 
   const sourced = [];
   for (const type of SOURCE_TYPED_ATTRIBUTE_TYPES) {
-    const attrs = await getAll(client,
-      `/EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.${type}?$select=LogicalName,SourceType,FormulaDefinition`);
+    let attrs;
+    try {
+      attrs = await getAll(client,
+        `/EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.${type}?$select=LogicalName,SourceType,FormulaDefinition`);
+    } catch (error) {
+      console.log(`   (skipped ${type}: ${String(error.message).slice(0, 120)})`);
+      continue;
+    }
     sourced.push(...attrs.filter((a) => a.SourceType === 1 || a.SourceType === 2));
   }
   const rollups = sourced.filter((a) => a.SourceType === 2).sort((a, b) => a.LogicalName.localeCompare(b.LogicalName));
