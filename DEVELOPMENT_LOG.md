@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Test Request Factory production enablement: MVP scope, write fence, email allowlist; isolation live (Session 546)
+
+**Milestone:** After eight days of sandbox-first hardening, the owner cut item 7 to a production MVP (a basic clone that lands before reviewer invite, the cloning admin as program director, an email recipient allowlist) and production enablement shipped: wave29 applied in production and `TEST_REQUEST_ISOLATION=on` live.
+**Sessions:** 546 (Opus; one Codex adversarial round per slice; owner decided every finding).
+**Ship state:**
+- PR #349 (`9ba8692a2`): pinned `--target=production`; production clone lands Phase II Pending in the Research program with the cloning admin as PD; GoVerify bypass, legacy execute and non-basic recipes refused; meeting date never re-written.
+- PR #350 (`fe71c846f`): run-scoped production write fence (closed POST shapes, destination-only Graph writes, source refused) and live source-revision checks.
+- PR #351 (`3738af3f0`): test-Request email allowlist (`@wmkeck.org` + admin-edited list) at create and dispatch; dispatch-gap residual risk accepted.
+- Production: wave29 applied (owner-run) and isolation on (redeploy `abv0745vo`); no production clone created yet.
+**Why it matters:** the first usable result of the Factory is one owner-run command away; scope is now anchored to the original ask (memory `feedback-anchor-multisession-features-to-the-original-ask`).
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` (*Owner decisions*, *MVP build list*); `lib/services/test-requests/production-write-fence.js`, `email-allowlist.js`.
+
 ## September 2026 — Test Request Factory: synthetic reviewers and reviews recipe promoted and live-proven (Session 543)
 
 **Milestone:** A cloned test Request can now carry synthetic reviewers and their reviews copied from the source: marker-isolated synthetic person rows (`wmkf_issyntheticreviewer`, wave30), suggestions, answer rows and received stamps, with review files copied and DOCX packages attested against SharePoint's characterized property promotion, and a terminal verifier that marks the run ready.

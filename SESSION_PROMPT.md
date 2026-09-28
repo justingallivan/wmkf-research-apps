@@ -1,4 +1,73 @@
-# Session 546 Prompt: Factory item 7 — owner accepts the production plan, then build P1–P4; review the Integrity branch
+# Session 547 Prompt: Factory MVP item 5 — verify transition contract, then the first production basic run
+
+## Session 546 Summary — 2026-09-27/28 PT (Opus; owner cut item 7 to an MVP; slices 1, 2, 4 built, reviewed, merged; production enabled)
+
+### What Was Completed
+
+1. **Scope reset (owner).** The original ask (Codex session log, 2026-09-19): "It is very hard for me to create requests from scratch for testing. Could you design a system that could create a new request based on an existing one?" After eight days without a usable result, the owner accepted an **MVP build list** (production plan *MVP build list*): a production `basic` clone that lands before reviewer invite, nothing else until used. New memory `feedback-anchor-multisession-features-to-the-original-ask`.
+2. **Owner decisions** (production plan *Owner decisions*): Q2 shared Postgres for the form phase; program director = the cloning admin; test-Request email recipient allowlist (`@wmkeck.org` + admin-edited list), superseding D-R4/6d; `correct_meeting_date` never writes in production; Foundation rollup columns join the transition contract (open question 7); post-cap Codex gap (first-write exception) accepted, deferred to recipe 5; slice-4 dispatch-gap residual risk accepted; one Codex review per slice, owner decides.
+3. **Probes (owner-run):** production has no meeting-date business rule; app user cannot read audit (403); `CalculatedFieldsAsync` and rollups fire on any Request column; Foundation has eight Request-aggregating rollups. Wiki: `docs/agent-wiki/topics/dataverse-dynamics.md`.
+4. **Slice 1** (PR #349, `9ba8692a2`): `--target=production`, lease-time target check, production create body adds Phase II Pending + active Research grant program + PD (`--director`, re-checked at fence and create), body re-hash at create, production refusals.
+5. **Slice 2** (PR #350, `fe71c846f`): `production-write-fence.js` (closed POST shapes, destination-only Graph writes, source refused, deny-by-default) and live source-revision checks.
+6. **Slice 4** (PR #351, `3738af3f0`): email allowlist at create and dispatch (dispatch re-reads the activity's own parties, only for test requests); editor at Admin → Test Requests.
+7. **Production enablement:** wave29 applied (owner-run) and `TEST_REQUEST_ISOLATION=on` (Config) with redeploy `abv0745vo` Ready [VERIFIED `vercel ls --prod`, probe section 1].
+8. **Unrelated fix:** `reviewer-roster-endpoint.test.js` expiry fixture aged out on 2026-09-28 UTC (`5ced59d3b`); seven similar fixtures logged in `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Commits
+All on `main` (merged PRs #349, #350, #351 and direct Tier 0 commits): `5c96e1713`…`464021dd3` (probes, decisions, plan), `5ced59d3b`, `12a54ea10`, and this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **MVP item 5, part 1 — verify transition contract (build).** `verifyClone` (`lib/services/test-requests/basic-clone-steps.js`) still compares the whole Foundation snapshot (`compareSnapshots`, `foundationBaselineDigest` over `versionnumber`), so a production run would fail on the accepted GoVerify refresh and rollup moves. Replace, for the production target only, with open question 4's projection contract plus open question 7's rollup rule; `verifyClone` also fails on any regarding email, and a Draft email is expected (P5 expected-outcome note) — decide how verify names/tolerates it (owner decides on the first run). One Codex review.
+   Evidence: production plan open questions 4, 7 and *MVP build list* item 5.
+2. **MVP item 5, part 2 — first production run (owner runs every command).** `--target=production --reserve --recipe=basic --director=<sign-in>` then `--advance`, with `DATAVERSE_PROD_WRITE_ACK` inline; a fresh bundle export (≤ 6 h); local ledger container (Q2 CLI phase). Then the trimmed P5: snapshot/compare, one check about an hour after, owner's Audit History read. Then invite a synthetic reviewer on the clone to an allowlisted inbox.
+   Evidence: plan P5 (trimmed) and *MVP build list*.
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 unapplied, recheck numbering): review when the owner wants it.
+
+### Parked
+
+1. Slice 5a (`claude/factory-recipe5a`), deeper recipes (IA, reviews, Pre-Site, 5, 3), admin form (P7), P3 actor, readiness endpoint, dependency-builder parameterization, 24 h watch — deferred by the MVP cut; resume only on owner request.
+2. Uploaded-review live pass, GoVerify bypass intermittent failure (sandbox-only), live-ledger flake — unchanged.
+3. Seven late-2026 `expiresAt` test fixtures (earliest 2026-10-08) — `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Verify Before Acting
+
+1. **Isolation is live in production.** If staff report "could not be confirmed as an ordinary request" on a Request email, check marker reads first; rollback is removing `TEST_REQUEST_ISOLATION` and redeploying.
+2. Sandbox residue (Requests 1000341–1000348) and local-ledger runs unchanged.
+
+### Do Not Reopen Without New Decision
+
+1. The MVP cut and its deferrals (owner, S546).
+2. Program director = cloning admin; the email allowlist replaces D-R4/6d (owner, S546).
+3. Accepted residual risks: slice-4 dispatch gap; Codex's round-2 vendor-create dissent; post-cap first-write gap (deferred to recipe 5).
+4. GoVerify not bypassed in production; stub `wmkf_ai_run` stays.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Owner decisions, MVP build list, open questions 4/5/7 |
+| `lib/services/test-requests/basic-clone-steps.js` | Targets, production create fields, `verifyClone` (item 5 target) |
+| `lib/services/test-requests/production-write-fence.js` | Production write fence |
+| `lib/services/test-requests/email-allowlist.js` | Recipient allowlist; enforced in `lib/services/dynamics/email.js` |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI (`--target=production`, `--director`) |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe (sections 1–9, `--meeting-date`, `--history`) |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|docx-package|presite|pre-rp|source-bundle|seed-synthetic).*"
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-test-request-factory-production-readiness.js --director=jgallivan@wmkeck.org   # owner-run
+```
+
+---
+
+## Prior Session 546 Prompt: Factory item 7 — owner accepts the production plan, then build P1–P4; review the Integrity branch
 
 ## Session 545 Summary — 2026-09-27 PT (Opus; recipe 5a built and parked, sandbox proofs stopped, production enablement planned and reviewed)
 
