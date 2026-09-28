@@ -106,6 +106,17 @@ not perform.
   second source of truth for either — `destination_request_number` is a
   server-assigned readback recorded for display/lookup convenience, not a
   value the ledger originates.
+- **Production Foundation baseline (MVP item 5, 2026-09-28):** a production
+  `basic` run journals one `foundation_transition` resource at
+  `fence_source`, before the create: digests of the Foundation account's
+  protected projection, its Tax Status/BMF 509 pair and its Contacts'
+  versions (`foundationProjectionSha256`, `foundationGoverifyResultSha256`,
+  `foundationContactsSha256`), the pre-run `akoya_countofrequests` (`count`),
+  the two GoVerify timestamps and `capturedAt`. No other account value is
+  stored. `verify` evaluates the account against it
+  (`lib/services/test-requests/foundation-transition.js`) and, on a pass,
+  journals a second `foundation_transition` row at `verify` whose `outcome`
+  is `refreshed` or `not_refreshed`. Sandbox runs write neither row.
 
 ## `test_request_run_reviewer_assignments` (slice 6c-i, D-R2 owner decision, 2026-09-25)
 
