@@ -22,6 +22,14 @@
  *      given time), every calculated column and the columns its formula
  *      reads, and the names of non-audited columns. Timestamps, states and
  *      names only; no rollup, calculated or other column values.
+ *  11. With --status-fields[=<dir>]: how the three status fields a test
+ *      Request will need to move are defined and what reacts to them
+ *      (akoya_requeststatus, wmkf_phaseistatus, wmkf_phaseiistatus): each
+ *      field's type and, for picklists, its live options; the Request forms'
+ *      control for akoya_requeststatus (where its dropdown comes from); and
+ *      every activated classic workflow triggered by an update of one of them.
+ *      With <dir>, each such workflow's definition (process logic, no record
+ *      data) is saved there for review of its conditions.
  *
  * SAFETY: GET requests only, through the interlocked raw client. Production
  * reads are owner-run behind the interlock override; nothing is written.
@@ -37,6 +45,7 @@
  *   emails, and audited field names on the Request and the Foundation account.
  *   Add --foundation-since=<ISO UTC> for section 10 (run it with the time just
  *   before a production run's fence_source).
+ *   Add --status-fields[=<dir>] for section 11.
  *   Add --meeting-date[=N] (default 50, max 200) to report whether the meeting
  *   date is written by an update after create on the N most recent Requests
  *   that carry one, by whom, and every audited meeting-date update on a
@@ -336,6 +345,74 @@ async function printFoundationUnauditedChanges(client, since) {
   console.log(`   ${unaudited.join(', ')}`);
 }
 
+const STATUS_FIELDS = ['akoya_requeststatus', 'wmkf_phaseistatus', 'wmkf_phaseiistatus'];
+const CONTROL_CLASSES = {
+  '{4273EDBD-AC1D-40D3-9FB2-095C621B552D}': 'text box',
+  '{3EF39988-22BB-4F0B-BBBE-64B5A3748AEE}': 'option set',
+};
+
+/** Section 11: status field definitions, the requeststatus form control, and update-triggered workflows. Metadata only. */
+async function printStatusFields(client, exportDir) {
+  console.log('\n11. Status fields a test Request will need to move');
+  for (const field of STATUS_FIELDS) {
+    const rows = await getAll(client,
+      `/EntityDefinitions(LogicalName='akoya_request')/Attributes?$select=LogicalName,AttributeType&$filter=LogicalName eq '${field}'`);
+    const type = rows[0]?.AttributeType || '(absent)';
+    console.log(`   ${field}: ${type}`);
+    if (type === 'Picklist') {
+      const resp = await client.get(
+        `/EntityDefinitions(LogicalName='akoya_request')/Attributes(LogicalName='${field}')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options),GlobalOptionSet($select=Name,Options)`);
+      if (!resp.ok) throw new Error(`GET ${field} options failed (${resp.status})`);
+      const set = resp.body?.OptionSet?.Options?.length ? resp.body.OptionSet : resp.body?.GlobalOptionSet;
+      if (resp.body?.GlobalOptionSet?.Name) console.log(`     global option set: ${resp.body.GlobalOptionSet.Name}`);
+      for (const o of set?.Options || []) console.log(`     ${o.Value}  ${o.Label?.UserLocalizedLabel?.Label ?? '(no label)'}`);
+    }
+  }
+
+  const forms = await getAll(client,
+    "/systemforms?$select=name,type,formxml&$filter=objecttypecode eq 'akoya_request' and type eq 2");
+  console.log(`   Request main forms: ${forms.length}`);
+  for (const form of forms) {
+    const xml = String(form.formxml || '');
+    const controls = [...xml.matchAll(/<control\b[^>]*datafieldname="akoya_requeststatus"[^>]*>/gi)].map((m) => m[0]);
+    if (!controls.length) continue;
+    console.log(`   - form "${form.name}": ${controls.length} akoya_requeststatus control(s)`);
+    for (const control of controls) {
+      const classid = (control.match(/classid="([^"]+)"/i)?.[1] || '').toUpperCase();
+      const id = control.match(/\bid="([^"]+)"/i)?.[1];
+      console.log(`     classid ${classid} (${CONTROL_CLASSES[classid] || 'custom or other'})  id ${id || '?'}`);
+    }
+    const custom = [...xml.matchAll(/<controlDescription\b[\s\S]*?<\/controlDescription>/gi)].map((m) => m[0])
+      .filter((block) => /akoya_requeststatus/i.test(block));
+    for (const block of custom) {
+      const names = [...new Set([...block.matchAll(/<customControl\b[^>]*name="([^"]+)"/gi)].map((m) => m[1]))];
+      console.log(`     custom control(s): ${names.join(', ') || '(unnamed)'}`);
+      console.log(`     parameters: ${block.replace(/\s+/g, ' ').slice(0, 800)}`);
+    }
+  }
+
+  const workflows = await getAll(client,
+    "/workflows?$select=name,workflowid,mode,triggeronupdateattributelist&$filter=primaryentity eq 'akoya_request' and category eq 0 and statecode eq 1 and type eq 1");
+  const triggered = workflows.filter((w) => STATUS_FIELDS.some((f) => String(w.triggeronupdateattributelist || '').split(',').includes(f)));
+  console.log(`   classic workflows triggered by an update of a status field: ${triggered.length}`);
+  for (const w of triggered) {
+    const resp = await client.get(`/workflows(${w.workflowid})?$select=xaml`);
+    if (!resp.ok) throw new Error(`GET workflow xaml failed (${resp.status})`);
+    const xaml = resp.body?.xaml || '';
+    const summary = summarizeWorkflowXaml(xaml);
+    const reads = STATUS_FIELDS.filter((f) => xaml.includes(`"${f}"`));
+    console.log(`   - ${w.name}  on update(${w.triggeronupdateattributelist})  ${w.mode === 1 ? 'real-time' : 'background'}`);
+    console.log(`     reads: ${reads.join(', ') || '(none)'}  creates: ${summary.creates.join(', ') || '(none)'}  sends email: ${summary.sendsEmail}`);
+    console.log(`     sets: ${summary.sets.join(', ') || '(none)'}`);
+    if (exportDir) {
+      const file = require('path').join(exportDir, `${w.name.replace(/[^A-Za-z0-9]+/g, '_')}.xaml`);
+      require('fs').mkdirSync(exportDir, { recursive: true });
+      require('fs').writeFileSync(file, xaml);
+      console.log(`     exported: ${file}`);
+    }
+  }
+}
+
 async function getAllOrForbidden(client, path) {
   try {
     return await getAll(client, path);
@@ -366,6 +443,8 @@ async function getAll(client, path) {
   const historyLimit = historyArg ? Math.min(Math.max(parseInt(historyArg.split('=')[1] || '10', 10) || 10, 1), 50) : 0;
   const meetingArg = process.argv.find((arg) => arg === '--meeting-date' || arg.startsWith('--meeting-date='));
   const meetingLimit = meetingArg ? Math.min(Math.max(parseInt(meetingArg.split('=')[1] || '50', 10) || 50, 1), 200) : 0;
+  const statusArg = process.argv.find((arg) => arg === '--status-fields' || arg.startsWith('--status-fields='));
+  const statusExportDir = statusArg && statusArg.includes('=') ? statusArg.slice('--status-fields='.length) : null;
   const sinceArg = process.argv.find((arg) => arg.startsWith('--foundation-since='));
   const foundationSince = sinceArg ? new Date(sinceArg.slice('--foundation-since='.length)) : null;
   if (foundationSince && Number.isNaN(foundationSince.getTime())) throw new Error('--foundation-since must be an ISO timestamp.');
@@ -440,6 +519,7 @@ async function getAll(client, path) {
   }
 
   if (foundationSince) await printFoundationUnauditedChanges(client, foundationSince);
+  if (statusArg) await printStatusFields(client, statusExportDir);
   if (historyLimit) await printCreationHistory(client, historyLimit);
   if (meetingLimit) await printMeetingDateWrites(client, meetingLimit, appUsers.length === 1 ? appUsers[0].systemuserid : null);
   if (!detail && !exportDir) return;
