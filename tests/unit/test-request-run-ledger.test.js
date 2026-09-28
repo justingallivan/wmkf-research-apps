@@ -970,6 +970,15 @@ describe('status setter journal (cast-and-status plan, slice C)', () => {
       .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
   });
 
+  it('records late recheck effects only on a finished change, validating the receipt', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'complete' })]);
+    await createRunLedger(db).recordLateStatusChangeEffects({ changeId: CHANGE_ID, effects: { kind: 'status_change', paymentIds: [CHANGE_ID] } });
+    expect(calls[0].text).toContain("status IN ('complete', 'needs_attention')");
+    await expect(createRunLedger(createFakeDb().db).recordLateStatusChangeEffects({ changeId: CHANGE_ID, effects: { note: 'x' } }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
   it('records needs_attention with sanitized error text from any open state', async () => {
     const { db, calls, queueRows } = createFakeDb();
     queueRows([row({ status: 'needs_attention' })]);

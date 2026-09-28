@@ -33,7 +33,7 @@ describe('resolveOption', () => {
 
   test('every live Phase I option is in the transition table', () => {
     for (const option of PHASE_I_OPTIONS) {
-      expect(() => planTransition({ field: STATUS_FIELDS.phase1, pair: { phase1: -1, phase2: null }, after: option.value })).not.toThrow();
+      expect(() => planTransition({ field: STATUS_FIELDS.phase1, pair: { phase1: null, phase2: null }, after: option.value })).not.toThrow();
     }
   });
 });
@@ -66,6 +66,27 @@ describe('planTransition', () => {
   });
 });
 
+describe('effect edges (payment- and tracking-producing changes)', () => {
+  test('Phase I → Invited only before Phase II and from a pre-decision Phase I', () => {
+    expect(planTransition({ field: STATUS_FIELDS.phase1, pair: { phase1: PHASE_I.RECOMMENDED_INVITE, phase2: null }, after: PHASE_I.INVITED }).allowed).toContain('tracking');
+    expect(() => planTransition({ field: STATUS_FIELDS.phase1, pair: { phase1: PHASE_I.NOT_INVITED, phase2: null }, after: PHASE_I.INVITED }))
+      .toThrow(expect.objectContaining({ code: 'status_change_edge' }));
+    expect(() => planTransition({ field: STATUS_FIELDS.phase1, pair: { phase1: null, phase2: PHASE_II.APPROVED }, after: PHASE_I.INVITED }))
+      .toThrow(expect.objectContaining({ code: 'status_change_edge' }));
+  });
+
+  test('Phase II → Recommended with Phase I Invited only from unset or Pending Committee Review', () => {
+    const invited = (phase2) => ({ phase1: PHASE_I.INVITED, phase2 });
+    expect(planTransition({ field: STATUS_FIELDS.phase2, pair: invited(PHASE_II.PENDING_COMMITTEE_REVIEW), after: PHASE_II.RECOMMENDED }).allowed).toEqual(['payments']);
+    expect(() => planTransition({ field: STATUS_FIELDS.phase2, pair: invited(PHASE_II.APPROVED), after: PHASE_II.RECOMMENDED }))
+      .toThrow(expect.objectContaining({ code: 'status_change_edge' }));
+  });
+
+  test('non-producing changes stay allowed from any state', () => {
+    expect(planTransition({ field: STATUS_FIELDS.phase2, pair: { phase1: PHASE_I.NOT_INVITED, phase2: PHASE_II.APPROVED }, after: PHASE_II.DECLINED }).allowed).toEqual([]);
+  });
+});
+
 describe('assertNotDuplicateProducing', () => {
   const prior = (effects, overrides = {}) => [{ status: 'complete', sequence: 1, field: STATUS_FIELDS.phase1, optionAfter: PHASE_I.INVITED, effects, ...overrides }];
   const change = { field: STATUS_FIELDS.phase1, after: PHASE_I.INVITED };
@@ -76,9 +97,18 @@ describe('assertNotDuplicateProducing', () => {
     expect(() => assertNotDuplicateProducing(prior({ trackingIds: ['t'] }), change, { rerun: true })).not.toThrow();
   });
 
-  test('allows a repeat whose earlier run created neither, or that never completed', () => {
+  test('an earlier change that recorded a tracking row blocks whatever its status', () => {
+    expect(() => assertNotDuplicateProducing(prior({ trackingIds: ['t'] }, { status: 'needs_attention' }), change)).toThrow(/--rerun/);
+  });
+
+  test('an earlier dispatched change with no census blocks a producing repeat, not a non-producing one', () => {
+    const unknown = prior(null, { status: 'needs_attention', dispatchedAt: '2026-09-28T22:00:00Z' });
+    expect(() => assertNotDuplicateProducing(unknown, { ...change, allowed: ['emails', 'tracking'] })).toThrow(/--rerun/);
+    expect(() => assertNotDuplicateProducing(unknown, { ...change, allowed: ['emails'] })).not.toThrow();
+  });
+
+  test('allows a repeat whose earlier run created neither, or that targeted another option', () => {
     expect(() => assertNotDuplicateProducing(prior({ emailIds: ['e'] }), change)).not.toThrow();
-    expect(() => assertNotDuplicateProducing(prior({ trackingIds: ['t'] }, { status: 'needs_attention' }), change)).not.toThrow();
     expect(() => assertNotDuplicateProducing(prior({ trackingIds: ['t'] }, { optionAfter: PHASE_I.NOT_INVITED }), change)).not.toThrow();
   });
 });

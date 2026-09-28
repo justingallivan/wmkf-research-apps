@@ -37,6 +37,7 @@ function memoryLedger(run, changes = []) {
     markStatusChangeApplied: async ({ changeId }) => move(changeId, ['dispatched', 'applied'], 'applied'),
     completeStatusChange: async ({ changeId, effects }) => move(changeId, ['applied'], 'complete', { effects }),
     markStatusChangeNeedsAttention: async ({ changeId, error, effects }) => move(changeId, ['planned', 'dispatched', 'applied'], 'needs_attention', { error, effects: effects ?? find(changeId)?.effects }),
+    recordLateStatusChangeEffects: async ({ changeId, effects }) => move(changeId, ['complete', 'needs_attention'], find(changeId)?.status, { effects }),
   };
 }
 
@@ -85,9 +86,13 @@ function fakeClient({
   };
 }
 
-const fastCompletion = { pollMs: 1, maxWaitMs: 5, now: (() => { let t = T0; return () => (t += 2); })(), sleep: async () => {} };
+// A clock that advances 1 s per read, with no real waiting.
+const fastCompletion = () => {
+  let t = T0;
+  return { pollMs: 1000, maxWaitMs: 300_000, minQuietMs: 90_000, now: () => (t += 1000), sleep: async () => {} };
+};
 const change = (client, ledger, overrides = {}) => runStatusChange({
-  client, ledger, runId: RUN_ID, field: PHASE2, optionLabel: 'Phase II Pending Committee Review', completion: fastCompletion, ...overrides,
+  client, ledger, runId: RUN_ID, field: PHASE2, optionLabel: 'Phase II Pending Committee Review', completion: fastCompletion(), ...overrides,
 });
 const AFTER = '2026-09-28T22:00:05Z';
 
@@ -186,11 +191,42 @@ describe('runStatusChange', () => {
     expect(ledger.rows[0].status).toBe('complete');
   });
 
+  test('an empty first poll is not completion: a job that appears later is waited for', async () => {
+    const job = { asyncoperationid: '66666666-6666-4666-8666-666666666666', createdon: AFTER };
+    let polls = 0;
+    const client = fakeClient({ jobs: () => {
+      polls += 1;
+      if (polls < 3) return [];
+      if (polls < 6) return [{ ...job, statecode: 0, statuscode: 0 }];
+      return [{ ...job, statecode: 3, statuscode: 30 }];
+    } });
+    const ledger = memoryLedger(READY_RUN);
+    await expect(change(client, ledger)).resolves.toMatchObject({ jobs: 1 });
+    expect(polls).toBeGreaterThan(6);
+    expect(ledger.rows[0].effects.jobIds).toEqual(['66666666-6666-4666-8666-666666666666']);
+  });
+
+  test('completion waits at least the minimum quiet period after the write', async () => {
+    let polls = 0;
+    const client = fakeClient({ jobs: () => { polls += 1; return []; } });
+    await change(client, memoryLedger(READY_RUN));
+    // 1 s per clock read; at least 90 s must pass before two quiet polls count.
+    expect(polls).toBeGreaterThanOrEqual(30);
+  });
+
   test('a failed background job stops the change needs_attention', async () => {
     const client = fakeClient({ jobs: [[{ asyncoperationid: '33333333-3333-4333-8333-333333333333', statecode: 3, statuscode: 31, createdon: AFTER }]] });
     const ledger = memoryLedger(READY_RUN);
     await expect(change(client, ledger)).rejects.toThrow(/background job\(s\) regarding the Request failed/);
     expect(ledger.rows[0].status).toBe('needs_attention');
+  });
+
+  test('a payment-producing change from an unlisted state is refused before any write', async () => {
+    const client = fakeClient({ request: { wmkf_phaseistatus: 100000003, wmkf_phaseiistatus: 100000003 } });
+    const ledger = memoryLedger(READY_RUN);
+    await expect(change(client, ledger, { optionLabel: 'Recommended' })).rejects.toMatchObject({ code: 'status_change_edge' });
+    expect(client.patches).toHaveLength(0);
+    expect(ledger.rows).toHaveLength(0);
   });
 
   test('a repeat of a change that created a tracking row is refused unless re-run', async () => {
@@ -207,5 +243,13 @@ describe('recheckStatusChange', () => {
     const client = fakeClient({ emails: late });
     const ledger = memoryLedger(READY_RUN, [{ changeId: 'c1', sequence: 1, field: PHASE2, optionBefore: null, optionAfter: 100000002, etagBefore: 'W/"100"', status: 'complete', dispatchedAt: '2026-09-28T22:00:00Z', effects: { emailIds: [] } }]);
     await expect(recheckStatusChange({ client, ledger, runId: RUN_ID })).resolves.toMatchObject({ ok: false, lateEffects: { emails: 1, tracking: 0, payments: 0 } });
+    expect(ledger.rows[0].effects.emailIds).toEqual(['44444444-4444-4444-8444-444444444444']);
+    expect(ledger.rows[0].status).toBe('complete');
+  });
+
+  test('reports jobs still open or failed after the change', async () => {
+    const client = fakeClient({ jobs: [[{ asyncoperationid: '55555555-5555-4555-8555-555555555555', statecode: 1, statuscode: 10, createdon: AFTER }]] });
+    const ledger = memoryLedger(READY_RUN, [{ changeId: 'c1', sequence: 1, field: PHASE2, optionBefore: null, optionAfter: 100000002, etagBefore: 'W/"100"', status: 'complete', dispatchedAt: '2026-09-28T22:00:00Z', effects: {} }]);
+    await expect(recheckStatusChange({ client, ledger, runId: RUN_ID })).resolves.toMatchObject({ ok: false, openJobs: 1, failedJobs: 0 });
   });
 });
