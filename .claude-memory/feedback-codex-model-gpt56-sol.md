@@ -9,6 +9,8 @@ metadata:
   modified: 2026-09-08T15:42:51.670Z
 ---
 
+**2026-09-28 (Session 547):** a review launched without `--model` fell back to the config default `gpt-6-luna` (not in the catalog) and was refused on ChatGPT auth. The config's effort had drifted to `"low"`; with owner authorization for this one edit, line 2 was set to `model_reasoning_effort = "high"` and the owner said to keep it. Codex's log (`~/.codex/logs_2.sqlite`, the thread's rows) confirmed the rerun used `gpt-5.6-sol` with `effort=Some(High)`. Before a review, check that the config still says `high`; if it doesn't, ask the owner rather than editing.
+
 **2026-09-23 (Session 535):** the owner asked for `gpt-6-sol` (high). Codex refused it twice, on CLI 0.153.x and after the owner updated to 0.156.1: "The 'gpt-6-sol' model is not supported when using Codex with a ChatGPT account." Per the owner's instruction the rule stays `--model gpt-5.6-sol`. Review commands accept `--model` but not `--effort` (their effort comes from `~/.codex/config.toml`, which sets `model_reasoning_effort = "high"`); for `task`, pass `--effort high`. `~/.codex/config.toml` currently names `gpt-6-sol` as its default, so never rely on the default — always pass `--model`.
 
 ## Recall Rule
