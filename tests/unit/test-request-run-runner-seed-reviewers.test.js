@@ -227,7 +227,7 @@ function createFakeLedger(initialRun, { assignments = [] } = {}) {
   };
 }
 
-const client = { baseUrl: 'https://sandbox.crm.dynamics.com/api/data/v9.2' };
+const client = { baseUrl: 'https://orgd9e66399.crm.dynamics.com/api/data/v9.2' };
 
 beforeEach(() => {
   createReviewsSandboxDeps.mockReset();

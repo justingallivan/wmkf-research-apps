@@ -66,6 +66,10 @@ import {
 import {
   READBACK_FIELDS,
   SANDBOX_URL,
+  TARGET_URLS,
+  resolveProgramDirector,
+  targetEnvironmentOf,
+  targetHostOf,
   SOURCE_SELECT,
   bodyOrThrow,
   buildCloneManifest,
@@ -199,6 +203,8 @@ export function parseArgs(argv) {
     manifest: null,
     steps: 1,
     runInspect: null,
+    target: 'sandbox',
+    director: null,
   };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
@@ -221,12 +227,29 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--manifest=')) parsed.manifest = arg.slice('--manifest='.length);
     else if (arg.startsWith('--steps=')) parsed.steps = Number(arg.slice('--steps='.length));
     else if (arg.startsWith('--run-inspect=')) parsed.runInspect = arg.slice('--run-inspect='.length);
+    else if (arg.startsWith('--target=')) parsed.target = arg.slice('--target='.length);
+    else if (arg.startsWith('--director=')) parsed.director = arg.slice('--director='.length);
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect];
   if (modes.filter(Boolean).length > 1) {
     throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, or --run-inspect.');
+  }
+  // Production plan P1 / MVP list item 1: the destination is an explicit
+  // operator choice, never inferred from the environment.
+  if (!Object.hasOwn(TARGET_URLS, parsed.target)) throw new Error('--target must be sandbox or production.');
+  if (parsed.target === 'production') {
+    if (parsed.prepare || parsed.execute || parsed.inspect) {
+      throw new Error('--target=production supports only --reserve, --advance and the read-only preflight; the legacy one-shot paths are sandbox-only.');
+    }
+    if (parsed.bypassGoverify) throw new Error('--bypass-goverify is never valid with --target=production.');
+    if (parsed.reserve && (parsed.recipe !== 'basic' || !parsed.director)) {
+      throw new Error('--target=production --reserve requires --recipe=basic (the default) and --director=<your sign-in>.');
+    }
+  }
+  if (parsed.director && !(parsed.reserve && parsed.target === 'production')) {
+    throw new Error('--director is valid only with --target=production --reserve.');
   }
   if (parsed.execute && !parsed.receipt) throw new Error('--execute requires --receipt.');
   if (!parsed.execute && !parsed.inspect && parsed.receipt) throw new Error('--receipt is valid only with --execute or --inspect.');
@@ -342,6 +365,7 @@ function printHelp() {
   console.log('  --actor: admin:<guid> or user:<guid>, or an OS username; a username (default: the current OS user) is stored only as cli:<16 hex digest>.');
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
   console.log('Inspect a ledger run (read-only, no Dataverse): ... --run-inspect=<runId>');
+  console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
   console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL, which must not be the shared Production/Preview database.');
 }
 
@@ -827,7 +851,14 @@ export async function runReserve(client, args, ledgerUrl) {
     throw new Error('Source Request must be a Grant Request matching the live Grant option.');
   }
   const cycle = resolveCloneCycle(source, args);
-  const manifest = buildCloneManifest(preflight, { ...cycle, source, testLabel: args.testLabel, bundle, recipe: args.recipe });
+  // The cloning admin is the clone's program director (owner, S546),
+  // resolved from their sign-in on the target, never a supplied GUID.
+  const target = args.target ?? 'sandbox';
+  const programDirector = target === 'production' ? await resolveProgramDirector(client, args.director) : null;
+  const manifest = buildCloneManifest(preflight, {
+    ...cycle, source, testLabel: args.testLabel, bundle, recipe: args.recipe, programDirector,
+  });
+  if (targetEnvironmentOf(manifest) !== target) throw new Error('Manifest target does not match --target.');
   if (!isBundleManifest(manifest)) throw new Error('The bounded ledger-driven runner only supports bundle (v4) manifests.');
 
   const { actorId } = args;
@@ -882,8 +913,8 @@ export async function runReserve(client, args, ledgerUrl) {
     copyPolicyDigest: manifest.copyPolicy.digest,
     planDigest,
     createBodySha256: manifest.createBodySha256,
-    destinationEnvironment: 'sandbox',
-    destinationDataverseHost: new URL(SANDBOX_URL).hostname,
+    destinationEnvironment: targetEnvironmentOf(manifest),
+    destinationDataverseHost: targetHostOf(manifest),
     destinationRequestId: manifest.values.requestId,
     destinationLocationId: manifest.values.locationId,
     expectedAppUserId: manifest.expectedAppUserId,
@@ -939,6 +970,9 @@ export async function runAdvance(client, args, ledgerUrl) {
   const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   enterDynamicsBypassForScript('rehearse-test-request-sandbox:advance');
   const manifest = readJson(args.manifest);
+  if (targetEnvironmentOf(manifest) !== (args.target ?? 'sandbox')) {
+    throw new Error(`Manifest target is ${targetEnvironmentOf(manifest)}; pass --target=${targetEnvironmentOf(manifest)} to advance it.`);
+  }
   assertSyntheticReviewerIsolationOnForReviews(manifest.recipe ?? 'basic');
   const bundle = readSourceBundle(readJson(args.bundle));
   const { graph, sharePointTarget } = await buildGraphContext();
@@ -1091,12 +1125,15 @@ async function main() {
     return;
   }
 
-  if (process.env.DYNAMICS_SANDBOX_URL !== SANDBOX_URL) {
+  const targetUrl = TARGET_URLS[args.target];
+  if (args.target === 'sandbox' && process.env.DYNAMICS_SANDBOX_URL !== SANDBOX_URL) {
     throw new Error(`DYNAMICS_SANDBOX_URL must equal the registered sandbox ${SANDBOX_URL}.`);
   }
+  // A production write still needs the interlock's per-invocation
+  // DATAVERSE_PROD_WRITE_ACK, set by the owner inline on the command.
   const client = createClient({
-    resourceUrl: SANDBOX_URL,
-    token: await getAccessToken(SANDBOX_URL),
+    resourceUrl: targetUrl,
+    token: await getAccessToken(targetUrl),
     // The factory CLI is the one sanctioned writer of the Test Request marker.
     allowTestRequestMarkerWrites: true,
   });
