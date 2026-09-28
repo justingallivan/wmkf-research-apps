@@ -21,7 +21,7 @@ A production test Request must be usable for the workflows staff test, which mea
 - An applicant-suggested reviewer is a `wmkf_potentialreviewers` person plus a `wmkf_appreviewersuggestion` row on the Request with `wmkf_applicantdisposition = 100000000` [VERIFIED `scripts/demote-applicant-suggested-reviewers.js`]. Production lacks the wave30 marker `wmkf_issyntheticreviewer` [VERIFIED probe section 1: absent].
 - The suggestion-creating adapter operations call `assertPersonBindable`, which refuses a marker-true person once `SYNTHETIC_REVIEWER_ISOLATION=on` [VERIFIED `lib/dataverse/adapters/reviewer-suggestion.js:52-68`]. The sandbox `reviews` recipe binds synthetic persons through its own Factory module (`lib/services/test-requests/reviews-sandbox-deps.js`: person create through the opted-out raw client, suggestion create through `write-core.js`, sandbox hosts only, exempt from `check:dataverse-access-layer` by name) [VERIFIED from that module's header]. Whether any other module binds synthetic persons is not established [ASSUMED none].
 - Phase I Status (`wmkf_phaseistatus`) and Phase II Status (`wmkf_phaseiistatus`) are picklists on global option sets, with 13 and 8 live options [DERIVED-FROM: probe section 11 output]; Request Status is a text field set by business rules [VERIFIED probe section 11; platform owner].
-- That the Request Status rules run on API updates is [ASSUMED]: their synchronous rule steps filter on these fields (probe section 4); the API does not expose their scope (probe section 12).
+- The Request Status rules run on API updates [VERIFIED by the characterization change, 2026-09-28: a PATCH of Phase II Status set Request Status to `Phase II Pending`]; the API does not expose their scope (probe section 12).
 - What reacts to the status fields is recorded in the production plan (*Status fields a test Request will need to move*).
 - No Factory marker column exists on `contact`: wave29 covers `akoya_request` and wave30 `wmkf_potentialreviewers` [VERIFIED `scripts/probe-test-request-factory-production-readiness.js` `MARKERS`].
 
@@ -58,7 +58,7 @@ A production test Request must be usable for the workflows staff test, which mea
 - **Guarded write.** The PATCH carries the Request's current ETag (`If-Match`), so a concurrent change fails instead of racing. It refuses any Request not carrying the test marker with a run ID the ledger owns.
 - **Journal and replay protection.** Before the write: the before-pair, the target, and the ETag. After it: every effect created regarding the Request (background jobs, draft emails, GoApply status-tracking rows, payment rows), by ID. A retry of a change whose write may have landed first reads the Request: if the field already holds the target, the change is recovered, not repeated. A transition whose recorded effects include a payment or a status-tracking row is refused on replay unless the owner explicitly re-runs it.
 - **Completion.** A change is complete only when every background job regarding the Request since the write is terminal, followed by a delayed recheck of Request Status and the effect census (as the basic run's `--run-recheck`). A failed or waiting job stops the change `needs_attention`, with the recovery (inspect, then deactivate the clone) written in the runbook.
-- **Characterize first.** The first production status change, Phase II Status = Phase II Pending Committee Review on a clone, runs under a snapshot and the owner's Audit History read, and establishes whether the Request Status rules run on API updates. Until it does, Request Status is recorded, not asserted.
+- **Characterize first.** The first production status change, Phase II Status = Phase II Pending Committee Review on a clone, runs under a snapshot and the owner's Audit History read, and establishes whether the Request Status rules run on API updates. **Done 2026-09-28 (see *Open questions* 2): they do.** Request Status is still recorded, not asserted, per change.
 - Also accepted at clone time as ordered changes after `verify`.
 
 ### Ledger
@@ -74,7 +74,7 @@ The cast record, the status-change journal and the new resource kinds (contact, 
 ## Open questions
 
 1. **Platform owner:** what `AkoyaGo.Sync_BusinessCentral` does on contact create, and whether a new contact joins any mailing list (*Update Mailing List Member Info*). Blocks contact creation.
-2. Whether the Request Status business rules run on API updates (answered by the characterization change in C).
+2. ~~Whether the Request Status business rules run on API updates.~~ **Answered (2026-09-28, S547): yes.** The characterization change (run `7293496e`, Request 1003302, change 1: Phase II Status unset → Phase II Pending Committee Review, owner-run from `main` after PR #355) read back Request Status `Phase II Pending`; 2 background jobs completed; 0 draft emails, 0 GoApply tracking rows, 0 payments. The owner's Audit History read and the Workbench visibility check follow.
 
 ## Order
 
