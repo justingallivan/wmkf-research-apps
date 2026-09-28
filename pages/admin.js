@@ -18,6 +18,7 @@ import DataverseFieldInfoButton, {
 } from '../shared/components/admin/DataverseFieldInfoButton';
 import AdminOverviewSection from '../shared/components/admin/AdminOverviewSection';
 import TestRequestPreviewSection from '../shared/components/admin/TestRequestPreviewSection';
+import TestRequestEmailAllowlistSection from '../shared/components/admin/TestRequestEmailAllowlistSection';
 import {
   AdminEditorPanel,
   AdminViewNavigation,
@@ -88,6 +89,14 @@ const ALERT_RECIPIENT_DATAVERSE_FIELDS = [
     'Per-category recipient JSON',
     'alertRecipientsByCategory',
     'The active-superuser fallback roster is Postgres-backed, not Dataverse.',
+  ),
+];
+
+const TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Test-request email allowlist',
+    'testRequestEmailAllowlist',
+    'JSON { addresses: [...] }. @wmkeck.org is always allowed in code and is not stored here.',
   ),
 ];
 
@@ -3423,14 +3432,25 @@ export function AiWorkspace({ view }) {
 
 function TestRequestsWorkspace() {
   return (
-    <AdminEditorPanel
-      id="test-request-preview"
-      title="Basic Request clone preview"
-      description="Resolve one sandbox Request, choose proposal files, and inspect the server-controlled field and filename plan. This panel has no create or copy action."
-      scope="Sandbox data · Shared files · Read-only"
-    >
-      <TestRequestPreviewSection />
-    </AdminEditorPanel>
+    <div className="space-y-6">
+      <AdminEditorPanel
+        id="test-request-email-allowlist"
+        title="Test-request email allowlist"
+        description="Who may receive email about a test request, for testing and training. Everyone else is refused."
+        scope="Global setting"
+        dataverseFields={TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS}
+      >
+        <TestRequestEmailAllowlistSection />
+      </AdminEditorPanel>
+      <AdminEditorPanel
+        id="test-request-preview"
+        title="Basic Request clone preview"
+        description="Resolve one sandbox Request, choose proposal files, and inspect the server-controlled field and filename plan. This panel has no create or copy action."
+        scope="Sandbox data · Shared files · Read-only"
+      >
+        <TestRequestPreviewSection />
+      </AdminEditorPanel>
+    </div>
   );
 }
 
