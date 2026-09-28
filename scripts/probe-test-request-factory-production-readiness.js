@@ -497,6 +497,7 @@ async function printCastReadiness(client, exportDir) {
   receipt.flows = { activated: flows.length, readable: flows.length - unreadable.length, unreadable: unreadable.map((f) => ({ name: f.name, reason: f.reason })) };
   console.log(`   activated cloud flows: ${flows.length}; readable definitions: ${flows.length - unreadable.length}; unreadable: ${unreadable.length}`);
   for (const f of unreadable) console.log(`   - UNREADABLE ${f.name} (${f.reason})`);
+  if (!flows.length) console.log('   (no activated cloud flows visible to this user: flow coverage is empty, not proven absent)');
   if (unreadable.length) receipt.incompleteReasons.push(`${unreadable.length} activated cloud flow definition(s) unreadable`);
 
   const allCreate = await getAll(client,
