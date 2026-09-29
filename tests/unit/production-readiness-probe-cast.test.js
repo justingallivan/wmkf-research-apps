@@ -239,6 +239,23 @@ describe('reviewer-slot metadata census', () => {
     }
   });
 
+  test('manual API-connection Request mentions require disposition without an unknown-trigger hard block', async () => {
+    const client = clientFor({ flows: [{ name: 'Manual Request action', clientdata: flow({
+      triggers: { manual: { type: 'Request', kind: 'ApiConnection', inputs: { parameters: { dataset: 'org', table: 'akoya_requests' } } } },
+      actions: { update: { inputs: { parameters: { entityName: 'akoya_requests' } } } },
+    }) }] });
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const receipt = await printReviewerSlotReadiness(client);
+      expect(receipt.complete).toBe(false);
+      expect(receipt.incompleteReasons).toEqual([]);
+      expect(receipt.dispositionRequired).toEqual(['flow mentions Request or slot without a classified Request trigger: Manual Request action']);
+      expect(receipt.counts.requestUpdateTriggers).toBe(0);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   test('reports incomplete when no activated cloud flows are visible', async () => {
     const client = clientFor();
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -256,6 +273,8 @@ describe('reviewer-slot metadata census', () => {
   test.each([
     ['unknown message', flow({ triggers: { trigger: { inputs: { parameters: { 'subscriptionRequest/entityname': 'akoya_request', 'subscriptionRequest/message': 99 } } } } })],
     ['alternate trigger', flow({ triggers: { trigger: { inputs: { parameters: { entityName: 'akoya_request' } } } } })],
+    ['manual lookalike with extra parameter', flow({ triggers: { manual: { type: 'Request', kind: 'ApiConnection', inputs: { parameters: { dataset: 'org', table: 'akoya_requests', 'subscriptionRequest/message': 3 } } } } })],
+    ['manual lookalike with HTTP kind', flow({ triggers: { manual: { type: 'Request', kind: 'Http', inputs: { parameters: { dataset: 'org', table: 'akoya_requests' } } } } })],
     ['action-only mention', flow({ triggers: { trigger: { type: 'Recurrence' } }, actions: { update: { inputs: { parameters: { entityName: 'akoya_requests' } } } } })],
   ])('fails closed on a %s flow without another incomplete reason', async (_label, clientdata) => {
     const client = clientFor({ flows: [{ name: 'Unclassified flow', clientdata }] });

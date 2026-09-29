@@ -525,6 +525,15 @@ function mentionsRequestOrSlot(value) {
   return /\bakoya_requests?\b/i.test(source) || slotMentions(source).length > 0;
 }
 
+/** The observed Power Automate manual API-connection shape has no Dataverse subscription. */
+function isManualApiConnectionTrigger(name, trigger) {
+  const parameters = trigger?.inputs?.parameters;
+  return name === 'manual' && trigger?.type === 'Request' && trigger?.kind === 'ApiConnection'
+    && parameters && typeof parameters === 'object' && !Array.isArray(parameters)
+    && Object.keys(parameters).length === 2
+    && Object.hasOwn(parameters, 'dataset') && Object.hasOwn(parameters, 'table');
+}
+
 /** null means no Request Update trigger; otherwise classify the exact filter list. */
 function classifySlotUpdateFlow(parameters) {
   if (parameters?.['subscriptionRequest/entityname'] !== 'akoya_request') return null;
@@ -659,7 +668,7 @@ async function printReviewerSlotReadiness(client, exportDir) {
           receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'unrecognized Request message' });
           receipt.incompleteReasons.push(`Request flow trigger message unrecognized: ${flow.name || '(unnamed)'} / ${triggerName}`);
         }
-      } else if (mentionsRequestOrSlot(trigger)) {
+      } else if (mentionsRequestOrSlot(trigger) && !isManualApiConnectionTrigger(triggerName, trigger)) {
         unclassifiedRequestTriggers += 1;
         receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'unclassified Request trigger shape' });
         receipt.incompleteReasons.push(`Request flow trigger shape unclassified: ${flow.name || '(unnamed)'} / ${triggerName}`);
