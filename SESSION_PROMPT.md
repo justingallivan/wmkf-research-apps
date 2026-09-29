@@ -9,14 +9,25 @@ console later became unavailable, so no further probe should be claimed without 
 console. No runtime, database, deployment, alias, Production, SharePoint, or deletion changes
 were made in this handoff.
 
+The feature branch remains unmerged and Production remains undeployed. Shared Postgres
+migration 055 is applied; Wave 30 evidence is sandbox-only. Bounded Preview Safari
+Watch/seek/Download acceptance passed and Preview presentation access was returned to `off`.
+The staff visit card currently exposes MP4 upload and Board link controls; Zoom URL and
+transcript staff inputs, and the Cancel/Retry controls below, are still planned. Older
+session sections in this file are historical snapshots and may describe earlier gates.
+
 ### Next session direction — owner decision
 
 Replace the low-value passive expiry wait with a concrete user-recovery milestone: add a visible
 **Cancel** action and a bounded **Retry upload** action for unfinished presentation-media uploads.
 The intended contract is to stop retrying on terminal Graph/session failure, preserve the last
-Graph-confirmed range, mark the durable intent failed/expired, let Cancel abandon the unfinished
-intent without creating a candidate or Request Document, and let Retry create a fresh Graph
-session and resume from the last confirmed range when integrity checks permit. Use
+Graph-confirmed range as diagnostic history, mark the durable intent failed with a terminal reason,
+let Cancel abandon the unfinished
+intent only after the exact path is confirmed absent without creating a candidate or Request
+Document, and let Retry create a fresh Graph session from byte zero after terminal failure and
+absent-path proof. Resume from the last confirmed range applies only to the still-live old
+session. The scoped, source-reconciled plan is §7.2.2 of
+`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`. Use
 `/contract-reconcile` before implementation, and obtain iterative read-only Claude Opus reviews
 for the code changes as before. Add focused tests for state transitions, bounded retry, cancel,
 fresh-session creation, and the no-candidate/no-Request-Document invariant.

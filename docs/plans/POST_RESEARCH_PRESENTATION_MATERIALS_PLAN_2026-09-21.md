@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the production-safe flow and shared schema are built, migration 055 is live in shared Neon, bounded branch Preview and macOS Safari Watch/available-seek/Download integrity passed and were closed safely, the code-owned 10 MiB policy is accepted, and Graph-confirmed upload-session expiry plus Production promotion remain."
+summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview and Safari acceptance passed, staff Cancel and terminal-session Retry are planned, Graph-confirmed terminal expiry remains unobserved, and Production promotion remains."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -40,6 +40,7 @@ Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-0
 | SharePoint video delivery | Offer Watch and Download without proxying the complete file through the application. |
 | First-slice MP4 cap | 2,000,000,000 bytes (about 1.86 GiB), so the exact byte count fits the existing Dataverse `wmkf_FileSize` integer. Raising the cap requires a reviewed larger-size schema field. |
 | Production test isolation | Schema readiness is environment-wide and is not a feature rollout guard. Add a separate server-enforced presentation access mode: `off`, `test:<approved request GUID>`, or `on`. Keep Production `off` until an owner-approved human-created disposable Request exists; the Test Request Factory is unfinished and is not a dependency. Use `test:<GUID>` for the bounded Production Safari media smoke and switch to `on` only after the remaining release gates pass. |
+| Unfinished recording recovery (owner 2026-09-29) | Keep Resume for a live Graph session. Add explicit staff Cancel and terminal-session Retry under §7.2.2. A new Graph session starts at byte zero; it cannot inherit fragments from an expired session. Do not replace an ambiguous or already committed item. |
 | Supported browser scope | Staff desktop browsers are the release target. The owner removed iPadOS support and its browser/device acceptance rows on 2026-09-24; no iPadOS run blocks this feature. The 2,000,000,000-byte cap remains a code/schema/integrity contract, but the owner removed a live near-cap throughput benchmark as a release gate on 2026-09-25. |
 | Existing full briefing | Preserve D19/D28: the existing distributed briefing remains a superset and continues to include research-presentation materials. Add audience-specific non-buffering Watch/Download resolution for Zoom and large SharePoint recordings. The new copied link is an additional materials-only option. |
 | Transport proof | **CHROME CORE PATH PASSED 2026-09-22; EDGE PARTIAL PATH REPORTED 2026-09-23; CHROME RELOAD/RESELECT AND PROOF-TOKEN RECOVERY PASSED 2026-09-24; SHARED 10 MiB PERFORMANCE TRANSPORT BENCHMARKED IN CHROME PREVIEW 2026-09-25; LOCAL-RUNTIME/SANDBOX-DATA SAFARI UPLOAD, PAUSE, RESUME, AND FINALIZE PASSED 2026-09-25.** The original status-0 failure was the application CSP, not Graph transport. A later current-hardening run exposed that Graph can publish a smaller same-path placeholder while the upload session is live; the corrected status contract treats that item as in progress only while the matching session remains live. Deployed Chrome then paused and resumed a 96.0 MiB direct Graph upload, finalized it, played it through both resolver shapes, downloaded byte- and SHA-256-identical content, and deleted the exact item to the recycle bin. Commit `bab770fe6` replaces the proof's 320 KiB/60-second loop with the shared 10 MiB, status-aware, stall-aware transport and removes the sealed-initial-expiry refusal. The performance problem to solve was request/rate-limit overhead from 320 KiB fragments on the office network, not the owner's temporarily slow home uplink. The code-owned 10 MiB default reduces a 100,665,703-byte upload from about 308 PUTs to 10 and a 2,000,000,000-byte upload from 6,104 nominal PUTs to 191. The owner accepted that policy as the performance resolution on 2026-09-25 and removed further live throughput/near-cap benchmarking as a release gate. The durable producer passed retained Chrome and Safari local-runtime/sandbox-data uploads on human-created Request `1000334`; Safari exercised Pause → Resume → saved, and exact Graph download matched source size/SHA-256. Graph-confirmed expiry remains unverified. The Windows Edge colleague reported upload, playback, and Download for a 97,777,999-byte MP4; the exact item was deleted after owner approval. The remaining Production Safari work is bounded to Watch/long-seek/Download behavior on an owner-approved human-created Request; the Factory remains unfinished and iPadOS is out of scope. |
@@ -166,6 +167,8 @@ works.
 | Deploying code before the Dataverse wave cannot add `wmkf_externalurl` to a live `$select`. | Request Document adapter, readiness helper | Readiness-off test proves the field is absent; readiness-on test proves it is present; invalid/unset readiness fails closed. |
 | A completed SharePoint upload is recoverable if Dataverse registration fails. | upload-intent store/finalizer | Inject failure after candidate persistence; retry registers the exact same drive item and does not upload a second file. |
 | An incomplete or abandoned upload cannot become a Board-visible material. | upload-intent store/finalizer/reader | Only a Ready Request Document is externally eligible; expired intent cleanup never promotes an item. |
+| Cancel never discards a completed or uncertain exact item. | cancel route, intent lease/store, Graph status/path reader | A successful Cancel has a confirmed closed/cancelled session, an absent exact path, and no candidate or Request Document; a complete item becomes Finish saving, while partial/mismatched/uncertain outcomes remain retained for reconciliation. |
+| Terminal Retry starts from zero without duplicating a live session or registry row. | retry route, intent store, Graph session helper, browser card | A live session uses Resume; a confirmed terminal no-item intent may get one fresh session per explicit action under the same intent ID/path, with a new sealed URL and 0-based range. Replay returns that session, and finalization keeps the original generation key. |
 | Cleanup never deletes SharePoint bytes referenced by any Request Document lifecycle state. | transcript staging reconciler, MP4 intent reconciler | Exact generation-key and drive/item match to one registry row means bound even when Superseded; zero matches may delete the exact candidate; ambiguous/mismatched/failed lookup retains and alerts. |
 | Zoom save, transcript finalize, and MP4 finalize cannot replace the same artifact type concurrently. | presentation-material slot-lease store + all three producers | Lease acquisition increments a fencing version stored on the new registry row; the holder renews/revalidates before each Dataverse mutation, and a stale lower-fence row never wins or supersedes predecessors. |
 | Expired transcript staging cannot strand or destroy a registered SharePoint candidate. | portal-upload staging migration/reconciler | Positive fixtures prove: any exact registry binding clears cleanup authority without deleting bytes; a true zero-row orphan is discarded by exact identity; unknown/ambiguous/mismatched shapes remain retained. |
@@ -204,6 +207,14 @@ The card contains:
   - show the fixed expiration date.
 
 The link controls do not send mail, alter recipients, or change a distribution ledger.
+
+The current branch card contains MP4 upload, Pause/Resume, Finish saving, and Board-link controls.
+The Zoom-paste and transcript producer APIs are source-built, but their staff input controls remain
+planned. For unfinished MP4s, add a visible Cancel action and a separate Retry upload action only
+when the server has proved the prior session terminal. Retry requires reselecting the same file and
+shows that a new session restarts at zero; a still-live session keeps Resume and its Graph-confirmed
+range. A complete item shows Finish saving instead of Cancel or Retry. Uncertain outcomes show a
+retained-for-reconciliation message rather than a success claim.
 
 ### 4.2 Staff Deliberations
 
@@ -458,9 +469,13 @@ operation lease, and retains/alerts on uncertain Graph or registry reads. In acc
 `test:<GUID>`, maintenance is inspect/record/alert only: it may refresh observed expiry and
 persist a candidate, but cannot cancel a session, clear its URL, mark abandoned, or delete bytes.
 In access `on`, the owner-approved routine cleanup policy may make those terminal transitions
-after the exact registry proof. A separately approved operator action may also do so for a named
-test intent; no staff abandon route is in this slice. A live session only moves its review-after
-time. Switching access to `off` stops new app-authorized PUTs but cannot revoke a preauthenticated
+after the exact registry proof. The planned explicit staff Cancel route in §7.2.2 is a separate,
+actor-bound user action under the current `test:<GUID>` or `on` access mode; it may mark
+`abandoned` only after Graph cancellation/terminal proof and an absent exact path are both
+confirmed. A complete, partial, mismatched, or uncertain path is retained, not silently abandoned
+or deleted. A separately approved operator action remains required to delete a retained exact
+SharePoint item. A live session otherwise only moves its review-after time. Switching access to
+`off` stops new app-authorized PUTs but cannot revoke a preauthenticated
 Graph URL already delivered to a browser; the test operator must wait for confirmed expiry or
 separately approved cancellation before treating its exact candidate as stable. If an unfinished
 session is confirmed gone with no exact item after that visibility check, Graph's partial bytes
@@ -603,8 +618,8 @@ producer subsequently passed a local-runtime/sandbox-data Safari upload with own
 and Resume plus exact Graph size/SHA-256 verification. The remaining Production Safari Watch,
 long-seek, and Download UI rows stay deferred to an owner-approved human-created
 disposable Request; the unfinished Test Request Factory is not a dependency. The proof harness is
-retired; the durable production intent that replaced it is source-built/offline-tested but not
-deployed or enabled in Preview or Production.
+retired; the durable production intent that replaced it is source-built/offline-tested. Bounded
+branch Preview acceptance was completed and closed; Production remains undeployed.
 
 After reload, the materials GET makes unfinished intents discoverable. An in-progress intent shows
 Resume; a committed candidate with no registry row shows Finish saving. Only the creating actor
@@ -687,7 +702,7 @@ The shared transport and its tests preserve these failure contracts:
 | Network error, stalled request, timeout, or 5xx | Do not infer that the in-flight bytes committed. Reauthorize through the existing resume/status route, query Graph's current session ranges, and resume only from the missing range. Use capped exponential backoff with jitter, at most three automatic attempts without Graph-confirmed offset progress, resetting the count after progress; leave a resumable intent and manual Resume action when exhausted. Never blindly replay an ambiguous range. |
 | `416` already-received range | Query status and continue from Graph's missing range, or verify the exact completed item. Do not turn this into an automatic fresh upload. |
 | `429` | Follow Graph's [throttling guidance](https://learn.microsoft.com/en-us/graph/throttling): expose the response's `Retry-After` through the browser XHR wrapper and honor a valid value before the next status/PUT request; otherwise use capped exponential backoff. Cap automatic throttling at three consecutive 429s or two minutes of total wait, whichever comes first. Then pause and require a fresh authorized status check for manual Resume; never spin indefinitely. |
-| `404`/`410` session after an ambiguous or final PUT | A closed session may mean a successful commit. Check the exact full-size item immediately and twice more after 2 and 10 seconds to allow SharePoint visibility. If still absent, mark the session closed but the item outcome unresolved; retain the intent/candidate for later status and registry-safe cleanup. Never auto-start a replacement or delete on this signal alone. Other 4xx or malformed/ambiguous ranges fail closed and retain the intent. |
+| `404`/`410` session after an ambiguous or final PUT | A closed session may mean a successful commit. Check the exact full-size item immediately and twice more after 2 and 10 seconds to allow SharePoint visibility. A complete item becomes Finish saving. A lone 404, partial/mismatched item, or failed read stays retained and cannot authorize Retry or abandonment. A confirmed terminal 410 with an absent exact path may offer explicit Retry under §7.2.2; the transport never starts a replacement automatically or deletes an item. Other 4xx or malformed/ambiguous ranges fail closed and retain the intent. |
 | Application resume/status route returns `401`/`403`, `5xx`, or is unreachable | Preserve the intent and Graph offset. Ask staff to sign in again for `401`/`403`; show Retry later for transient app/Dataverse failures. These are not Graph fragment failures and do not consume the fragment retry budget. Never bypass server reauthorization with a cached upload URL. |
 | Pause, reload, same-file reselect, or request switch | Show Pausing while a 10 MiB fragment finishes. The shipped control is graceful pause-after-fragment, not immediate abort. A lifecycle abort cancels XHR/timers and retains durable resume state; the next manual Resume performs the fresh authorized status reconciliation because commit is uncertain. Reauthorize and fingerprint-check before resume, and suppress stale progress/errors/PUTs for a different Request. Do not discard a recoverable intent or claim that committed bytes must restart. |
 
@@ -725,8 +740,9 @@ wait up to two minutes for an `online` event without spending a Graph attempt, t
 Resume if connectivity does not return. It labels waiting for a retry
 as Reconnecting, intentional stop as Paused, and an expired session as needing a new upload.
 The ETA becomes unknown while stalled or reconnecting and is recalculated after resume; the UI
-must not show an uncommitted fragment as durable progress. A same-browser upload-intent lock
-prevents a second tab from starting another PUT stream for that intent; a second device may still
+must not show an uncommitted fragment as durable progress. An expired session shows Retry upload
+only after server-side terminal/no-item proof; its new progress starts at zero even when the old
+session had confirmed bytes. A same-browser upload-intent lock prevents a second tab from starting another PUT stream for that intent; a second device may still
 race, so server reauthorization, Graph range/status reconciliation, and finalize fencing must
 remain correct under two clients. Test both cases. Keep preauthenticated URLs and tokens out of
 logs, measurements, and persisted plaintext.
@@ -831,6 +847,73 @@ benchmark blocks release:
    write, or deletion still requires its own exact approval and registry-safe retention/cleanup
    decision.
 
+### 7.2.2 Staff Cancel and terminal-session Retry — PLANNED 2026-09-29
+
+**Owner decision:** replace the passive wait for a Graph-confirmed expiry demonstration with a
+user-controlled recovery milestone. Microsoft documents that an uncommitted expired upload
+session discards its fragments; its missing ranges belong to that session alone. A live session
+still resumes from its own Graph-confirmed next range. A fresh session starts at byte zero, never
+at the last offset from the old session. This is a plan correction to the Session 551 handoff,
+not a claim that either new control exists.
+See the [Microsoft Graph upload-session contract](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0).
+
+The two actions share the existing Meeting Tracker grant, session-derived actor, path-bound
+Request and upload IDs, active Site Visit check, schema readiness, and server-side access mode.
+They take a short per-intent operation lease that excludes finalize, the other action, and
+cleanup; every post-await mutation rechecks that lease. Neither accepts a client-selected
+SharePoint path, Graph URL, candidate identity, actor, or Request Document payload. The current
+upload row already has failed and abandoned states, a lease, sealed URL, and immutable
+server-owned path/generation key, so the planned contract adds no column or migration.
+
+1. **Cancel:** The staff card first stops its local PUT stream, then calls a new exact-empty-body
+   POST at the intent's cancel route. The server reauthorizes and claims an initiated or
+   terminal-failed row only when no candidate or Request Document is recorded. If the old Graph
+   URL is live, call Graph's upload-session DELETE; a successful cancellation or confirmed
+   terminal 410 is followed by immediate, 2-second, and 8-second reads of the exact server-owned
+   path. A successful Cancel requires that path to be absent and a lease-fenced transition to
+   abandoned that clears the sealed URL. A session-create failure with no delivered URL may
+   also be abandoned after the same absent-path proof. Graph 404 alone, a failed Graph/path read,
+   or a visible partial/mismatched item is not success: retain the row, URL, and cleanup
+   authority, report a pending reconciliation state, and do not create a candidate or Request
+   Document. If the exact full-size item is found, persist its stable candidate identity and
+   offer Finish saving; Cancel does not delete or hide it. Already finalized rows return their
+   saved material instead of claiming cancellation. A successful abandoned row is excluded from
+   the routine sweep only because the exact path was proved absent; a retained failed row stays
+   eligible for the existing inspect/alert sweep. Cancel never performs an item DELETE.
+2. **Retry upload:** A new exact-body POST at the intent's retry route accepts only the selected
+   file's bounded resume fingerprint. The user must reselect the same MP4 after reload. The
+   server permits Retry only for a session-create failure before any URL was delivered or a
+   Graph-confirmed terminal 410 recorded as failed, with no candidate/Request Document and an
+   absent exact path after bounded visibility reads. A live session returns Resume; a complete
+   item returns Finish saving; Graph 404 alone or partial/mismatched/unknown path state blocks
+   Retry and retains the old intent for reconciliation. Under the same intent ID, server-owned
+   path, and generation key, claim the lease, create one new Graph session with conflict
+   behavior fail, replace the sealed URL/expiry atomically, and return only that session's
+   validated zero-based range. No old confirmed offset is credited. A lost-response replay
+   returns the already recorded live session after fresh authorization/status and does not mint
+   another. If session creation or persistence fails before the URL is returned, leave the row
+   failed and retain/alert on an uncertain Graph cancellation; no bytes can be sent from an
+   undisclosed URL. One explicit click starts at most one new session; fragment retry backoff
+   remains the separately bounded policy in §7.2.1, with no automatic fresh-session loop.
+3. **UI and race behavior:** Cancel needs a confirmation that unsaved progress will be lost.
+   Retry states plainly that the new upload starts at zero, resets the new progress bar, and may
+   show the old confirmed byte count only as historical context. Both actions have one busy
+   guard, are hidden while finalization owns the row, and use the request-generation/mounted
+   checks for every success and error response. Reload rediscovers the server's current state.
+   A stale tab cannot restore a cancelled URL, start a second PUT stream, or mark a newer
+   Request successful. Access off or another test Request blocks both actions before Graph.
+
+**Acceptance before implementation completion:** focused service/store/route/card tests cover
+live Resume versus terminal Retry, Graph 410 with absent path, 404 with a late full-size item,
+partial placeholder, path/read failure, cancel DELETE success/failure, lease/finalize/cleanup
+races, same-actor/file/visit replay, wrong actor/request/file/access refusals, lost response,
+new-session zero offset, and no candidate/Request Document on a successful Cancel or an
+incomplete Retry. A positive late-commit fixture must contain the item being protected.
+Run route/security, Atlas if schema changes, documentation, and relevant code gates with each
+self-test sequentially. Review the code in iterative read-only OAuth Claude Opus rounds as
+directed by the owner. No new live upload, retained-item deletion, alias move, Production
+configuration, or Production deployment is authorized by this plan revision.
+
 ### 7.3 Finalize
 
 1. Client POSTs no authority-bearing body; upload ID is in the path and is the stable retry/lease
@@ -900,6 +983,8 @@ feature and supplies no test Request.
 | same | PATCH | Exact action to save/replace a Zoom link; request and actor are server-owned. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript and recording source-built/offline-tested:** transcript begins bounded private-Blob staging; recording writes an immutable durable intent before creating a browser-direct Graph session and returns the code-owned 10 MiB contract. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | **Source-built/offline-tested and local/sandbox Chrome/Safari-tested:** independently reauthorize creating actor/request/visit, verify the bounded local-file fingerprint, resolve the exact path, and check live Graph status. Return the no-store URL plus one validated sequential open-ended or exact-to-file-end range only while live; for an exact committed item return finalize-only state and no URL. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/cancel` | POST | **PLANNED §7.2.2:** exact-empty-body, same-actor/request/visit and access checks, lease-fenced Graph cancellation plus exact-path proof; only an absent path permits abandoned with no candidate or Request Document. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/retry` | POST | **PLANNED §7.2.2:** exact fingerprint body, terminal/no-item proof, lease-fenced fresh session under the same intent; a lost-response replay returns that live session, and its range starts at zero. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript and recording source-built/offline-tested:** lease-fenced, request-bound finalize/recovery. MP4 re-resolves the exact stable candidate, validates bounded signature/malware facts, then uses the Recording slot fence and durable replay. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | **Source-built/offline-tested:** GET current link; POST exact `ensure` or compare-and-swap `reissue`, behind both Meeting Tracker and post-presentation readiness/access checks. |
 | Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection/status for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While readiness is off, return the legacy payload with `presentationMaterialsStatus: 'disabled'`, not a false empty collection; do not 503 the existing logistics read. |
@@ -1074,8 +1159,9 @@ bounded Preview acceptance on a freshly approved human-created sandbox Request. 
 runtime/sandbox-data Safari upload, Pause, Resume, finalize, and exact-byte verification passed.
 The later registered-alias bounded Preview run passed Safari Watch, seeking across the available
 sub-minute timeline, and exact Download integrity. A greater-than-two-minute seek was impossible
-with this fixture and is not claimed. Graph-confirmed terminal upload-session expiry remains open,
-so Slice 0 is not yet complete.
+with this fixture and is not claimed. Graph-confirmed terminal upload-session expiry remains an
+unproved historical cell. The owner replaced another passive wait with the planned Slice 4a
+recovery milestone; do not upgrade the cell to PASS from offline tests.
 
 [VERIFIED historically via commit `bab770fe6`, 84 focused proof tests, scoped ESLint, type checking,
 and a local webpack production build] the Preview harness consumed the shared 10 MiB browser
@@ -1230,7 +1316,7 @@ exact deletion. No bearer URL or token was saved.
 |---|---|---|---|
 | Desktop Chrome | Historical core path | 2026-09-22 receipt above: 100,665,703 bytes, 302 and one-shot Watch, seek, size/SHA-256 match, exact cleanup. | Agent (historical PASS) |
 | Desktop Chrome | Reload and same-file reselect Resume | 2026-09-24 PASS: paused at 0.9 MiB, reloaded, reselected the same file, resumed direct Microsoft `202` chunks, committed 100,665,703 bytes, finalized, and cleaned the exact item. | Agent |
-| Desktop Chrome | Upload-session expiry and recovery | PARTIAL: after the sealed initial expiry, Resume refused and retained its permit; approved Cleanup returned `session_cancelled` with no item. This proves the old local refusal/cleanup path, but a 2xx Graph cancellation means Graph-confirmed expiry was not observed. Commit `bab770fe6` corrected the initial-expiry predicate offline. The 2026-09-25 durable-producer run on sandbox Request `1000334` then proved authenticated live-status resume from Graph's bounded remaining range, but the session was still live. Retest only terminal expiry/recovery through the durable producer; the retired harness is not the test surface. The third historical session did commit 100,665,703 bytes and was cleaned exactly. | Agent, with owner final UI clicks after browser auto-review block |
+| Desktop Chrome | Upload-session expiry and recovery | PARTIAL: after the sealed initial expiry, Resume refused and retained its permit; approved Cleanup returned `session_cancelled` with no item. This proves the old local refusal/cleanup path, but a 2xx Graph cancellation means Graph-confirmed expiry was not observed. Commit `bab770fe6` corrected the initial-expiry predicate offline. The 2026-09-25 durable-producer run on sandbox Request `1000334` then proved authenticated live-status resume from Graph's bounded remaining range, but the session was still live. The owner replaced another passive expiry wait with planned Slice 4a Cancel/Retry coverage; the retired harness is not the test surface. The third historical session did commit 100,665,703 bytes and was cleaned exactly. | Agent, with owner final UI clicks after browser auto-review block |
 | Desktop Chrome | Five-minute proof-token expiry recovery | 2026-09-24 PASS: old link refused as `expired` after reload; fresh link from the same item played and accepted End/Home seeks with resolver count one. | Agent |
 | Desktop Edge | 2026-09-23 upload, playback, Download | Colleague reported these actions for 97,777,999 bytes; Graph confirmed the item. Remaining detailed Edge trace is not a Slice 0 blocker under Session 536. | Historical owner colleague; no new Edge run |
 | macOS Safari | Durable-producer upload, Pause, Resume, finalize | 2026-09-25 local-runtime/sandbox-data PASS: owner observed Pause → Resume → saved; exact retained Graph item is 100,665,703 bytes and its downloaded SHA-256 matches the source; slot version 3 is Ready and slots 1–2 are Superseded. Fragment boundary and rate/ETA were not independently recorded. | Owner by hand; agent Graph/Dataverse/Postgres verification |
@@ -1249,7 +1335,7 @@ The earlier Chrome CSP and live-placeholder failures were corrected by `35b9990b
 | macOS Safari full path | PASS FOR BOUNDED PREVIEW UPLOAD AND MEDIA PATH | [VERIFIED 2026-09-25/26] the local durable producer passed owner-observed Pause → Resume → saved, and the registered-alias bounded Preview passed Watch, seeking across the available sub-minute timeline, and exact Download size/SHA-256 on sandbox Request `1000334`. A >2-minute seek was impossible and is not claimed. Production runtime promotion remains separate; the unfinished Factory is not a prerequisite and the live near-cap throughput row is removed. |
 | iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] Staff will not use iPadOS for this work; its upload, playback, Files-app, and backgrounding checks are removed from the acceptance matrix. |
 | Reload and same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] 0.9 MiB pause, reload, reselect, direct Microsoft `202` chunks, 100,665,703-byte commit/finalize, exact ETag-guarded cleanup with Graph 404 and empty folder. |
-| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. [VERIFIED offline at `bab770fe6`] the false terminal predicate is corrected. [VERIFIED 2026-09-25 via local/sandbox durable-producer Chrome acceptance] authenticated live-status resume worked from Graph's bounded remaining range, but Graph had not expired the session. Terminal expiry/recovery still needs a separately approved wait/retest through the durable producer; the retired harness is not restored. |
+| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] after the *initial sealed* expiry at 8:49:47 PM PDT, Resume refused and retained the permit; approved Cleanup returned `session_cancelled` (Graph accepted cancellation, so the session was not proved expired). [VERIFIED via Graph] a third fresh session committed the full 100,665,703-byte MP4 at its exact path. [REPORTED by owner] Finish saving created the playback proof and Cleanup moved that exact item to the recycle bin. [VERIFIED via Graph] exact-path not found and folder empty. [VERIFIED offline at `bab770fe6`] the false terminal predicate is corrected. [VERIFIED 2026-09-25 via local/sandbox durable-producer Chrome acceptance] authenticated live-status resume worked from Graph's bounded remaining range, but Graph had not expired the session. The owner replaced another passive expiry wait with planned Slice 4a Cancel/Retry controls; this historical cell remains PARTIAL and the retired harness is not restored. |
 | Five-minute proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] expired old link refused after reload; Finish saving minted a fresh link from the same committed item; Watch played and End/Home seeks caused no additional resolver action. |
 | Long-duration seeking | NOT PROVED BY AVAILABLE FIXTURE | [VERIFIED via Chrome/Safari receipts] the retained recording is under one minute. Safari seeking worked across its available timeline, but a >2-minute seek is impossible and is not claimed. No longer fixture was authorized or uploaded. |
 | Upload and throughput near 2,000,000,000 bytes | NOT REQUIRED | [OWNER DECISION 2026-09-25] live near-cap timing and the 45-minute/baseline thresholds are removed. The 2,000,000,000-byte validation/schema boundary and integrity/resume behavior remain code- and test-enforced. |
@@ -1487,7 +1573,7 @@ deleted the exact committed item to the recycle bin or confirmed that the upload
 cancelled, gone, or expired with no exact item; uncertain transport retained the encrypted permit
 for retry.
 
-### Slice 1 — Additive schema and readiness — SHARED POSTGRES APPLIED 2026-09-26; BOUNDED PREVIEW ACTIVE; PRODUCTION RUNTIME OFF
+### Slice 1 — Additive schema and readiness — SHARED POSTGRES APPLIED 2026-09-26; BOUNDED PREVIEW CLOSED; PRODUCTION RUNTIME OFF
 
 **[VERIFIED via source, focused tests, preflight self-test, migration/fresh-install parity, and
 sandbox readback.]** Wave 30, migration 055/V56, readiness/access parsing, compatibility-gated
@@ -1495,7 +1581,7 @@ Request Document projection, Atlas, and runbook updates are built on `codex/feat
 Wave 30 was applied to sandbox Dataverse and both fields were read back with their exact types.
 Under explicit owner authorization, migration 055 was later applied by the canonical runner to the
 shared Preview/Production Neon database and exact readback found all three presentation tables
-empty. Branch-scoped Preview readiness/access is active for the approved sandbox Request;
+empty. The approved branch Preview acceptance is closed and its access reset to off;
 Production runtime configuration and general producer enablement remain off.
 
 - Dataverse wave adds `wmkf_ExternalUrl` and `wmkf_SlotVersion` to Request Document plus exact
@@ -1642,6 +1728,18 @@ size/SHA-256, and slot-version supersession. It closes the Safari upload subpath
 Production Watch/long-seek/Download row. The live near-cap performance row was later removed by
 owner decision; the 2 GB validation/integrity contract remains.
 
+### Slice 4a — Staff Cancel and terminal Retry — PLANNED 2026-09-29
+
+Build the §7.2.2 route/service/store/card changes on this feature branch before Production
+promotion. Existing failed/abandoned states and the immutable intent identity are reused; no
+schema migration is planned. Keep ordinary live-session Resume, exact-item recovery, the
+inspect-only cleanup posture in access off/test, and slot-fenced finalize unchanged. Add the
+Cancel/Retry routes to the security matrix and counts only when those route files are built.
+The historical Graph-confirmed expiry row remains PARTIAL; the owner chose the actionable
+recovery controls and fault-injection coverage in place of another passive expiry wait. The
+Zoom-paste and transcript staff inputs are still separate unbuilt UI work in the first-slice
+target flow, even though their producer APIs exist.
+
 ### Slice 5 — Internal and external consumers
 
 - Extend the existing `reviewers`-grant Workbench logistics GET with a distinct
@@ -1669,6 +1767,10 @@ Production write was performed for this slice.
 
 - **[SOURCE-RETIRED/OFFLINE-TESTED 2026-09-25]** Remove the Preview proof harness while retaining
   the shared Graph transport and historical benchmark receipts.
+- Complete planned Slice 4a Cancel/Retry controls and fault-injection tests before Production
+  promotion. Keep the Graph-confirmed terminal-expiry cell PARTIAL without another passive wait.
+- Complete the Zoom-paste and transcript-upload staff inputs before claiming the full first-slice
+  user flow; their source-built server producers alone are not UI evidence.
 - Owner-applied schema/migration and readiness enablement.
 - Signed-in Meeting Tracker smoke with one Zoom link, one transcript, and one owner-approved,
   registry-bound retained test MP4 (retention per §15 step 6).
@@ -1769,6 +1871,12 @@ fact-consistency gates each pass after their self-test ran sequentially.
   refreshed expiry, and terminal 404 are covered with positive fixtures;
 - unfinished intent rediscovery, complete-session Finish saving, creating-actor-only resume,
   active-visit drift refusal, and automatic bounded retry after a slot conflict;
+- explicit Cancel with confirmed session termination and an absent exact path; 404/late full item,
+  partial placeholder, mismatch, or failed read retains rather than abandoning; a successful
+  Cancel creates no candidate or Request Document;
+- explicit terminal Retry with same-file fingerprint, same durable intent/path/generation,
+  lease-fenced fresh Graph session and zero-based progress; live Resume preserves its own
+  confirmed range, while response replay reuses the already stored new session;
 - navigation/request change suppresses stale progress/success/error state;
 - incomplete Graph session never creates a Request Document;
 - completed Graph upload + Dataverse failure retries the same exact item;
@@ -1785,6 +1893,8 @@ fact-consistency gates each pass after their self-test ran sequentially.
 ### UI and browser
 
 - source chooser, replace confirmation, distinct loaded-empty/unavailable states, upload progress;
+- visible Cancel and terminal-only Retry upload controls, with truthful zero-reset copy, busy
+  guards, request-generation checks, and retained-for-reconciliation error states;
 - presentation-material success remains visible when recipient/logistics loading fails;
 - Copy link success/failure/manual fallback and state reset after reissue;
 - Staff Deliberations renders Zoom, SharePoint, transcript, and missing states;
@@ -1867,13 +1977,14 @@ Release order:
 
 1. **HISTORICAL PROOF COMPLETE; DURABLE-PRODUCER SANDBOX CHROME AND SAFARI UPLOAD ACCEPTANCE PASSED; ACCEPTANCE STILL PARTIAL:** the fail-closed Slice 0 harness passed the deployed Chrome core path after a
    route-scoped CSP correction. Chrome reload/reselect and proof-token recovery passed on
-   2026-09-24; Graph-confirmed session expiry needs a corrective retest. Commit `bab770fe6`
+   2026-09-24; Graph-confirmed terminal expiry was not observed. Commit `bab770fe6`
    built and offline-tested the §7.2.1 transport as one browser module used by the Preview
    benchmark harness and intended for the later production producer. The separately approved
    representative Chrome benchmark passed on 2026-09-25. The durable producer subsequently passed
    a retained local-runtime/sandbox-data Chrome pause/resume/finalize run on freshly approved
-   human-created Request `1000334`, including live Graph status reconciliation. Retest only the
-   still-open Graph-confirmed terminal-expiry row through the durable producer; do not restore the
+   human-created Request `1000334`, including live Graph status reconciliation. The owner
+   replaced another passive expiry wait with the planned Slice 4a Cancel/Retry recovery controls
+   and fault-injection tests; retain the historical expiry row as PARTIAL and do not restore the
    retired harness. A later owner-operated Safari run through the same local producer/sandbox data
    passed Pause, Resume, finalize, and exact size/SHA-256 verification, while leaving Production
    Watch/long-seek/Download acceptance open.
@@ -1882,7 +1993,8 @@ Release order:
    and long-seek cells remain in the Slice 0 matrix but block general release after
    the production-safe flow exists, not coding of that flow. **[SOURCE-BUILT/OFFLINE-TESTED
    2026-09-25]** that durable MP4 flow now exists on `codex/feature-request`; as of 2026-09-26 its
-   shared schema and bounded registered-alias Preview are active, while no new upload was run;
+   shared schema is applied and bounded registered-alias Preview acceptance is closed, with
+   branch presentation access reset to off;
 2. **SOURCE COMPLETE/OFFLINE-TESTED:** remove the proof harness and merge the compatibility floor: deploy-safe readers,
    backing validation, disabled-state payload, and external-route readiness guards with readiness
    off and both new fields absent from live selects. Confirm only the presence—not the value—of
@@ -1894,12 +2006,12 @@ Release order:
    registered-alias Chrome readiness/link issuance and macOS Safari Watch/available-seek/Download
    integrity on the approved Request. Cleanup restored the alias to the exact prior Factory
    deployment and reset branch presentation access to `off`. Graph-confirmed terminal upload-
-   session expiry/recovery remains open through the durable producer; the retired harness stays
-   retired;
+   session expiry/recovery remains unobserved; planned Slice 4a is the recovery milestone before
+   promotion, and the retired harness stays retired;
 5. for Production, separately confirm the target registry/interlock classifies the production
-   Dataverse organization, owner applies the same Postgres migration to the Production-connected
-   database and the Dataverse wave to the production organization, and runs exact preflights with
-   Production readiness still off;
+   Dataverse organization, recheck that migration 055 remains tracked in the shared
+   Preview/Production Neon database, apply the Dataverse wave to the production organization
+   under separate owner approval, and run exact preflights with Production readiness still off;
 6. deploy the compatible runtime to Production with schema readiness and access both off, rerun
    tolerance fixtures, then owner enables schema readiness and sets
    `POST_PRESENTATION_MATERIALS_ACCESS=test:<verified owner-approved request GUID>` for the bounded
@@ -1928,6 +2040,9 @@ closed and Staff Deliberations shows disabled rather than a false empty state.
 `Meeting Tracker staff → request-bound client state → exact route payload → grant/auth/GUID/body
 validation → post-presentation service → SharePoint/Request Document/Postgres → projected response
 → Staff Deliberations or presentation-token page → tests/docs/gates` is accounted for above.
+Planned Cancel/Retry branches use the same entry authorization and upload-intent store but stop
+before Request Document writes unless an already committed exact item is found and separately
+finalized.
 
 ### Partial success
 
@@ -1944,12 +2059,18 @@ validation → post-presentation service → SharePoint/Request Document/Postgre
 - New-row confirmation precedes predecessor supersede, so failure never erases the last usable
   material.
 - A response returns concrete material/link/upload identifiers, never success-by-count.
+- Cancel may report success only for a lease-fenced absent-path abandonment. A full item becomes
+  a retained candidate/Finish saving outcome; a partial or uncertain item remains under the
+  existing cleanup authority. Retry replaces only a terminal session URL on the same intent,
+  never a candidate or Request Document, and starts its new Graph range at zero.
 
 ### Async/stale state
 
 Every client post-await state write is request-generation guarded. Server retries are keyed by
 operation/staging/upload ID, unfinished uploads are rediscoverable after reload, and every resume
 or finalization independently reauthorizes the creating actor, request, and active visit.
+Planned Cancel and Retry share that authorization and lease exclusion, stop local work before
+their server action, and guard every post-await success/error write against a changed Request.
 
 ### Helper extraction
 
@@ -1963,6 +2084,9 @@ The single Postgres migration includes link rows, upload intents, fenced slot le
 transcript scope constraint. Fresh-install parity, manifest, two-field schema wave/preflight,
 readiness-gated selects/routes, Atlas, route matrix, service catalog, readiness runbook, writer
 census, daily cleanup policy, tests, and gates are all named.
+Slice 4a reuses the existing failed/abandoned intent states and server-owned identity; it plans
+no schema migration. Its two new routes must enter the security matrix and canonical counts
+when implemented, not while they are only planned.
 
 ### Symbol-consumer fan-out
 
@@ -2244,3 +2368,12 @@ Preview alias was restored/re-inspected at exact prior Factory deployment
 `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. The temporary environment readback file was removed. The live
 materials link row, retained recording, Request Documents, and migrations 054/055 schema remain
 untouched. No deletion or Production runtime configuration/deployment change occurred.
+
+**2026-09-29 owner recovery decision and plan reconciliation:** the owner chose explicit Cancel
+and Retry upload controls in place of another passive Graph-expiry proof wait. Microsoft Graph's
+upload-session documentation says uncommitted fragments are discarded when that session expires;
+therefore a new session starts at zero, while only a live existing session can Resume from its
+confirmed range. Section 7.2.2 specifies the planned lease, exact-path, late-commit, replay,
+authorization, UI, and test contracts. No Cancel/Retry runtime code, migration, deployment,
+configuration, live upload, or deletion was performed by this plan revision. The historical
+Graph-confirmed terminal-expiry row stays PARTIAL.
