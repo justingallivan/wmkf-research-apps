@@ -14,6 +14,8 @@ Owner decision 8 (S549, option A): ordinary suggestion-creating operations admit
 
 ## What the revision must settle (one subsection each, with file:line evidence)
 
+File references below come from the round-1 review and Claude's S549 trace; re-verify each before relying on it.
+
 1. **Hydration and promotion.** Find-tab intake hydrates the slot person through `loadApplicantKnownReviewer` → `findByEmailCandidates`, which excludes synthetic people; promotion then 503s. Design the request-scoped exact-person path (admits the GUID-bound person only after proving the Request is a test Request) and name every other read on the Find → Candidates → Review Manager path that excludes synthetic people. Search exclusions stay.
 2. **One capability, both switches.** Define a single fail-closed predicate over `SYNTHETIC_REVIEWER_ISOLATION` and `TEST_REQUEST_ISOLATION` (on / off / unset / invalid) and state what every combination does, including that a marked person must never take the ordinary path onto a real Request when the reviewer switch is off.
 3. **Authorize at service entry.** For `save-candidates-service.js`, `promote-applicant-reviewer-service.js`, `manual-reviewer-service.js` and the applicant-reviewers intake, place the pairing check before the first person write, and state which person writes are forbidden for a cast person (identity fields, email, ORCID, address trust, Contact link). Recommend whether manual add stays refused (the owner will decide).
@@ -40,6 +42,8 @@ Commit the Potential Reviewer slot probe as a new section of `scripts/probe-test
 The plan's *Order* 6 reads as revision 3 with all seven subsections, owner questions listed at the end, the probe section committed with its test, gates green, branch pushed. Report the commit list and the open owner questions.
 
 ## Appendix — the probe as run (S549, session scratch)
+
+Reference only: it requires the client by an absolute path to the main checkout; the committed section uses the probe script's own imports and helpers.
 
 ```js
 #!/usr/bin/env node
