@@ -129,6 +129,8 @@ test('mine-scope with no resolvable PD → empty list, pdResolved:false, no quer
   expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
 });
 
+// Placeholder program ids take the Request-copy Liaison path; the Research
+// institution Liaison is covered in grantee-awardees-workbench-service.
 test('maps records to awardees with formatted PI/liaison names + deliverable status', async () => {
   DynamicsService.queryAllRecords.mockResolvedValue({ records: [
     {
@@ -136,12 +138,14 @@ test('maps records to awardees with formatted PI/liaison names + deliverable sta
       _wmkf_projectleader_value: 'pi1', _wmkf_projectleader_value_formatted: 'Erika Espinosa-Ortiz',
       _akoya_primarycontactid_value: 'li1', _akoya_primarycontactid_value_formatted: 'Dawnie Elzinga',
       _akoya_programid_value: 'prog1', _akoya_programid_value_formatted: 'Science and Engineering Research',
+      _akoya_applicantid_value: null,
       wmkf_abstractformatted: 'already drafted',
     },
     {
       akoya_requestid: 'r2', akoya_requestnum: '1002324', akoya_title: 'Circadian clock',
       _wmkf_projectleader_value: 'pi2', _wmkf_projectleader_value_formatted: 'Margaret Stratton',
-      _akoya_primarycontactid_value: null, _akoya_programid_value_formatted: 'Medical Research',
+      _akoya_primarycontactid_value: null, _akoya_programid_value: 'prog2', _akoya_programid_value_formatted: 'Medical Research',
+      _akoya_applicantid_value: null,
       wmkf_abstractformatted: null,
     },
   ] });
