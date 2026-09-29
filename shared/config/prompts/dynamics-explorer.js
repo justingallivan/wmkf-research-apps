@@ -70,7 +70,7 @@ export const TABLE_ANNOTATIONS = {
       'wmkf_seconcept1title..4title': 'string — Science & Engineering concept titles (4 slots)',
       // Organizations and people (external)
       _akoya_applicantid_value: 'lookup → account — applicant institution (grantee)',
-      _akoya_primarycontactid_value: 'lookup → contact — liaison / primary contact at institution',
+      _akoya_primarycontactid_value: 'lookup → contact — the Request\'s own copy of the Primary Contact; for Research programs NOT the current Liaison of record (that is the applicant account\'s _primarycontactid_value)',
       _wmkf_projectleader_value: 'lookup → contact — PI / principal investigator / researcher',
       _wmkf_researchleader_value: 'lookup → contact — VPR / VP for research / top research official at institution',
       _wmkf_ceo_value: 'lookup → contact — CEO / president / chancellor of institution',
@@ -223,7 +223,7 @@ export const TABLE_ANNOTATIONS = {
       websiteurl: 'string — website',
       telephone1: 'string — phone number',
       // Lookups
-      _primarycontactid_value: 'lookup → contact — primary contact for the organization. 68% populated.',
+      _primarycontactid_value: 'lookup → contact — primary contact for the organization; for Research programs this is the Liaison of record. 68% populated.',
       _wmkf_organizationleader_value: 'lookup → contact — organization leader (CEO/president). 28% populated.',
       accountid: 'guid — primary key',
       createdon: 'datetime — record creation date',
@@ -536,7 +536,7 @@ function buildDomainGuardrails() {
     .filter(([, a]) => a.pi_bearing)
     .map(([name]) => name);
   return `DOMAIN GUARDRAILS (probe-verified — trust over surface guesses):
-- CONTACT ROLES, do not conflate: _akoya_primarycontactid_value ("Primary Contact") is the institution's FOUNDATION LIAISON / grant steward (the President's office for large gifts) — NOT the principal investigator. The PI is _wmkf_projectleader_value. _wmkf_researchleader_value is the institution's senior research officer (e.g. VP for Research), also NOT the PI. Never present the primary contact (or research leader) as the researcher/PI.
+- CONTACT ROLES, do not conflate: the institution's Primary Contact (account _primarycontactid_value) is its FOUNDATION LIAISON / grant steward (the President's office for large gifts) and, for Research programs, the Liaison of record. The Request's _akoya_primarycontactid_value ("Request Primary Contact (copy)") is the Primary Contact copied onto that Request; it can be stale, so for Research never present it as the current Liaison. A Primary Contact (either one) is NOT the principal investigator. The PI is _wmkf_projectleader_value. _wmkf_researchleader_value is the institution's senior research officer (e.g. VP for Research), also NOT the PI. Never present the primary contact (or research leader) as the researcher/PI.
 - PI IS PROGRAM-CONDITIONAL: _wmkf_projectleader_value (the PI) is populated almost only for research programs (${piBearing.join(', ')}); non-research/discretionary grants have no PI concept and leave it empty. A null project leader on a non-research grant means "no PI for this grant type" — NOT missing data. Do not confabulate "no PI found" or read an empty PI as the researcher being absent.
 - createdon IS NOT A BUSINESS DATE: ${ERA_CUTOVER_DATE} is a one-time bulk data-migration date (~22.5K rows imported that day), not a business event. NEVER slice business history ("grants over time", "since when") on createdon — use akoya_decisiondate, akoya_submitdate, wmkf_meetingdate, or akoya_loireceived. createdon is record-creation provenance only.
 - STATUS CLASSES: terminal NO-AWARD statuses (declines, ineligibilities, and equivalents) are exactly [${TERMINAL_NON_AWARD_STATUSES.join(', ')}]. "Active"/"Approved"/"Closed" are decided AWARDS. The "Pending" family ("Phase I Pending", "Phase II Pending", "Concept Pending", "Pending") is undecided/in-flight. Use these sets for "declined"/"awarded"/"in progress" questions instead of guessing status strings.`;
@@ -561,7 +561,7 @@ export function buildSystemPrompt({ userRole = 'read_only', restrictions = [], r
 TOOLS — choose the right one:
 - search: keyword/topic discovery across all tables ("find grants about fungi")
 - get_entity: fetch one record by name, number, or GUID ("tell me about request 1001585", "look up Stanford")
-- get_related: follow relationships — use for ANY "show me X for Y" query ("requests from Stanford", "emails for Stanford", "payments for request 1001585", "reviewers for request 1001585"). For contact→requests, it searches every grantee-side role: primary contact, PI/project leader, VPR, CEO, authorized official, payment contact, and co-PI slots.
+- get_related: follow relationships — use for ANY "show me X for Y" query ("requests from Stanford", "emails for Stanford", "payments for request 1001585", "reviewers for request 1001585"). For contact→requests, it searches every grantee-side role: the Request's Primary Contact copy, PI/project leader, VPR, CEO, authorized official, payment contact, and co-PI slots, plus the Research Requests of institutions whose Primary Contact the contact is (role "Liaison (institution)").
 - describe_table: understand field names/types/meanings BEFORE building OData queries. For inline-schema tables, call it when a needed field is absent from the curated/common fields or you are uncertain.
 - query_records: structured OData queries (date ranges, exact filters). For tables in INLINE SCHEMAS, query directly only when the curated/common field you need is present and unambiguous.
 - count_records: count records with optional filter
@@ -579,7 +579,7 @@ RULES:
 - For tables in INLINE SCHEMAS below, you have curated/common field details, not every live field. If the user needs a field not listed there, or you are unsure of a field name, call describe_table with full:true before query_records.
 - For OTHER tables, ALWAYS call describe_table BEFORE your first query_records. Do NOT guess field names — they are non-obvious (e.g. akoya_requestnum NOT akoya_requestnumber, akoya_program NOT akoya_name).
 - For org name lookups, review ALL results and pick the exact match.
-- Present results as markdown tables. Show totalCount if results are truncated.
+- Present results as markdown tables. Show totalCount if results are truncated; when totalCount is null, report "at least N" using returnedCount.
 - TEST REQUEST VISIBILITY: When a request result contains the server-derived isTestRequest field, always preserve it as an "Is Test Request" column in the markdown table. Render true as TEST and false as blank. Never expose or infer the underlying marker/run fields.
 - EXPORT: When the user asks to "export", "download", "spreadsheet", or wants the full dataset, use export_csv. It fetches ALL matching records (up to 5000) and generates a downloadable Excel file. CRITICAL: If you already queried this data with query_records earlier in the conversation, reuse the EXACT same table_name, filter, and select values — do NOT guess new field names. Copy them verbatim from your earlier successful tool call.
 - AI-processed exports: when the user wants AI analysis on exported data (e.g., "export with keywords extracted"), use export_csv with process_instruction. The tool returns a cost/time estimate and sample output. Present the estimate to the user (count, sample, cost, time) and ask for confirmation. Only after the user confirms, call export_csv again with the SAME parameters plus confirmed: true.
@@ -620,7 +620,8 @@ Programs:
 - For other programs, query the lookup table first to get the GUID.
 People (external — at institution):
 - "PI"/"researcher"/"principal investigator" → _wmkf_projectleader_value
-- "liaison"/"primary contact" → _akoya_primarycontactid_value
+- "liaison" (Research) → the applicant account's _primarycontactid_value (via _akoya_applicantid_value); _akoya_primarycontactid_value is only the Request's copy
+- "primary contact" (on a Request) → _akoya_primarycontactid_value, the Request's copy
 - "VPR"/"VP for research" → _wmkf_researchleader_value
 - "CEO"/"president"/"chancellor" → _wmkf_ceo_value
 - "authorized official" → _wmkf_authorizedofficial_value
