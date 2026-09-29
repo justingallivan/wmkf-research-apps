@@ -623,6 +623,10 @@ and offline-tested only on `codex/feature-request`.
   live Graph state and it is not deletion authority. Daily maintenance claims
   eligible rows and, unless both general access and the separate destructive
   cleanup permission are literal `on`, remains inspect/refresh/record/alert-only.
+  Staff Cancel and terminal-session Retry share the intent lease with finalize and
+  cleanup. Cancel abandons only after confirmed session termination and an absent
+  exact path; Retry retains the same intent/path/generation and starts a newly
+  confirmed terminal session from byte zero.
 - `presentation_material_slot_leases` is keyed by Request + Recording,
   Transcript, or Transcript Summary artifact type and stores a paired
   token/expiry plus a positive fence capped at 2,147,483,647.

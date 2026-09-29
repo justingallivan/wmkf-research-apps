@@ -3,13 +3,18 @@ jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
 
 import { sql } from '@vercel/postgres';
 import {
+  cancelPresentationMaterialUploadRecovery,
+  claimPresentationMaterialUploadRecovery,
   claimPresentationMaterialUpload,
   claimPresentationMaterialUploadsForCleanup,
   completePresentationMaterialUpload,
   getPresentationMaterialUpload,
   insertPresentationMaterialUpload,
   listPresentationMaterialUploads,
+  markPresentationMaterialUploadSessionClosed,
   recordPresentationMaterialUploadCandidate,
+  recordPresentationMaterialUploadRecoverySession,
+  refreshPresentationMaterialUploadSession,
   releasePresentationMaterialUploadCleanupLease,
   renewPresentationMaterialUploadCleanupLease,
   renewPresentationMaterialUploadLease,
@@ -47,7 +52,7 @@ test('intent reads and claims are bound to upload, request, and creating actor',
 
 test('unfinished-upload projection includes the lease expiry needed to distinguish a live finalizer', async () => {
   await listPresentationMaterialUploads(INPUT);
-  expect(statement()).toContain('intent_expires_at, lease_expires_at');
+  expect(statement()).toContain('intent_expires_at, lease_token, lease_expires_at');
 });
 
 test('lease renewal fails closed after either lease or review-after expiry', async () => {
@@ -97,6 +102,47 @@ test('status candidate persistence cannot demote a live finalizer', async () => 
   expect(text).toContain("state IN ('initiated', 'uploaded', 'failed')");
   expect(text).toContain("state = 'finalizing' AND lease_expires_at <= NOW()");
   expect(text).toContain('(lease_token IS NULL OR lease_expires_at <= NOW())');
+});
+
+test('late status writes are fenced to the exact session URL they observed', async () => {
+  await refreshPresentationMaterialUploadSession({
+    ...INPUT, uploadUrlCiphertext: 'sealed-old',
+    expiresAt: '2026-09-30T13:00:00Z', intentExpiresAt: '2026-10-03T13:00:00Z',
+  });
+  expect(statement()).toContain('upload_url_ciphertext = ?');
+  expect(sql.mock.calls.at(-1).slice(1)).toContain('sealed-old');
+  await markPresentationMaterialUploadSessionClosed({
+    ...INPUT, uploadUrlCiphertext: 'sealed-old', lastError: 'session_expired',
+  });
+  expect(statement()).toContain('upload_url_ciphertext = ?');
+  expect(sql.mock.calls.at(-1).slice(1)).toContain('sealed-old');
+});
+
+test('staff recovery shares the lease and cannot abandon or replace a recorded candidate', async () => {
+  await claimPresentationMaterialUploadRecovery(INPUT);
+  const claim = statement();
+  expect(claim).toContain('request_id = ? AND actor_id = ?');
+  expect(claim).toContain("state IN ('initiated', 'failed')");
+  expect(claim).toContain('candidate_item_id IS NULL');
+  expect(claim).toContain('request_document_id IS NULL');
+  expect(claim).toContain('(lease_token IS NULL OR lease_expires_at <= NOW())');
+
+  await cancelPresentationMaterialUploadRecovery(INPUT);
+  const cancel = statement();
+  expect(cancel).toContain('lease_token = ? AND lease_expires_at > NOW()');
+  expect(cancel).toContain('candidate_item_id IS NULL');
+  expect(cancel).toContain('request_document_id IS NULL');
+  expect(cancel).toContain("state IN ('initiated', 'failed')");
+
+  await recordPresentationMaterialUploadRecoverySession({
+    ...INPUT, uploadUrlCiphertext: 'sealed-new',
+    expiresAt: '2026-09-30T13:00:00Z', intentExpiresAt: '2026-10-03T13:00:00Z',
+  });
+  const retry = statement();
+  expect(retry).toContain("state = 'failed'");
+  expect(retry).toContain('candidate_item_id IS NULL');
+  expect(retry).toContain('request_document_id IS NULL');
+  expect(retry).toContain('lease_token = ? AND lease_expires_at > NOW()');
 });
 
 test('cleanup scheduling throttles recently reviewed rows without extending the user finalize deadline', async () => {

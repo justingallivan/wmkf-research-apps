@@ -104,12 +104,12 @@ Two earlier decisions are **superseded in part** and must be read with this plan
 - **[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; BOUNDED PREVIEW ACCEPTED 2026-09-26;
   PRODUCTION NOT DEPLOYED.]** Recording, transcript, and transcript-summary have
   governed producers under the post-presentation rollout gates. The current visit
-  card exposes browser-direct MP4 upload and independent 60-day Board presentation-link
-  Copy/Reissue controls; Zoom URL and transcript staff inputs remain planned. The Staff
+  card exposes browser-direct MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
+  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript staff inputs remain planned. The Staff
   Deliberations tab reads the current three slots. Shared Postgres migration 055 was
   applied, while the Dataverse Wave 30 test was sandbox-only. Bounded Preview acceptance
   is closed and presentation access is off there. See the presentation-materials plan
-  for the separate Production gates and planned staff Cancel/Retry controls.
+  for the separate Production gates and source-built/offline-tested staff Cancel/Retry controls.
 
 ## 4. The conflict the build must resolve first
 

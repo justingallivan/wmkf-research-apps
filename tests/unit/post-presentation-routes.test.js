@@ -10,6 +10,8 @@ jest.mock('../../shared/config/meetingTracker', () => ({
 }));
 jest.mock('../../lib/services/post-presentation-materials/material-service', () => ({
   finalizeMp4Upload: jest.fn(),
+  cancelMp4Upload: jest.fn(),
+  retryMp4Upload: jest.fn(),
   finalizeTranscriptUpload: jest.fn(),
   getMp4UploadStatus: jest.fn(),
   getPresentationMaterials: jest.fn(),
@@ -49,12 +51,14 @@ jest.mock('../../lib/services/deliberation-briefing/briefing-page-service', () =
 import { requireAppAccess } from '../../lib/utils/auth';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import {
+  cancelMp4Upload,
   finalizeMp4Upload,
   finalizeTranscriptUpload,
   getMp4UploadStatus,
   mintMp4Upload,
   mintTranscriptUpload,
   saveZoomRecording,
+  retryMp4Upload,
 } from '../../lib/services/post-presentation-materials/material-service';
 import {
   claimPortalUpload,
@@ -70,6 +74,8 @@ import presentationMaterialsHandler from '../../pages/api/meeting-tracker/visits
 import presentationUploadsHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-uploads';
 import presentationUploadFinalizeHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize';
 import presentationUploadResumeHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume';
+import presentationUploadCancelHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/cancel';
+import presentationUploadRetryHandler from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/retry';
 import briefingOpenHandler from '../../pages/api/external/briefing/[token]/open';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -255,6 +261,50 @@ test('recording resume accepts only the fingerprint and independently reauthoriz
     resumeFingerprint: 'a'.repeat(64),
   });
   expect(res.statusCode).toBe(200);
+  expect(res.headers['Cache-Control']).toBe('private, no-store');
+});
+
+test('recording Cancel accepts no client authority and uses the session actor', async () => {
+  const rejected = response();
+  await presentationUploadCancelHandler({
+    method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID },
+    body: { uploadUrl: 'https://attacker.example/session' },
+  }, rejected);
+  expect(rejected.statusCode).toBe(400);
+  expect(cancelMp4Upload).not.toHaveBeenCalled();
+
+  cancelMp4Upload.mockResolvedValue({ uploadId: UPLOAD_ID, cancelled: true });
+  const res = response();
+  await presentationUploadCancelHandler({
+    method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID }, body: {},
+  }, res);
+  expect(cancelMp4Upload).toHaveBeenCalledWith({
+    requestId: REQUEST_ID, uploadId: UPLOAD_ID, actingUserSystemId: ACTOR_ID,
+  });
+  expect(res.body).toEqual({ success: true, uploadId: UPLOAD_ID, cancelled: true });
+  expect(res.headers['Cache-Control']).toBe('private, no-store');
+});
+
+test('recording Retry accepts only the original fingerprint and returns one transfer contract', async () => {
+  const rejected = response();
+  await presentationUploadRetryHandler({
+    method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID },
+    body: { resumeFingerprint: 'a'.repeat(64), path: '/injected' },
+  }, rejected);
+  expect(rejected.statusCode).toBe(400);
+  expect(retryMp4Upload).not.toHaveBeenCalled();
+
+  retryMp4Upload.mockResolvedValue({ uploadId: UPLOAD_ID, nextExpectedRanges: ['0-'], restarted: true });
+  const res = response();
+  await presentationUploadRetryHandler({
+    method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID },
+    body: { resumeFingerprint: 'a'.repeat(64) },
+  }, res);
+  expect(retryMp4Upload).toHaveBeenCalledWith({
+    requestId: REQUEST_ID, uploadId: UPLOAD_ID,
+    actingUserSystemId: ACTOR_ID, resumeFingerprint: 'a'.repeat(64),
+  });
+  expect(res.body.upload).toMatchObject({ uploadId: UPLOAD_ID, restarted: true });
   expect(res.headers['Cache-Control']).toBe('private, no-store');
 });
 

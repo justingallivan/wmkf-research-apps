@@ -55,10 +55,13 @@ function uploadFailureMessage(error) {
   }
   if ([401, 403].includes(status)) return 'Your sign-in is no longer authorized. Sign in again, then choose Resume.';
   if (status === 410 || ['post_presentation_upload_session_expired', 'post_presentation_upload_expired'].includes(code)) {
-    return 'Microsoft confirmed that this upload session expired. Start a new upload with the same recording.';
+    return 'Microsoft confirmed that this upload session expired. Reselect the same recording and choose Retry upload; a new session starts at zero.';
   }
   if (code === 'post_presentation_upload_session_closed') {
-    return 'Microsoft closed this upload session. Refresh the unfinished upload state, then finish saving or start a new upload.';
+    return 'Microsoft closed this upload session, but the file outcome is uncertain. The upload is retained for reconciliation.';
+  }
+  if (code === 'post_presentation_upload_reconciliation_pending') {
+    return 'The exact file or upload-session outcome is uncertain. This upload is retained for reconciliation.';
   }
   if (code === 'post_presentation_site_visit_changed') {
     return 'The active Site Visit changed after this upload began. Reload the page before resuming.';
@@ -86,7 +89,7 @@ function finalizeFailureMessage(error) {
   }
   if (error.status === 410
     || ['post_presentation_upload_session_expired', 'post_presentation_upload_expired'].includes(code)) {
-    return 'Microsoft confirmed that this upload can no longer be saved. Start a new upload with the same recording.';
+    return 'Microsoft confirmed that this upload can no longer be saved. Reload to check whether Retry upload is available.';
   }
   if (code === 'post_presentation_finalize_in_progress') {
     return 'This recording is already being saved. Wait briefly, then retry Finish saving.';
@@ -132,6 +135,8 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busyUploadId, setBusyUploadId] = useState(null);
+  const [recoveryBusyId, setRecoveryBusyId] = useState(null);
+  const [confirmCancelId, setConfirmCancelId] = useState(null);
   const [transfer, setTransfer] = useState(null);
   const [pauseRequested, setPauseRequested] = useState(false);
   const [link, setLink] = useState(null);
@@ -145,6 +150,7 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   const controllerRef = useRef(null);
   const pauseControllerRef = useRef(null);
   const pauseRef = useRef(false);
+  const recoveryBusyRef = useRef(null);
   const linkIdRef = useRef(null);
   const linkEpochRef = useRef(0);
   const linkReadRef = useRef(0);
@@ -156,6 +162,7 @@ export default function PostPresentationMaterialsCard({ requestId }) {
       generationRef.current += 1;
       controllerRef.current?.abort();
       pauseControllerRef.current?.abort();
+      recoveryBusyRef.current = null;
     };
   }, []);
 
@@ -231,12 +238,15 @@ export default function PostPresentationMaterialsCard({ requestId }) {
     controllerRef.current = null;
     pauseControllerRef.current = null;
     pauseRef.current = false;
+    recoveryBusyRef.current = null;
     const timer = window.setTimeout(() => {
       setData(null);
       setFile(null);
       setError(null);
       setNotice(null);
       setBusyUploadId(null);
+      setRecoveryBusyId(null);
+      setConfirmCancelId(null);
       setTransfer(null);
       setPauseRequested(false);
       setUnavailable(false);
@@ -314,7 +324,7 @@ export default function PostPresentationMaterialsCard({ requestId }) {
     return validateUploadContract(body?.upload, { expectedUploadId: uploadId });
   };
 
-  const runUpload = async ({ selectedFile, fingerprint, upload }) => {
+  const runUpload = async ({ selectedFile, fingerprint, upload, startingOver = false }) => {
     const generation = generationRef.current;
     const controller = new AbortController();
     const pauseController = new AbortController();
@@ -326,7 +336,7 @@ export default function PostPresentationMaterialsCard({ requestId }) {
     setPauseRequested(false);
     setBusyUploadId(upload.uploadId);
     setError(null);
-    setNotice(null);
+    setNotice(startingOver ? 'A fresh Microsoft upload session is starting from zero.' : null);
     const authorizeStatus = async () => requestUploadStatus({
       uploadId: upload.uploadId,
       fingerprint,
@@ -345,7 +355,9 @@ export default function PostPresentationMaterialsCard({ requestId }) {
           shouldPause: () => pauseRef.current,
           authorizeStatus,
           onState: (state) => {
-            if (current(generation)) setTransfer({ ...state, uploadId: upload.uploadId });
+            if (current(generation) && recoveryBusyRef.current !== upload.uploadId) {
+              setTransfer({ ...state, uploadId: upload.uploadId });
+            }
           },
         }));
       if (!current(generation)) return;
@@ -468,6 +480,82 @@ export default function PostPresentationMaterialsCard({ requestId }) {
     }
   };
 
+  const cancel = async (intent) => {
+    const generation = generationRef.current;
+    recoveryBusyRef.current = intent.uploadId;
+    setRecoveryBusyId(intent.uploadId);
+    setConfirmCancelId(null);
+    setError(null);
+    controllerRef.current?.abort();
+    pauseControllerRef.current?.abort();
+    setTransfer(null);
+    try {
+      const result = await requestJson(
+        `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-uploads/${encodeURIComponent(intent.uploadId)}/cancel`,
+        { method: 'POST', body: {}, tolerantBody: true },
+      );
+      if (!current(generation)) return;
+      await load();
+      if (!current(generation)) return;
+      setNotice(result.complete
+        ? 'The recording is already complete. Choose Finish saving.'
+        : result.finalized ? 'This recording was already saved.' : 'Unfinished upload cancelled.');
+    } catch (cancelError) {
+      if (!current(generation)) return;
+      await load();
+      if (current(generation)) setError(uploadFailureMessage(cancelError));
+    } finally {
+      if (current(generation)) {
+        recoveryBusyRef.current = null;
+        setRecoveryBusyId(null);
+      }
+    }
+  };
+
+  const retry = async (intent) => {
+    if (!file || file.name !== intent.filename || file.size !== intent.size) {
+      setError(`Reselect ${intent.filename} (${formatBytes(intent.size)}) to retry from zero.`);
+      return;
+    }
+    const generation = generationRef.current;
+    recoveryBusyRef.current = intent.uploadId;
+    setRecoveryBusyId(intent.uploadId);
+    setError(null);
+    setTransfer(null);
+    try {
+      const fingerprint = await fingerprintGraphBrowserUploadFile(file);
+      if (!current(generation)) return;
+      const body = await requestJson(
+        `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-uploads/${encodeURIComponent(intent.uploadId)}/retry`,
+        { method: 'POST', body: { resumeFingerprint: fingerprint }, tolerantBody: true },
+      );
+      if (!current(generation)) return;
+      if (body?.upload?.finalized) {
+        await load();
+        if (current(generation)) setNotice('This recording was already saved.');
+        return;
+      }
+      const upload = validateUploadContract(body?.upload, { expectedUploadId: intent.uploadId });
+      if (upload.complete) {
+        await load();
+        if (current(generation)) setNotice('The recording is already complete. Choose Finish saving.');
+        return;
+      }
+      recoveryBusyRef.current = null;
+      setRecoveryBusyId(null);
+      await runUpload({ selectedFile: file, fingerprint, upload, startingOver: upload.restarted === true });
+    } catch (retryError) {
+      if (!current(generation)) return;
+      await load();
+      if (current(generation)) setError(uploadFailureMessage(retryError));
+    } finally {
+      if (current(generation)) {
+        recoveryBusyRef.current = null;
+        setRecoveryBusyId(null);
+      }
+    }
+  };
+
   const mutateLink = async (action) => {
     const generation = generationRef.current;
     const mutationEpoch = ++linkEpochRef.current;
@@ -543,12 +631,12 @@ export default function PostPresentationMaterialsCard({ requestId }) {
             id="post-presentation-mp4"
             type="file"
             accept="video/mp4,.mp4"
-            disabled={Boolean(busyUploadId)}
+            disabled={Boolean(busyUploadId || recoveryBusyId)}
             onChange={(event) => setFile(event.target.files?.[0] || null)}
             className="mt-2 block w-full rounded-lg border border-gray-300 p-2 text-sm"
           />
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" disabled={!file || Boolean(busyUploadId)} loading={busyUploadId === 'new'} onClick={begin}>Upload recording</Button>
+            <Button type="button" disabled={!file || Boolean(busyUploadId || recoveryBusyId)} loading={busyUploadId === 'new'} onClick={begin}>Upload recording</Button>
             {busyUploadId && transfer?.phase && !['paused', 'complete'].includes(transfer.phase) && (
               <Button type="button" variant="outline" disabled={pauseRequested} onClick={() => {
                 pauseRef.current = true;
@@ -578,9 +666,20 @@ export default function PostPresentationMaterialsCard({ requestId }) {
                   <li key={intent.uploadId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                     <div><p className="font-medium text-gray-900">{intent.filename}</p><p className="text-xs text-gray-500">{formatBytes(intent.size)} · {intent.state}</p></div>
                     <div className="flex gap-2">
-                      {intent.canResume && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId)} onClick={() => resume(intent)}>Resume</Button>}
-                      {intent.canFinalize && <Button type="button" size="sm" disabled={Boolean(busyUploadId)} loading={busyUploadId === intent.uploadId} onClick={() => finish(intent.uploadId)}>Finish saving</Button>}
+                      {intent.canResume && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId || recoveryBusyId)} onClick={() => resume(intent)}>Resume</Button>}
+                      {intent.canRetry && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId || recoveryBusyId)} loading={recoveryBusyId === intent.uploadId} onClick={() => retry(intent)}>Retry upload</Button>}
+                      {intent.canFinalize && <Button type="button" size="sm" disabled={Boolean(busyUploadId || recoveryBusyId)} loading={busyUploadId === intent.uploadId} onClick={() => finish(intent.uploadId)}>Finish saving</Button>}
+                      {intent.canCancel && !intent.canFinalize && <Button type="button" size="sm" variant="outline" disabled={Boolean(recoveryBusyId || (busyUploadId && busyUploadId !== intent.uploadId))} onClick={() => setConfirmCancelId(intent.uploadId)}>Cancel</Button>}
                     </div>
+                    {confirmCancelId === intent.uploadId && (
+                      <div className="w-full rounded border border-amber-200 bg-amber-50 p-3 text-amber-950">
+                        <p>Cancel this unfinished upload? Unsaved progress will be lost. A completed recording will remain available to finish saving.</p>
+                        <div className="mt-2 flex gap-2">
+                          <Button type="button" size="sm" disabled={Boolean(recoveryBusyId)} onClick={() => cancel(intent)}>Cancel upload</Button>
+                          <Button type="button" size="sm" variant="outline" disabled={Boolean(recoveryBusyId)} onClick={() => setConfirmCancelId(null)}>Keep upload</Button>
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

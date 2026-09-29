@@ -909,3 +909,107 @@ test('late request A load cannot overwrite request B state', async () => {
   expect(screen.queryByText('request-a.mp4')).not.toBeInTheDocument();
   expect(screen.getByText('request-b.mp4')).toBeInTheDocument();
 });
+
+test('Cancel requires confirmation and removes only the unfinished row after server success', async () => {
+  let cancelled = false;
+  const intent = {
+    uploadId: UPLOAD_ID, filename: 'recording.mp4', size: 4,
+    state: 'initiated', canResume: true, canCancel: true, canFinalize: false,
+  };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (url.endsWith(`/${UPLOAD_ID}/cancel`) && options.method === 'POST') {
+      cancelled = true;
+      return response({ success: true, uploadId: UPLOAD_ID, cancelled: true });
+    }
+    if (url.endsWith('/presentation-link')) return response({ link: null });
+    return response({ status: 'ready', materials: [], uploads: cancelled ? [] : [intent] });
+  });
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+  expect(screen.getByText(/Unsaved progress will be lost/)).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([url]) => url.endsWith(`/${UPLOAD_ID}/cancel`))).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Keep upload' }));
+  expect(screen.queryByRole('button', { name: 'Cancel upload' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel upload' }));
+  expect(await screen.findByText('Unfinished upload cancelled.')).toBeInTheDocument();
+  expect(screen.queryByText('recording.mp4')).not.toBeInTheDocument();
+  expect(uploadBrowserDirectGraphFile).not.toHaveBeenCalled();
+});
+
+test('Retry requires the same selected file and explains that new progress starts at zero', async () => {
+  const intent = {
+    uploadId: UPLOAD_ID, filename: 'recording.mp4', size: 4,
+    state: 'failed', canResume: false, canRetry: true, canCancel: true, canFinalize: false,
+  };
+  uploadBrowserDirectGraphFile.mockImplementation(async ({ onState }) => {
+    onState({ phase: 'uploading', confirmedBytes: 0, inFlightBytes: 0, totalBytes: 4,
+      percent: 0, mbps: null, etaSeconds: null });
+    return new Promise(() => {});
+  });
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (url.endsWith(`/${UPLOAD_ID}/retry`) && options.method === 'POST') {
+      return response({ success: true, upload: { ...uploadContract(), restarted: true } });
+    }
+    if (url.endsWith('/presentation-link')) return response({ link: null });
+    return response({ status: 'ready', materials: [], uploads: [intent] });
+  });
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry upload' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Reselect recording.mp4');
+  expect(global.fetch.mock.calls.some(([url]) => url.endsWith(`/${UPLOAD_ID}/retry`))).toBe(false);
+  fireEvent.change(screen.getByLabelText('Zoom MP4'), {
+    target: { files: [new File(['test'], 'recording.mp4', { type: 'video/mp4' })] },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Retry upload' }));
+  expect(await screen.findByText('A fresh Microsoft upload session is starting from zero.')).toBeInTheDocument();
+  expect(screen.getByText(/Graph-confirmed: 0 bytes of 4 bytes/)).toBeInTheDocument();
+  expect(uploadBrowserDirectGraphFile).toHaveBeenCalledWith(expect.objectContaining({
+    start: 0, uploadUrl: 'https://upload.example/session',
+  }));
+  const [, options] = global.fetch.mock.calls.find(([url]) => url.endsWith(`/${UPLOAD_ID}/retry`));
+  expect(JSON.parse(options.body)).toEqual({ resumeFingerprint: 'a'.repeat(64) });
+});
+
+test('Cancel stops an active local transfer before calling the server', async () => {
+  let cancelled = false;
+  let uploadSignal;
+  uploadBrowserDirectGraphFile.mockImplementation(async ({ signal, onState }) => {
+    uploadSignal = signal;
+    onState({ phase: 'uploading', confirmedBytes: 0, inFlightBytes: 1, totalBytes: 4,
+      percent: 0, mbps: null, etaSeconds: null });
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => {
+        const error = new Error('stopped');
+        error.name = 'AbortError';
+        reject(error);
+      }, { once: true });
+    });
+  });
+  const intent = {
+    uploadId: UPLOAD_ID, filename: 'recording.mp4', size: 4,
+    state: 'initiated', canResume: true, canCancel: true,
+  };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (url.endsWith('/presentation-uploads') && options.method === 'POST') {
+      return response({ success: true, upload: uploadContract() });
+    }
+    if (url.endsWith(`/${UPLOAD_ID}/cancel`)) {
+      expect(uploadSignal.aborted).toBe(true);
+      cancelled = true;
+      return response({ success: true, cancelled: true });
+    }
+    if (url.endsWith('/presentation-link')) return response({ link: null });
+    return response({ status: 'ready', materials: [], uploads: cancelled ? [] : [intent] });
+  });
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  fireEvent.change(await screen.findByLabelText('Zoom MP4'), {
+    target: { files: [new File(['test'], 'recording.mp4', { type: 'video/mp4' })] },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload recording' }));
+  await waitFor(() => expect(uploadSignal).toBeDefined());
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel upload' }));
+  expect(await screen.findByText('Unfinished upload cancelled.')).toBeInTheDocument();
+  expect(uploadSignal.aborted).toBe(true);
+});

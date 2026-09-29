@@ -1,4 +1,17 @@
-# Session 551 Prompt: Replace expiry proof with user-controlled cancel/retry UX (branch-local)
+# Session 552 Prompt: Review and promote staff Cancel/Retry recovery (branch-local)
+
+## Current branch status (2026-09-29)
+
+**[VERIFIED via feature-branch source and focused offline tests]** Staff Cancel and Retry upload
+are now built on `codex/feature-request` in the Meeting Tracker card, guarded routes, service,
+and durable upload-intent store. Cancel requires a confirmed closed session and absent exact
+path before abandoning; Retry rechecks Graph and resumes a live session or starts a new session
+from byte zero only after a terminal 410 or a failed mint with no URL. The same actor, Request,
+active Site Visit, and immutable intent/path/generation are retained. No migration was added.
+The historical Graph-confirmed expiry cell remains PARTIAL; no live upload, deployment, alias,
+Production configuration, or SharePoint deletion occurred in this implementation. Zoom URL and
+transcript staff inputs remain unbuilt. The source branch needs final review/promotion before
+runtime acceptance. The Session 551 instructions below are historical context.
 
 ## Session 550 Summary
 
@@ -331,8 +344,9 @@ retain their exact scoped exceptions. Historical benchmark receipts remain in th
 ESLint (zero warnings/errors), and `npm run build -- --webpack` pass; the build reports only the
 repository's existing dynamic-dependency and Next configuration warnings. API-route,
 route-lifecycle-auth, route-service-boundary, and fact-consistency gates pass with their self-tests
-run sequentially. Canonical counts are 234 API route files and 145 `requireAppAccess` endpoint
-files. Six iterative read-only OAuth Claude Opus rounds found no runtime, security, CSP, or
+run sequentially. Current route and guarded-endpoint counts are generated in
+`docs/CANONICAL_COUNTS.md`; this historical receipt does not freeze them. Six iterative
+read-only OAuth Claude Opus rounds found no runtime, security, CSP, or
 shared-transport regression. Accepted evidence fixes moved the retired-path negative test into
 Preview mode, preserved historical Slice 5 counts, marked Session 542's work item superseded,
 described the intent's sliding Graph-expiry-plus-three-day review window accurately, removed

@@ -226,6 +226,16 @@ test('GET exposes an expired finalizer for recovery but not a live finalizer', a
   ]);
 });
 
+test('failed uploads retain Retry after cleanup changes the terminal error label', async () => {
+  const d = deps({ listUploadIntents: jest.fn(async () => [mp4Intent({
+    state: 'failed', last_error: 'closed_session_inspect_only',
+    upload_url_ciphertext: 'sealed-upload-url',
+    lease_token: null,
+  })]) });
+  const result = await getPresentationMaterials({ requestId: REQUEST_ID, actingUserSystemId: ACTOR_ID }, d);
+  expect(result.uploads[0]).toMatchObject({ canCancel: true, canRetry: true });
+});
+
 test('Zoom save derives all governed fields, fences every mutation, and supersedes only the captured predecessor', async () => {
   const old = recording(OLD_ID, 6);
   const current = recording(NEW_ID, 7);
@@ -928,6 +938,7 @@ test('MP4 resume accepts Graph bounded remaining range and refreshes review-afte
     uploadId: OPERATION_ID,
     requestId: REQUEST_ID,
     actorId: ACTOR_ID,
+    uploadUrlCiphertext: 'sealed-upload-url',
     expiresAt: '2026-09-25T14:00:00.000Z',
     intentExpiresAt: '2026-09-28T14:00:00.000Z',
   });
@@ -1031,6 +1042,17 @@ test('MP4 status refuses to overwrite an active finalizer candidate', async () =
   expect(d.recordUploadCandidate).not.toHaveBeenCalled();
 });
 
+test('stale Resume explains when another tab already cancelled the upload', async () => {
+  const d = deps({ getUploadIntent: jest.fn(async () => mp4Intent({
+    state: 'abandoned', upload_url_ciphertext: null,
+  })) });
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID, uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID, resumeFingerprint: 'a'.repeat(64),
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_cancelled', httpStatus: 409 });
+  expect(d.getFileMetadataByPath).not.toHaveBeenCalled();
+});
+
 test('MP4 status recovers an expired finalizer when the exact item is stable', async () => {
   const pathItem = {
     siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
@@ -1101,6 +1123,26 @@ test('Graph-confirmed MP4 session expiry is persisted as terminal only after exa
   expect(d.markUploadSessionClosed).toHaveBeenCalledWith(expect.objectContaining({
     uploadId: OPERATION_ID,
     lastError: 'session_expired',
+  }));
+});
+
+test('Graph 410 with a visible partial placeholder remains uncertain and does not enable Retry', async () => {
+  const d = deps({
+    getUploadIntent: jest.fn(async () => mp4Intent()),
+    getFileMetadataByPath: jest.fn(async () => ({
+      siteId: 'site', driveId: 'drive', id: 'partial',
+      name: `1003220-Recording-${OPERATION_ID}.mp4`, size: 20,
+    })),
+    getBrowserUploadSessionStatus: jest.fn(async () => {
+      throw Object.assign(new Error('expired'), { status: 410 });
+    }),
+  });
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID, uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID, resumeFingerprint: 'a'.repeat(64),
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_reconciliation_pending' });
+  expect(d.markUploadSessionClosed).toHaveBeenCalledWith(expect.objectContaining({
+    uploadUrlCiphertext: 'sealed-upload-url', lastError: 'session_closed_unknown',
   }));
 });
 

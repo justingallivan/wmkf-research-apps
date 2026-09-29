@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview and Safari acceptance passed, staff Cancel and terminal-session Retry are planned, Graph-confirmed terminal expiry remains unobserved, and Production promotion remains."
+summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview and Safari acceptance passed, staff Cancel and terminal-session Retry are source-built and offline-tested, Graph-confirmed terminal expiry remains unobserved, and Production promotion remains."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -208,13 +208,13 @@ The card contains:
 
 The link controls do not send mail, alter recipients, or change a distribution ledger.
 
-The current branch card contains MP4 upload, Pause/Resume, Finish saving, and Board-link controls.
-The Zoom-paste and transcript producer APIs are source-built, but their staff input controls remain
-planned. For unfinished MP4s, add a visible Cancel action and a separate Retry upload action only
-when the server has proved the prior session terminal. Retry requires reselecting the same file and
-shows that a new session restarts at zero; a still-live session keeps Resume and its Graph-confirmed
-range. A complete item shows Finish saving instead of Cancel or Retry. Uncertain outcomes show a
-retained-for-reconciliation message rather than a success claim.
+The current branch card contains MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
+and Board-link controls. The Zoom-paste and transcript producer APIs are source-built, but their
+staff input controls remain planned. A failed unfinished intent offers Retry; the server then
+checks the current Graph session and exact path before deciding whether to resume its confirmed
+range or create a new session from zero. Retry requires reselecting the same file. A complete item
+shows Finish saving instead of Cancel or Retry. Uncertain outcomes show a retained-for-reconciliation
+message rather than a success claim.
 
 ### 4.2 Staff Deliberations
 
@@ -847,14 +847,14 @@ benchmark blocks release:
    write, or deletion still requires its own exact approval and registry-safe retention/cleanup
    decision.
 
-### 7.2.2 Staff Cancel and terminal-session Retry — PLANNED 2026-09-29
+### 7.2.2 Staff Cancel and terminal-session Retry — SOURCE-BUILT/OFFLINE-TESTED 2026-09-29
 
 **Owner decision:** replace the passive wait for a Graph-confirmed expiry demonstration with a
 user-controlled recovery milestone. Microsoft documents that an uncommitted expired upload
 session discards its fragments; its missing ranges belong to that session alone. A live session
 still resumes from its own Graph-confirmed next range. A fresh session starts at byte zero, never
-at the last offset from the old session. This is a plan correction to the Session 551 handoff,
-not a claim that either new control exists.
+at the last offset from the old session. The controls are built on the feature branch and have
+not been deployed or exercised against a live Graph expiry.
 See the [Microsoft Graph upload-session contract](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0).
 
 The two actions share the existing Meeting Tracker grant, session-derived actor, path-bound
@@ -877,16 +877,20 @@ server-owned path/generation key, so the planned contract adds no column or migr
    authority, report a pending reconciliation state, and do not create a candidate or Request
    Document. If the exact full-size item is found, persist its stable candidate identity and
    offer Finish saving; Cancel does not delete or hide it. Already finalized rows return their
-   saved material instead of claiming cancellation. A successful abandoned row is excluded from
+   saved material instead of claiming cancellation; replay of an abandoned Cancel returns the
+   prior success. A successful abandoned row is excluded from
    the routine sweep only because the exact path was proved absent; a retained failed row stays
    eligible for the existing inspect/alert sweep. Cancel never performs an item DELETE.
 2. **Retry upload:** A new exact-body POST at the intent's retry route accepts only the selected
    file's bounded resume fingerprint. The user must reselect the same MP4 after reload. The
-   server permits Retry only for a session-create failure before any URL was delivered or a
-   Graph-confirmed terminal 410 recorded as failed, with no candidate/Request Document and an
-   absent exact path after bounded visibility reads. A live session returns Resume; a complete
-   item returns Finish saving; Graph 404 alone or partial/mismatched/unknown path state blocks
-   Retry and retains the old intent for reconciliation. Under the same intent ID, server-owned
+   server offers Retry for a failed unfinished row, independent of the latest cleanup error
+   label. On every request it rechecks Graph: only a session-create failure before a URL was
+   delivered or a Graph-confirmed terminal 410 with no candidate/Request Document and an
+   absent exact path after bounded visibility reads permits a fresh session. A live session
+   returns Resume; a complete item returns Finish saving; Graph 404 alone or partial/mismatched/unknown path state blocks
+   Retry and retains the old intent for reconciliation. A partial-path observation in the same
+   recovery attempt blocks fresh-session creation, even if a later path read is absent. Under the same intent ID,
+   server-owned
    path, and generation key, claim the lease, create one new Graph session with conflict
    behavior fail, replace the sealed URL/expiry atomically, and return only that session's
    validated zero-based range. No old confirmed offset is credited. A lost-response replay
@@ -903,7 +907,7 @@ server-owned path/generation key, so the planned contract adds no column or migr
    A stale tab cannot restore a cancelled URL, start a second PUT stream, or mark a newer
    Request successful. Access off or another test Request blocks both actions before Graph.
 
-**Acceptance before implementation completion:** focused service/store/route/card tests cover
+**Offline acceptance:** focused service/store/route/card tests cover
 live Resume versus terminal Retry, Graph 410 with absent path, 404 with a late full-size item,
 partial placeholder, path/read failure, cancel DELETE success/failure, lease/finalize/cleanup
 races, same-actor/file/visit replay, wrong actor/request/file/access refusals, lost response,
@@ -983,8 +987,8 @@ feature and supplies no test Request.
 | same | PATCH | Exact action to save/replace a Zoom link; request and actor are server-owned. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript and recording source-built/offline-tested:** transcript begins bounded private-Blob staging; recording writes an immutable durable intent before creating a browser-direct Graph session and returns the code-owned 10 MiB contract. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | **Source-built/offline-tested and local/sandbox Chrome/Safari-tested:** independently reauthorize creating actor/request/visit, verify the bounded local-file fingerprint, resolve the exact path, and check live Graph status. Return the no-store URL plus one validated sequential open-ended or exact-to-file-end range only while live; for an exact committed item return finalize-only state and no URL. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/cancel` | POST | **PLANNED §7.2.2:** exact-empty-body, same-actor/request/visit and access checks, lease-fenced Graph cancellation plus exact-path proof; only an absent path permits abandoned with no candidate or Request Document. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/retry` | POST | **PLANNED §7.2.2:** exact fingerprint body, terminal/no-item proof, lease-fenced fresh session under the same intent; a lost-response replay returns that live session, and its range starts at zero. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/cancel` | POST | **Source-built/offline-tested §7.2.2:** exact-empty-body, same-actor/request/visit and access checks, lease-fenced Graph cancellation plus exact-path proof; only an absent path permits abandoned with no candidate or Request Document. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/retry` | POST | **Source-built/offline-tested §7.2.2:** exact fingerprint body, live-session or terminal/no-item proof, lease-fenced fresh session under the same intent; a lost-response replay returns that live session, and a new range starts at zero. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript and recording source-built/offline-tested:** lease-fenced, request-bound finalize/recovery. MP4 re-resolves the exact stable candidate, validates bounded signature/malware facts, then uses the Recording slot fence and durable replay. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | **Source-built/offline-tested:** GET current link; POST exact `ensure` or compare-and-swap `reissue`, behind both Meeting Tracker and post-presentation readiness/access checks. |
 | Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection/status for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While readiness is off, return the legacy payload with `presentationMaterialsStatus: 'disabled'`, not a false empty collection; do not 503 the existing logistics read. |
@@ -1160,7 +1164,7 @@ runtime/sandbox-data Safari upload, Pause, Resume, finalize, and exact-byte veri
 The later registered-alias bounded Preview run passed Safari Watch, seeking across the available
 sub-minute timeline, and exact Download integrity. A greater-than-two-minute seek was impossible
 with this fixture and is not claimed. Graph-confirmed terminal upload-session expiry remains an
-unproved historical cell. The owner replaced another passive wait with the planned Slice 4a
+unproved historical cell. The owner replaced another passive wait with the source-built Slice 4a
 recovery milestone; do not upgrade the cell to PASS from offline tests.
 
 [VERIFIED historically via commit `bab770fe6`, 84 focused proof tests, scoped ESLint, type checking,
@@ -1728,13 +1732,13 @@ size/SHA-256, and slot-version supersession. It closes the Safari upload subpath
 Production Watch/long-seek/Download row. The live near-cap performance row was later removed by
 owner decision; the 2 GB validation/integrity contract remains.
 
-### Slice 4a — Staff Cancel and terminal Retry — PLANNED 2026-09-29
+### Slice 4a — Staff Cancel and terminal Retry — SOURCE-BUILT/OFFLINE-TESTED 2026-09-29
 
-Build the §7.2.2 route/service/store/card changes on this feature branch before Production
+The §7.2.2 route/service/store/card changes are built on this feature branch before Production
 promotion. Existing failed/abandoned states and the immutable intent identity are reused; no
-schema migration is planned. Keep ordinary live-session Resume, exact-item recovery, the
-inspect-only cleanup posture in access off/test, and slot-fenced finalize unchanged. Add the
-Cancel/Retry routes to the security matrix and counts only when those route files are built.
+schema migration was added. Ordinary live-session Resume, exact-item recovery, the
+inspect-only cleanup posture in access off/test, and slot-fenced finalize remain. The
+Cancel/Retry routes are in the security matrix and canonical counts.
 The historical Graph-confirmed expiry row remains PARTIAL; the owner chose the actionable
 recovery controls and fault-injection coverage in place of another passive expiry wait. The
 Zoom-paste and transcript staff inputs are still separate unbuilt UI work in the first-slice
@@ -1767,7 +1771,7 @@ Production write was performed for this slice.
 
 - **[SOURCE-RETIRED/OFFLINE-TESTED 2026-09-25]** Remove the Preview proof harness while retaining
   the shared Graph transport and historical benchmark receipts.
-- Complete planned Slice 4a Cancel/Retry controls and fault-injection tests before Production
+- Review and promote the source-built Slice 4a Cancel/Retry controls before Production
   promotion. Keep the Graph-confirmed terminal-expiry cell PARTIAL without another passive wait.
 - Complete the Zoom-paste and transcript-upload staff inputs before claiming the full first-slice
   user flow; their source-built server producers alone are not UI evidence.
@@ -2006,7 +2010,7 @@ Release order:
    registered-alias Chrome readiness/link issuance and macOS Safari Watch/available-seek/Download
    integrity on the approved Request. Cleanup restored the alias to the exact prior Factory
    deployment and reset branch presentation access to `off`. Graph-confirmed terminal upload-
-   session expiry/recovery remains unobserved; planned Slice 4a is the recovery milestone before
+   session expiry/recovery remains unobserved; source-built Slice 4a is the recovery milestone before
    promotion, and the retired harness stays retired;
 5. for Production, separately confirm the target registry/interlock classifies the production
    Dataverse organization, recheck that migration 055 remains tracked in the shared
@@ -2040,7 +2044,7 @@ closed and Staff Deliberations shows disabled rather than a false empty state.
 `Meeting Tracker staff → request-bound client state → exact route payload → grant/auth/GUID/body
 validation → post-presentation service → SharePoint/Request Document/Postgres → projected response
 → Staff Deliberations or presentation-token page → tests/docs/gates` is accounted for above.
-Planned Cancel/Retry branches use the same entry authorization and upload-intent store but stop
+Cancel/Retry branches use the same entry authorization and upload-intent store but stop
 before Request Document writes unless an already committed exact item is found and separately
 finalized.
 
@@ -2069,7 +2073,7 @@ finalized.
 Every client post-await state write is request-generation guarded. Server retries are keyed by
 operation/staging/upload ID, unfinished uploads are rediscoverable after reload, and every resume
 or finalization independently reauthorizes the creating actor, request, and active visit.
-Planned Cancel and Retry share that authorization and lease exclusion, stop local work before
+Cancel and Retry share that authorization and lease exclusion, stop local work before
 their server action, and guard every post-await success/error write against a changed Request.
 
 ### Helper extraction
@@ -2084,9 +2088,8 @@ The single Postgres migration includes link rows, upload intents, fenced slot le
 transcript scope constraint. Fresh-install parity, manifest, two-field schema wave/preflight,
 readiness-gated selects/routes, Atlas, route matrix, service catalog, readiness runbook, writer
 census, daily cleanup policy, tests, and gates are all named.
-Slice 4a reuses the existing failed/abandoned intent states and server-owned identity; it plans
-no schema migration. Its two new routes must enter the security matrix and canonical counts
-when implemented, not while they are only planned.
+Slice 4a reuses the existing failed/abandoned intent states and server-owned identity without
+a schema migration. Its two new routes are recorded in the security matrix and canonical counts.
 
 ### Symbol-consumer fan-out
 
@@ -2377,3 +2380,14 @@ confirmed range. Section 7.2.2 specifies the planned lease, exact-path, late-com
 authorization, UI, and test contracts. No Cancel/Retry runtime code, migration, deployment,
 configuration, live upload, or deletion was performed by this plan revision. The historical
 Graph-confirmed terminal-expiry row stays PARTIAL.
+
+**2026-09-29 Slice 4a implementation:** [VERIFIED via feature-branch source, focused unit tests,
+route/security gates, and read-only OAuth Opus adversarial review] Meeting Tracker now has
+explicit Cancel and Retry upload controls, exact-body guarded routes, a shared intent recovery
+lease, observed-URL fences, bounded exact-path checks, same-intent terminal session replacement,
+and lost-response replay. Opus found a cleanup error-label case that could hide Retry; the
+staff descriptor now offers Retry for any failed unfinished row, while the service still
+requires a live-session status or terminal/no-item proof before returning a URL. Repeated Cancel
+and already-finalized stale actions return idempotent results. This branch implementation has
+not been deployed or live-tested against Graph expiry. No migration, SharePoint write/deletion,
+alias move, or Production configuration change was made in Slice 4a.
