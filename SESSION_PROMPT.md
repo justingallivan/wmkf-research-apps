@@ -1,4 +1,89 @@
-# Session 549 Prompt: first cast-bound production clone, then merge the cast (PR #357)
+# Session 550 Prompt: build the Research Liaison switch; review Codex's B4 revision
+
+## Session 549 Summary — 2026-09-29 PT (Opus; first cast-bound clone, PR #357 merged, two plans through Codex review)
+
+### What Was Completed
+
+1. **First cast-bound production clone** (owner-run from `claude/factory-cast` at `f47703167`) [VERIFIED: owner-run output]:
+   - Run `e33fa857`, Request **1003303**, reached `ready` at 16:38:58Z, and the one-hour `--run-recheck` passed (`ok`, `not_refreshed`).
+   - The PI and Liaison show on the Awardee tab (To and Cc), with the TEST badge.
+   - `--bind-reviewer` created suggestion `0d1a990d`.
+   - The owner set the Foundation's Organization Leader to WMKF ORG LEADER, and also set Potential Reviewer 1 on 1003303 by hand.
+2. **The cast reviewer does not work in the app** (cast plan *Facts*, *Order* 5–6):
+   - The Find tab reads the Request's `wmkf_potentialreviewer1..5` slots, not suggestion rows.
+   - With the slot set, ingest is refused by `assertPersonBindable` (synthetic fence).
+   - The S548 "visibility" claim is marked STALE.
+   - Owner decision 8 (option A): admit a synthetic person on test Requests only.
+   - Slice B4 planned; Codex round 1 no-ship (four high, one medium). Revision handed to Codex on `codex/factory-reviewer-b4`.
+3. **PR #357 merged** (`75d58e331`), without B4. All 12 CI checks were green. The production deploy of the merge build was confirmed Ready.
+4. **Read-only production probes, owner-authorized** (session scratch scripts, not committed):
+   - Potential Reviewer slots: not audited, no slot-triggered automation.
+   - Liaison coverage: 108 active Research awards; 84 have a Request-copy Liaison contact different from the institution's Primary Contact; only 1 institution (Santa Monica College, 996068) has none. The owner accepts that case.
+   - Email comparison: the recipient actually changes on **27 active awards / 35 upcoming Requests**.
+5. **Liaison decision** (owner with the platform owner): the Research Liaison of record is the applicant institution's Primary Contact.
+   - Plan `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`, revision 7, on `claude/liaison-from-institution`.
+   - Six Codex rounds, then a Codex review-and-fix pass; verdict **ready to build**.
+   - Owner answers 5–9 are recorded in the plan (relabel export, Explorer via institution, one editable Cc with server check, measure first, split).
+6. **Split** (owner): re-addressing queued grantee reminders, plus the scheduled-email engine hardening it needs, moved to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` (draft r0, unreviewed; carries rounds 2–3 as open requirements).
+
+### Commits
+- `main`: `fa42b274b`, `4ccfc6ac4` (cast plan), PR #357 merge `75d58e331`, this handoff.
+- `claude/liaison-from-institution` (pushed, not merged): `9a28a4e82` … `fbe64a69b`; Codex's `3700653a4`.
+- `codex/factory-reviewer-b4` (pushed): brief `8dc5c3d40`, `221fc7896`; Codex's `175675b9e`, `92d175f14` (unreviewed).
+
+## Next Items
+
+### Verified Open
+
+1. **Build the Research Liaison switch** on `claude/liaison-from-institution`, in `.claude/worktrees/liaison-from-institution`, per plan revision 7 and its test matrix (Tier 2). Then run an implementation code review before any merge.
+   Evidence: plan Status line; Codex task report (ready to build).
+2. **Review Codex's B4 plan revision** on `codex/factory-reviewer-b4` (`../WMKF_Apps-codex-b4`), read-only, as a reviewer who is not the author. It touched 5 files, including `docs/CREDENTIALS_RUNBOOK.md` and `docs/atlas/postgres-test-request-runs.md`, beyond the brief's plan-plus-probe scope; check those edits.
+   Evidence: `git diff --stat 221fc7896 origin/codex/factory-reviewer-b4`.
+
+### Owner Decision Needed
+
+1. **B4 open questions** will come from Codex's revision: email contract ("allowlisted recipients" vs recipient binding), and whether manual add stays refused.
+2. **Scheduled-email engine plan:** when to take it up. It covers a duplicate-send hazard after recorded send intent that exists for every program today.
+3. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab` in `../WMKF_Apps-codex`; migrations 056–057 need renumbering). Unchanged.
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a; the seven late-2026 `expiresAt` fixtures; cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer by name or email (browse works); cause unknown (index or the `·`). Ask the platform owner if it matters.
+
+### Verify Before Acting
+
+1. **Residue:**
+   - Test Requests 1003301, 1003302 and **1003303** (Potential Reviewer 1 set by hand; suggestion `0d1a990d`).
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - Worktrees `.claude/worktrees/liaison-from-institution` and `../WMKF_Apps-codex-b4`, plus older ones.
+   
+   List and confirm before deleting any of them.
+2. **Session probes are gone with the scratchpad.** Their results are recorded in the liaison plan (*Measurement*) and cast plan (*Order* 5). Re-create from the plan text if a re-run is needed.
+
+### Do Not Reopen Without New Decision
+
+1. S549 owner decisions: option A for synthetic reviewers (cast decision 8); liaison answers 1–9; the Santa Monica College case accepted; the split.
+2. Earlier decisions listed in the Session 549 prompt below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` (branch) | Build plan r7: helper, six readers, export and Explorer, tests |
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` (branch) | Engine plan r0 for queued-reminder re-addressing |
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` | Cast plan: *Order* 5 clone record, 6 B4 and its round-1 findings |
+| `docs/plans/FACTORY_REVIEWER_B4_CODEX_BRIEF_2026-09-29.md` (B4 branch) | Codex brief for the B4 revision |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|rehearse-test-request|email-source|migration-054).*"
+```
+
+---
+
+## Prior Session 549 Prompt: first cast-bound production clone, then merge the cast (PR #357)
 
 ## Session 548 Summary — 2026-09-28 PT (Opus; probe hardening, wave30 live, meeting-date fix, synthetic cast slices A + B built, reviewed and created in production)
 

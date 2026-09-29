@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Test Request Factory: synthetic cast bound to production clones (Sessions 548–549)
+
+**Milestone:** Production test Requests now carry a reused synthetic cast — PI, Liaison and Research Leader contacts under the Foundation, plus a WMKF Org Leader on the Foundation — so staff can exercise PI/Liaison email workflows on a clone without touching real people.
+**Sessions:** 548 (build, one Codex round), 549 (first cast-bound clone, merge).
+**Ship state:**
+- PR #357 (`75d58e331`): cast ledger and `--create-cast`, create-body binds with per-lookup fences, Foundation transition contract journaling the cast contacts, `--bind-reviewer`.
+- First cast-bound clone: run `e33fa857`, Request 1003303, `ready`, one-hour recheck clean; PI and Liaison confirmed on the Awardee tab.
+- Not shipped: the suggested reviewer is not usable in the app (the Find tab reads the Request's Potential Reviewer slots, and the synthetic fence refuses the person); slice B4 is in plan revision.
+**Why it matters:** clones are now realistic for contact-driven workflows; testing the reviewer workflow waits on B4.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (*Order* 4–6); `lib/services/test-requests/cast-runner.js`, `cast-binding-runner.js`.
+
 ## September 2026 — Test Request Factory: first production clone verified; status setter live (Session 547)
 
 **Milestone:** The Factory produced its first verified production test Request (1003302), checked against a Foundation-account transition contract at creation and an hour later, and gained a status setter that moves a test Request's Phase I/II Status with the platform's reactions recorded; its first change made the clone visible in Workbench.

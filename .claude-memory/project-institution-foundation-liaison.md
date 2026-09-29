@@ -8,6 +8,8 @@ metadata:
   last_verified: 2026-07-12 re-reviewed — contact-role triad semantics are user-attested (WMKF authority, S159) + behavioral-signature corroborated; the field meanings are not probe-provable, and the evidence files under docs/atlas/evidence/ remain the substantiation
 ---
 
+**Decision 2026-09-29 (S549, owner with the AkoyaGO platform owner):** for the Research program the Liaison *of record* is the applicant institution's Primary Contact (`account.primarycontactid`); `akoya_request.akoya_primarycontactid` is a copy that flows up only and goes stale (measured S549: 27 active Research awards' Liaison email differs). App readers are being switched per `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` (branch `claude/liaison-from-institution`, **not built** as of S549); until it merges, app code still reads the Request copy.
+
 ## Recall Rule
 
 Read this when: surfacing `akoya_request` person fields anywhere (bulk export, Grant Reporting auto-fill, contact enrichment, Reviewer Finder COI).
