@@ -36,7 +36,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
     `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
-       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments', 'test_request_status_changes')`,
+       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments', 'test_request_status_changes', 'test_request_cast_members', 'test_request_cast_bindings')`,
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
@@ -84,6 +84,7 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   let db;
   let ledger;
   const createdRunIds = [];
+  const createdMemberIds = [];
 
   beforeAll(async () => {
     db = pgLedgerDb(TEST_URL);
@@ -97,6 +98,10 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
   });
 
   afterAll(async () => {
+    if (createdMemberIds.length) {
+      await db.query(`DELETE FROM test_request_cast_bindings WHERE member_id = ANY($1::uuid[])`, [createdMemberIds]);
+      await db.query(`DELETE FROM test_request_cast_members WHERE member_id = ANY($1::uuid[])`, [createdMemberIds]);
+    }
     if (createdRunIds.length) {
       await db.query(`DELETE FROM test_request_status_changes WHERE run_id = ANY($1::uuid[])`, [createdRunIds]);
       await db.query(
@@ -337,6 +342,56 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     await expect(db.query(
       `UPDATE test_request_status_changes SET effects = '{"requestStatus":"Phase II Pending"}'::jsonb WHERE change_id = $1::uuid`, [second.changeId],
     )).rejects.toThrow(/check constraint/i);
+  });
+
+  it('cast: one member per role per environment, journaled then verified; a binding is one per run and member', async () => {
+    const { rows: existing } = await db.query(`SELECT 1 FROM test_request_cast_members WHERE environment = 'sandbox' AND role = 'pi'`);
+    if (existing.length) throw new Error('The scratch ledger already holds a sandbox PI cast member; run this proof against a fresh scratch database.');
+    const member = {
+      memberId: crypto.randomUUID(), environment: 'sandbox', role: 'pi', firstName: 'TEST · Factory', lastName: 'PI',
+      addressSha256: reviewerAddressSha256('cast-pi@example.test').addressSha256,
+    };
+    createdMemberIds.push(member.memberId);
+    const planned = await ledger.planCastMember(member);
+    expect(planned).toMatchObject({ status: 'planned', entity: 'contact', role: 'pi' });
+    await expect(ledger.planCastMember({ ...member, memberId: crypto.randomUUID() }))
+      .rejects.toThrow(/test_request_cast_members_one_per_role|duplicate key/);
+    expect(await ledger.markCastMemberVerified({ memberId: member.memberId, readback: { matched: true } })).toBeNull();
+    await ledger.markCastMemberDispatched({ memberId: member.memberId });
+    const verified = await ledger.markCastMemberVerified({ memberId: member.memberId, readback: { matched: true, recovered: false } });
+    expect(verified).toMatchObject({ status: 'verified' });
+    expect(verified.verifiedAt).not.toBeNull();
+    expect((await ledger.listCastMembers({ environment: 'sandbox' })).map((m) => m.memberId)).toContain(member.memberId);
+    await expect(db.query(
+      `INSERT INTO test_request_cast_members (member_id, environment, role, entity, first_name, last_name, address_sha256)
+       VALUES ($1::uuid, 'sandbox', 'liaison', 'wmkf_potentialreviewers', 'A', 'B', $2)`,
+      [crypto.randomUUID(), 'b'.repeat(64)],
+    )).rejects.toThrow(/test_request_cast_members_role_entity/);
+
+    const plan = basePlan();
+    createdRunIds.push(plan.runId);
+    const { run } = await ledger.reserveRun({ actorId: cliActorId(`actor-${crypto.randomUUID()}`), idempotencyKey: 'key-cast', plan });
+    const binding = await ledger.planCastBinding({ bindingId: crypto.randomUUID(), runId: run.runId, memberId: member.memberId });
+    expect(binding).toMatchObject({ status: 'planned' });
+    await expect(ledger.planCastBinding({ bindingId: crypto.randomUUID(), runId: run.runId, memberId: member.memberId }))
+      .rejects.toThrow(/test_request_cast_bindings_one_per_run|duplicate key/);
+    await ledger.markCastBindingDispatched({ bindingId: binding.bindingId });
+    const stopped = await ledger.markCastBindingNeedsAttention({ bindingId: binding.bindingId, error: 'readback mismatch', readback: { matched: false } });
+    expect(stopped).toMatchObject({ status: 'needs_attention', error: 'readback mismatch' });
+    expect(await ledger.getCastBinding({ runId: run.runId, memberId: member.memberId })).toMatchObject({ bindingId: binding.bindingId });
+    await expect(ledger.markCastMemberVerified({ memberId: member.memberId, readback: { requestStatus: 'x' } })).rejects.toThrow(/receipt/i);
+  });
+
+  it('receipt grammar: the Foundation baseline may journal a null or GUID Primary Contact and a GUID Liaison; null stays refused elsewhere', async () => {
+    const ok = async (receipt) => (await db.query('SELECT test_request_receipt_ok($1::jsonb) AS ok', [JSON.stringify(receipt)])).rows[0].ok;
+    const guid = crypto.randomUUID();
+    expect(await ok({ kind: 'foundation_transition', primaryContactId: null, liaisonContactId: guid })).toBe(true);
+    expect(await ok({ kind: 'foundation_transition', primaryContactId: guid, liaisonContactId: guid })).toBe(true);
+    expect(await ok({ kind: 'foundation_transition', primaryContactId: null, liaisonContactId: guid, piContactId: crypto.randomUUID() })).toBe(true);
+    expect(await ok({ piContactId: 'x' })).toBe(false);
+    expect(await ok({ primaryContactId: 'not-a-guid' })).toBe(false);
+    expect(await ok({ liaisonContactId: null })).toBe(false);
+    expect(await ok({ requestId: null })).toBe(false);
   });
 
   it('claimLease succeeds once; a second claim with the stale version returns null', async () => {

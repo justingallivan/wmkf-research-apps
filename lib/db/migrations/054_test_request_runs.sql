@@ -40,6 +40,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
          OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
          OR (e.key IN ('requestIds', 'locationIds', 'emailIds', 'trackingIds', 'paymentIds', 'jobIds') AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
+         OR (e.key = 'primaryContactId' AND s.t = 'null')
          OR (e.key = 'itemIds' AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~ '^01[A-Z2-7]{32}$'))
          OR (e.key = 'resourceIds' AND s.t = 'array' AND NOT EXISTS (
@@ -50,7 +51,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
            AND s.v !~ '(://|[[:cntrl:]])'
            AND s.v !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
            AND CASE
-             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId', 'promptId', 'confirmedRunId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId', 'promptId', 'confirmedRunId', 'primaryContactId', 'liaisonContactId', 'piContactId', 'researchLeaderContactId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
              WHEN e.key IN ('itemId', 'folderItemId', 'graphItemId', 'sourceGraphItemId') THEN s.v ~ '^01[A-Z2-7]{32}$'
              WHEN e.key IN ('driveId', 'sourceDriveId') THEN s.v ~ '^b![A-Za-z0-9_-]{16,120}$'
@@ -398,3 +399,47 @@ CREATE TABLE IF NOT EXISTS test_request_status_changes (
 
 CREATE UNIQUE INDEX IF NOT EXISTS test_request_status_changes_one_open_idx
   ON test_request_status_changes (run_id) WHERE status IN ('planned', 'dispatched', 'applied');
+
+-- Synthetic cast (cast-and-status plan, slices A + B, 2026-09-28): the
+-- reused synthetic PI and Liaison contacts and suggested-reviewer person,
+-- one per role per environment. `member_id` is the Dataverse GUID,
+-- preallocated and journaled before the create POST names it, so ownership
+-- is by journal: a lost response is recovered by reading that GUID, never by
+-- re-POSTing, and a row the ledger did not journal is never adopted. Names
+-- are the Factory's synthetic defaults; the address is stored as a digest
+-- only (the owner supplies it at run time, off the repository).
+CREATE TABLE IF NOT EXISTS test_request_cast_members (
+  member_id      UUID PRIMARY KEY,
+  environment    TEXT NOT NULL CHECK (environment IN ('sandbox', 'production')),
+  role           TEXT NOT NULL CHECK (role IN ('pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader')),
+  entity         TEXT NOT NULL CHECK (entity IN ('contact', 'wmkf_potentialreviewers')),
+  first_name     TEXT NOT NULL CHECK (length(first_name) BETWEEN 1 AND 50 AND first_name !~ '[[:cntrl:]]'),
+  last_name      TEXT NOT NULL CHECK (length(last_name) BETWEEN 1 AND 50 AND last_name !~ '[[:cntrl:]]'),
+  address_sha256 TEXT NOT NULL CHECK (address_sha256 ~ '^[0-9a-f]{64}$'),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'verified', 'needs_attention')),
+  dispatched_at  TIMESTAMPTZ NULL,
+  readback       JSONB NULL CHECK (test_request_receipt_ok(readback)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at    TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_cast_members_one_per_role UNIQUE (environment, role),
+  CONSTRAINT test_request_cast_members_role_entity CHECK ((role = 'suggested_reviewer') = (entity = 'wmkf_potentialreviewers'))
+);
+
+-- One row per suggested-reviewer suggestion the Factory binds to a ready
+-- production test Request (owner-run, like a status change, so no lease).
+-- `binding_id` is the preallocated wmkf_appreviewersuggestionid.
+CREATE TABLE IF NOT EXISTS test_request_cast_bindings (
+  binding_id     UUID PRIMARY KEY,
+  run_id         UUID NOT NULL REFERENCES test_request_runs (run_id),
+  member_id      UUID NOT NULL REFERENCES test_request_cast_members (member_id),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'verified', 'needs_attention')),
+  dispatched_at  TIMESTAMPTZ NULL,
+  readback       JSONB NULL CHECK (test_request_receipt_ok(readback)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at    TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_cast_bindings_one_per_run UNIQUE (run_id, member_id)
+);

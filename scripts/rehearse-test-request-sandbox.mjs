@@ -104,6 +104,10 @@ import {
 import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
 import { recheckFoundationTransition } from '../lib/services/test-requests/foundation-transition.js';
 import { fieldFor, recheckStatusChange, runStatusChange } from '../lib/services/test-requests/status-change-runner.js';
+import { CAST_DEFAULT_NAMES, CAST_ROLE_ORDER, planCastAddresses, readCast, runCastCreate } from '../lib/services/test-requests/cast-runner.js';
+import { runCastBinding } from '../lib/services/test-requests/cast-binding-runner.js';
+import { TEST_REQUEST_EMAIL_ALLOWLIST_KEY, parseAllowlistValue } from '../lib/services/test-requests/email-allowlist.js';
+import * as odata from '../lib/dataverse/core/odata.js';
 import { recipeSeedsPreSite, recipeSeedsReviewers } from '../lib/services/test-requests/recipe-capabilities.js';
 import {
   LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
@@ -213,6 +217,14 @@ export function parseArgs(argv) {
     statusRecheck: null,
     target: 'sandbox',
     director: null,
+    createCast: false,
+    castPi: null,
+    castLiaison: null,
+    castReviewer: null,
+    castOrgLeader: null,
+    castResearchLeader: null,
+    confirm: false,
+    bindReviewer: null,
   };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
@@ -243,12 +255,29 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--status-recheck=')) parsed.statusRecheck = arg.slice('--status-recheck='.length);
     else if (arg.startsWith('--target=')) parsed.target = arg.slice('--target='.length);
     else if (arg.startsWith('--director=')) parsed.director = arg.slice('--director='.length);
+    else if (arg === '--create-cast') parsed.createCast = true;
+    else if (arg.startsWith('--cast-pi=')) parsed.castPi = arg.slice('--cast-pi='.length);
+    else if (arg.startsWith('--cast-liaison=')) parsed.castLiaison = arg.slice('--cast-liaison='.length);
+    else if (arg.startsWith('--cast-reviewer=')) parsed.castReviewer = arg.slice('--cast-reviewer='.length);
+    else if (arg.startsWith('--cast-org-leader=')) parsed.castOrgLeader = arg.slice('--cast-org-leader='.length);
+    else if (arg.startsWith('--cast-research-leader=')) parsed.castResearchLeader = arg.slice('--cast-research-leader='.length);
+    else if (arg === '--confirm') parsed.confirm = true;
+    else if (arg.startsWith('--bind-reviewer=')) parsed.bindReviewer = arg.slice('--bind-reviewer='.length);
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
-  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck];
+  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.createCast ? '--create-cast' : null, parsed.bindReviewer];
   if (modes.filter(Boolean).length > 1) {
-    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, --run-inspect, --run-recheck, --set-status, or --status-recheck.');
+    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, --run-inspect, --run-recheck, --set-status, --status-recheck, --create-cast, or --bind-reviewer.');
+  }
+  if ((parsed.createCast || parsed.bindReviewer) && parsed.target !== 'production') {
+    throw new Error('--create-cast and --bind-reviewer are valid only with --target=production.');
+  }
+  if (parsed.createCast && !(parsed.castPi && parsed.castLiaison && parsed.castReviewer && parsed.castOrgLeader && parsed.castResearchLeader)) {
+    throw new Error('--create-cast requires --cast-pi=, --cast-liaison=, --cast-reviewer=, --cast-org-leader= and --cast-research-leader= (allowlisted addresses).');
+  }
+  if (!parsed.createCast && (parsed.castPi || parsed.castLiaison || parsed.castReviewer || parsed.castOrgLeader || parsed.castResearchLeader || parsed.confirm)) {
+    throw new Error('--cast-* addresses and --confirm are valid only with --create-cast.');
   }
   // Production plan P1 / MVP list item 1: the destination is an explicit
   // operator choice, never inferred from the environment.
@@ -360,8 +389,8 @@ export function parseArgs(argv) {
       parsed.reviewerAddressFlags = parsedFlags;
     }
   }
-  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck].filter(Boolean)) {
-    if (!RUN_ID.test(runId)) throw new Error('--advance/--run-inspect/--run-recheck take a run ID GUID.');
+  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.bindReviewer].filter(Boolean)) {
+    if (!RUN_ID.test(runId)) throw new Error('--advance/--run-inspect/--run-recheck/--set-status/--status-recheck/--bind-reviewer take a run ID GUID.');
   }
   if (parsed.advance && (!parsed.manifest || !parsed.bundle)) {
     throw new Error('--advance requires --manifest and --bundle.');
@@ -394,6 +423,8 @@ function printHelp() {
   console.log('Set Phase I or II Status on a ready production test Request (owner-run; writes need DATAVERSE_PROD_WRITE_ACK): ... --target=production --set-status=<runId> --field=phase1|phase2 --option="<live option label>" [--rerun]');
   console.log('Recheck a status change for late effects (read-only): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --status-recheck=<runId>');
   console.log('Recheck a production run\'s Foundation account against its pre-create baseline (read-only; plan P5\'s later check): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --run-recheck=<runId>');
+  console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> --cast-org-leader=<address> --cast-research-leader=<address> [--confirm]');
+  console.log('Bind the cast suggested reviewer to a ready production test Request (owner-run; needs DATAVERSE_ALLOW_PROD_READS=yes and DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer=<runId>');
   console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
   console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL, which must not be the shared Production/Preview database.');
 }
@@ -884,8 +915,20 @@ export async function runReserve(client, args, ledgerUrl) {
   // resolved from their sign-in on the target, never a supplied GUID.
   const target = args.target ?? 'sandbox';
   const programDirector = target === 'production' ? await resolveProgramDirector(client, args.director) : null;
+  // Every production clone binds the synthetic cast PI and Liaison (owner,
+  // S548); the reservation refuses until the cast exists and reads back.
+  let cast = null;
+  if (target === 'production') {
+    const castDb = pgLedgerDb(ledgerUrl);
+    try {
+      const members = await readCast({ client, ledger: createRunLedger(castDb), environment: 'production', parentAccountId: preflight.foundation.accountid });
+      cast = { piContactId: members.pi.memberId, liaisonContactId: members.liaison.memberId, researchLeaderContactId: members.research_leader.memberId };
+    } finally {
+      await castDb.end();
+    }
+  }
   const manifest = buildCloneManifest(preflight, {
-    ...cycle, source, testLabel: args.testLabel, bundle, recipe: args.recipe, programDirector,
+    ...cycle, source, testLabel: args.testLabel, bundle, recipe: args.recipe, programDirector, ...(cast ? { cast } : {}),
   });
   if (targetEnvironmentOf(manifest) !== target) throw new Error('Manifest target does not match --target.');
   if (!isBundleManifest(manifest)) throw new Error('The bounded ledger-driven runner only supports bundle (v4) manifests.');
@@ -1157,6 +1200,53 @@ export async function runStatusMode(client, args, ledgerUrl) {
   }
 }
 
+/** The Admin test-Request allowlist, read from the target org (the local settings service may point at the sandbox). */
+async function readTargetAllowlist(client) {
+  const filter = odata.eq('wmkf_settingkey', TEST_REQUEST_EMAIL_ALLOWLIST_KEY);
+  const response = await client.get(`/wmkf_appsystemsettings?$select=wmkf_settingvalue&$filter=${encodeURIComponent(filter)}&$top=1`);
+  if (!response.ok) throw new Error(`Reading the test-Request allowlist failed (${response.status}).`);
+  return parseAllowlistValue(response.body?.value?.[0]?.wmkf_settingvalue ?? null);
+}
+
+/**
+ * Synthetic cast (cast-and-status plan, slices A + B): --create-cast creates
+ * or resumes the reused PI, Liaison and suggested-reviewer person (prints
+ * the plan and stops without --confirm); --bind-reviewer attaches the cast
+ * reviewer to one ready production test Request. Output carries no addresses.
+ */
+export async function runCastMode(client, args, ledgerUrl) {
+  const db = pgLedgerDb(ledgerUrl);
+  try {
+    const ledger = createRunLedger(db);
+    if (args.bindReviewer) {
+      const result = await runCastBinding({ client, ledger, runId: args.bindReviewer });
+      console.log(JSON.stringify({ mode: 'CAST_REVIEWER_BOUND', runId: args.bindReviewer, ...result }, null, 2));
+      return;
+    }
+    const addresses = {
+      pi: args.castPi, liaison: args.castLiaison, suggested_reviewer: args.castReviewer,
+      org_leader: args.castOrgLeader, research_leader: args.castResearchLeader,
+    };
+    const allowlist = await readTargetAllowlist(client);
+    planCastAddresses({ addresses, allowlist });
+    if (!args.confirm) {
+      console.log(JSON.stringify({
+        mode: 'CAST_PLAN_ONLY',
+        target: client.baseUrl,
+        members: CAST_ROLE_ORDER.map((role) => ({ role, ...CAST_DEFAULT_NAMES[role] })),
+        next: 'Re-run with --confirm (and DATAVERSE_PROD_WRITE_ACK) to create or resume these members.',
+      }, null, 2));
+      return;
+    }
+    // Cast contacts are children of the Foundation account (owner, S548).
+    const { accountid: parentAccountId } = await getFoundationSnapshot(client);
+    const result = await runCastCreate({ client, ledger, environment: 'production', addresses, allowlist, parentAccountId });
+    console.log(JSON.stringify({ mode: 'CAST_CREATED', ...result }, null, 2));
+  } finally {
+    await db.end();
+  }
+}
+
 /**
  * Read-only: re-evaluates a production run's Foundation account and Contacts
  * against its journaled pre-create baseline (foundation-transition.js). No
@@ -1170,6 +1260,7 @@ export async function runRecheck(client, runId, ledgerUrl) {
     if (!run) throw new Error(`No test request run found for ${runId}.`);
     if (run.destinationEnvironment !== 'production') throw new Error(`Run ${runId} is not a production run.`);
     const resources = await ledger.listRunResources(runId);
+    // The Liaison allowance comes only from this run's own journaled baseline.
     const { failures, outcome } = await recheckFoundationTransition({ client, organizationId: run.expectedOrganizationId, resources });
     console.log(JSON.stringify({
       mode: 'READ_ONLY_FOUNDATION_RECHECK', runId, status: run.status, ok: failures.length === 0, outcome, failures,
@@ -1201,6 +1292,13 @@ async function main() {
     // No marker writes: a status change never touches the Test Request marker.
     const statusClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
     await runStatusMode(statusClient, args, ledgerUrl);
+    return;
+  }
+  if (args.createCast || args.bindReviewer) {
+    const ledgerUrl = requireLedgerUrl();
+    // The cast person create is a sanctioned marker write (wmkf_potentialreviewerses).
+    const castClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl), allowTestRequestMarkerWrites: true });
+    await runCastMode(castClient, args, ledgerUrl);
     return;
   }
   if (args.runRecheck) {

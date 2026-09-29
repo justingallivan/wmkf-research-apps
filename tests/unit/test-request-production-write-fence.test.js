@@ -4,7 +4,9 @@
  * @jest-environment node
  */
 import { jest } from '@jest/globals';
-import { fenceProductionClient, fenceProductionGraph, fenceStatusChangeClient } from '../../lib/services/test-requests/production-write-fence.js';
+import {
+  fenceCastBindingClient, fenceCastCreateClient, fenceProductionClient, fenceProductionGraph, fenceStatusChangeClient,
+} from '../../lib/services/test-requests/production-write-fence.js';
 import { MANIFEST_V4, PRODUCTION_URL, fenceSource, sha256 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
@@ -248,5 +250,150 @@ describe('fenceStatusChangeClient (status setter)', () => {
     const { calls } = make();
     const basic = fenceProductionClient({ patchWithOptions: () => calls.push('x') }, { destinationRequestId: DEST, destinationLocationId: DEST, sourceRequestId: SRC });
     expect(() => basic.patchWithOptions(...good())).toThrow(/not allowed in a production run/);
+  });
+});
+
+describe('cast contact binds on the Request create (slice B)', () => {
+  const PI = '66666666-6666-4666-8666-666666666666';
+  const LIAISON = '77777777-7777-4777-8777-777777777777';
+  const OTHER = '88888888-8888-4888-8888-888888888888';
+  const castBinds = { wmkf_projectleader: PI, akoya_primarycontactid: LIAISON };
+  const body = (pi, liaison) => ({
+    akoya_requestid: DEST, 'wmkf_ProjectLeader@odata.bind': `/contacts(${pi})`, 'akoya_primarycontactid@odata.bind': `/contacts(${liaison})`,
+  });
+
+  test('admits the PI and Liaison binds, each to its own journaled cast contact', async () => {
+    const { client } = fakeClient();
+    const fenced = fenceProductionClient(client, { ...fence, castBinds });
+    await expect(fenced.post('/akoya_requests', body(PI.toUpperCase(), LIAISON))).resolves.toBeTruthy();
+  });
+
+  test.each([
+    ['swapped PI and Liaison', body(LIAISON, PI), /is not approved/],
+    ['an unjournaled contact', body(OTHER, LIAISON), /is not approved/],
+    ['a contact bound through another lookup', { ...body(PI, LIAISON), 'wmkf_otherperson@odata.bind': `/contacts(${PI})` }, /is not approved/],
+    ['a missing Liaison bind', (({ 'akoya_primarycontactid@odata.bind': _l, ...rest }) => rest)(body(PI, LIAISON)), /akoya_primarycontactid .* exactly once/],
+  ])('refuses %s', (_label, requestBody, message) => {
+    const { client } = fakeClient();
+    expect(() => fenceProductionClient(client, { ...fence, castBinds }).post('/akoya_requests', requestBody)).toThrow(message);
+  });
+
+  test('without cast IDs no contact bind is admitted', () => {
+    const { client } = fakeClient();
+    expect(() => fenceProductionClient(client, fence).post('/akoya_requests', body(PI, LIAISON))).toThrow(/is not approved/);
+  });
+});
+
+describe('fenceCastCreateClient (slice A)', () => {
+  const CONTACT = '66666666-6666-4666-8666-666666666666';
+  const PERSON = '99999999-9999-4999-8999-999999999999';
+  const FOUNDATION = 'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0';
+  const castFence = { parentAccountId: FOUNDATION, members: [
+    { memberId: CONTACT, entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI', address: 'pi@example.test' },
+    { memberId: PERSON, entity: 'wmkf_potentialreviewers', firstName: 'TEST · Factory', lastName: 'Reviewer', address: 'reviewer@example.test' },
+  ] };
+  const contact = {
+    contactid: CONTACT, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'pi@example.test',
+    'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})`,
+  };
+  const person = {
+    wmkf_potentialreviewersid: PERSON, wmkf_firstname: 'TEST · Factory', wmkf_lastname: 'Reviewer',
+    wmkf_emailaddress: 'reviewer@example.test', wmkf_issyntheticreviewer: true,
+  };
+
+  test('admits each journaled member\'s closed create, and reads', async () => {
+    const { client, calls } = fakeClient();
+    const fenced = fenceCastCreateClient(client, castFence);
+    await fenced.get('/contacts(x)');
+    await fenced.post('/contacts', contact);
+    await fenced.postWithOptions('/wmkf_potentialreviewerses', person, {}, {});
+    expect(calls.map((c) => c[0])).toEqual(['get', 'post', 'postWithOptions']);
+  });
+
+  test.each([
+    ['an unjournaled GUID', '/contacts', { ...contact, contactid: DEST }],
+    ['a person GUID on the contact set', '/contacts', { ...contact, contactid: PERSON }],
+    ['another parent account', '/contacts', { ...contact, 'parentcustomerid_account@odata.bind': `/accounts(${DEST})` }],
+    ['a missing parent bind', '/contacts', (({ 'parentcustomerid_account@odata.bind': _p, ...rest }) => rest)(contact)],
+    ['a parent bind on the person', '/wmkf_potentialreviewerses', { ...person, 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }],
+    ['an extra column', '/contacts', { ...contact, telephone1: '555' }],
+    ['a person without the marker', '/wmkf_potentialreviewerses', { ...person, wmkf_issyntheticreviewer: false }],
+    ['another entity set', '/accounts', { accountid: CONTACT }],
+    ['a wrong name', '/contacts', { ...contact, lastname: 'Liaison' }],
+    ['a wrong address', '/contacts', { ...contact, emailaddress1: 'someone@example.test' }],
+    ['an omitted column', '/contacts', (({ emailaddress1: _e, ...rest }) => rest)(contact)],
+  ])('refuses %s', (_label, path, body) => {
+    const { client } = fakeClient();
+    expect(() => fenceCastCreateClient(client, castFence).post(path, body)).toThrow(/Production write fence/);
+  });
+
+  test.each(['patch', 'delete_', 'raw'])('refuses %s outright', (name) => {
+    const { client } = fakeClient();
+    expect(() => fenceCastCreateClient(client, castFence)[name]('/contacts(x)', {})).toThrow(/not allowed in a cast create/);
+  });
+
+  test('admits the one PATCH that attaches the parent to a journaled contact under a concrete If-Match', async () => {
+    const { client, calls } = fakeClient();
+    await fenceCastCreateClient(client, castFence).patchWithOptions(`/contacts(${CONTACT})`,
+      { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, { 'If-Match': 'W/"12"' });
+    expect(calls.map((c) => c[0])).toEqual(['patchWithOptions']);
+  });
+
+  test.each([
+    ['another contact', `/contacts(${DEST})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, { 'If-Match': 'W/"12"' }],
+    ['the person', `/contacts(${PERSON})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, { 'If-Match': 'W/"12"' }],
+    ['another account', `/contacts(${CONTACT})`, { 'parentcustomerid_account@odata.bind': `/accounts(${DEST})` }, { 'If-Match': 'W/"12"' }],
+    ['an extra field', `/contacts(${CONTACT})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})`, firstname: 'X' }, { 'If-Match': 'W/"12"' }],
+    ['a name change', `/contacts(${CONTACT})`, { lastname: 'X' }, { 'If-Match': 'W/"12"' }],
+    ['no If-Match', `/contacts(${CONTACT})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, {}],
+    ['a wildcard If-Match', `/contacts(${CONTACT})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, { 'If-Match': '*' }],
+  ])('refuses a PATCH of %s', (_label, path, body, headers) => {
+    const { client } = fakeClient();
+    expect(() => fenceCastCreateClient(client, castFence).patchWithOptions(path, body, headers)).toThrow(/Production write fence/);
+  });
+
+  test('refuses to build without journaled members or a parent account', () => {
+    const { client } = fakeClient();
+    expect(() => fenceCastCreateClient(client, { parentAccountId: FOUNDATION, members: [] })).toThrow(/journaled members/);
+    expect(() => fenceCastCreateClient(client, { members: castFence.members })).toThrow(/parent account/);
+  });
+});
+
+describe('fenceCastBindingClient (slice B)', () => {
+  const BINDING = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const PERSON = '99999999-9999-4999-8999-999999999999';
+  const bindingFence = { bindingId: BINDING, personId: PERSON, destinationRequestId: DEST, sourceRequestId: SOURCE, label: 'Applicant recommendation (Factory cast)' };
+  const suggestion = {
+    wmkf_appreviewersuggestionid: BINDING, wmkf_suggestionlabel: 'Applicant recommendation (Factory cast)', wmkf_sources: 'applicant',
+    wmkf_selected: false, wmkf_applicantdisposition: 100000000,
+    'wmkf_PotentialReviewer@odata.bind': `/wmkf_potentialreviewerses(${PERSON})`, 'wmkf_Request@odata.bind': `/akoya_requests(${DEST})`,
+  };
+
+  test('admits the one applicant-recommended suggestion', async () => {
+    const { client, calls } = fakeClient();
+    await fenceCastBindingClient(client, bindingFence).post('/wmkf_appreviewersuggestions', suggestion);
+    expect(calls).toHaveLength(1);
+  });
+
+  test.each([
+    ['another suggestion GUID', { ...suggestion, wmkf_appreviewersuggestionid: DEST }],
+    ['another person', { ...suggestion, 'wmkf_PotentialReviewer@odata.bind': `/wmkf_potentialreviewerses(${DEST})` }],
+    ['the source Request', { ...suggestion, 'wmkf_Request@odata.bind': `/akoya_requests(${SOURCE})` }],
+    ['an excluded disposition', { ...suggestion, wmkf_applicantdisposition: 100000001 }],
+    ['a missing Request bind', (({ 'wmkf_Request@odata.bind': _r, ...rest }) => rest)(suggestion)],
+    ['an engagement column', { ...suggestion, wmkf_invited: true }],
+    ['a selected suggestion', { ...suggestion, wmkf_selected: true }],
+    ['another source', { ...suggestion, wmkf_sources: 'applicant,staff' }],
+    ['another label', { ...suggestion, wmkf_suggestionlabel: 'Real recommendation' }],
+    ['a missing label', (({ wmkf_suggestionlabel: _l, ...rest }) => rest)(suggestion)],
+    ['a malformed cycle code', { ...suggestion, wmkf_grantcyclecode: 'December' }],
+  ])('refuses %s', (_label, body) => {
+    const { client } = fakeClient();
+    expect(() => fenceCastBindingClient(client, bindingFence).post('/wmkf_appreviewersuggestions', body)).toThrow(/Production write fence/);
+  });
+
+  test.each(['patch', 'patchWithOptions', 'delete_', 'raw'])('refuses %s outright', (name) => {
+    const { client } = fakeClient();
+    expect(() => fenceCastBindingClient(client, bindingFence)[name]('/x', {})).toThrow(/not allowed in a cast binding/);
   });
 });

@@ -13,7 +13,7 @@ related:
   - lib/db/migrations/054_test_request_runs.sql
 ---
 
-# Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` / `test_request_status_changes` (Postgres)
+# Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` / `test_request_status_changes` / `test_request_cast_members` / `test_request_cast_bindings` (Postgres)
 
 **[VERIFIED via source, 2026-09-23]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
@@ -264,6 +264,16 @@ A fourth table, added in place to migration 054 (and its `scripts/setup-database
 - **Writer:** `createRunLedger(db)` `planStatusChange`, `markStatusChangeDispatched`, `markStatusChangeApplied`, `completeStatusChange`, `markStatusChangeNeedsAttention`. No lease: the CLI is owner-run, and a partial unique index (`status IN ('planned','dispatched','applied')`) admits one open change per run.
 - **Reader:** `listStatusChanges(runId)` (the runner's replay and resume checks; `--run-inspect`).
 - **Dataverse reads by the runner** (`lib/services/test-requests/status-change-runner.js`, read-only): `asyncoperations` regarding the Request (completion waits until every job since the write is terminal), `akoya_goapplystatustrackings` by `_akoya_request_value`, regarding `emails`, `akoya_requestpayments`, and the Request's own status fields. Its one write is the fenced `akoya_requests` status PATCH.
+
+## `test_request_cast_members` / `test_request_cast_bindings` (synthetic cast, 2026-09-28)
+
+**[VERIFIED via lib/db/migrations/054_test_request_runs.sql and lib/services/test-requests/run-ledger.js, 2026-09-28; branch `claude/factory-cast`, not merged]**
+Two tables added in place to migration 054 (and the V55 mirror) for the cast plan's slices A + B (`docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`).
+
+- **`test_request_cast_members`:** the reused synthetic PI and Liaison contacts and suggested-reviewer person, one per `(environment, role)`. `member_id` is the preallocated Dataverse GUID (`contactid` or `wmkf_potentialreviewersid`), journaled before the create POST names it; `role` (`pi`, `liaison`, `suggested_reviewer`, `org_leader`, `research_leader`) fixes `entity` (`wmkf_potentialreviewers` for the suggested reviewer, `contact` otherwise, a CHECK); `first_name`/`last_name` (the Factory's synthetic defaults), `address_sha256` (digest only, never the address), `status` (`planned` → `dispatched` → `verified`, or `needs_attention`), `readback` (receipt), `error` (sanitized), timestamps.
+- **`test_request_cast_bindings`:** one suggested-reviewer suggestion per `(run_id, member_id)`; `binding_id` is the preallocated `wmkf_appreviewersuggestionid`; same status set, readback and error.
+- **Writer:** `createRunLedger(db)` `planCastMember`, `markCastMemberDispatched`, `markCastMemberVerified`, `markCastMemberNeedsAttention`, `planCastBinding`, `markCastBindingDispatched`, `markCastBindingVerified`, `markCastBindingNeedsAttention`. Owner-run CLI, no lease; the unique constraints refuse a second plan.
+- **Reader:** `listCastMembers({ environment })`, `getCastBinding({ runId, memberId })`.
 
 ## Limits
 
