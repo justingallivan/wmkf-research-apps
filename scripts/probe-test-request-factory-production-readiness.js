@@ -590,9 +590,10 @@ async function printReviewerSlotReadiness(client, exportDir) {
   }
 
   const steps = await getAll(client, '/sdkmessageprocessingsteps?$select=name,stage,mode,filteringattributes,ishidden' +
-    '&$expand=sdkmessageid($select=name),plugintypeid($select=typename)' +
-    "&$filter=sdkmessagefilterid/primaryobjecttypecode eq 'akoya_request' and statecode eq 0");
-  const updates = steps.filter((row) => row.sdkmessageid?.name === 'Update');
+    '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename)' +
+    "&$filter=sdkmessageid/name eq 'Update' and statecode eq 0");
+  const updates = steps.filter((row) => row.sdkmessageid?.name === 'Update' && row.sdkmessagefilterid?.primaryobjecttypecode === 'akoya_request');
+  receipt.counts.allEnabledUpdateSteps = steps.length;
   receipt.counts.entityUpdateSteps = updates.length;
   console.log(`   enabled Request Update steps: ${updates.length}`);
   for (const row of updates) {
@@ -601,10 +602,10 @@ async function printReviewerSlotReadiness(client, exportDir) {
     receipt.steps.push({ name: row.name || '(unnamed)', type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn });
     console.log(`   - ${firesOn}: ${stepLabel(row)}`);
   }
-  const unfiltered = await getAll(client, '/sdkmessageprocessingsteps?$select=name,stage,mode,ishidden' +
-    '&$expand=sdkmessageid($select=name),plugintypeid($select=typename)' +
-    '&$filter=_sdkmessagefilterid_value eq null and statecode eq 0');
-  const globalUpdates = unfiltered.filter((row) => row.sdkmessageid?.name === 'Update');
+  // Dataverse can represent an all-entity registration as no filter row, a
+  // filter with no primary type, or a filter whose primary type is 'none'.
+  const globalUpdates = steps.filter((row) => row.sdkmessageid?.name === 'Update'
+    && (!row.sdkmessagefilterid || !row.sdkmessagefilterid.primaryobjecttypecode || row.sdkmessagefilterid.primaryobjecttypecode === 'none'));
   receipt.counts.globalUpdateSteps = globalUpdates.length;
   receipt.counts.hiddenGlobalUpdateSteps = globalUpdates.filter(stepIsHidden).length;
   receipt.counts.hiddenMicrosoftPlatformUpdateSteps = globalUpdates.filter(isPlatformStep).length;
@@ -667,6 +668,7 @@ async function printReviewerSlotReadiness(client, exportDir) {
   receipt.counts.requestNonUpdateTriggers = requestNonUpdate;
   receipt.counts.unclassifiedFlowTriggers = receipt.unclassifiedFlowTriggers.length;
   receipt.counts.unreadableFlows = unreadable;
+  if (flows.length === 0) receipt.incompleteReasons.push('no activated cloud flows visible to the probe identity; flow coverage unverified');
   if (unreadable) receipt.incompleteReasons.push(`${unreadable} cloud-flow definitions unreadable`);
   console.log(`   flows read: ${flows.length}; Request/slot mention superset: ${receipt.flowMentions.length}; Request update triggers: ${requestUpdate}; unclassified: ${receipt.unclassifiedFlowTriggers.length}; unreadable definitions: ${unreadable}`);
   for (const item of receipt.unclassifiedFlowTriggers) console.log(`   - UNCLASSIFIED ${item.name} / ${item.trigger}: ${item.reason}`);

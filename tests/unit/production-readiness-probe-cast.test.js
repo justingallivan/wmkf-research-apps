@@ -133,10 +133,7 @@ describe('reviewer-slot metadata census', () => {
       }
       if (path.startsWith('/EntityDefinitions')) return { ok: true, body: { IsAuditEnabled: { Value: true } } };
       if (path.startsWith('/workflows?$select=name,category')) return { ok: true, body: { value: workflows } };
-      if (path.startsWith('/sdkmessageprocessingsteps?') && path.includes('primaryobjecttypecode')) {
-        return { ok: true, body: { value: entitySteps } };
-      }
-      if (path.startsWith('/sdkmessageprocessingsteps?')) return { ok: true, body: { value: globalSteps } };
+      if (path.startsWith('/sdkmessageprocessingsteps?')) return { ok: true, body: { value: [...entitySteps, ...globalSteps] } };
       if (path.startsWith('/workflows?$select=name,clientdata')) return { ok: true, body: { value: flows } };
       throw new Error(`unexpected metadata path: ${path}`);
     }) };
@@ -151,10 +148,11 @@ describe('reviewer-slot metadata census', () => {
         { name: 'Unreadable slot workflow', category: 0, mode: 0, triggeronupdateattributelist: 'wmkf_potentialreviewer2', xaml: null },
         { name: 'Slot business rule', category: 2, mode: 0, xaml: 'wmkf_potentialreviewer3' },
       ],
-      entitySteps: [{ name: 'Any-column step', stage: 40, mode: 1, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, filteringattributes: '' }],
+      entitySteps: [{ name: 'Any-column step', stage: 40, mode: 1, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'akoya_request' }, filteringattributes: '' }],
       globalSteps: [
-        { name: 'Hidden vendor step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, plugintypeid: { typename: 'AkoyaGo.Custom' }, sdkmessageprocessingstepid: inputId },
-        { name: 'Hidden platform step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, plugintypeid: { typename: 'Microsoft.Platform' } },
+        { name: 'Hidden vendor step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: null, plugintypeid: { typename: 'AkoyaGo.Custom' }, sdkmessageprocessingstepid: inputId },
+        { name: 'None-filter vendor step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'none' }, plugintypeid: { typename: 'AkoyaGo.NoneFilter' } },
+        { name: 'Hidden platform step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: null, plugintypeid: { typename: 'Microsoft.Platform' } },
       ],
       flows: [
         { name: 'Slot flow', workflowid: inputId, clientdata: flow({ triggers: { trigger: { inputs: { parameters: { 'subscriptionRequest/entityname': 'akoya_request', 'subscriptionRequest/message': 3, 'subscriptionRequest/filteringattributes': 'wmkf_potentialreviewer1' } } } } }) },
@@ -184,14 +182,19 @@ describe('reviewer-slot metadata census', () => {
       expect(receipt.steps).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: 'Any-column step', hidden: false, firesOn: 'ANY column' }),
         expect.objectContaining({ name: 'Hidden vendor step', hidden: true, firesOn: 'ANY entity/column' }),
+        expect.objectContaining({ name: 'None-filter vendor step', hidden: true, firesOn: 'ANY entity/column' }),
       ]));
       expect(receipt.steps).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Hidden platform step' })]));
       expect(receipt.flows).toEqual([expect.objectContaining({ name: 'Slot flow', firesOn: 'a slot (wmkf_potentialreviewer1)' })]);
       expect(receipt.incompleteReasons).toContain('1 cloud-flow definitions unreadable');
-      expect(receipt.counts).toEqual(expect.objectContaining({ activatedWorkflowsAndRules: 3, updateTriggeredWorkflows: 2, unreadableWorkflowsAndRules: 1, entityUpdateSteps: 1, hiddenMicrosoftPlatformUpdateSteps: 1, flowsMentioningRequestOrSlot: 5, unclassifiedFlowTriggers: 3 }));
+      expect(receipt.counts).toEqual(expect.objectContaining({ activatedWorkflowsAndRules: 3, updateTriggeredWorkflows: 2, unreadableWorkflowsAndRules: 1, allEnabledUpdateSteps: 4, entityUpdateSteps: 1, globalUpdateSteps: 3, hiddenMicrosoftPlatformUpdateSteps: 1, flowsMentioningRequestOrSlot: 5, unclassifiedFlowTriggers: 3 }));
       expect(receipt.flowMentions).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Unreadable flow', readable: false })]));
       expect(receipt.section).toBe(13);
       expect(receipt.target).toBe('https://wmkf.crm.dynamics.com');
+      const stepQueries = client.get.mock.calls.map(([path]) => path).filter((path) => path.startsWith('/sdkmessageprocessingsteps?'));
+      expect(stepQueries).toHaveLength(1);
+      expect(stepQueries[0]).toContain("$filter=sdkmessageid/name eq 'Update' and statecode eq 0");
+      expect(stepQueries[0]).not.toContain("primaryobjecttypecode eq 'akoya_request'");
       expect(write).toHaveBeenCalledWith(expect.stringContaining('reviewer-slot-readiness-receipt-'), expect.any(String), { flag: 'wx' });
       const saved = write.mock.calls[0][1];
       expect(saved).not.toContain(inputId);
@@ -212,6 +215,19 @@ describe('reviewer-slot metadata census', () => {
       expect(receipt.counts.requestUpdateTriggers).toBe(0);
       expect(receipt.counts.requestNonUpdateTriggers).toBe(1);
       expect(receipt.flowMentions).toEqual([expect.objectContaining({ name: 'Request create flow', recognizedRequestTriggers: 1 })]);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  test('reports incomplete when no activated cloud flows are visible', async () => {
+    const client = clientFor();
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const receipt = await printReviewerSlotReadiness(client);
+      expect(receipt.complete).toBe(false);
+      expect(receipt.counts.flowsRead).toBe(0);
+      expect(receipt.incompleteReasons).toContain('no activated cloud flows visible to the probe identity; flow coverage unverified');
     } finally {
       log.mockRestore();
     }

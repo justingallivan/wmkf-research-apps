@@ -19,10 +19,10 @@ related:
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
 the Test Request Factory's "basic clone" stage
 (docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md, "Operation contract
-and recovery" and the "3. Basic clone" build-stage row). The owner-run
-production clone and cast binding used the local `ledger_prod` database
-[VERIFIED via the owner-run record in
-`docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md:112-116`].
+and recovery" and the "3. Basic clone" build-stage row). The owner-run record
+reports local-ledger use for the production clone and cast binding [VERIFIED
+via `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`,
+*Order* 5].
 Whether migration 054 is applied to the shared Production/Preview Postgres
 database was not re-probed for the B4 plan revision [ASSUMED unknown]. Existing
 databases use `node scripts/apply-migrations.js`; the owner retains control of
@@ -284,8 +284,11 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   S549 owner-run record in the cast plan]. Shared Production/Preview database
   migration status remains unverified; this B4 revision performs no live read.
 - Slice B4 plans a **separate** Potential Reviewer 1 operation table in new
-  migration 055, with a new V56 fresh-install mirror after V55. It is not built or applied
-  [PLANNED via the cast plan, *Order* 6 revision 3].
+  migration 055, with a new V56 fresh-install mirror after V55. Typed columns
+  hold the slot snapshot and readback without changing the receipt grammar.
+  Migration 055 must reconcile earlier applied 054 shapes before adding its
+  composite foreign key; each target's schema remains unverified. It is not
+  built or applied [PLANNED via the cast plan, *Order* 6 revision 3].
 - `test_request_run_resources.readback`/`source_provenance` are JSONB and
   the schema cannot itself forbid a caller from stuffing prohibited content
   (document bodies, tokens) into them — that discipline lives in the
