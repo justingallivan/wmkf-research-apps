@@ -1251,13 +1251,8 @@ export async function runRecheck(client, runId, ledgerUrl) {
     if (!run) throw new Error(`No test request run found for ${runId}.`);
     if (run.destinationEnvironment !== 'production') throw new Error(`Run ${runId} is not a production run.`);
     const resources = await ledger.listRunResources(runId);
-    // The cast Liaison is the one contact the Foundation Primary Contact may
-    // become (slice B); a run journaled before the cast fails closed without it.
-    const liaison = (await ledger.listCastMembers({ environment: 'production' }))
-      .find((member) => member.role === 'liaison' && member.status === 'verified');
-    const { failures, outcome } = await recheckFoundationTransition({
-      client, organizationId: run.expectedOrganizationId, resources, liaisonContactId: liaison?.memberId ?? null,
-    });
+    // The Liaison allowance comes only from this run's own journaled baseline.
+    const { failures, outcome } = await recheckFoundationTransition({ client, organizationId: run.expectedOrganizationId, resources });
     console.log(JSON.stringify({
       mode: 'READ_ONLY_FOUNDATION_RECHECK', runId, status: run.status, ok: failures.length === 0, outcome, failures,
     }, null, 2));

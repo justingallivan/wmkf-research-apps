@@ -382,6 +382,16 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     await expect(ledger.markCastMemberVerified({ memberId: member.memberId, readback: { requestStatus: 'x' } })).rejects.toThrow(/receipt/i);
   });
 
+  it('receipt grammar: the Foundation baseline may journal a null or GUID Primary Contact and a GUID Liaison; null stays refused elsewhere', async () => {
+    const ok = async (receipt) => (await db.query('SELECT test_request_receipt_ok($1::jsonb) AS ok', [JSON.stringify(receipt)])).rows[0].ok;
+    const guid = crypto.randomUUID();
+    expect(await ok({ kind: 'foundation_transition', primaryContactId: null, liaisonContactId: guid })).toBe(true);
+    expect(await ok({ kind: 'foundation_transition', primaryContactId: guid, liaisonContactId: guid })).toBe(true);
+    expect(await ok({ primaryContactId: 'not-a-guid' })).toBe(false);
+    expect(await ok({ liaisonContactId: null })).toBe(false);
+    expect(await ok({ requestId: null })).toBe(false);
+  });
+
   it('claimLease succeeds once; a second claim with the stale version returns null', async () => {
     const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
     const plan = basePlan();

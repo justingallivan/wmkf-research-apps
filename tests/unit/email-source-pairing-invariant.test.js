@@ -74,6 +74,10 @@ const EXEMPT = new Set([
   // (`test_request_cast_members.address_sha256`, owner-supplied at run time),
   // and the production fence (`CAST_PERSON_COLUMNS`) admits no other column.
   'lib/services/test-requests/cast-runner.js',
+  // The production write fence's cast-person `expected` projection is a
+  // COMPARISON object -- the values a fenced POST must carry -- not a write
+  // payload; the body it checks is the cast runner's (exempt above).
+  'lib/services/test-requests/production-write-fence.js',
 ]);
 
 function listFiles(dir) {

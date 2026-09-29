@@ -157,6 +157,24 @@ describe('runCastBinding', () => {
     expect(client.posts).toHaveLength(0);
   });
 
+  test('a verified binding still passes once staff have promoted it (selected true)', async () => {
+    const ledger = memoryLedger({ bindings: [{ bindingId: BINDING_ID, runId: RUN_ID, memberId: PERSON_ID, status: 'verified' }] });
+    const client = fakeClient({ suggestions: [{ ...suggestionRow(BINDING_ID), wmkf_selected: true }] });
+    await expect(runCastBinding({ client, ledger, runId: RUN_ID })).resolves.toMatchObject({ alreadyVerified: true });
+  });
+
+  test.each([
+    ['deleted', null],
+    ['deactivated', { statecode: 1 }],
+    ['retargeted to another Request', { _wmkf_request_value: SOURCE_ID }],
+    ['flipped to excluded', { wmkf_applicantdisposition: 100000001 }],
+  ])('a verified binding whose suggestion was %s is refused as drifted, with no write', async (_label, drift) => {
+    const ledger = memoryLedger({ bindings: [{ bindingId: BINDING_ID, runId: RUN_ID, memberId: PERSON_ID, status: 'verified' }] });
+    const client = fakeClient({ suggestions: drift === null ? [] : [{ ...suggestionRow(BINDING_ID), ...drift }] });
+    await expect(runCastBinding({ client, ledger, runId: RUN_ID })).rejects.toMatchObject({ code: 'cast_binding_drifted' });
+    expect(client.posts).toHaveLength(0);
+  });
+
   test('dispatched binding with the row present recovers by GUID read, never re-POSTs', async () => {
     const ledger = memoryLedger({ bindings: [{ bindingId: BINDING_ID, runId: RUN_ID, memberId: PERSON_ID, status: 'dispatched' }] });
     const client = fakeClient({ suggestions: [suggestionRow(BINDING_ID)] });

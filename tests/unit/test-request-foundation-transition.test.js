@@ -201,8 +201,8 @@ describe('Foundation Primary Contact and the cast Liaison (cast-and-status plan,
   const LIAISON = '99999999-9999-4999-8999-999999999999';
   const OTHER = '12121212-1212-4121-8121-121212121212';
   const before = () => account({ _primarycontactid_value: PRIOR });
-  const journaled = () => captureFoundationBaseline(before(), CONTACTS, CAPTURED, { journalPrimaryContact: true });
-  const evaluateJournaled = (after, liaisonContactId = LIAISON) => evaluateFoundationTransition(journaled(), after, CONTACTS, { verifiedAt: VERIFIED, liaisonContactId });
+  const journaled = (liaisonContactId = LIAISON) => captureFoundationBaseline(before(), CONTACTS, CAPTURED, { journalPrimaryContact: true, liaisonContactId });
+  const evaluateJournaled = (after, liaisonContactId = LIAISON) => evaluateFoundationTransition(journaled(liaisonContactId), after, CONTACTS, { verifiedAt: VERIFIED });
 
   test('passes with the Primary Contact unchanged (the copy is allowed, not required)', () => {
     expect(evaluateJournaled(refreshed({ _primarycontactid_value: PRIOR }))).toEqual({ failures: [], outcome: 'refreshed' });
@@ -220,7 +220,7 @@ describe('Foundation Primary Contact and the cast Liaison (cast-and-status plan,
       .toEqual(['Foundation Primary Contact changed to a contact other than the run\'s cast Liaison']);
   });
 
-  test('fails a change to the Liaison when the run names no Liaison', () => {
+  test('fails a change to the Liaison when the baseline journaled no Liaison', () => {
     expect(evaluateJournaled(refreshed({ _primarycontactid_value: LIAISON }), null).failures)
       .toEqual(['Foundation Primary Contact changed to a contact other than the run\'s cast Liaison']);
   });
@@ -234,18 +234,29 @@ describe('Foundation Primary Contact and the cast Liaison (cast-and-status plan,
     const legacy = captureFoundationBaseline(before(), CONTACTS, CAPTURED);
     expect(legacy).not.toHaveProperty('primaryContactId');
     const after = refreshed({ _primarycontactid_value: LIAISON });
-    expect(evaluateFoundationTransition(legacy, after, CONTACTS, { verifiedAt: VERIFIED, liaisonContactId: LIAISON }).failures)
+    expect(evaluateFoundationTransition(legacy, after, CONTACTS, { verifiedAt: VERIFIED }).failures)
       .toEqual(['Foundation account protected columns changed during the run']);
-    expect(evaluateFoundationTransition(legacy, refreshed({ _primarycontactid_value: PRIOR }), CONTACTS, { verifiedAt: VERIFIED, liaisonContactId: LIAISON }))
+    expect(evaluateFoundationTransition(legacy, refreshed({ _primarycontactid_value: PRIOR }), CONTACTS, { verifiedAt: VERIFIED }))
       .toEqual({ failures: [], outcome: 'refreshed' });
   });
 
-  test('the journaled Primary Contact is an allowlisted ledger receipt key', () => {
-    expect(journaled().primaryContactId).toBe(PRIOR);
+  test('the journaled Primary Contact and Liaison are allowlisted ledger receipt keys', () => {
+    expect(journaled()).toMatchObject({ primaryContactId: PRIOR, liaisonContactId: LIAISON });
     expect(() => assertLedgerReceipt(journaled())).not.toThrow();
   });
 
-  test('recheckFoundationTransition threads the Liaison to the contract', async () => {
+  test('an account with no Primary Contact journals null, and a Liaison copy onto it passes', () => {
+    const empty = captureFoundationBaseline(account({ _primarycontactid_value: null }), CONTACTS, CAPTURED, { journalPrimaryContact: true, liaisonContactId: LIAISON });
+    expect(empty.primaryContactId).toBeNull();
+    expect(evaluateFoundationTransition(empty, refreshed({ _primarycontactid_value: LIAISON }), CONTACTS, { verifiedAt: VERIFIED }))
+      .toEqual({ failures: [], outcome: 'refreshed' });
+  });
+
+  test('a non-GUID Liaison is refused at capture', () => {
+    expect(() => journaled('not-a-guid')).toThrow(/Liaison is not a GUID/);
+  });
+
+  test('recheckFoundationTransition judges against the run\'s journaled Liaison only (a later cast replacement does not change the audit)', async () => {
     const client = {
       get: async (path) => {
         if (path === `/accounts(${ORG_ID})`) return { ok: true, status: 200, body: refreshed({ _primarycontactid_value: LIAISON }) };
@@ -253,10 +264,12 @@ describe('Foundation Primary Contact and the cast Liaison (cast-and-status plan,
       },
     };
     const resources = [{ step: 'fence_source', resourceKind: 'foundation_transition', plannedIdentity: journaled() }];
-    await expect(recheckFoundationTransition({ client, organizationId: ORG_ID, resources, verifiedAt: VERIFIED, liaisonContactId: LIAISON }))
+    await expect(recheckFoundationTransition({ client, organizationId: ORG_ID, resources, verifiedAt: VERIFIED }))
       .resolves.toEqual({ failures: [], outcome: 'refreshed' });
-    const without = await recheckFoundationTransition({ client, organizationId: ORG_ID, resources, verifiedAt: VERIFIED });
-    expect(without.failures).toEqual(['Foundation Primary Contact changed to a contact other than the run\'s cast Liaison']);
+    // The same account against a run that journaled another Liaison (the cast was replaced since) fails.
+    const rotated = [{ step: 'fence_source', resourceKind: 'foundation_transition', plannedIdentity: journaled(OTHER) }];
+    const other = await recheckFoundationTransition({ client, organizationId: ORG_ID, resources: rotated, verifiedAt: VERIFIED });
+    expect(other.failures).toEqual(['Foundation Primary Contact changed to a contact other than the run\'s cast Liaison']);
   });
 });
 

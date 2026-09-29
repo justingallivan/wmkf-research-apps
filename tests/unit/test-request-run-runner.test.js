@@ -599,13 +599,21 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     // The recorder runs at the end of a production fence_source (after the
     // body re-hash and absence check); called directly here because the
     // fixture metadata cannot compile a create body.
-    async function recordBaseline(account, ledgerFixture = createFakeLedger(baseRun({ leaseToken: 'lease', leaseGeneration: 1, lockedUntil: 'x' }))) {
+    async function recordBaseline(account, ledgerFixture = createFakeLedger(baseRun({ leaseToken: 'lease', leaseGeneration: 1, lockedUntil: 'x' })), liaisonContactId = null) {
       const { client, run } = fixture({ step: 'fence_source', account });
       const leased = { ...run, leaseToken: 'lease', leaseGeneration: 1 };
-      const outcome = await recordFoundationTransitionBaseline({ run: leased, ledger: ledgerFixture.ledger, client })
+      const outcome = await recordFoundationTransitionBaseline({ run: leased, ledger: ledgerFixture.ledger, client, liaisonContactId })
         .then((resources) => ({ resources }), (error) => ({ error }));
       return { ...outcome, getResources: ledgerFixture.getResources, ledgerFixture };
     }
+
+    test('the baseline journals the pre-run Primary Contact and the run\'s Liaison as ledger receipt keys', async () => {
+      const { resources, error } = await recordBaseline(() => foundation({ _primarycontactid_value: PI_ID }), undefined, LIAISON_ID);
+      expect(error).toBeUndefined();
+      const identity = resources[0].plannedIdentity;
+      expect(identity).toMatchObject({ primaryContactId: PI_ID, liaisonContactId: LIAISON_ID });
+      expect(() => assertLedgerReceipt(identity)).not.toThrow();
+    });
 
     test('a production fence_source journals the baseline before advancing to the create', async () => {
       process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
@@ -731,8 +739,8 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     // Primary Contact, which the ledger grammar cannot hold yet (the runner
     // never journals one); built directly here to prove the runner threads
     // the manifest Liaison into the contract.
-    test('verify threads the manifest Liaison into the transition contract', async () => {
-      const journaled = captureFoundationBaseline(foundation(), [], new Date(Date.now() - 60_000), { journalPrimaryContact: true });
+    test('verify judges the Primary Contact against the Liaison journaled with the baseline', async () => {
+      const journaled = captureFoundationBaseline(foundation(), [], new Date(Date.now() - 60_000), { journalPrimaryContact: true, liaisonContactId: LIAISON_ID });
       const copied = await verifyWith(foundation({ _primarycontactid_value: LIAISON_ID }), journaled);
       expect(copied.result.errorMessage).toBeUndefined();
       expect(copied.result.outcome).toBe('ready');
