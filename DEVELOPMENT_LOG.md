@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Research Liaison of record comes from the applicant institution (Session 550)
+
+**Milestone:** For Research Requests, every app reader of the Liaison (the invitation, new grantee reminders, the Awardees list, site-visit materials and contacts, and Dynamics Explorer) now uses the applicant institution's Primary Contact instead of the stale Request copy. The Dataverse export relabels the copy.
+**Sessions:** 549 (owner decision with the AkoyaGO platform owner, measurement, six Codex plan rounds), 550 (build, Codex implementation review, release).
+**Ship state:**
+- PR #361 (`61dafcb81`), live via `9f408590e`: helper `lib/services/contacts/request-liaison.js` (fail-closed found/none), a stale-Liaison 409 at invitation send, PI-only only for a confirmed none, and a compare-and-swap on the materials automatic reminder claim with a live-Postgres proof in CI.
+- The owner's production check on 997125 showed the institution Liaison as the invitation Cc.
+- Not shipped: re-addressing reminders queued before the switch (`docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, draft).
+**Why it matters:** the Liaison recipient changes on 27 active awards and 35 upcoming Requests; staff stop emailing former Liaisons.
+**Pointers:** `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` (*Build record*).
+
 ## September 2026 — Test Request Factory: synthetic cast bound to production clones (Sessions 548–549)
 
 **Milestone:** Production test Requests now carry a reused synthetic cast — PI, Liaison and Research Leader contacts under the Foundation, plus a WMKF Org Leader on the Foundation — so staff can exercise PI/Liaison email workflows on a clone without touching real people.

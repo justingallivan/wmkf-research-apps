@@ -8,7 +8,7 @@ metadata:
   last_verified: 2026-07-12 re-reviewed — contact-role triad semantics are user-attested (WMKF authority, S159) + behavioral-signature corroborated; the field meanings are not probe-provable, and the evidence files under docs/atlas/evidence/ remain the substantiation
 ---
 
-**Decision 2026-09-29 (S549, owner with the AkoyaGO platform owner):** for the Research program the Liaison *of record* is the applicant institution's Primary Contact (`account.primarycontactid`); `akoya_request.akoya_primarycontactid` is a copy that flows up only and goes stale (measured S549: 27 active Research awards' Liaison email differs). App readers switch per `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` through `lib/services/contacts/request-liaison.js` (built S550 on branch `claude/liaison-from-institution`; `main` reads the Request copy until that branch merges). The export captions the field "Request Primary Contact (copy)".
+**Decision 2026-09-29 (S549, owner with the AkoyaGO platform owner):** for the Research program the Liaison *of record* is the applicant institution's Primary Contact (`account.primarycontactid`); `akoya_request.akoya_primarycontactid` is a copy that flows up only and goes stale (measured S549: 27 active Research awards' Liaison email differs). App readers switch per `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` through `lib/services/contacts/request-liaison.js` (released S550: PR #361, live in Production via `9f408590e`; reminders queued before the switch keep their stored recipients until `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` lands). The export captions the field "Request Primary Contact (copy)".
 
 ## Recall Rule
 

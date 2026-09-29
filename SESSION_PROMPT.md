@@ -1,4 +1,93 @@
-# Session 550 Prompt: build the Research Liaison switch; review Codex's B4 revision
+# Session 551 Prompt: size the queued-reminder problem, then revise the re-address plan
+
+## Session 550 Summary — 2026-09-29 PT (Opus; Research Liaison switch built, reviewed, released; security bump)
+
+### What Was Completed
+
+1. **B4 plan revision reviewed (read-only, round 3; S550)** at `209877256` on `codex/factory-reviewer-b4`.
+   - The spot-checked file:line citations matched source. The `CREDENTIALS_RUNBOOK.md` and Atlas edits are correct fact fixes.
+   - The owner confirmed owner decisions 9–10 (switch-off stops all binds; either switch off pauses all acceptance jobs).
+   - Findings handed to Codex, which was still working:
+     - Probe section 13 marks any flow that mentions Requests INCOMPLETE, with no way for the owner to classify it, so it would block the slot PATCH forever.
+     - Preview switch values are unverified. Under decision 9, a B4 runtime push to Preview stops every reviewer bind there unless both switches are set first.
+     - The 055 "repair earlier-054" logic may be unnecessary. An owner-authorized `schema_migrations` read would settle it.
+   - Codex has since pushed `bd0c5739a`, `664d924a9` and `bde50dcd2`, and opened **PR #360**. S550 has not read these.
+2. **Research Liaison switch: built, reviewed, released.**
+   - Plan `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` r7; see its *Build record*.
+   - Helper `lib/services/contacts/request-liaison.js`, plus readers 1–7 and the docs reconcile.
+   - Tests: every guard was mutation-checked. New live-Postgres test `tests/integration/site-visit-materials-claim.pg.test.js`, added to the CI ledger job.
+   - A read-only sandbox probe verified that selected blank lookups return `null`.
+   - Codex adversarial implementation review (gpt-5.6-sol): needs-attention, one high and one medium, both fixed in `9d8947dcf`.
+   - PR #361 merged as `61dafcb81`; all 12 CI checks green.
+3. **Release:** Vercel made **no production deployment for `61dafcb81`**. The next merge, `9f408590e`, deployed to Production at 22:27Z and carries it [VERIFIED via `vercel ls --prod`; ancestry].
+   - Owner production check: on 997125 (UCLA) the Awardee tab Cc showed the institution Liaison (Jamie Lynn), not the Request copy.
+   - The candidate list came from an owner-run read-only probe (session scratch).
+4. **Security:** PR #362 (`9f408590e`), a lockfile-only bump: undici 6.29.0 and 7.30.0, ip-address 10.7.2.
+   - Cleared Dependabot alerts #88–#102 (published 2026-09-29; our code did not introduce them).
+   - `npm audit --omit=dev`: 0.
+
+### Commits
+- `main`: PR #361 merge `61dafcb81` (branch commits `14d0332c0`…`319bb3b47`); PR #362 merge `9f408590e` (`6e383975e`); `8861f9bec` (release record); this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Queued-reminder re-addressing** (`docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, draft r0, on `main`). This is the one remaining gap in rule 2 now that the switch is live. The plan lists six unresolved round-3 requirements, so revise before any Codex review.
+   - **First step (owner choice pending): size the problem.** Count queued, unsent `grantee_abstract_reminder` rows in `scheduled_email_messages` whose stored Cc differs from the current institution Liaison. This is a production Postgres plus Dataverse read, so the owner runs it; S550 proposed it but did not write the script.
+   - If the count is small: stop those rows, have staff send those reminders by hand, and split the engine hardening (no re-send after `send_requested_at`, a version-fenced PD-handoff rebuild) into its own plan, since it affects every program.
+   - Staff can edit a queued row's subject and body, or stop it, but not its recipients [VERIFIED via `pages/api/scheduled-emails/[id].js`, `lib/services/scheduled-email-store.js` `updateScheduledEmailDraft`].
+2. **B4 PR #360** (`codex/factory-reviewer-b4`, head `bde50dcd2`). Read what changed since `209877256`, including whether the S550 round-3 findings above were addressed. Review it as a non-author before any merge. It is plan plus probe only, no runtime code.
+
+### Owner Decision Needed
+
+1. **Re-address plan:** size first (recommended), or write revision 1 now.
+2. **Scheduled-email engine hardening:** when to take it up (a duplicate-send hazard after recorded send intent exists for every program).
+3. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab` in `../WMKF_Apps-codex`; migrations 056–057 need renumbering). Unchanged.
+
+### Parked
+
+1. Deeper recipes, the admin form, slice 5a, the seven late-2026 `expiresAt` fixtures, and the cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer. Unchanged.
+3. **Liaison follow-ups the owner may want** (not requested):
+   - An automatic recipients reload on a 409 `liaison_changed` (staff reload the page today).
+   - Open materials collections show "Liaison not verified" until refreshed.
+   - The seed materials templates use `{{liaisonFullName}}`, so a Research Request with no institution Liaison refuses materials email (0 upcoming per the measurement).
+
+### Verify Before Acting
+
+1. **Why Vercel skipped the production build of `61dafcb81`:** not diagnosed. Check the Vercel project's Git/production settings if it recurs.
+2. **Residue** (list and confirm before deleting any of it):
+   - Test Requests 1003301, 1003302 and 1003303.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`. S550's Postgres test used a temp schema in `ledger_ci_s548` and dropped it.
+   - Worktrees `.claude/worktrees/liaison-from-institution` (branch now merged) and `../WMKF_Apps-codex-b4` (live, Codex).
+   - Five prunable `/private/tmp/wmkf-*` worktrees and the older ones.
+3. **Two gates red only inside `.claude/worktrees/liaison-from-institution`:** `check:agent-invariants` and `check:agent-wiki` fail on the per-machine `.agents/skills` and memory symlinks the worktree lacks. The main checkout and the `:ci` variants are green.
+
+### Do Not Reopen Without New Decision
+
+1. S549–S550 owner decisions: the liaison answers 1–9; the Santa Monica College case; the split; B4 option A and owner decisions 9–10.
+2. Earlier decisions listed in the prompts below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/contacts/request-liaison.js` | Liaison of record helper (Research: institution Primary Contact) |
+| `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` | Liaison plan r7 + Build record (released) |
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` | Queued-reminder re-address plan r0 (next) |
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (B4 branch / PR #360) | B4 revision |
+
+## Testing
+
+```bash
+npx jest tests/unit/request-liaison.test.js tests/unit/grantee-send-invite-workbench-service.test.js tests/unit/site-visit-materials-reminder-sweep.test.js tests/unit/dynamics-explorer-contact-liaison.test.js
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<scratch-db> npx jest tests/integration/site-visit-materials-claim.pg.test.js
+```
+
+---
+
+## Prior Session 550 Prompt: build the Research Liaison switch; review Codex's B4 revision
 
 ## Session 549 Summary — 2026-09-29 PT (Opus; first cast-bound clone, PR #357 merged, two plans through Codex review)
 
