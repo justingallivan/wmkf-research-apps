@@ -1,6 +1,6 @@
 # Research Liaison read from the applicant institution
 
-Status: **DRAFT, revision 4 (2026-09-29, Session 549). Codex plan reviews: round 1 needs-attention (five high, two medium); round 2 needs-attention (four high, two medium); round 3 on revision 3 needs-attention (five high, one medium), five of the six on re-addressing queued reminders. Revision 4 splits the work (owner, S549): this plan covers the readers and new reminders; re-addressing queued reminders moves to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`. One more review before the build. Nothing built.** Branch `claude/liaison-from-institution`.
+Status: **DRAFT, revision 5 (2026-09-29, Session 549; revision 4's round-4 review: needs-attention, one high and three medium, all answered below). Codex plan reviews: round 1 needs-attention (five high, two medium); round 2 needs-attention (four high, two medium); round 3 on revision 3 needs-attention (five high, one medium), five of the six on re-addressing queued reminders. Revision 4 splits the work (owner, S549): this plan covers the readers and new reminders; re-addressing queued reminders moves to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`. One more review before the build. Nothing built.** Branch `claude/liaison-from-institution`.
 
 ## Decision (owner with the AkoyaGO platform owner, 2026-09-29)
 
@@ -88,7 +88,7 @@ So the switch changes the actual Liaison recipient on 27 active awards and 35 up
     - Any difference, including a Liaison that appeared or disappeared → 409 `liaison_changed` ("The Liaison changed; reload before sending"), nothing sent.
     - A resolution failure → 503, nothing sent.
     - A match → the Cc is sent as submitted. Staff edits, including removing the Liaison or adding an assistant, stay deliberate (owner answer 6).
-  - The Awardee tab shows a recipients load failure with Retry and disables Send until recipients load.
+  - The Awardee tab shows a recipients load failure with Retry and disables Send until recipients load. Today the loader guards only a successful response, by request id [VERIFIED via `shared/components/workbench/AwardeeTab.js:266-275`]. The new version keeps a load sequence number: every success, failure and loading-state write checks that its sequence is still the latest and the request is unchanged, and switching Requests resets the state (round 4 finding 3).
 
 ### 2. Grantee reminders (new rows only)
 
@@ -99,7 +99,7 @@ So the switch changes the actual Liaison recipient on 27 active awards and 35 up
     3. It delivers due messages through `deliverScheduledEmail`.
   - A row is created with `ccRecipients: [liaison email]` and `recipientContactIds: [pi, liaison]`, and `approval_required` is computed once from the PD's review-all override and VIP flags [VERIFIED via `:268-330`]. A missing Liaison email skips the row (`:277-280`).
 - Change at creation: the Liaison comes from the helper. `none` → the row is created To the PI with no Cc. A failure → the row is skipped as retryable, never created PI-only.
-- **Queued rows are not changed here.** A row already created keeps its stored recipients, and `scheduled-email-service.js`, the store and the digest are untouched by this plan. Re-addressing queued rows, and the engine hardening Codex rounds 2 and 3 showed it needs, is `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`. A reminder queued before a Liaison change therefore still goes to the Liaison it was queued with until that plan lands (owner answer 9).
+- **Queued rows are not re-addressed by this plan, with one existing exception.** `scheduled-email-service.js`, the store and the digest are untouched, and a queued row keeps its stored recipients, except on the existing **PD handoff**. When `createOrGetScheduledEmail` returns a row owned by another PD, the cron already passes its freshly resolved draft to `reassignScheduledEmail`, which rewrites the recipients [VERIFIED via `grantee-deliverable-reminders-service.js:332-351`; `scheduled-email-store.js:344-357`]. That branch keeps working as today, now with the helper's Liaison (or none), which is what rule 2 asks for. Its missing generation and version protections are a pre-existing hazard of every handoff, owned by the engine plan (round 4 finding 1; decision recorded here, not a new engine change). Re-addressing queued rows, and the engine hardening Codex rounds 2 and 3 showed it needs, is `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`. A reminder queued before a Liaison change therefore still goes to the Liaison it was queued with until that plan lands (owner answer 9).
 - The `none` → PI-only change applies only to rows this cron newly creates. For them, the Cc is empty from creation, and no existing row changes shape.
 
 ### 3. Awardees panel — `awardees-service.js`
@@ -116,7 +116,7 @@ So the switch changes the actual Liaison recipient on 27 active awards and 35 up
   - Contacts are persisted as a snapshot (migration 042), refreshed on manual invite and remind by compare-and-swap [VERIFIED via `lib/services/site-visit-materials/collection-store.js:81-112`].
 - Change:
   - Both reads use the helper, so recipients and names always agree.
-  - `none` → the email goes to the PI only. The recipients 409 becomes PI-required.
+  - `none` → the email goes to the PI only. **Only a helper `none` allows that** (round 4 finding 2). A `found` Liaison whose contact has no email still refuses with the existing 409 (`:257-265`), now naming the Liaison's missing email. The collection's saved `contacts` snapshot records which case applies (`liaison: null` with `liaisonStatus: 'none'`), so the invitation and both reminder paths make the same distinction. The saved-recipients card shows "No institution Liaison" for `none`, not a missing email.
   - A template using `{{liaisonFullName}}` still refuses without a Liaison, with a message naming the missing Institution Primary Contact.
   - A failure → 503.
 
@@ -147,7 +147,11 @@ So the switch changes the actual Liaison recipient on 27 active awards and 35 up
     3. **Existing query:** unchanged apart from the label, now also selecting `akoya_requestid`.
     4. **Merge:** by lowercased `akoya_requestid`, with the roles of a Request in both results unioned (for example "PI, Liaison (institution)").
     5. **Order and cap:** sort by `akoya_submitdate` desc, then cap at 100.
-    6. **Counts:** `totalCount` is the merged count before the cap. `hasMore` is true if any query hit its cap, the account list was truncated, or the merge exceeded 100.
+    6. **Counts (round 4 finding 4):**
+       - When every source is complete (no query at its cap, account list not truncated), `totalCount` is the exact merged count.
+       - Otherwise `totalCount` is `null`, the result carries `returnedCount` and `hasMore: true`, and the tool text says the list is partial.
+       - Both Request queries order by `akoya_submitdate desc` before capping, so the returned subset is the newest.
+       - The prompt's truncation rule (`shared/config/prompts/dynamics-explorer.js:582`, per round 4) is updated so a null total is reported as "at least N".
   - A failed account or Request read fails the tool call, as the existing query's failure does.
   - The prompt names the institution's Primary Contact as the Liaison of record. Prompt edits run `check:prompt-injection-tagging` and its self-test.
 
@@ -183,9 +187,12 @@ Per reader:
 - **Reminder cron:**
   - The account returns a Liaison id but the contact read throws → row skipped, not created PI-only.
   - `none` → PI-only row (new rows only).
-  - An existing row with a stored Cc is left unchanged by the cron (no rebuild, no re-address) — the documented gap until the engine plan lands.
+  - An existing row with a stored Cc and the same PD is left unchanged by the cron — the documented gap until the engine plan lands.
+  - An existing unsent row owned by a former PD is rebuilt by the existing handoff with the helper's Liaison: institution contact, or no Cc for `none`.
 - **Awardees:** a batch missing an account → request fails. A divergent Request copy never shown for Research.
-- **Collection:** recipients and `{{liaisonFullName}}` from one source with divergent fixtures. `none` → PI-only send. A `{{liaisonFullName}}` template with `none` → refused.
+- **Collection:** recipients and `{{liaisonFullName}}` from one source with divergent fixtures. `none` → PI-only send. **`found` with a blank email → 409, not PI-only.** A `{{liaisonFullName}}` template with `none` → refused.
+- **Invitation load ordering:** switch Requests while a load is in flight (the slower old response lands last) → ignored; overlapping retries → only the latest result applies.
+- **Reminder handoff:** an unsent row owned by a former PD, with the Request copy differing from the institution → rebuilt To the PI, Cc the institution Liaison; `none` → no Cc.
 - **Sweep:**
   - A concurrent manual contacts update between prepare and claim → claim lost, nothing sent.
   - Refreshed contacts persisted with the claim.
@@ -193,7 +200,7 @@ Per reader:
 - **Applicant contacts:** SoCal keeps its account fallback. Research never uses the Request copy.
 - **Export and Explorer:**
   - Divergent Request and account fixtures. The Explorer Liaison relationship returns the current institution contact's Research Requests and labels the former Request-copy match as the copy. The export shows the relabelled caption.
-  - Explorer merge: a Request found by both queries appears once with both roles; more than 25 accounts, or a capped query, sets `hasMore`; `totalCount` counts the merged set; a SoCal Request of an account the contact leads is not labelled Liaison (institution).
+  - Explorer merge: a Request found by both queries appears once with both roles; more than 25 accounts, or a capped query, gives `hasMore: true` and `totalCount: null` with `returnedCount`; complete sources give the exact merged `totalCount`; a SoCal Request of an account the contact leads is not labelled Liaison (institution).
 
 Every failure test asserts the transport or email-activity mock was not called, and every success test asserts the exact To and Cc sent. Each guard is mutation-checked, so the test fails when the guard is removed.
 
@@ -204,7 +211,7 @@ Every failure test asserts the transport or email-activity mock was not called, 
 | Research Liaison = institution Primary Contact; Request copy never used for Research | helper; every reader |
 | `none` only from a successful read; account, batch-cardinality and contact read failures fail closed | helper; readers 1–5 |
 | Invitation and materials reminders go only to the Liaison current at send; new grantee reminders are created with the current Liaison | readers 1, 2, 5 |
-| Queued grantee reminders unchanged (known gap; engine plan) | reader 2 |
+| Queued grantee reminders unchanged except the existing PD-handoff rebuild (known gap; engine plan) | reader 2 |
 | Non-Research and blank-program Requests unchanged | helper `request_copy` path |
 | No new routes, tables or migrations; `scheduled-email-service.js`, its store and the digest untouched | `check:api-routes`, `check:atlas`, `check:migrations-manifest` |
 
@@ -232,6 +239,12 @@ Rounds 1–2 responses naming the Phase 1 stop, Phase 2, the recipient generatio
 Round 3 (on revision 3):
 1–5. (high) Phase 1 stops stranded by Phase 2; the source-cancel path not fenced; no crash-safe digest receipt; PD handoff outside the recipient generation; `send_unconfirmed` not a durable state → **moved with the design to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`**; this plan no longer touches queued reminders or the email engine (owner answer 9).
 6. (medium) Explorer merge contract incomplete → specified in reader 7 (bounded account discovery, merge by Request id with role union, one sort and cap, conservative `totalCount`/`hasMore`) and tested.
+
+Round 4 (on revision 4; PI-only new rows confirmed compatible with the existing engine):
+1. (high) PD handoff re-addresses queued rows despite the scope claim → claim corrected; the existing handoff keeps re-resolving recipients, now with the helper, as rule 2 wants; its generation hazard is pre-existing and in the engine plan (reader 2).
+2. (medium) Site visits collapsed `none` with a Liaison lacking email → PI-only only for `none`; `found` without email stays a 409; the snapshot records the case (reader 4).
+3. (medium) Awardee Retry had no stale-load guard → load sequence on every write (reader 1).
+4. (medium) Explorer `totalCount` unprovable when capped → `null` plus `returnedCount` when any source is incomplete; queries ordered before capping (reader 7).
 
 ## Docs to reconcile in the build
 
