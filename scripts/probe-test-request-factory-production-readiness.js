@@ -53,6 +53,9 @@
  *      join without create-time automation.
  *      With <dir>, a dated create-only JSON receipt (names, labels, counts,
  *      booleans; no ids, no raw definitions) is written there.
+ *  13. With --reviewer-slots[=<dir>]: read-only metadata for Potential Reviewer
+ *      1–5 auditing and Request-update automation. With <dir>, write a dated
+ *      receipt containing names, labels, counts and booleans (no ids or definitions).
  *
  * SAFETY: GET requests only, through the interlocked raw client. Production
  * reads are owner-run behind the interlock override; nothing is written.
@@ -68,7 +71,8 @@
  *   emails, and audited field names on the Request and the Foundation account.
  *   Add --foundation-since=<ISO UTC> for section 10 (run it with the time just
  *   before a production run's fence_source).
- *   Add --status-fields[=<dir>] for section 11; --cast[=<dir>] for section 12.
+ *   Add --status-fields[=<dir>] for section 11; --cast[=<dir>] for section 12;
+ *   --reviewer-slots[=<dir>] for section 13.
  *   Add --meeting-date[=N] (default 50, max 200) to report whether the meeting
  *   date is written by an update after create on the N most recent Requests
  *   that carry one, by whom, and every audited meeting-date update on a
@@ -506,6 +510,121 @@ function customWorkflowActivities(xaml) {
 
 const stepLabel = (st) => `[stage ${st.stage}, ${st.mode === 0 ? 'sync' : 'async'}] ${st.name || '(unnamed)'}  type=${st.plugintypeid?.typename || '?'}`;
 
+const REVIEWER_SLOTS = ['1', '2', '3', '4', '5'].map((n) => `wmkf_potentialreviewer${n}`);
+
+function slotMentions(value) {
+  return REVIEWER_SLOTS.filter((slot) => String(value || '').toLowerCase().includes(slot));
+}
+
+/** null means no Request Update trigger; otherwise classify the exact filter list. */
+function classifySlotUpdateFlow(parameters) {
+  if (parameters?.['subscriptionRequest/entityname'] !== 'akoya_request') return null;
+  const message = Number(parameters?.['subscriptionRequest/message']);
+  if (![3, 4, 6, 7].includes(message)) return null;
+  const filter = String(parameters?.['subscriptionRequest/filteringattributes'] || '');
+  const fields = filter.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const slots = fields.filter((field) => REVIEWER_SLOTS.includes(field));
+  return { message: FLOW_MESSAGE[message], firesOn: !fields.length ? 'ANY column' : slots.length ? `a slot (${slots.join(',')})` : `other columns only (${filter})` };
+}
+
+/** null means the step cannot fire on a reviewer-slot update. */
+function classifySlotUpdateStep(step) {
+  if (step?.sdkmessageid?.name !== 'Update') return null;
+  const fields = String(step.filteringattributes || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  if (!fields.length) return 'ANY column';
+  const slots = fields.filter((field) => REVIEWER_SLOTS.includes(field));
+  return slots.length ? `a slot (${slots.join(',')})` : null;
+}
+
+function stepIsHidden(step) {
+  return step?.ishidden === true || step?.ishidden?.Value === true;
+}
+
+/** Section 13: metadata only; every unreadable definition makes the receipt incomplete. */
+async function printReviewerSlotReadiness(client, exportDir) {
+  console.log('\n13. Potential Reviewer slot update readiness (metadata only)');
+  const receipt = { generatedAt: new Date().toISOString(), complete: false, incompleteReasons: [], auditing: {}, workflows: [], steps: [], flows: [], counts: {} };
+  const entity = await client.get("/EntityDefinitions(LogicalName='akoya_request')?$select=IsAuditEnabled");
+  if (!entity.ok || typeof entity.body?.IsAuditEnabled?.Value !== 'boolean') receipt.incompleteReasons.push('Request entity auditing unreadable');
+  receipt.auditing.entity = entity.body?.IsAuditEnabled?.Value ?? null;
+  console.log(`   Request auditing: ${receipt.auditing.entity === null ? 'unreadable' : receipt.auditing.entity}`);
+  for (const slot of REVIEWER_SLOTS) {
+    const response = await client.get(`/EntityDefinitions(LogicalName='akoya_request')/Attributes(LogicalName='${slot}')?$select=LogicalName,IsAuditEnabled`);
+    const audited = response.ok ? response.body?.IsAuditEnabled?.Value : null;
+    if (typeof audited !== 'boolean') receipt.incompleteReasons.push(`${slot} auditing unreadable`);
+    receipt.auditing[slot] = typeof audited === 'boolean' ? audited : null;
+    console.log(`   ${slot}: audited=${receipt.auditing[slot] === null ? 'unreadable' : receipt.auditing[slot]}`);
+  }
+
+  const workflows = await getAll(client, "/workflows?$select=name,category,mode,triggeronupdateattributelist,xaml&$filter=primaryentity eq 'akoya_request' and type eq 1 and statecode eq 1");
+  const classic = workflows.filter((row) => row.category === 0 && row.triggeronupdateattributelist);
+  const triggered = classic.filter((row) => String(row.triggeronupdateattributelist).split(',').some((field) => REVIEWER_SLOTS.includes(field.trim().toLowerCase())));
+  console.log(`   activated Request workflows/rules: ${workflows.length}; update-triggered workflows: ${classic.length}; slot-triggered: ${triggered.length}`);
+  for (const row of workflows) {
+    if (!row.xaml) { receipt.incompleteReasons.push(`workflow definition unreadable: ${row.name || '(unnamed)'}`); continue; }
+    const mentions = slotMentions(row.xaml);
+    if (triggered.includes(row) || mentions.length) {
+      const item = { name: row.name || '(unnamed)', kind: row.category === 2 ? 'business rule' : 'workflow', triggered: triggered.includes(row), mentions };
+      receipt.workflows.push(item);
+      console.log(`   - ${item.kind} ${item.name}: ${item.triggered ? 'slot-triggered' : 'mentions'} ${mentions.join(',')}`);
+    }
+  }
+  receipt.counts.slotTriggeredWorkflows = triggered.length;
+
+  const steps = await getAll(client, '/sdkmessageprocessingsteps?$select=name,stage,mode,filteringattributes,ishidden' +
+    '&$expand=sdkmessageid($select=name),plugintypeid($select=typename)' +
+    "&$filter=sdkmessagefilterid/primaryobjecttypecode eq 'akoya_request' and statecode eq 0");
+  const updates = steps.filter((row) => row.sdkmessageid?.name === 'Update');
+  console.log(`   enabled Request Update steps: ${updates.length}`);
+  for (const row of updates) {
+    const firesOn = classifySlotUpdateStep(row);
+    if (!firesOn) continue;
+    receipt.steps.push({ name: row.name || '(unnamed)', type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn });
+    console.log(`   - ${firesOn}: ${stepLabel(row)}`);
+  }
+  const unfiltered = await getAll(client, '/sdkmessageprocessingsteps?$select=name,stage,mode,ishidden' +
+    '&$expand=sdkmessageid($select=name),plugintypeid($select=typename)' +
+    '&$filter=_sdkmessagefilterid_value eq null and statecode eq 0');
+  const globalUpdates = unfiltered.filter((row) => row.sdkmessageid?.name === 'Update');
+  receipt.counts.globalUpdateSteps = globalUpdates.length;
+  receipt.counts.hiddenGlobalUpdateSteps = globalUpdates.filter(stepIsHidden).length;
+  console.log(`   enabled Update steps with no entity filter: ${globalUpdates.length} (hidden: ${receipt.counts.hiddenGlobalUpdateSteps})`);
+  for (const row of globalUpdates.filter((item) => !stepIsHidden(item))) {
+    receipt.steps.push({ name: row.name || '(unnamed)', type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: false, firesOn: 'ANY entity/column' });
+    console.log(`   - ANY entity/column: ${stepLabel(row)}`);
+  }
+
+  const flows = await getAll(client, '/workflows?$select=name,clientdata&$filter=category eq 5 and statecode eq 1');
+  let unreadable = 0;
+  let requestUpdate = 0;
+  for (const flow of flows) {
+    const classified = classifyFlowDefinition(flow.clientdata);
+    if (!classified.readable) { unreadable += 1; continue; }
+    for (const [triggerName, trigger] of Object.entries(classified.definition.triggers || {})) {
+      const match = classifySlotUpdateFlow(trigger?.inputs?.parameters);
+      if (!match) continue;
+      requestUpdate += 1;
+      receipt.flows.push({ name: flow.name || '(unnamed)', trigger: triggerName, ...match });
+      console.log(`   - cloud flow ${flow.name || '(unnamed)'} / ${triggerName}: ${match.message}, fires on ${match.firesOn}`);
+    }
+  }
+  receipt.counts.flowsRead = flows.length;
+  receipt.counts.requestUpdateTriggers = requestUpdate;
+  receipt.counts.unreadableFlows = unreadable;
+  if (unreadable) receipt.incompleteReasons.push(`${unreadable} cloud-flow definitions unreadable`);
+  console.log(`   flows read: ${flows.length}; Request update triggers: ${requestUpdate}; unreadable definitions: ${unreadable}`);
+  receipt.complete = receipt.incompleteReasons.length === 0;
+  console.log(`   section 13: ${receipt.complete ? 'COMPLETE' : `INCOMPLETE (${receipt.incompleteReasons.join('; ')})`}`);
+  if (exportDir) {
+    const fs = require('fs');
+    fs.mkdirSync(exportDir, { recursive: true });
+    const file = require('path').join(exportDir, `reviewer-slot-readiness-receipt-${receipt.generatedAt.replace(/[:.]/g, '-')}.json`);
+    fs.writeFileSync(file, `${JSON.stringify(receipt, null, 2)}\n`, { flag: 'wx' });
+    console.log(`   receipt: ${file}`);
+  }
+  return receipt;
+}
+
 /**
  * Section 12: synthetic-cast readiness. Metadata, names and one count only.
  * Returns the receipt: names, labels, counts and booleans (no ids, no raw
@@ -738,6 +857,8 @@ async function main() {
   const statusExportDir = statusArg && statusArg.includes('=') ? statusArg.slice('--status-fields='.length) : null;
   const castArg = process.argv.find((arg) => arg === '--cast' || arg.startsWith('--cast='));
   const castExportDir = castArg && castArg.includes('=') ? castArg.slice('--cast='.length) : null;
+  const slotArg = process.argv.find((arg) => arg === '--reviewer-slots' || arg.startsWith('--reviewer-slots='));
+  const slotExportDir = slotArg && slotArg.includes('=') ? slotArg.slice('--reviewer-slots='.length) : null;
   const sinceArg = process.argv.find((arg) => arg.startsWith('--foundation-since='));
   const foundationSince = sinceArg ? new Date(sinceArg.slice('--foundation-since='.length)) : null;
   if (foundationSince && Number.isNaN(foundationSince.getTime())) throw new Error('--foundation-since must be an ISO timestamp.');
@@ -817,6 +938,10 @@ async function main() {
     const castReceipt = await printCastReadiness(client, castExportDir);
     if (!castReceipt.complete) process.exitCode = 1;
   }
+  if (slotArg) {
+    const slotReceipt = await printReviewerSlotReadiness(client, slotExportDir);
+    if (!slotReceipt.complete) process.exitCode = 1;
+  }
   if (historyLimit) await printCreationHistory(client, historyLimit);
   if (meetingLimit) await printMeetingDateWrites(client, meetingLimit, appUsers.length === 1 ? appUsers[0].systemuserid : null);
   if (!detail && !exportDir) return;
@@ -854,4 +979,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { classifyFlowDefinition, flowNamesEntity, unfilteredCreateSteps, isPlatformStep, customWorkflowActivities, printCastReadiness };
+module.exports = { classifyFlowDefinition, flowNamesEntity, unfilteredCreateSteps, isPlatformStep, customWorkflowActivities, printCastReadiness, classifySlotUpdateFlow, classifySlotUpdateStep, printReviewerSlotReadiness };

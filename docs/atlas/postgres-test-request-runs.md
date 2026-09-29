@@ -3,10 +3,10 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable operation ledger for admin-driven test request clone runs; unapplied to any live database."
+summary: "Durable operation ledger for owner-run test request clones; local ledger use recorded, shared database status unverified."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-09-25
+last_verified: 2026-09-29
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
@@ -15,16 +15,18 @@ related:
 
 # Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` / `test_request_status_changes` / `test_request_cast_members` / `test_request_cast_bindings` (Postgres)
 
-**[VERIFIED via source, 2026-09-23]** Migration 054 and its fresh-install
+**[VERIFIED via source, 2026-09-29]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
 the Test Request Factory's "basic clone" stage
 (docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md, "Operation contract
-and recovery" and the "3. Basic clone" build-stage row). **Neither table
-exists in any live database yet.** Migration 054 is listed in
-`lib/db/migrations-manifest.json` but has not been run against the shared
-Production/Preview Postgres database; applying it requires explicit owner
-authorization and `node scripts/apply-migrations.js`, which this slice does
-not perform.
+and recovery" and the "3. Basic clone" build-stage row). The owner-run
+production clone and cast binding used the local `ledger_prod` database
+[VERIFIED via the owner-run record in
+`docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md:112-116`].
+Whether migration 054 is applied to the shared Production/Preview Postgres
+database was not re-probed for the B4 plan revision [ASSUMED unknown]. Existing
+databases use `node scripts/apply-migrations.js`; the owner retains control of
+any shared-database application.
 
 ## Contract
 
@@ -124,7 +126,7 @@ not perform.
 ## `test_request_run_reviewer_assignments` (slice 6c-i, D-R2 owner decision, 2026-09-25)
 
 **[VERIFIED via lib/db/migrations/054_test_request_runs.sql and lib/services/test-requests/run-ledger.js, 2026-09-25]**
-A third table, added in place to the same unapplied migration 054 (and its
+A third table, added in place to migration 054 (and its
 `scripts/setup-database.js` V55 mirror): one row per reviewer assignment
 reserved for a `reviews` recipe run (`run_id`, `sequence`,
 `source_person_id`, `destination_person_id`, `reused`, `address`,
@@ -267,7 +269,7 @@ A fourth table, added in place to migration 054 (and its `scripts/setup-database
 
 ## `test_request_cast_members` / `test_request_cast_bindings` (synthetic cast, 2026-09-28)
 
-**[VERIFIED via lib/db/migrations/054_test_request_runs.sql and lib/services/test-requests/run-ledger.js, 2026-09-28; branch `claude/factory-cast`, not merged]**
+**[VERIFIED via lib/db/migrations/054_test_request_runs.sql, lib/services/test-requests/run-ledger.js, and merge commit `75d58e331`, 2026-09-29]**
 Two tables added in place to migration 054 (and the V55 mirror) for the cast plan's slices A + B (`docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`).
 
 - **`test_request_cast_members`:** the reused synthetic PI and Liaison contacts and suggested-reviewer person, one per `(environment, role)`. `member_id` is the preallocated Dataverse GUID (`contactid` or `wmkf_potentialreviewersid`), journaled before the create POST names it; `role` (`pi`, `liaison`, `suggested_reviewer`, `org_leader`, `research_leader`) fixes `entity` (`wmkf_potentialreviewers` for the suggested reviewer, `contact` otherwise, a CHECK); `first_name`/`last_name` (the Factory's synthetic defaults), `address_sha256` (digest only, never the address), `status` (`planned` → `dispatched` → `verified`, or `needs_attention`), `readback` (receipt), `error` (sanitized), timestamps.
@@ -277,8 +279,13 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
 
 ## Limits
 
-- Migration 054 is unapplied; nothing in this repository writes to these
-  tables yet outside tests.
+- The owner-run CLI writes to the local ledger for production test Requests
+  [VERIFIED via `scripts/rehearse-test-request-sandbox.mjs:1214-1299` and the
+  S549 owner-run record in the cast plan]. Shared Production/Preview database
+  migration status remains unverified; this B4 revision performs no live read.
+- Slice B4 plans a **separate** Potential Reviewer 1 operation table in new
+  migration 055, with a V55 fresh-install mirror. It is not built or applied
+  [PLANNED via the cast plan, *Order* 6 revision 3].
 - `test_request_run_resources.readback`/`source_provenance` are JSONB and
   the schema cannot itself forbid a caller from stuffing prohibited content
   (document bodies, tokens) into them — that discipline lives in the

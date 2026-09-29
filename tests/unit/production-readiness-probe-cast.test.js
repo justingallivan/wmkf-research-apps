@@ -10,6 +10,9 @@ const {
   unfilteredCreateSteps,
   isPlatformStep,
   customWorkflowActivities,
+  classifySlotUpdateFlow,
+  classifySlotUpdateStep,
+  printReviewerSlotReadiness,
 } = require('../../scripts/probe-test-request-factory-production-readiness.js');
 
 const flow = (definition) => JSON.stringify({ properties: { definition } });
@@ -89,5 +92,60 @@ describe('customWorkflowActivities', () => {
     ].join('');
     expect(customWorkflowActivities(xaml)).toEqual(['AkoyaGo.Workflows.UpdateMailingListMember']);
     expect(customWorkflowActivities('')).toEqual([]);
+  });
+});
+
+describe('reviewer-slot update classifiers', () => {
+  test('a Request update flow with a slot in its filter is included', () => {
+    const parameters = {
+      'subscriptionRequest/entityname': 'akoya_request',
+      'subscriptionRequest/message': 3,
+      'subscriptionRequest/filteringattributes': 'akoya_title,wmkf_potentialreviewer1',
+    };
+    expect(classifySlotUpdateFlow(parameters)).toEqual({
+      message: 'update', firesOn: 'a slot (wmkf_potentialreviewer1)',
+    });
+    expect(classifySlotUpdateFlow({ ...parameters, 'subscriptionRequest/filteringattributes': '' }).firesOn).toBe('ANY column');
+    expect(classifySlotUpdateFlow({ ...parameters, 'subscriptionRequest/filteringattributes': 'akoya_title' }).firesOn).toBe('other columns only (akoya_title)');
+    expect(classifySlotUpdateFlow({ ...parameters, 'subscriptionRequest/entityname': 'contact' })).toBeNull();
+    expect(classifySlotUpdateFlow({ ...parameters, 'subscriptionRequest/message': 1 })).toBeNull();
+  });
+
+  test('an enabled Update step with the slot present is classified, including unfiltered steps', () => {
+    const step = { sdkmessageid: { name: 'Update' }, filteringattributes: 'akoya_title,wmkf_potentialreviewer5' };
+    expect(classifySlotUpdateStep(step)).toBe('a slot (wmkf_potentialreviewer5)');
+    expect(classifySlotUpdateStep({ ...step, filteringattributes: '' })).toBe('ANY column');
+    expect(classifySlotUpdateStep({ ...step, filteringattributes: 'akoya_title' })).toBeNull();
+    expect(classifySlotUpdateStep({ ...step, sdkmessageid: { name: 'Create' } })).toBeNull();
+  });
+});
+
+describe('reviewer-slot metadata census', () => {
+  test('keeps a slot-triggered flow and an any-column step, and marks an unreadable flow incomplete', async () => {
+    const client = { get: jest.fn(async (path) => {
+      if (path.includes('/Attributes(LogicalName=')) return { ok: true, body: { IsAuditEnabled: { Value: false } } };
+      if (path.startsWith('/EntityDefinitions')) return { ok: true, body: { IsAuditEnabled: { Value: true } } };
+      if (path.startsWith('/workflows?$select=name,category')) return { ok: true, body: { value: [] } };
+      if (path.startsWith('/sdkmessageprocessingsteps?') && path.includes('primaryobjecttypecode')) {
+        return { ok: true, body: { value: [{ name: 'Any-column step', stage: 40, mode: 1, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, filteringattributes: '' }] } };
+      }
+      if (path.startsWith('/sdkmessageprocessingsteps?')) return { ok: true, body: { value: [] } };
+      if (path.startsWith('/workflows?$select=name,clientdata')) return { ok: true, body: { value: [
+        { name: 'Slot flow', clientdata: flow({ triggers: { trigger: { inputs: { parameters: { 'subscriptionRequest/entityname': 'akoya_request', 'subscriptionRequest/message': 3, 'subscriptionRequest/filteringattributes': 'wmkf_potentialreviewer1' } } } } }) },
+        { name: 'Unreadable flow', clientdata: null },
+      ] } };
+      throw new Error(`unexpected metadata path: ${path}`);
+    }) };
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const receipt = await printReviewerSlotReadiness(client);
+      expect(receipt.complete).toBe(false);
+      expect(receipt.auditing.wmkf_potentialreviewer1).toBe(false);
+      expect(receipt.steps).toEqual([expect.objectContaining({ name: 'Any-column step', hidden: false, firesOn: 'ANY column' })]);
+      expect(receipt.flows).toEqual([expect.objectContaining({ name: 'Slot flow', firesOn: 'a slot (wmkf_potentialreviewer1)' })]);
+      expect(receipt.incompleteReasons).toContain('1 cloud-flow definitions unreadable');
+    } finally {
+      log.mockRestore();
+    }
   });
 });
