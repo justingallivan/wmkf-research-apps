@@ -16,7 +16,7 @@ So no queued reminder carries a Liaison from before the switch. Every row the cr
 
 ## Current engine facts
 
-All line numbers are as of `b9f05ae5d`.
+All line numbers are as of `ed04b6c17`.
 
 - The daily cron runs three passes in order: process deliverables (create or PD-handoff rebuild), send digests, deliver due messages [VERIFIED via `lib/services/cron/grantee-deliverable-reminders-service.js:173-209`].
 - **Duplicate send after send intent (every program).** An error from the SendEmail call once `send_requested_at` is set is classified `uncertain` [VERIFIED via `shared/utils/email-send-outcome.js:51-58`], and an `uncertain` outcome skips `recordFailure` [VERIFIED via `lib/services/scheduled-email-service.js:384-392`]. The row stays `sending` until its lease expires. The due query includes `sending` rows with an expired lease [VERIFIED via `lib/services/scheduled-email-store.js:81-92`]. On the next claim, an activity that is not yet accepted gets `recordSendRequested` (a COALESCE no-op) and **another `sendEmail`** [VERIFIED via `scheduled-email-service.js:363-377`]. Only the test-Request path refuses to resend [VERIFIED via `scheduled-email-service.js:243-275`].
