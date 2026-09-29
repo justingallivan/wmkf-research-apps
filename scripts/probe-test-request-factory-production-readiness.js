@@ -57,7 +57,8 @@
  *      1–5 auditing and Request-update automation (enabled Update and
  *      UpdateMultiple, Upsert and UpsertMultiple steps, Request-filtered and
  *      all-entity). Unreadable or unrecognized definitions are hard blocks;
- *      action-only mentions and zero visible flows need owner disposition.
+ *      manual API-connection triggers, action-only mentions and zero visible
+ *      flows need distinct owner dispositions.
  *      With <dir>, write a dated receipt containing the target, names, labels,
  *      counts and booleans (no record ids or raw definitions).
  *
@@ -639,6 +640,7 @@ async function printReviewerSlotReadiness(client, exportDir) {
   let unreadable = 0;
   let requestUpdate = 0;
   let requestNonUpdate = 0;
+  let manualApiConnectionTriggers = 0;
   for (const flow of flows) {
     const rawMention = mentionsRequestOrSlot(flow.clientdata);
     const classified = classifyFlowDefinition(flow.clientdata);
@@ -649,6 +651,7 @@ async function printReviewerSlotReadiness(client, exportDir) {
     }
     let recognizedRequestTriggers = 0;
     let unclassifiedRequestTriggers = 0;
+    let manualTriggersInFlow = 0;
     for (const [triggerName, trigger] of Object.entries(classified.definition.triggers || {})) {
       const parameters = trigger?.inputs?.parameters;
       if (parameters?.['subscriptionRequest/entityname'] === 'akoya_request') {
@@ -668,15 +671,20 @@ async function printReviewerSlotReadiness(client, exportDir) {
           receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'unrecognized Request message' });
           receipt.incompleteReasons.push(`Request flow trigger message unrecognized: ${flow.name || '(unnamed)'} / ${triggerName}`);
         }
-      } else if (mentionsRequestOrSlot(trigger) && !isManualApiConnectionTrigger(triggerName, trigger)) {
+      } else if (rawMention && isManualApiConnectionTrigger(triggerName, trigger)) {
+        manualApiConnectionTriggers += 1;
+        manualTriggersInFlow += 1;
+        receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'manual API-connection trigger without Dataverse subscription' });
+        receipt.dispositionRequired.push(`manual API-connection trigger in Request/slot-mentioning flow requires owner classification: ${flow.name || '(unnamed)'} / ${triggerName}`);
+      } else if (mentionsRequestOrSlot(trigger)) {
         unclassifiedRequestTriggers += 1;
         receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'unclassified Request trigger shape' });
         receipt.incompleteReasons.push(`Request flow trigger shape unclassified: ${flow.name || '(unnamed)'} / ${triggerName}`);
       }
     }
     if (rawMention) {
-      receipt.flowMentions.push({ name: flow.name || '(unnamed)', readable: true, recognizedRequestTriggers, unclassifiedRequestTriggers });
-      if (!recognizedRequestTriggers && !unclassifiedRequestTriggers) {
+      receipt.flowMentions.push({ name: flow.name || '(unnamed)', readable: true, recognizedRequestTriggers, unclassifiedRequestTriggers, manualApiConnectionTriggers: manualTriggersInFlow });
+      if (!recognizedRequestTriggers && !unclassifiedRequestTriggers && !manualTriggersInFlow) {
         receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: '(none)', reason: 'mention without classified Request trigger' });
         receipt.dispositionRequired.push(`flow mentions Request or slot without a classified Request trigger: ${flow.name || '(unnamed)'}`);
       }
@@ -686,12 +694,13 @@ async function printReviewerSlotReadiness(client, exportDir) {
   receipt.counts.flowsMentioningRequestOrSlot = receipt.flowMentions.length;
   receipt.counts.requestUpdateTriggers = requestUpdate;
   receipt.counts.requestNonUpdateTriggers = requestNonUpdate;
+  receipt.counts.manualApiConnectionTriggers = manualApiConnectionTriggers;
   receipt.counts.unclassifiedFlowTriggers = receipt.unclassifiedFlowTriggers.length;
   receipt.counts.unreadableFlows = unreadable;
   if (flows.length === 0) receipt.dispositionRequired.push('no activated cloud flows visible to the probe identity; confirm zero against an admin inventory');
   if (unreadable) receipt.incompleteReasons.push(`${unreadable} cloud-flow definitions unreadable`);
-  console.log(`   flows read: ${flows.length}; Request/slot mention superset: ${receipt.flowMentions.length}; Request update triggers: ${requestUpdate}; unclassified: ${receipt.unclassifiedFlowTriggers.length}; unreadable definitions: ${unreadable}`);
-  for (const item of receipt.unclassifiedFlowTriggers) console.log(`   - UNCLASSIFIED ${item.name} / ${item.trigger}: ${item.reason}`);
+  console.log(`   flows read: ${flows.length}; Request/slot mention superset: ${receipt.flowMentions.length}; Request update triggers: ${requestUpdate}; manual API-connection triggers for disposition: ${manualApiConnectionTriggers}; trigger/mention review entries: ${receipt.unclassifiedFlowTriggers.length}; unreadable definitions: ${unreadable}`);
+  for (const item of receipt.unclassifiedFlowTriggers) console.log(`   - REVIEW ${item.name} / ${item.trigger}: ${item.reason}`);
   // Completeness covers the visible definitions only. The release gate separately
   // requires effective organization-wide Process read or an admin inventory.
   receipt.complete = receipt.incompleteReasons.length === 0 && receipt.dispositionRequired.length === 0;

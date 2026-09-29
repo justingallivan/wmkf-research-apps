@@ -249,7 +249,9 @@ describe('reviewer-slot metadata census', () => {
       const receipt = await printReviewerSlotReadiness(client);
       expect(receipt.complete).toBe(false);
       expect(receipt.incompleteReasons).toEqual([]);
-      expect(receipt.dispositionRequired).toEqual(['flow mentions Request or slot without a classified Request trigger: Manual Request action']);
+      expect(receipt.dispositionRequired).toEqual(['manual API-connection trigger in Request/slot-mentioning flow requires owner classification: Manual Request action / manual']);
+      expect(receipt.unclassifiedFlowTriggers).toEqual([{ name: 'Manual Request action', trigger: 'manual', reason: 'manual API-connection trigger without Dataverse subscription' }]);
+      expect(receipt.counts.manualApiConnectionTriggers).toBe(1);
       expect(receipt.counts.requestUpdateTriggers).toBe(0);
     } finally {
       log.mockRestore();
@@ -275,6 +277,9 @@ describe('reviewer-slot metadata census', () => {
     ['alternate trigger', flow({ triggers: { trigger: { inputs: { parameters: { entityName: 'akoya_request' } } } } })],
     ['manual lookalike with extra parameter', flow({ triggers: { manual: { type: 'Request', kind: 'ApiConnection', inputs: { parameters: { dataset: 'org', table: 'akoya_requests', 'subscriptionRequest/message': 3 } } } } })],
     ['manual lookalike with HTTP kind', flow({ triggers: { manual: { type: 'Request', kind: 'Http', inputs: { parameters: { dataset: 'org', table: 'akoya_requests' } } } } })],
+    ['manual lookalike with wrong type', flow({ triggers: { manual: { type: 'ApiConnection', kind: 'ApiConnection', inputs: { parameters: { dataset: 'org', table: 'akoya_requests' } } } } })],
+    ['manual lookalike with wrong trigger name', flow({ triggers: { onChange: { type: 'Request', kind: 'ApiConnection', inputs: { parameters: { dataset: 'org', table: 'akoya_requests' } } } } })],
+    ['manual lookalike without table', flow({ triggers: { manual: { type: 'Request', kind: 'ApiConnection', inputs: { parameters: { dataset: 'org', other: 'akoya_requests' } } } } })],
     ['action-only mention', flow({ triggers: { trigger: { type: 'Recurrence' } }, actions: { update: { inputs: { parameters: { entityName: 'akoya_requests' } } } } })],
   ])('fails closed on a %s flow without another incomplete reason', async (_label, clientdata) => {
     const client = clientFor({ flows: [{ name: 'Unclassified flow', clientdata }] });
