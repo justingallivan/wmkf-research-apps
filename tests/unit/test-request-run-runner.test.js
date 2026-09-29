@@ -28,22 +28,24 @@ const ORG_ID = '66666666-6666-4666-8666-666666666666';
 // Slice B: the production cast PI and Liaison contacts.
 const PI_ID = '88888888-8888-4888-8888-888888888888';
 const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
+const RESEARCH_LEADER_ID = '15151515-1515-4151-8151-151515151515';
 const OTHER_CONTACT = '12121212-1212-4121-8121-121212121212';
-const CAST_NAMES = { pi: 'PI', liaison: 'Liaison' };
+const CAST_NAMES = { pi: 'PI', liaison: 'Liaison', research_leader: 'RESEARCH LEADER' };
+const CAST_FIRST = { pi: 'TEST · Factory', liaison: 'TEST · Factory', research_leader: 'WMKF' };
 const castAddress = (role) => `cast-${role}@example.test`;
 const castMember = (role, memberId, overrides = {}) => ({
   memberId, environment: 'production', role, entity: 'contact', status: 'verified',
-  firstName: 'TEST · Factory', lastName: CAST_NAMES[role], addressSha256: reviewerAddressSha256(castAddress(role)).addressSha256, ...overrides,
+  firstName: CAST_FIRST[role], lastName: CAST_NAMES[role], addressSha256: reviewerAddressSha256(castAddress(role)).addressSha256, ...overrides,
 });
 /** The live cast contact row as readCast reads it; `drift` overrides fields. */
 const castContactRow = (contactId, statecode, drift = {}) => {
-  const role = contactId === LIAISON_ID ? 'liaison' : 'pi';
+  const role = contactId === LIAISON_ID ? 'liaison' : contactId === RESEARCH_LEADER_ID ? 'research_leader' : 'pi';
   return {
-    contactid: contactId, firstname: 'TEST · Factory', lastname: CAST_NAMES[role], emailaddress1: castAddress(role),
+    contactid: contactId, firstname: CAST_FIRST[role], lastname: CAST_NAMES[role], emailaddress1: castAddress(role),
     statecode, _parentcustomerid_value: ORG_ID, ...drift,
   };
 };
-const VERIFIED_CAST = [castMember('liaison', LIAISON_ID), castMember('pi', PI_ID)];
+const VERIFIED_CAST = [castMember('liaison', LIAISON_ID), castMember('pi', PI_ID), castMember('research_leader', RESEARCH_LEADER_ID)];
 
 function ok(body, status = 200) {
   return { ok: true, status, body };
@@ -389,6 +391,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
           if (requestPath.includes("'wmkf_programdirector'")) return ok({ value: [{ ReferencedEntity: 'systemuser', ReferencingEntityNavigationPropertyName: 'wmkf_ProgramDirector' }] });
           if (requestPath.includes("'wmkf_grantprogram'")) return ok({ value: [{ ReferencedEntity: 'wmkf_grantprogram', ReferencingEntityNavigationPropertyName: 'wmkf_GrantProgram' }] });
           if (requestPath.includes("'wmkf_projectleader'")) return ok({ value: [{ ReferencedEntity: 'contact', ReferencingEntityNavigationPropertyName: 'wmkf_ProjectLeader' }] });
+          if (requestPath.includes("'wmkf_researchleader'")) return ok({ value: [{ ReferencedEntity: 'contact', ReferencingEntityNavigationPropertyName: 'wmkf_ResearchLeader' }] });
           if (requestPath.includes("'akoya_primarycontactid'")) return ok({ value: [{ ReferencedEntity: 'contact', ReferencingEntityNavigationPropertyName: 'akoya_primarycontactid' }] });
           return ok({ value: [{ ReferencedEntity: 'account' }] });
         }
@@ -409,7 +412,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         if (requestPath.startsWith('/sharepointdocumentlocations')) return ok({ value: [{ sharepointdocumentlocationid: 'parent-1', _parentsiteorlocation_value: 'site-x' }] });
         if (requestPath.startsWith('/systemusers')) return ok({ value: [{ systemuserid: APP_USER_ID, fullname: '# WMK: Research Review App Suite', accessmode: 4, isdisabled: false }] });
         const castContact = /^\/contacts\(([0-9a-f-]{36})\)/.exec(requestPath);
-        if (castContact && [PI_ID, LIAISON_ID, OTHER_CONTACT].includes(castContact[1])) return ok(castContactRow(castContact[1], castContactState, castDrift));
+        if (castContact && [PI_ID, LIAISON_ID, RESEARCH_LEADER_ID, OTHER_CONTACT].includes(castContact[1])) return ok(castContactRow(castContact[1], castContactState, castDrift));
         if (requestPath.startsWith('/contacts?')) return ok({ value: [] });
         throw new Error(`unexpected path: ${requestPath}`);
       },
@@ -437,7 +440,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         dataverseHost: bundle.source.dataverseHost, exportedAt: bundle.exportedAt, requestNumber: '1003222',
       },
       copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
-      values: { ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, piContactId: PI_ID, liaisonContactId: LIAISON_ID },
+      values: { ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID },
     });
     process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
     const postWithOptions = jest.fn();
@@ -467,7 +470,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
 
   test('with the source unchanged, the same setup reaches the transport (the two refusals above are not vacuous)', async () => {
     const { postWithOptions } = await runProductionCreate({
-      body: { ...legitBody, 'wmkf_ProjectLeader@odata.bind': `/contacts(${PI_ID})`, 'akoya_primarycontactid@odata.bind': `/contacts(${LIAISON_ID})` },
+      body: { ...legitBody, 'wmkf_ProjectLeader@odata.bind': `/contacts(${PI_ID})`, 'akoya_primarycontactid@odata.bind': `/contacts(${LIAISON_ID})`, 'wmkf_ResearchLeader@odata.bind': `/contacts(${RESEARCH_LEADER_ID})` },
     });
     expect(postWithOptions).toHaveBeenCalledTimes(1);
   });
@@ -477,6 +480,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       ...legitBody,
       'wmkf_ProjectLeader@odata.bind': `/contacts(${PI_ID})`,
       'akoya_primarycontactid@odata.bind': `/contacts(${LIAISON_ID})`,
+      'wmkf_ResearchLeader@odata.bind': `/contacts(${RESEARCH_LEADER_ID})`,
     };
 
     test('the fence admits the create binding exactly the manifest cast contacts', async () => {
@@ -488,11 +492,21 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
 
     test('the fence refuses the PI and Liaison swapped (castBinds reach the fence per lookup)', async () => {
       const { result, postWithOptions } = await runProductionCreate({
-        body: { ...legitBody, 'wmkf_ProjectLeader@odata.bind': `/contacts(${LIAISON_ID})`, 'akoya_primarycontactid@odata.bind': `/contacts(${PI_ID})` },
+        body: { ...legitBody, 'wmkf_ProjectLeader@odata.bind': `/contacts(${LIAISON_ID})`, 'akoya_primarycontactid@odata.bind': `/contacts(${PI_ID})`, 'wmkf_ResearchLeader@odata.bind': `/contacts(${RESEARCH_LEADER_ID})` },
       });
       expect(result.outcome).toBe('needs_attention');
       expect(result.errorMessage).toMatch(/Production write fence: Request bind .* is not approved/);
       expect(postWithOptions).not.toHaveBeenCalled();
+    });
+
+    test('the fence refuses the Research Leader bound to the PI, and a create missing the Research Leader bind', async () => {
+      const swapped = await runProductionCreate({ body: { ...castBody, 'wmkf_ResearchLeader@odata.bind': `/contacts(${PI_ID})` } });
+      expect(swapped.result.errorMessage).toMatch(/Production write fence: Request bind wmkf_ResearchLeader@odata.bind is not approved/);
+      expect(swapped.postWithOptions).not.toHaveBeenCalled();
+      const { 'wmkf_ResearchLeader@odata.bind': _rl, ...withoutRl } = castBody;
+      const missing = await runProductionCreate({ body: withoutRl });
+      expect(missing.result.errorMessage).toMatch(/wmkf_researchleader to the cast contact exactly once/);
+      expect(missing.postWithOptions).not.toHaveBeenCalled();
     });
 
     test('the fence refuses a contact bind outside the manifest cast (castBinds reach the fence)', async () => {
@@ -504,7 +518,8 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
 
     test.each([
       ['the ledger Liaison is not verified', { castMembers: [castMember('pi', PI_ID), castMember('liaison', LIAISON_ID, { status: 'dispatched' })] }, /cast is not bindable \(cast_member_unverified\)/],
-      ['the ledger PI is a different contact', { castMembers: [castMember('pi', OTHER_CONTACT), castMember('liaison', LIAISON_ID)] }, /cast pi is not the journaled, verified/],
+      ['the ledger PI is a different contact', { castMembers: [castMember('pi', OTHER_CONTACT), castMember('liaison', LIAISON_ID), castMember('research_leader', RESEARCH_LEADER_ID)] }, /cast pi is not the journaled, verified/],
+      ['the ledger has no Research Leader', { castMembers: [castMember('pi', PI_ID), castMember('liaison', LIAISON_ID)] }, /cast_member_missing.*research_leader/],
       ['the ledger has no production cast', { castMembers: [] }, /cast is not bindable \(cast_member_missing\)/],
       ['a cast contact is inactive', { castContactState: 1 }, /cast is not bindable \(cast_member_drifted\).*statecode/],
       ['a cast contact\'s email changed after reservation', { castDrift: { emailaddress1: 'someone-else@example.test' } }, /cast_member_drifted.*emailaddress1/],
@@ -538,7 +553,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       akoya_requestid: 'Uniqueidentifier', akoya_applicantid: 'Lookup', akoya_purpose: 'Memo', akoya_request: 'Money',
       akoya_requesttype: 'Picklist', wmkf_meetingdate: 'DateOnly', wmkf_istestrequest: 'Boolean',
       wmkf_respondreminderenabled: 'Boolean', wmkf_reviewduereminderenabled: 'Boolean',
-      wmkf_programdirector: 'Lookup', wmkf_grantprogram: 'Lookup', wmkf_projectleader: 'Lookup', akoya_primarycontactid: 'Lookup',
+      wmkf_programdirector: 'Lookup', wmkf_grantprogram: 'Lookup', wmkf_projectleader: 'Lookup', akoya_primarycontactid: 'Lookup', wmkf_researchleader: 'Lookup',
     };
 
     function fixture({ step, account, requestRow = null }) {
@@ -581,7 +596,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
         values: {
           ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, testLabel: 'TEST fixture', fiscalYear: 'December 2026',
-          piContactId: PI_ID, liaisonContactId: LIAISON_ID,
+          piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID,
         },
         invariants: { expectedSharePointFiles: 0 },
       });
@@ -691,7 +706,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         _createdby_value: APP_USER_ID, _ownerid_value: APP_USER_ID, wmkf_istestrequest: true, wmkf_testcreationrunid: RUN_ID,
         wmkf_respondreminderenabled: false, wmkf_reviewduereminderenabled: false, akoya_submissionaccepted: false,
         _wmkf_programdirector_value: PD_ID, _wmkf_grantprogram_value: PROGRAM_ID,
-        _wmkf_projectleader_value: PI_ID, _akoya_primarycontactid_value: LIAISON_ID, ...requestOverrides,
+        _wmkf_projectleader_value: PI_ID, _akoya_primarycontactid_value: LIAISON_ID, _wmkf_researchleader_value: RESEARCH_LEADER_ID, ...requestOverrides,
       };
       const withRequest = fixture({ step: 'verify', account: () => accountAfter, requestRow });
       withRequest.manifest.createBody = body;
@@ -726,6 +741,12 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       expect(result.outcome).toBe('needs_attention');
       expect(result.errorMessage).toMatch(/Foundation account protected columns changed during the run/);
       expect(result.errorMessage).not.toMatch(/555-0199/);
+    });
+
+    test('verify fails when the Research Leader reads back different from the manifest', async () => {
+      const { result } = await verifyWith(foundation(), baselineFor(foundation()), { _wmkf_researchleader_value: PI_ID });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.errorMessage).toMatch(/cast Research Leader mismatch/);
     });
 
     test('verify fails when a cast lookup reads back different from the manifest (slice B)', async () => {

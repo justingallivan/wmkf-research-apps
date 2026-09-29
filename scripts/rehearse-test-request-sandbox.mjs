@@ -221,6 +221,8 @@ export function parseArgs(argv) {
     castPi: null,
     castLiaison: null,
     castReviewer: null,
+    castOrgLeader: null,
+    castResearchLeader: null,
     confirm: false,
     bindReviewer: null,
   };
@@ -257,6 +259,8 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--cast-pi=')) parsed.castPi = arg.slice('--cast-pi='.length);
     else if (arg.startsWith('--cast-liaison=')) parsed.castLiaison = arg.slice('--cast-liaison='.length);
     else if (arg.startsWith('--cast-reviewer=')) parsed.castReviewer = arg.slice('--cast-reviewer='.length);
+    else if (arg.startsWith('--cast-org-leader=')) parsed.castOrgLeader = arg.slice('--cast-org-leader='.length);
+    else if (arg.startsWith('--cast-research-leader=')) parsed.castResearchLeader = arg.slice('--cast-research-leader='.length);
     else if (arg === '--confirm') parsed.confirm = true;
     else if (arg.startsWith('--bind-reviewer=')) parsed.bindReviewer = arg.slice('--bind-reviewer='.length);
     else if (arg === '--help' || arg === '-h') parsed.help = true;
@@ -269,11 +273,11 @@ export function parseArgs(argv) {
   if ((parsed.createCast || parsed.bindReviewer) && parsed.target !== 'production') {
     throw new Error('--create-cast and --bind-reviewer are valid only with --target=production.');
   }
-  if (parsed.createCast && !(parsed.castPi && parsed.castLiaison && parsed.castReviewer)) {
-    throw new Error('--create-cast requires --cast-pi=, --cast-liaison= and --cast-reviewer= (allowlisted addresses).');
+  if (parsed.createCast && !(parsed.castPi && parsed.castLiaison && parsed.castReviewer && parsed.castOrgLeader && parsed.castResearchLeader)) {
+    throw new Error('--create-cast requires --cast-pi=, --cast-liaison=, --cast-reviewer=, --cast-org-leader= and --cast-research-leader= (allowlisted addresses).');
   }
-  if (!parsed.createCast && (parsed.castPi || parsed.castLiaison || parsed.castReviewer || parsed.confirm)) {
-    throw new Error('--cast-pi, --cast-liaison, --cast-reviewer and --confirm are valid only with --create-cast.');
+  if (!parsed.createCast && (parsed.castPi || parsed.castLiaison || parsed.castReviewer || parsed.castOrgLeader || parsed.castResearchLeader || parsed.confirm)) {
+    throw new Error('--cast-* addresses and --confirm are valid only with --create-cast.');
   }
   // Production plan P1 / MVP list item 1: the destination is an explicit
   // operator choice, never inferred from the environment.
@@ -419,7 +423,7 @@ function printHelp() {
   console.log('Set Phase I or II Status on a ready production test Request (owner-run; writes need DATAVERSE_PROD_WRITE_ACK): ... --target=production --set-status=<runId> --field=phase1|phase2 --option="<live option label>" [--rerun]');
   console.log('Recheck a status change for late effects (read-only): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --status-recheck=<runId>');
   console.log('Recheck a production run\'s Foundation account against its pre-create baseline (read-only; plan P5\'s later check): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --run-recheck=<runId>');
-  console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> [--confirm]');
+  console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> --cast-org-leader=<address> --cast-research-leader=<address> [--confirm]');
   console.log('Bind the cast suggested reviewer to a ready production test Request (owner-run; needs DATAVERSE_ALLOW_PROD_READS=yes and DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer=<runId>');
   console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
   console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL, which must not be the shared Production/Preview database.');
@@ -918,7 +922,7 @@ export async function runReserve(client, args, ledgerUrl) {
     const castDb = pgLedgerDb(ledgerUrl);
     try {
       const members = await readCast({ client, ledger: createRunLedger(castDb), environment: 'production', parentAccountId: preflight.foundation.accountid });
-      cast = { piContactId: members.pi.memberId, liaisonContactId: members.liaison.memberId };
+      cast = { piContactId: members.pi.memberId, liaisonContactId: members.liaison.memberId, researchLeaderContactId: members.research_leader.memberId };
     } finally {
       await castDb.end();
     }
@@ -1219,7 +1223,10 @@ export async function runCastMode(client, args, ledgerUrl) {
       console.log(JSON.stringify({ mode: 'CAST_REVIEWER_BOUND', runId: args.bindReviewer, ...result }, null, 2));
       return;
     }
-    const addresses = { pi: args.castPi, liaison: args.castLiaison, suggested_reviewer: args.castReviewer };
+    const addresses = {
+      pi: args.castPi, liaison: args.castLiaison, suggested_reviewer: args.castReviewer,
+      org_leader: args.castOrgLeader, research_leader: args.castResearchLeader,
+    };
     const allowlist = await readTargetAllowlist(client);
     planCastAddresses({ addresses, allowlist });
     if (!args.confirm) {

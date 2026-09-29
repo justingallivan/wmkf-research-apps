@@ -1246,7 +1246,7 @@ LANGUAGE sql IMMUTABLE AS $receipt$
            AND s.v !~ '(://|[[:cntrl:]])'
            AND s.v !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
            AND CASE
-             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId', 'promptId', 'confirmedRunId', 'primaryContactId', 'liaisonContactId', 'piContactId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId', 'promptId', 'confirmedRunId', 'primaryContactId', 'liaisonContactId', 'piContactId', 'researchLeaderContactId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
              WHEN e.key IN ('itemId', 'folderItemId', 'graphItemId', 'sourceGraphItemId') THEN s.v ~ '^01[A-Z2-7]{32}$'
              WHEN e.key IN ('driveId', 'sourceDriveId') THEN s.v ~ '^b![A-Za-z0-9_-]{16,120}$'
@@ -1495,7 +1495,7 @@ $receipt$`,
   `CREATE TABLE IF NOT EXISTS test_request_cast_members (
   member_id      UUID PRIMARY KEY,
   environment    TEXT NOT NULL CHECK (environment IN ('sandbox', 'production')),
-  role           TEXT NOT NULL CHECK (role IN ('pi', 'liaison', 'suggested_reviewer')),
+  role           TEXT NOT NULL CHECK (role IN ('pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader')),
   entity         TEXT NOT NULL CHECK (entity IN ('contact', 'wmkf_potentialreviewers')),
   first_name     TEXT NOT NULL CHECK (length(first_name) BETWEEN 1 AND 50 AND first_name !~ '[[:cntrl:]]'),
   last_name      TEXT NOT NULL CHECK (length(last_name) BETWEEN 1 AND 50 AND last_name !~ '[[:cntrl:]]'),

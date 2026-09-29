@@ -25,7 +25,10 @@ jest.mock('../../lib/services/test-requests/production-write-fence.js', () => {
 });
 
 const SANDBOX_URL = 'https://orgd9e66399.crm.dynamics.com/api/data/v9.2';
-const ADDRESSES = { pi: 'Owner+PI@Example.org', liaison: 'owner+liaison@example.org', suggested_reviewer: 'owner+reviewer@example.org' };
+const ADDRESSES = {
+  pi: 'Owner+PI@Example.org', liaison: 'owner+liaison@example.org', suggested_reviewer: 'owner+reviewer@example.org',
+  org_leader: 'owner+orgleader@example.org', research_leader: 'owner+researchleader@example.org',
+};
 const ALLOWLIST = new Set(['owner@example.org']);
 const ENV = 'sandbox';
 const FOUNDATION = 'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0';
@@ -42,7 +45,7 @@ function memoryLedger(initial = []) {
     Object.assign(row, { status: to }, extra);
     return { ...row };
   };
-  const entityOf = { pi: 'contact', liaison: 'contact', suggested_reviewer: 'wmkf_potentialreviewers' };
+  const entityOf = { pi: 'contact', liaison: 'contact', suggested_reviewer: 'wmkf_potentialreviewers', org_leader: 'contact', research_leader: 'contact' };
   return {
     rows,
     calls,
@@ -142,7 +145,7 @@ describe('planCastAddresses', () => {
   test('normalizes, digests, and accepts plus-tags of a listed address', () => {
     const out = planCastAddresses({ addresses: ADDRESSES, allowlist: ALLOWLIST });
     expect(out.pi).toEqual({ address: 'owner+pi@example.org', addressSha256: digest('owner+pi@example.org') });
-    expect(Object.keys(out)).toEqual(['pi', 'liaison', 'suggested_reviewer']);
+    expect(Object.keys(out)).toEqual(['pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader']);
   });
 
   test.each([
@@ -161,13 +164,13 @@ describe('planCastAddresses', () => {
 });
 
 describe('runCastCreate', () => {
-  test('happy path: three creates with exact closed bodies, each fenced, verified by GUID readback', async () => {
+  test('happy path: five creates with exact closed bodies, each fenced, verified by GUID readback', async () => {
     const client = fakeClient();
     const ledger = memoryLedger();
     const result = await run(client, ledger);
 
-    expect(client.posts.map((p) => p.path)).toEqual(['/contacts', '/contacts', '/wmkf_potentialreviewerses']);
-    const [pi, liaison, reviewer] = ledger.rows;
+    expect(client.posts.map((p) => p.path)).toEqual(['/contacts', '/contacts', '/wmkf_potentialreviewerses', '/contacts', '/contacts']);
+    const [pi, liaison, reviewer, orgLeader, researchLeader] = ledger.rows;
     expect(client.posts[0].body).toEqual({
       contactid: pi.memberId, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'owner+pi@example.org', [PARENT_BIND]: `/accounts(${FOUNDATION})`,
     });
@@ -178,20 +181,31 @@ describe('runCastCreate', () => {
       wmkf_potentialreviewersid: reviewer.memberId, wmkf_firstname: 'TEST · Factory', wmkf_lastname: 'Reviewer',
       wmkf_emailaddress: 'owner+reviewer@example.org', wmkf_issyntheticreviewer: true,
     });
+    expect(client.posts[3].body).toEqual({
+      contactid: orgLeader.memberId, firstname: 'WMKF', lastname: 'ORG LEADER', emailaddress1: 'owner+orgleader@example.org', [PARENT_BIND]: `/accounts(${FOUNDATION})`,
+    });
+    expect(client.posts[4].body).toEqual({
+      contactid: researchLeader.memberId, firstname: 'WMKF', lastname: 'RESEARCH LEADER', emailaddress1: 'owner+researchleader@example.org', [PARENT_BIND]: `/accounts(${FOUNDATION})`,
+    });
     expect(ledger.rows.map((r) => [r.role, r.status, r.addressSha256])).toEqual([
       ['pi', 'verified', digest('owner+pi@example.org')],
       ['liaison', 'verified', digest('owner+liaison@example.org')],
       ['suggested_reviewer', 'verified', digest('owner+reviewer@example.org')],
+      ['org_leader', 'verified', digest('owner+orgleader@example.org')],
+      ['research_leader', 'verified', digest('owner+researchleader@example.org')],
     ]);
     expect(ledger.rows[0].readback).toEqual(expect.objectContaining({ exists: true, matched: true, recovered: false }));
     expect(result.members.map((m) => [m.role, m.status, m.outcome])).toEqual([
       ['pi', 'verified', 'created'], ['liaison', 'verified', 'created'], ['suggested_reviewer', 'verified', 'created'],
+      ['org_leader', 'verified', 'created'], ['research_leader', 'verified', 'created'],
     ]);
     expect(JSON.stringify(result)).not.toMatch(/example\.org/);
     expect(fenceModule.fenceCastCreateClient.mock.calls.map(([, f]) => f)).toEqual([
       { parentAccountId: FOUNDATION, members: [{ memberId: pi.memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI', address: 'owner+pi@example.org' }] },
       { parentAccountId: FOUNDATION, members: [{ memberId: liaison.memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'Liaison', address: 'owner+liaison@example.org' }] },
       { parentAccountId: FOUNDATION, members: [{ memberId: reviewer.memberId, entity: 'wmkf_potentialreviewers', firstName: 'TEST · Factory', lastName: 'Reviewer', address: 'owner+reviewer@example.org' }] },
+      { parentAccountId: FOUNDATION, members: [{ memberId: orgLeader.memberId, entity: 'contact', firstName: 'WMKF', lastName: 'ORG LEADER', address: 'owner+orgleader@example.org' }] },
+      { parentAccountId: FOUNDATION, members: [{ memberId: researchLeader.memberId, entity: 'contact', firstName: 'WMKF', lastName: 'RESEARCH LEADER', address: 'owner+researchleader@example.org' }] },
     ]);
   });
 
@@ -201,9 +215,9 @@ describe('runCastCreate', () => {
     await run(client, ledger);
     ledger.planCastMember.mockClear();
     const result = await run(client, ledger);
-    expect(client.posts).toHaveLength(3);
+    expect(client.posts).toHaveLength(5);
     expect(ledger.planCastMember).not.toHaveBeenCalled();
-    expect(result.members.map((m) => m.outcome)).toEqual(['reused', 'reused', 'reused']);
+    expect(result.members.map((m) => m.outcome)).toEqual(['reused', 'reused', 'reused', 'reused', 'reused']);
   });
 
   test('rerun refuses a verified member that drifted, and one supplied with a different address', async () => {
@@ -214,7 +228,7 @@ describe('runCastCreate', () => {
       .rejects.toMatchObject({ code: 'cast_address_changed', role: 'pi' });
     client.store.find((r) => r.lastname === 'Liaison').statecode = 1;
     await expect(run(client, ledger)).rejects.toMatchObject({ code: 'cast_member_drifted', role: 'liaison' });
-    expect(client.posts).toHaveLength(3);
+    expect(client.posts).toHaveLength(5);
   });
 
   test('collision by address (any case, any state) refuses before any plan or POST', async () => {
@@ -244,7 +258,7 @@ describe('runCastCreate', () => {
     const client = fakeClient({ onPost: ({ path, row, store }) => { store.push(row); if (path === '/contacts' && row.lastname === 'PI') throw new Error('socket hang up'); return { ok: true, status: 204 }; } });
     const ledger = memoryLedger();
     const result = await run(client, ledger);
-    expect(client.posts).toHaveLength(3);
+    expect(client.posts).toHaveLength(5);
     expect(result.members[0]).toMatchObject({ role: 'pi', status: 'verified', outcome: 'recovered' });
     expect(ledger.rows[0].readback).toMatchObject({ recovered: true, matched: true });
   });
@@ -280,7 +294,7 @@ describe('runCastCreate', () => {
     expect(ledger.rows[0].status).toBe('dispatched');
     const result = await run(client, ledger);
     expect(result.members[0]).toMatchObject({ role: 'pi', outcome: 'recovered' });
-    expect(client.posts).toHaveLength(3);
+    expect(client.posts).toHaveLength(5);
   });
 
   test('dispatched on entry with the row present: recovered without POSTing it', async () => {
@@ -288,7 +302,7 @@ describe('runCastCreate', () => {
     const ledger = memoryLedger([{ memberId, environment: ENV, role: 'pi', entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI', addressSha256: digest('owner+pi@example.org'), status: 'dispatched' }]);
     const client = fakeClient({ rows: [{ entity: 'contact', contactid: memberId, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'owner+pi@example.org', statecode: 0, _parentcustomerid_value: FOUNDATION }] });
     const result = await run(client, ledger);
-    expect(client.posts.map((p) => p.path)).toEqual(['/contacts', '/wmkf_potentialreviewerses']);
+    expect(client.posts.map((p) => p.path)).toEqual(['/contacts', '/wmkf_potentialreviewerses', '/contacts', '/contacts']);
     expect(client.posts.some((p) => p.body.contactid === memberId)).toBe(false);
     expect(result.members[0]).toMatchObject({ memberId, outcome: 'recovered', status: 'verified' });
   });
@@ -342,10 +356,19 @@ describe('runCastCreate', () => {
     await expect(run(client, ledger, { allowlist: new Set(['other@example.org']) })).rejects.toMatchObject({ code: 'cast_address_not_allowlisted' });
     await expect(run(client, ledger, { addresses: { ...ADDRESSES, suggested_reviewer: ADDRESSES.pi } })).rejects.toMatchObject({ code: 'cast_address_duplicate' });
     await expect(run({ ...client, baseUrl: 'https://wmkf.crm.dynamics.com/api/data/v9.2' }, ledger)).rejects.toMatchObject({ code: 'cast_environment_mismatch' });
-    await expect(run(client, ledger, { names: { ...CAST_DEFAULT_NAMES, pi: { firstName: 'Factory', lastName: 'PI' } } })).rejects.toMatchObject({ code: 'cast_name_invalid' });
+    await expect(run(client, ledger, { names: { ...CAST_DEFAULT_NAMES, suggested_reviewer: { firstName: 'Factory', lastName: 'Reviewer' } } }))
+      .rejects.toMatchObject({ code: 'cast_name_invalid', role: 'suggested_reviewer' });
     expect(client.posts).toHaveLength(0);
     expect(ledger.planCastMember).not.toHaveBeenCalled();
   });
+});
+
+test('a contact role without the synthetic prefix is accepted (owner-chosen names)', async () => {
+  const client = fakeClient();
+  const ledger = memoryLedger();
+  const result = await run(client, ledger, { names: { ...CAST_DEFAULT_NAMES, pi: { firstName: 'Factory', lastName: 'PI' } } });
+  expect(result.members.map((m) => m.status)).toEqual(Array(5).fill('verified'));
+  expect(client.posts[0].body).toMatchObject({ firstname: 'Factory', lastname: 'PI' });
 });
 
 describe('buildCastBody', () => {
@@ -408,7 +431,7 @@ describe('readCast', () => {
     const ledger = memoryLedger();
     await run(client, ledger);
     const cast = await readCast({ client, ledger, environment: ENV, parentAccountId: FOUNDATION });
-    expect(Object.keys(cast)).toEqual(['pi', 'liaison', 'suggested_reviewer']);
+    expect(Object.keys(cast)).toEqual(['pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader']);
     expect(cast.pi).toEqual({ memberId: ledger.rows[0].memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI' });
     expect(JSON.stringify(cast)).not.toMatch(/example\.org/);
   });

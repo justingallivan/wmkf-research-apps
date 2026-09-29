@@ -14,12 +14,16 @@ import { parseArgs, runCastMode } from '../../scripts/rehearse-test-request-sand
 
 const RUN = '11111111-1111-4111-8111-111111111111';
 const argv = (...args) => ['node', 'rehearse-test-request-sandbox.mjs', ...args];
-const castArgs = ['--create-cast', '--cast-pi=pi@example.test', '--cast-liaison=liaison@example.test', '--cast-reviewer=reviewer@example.test'];
+const castArgs = [
+  '--create-cast', '--cast-pi=pi@example.test', '--cast-liaison=liaison@example.test', '--cast-reviewer=reviewer@example.test',
+  '--cast-org-leader=orgleader@example.test', '--cast-research-leader=researchleader@example.test',
+];
 
 describe('cast mode parsing', () => {
-  test('accepts --create-cast with three addresses on production, and --bind-reviewer with a run ID', () => {
+  test('accepts --create-cast with five addresses on production, and --bind-reviewer with a run ID', () => {
     expect(parseArgs(argv('--target=production', ...castArgs, '--confirm'))).toMatchObject({
-      createCast: true, castPi: 'pi@example.test', castLiaison: 'liaison@example.test', castReviewer: 'reviewer@example.test', confirm: true,
+      createCast: true, castPi: 'pi@example.test', castLiaison: 'liaison@example.test', castReviewer: 'reviewer@example.test',
+      castOrgLeader: 'orgleader@example.test', castResearchLeader: 'researchleader@example.test', confirm: true,
     });
     expect(parseArgs(argv('--target=production', `--bind-reviewer=${RUN}`)).bindReviewer).toBe(RUN);
   });
@@ -27,6 +31,7 @@ describe('cast mode parsing', () => {
   test.each([
     ['a sandbox target', [...castArgs]],
     ['a missing address', ['--target=production', '--create-cast', '--cast-pi=pi@example.test', '--cast-liaison=liaison@example.test']],
+    ['a missing Research Leader address', ['--target=production', ...castArgs.filter((a) => !a.startsWith('--cast-research-leader='))]],
     ['--confirm without --create-cast', ['--target=production', `--bind-reviewer=${RUN}`, '--confirm']],
     ['a cast address without --create-cast', ['--target=production', '--cast-pi=pi@example.test']],
     ['a non-GUID run', ['--target=production', '--bind-reviewer=1003302']],
@@ -42,20 +47,23 @@ describe('--create-cast plan-only', () => {
     get: jest.fn(async () => ({ ok: true, status: 200, body: { value: value === null ? [] : [{ wmkf_settingvalue: value }] } })),
     post: jest.fn(),
   });
-  const args = { createCast: true, castPi: 'pi@example.test', castLiaison: 'liaison@example.test', castReviewer: 'reviewer@example.test', confirm: false };
+  const args = {
+    createCast: true, castPi: 'pi@example.test', castLiaison: 'liaison@example.test', castReviewer: 'reviewer@example.test',
+    castOrgLeader: 'orgleader@example.test', castResearchLeader: 'researchleader@example.test', confirm: false,
+  };
   const ledgerUrl = 'postgres://nobody@127.0.0.1:1/unused';
 
   afterEach(() => jest.restoreAllMocks());
 
   test('reads the allowlist from the target org, prints the plan, and writes nothing', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const client = clientWith(JSON.stringify({ addresses: ['pi@example.test', 'liaison@example.test', 'reviewer@example.test'] }));
+    const client = clientWith(JSON.stringify({ addresses: ['pi@example.test', 'liaison@example.test', 'reviewer@example.test', 'orgleader@example.test', 'researchleader@example.test'] }));
     await runCastMode(client, args, ledgerUrl);
     expect(client.get.mock.calls[0][0]).toMatch(/^\/wmkf_appsystemsettings\?/);
     expect(client.post).not.toHaveBeenCalled();
     const out = JSON.parse(log.mock.calls[0][0]);
     expect(out.mode).toBe('CAST_PLAN_ONLY');
-    expect(out.members.map((m) => m.role)).toEqual(['pi', 'liaison', 'suggested_reviewer']);
+    expect(out.members.map((m) => m.role)).toEqual(['pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader']);
     expect(JSON.stringify(out)).not.toMatch(/example\.test/);
   });
 

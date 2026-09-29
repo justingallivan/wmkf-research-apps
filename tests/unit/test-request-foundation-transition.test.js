@@ -272,6 +272,25 @@ describe('Foundation Primary Contact and the cast Liaison (cast-and-status plan,
       .toEqual(['Foundation contact rows changed during the run']);
   });
 
+  test('the run\'s Research Leader is journaled and excluded; an Org Leader contact (a Foundation child not bound to the clone) stays protected', () => {
+    const PI = '14141414-1414-4141-8141-141414141414';
+    const RL = '15151515-1515-4151-8151-151515151515';
+    const ORG_LEADER = '16161616-1616-4161-8161-161616161616';
+    const before = [CONTACTS[0], { contactid: PI, versionnumber: 1 }, { contactid: LIAISON, versionnumber: 1 }, { contactid: RL, versionnumber: 1 }, { contactid: ORG_LEADER, versionnumber: 1 }];
+    const withCast = captureFoundationBaseline(account({ _primarycontactid_value: PRIOR }), before, CAPTURED,
+      { journalPrimaryContact: true, liaisonContactId: LIAISON, piContactId: PI, researchLeaderContactId: RL });
+    expect(withCast).toMatchObject({ researchLeaderContactId: RL });
+    expect(() => assertLedgerReceipt(withCast)).not.toThrow();
+    const rlTouched = before.map((row) => (row.contactid === RL ? { ...row, versionnumber: 8 } : row));
+    expect(evaluateFoundationTransition(withCast, refreshed({ _primarycontactid_value: PRIOR }), rlTouched, { verifiedAt: VERIFIED }))
+      .toEqual({ failures: [], outcome: 'refreshed' });
+    const orgLeaderTouched = before.map((row) => (row.contactid === ORG_LEADER ? { ...row, versionnumber: 8 } : row));
+    expect(evaluateFoundationTransition(withCast, refreshed({ _primarycontactid_value: PRIOR }), orgLeaderTouched, { verifiedAt: VERIFIED }).failures)
+      .toEqual(['Foundation contact rows changed during the run']);
+    expect(() => captureFoundationBaseline(account(), before, CAPTURED, { journalPrimaryContact: true, researchLeaderContactId: 'nope' }))
+      .toThrow(/Research Leader is not a GUID/);
+  });
+
   test('a non-GUID Liaison is refused at capture', () => {
     expect(() => journaled('not-a-guid')).toThrow(/Liaison is not a GUID/);
   });

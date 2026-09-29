@@ -32,6 +32,7 @@ const PD_ID = '66666666-6666-4666-8666-666666666666';
 const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
 const PI_ID = '88888888-8888-4888-8888-888888888888';
 const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
+const RESEARCH_LEADER_ID = '15151515-1515-4151-8151-151515151515';
 
 const BASE_FIELDS = [
   'akoya_requestid', 'akoya_title', 'akoya_purpose', 'akoya_request', 'akoya_fiscalyear',
@@ -71,6 +72,9 @@ function metadata({ production = true, overrides = {} } = {}) {
     fields.akoya_primarycontactid = {
       createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity: 'contact', navigationProperty: 'akoya_primarycontactid',
     };
+    fields.wmkf_researchleader = {
+      createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity: 'contact', navigationProperty: 'wmkf_ResearchLeader',
+    };
   }
   return { entity: 'akoya_request', fields: { ...fields, ...overrides } };
 }
@@ -87,6 +91,7 @@ function draftInput(overrides = {}) {
 
 const production = {
   requestStatus: 'Phase II Pending', programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, piContactId: PI_ID, liaisonContactId: LIAISON_ID,
+  researchLeaderContactId: RESEARCH_LEADER_ID,
 };
 
 describe('policy: production create-body additions', () => {
@@ -98,17 +103,19 @@ describe('policy: production create-body additions', () => {
     expect(result.createBody['wmkf_GrantProgram@odata.bind']).toBe(`/wmkf_grantprograms(${PROGRAM_ID})`);
   });
 
-  test('binds exactly the cast PI and Liaison contacts through the metadata navigation properties (slice B)', () => {
+  test('binds exactly the cast PI, Liaison and Research Leader contacts through the metadata navigation properties (slice B)', () => {
     const md = metadata();
     // Nav property names come from live metadata, never a constant in the compiler.
     md.fields.wmkf_projectleader = { ...md.fields.wmkf_projectleader, navigationProperty: 'Resolved_PI_Nav' };
     md.fields.akoya_primarycontactid = { ...md.fields.akoya_primarycontactid, navigationProperty: 'Resolved_Liaison_Nav' };
+    md.fields.wmkf_researchleader = { ...md.fields.wmkf_researchleader, navigationProperty: 'Resolved_RL_Nav' };
     const result = compileTestRequestDraft(draftInput({ metadata: md, production }));
     expect(result.blockers).toEqual([]);
     const contactBinds = Object.entries(result.createBody).filter(([, value]) => String(value).startsWith('/contacts('));
     expect(contactBinds).toEqual([
       ['Resolved_PI_Nav@odata.bind', `/contacts(${PI_ID})`],
       ['Resolved_Liaison_Nav@odata.bind', `/contacts(${LIAISON_ID})`],
+      ['Resolved_RL_Nav@odata.bind', `/contacts(${RESEARCH_LEADER_ID})`],
     ]);
   });
 
@@ -116,6 +123,9 @@ describe('policy: production create-body additions', () => {
     ['without a PI', { ...production, piContactId: undefined }, 'wmkf_projectleader'],
     ['without a Liaison', { ...production, liaisonContactId: undefined }, 'akoya_primarycontactid'],
     ['with the same contact as PI and Liaison', { ...production, liaisonContactId: PI_ID.toUpperCase() }, 'akoya_primarycontactid'],
+    ['without a Research Leader', { ...production, researchLeaderContactId: undefined }, 'wmkf_researchleader'],
+    ['with the Research Leader equal to the PI', { ...production, researchLeaderContactId: PI_ID }, 'akoya_primarycontactid'],
+    ['with the Research Leader equal to the Liaison', { ...production, researchLeaderContactId: LIAISON_ID.toUpperCase() }, 'akoya_primarycontactid'],
   ])('refuses a production draft %s', (_label, value, field) => {
     const result = compileTestRequestDraft(draftInput({ production: value }));
     expect(result.createBody).toBeNull();
@@ -169,7 +179,7 @@ function productionManifest(overrides = {}) {
     recipe: 'basic',
     values: {
       requestId: REQUEST_ID, runId: RUN_ID, meetingDate: '2026-12-01', programDirectorId: PD_ID, grantProgramId: PROGRAM_ID,
-      piContactId: PI_ID, liaisonContactId: LIAISON_ID,
+      piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID,
     },
     createBody: { akoya_requeststatus: 'Phase II Pending' },
     expectedAppUserId: APP_USER_ID,
@@ -187,14 +197,18 @@ describe('manifest target', () => {
     expect(() => buildCloneManifest({ targetEnvironment: 'sandbox' }, { programDirector: director })).toThrow(/only on a production target/);
   });
 
-  test('buildCloneManifest refuses a production target without two distinct cast contacts, and a sandbox target with any', () => {
+  test('buildCloneManifest refuses a production target without three distinct cast contacts, and a sandbox target with any', () => {
     const preflight = { targetEnvironment: 'production', grantProgram: { grantprogramid: PROGRAM_ID } };
     const base = { bundle: {}, programDirector: { systemuserid: PD_ID } };
-    expect(() => buildCloneManifest(preflight, base)).toThrow(/requires the cast PI and Liaison/);
-    expect(() => buildCloneManifest(preflight, { ...base, cast: { piContactId: PI_ID } })).toThrow(/requires the cast PI and Liaison/);
-    expect(() => buildCloneManifest(preflight, { ...base, cast: { piContactId: PI_ID, liaisonContactId: 'nope' } })).toThrow(/requires the cast PI and Liaison/);
-    expect(() => buildCloneManifest(preflight, { ...base, cast: { piContactId: PI_ID, liaisonContactId: PI_ID.toUpperCase() } }))
+    const full = { piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID };
+    expect(() => buildCloneManifest(preflight, base)).toThrow(/requires the cast PI, Liaison and Research Leader/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { piContactId: PI_ID } })).toThrow(/requires the cast PI, Liaison and Research Leader/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { ...full, liaisonContactId: 'nope' } })).toThrow(/requires the cast PI, Liaison and Research Leader/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { piContactId: PI_ID, liaisonContactId: LIAISON_ID } })).toThrow(/requires the cast PI, Liaison and Research Leader/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { ...full, liaisonContactId: PI_ID.toUpperCase() } }))
       .toThrow(/must be different contacts/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { ...full, researchLeaderContactId: PI_ID } })).toThrow(/must be different contacts/);
+    expect(() => buildCloneManifest(preflight, { ...base, cast: { ...full, researchLeaderContactId: LIAISON_ID.toUpperCase() } })).toThrow(/must be different contacts/);
     expect(() => buildCloneManifest({ targetEnvironment: 'sandbox' }, { cast: { piContactId: PI_ID, liaisonContactId: LIAISON_ID } }))
       .toThrow(/bound only on a production target/);
   });
@@ -204,9 +218,12 @@ describe('manifest target', () => {
     ['no Liaison', { liaisonContactId: undefined }],
     ['a non-GUID Liaison', { liaisonContactId: 'me@wmkeck.org' }],
     ['the same contact twice', { liaisonContactId: PI_ID.toUpperCase() }],
+    ['no Research Leader', { researchLeaderContactId: undefined }],
+    ['the Research Leader equal to the PI', { researchLeaderContactId: PI_ID }],
+    ['the Research Leader equal to the Liaison', { researchLeaderContactId: LIAISON_ID }],
   ])('validateCloneManifest refuses a production manifest with %s', (_label, change) => {
     const manifest = productionManifest({ values: { ...productionManifest().values, ...change } });
-    expect(() => validateCloneManifest(manifest)).toThrow(/two different cast contacts/);
+    expect(() => validateCloneManifest(manifest)).toThrow(/three different cast contacts/);
   });
 
   test('validateCloneManifest refuses a sandbox manifest that carries a cast contact', () => {
@@ -388,12 +405,14 @@ describe('verifyClone on a production target', () => {
     expect(failures.join(' ')).not.toMatch(/Private subject/);
   });
 
-  test('confirms the cast PI and Liaison read back on the created Request (slice B)', () => {
+  test('confirms the cast PI, Liaison and Research Leader read back on the created Request (slice B)', () => {
     const readback = (request) => verifyClone(manifest(), preflightBefore, { ...observation([]), request }, [], preflightBefore.foundation, []).failures;
-    const bound = { _wmkf_projectleader_value: PI_ID.toUpperCase(), _akoya_primarycontactid_value: LIAISON_ID };
+    const bound = { _wmkf_projectleader_value: PI_ID.toUpperCase(), _akoya_primarycontactid_value: LIAISON_ID, _wmkf_researchleader_value: RESEARCH_LEADER_ID };
     expect(readback(bound)).not.toEqual(expect.arrayContaining([expect.stringMatching(/^cast /)]));
     expect(readback({ ...bound, _wmkf_projectleader_value: LIAISON_ID })).toContain('cast PI mismatch');
     expect(readback({ ...bound, _akoya_primarycontactid_value: null })).toContain('cast Liaison mismatch');
+    expect(readback({ ...bound, _wmkf_researchleader_value: PI_ID })).toContain('cast Research Leader mismatch');
+    expect(readback({ ...bound, _wmkf_researchleader_value: null })).toContain('cast Research Leader mismatch');
     const sandbox = verifyClone(manifest({ targetEnvironment: 'sandbox' }), preflightBefore, observation([]), [], preflightBefore.foundation, []);
     expect(sandbox.failures.filter((failure) => failure.startsWith('cast '))).toEqual([]);
   });
