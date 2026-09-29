@@ -49,7 +49,7 @@ Program ids, applicant ids and returned account ids compare case-insensitively. 
 
 Before the build, the owner runs a read-only production probe (session scratch script `probe-research-liaison-coverage.js`; counts only, no names, emails or ids). It covers active Research awardees and Research Requests with a meeting date today or later, both excluding test Requests. For each population it reports how many Request copies match the institution's Primary Contact, differ from it, would gain a Liaison, or would lose the Liaison Cc under rule 1. The result is recorded here; the probe is committed as a script in the build if kept.
 
-**Result (owner-requested run, production, 2026-09-29, read-only, complete) [ASSUMED] — recorded owner-run probe output is not checked into this worktree; contact GUIDs were compared, not people:**
+**Result (owner-requested run, production, 2026-09-29, read-only, complete) [DERIVED-FROM: the S549 session run of the scratch probe; its output is not committed] — contact GUIDs were compared, not people:**
 
 | | A. Active Research awardees | B. Research Requests, meeting date ≥ 2026-09-29 |
 |---|---|---|
@@ -62,7 +62,7 @@ Before the build, the owner runs a read-only production probe (session scratch s
 
 Rule 1 costs almost nothing: one awardee loses its Liaison Cc. The switch itself changes the Liaison contact on most active awardees (84 of 108) and on about a fifth of upcoming Requests. Some of those differences may be duplicate contact rows for one person rather than a different person, so the address may or may not change (earlier SoCal probes found GUID divergence overstates person divergence; owner answer 8 accepts this).
 
-**Email comparison of the differing pairs (owner-requested run, production, 2026-09-29, read-only, complete) [ASSUMED] — recorded owner-run probe output is not checked into this worktree; `emailaddress1` was normalized:**
+**Email comparison of the differing pairs (owner-requested run, production, 2026-09-29, read-only, complete) [DERIVED-FROM: the S549 session run of the comparison probe; its output is not committed] — `emailaddress1` was normalized:**
 
 | | A. Active awardees | B. Upcoming Requests |
 |---|---|---|
