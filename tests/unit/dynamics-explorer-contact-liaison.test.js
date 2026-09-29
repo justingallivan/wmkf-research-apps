@@ -155,6 +155,8 @@ test.each([
   ['capped', accounts([ACCOUNT], { capped: true })],
   ['a larger totalCount', accounts([ACCOUNT], { totalCount: 5001 })],
   ['malformed', { value: [] }],
+  ['an omitted totalCount', accounts([ACCOUNT], { totalCount: undefined })],
+  ['a non-numeric totalCount', accounts([ACCOUNT], { totalCount: '1' })],
 ])('%s account discovery fails the tool call', async (_label, response) => {
   queryAllAccounts.mockResolvedValue(response);
   await expect(run()).rejects.toThrow(/account discovery was incomplete/);
@@ -165,4 +167,13 @@ test('a failed institution Request read fails the tool call', async () => {
   queryAllAccounts.mockResolvedValue(accounts([ACCOUNT]));
   queryRequests.mockRejectedValue(new Error('dataverse 503'));
   await expect(run()).rejects.toThrow('dataverse 503');
+});
+
+test.each([
+  ['an omitted totalCount', { totalCount: undefined }],
+  ['a non-numeric totalCount', { totalCount: '1' }],
+])('a Request query with %s is reported as partial, never an exact total', async (_label, extra) => {
+  queryRecords.mockResolvedValue(page([req(12, '2026-01-01T00:00:00Z', { _wmkf_projectleader_value: CONTACT })], extra));
+  const result = await run();
+  expect(result).toMatchObject({ totalCount: null, returnedCount: 1, hasMore: true });
 });

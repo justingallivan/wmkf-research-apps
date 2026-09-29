@@ -551,6 +551,15 @@ describe('Liaison of record (Research)', () => {
     expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
   });
 
+  test('an account row missing its Primary Contact lookup skips the row, never PI-only', async () => {
+    wire();
+    DynamicsService.queryRecords.mockResolvedValue({ records: [{ accountid: ACCOUNT }], totalCount: 1, hasMore: false });
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.skippedNoRecipient).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+  });
+
   test('an existing row with the same PD keeps its stored recipients (the documented gap)', async () => {
     wire();
     scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({

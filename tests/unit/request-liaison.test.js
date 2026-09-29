@@ -79,6 +79,19 @@ describe('single Request', () => {
     await expect(resolveRequestLiaison(request())).rejects.toThrow(/was not returned/);
   });
 
+  test('Research: a returned account missing the selected Primary Contact lookup throws, not none', async () => {
+    accountAdapter.queryAccounts.mockResolvedValue(accountsResponse([{ accountid: ACCOUNT }]));
+    await expect(resolveRequestLiaison(request())).rejects.toThrow(/omits _primarycontactid_value/);
+  });
+
+  test.each([
+    ['an omitted totalCount', { totalCount: undefined }],
+    ['a non-numeric totalCount', { totalCount: '1' }],
+  ])('Research: an account chunk with %s throws', async (_label, extra) => {
+    accountAdapter.queryAccounts.mockResolvedValue(accountsResponse([{ accountid: ACCOUNT, _primarycontactid_value: INSTITUTION_CONTACT }], extra));
+    await expect(resolveRequestLiaison(request())).rejects.toThrow(/truncated/);
+  });
+
   test('Research: a malformed account response throws', async () => {
     accountAdapter.queryAccounts.mockResolvedValue({ value: [] });
     await expect(resolveRequestLiaison(request())).rejects.toThrow(/malformed/);
