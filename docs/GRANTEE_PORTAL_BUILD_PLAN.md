@@ -39,7 +39,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 1 | **Token + auth foundation** | grantee token lifecycle, `verify-grantee-token`, `/external/grantee/[token]` page scaffold, `context` route (fail-closed) | schema (token state — see Q1) |
 | 2 | **Abstract generation** | Executor prompt/template: `wmkf_abstract` → `wmkf_abstractformatted` | Executor contract |
 | 3 | **Generate + persist abstract** (split from the original combined chunk 3) | `POST /api/workbench/grantee-deliverables/generate` — generate via chunk-2 service, persist `wmkf_abstractformatted` + status→Drafted (ETag-conditional) | 2 |
-| 3b | **Recipient resolution** ✅ | resolve TWO contacts — PI (`wmkf_projectleader`) + liaison (`akoya_primarycontactid`); staff confirm. Research-only (no program branching). `GET .../recipients` | 3 |
+| 3b | **Recipient resolution** ✅ | resolve TWO contacts — PI (`wmkf_projectleader`) + liaison (`akoya_primarycontactid`; superseded 2026-09-29 by the institution Liaison of record, see the recipients note below); staff confirm. Research-only (no program branching). `GET .../recipients` | 3 |
 | 3c | **Send invite** ✅ | grantee token mint (chunk 1) + M365 email (PI `To`, liaison `Cc`, action-button + fallback), status→Invited. `POST .../send-invite` | 1, 3, 3b |
 | 3d | **Awardee-tab UI** ✅ | `AwardeeTab` wired into the workbench tab dispatch — generate → confirm recipients → preview → send | 3, 3b, 3c |
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
@@ -267,7 +267,7 @@ program-family branching — no SoCal/Discretionary logic needed.
 - **PI** = `wmkf_projectleader` → `contact` (the principal investigator; Research native fill ~90–98%).
 - **Liaison** = `akoya_primarycontactid` → `contact` — the institution's WMKF **foundation liaison /
   grant steward** (NOT the PI; documented in `lib/services/dataverse-export/constants.js:362` + the
-  dynamics-explorer prompt). 
+  dynamics-explorer prompt). **[SUPERSEDED 2026-09-29 for Research: the Liaison of record is the applicant institution's Primary Contact (`account.primarycontactid`), not the Request's `akoya_primarycontactid` copy; `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`.]** 
 Resolve each contact's `emailaddress1` + `firstname`/`lastname` (read the two `_*_value` lookups off
 the request, then load the contacts — or `$expand`). Return both with a missing-email flag.
 

@@ -81,9 +81,13 @@ Per grantee, exactly:
 - **D5 — Scope = RESEARCH only; recipients = TWO contacts (owner-confirmed S268).** The portal runs
   on research grants only (the deliverable is a research output), so there is NO program-family
   branching. The invite addresses the **PI** (`akoya_request.wmkf_projectleader` → `contact`) in **`To`**
-  and **Cc's the liaison** (`akoya_request.akoya_primarycontactid` → `contact` — the institution's WMKF
-  foundation liaison / grant steward, NOT the PI). Both are auto-resolved (`emailaddress1` + name); staff
-  confirm/override and preview the email before send. The earlier program-aware SoCal/Discretionary
+  and **Cc's the liaison** — the Liaison of record, the applicant institution's Primary Contact
+  (`account.primarycontactid` via `akoya_applicantid` → `contact`; the institution's WMKF foundation
+  liaison / grant steward, NOT the PI). The Request's `akoya_primarycontactid` copy is not used (owner
+  decision 2026-09-29, `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`); with no institution
+  Primary Contact the invite goes to the PI with no Liaison Cc. Both are auto-resolved (`emailaddress1` +
+  name); staff confirm/override and preview the email before send, and the send refuses if the Liaison
+  changed since the preview. The earlier program-aware SoCal/Discretionary
   mapping is superseded. (`docs/atlas/dataverse-akoya-request.md:135-160`.)
 - **D6 — Schema home: split text from package state.** `akoya_request` retains the two abstract
   fields. A one-per-request `wmkf_granteedeliverable` child row owns package state and evidence,

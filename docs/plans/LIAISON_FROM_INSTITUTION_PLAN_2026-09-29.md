@@ -1,6 +1,6 @@
 # Research Liaison read from the applicant institution
 
-Status: **DRAFT, revision 7 (2026-09-29, Session 549; round 4: one high and three medium; round 5: one medium; round 6: one high and six medium; all answered below). Codex plan reviews: round 1 needs-attention (five high, two medium); round 2 needs-attention (four high, two medium); round 3 on revision 3 needs-attention (five high, one medium), five of the six on re-addressing queued reminders. Revision 4 splits the work (owner, S549): this plan covers the readers and new reminders; re-addressing queued reminders moves to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`. Revision 7 is ready to build after the round-6 fixes. The implementation described here remains `[PLANNED]`.** Branch `claude/liaison-from-institution`.
+Status: **DRAFT, revision 7 (2026-09-29, Session 549; round 4: one high and three medium; round 5: one medium; round 6: one high and six medium; all answered below). Codex plan reviews: round 1 needs-attention (five high, two medium); round 2 needs-attention (four high, two medium); round 3 on revision 3 needs-attention (five high, one medium), five of the six on re-addressing queued reminders. Revision 4 splits the work (owner, S549): this plan covers the readers and new reminders; re-addressing queued reminders moves to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`. Revision 7 is ready to build after the round-6 fixes. **BUILT 2026-09-29 (S550) on branch `claude/liaison-from-institution`, not merged; implementation review pending before promotion (Tier 2).** See *Build record*.** Branch `claude/liaison-from-institution`.
 
 ## Decision (owner with the AkoyaGO platform owner, 2026-09-29)
 
@@ -268,6 +268,19 @@ Round 6 (Codex review and fix, on revision 6):
 ## Docs to reconcile in the build
 
 Source headers (`lib/services/workbench/grantee-deliverables/recipients-service.js:9`, `lib/services/site-visit/applicant-contacts.js:2-4`, the reminder and sweep headers); `docs/API_ROUTE_SECURITY_MATRIX.md:156,336`; `docs/atlas/dataverse-wmkf-sitevisit.md:66`; `docs/atlas/postgres-infra-tables.md:673`; `docs/SERVICE_AND_UTILITY_CATALOG.md:83`; `docs/GRANTEE_PORTAL_SPEC.md:84`; `docs/GRANTEE_PORTAL_BUILD_PLAN.md:42,268`; `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md:507,771`; `docs/PC_MEETING_TRACKER_PLAN.md:151`; `docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md:109,192`; `docs/DYNAMICS_SCHEMA_ANNOTATION.md:106`; `docs/DATAVERSE_POWER_TOOLS_DESIGN.md:219`; `docs/DATAVERSE_POWER_TOOLS_TRACK_B_BUILD_PLAN.md:162-184`; `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md:92`; `SESSION_PROMPT.md:716-720`; `.claude-memory/project-institution-foundation-liaison.md`; `.claude-memory/reviewer-identity-fragmentation.md`; and the cast plan *Facts*. Reconcile with `/sweep`; classify historical evidence rather than rewriting it, and leave no active current-guidance statement that still calls the Research Request copy the institution Liaison.
+
+## Build record (S550, 2026-09-29)
+
+Built on `claude/liaison-from-institution` as revision 7 specifies [VERIFIED via the branch commits and their tests; not merged, not deployed]:
+
+- Helper `lib/services/contacts/request-liaison.js` (`resolveRequestLiaison`, `resolveRequestLiaisons`, `REQUEST_LIAISON_FIELDS`, `isResearchProgram`).
+- Reader 1: `recipients-service.js` (503 on unreadable Liaison or contact, including the PI's contact read, which shares `resolveContact`), `send-invite.js` (closed `liaisonSeen`), `send-invite-service.js` (409 `liaison_changed` before mint), `AwardeeTab.js` (load sequence, Retry, Send gated on loaded recipients).
+- Reader 2: `grantee-deliverable-reminders-service.js` (`readLiaison`; `none` → PI-only new rows; failures skip).
+- Reader 3: `awardees-service.js` (one batched account read; failure → 503).
+- Readers 4–6: `applicant-contacts.js` (Research branch, `liaisonStatus`), `collection-service.js` (snapshot `liaisonStatus`, names via the helper, exported `resolveCurrentMaterialsContacts`), `collection-store.js` (`claimAutomaticReminder` compares and saves contacts), `reminder-sweep.js` (refresh before prepare), `SiteVisitMaterialsCard.js` (labels).
+- Reader 7: export caption and disclosure; Explorer `contact→requests` merge (`get-related.js`) and prompt.
+- Tests: helper matrix and every reader's cases, each guard mutation-checked (one equivalent mutant recorded in the readers 4–6 commit); a live-Postgres proof of the automatic claim's contacts compare, `tests/integration/site-visit-materials-claim.pg.test.js`, added to the CI ledger job.
+- Consequence to note: the seed materials templates use `{{liaisonFullName}}`, so a Research Request with no institution Liaison refuses materials email until staff remove the placeholder (the measurement found 0 such upcoming Requests).
 
 ## Release
 

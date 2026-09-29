@@ -1,6 +1,6 @@
 ---
 name: project_institution_foundation_liaison
-description: WMKF contact-role triad (user-attested S159) — akoya_primarycontactid = foundation liaison/grant-steward (NOT PI), wmkf_projectleader = the PI/scientific lead, wmkf_researchleader = institutional research officer (NOT PI)
+description: WMKF contact-role triad (user-attested S159) — the institution's Primary Contact = foundation liaison/grant-steward (NOT PI; for Research the account's primarycontactid is the Liaison of record, akoya_primarycontactid is the Request's copy), wmkf_projectleader = the PI/scientific lead, wmkf_researchleader = institutional research officer (NOT PI)
 metadata:
   type: project
   status: active
@@ -8,14 +8,14 @@ metadata:
   last_verified: 2026-07-12 re-reviewed — contact-role triad semantics are user-attested (WMKF authority, S159) + behavioral-signature corroborated; the field meanings are not probe-provable, and the evidence files under docs/atlas/evidence/ remain the substantiation
 ---
 
-**Decision 2026-09-29 (S549, owner with the AkoyaGO platform owner):** for the Research program the Liaison *of record* is the applicant institution's Primary Contact (`account.primarycontactid`); `akoya_request.akoya_primarycontactid` is a copy that flows up only and goes stale (measured S549: 27 active Research awards' Liaison email differs). App readers are being switched per `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` (branch `claude/liaison-from-institution`, **not built** as of S549); until it merges, app code still reads the Request copy.
+**Decision 2026-09-29 (S549, owner with the AkoyaGO platform owner):** for the Research program the Liaison *of record* is the applicant institution's Primary Contact (`account.primarycontactid`); `akoya_request.akoya_primarycontactid` is a copy that flows up only and goes stale (measured S549: 27 active Research awards' Liaison email differs). App readers switch per `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` through `lib/services/contacts/request-liaison.js` (built S550 on branch `claude/liaison-from-institution`; `main` reads the Request copy until that branch merges). The export captions the field "Request Primary Contact (copy)".
 
 ## Recall Rule
 
 Read this when: surfacing `akoya_request` person fields anywhere (bulk export, Grant Reporting auto-fill, contact enrichment, Reviewer Finder COI).
 
 Do:
-- Label `akoya_primarycontactid` ("Primary Contact") as the foundation liaison / grant steward (President's office for large gifts) — NOT the PI.
+- For Research, take the Liaison from the applicant account's `primarycontactid` via `lib/services/contacts/request-liaison.js`; label `akoya_primarycontactid` as the Request's copy ("Request Primary Contact (copy)"). Either way the Primary Contact is the foundation liaison / grant steward role (President's office for large gifts) — NOT the PI.
 - Surface `wmkf_projectleader` ("Project Leader") as the PI for research-scoped data; use an `N/A — no PI (non-research process)` sentinel where structurally absent.
 - Treat `wmkf_researchleader` as the institution's senior research officer, not the PI.
 - Render null fill as a not-captured sentinel, never blank (migrated-era fill is institution-variable).

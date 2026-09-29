@@ -65,7 +65,7 @@ Money / dates:
 People (lookups):
 - `akoya_applicantid` → `accounts`
 - `akoya_payee` → `accounts`
-- `akoya_primarycontactid` → `contacts`
+- `akoya_primarycontactid` → `contacts` (the Request's own copy of the Primary Contact; for Research the Liaison of record is the applicant account's `primarycontactid`, resolved by `lib/services/contacts/request-liaison.js`)
 - `wmkf_projectleader`, `wmkf_researchleader`, `wmkf_ceo` → `contacts`
 - `wmkf_copi1..5` → `contacts` (legacy 5-slot Co-PI roster — superseded by `wmkf_apprequestperson` junction since S139; intake portal pilot will extend that junction with `wmkf_effortpct` / `wmkf_biosketchurl` / `wmkf_lineorder` and expand `wmkf_role` to PI / Co-PI / Senior Personnel / Key Personnel / Other per 2026-05-14 schema review)
 - `wmkf_potentialreviewer1..5` → `wmkf_potentialreviewers` (legacy slots — actual reviewer state lives in `wmkf_appreviewersuggestion`; the slots remain a read-only source of prior-request recognition context for an exact server-resolved reviewer)
