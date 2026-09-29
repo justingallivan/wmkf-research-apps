@@ -284,7 +284,7 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   S549 owner-run record in the cast plan]. Shared Production/Preview database
   migration status remains unverified; this B4 revision performs no live read.
 - Slice B4 plans a **separate** Potential Reviewer 1 operation table in new
-  migration 055, with a V55 fresh-install mirror. It is not built or applied
+  migration 055, with a new V56 fresh-install mirror after V55. It is not built or applied
   [PLANNED via the cast plan, *Order* 6 revision 3].
 - `test_request_run_resources.readback`/`source_provenance` are JSONB and
   the schema cannot itself forbid a caller from stuffing prohibited content

@@ -54,8 +54,10 @@
  *      With <dir>, a dated create-only JSON receipt (names, labels, counts,
  *      booleans; no ids, no raw definitions) is written there.
  *  13. With --reviewer-slots[=<dir>]: read-only metadata for Potential Reviewer
- *      1–5 auditing and Request-update automation. With <dir>, write a dated
- *      receipt containing names, labels, counts and booleans (no ids or definitions).
+ *      1–5 auditing and Request-update automation. Unclassified Request/slot
+ *      flow mentions and unreadable definitions make the section incomplete.
+ *      With <dir>, write a dated receipt containing the target, names, labels,
+ *      counts and booleans (no record ids or raw definitions).
  *
  * SAFETY: GET requests only, through the interlocked raw client. Production
  * reads are owner-run behind the interlock override; nothing is written.
@@ -516,6 +518,11 @@ function slotMentions(value) {
   return REVIEWER_SLOTS.filter((slot) => String(value || '').toLowerCase().includes(slot));
 }
 
+function mentionsRequestOrSlot(value) {
+  const source = typeof value === 'string' ? value : JSON.stringify(value ?? '');
+  return /\bakoya_requests?\b/i.test(source) || slotMentions(source).length > 0;
+}
+
 /** null means no Request Update trigger; otherwise classify the exact filter list. */
 function classifySlotUpdateFlow(parameters) {
   if (parameters?.['subscriptionRequest/entityname'] !== 'akoya_request') return null;
@@ -543,7 +550,10 @@ function stepIsHidden(step) {
 /** Section 13: metadata only; every unreadable definition makes the receipt incomplete. */
 async function printReviewerSlotReadiness(client, exportDir) {
   console.log('\n13. Potential Reviewer slot update readiness (metadata only)');
-  const receipt = { generatedAt: new Date().toISOString(), complete: false, incompleteReasons: [], auditing: {}, workflows: [], steps: [], flows: [], counts: {} };
+  const receipt = {
+    section: 13, target: PRODUCTION_URL, generatedAt: new Date().toISOString(), complete: false,
+    incompleteReasons: [], auditing: {}, workflows: [], steps: [], flows: [], flowMentions: [], unclassifiedFlowTriggers: [], counts: {},
+  };
   const entity = await client.get("/EntityDefinitions(LogicalName='akoya_request')?$select=IsAuditEnabled");
   if (!entity.ok || typeof entity.body?.IsAuditEnabled?.Value !== 'boolean') receipt.incompleteReasons.push('Request entity auditing unreadable');
   receipt.auditing.entity = entity.body?.IsAuditEnabled?.Value ?? null;
@@ -559,22 +569,31 @@ async function printReviewerSlotReadiness(client, exportDir) {
   const workflows = await getAll(client, "/workflows?$select=name,category,mode,triggeronupdateattributelist,xaml&$filter=primaryentity eq 'akoya_request' and type eq 1 and statecode eq 1");
   const classic = workflows.filter((row) => row.category === 0 && row.triggeronupdateattributelist);
   const triggered = classic.filter((row) => String(row.triggeronupdateattributelist).split(',').some((field) => REVIEWER_SLOTS.includes(field.trim().toLowerCase())));
+  receipt.counts.activatedWorkflowsAndRules = workflows.length;
+  receipt.counts.updateTriggeredWorkflows = classic.length;
+  receipt.counts.slotTriggeredWorkflows = triggered.length;
+  receipt.counts.unreadableWorkflowsAndRules = workflows.filter((row) => !row.xaml).length;
   console.log(`   activated Request workflows/rules: ${workflows.length}; update-triggered workflows: ${classic.length}; slot-triggered: ${triggered.length}`);
   for (const row of workflows) {
-    if (!row.xaml) { receipt.incompleteReasons.push(`workflow definition unreadable: ${row.name || '(unnamed)'}`); continue; }
-    const mentions = slotMentions(row.xaml);
-    if (triggered.includes(row) || mentions.length) {
-      const item = { name: row.name || '(unnamed)', kind: row.category === 2 ? 'business rule' : 'workflow', triggered: triggered.includes(row), mentions };
+    const readable = Boolean(row.xaml);
+    const mentions = readable ? slotMentions(row.xaml) : [];
+    if (triggered.includes(row) || mentions.length || !readable) {
+      const item = {
+        name: row.name || '(unnamed)', kind: row.category === 2 ? 'business rule' : 'workflow',
+        mode: row.category === 0 ? (row.mode === 1 ? 'real-time' : 'background') : null,
+        triggered: triggered.includes(row), mentions, readable,
+      };
       receipt.workflows.push(item);
-      console.log(`   - ${item.kind} ${item.name}: ${item.triggered ? 'slot-triggered' : 'mentions'} ${mentions.join(',')}`);
+      console.log(`   - ${item.kind} ${item.name}: ${item.triggered ? 'slot-triggered' : 'mentions'} ${mentions.join(',')} (${readable ? 'readable' : 'UNREADABLE'})`);
     }
+    if (!readable) receipt.incompleteReasons.push(`workflow definition unreadable: ${row.name || '(unnamed)'}`);
   }
-  receipt.counts.slotTriggeredWorkflows = triggered.length;
 
   const steps = await getAll(client, '/sdkmessageprocessingsteps?$select=name,stage,mode,filteringattributes,ishidden' +
     '&$expand=sdkmessageid($select=name),plugintypeid($select=typename)' +
     "&$filter=sdkmessagefilterid/primaryobjecttypecode eq 'akoya_request' and statecode eq 0");
   const updates = steps.filter((row) => row.sdkmessageid?.name === 'Update');
+  receipt.counts.entityUpdateSteps = updates.length;
   console.log(`   enabled Request Update steps: ${updates.length}`);
   for (const row of updates) {
     const firesOn = classifySlotUpdateStep(row);
@@ -588,31 +607,69 @@ async function printReviewerSlotReadiness(client, exportDir) {
   const globalUpdates = unfiltered.filter((row) => row.sdkmessageid?.name === 'Update');
   receipt.counts.globalUpdateSteps = globalUpdates.length;
   receipt.counts.hiddenGlobalUpdateSteps = globalUpdates.filter(stepIsHidden).length;
-  console.log(`   enabled Update steps with no entity filter: ${globalUpdates.length} (hidden: ${receipt.counts.hiddenGlobalUpdateSteps})`);
-  for (const row of globalUpdates.filter((item) => !stepIsHidden(item))) {
-    receipt.steps.push({ name: row.name || '(unnamed)', type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: false, firesOn: 'ANY entity/column' });
+  receipt.counts.hiddenMicrosoftPlatformUpdateSteps = globalUpdates.filter(isPlatformStep).length;
+  console.log(`   enabled Update steps with no entity filter: ${globalUpdates.length} (hidden: ${receipt.counts.hiddenGlobalUpdateSteps}; hidden Microsoft platform: ${receipt.counts.hiddenMicrosoftPlatformUpdateSteps})`);
+  for (const row of globalUpdates.filter((item) => !isPlatformStep(item))) {
+    receipt.steps.push({ name: row.name || '(unnamed)', type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn: 'ANY entity/column' });
     console.log(`   - ANY entity/column: ${stepLabel(row)}`);
   }
 
   const flows = await getAll(client, '/workflows?$select=name,clientdata&$filter=category eq 5 and statecode eq 1');
   let unreadable = 0;
   let requestUpdate = 0;
+  let requestNonUpdate = 0;
   for (const flow of flows) {
+    const rawMention = mentionsRequestOrSlot(flow.clientdata);
     const classified = classifyFlowDefinition(flow.clientdata);
-    if (!classified.readable) { unreadable += 1; continue; }
+    if (!classified.readable) {
+      unreadable += 1;
+      if (rawMention) receipt.flowMentions.push({ name: flow.name || '(unnamed)', readable: false, recognizedRequestTriggers: 0, unclassifiedRequestTriggers: 0 });
+      continue;
+    }
+    let recognizedRequestTriggers = 0;
+    let unclassifiedRequestTriggers = 0;
     for (const [triggerName, trigger] of Object.entries(classified.definition.triggers || {})) {
-      const match = classifySlotUpdateFlow(trigger?.inputs?.parameters);
-      if (!match) continue;
-      requestUpdate += 1;
-      receipt.flows.push({ name: flow.name || '(unnamed)', trigger: triggerName, ...match });
-      console.log(`   - cloud flow ${flow.name || '(unnamed)'} / ${triggerName}: ${match.message}, fires on ${match.firesOn}`);
+      const parameters = trigger?.inputs?.parameters;
+      if (parameters?.['subscriptionRequest/entityname'] === 'akoya_request') {
+        const message = Number(parameters['subscriptionRequest/message']);
+        if (Object.hasOwn(FLOW_MESSAGE, message)) {
+          recognizedRequestTriggers += 1;
+          const match = classifySlotUpdateFlow(parameters);
+          if (match) {
+            requestUpdate += 1;
+            receipt.flows.push({ name: flow.name || '(unnamed)', trigger: triggerName, ...match });
+            console.log(`   - cloud flow ${flow.name || '(unnamed)'} / ${triggerName}: ${match.message}, fires on ${match.firesOn}`);
+          } else {
+            requestNonUpdate += 1;
+          }
+        } else {
+          unclassifiedRequestTriggers += 1;
+          receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'unrecognized Request message' });
+          receipt.incompleteReasons.push(`Request flow trigger message unrecognized: ${flow.name || '(unnamed)'} / ${triggerName}`);
+        }
+      } else if (mentionsRequestOrSlot(trigger)) {
+        unclassifiedRequestTriggers += 1;
+        receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'unclassified Request trigger shape' });
+        receipt.incompleteReasons.push(`Request flow trigger shape unclassified: ${flow.name || '(unnamed)'} / ${triggerName}`);
+      }
+    }
+    if (rawMention) {
+      receipt.flowMentions.push({ name: flow.name || '(unnamed)', readable: true, recognizedRequestTriggers, unclassifiedRequestTriggers });
+      if (!recognizedRequestTriggers && !unclassifiedRequestTriggers) {
+        receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: '(none)', reason: 'mention without classified Request trigger' });
+        receipt.incompleteReasons.push(`flow mentions Request or slot without a classified Request trigger: ${flow.name || '(unnamed)'}`);
+      }
     }
   }
   receipt.counts.flowsRead = flows.length;
+  receipt.counts.flowsMentioningRequestOrSlot = receipt.flowMentions.length;
   receipt.counts.requestUpdateTriggers = requestUpdate;
+  receipt.counts.requestNonUpdateTriggers = requestNonUpdate;
+  receipt.counts.unclassifiedFlowTriggers = receipt.unclassifiedFlowTriggers.length;
   receipt.counts.unreadableFlows = unreadable;
   if (unreadable) receipt.incompleteReasons.push(`${unreadable} cloud-flow definitions unreadable`);
-  console.log(`   flows read: ${flows.length}; Request update triggers: ${requestUpdate}; unreadable definitions: ${unreadable}`);
+  console.log(`   flows read: ${flows.length}; Request/slot mention superset: ${receipt.flowMentions.length}; Request update triggers: ${requestUpdate}; unclassified: ${receipt.unclassifiedFlowTriggers.length}; unreadable definitions: ${unreadable}`);
+  for (const item of receipt.unclassifiedFlowTriggers) console.log(`   - UNCLASSIFIED ${item.name} / ${item.trigger}: ${item.reason}`);
   receipt.complete = receipt.incompleteReasons.length === 0;
   console.log(`   section 13: ${receipt.complete ? 'COMPLETE' : `INCOMPLETE (${receipt.incompleteReasons.join('; ')})`}`);
   if (exportDir) {
