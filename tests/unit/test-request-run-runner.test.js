@@ -40,7 +40,7 @@ const castContactRow = (contactId, statecode, drift = {}) => {
   const role = contactId === LIAISON_ID ? 'liaison' : 'pi';
   return {
     contactid: contactId, firstname: 'TEST · Factory', lastname: CAST_NAMES[role], emailaddress1: castAddress(role),
-    statecode, _parentcustomerid_value: null, ...drift,
+    statecode, _parentcustomerid_value: ORG_ID, ...drift,
   };
 };
 const VERIFIED_CAST = [castMember('liaison', LIAISON_ID), castMember('pi', PI_ID)];
@@ -508,7 +508,8 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       ['the ledger has no production cast', { castMembers: [] }, /cast is not bindable \(cast_member_missing\)/],
       ['a cast contact is inactive', { castContactState: 1 }, /cast is not bindable \(cast_member_drifted\).*statecode/],
       ['a cast contact\'s email changed after reservation', { castDrift: { emailaddress1: 'someone-else@example.test' } }, /cast_member_drifted.*emailaddress1/],
-      ['a cast contact gained a parent account', { castDrift: { _parentcustomerid_value: ORG_ID } }, /cast_member_drifted.*_parentcustomerid_value/],
+      ['a cast contact moved to another account', { castDrift: { _parentcustomerid_value: OTHER_CONTACT } }, /cast_member_drifted.*_parentcustomerid_value/],
+      ['a cast contact lost its Foundation parent', { castDrift: { _parentcustomerid_value: null } }, /cast_member_drifted.*_parentcustomerid_value/],
       ['a cast contact was renamed', { castDrift: { lastname: 'Someone' } }, /cast_member_drifted.*lastname/],
     ])('the create lease refuses before the POST when %s', async (_label, options, message) => {
       const { result, postWithOptions } = await runProductionCreate({ body: castBody, ...options });
@@ -599,19 +600,19 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     // The recorder runs at the end of a production fence_source (after the
     // body re-hash and absence check); called directly here because the
     // fixture metadata cannot compile a create body.
-    async function recordBaseline(account, ledgerFixture = createFakeLedger(baseRun({ leaseToken: 'lease', leaseGeneration: 1, lockedUntil: 'x' })), liaisonContactId = null) {
+    async function recordBaseline(account, ledgerFixture = createFakeLedger(baseRun({ leaseToken: 'lease', leaseGeneration: 1, lockedUntil: 'x' })), liaisonContactId = null, piContactId = null) {
       const { client, run } = fixture({ step: 'fence_source', account });
       const leased = { ...run, leaseToken: 'lease', leaseGeneration: 1 };
-      const outcome = await recordFoundationTransitionBaseline({ run: leased, ledger: ledgerFixture.ledger, client, liaisonContactId })
+      const outcome = await recordFoundationTransitionBaseline({ run: leased, ledger: ledgerFixture.ledger, client, liaisonContactId, piContactId })
         .then((resources) => ({ resources }), (error) => ({ error }));
       return { ...outcome, getResources: ledgerFixture.getResources, ledgerFixture };
     }
 
     test('the baseline journals the pre-run Primary Contact and the run\'s Liaison as ledger receipt keys', async () => {
-      const { resources, error } = await recordBaseline(() => foundation({ _primarycontactid_value: PI_ID }), undefined, LIAISON_ID);
+      const { resources, error } = await recordBaseline(() => foundation({ _primarycontactid_value: OTHER_CONTACT }), undefined, LIAISON_ID, PI_ID);
       expect(error).toBeUndefined();
       const identity = resources[0].plannedIdentity;
-      expect(identity).toMatchObject({ primaryContactId: PI_ID, liaisonContactId: LIAISON_ID });
+      expect(identity).toMatchObject({ primaryContactId: OTHER_CONTACT, liaisonContactId: LIAISON_ID, piContactId: PI_ID });
       expect(() => assertLedgerReceipt(identity)).not.toThrow();
     });
 

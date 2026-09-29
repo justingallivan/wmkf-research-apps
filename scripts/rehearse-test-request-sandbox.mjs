@@ -917,7 +917,7 @@ export async function runReserve(client, args, ledgerUrl) {
   if (target === 'production') {
     const castDb = pgLedgerDb(ledgerUrl);
     try {
-      const members = await readCast({ client, ledger: createRunLedger(castDb), environment: 'production' });
+      const members = await readCast({ client, ledger: createRunLedger(castDb), environment: 'production', parentAccountId: preflight.foundation.accountid });
       cast = { piContactId: members.pi.memberId, liaisonContactId: members.liaison.memberId };
     } finally {
       await castDb.end();
@@ -1231,7 +1231,9 @@ export async function runCastMode(client, args, ledgerUrl) {
       }, null, 2));
       return;
     }
-    const result = await runCastCreate({ client, ledger, environment: 'production', addresses, allowlist });
+    // Cast contacts are children of the Foundation account (owner, S548).
+    const { accountid: parentAccountId } = await getFoundationSnapshot(client);
+    const result = await runCastCreate({ client, ledger, environment: 'production', addresses, allowlist, parentAccountId });
     console.log(JSON.stringify({ mode: 'CAST_CREATED', ...result }, null, 2));
   } finally {
     await db.end();

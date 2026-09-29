@@ -387,6 +387,8 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     const guid = crypto.randomUUID();
     expect(await ok({ kind: 'foundation_transition', primaryContactId: null, liaisonContactId: guid })).toBe(true);
     expect(await ok({ kind: 'foundation_transition', primaryContactId: guid, liaisonContactId: guid })).toBe(true);
+    expect(await ok({ kind: 'foundation_transition', primaryContactId: null, liaisonContactId: guid, piContactId: crypto.randomUUID() })).toBe(true);
+    expect(await ok({ piContactId: 'x' })).toBe(false);
     expect(await ok({ primaryContactId: 'not-a-guid' })).toBe(false);
     expect(await ok({ liaisonContactId: null })).toBe(false);
     expect(await ok({ requestId: null })).toBe(false);

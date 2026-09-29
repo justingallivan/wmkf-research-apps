@@ -28,6 +28,8 @@ const SANDBOX_URL = 'https://orgd9e66399.crm.dynamics.com/api/data/v9.2';
 const ADDRESSES = { pi: 'Owner+PI@Example.org', liaison: 'owner+liaison@example.org', suggested_reviewer: 'owner+reviewer@example.org' };
 const ALLOWLIST = new Set(['owner@example.org']);
 const ENV = 'sandbox';
+const FOUNDATION = 'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0';
+const PARENT_BIND = 'parentcustomerid_account@odata.bind';
 const SET_ENTITY = { contacts: 'contact', wmkf_potentialreviewerses: 'wmkf_potentialreviewers' };
 const ID_FIELD = { contact: 'contactid', wmkf_potentialreviewers: 'wmkf_potentialreviewersid' };
 
@@ -105,11 +107,20 @@ function fakeClient({ rows = [], onPost } = {}) {
     post: async (path, body) => {
       posts.push({ path, body });
       const entity = SET_ENTITY[path.slice(1)];
+      const { [PARENT_BIND]: parentBind, ...fields } = body;
       const row = entity === 'contact'
-        ? { entity, statecode: 0, _parentcustomerid_value: null, ...body }
+        ? { entity, statecode: 0, '@odata.etag': 'W/"1"', ...fields, _parentcustomerid_value: parentBind ? /\(([0-9a-f-]{36})\)/.exec(parentBind)[1] : null }
         : { entity, statecode: 0, _wmkf_contact_value: null, wmkf_name: `${body.wmkf_firstname} ${body.wmkf_lastname}`, ...body };
       if (onPost) return onPost({ path, body, row, store });
       store.push(row);
+      return { ok: true, status: 204, body: null };
+    },
+    patches: [],
+    patchWithOptions: async (path, body, headers) => {
+      client.patches.push({ path, body, headers });
+      const id = /^\/contacts\(([0-9a-f-]{36})\)$/.exec(path)[1];
+      const row = store.find((r) => r.entity === 'contact' && r.contactid === id);
+      row._parentcustomerid_value = /\(([0-9a-f-]{36})\)/.exec(body[PARENT_BIND])[1];
       return { ok: true, status: 204, body: null };
     },
     patch: async () => { throw new Error('patch must not be called'); },
@@ -119,7 +130,7 @@ function fakeClient({ rows = [], onPost } = {}) {
   return client;
 }
 
-const run = (client, ledger, extra = {}) => runCastCreate({ client, ledger, environment: ENV, addresses: ADDRESSES, allowlist: ALLOWLIST, ...extra });
+const run = (client, ledger, extra = {}) => runCastCreate({ client, ledger, environment: ENV, addresses: ADDRESSES, allowlist: ALLOWLIST, parentAccountId: FOUNDATION, ...extra });
 const digest = (a) => reviewerAddressSha256(a).addressSha256;
 
 beforeEach(() => {
@@ -157,8 +168,12 @@ describe('runCastCreate', () => {
 
     expect(client.posts.map((p) => p.path)).toEqual(['/contacts', '/contacts', '/wmkf_potentialreviewerses']);
     const [pi, liaison, reviewer] = ledger.rows;
-    expect(client.posts[0].body).toEqual({ contactid: pi.memberId, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'owner+pi@example.org' });
-    expect(client.posts[1].body).toEqual({ contactid: liaison.memberId, firstname: 'TEST · Factory', lastname: 'Liaison', emailaddress1: 'owner+liaison@example.org' });
+    expect(client.posts[0].body).toEqual({
+      contactid: pi.memberId, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'owner+pi@example.org', [PARENT_BIND]: `/accounts(${FOUNDATION})`,
+    });
+    expect(client.posts[1].body).toEqual({
+      contactid: liaison.memberId, firstname: 'TEST · Factory', lastname: 'Liaison', emailaddress1: 'owner+liaison@example.org', [PARENT_BIND]: `/accounts(${FOUNDATION})`,
+    });
     expect(client.posts[2].body).toEqual({
       wmkf_potentialreviewersid: reviewer.memberId, wmkf_firstname: 'TEST · Factory', wmkf_lastname: 'Reviewer',
       wmkf_emailaddress: 'owner+reviewer@example.org', wmkf_issyntheticreviewer: true,
@@ -174,9 +189,9 @@ describe('runCastCreate', () => {
     ]);
     expect(JSON.stringify(result)).not.toMatch(/example\.org/);
     expect(fenceModule.fenceCastCreateClient.mock.calls.map(([, f]) => f)).toEqual([
-      { members: [{ memberId: pi.memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI', address: 'owner+pi@example.org' }] },
-      { members: [{ memberId: liaison.memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'Liaison', address: 'owner+liaison@example.org' }] },
-      { members: [{ memberId: reviewer.memberId, entity: 'wmkf_potentialreviewers', firstName: 'TEST · Factory', lastName: 'Reviewer', address: 'owner+reviewer@example.org' }] },
+      { parentAccountId: FOUNDATION, members: [{ memberId: pi.memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI', address: 'owner+pi@example.org' }] },
+      { parentAccountId: FOUNDATION, members: [{ memberId: liaison.memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'Liaison', address: 'owner+liaison@example.org' }] },
+      { parentAccountId: FOUNDATION, members: [{ memberId: reviewer.memberId, entity: 'wmkf_potentialreviewers', firstName: 'TEST · Factory', lastName: 'Reviewer', address: 'owner+reviewer@example.org' }] },
     ]);
   });
 
@@ -271,7 +286,7 @@ describe('runCastCreate', () => {
   test('dispatched on entry with the row present: recovered without POSTing it', async () => {
     const memberId = '44444444-4444-4444-8444-444444444444';
     const ledger = memoryLedger([{ memberId, environment: ENV, role: 'pi', entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI', addressSha256: digest('owner+pi@example.org'), status: 'dispatched' }]);
-    const client = fakeClient({ rows: [{ entity: 'contact', contactid: memberId, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'owner+pi@example.org', statecode: 0, _parentcustomerid_value: null }] });
+    const client = fakeClient({ rows: [{ entity: 'contact', contactid: memberId, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'owner+pi@example.org', statecode: 0, _parentcustomerid_value: FOUNDATION }] });
     const result = await run(client, ledger);
     expect(client.posts.map((p) => p.path)).toEqual(['/contacts', '/wmkf_potentialreviewerses']);
     expect(client.posts.some((p) => p.body.contactid === memberId)).toBe(false);
@@ -339,8 +354,8 @@ describe('buildCastBody', () => {
     for (const [role, entity] of [['pi', 'contact'], ['suggested_reviewer', 'wmkf_potentialreviewers']]) {
       const memberId = '77777777-7777-4777-8777-777777777777';
       const inner = { baseUrl: SANDBOX_URL, post: jest.fn(async () => ({ ok: true, status: 204 })) };
-      const fenced = actual.fenceCastCreateClient(inner, { members: [{ memberId, entity, firstName: 'TEST · Factory', lastName: 'X', address: 'a@b.org' }] });
-      const body = buildCastBody({ role, memberId, firstName: 'TEST · Factory', lastName: 'X', address: 'a@b.org' });
+      const fenced = actual.fenceCastCreateClient(inner, { parentAccountId: FOUNDATION, members: [{ memberId, entity, firstName: 'TEST · Factory', lastName: 'X', address: 'a@b.org' }] });
+      const body = buildCastBody({ role, memberId, firstName: 'TEST · Factory', lastName: 'X', address: 'a@b.org', parentAccountId: FOUNDATION });
       const path = entity === 'contact' ? '/contacts' : '/wmkf_potentialreviewerses';
       await fenced.post(path, body);
       expect(() => fenced.post(path, { ...body, extra: 1 })).toThrow(expect.objectContaining({ code: 'create_rejected' }));
@@ -349,12 +364,50 @@ describe('buildCastBody', () => {
   });
 });
 
+describe('the Foundation parent (owner, S548)', () => {
+  const verifiedContact = (memberId, role, lastName, address) => ({
+    memberId, environment: ENV, role, entity: 'contact', firstName: 'TEST · Factory', lastName, addressSha256: digest(address), status: 'verified',
+  });
+  const liveContact = (memberId, lastName, address, parent) => ({
+    entity: 'contact', contactid: memberId, firstname: 'TEST · Factory', lastname: lastName, emailaddress1: address,
+    statecode: 0, _parentcustomerid_value: parent, '@odata.etag': 'W/"7"',
+  });
+  const PI = '61616161-6161-4616-8616-616161616161';
+  const LI = '62626262-6262-4626-8626-626262626262';
+
+  test('a verified contact created parentless gets its parent attached by one fenced PATCH under its ETag, then reads back', async () => {
+    const ledger = memoryLedger([verifiedContact(PI, 'pi', 'PI', 'owner+pi@example.org'), verifiedContact(LI, 'liaison', 'Liaison', 'owner+liaison@example.org')]);
+    const client = fakeClient({ rows: [liveContact(PI, 'PI', 'owner+pi@example.org', null), liveContact(LI, 'Liaison', 'owner+liaison@example.org', FOUNDATION)] });
+    const result = await run(client, ledger);
+    expect(client.patches).toEqual([{ path: `/contacts(${PI})`, body: { [PARENT_BIND]: `/accounts(${FOUNDATION})` }, headers: { 'If-Match': 'W/"7"' } }]);
+    expect(result.members.slice(0, 2).map((m) => m.outcome)).toEqual(['parent_attached', 'reused']);
+    await expect(readCast({ client, ledger, environment: ENV, parentAccountId: FOUNDATION, roles: ['pi', 'liaison'] })).resolves.toBeTruthy();
+  });
+
+  test('a verified contact under another account is drift, never re-parented', async () => {
+    const OTHER = '63636363-6363-4636-8636-636363636363';
+    const ledger = memoryLedger([verifiedContact(PI, 'pi', 'PI', 'owner+pi@example.org')]);
+    const client = fakeClient({ rows: [liveContact(PI, 'PI', 'owner+pi@example.org', OTHER)] });
+    await expect(run(client, ledger)).rejects.toMatchObject({ code: 'cast_member_drifted', role: 'pi' });
+    expect(client.patches).toEqual([]);
+  });
+
+  test('readCast refuses a parentless cast contact and a missing parent account', async () => {
+    const ledger = memoryLedger([verifiedContact(PI, 'pi', 'PI', 'owner+pi@example.org')]);
+    const client = fakeClient({ rows: [liveContact(PI, 'PI', 'owner+pi@example.org', null)] });
+    await expect(readCast({ client, ledger, environment: ENV, parentAccountId: FOUNDATION, roles: ['pi'] }))
+      .rejects.toMatchObject({ code: 'cast_member_drifted' });
+    await expect(readCast({ client, ledger, environment: ENV, roles: ['pi'] })).rejects.toMatchObject({ code: 'cast_parent_invalid' });
+    await expect(run(client, ledger, { parentAccountId: undefined })).rejects.toMatchObject({ code: 'cast_parent_invalid' });
+  });
+});
+
 describe('readCast', () => {
   test('returns the three verified members confirmed live, with no addresses', async () => {
     const client = fakeClient();
     const ledger = memoryLedger();
     await run(client, ledger);
-    const cast = await readCast({ client, ledger, environment: ENV });
+    const cast = await readCast({ client, ledger, environment: ENV, parentAccountId: FOUNDATION });
     expect(Object.keys(cast)).toEqual(['pi', 'liaison', 'suggested_reviewer']);
     expect(cast.pi).toEqual({ memberId: ledger.rows[0].memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI' });
     expect(JSON.stringify(cast)).not.toMatch(/example\.org/);
@@ -363,11 +416,11 @@ describe('readCast', () => {
   test('refuses a missing role, an unverified member, and a live email that no longer matches the digest', async () => {
     const client = fakeClient();
     const ledger = memoryLedger();
-    await expect(readCast({ client, ledger, environment: ENV })).rejects.toMatchObject({ code: 'cast_member_missing', role: 'pi' });
+    await expect(readCast({ client, ledger, environment: ENV, parentAccountId: FOUNDATION })).rejects.toMatchObject({ code: 'cast_member_missing', role: 'pi' });
     await run(client, ledger);
     client.store.find((r) => r.entity === 'wmkf_potentialreviewers').wmkf_emailaddress = 'owner+swapped@example.org';
-    await expect(readCast({ client, ledger, environment: ENV })).rejects.toMatchObject({ code: 'cast_member_drifted', role: 'suggested_reviewer' });
+    await expect(readCast({ client, ledger, environment: ENV, parentAccountId: FOUNDATION })).rejects.toMatchObject({ code: 'cast_member_drifted', role: 'suggested_reviewer' });
     ledger.rows[1].status = 'dispatched';
-    await expect(readCast({ client, ledger, environment: ENV })).rejects.toMatchObject({ code: 'cast_member_unverified', role: 'liaison' });
+    await expect(readCast({ client, ledger, environment: ENV, parentAccountId: FOUNDATION })).rejects.toMatchObject({ code: 'cast_member_unverified', role: 'liaison' });
   });
 });

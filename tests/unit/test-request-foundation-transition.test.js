@@ -252,6 +252,26 @@ describe('Foundation Primary Contact and the cast Liaison (cast-and-status plan,
       .toEqual({ failures: [], outcome: 'refreshed' });
   });
 
+  test('the run\'s cast PI and Liaison, Foundation children, may change during the run; every other Foundation contact stays protected', () => {
+    const PI = '14141414-1414-4141-8141-141414141414';
+    const staff = CONTACTS[0];
+    const before = [staff, { contactid: PI, versionnumber: 1 }, { contactid: LIAISON, versionnumber: 1 }];
+    const withCast = captureFoundationBaseline(account({ _primarycontactid_value: PRIOR }), before, CAPTURED,
+      { journalPrimaryContact: true, liaisonContactId: LIAISON, piContactId: PI });
+    expect(withCast).toMatchObject({ piContactId: PI, liaisonContactId: LIAISON });
+    expect(() => assertLedgerReceipt(withCast)).not.toThrow();
+    const touched = [staff, { contactid: PI, versionnumber: 9 }, { contactid: LIAISON.toUpperCase(), versionnumber: 4 }];
+    expect(evaluateFoundationTransition(withCast, refreshed({ _primarycontactid_value: PRIOR }), touched, { verifiedAt: VERIFIED }))
+      .toEqual({ failures: [], outcome: 'refreshed' });
+    const staffTouched = [{ ...staff, versionnumber: 6 }, ...touched.slice(1)];
+    expect(evaluateFoundationTransition(withCast, refreshed({ _primarycontactid_value: PRIOR }), staffTouched, { verifiedAt: VERIFIED }).failures)
+      .toEqual(['Foundation contact rows changed during the run']);
+    // A baseline that journaled no cast (before S548) still protects every child, cast or not.
+    const legacy = captureFoundationBaseline(account(), before, CAPTURED);
+    expect(evaluateFoundationTransition(legacy, refreshed(), touched, { verifiedAt: VERIFIED }).failures)
+      .toEqual(['Foundation contact rows changed during the run']);
+  });
+
   test('a non-GUID Liaison is refused at capture', () => {
     expect(() => journaled('not-a-guid')).toThrow(/Liaison is not a GUID/);
   });

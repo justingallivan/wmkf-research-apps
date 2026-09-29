@@ -287,11 +287,15 @@ describe('cast contact binds on the Request create (slice B)', () => {
 describe('fenceCastCreateClient (slice A)', () => {
   const CONTACT = '66666666-6666-4666-8666-666666666666';
   const PERSON = '99999999-9999-4999-8999-999999999999';
-  const castFence = { members: [
+  const FOUNDATION = 'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0';
+  const castFence = { parentAccountId: FOUNDATION, members: [
     { memberId: CONTACT, entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI', address: 'pi@example.test' },
     { memberId: PERSON, entity: 'wmkf_potentialreviewers', firstName: 'TEST · Factory', lastName: 'Reviewer', address: 'reviewer@example.test' },
   ] };
-  const contact = { contactid: CONTACT, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'pi@example.test' };
+  const contact = {
+    contactid: CONTACT, firstname: 'TEST · Factory', lastname: 'PI', emailaddress1: 'pi@example.test',
+    'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})`,
+  };
   const person = {
     wmkf_potentialreviewersid: PERSON, wmkf_firstname: 'TEST · Factory', wmkf_lastname: 'Reviewer',
     wmkf_emailaddress: 'reviewer@example.test', wmkf_issyntheticreviewer: true,
@@ -309,7 +313,9 @@ describe('fenceCastCreateClient (slice A)', () => {
   test.each([
     ['an unjournaled GUID', '/contacts', { ...contact, contactid: DEST }],
     ['a person GUID on the contact set', '/contacts', { ...contact, contactid: PERSON }],
-    ['a parent account bind', '/contacts', { ...contact, 'parentcustomerid_account@odata.bind': `/accounts(${DEST})` }],
+    ['another parent account', '/contacts', { ...contact, 'parentcustomerid_account@odata.bind': `/accounts(${DEST})` }],
+    ['a missing parent bind', '/contacts', (({ 'parentcustomerid_account@odata.bind': _p, ...rest }) => rest)(contact)],
+    ['a parent bind on the person', '/wmkf_potentialreviewerses', { ...person, 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }],
     ['an extra column', '/contacts', { ...contact, telephone1: '555' }],
     ['a person without the marker', '/wmkf_potentialreviewerses', { ...person, wmkf_issyntheticreviewer: false }],
     ['another entity set', '/accounts', { accountid: CONTACT }],
@@ -321,14 +327,35 @@ describe('fenceCastCreateClient (slice A)', () => {
     expect(() => fenceCastCreateClient(client, castFence).post(path, body)).toThrow(/Production write fence/);
   });
 
-  test.each(['patch', 'patchWithOptions', 'delete_', 'raw'])('refuses %s outright', (name) => {
+  test.each(['patch', 'delete_', 'raw'])('refuses %s outright', (name) => {
     const { client } = fakeClient();
     expect(() => fenceCastCreateClient(client, castFence)[name]('/contacts(x)', {})).toThrow(/not allowed in a cast create/);
   });
 
-  test('refuses to build without journaled members', () => {
+  test('admits the one PATCH that attaches the parent to a journaled contact under a concrete If-Match', async () => {
+    const { client, calls } = fakeClient();
+    await fenceCastCreateClient(client, castFence).patchWithOptions(`/contacts(${CONTACT})`,
+      { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, { 'If-Match': 'W/"12"' });
+    expect(calls.map((c) => c[0])).toEqual(['patchWithOptions']);
+  });
+
+  test.each([
+    ['another contact', `/contacts(${DEST})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, { 'If-Match': 'W/"12"' }],
+    ['the person', `/contacts(${PERSON})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, { 'If-Match': 'W/"12"' }],
+    ['another account', `/contacts(${CONTACT})`, { 'parentcustomerid_account@odata.bind': `/accounts(${DEST})` }, { 'If-Match': 'W/"12"' }],
+    ['an extra field', `/contacts(${CONTACT})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})`, firstname: 'X' }, { 'If-Match': 'W/"12"' }],
+    ['a name change', `/contacts(${CONTACT})`, { lastname: 'X' }, { 'If-Match': 'W/"12"' }],
+    ['no If-Match', `/contacts(${CONTACT})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, {}],
+    ['a wildcard If-Match', `/contacts(${CONTACT})`, { 'parentcustomerid_account@odata.bind': `/accounts(${FOUNDATION})` }, { 'If-Match': '*' }],
+  ])('refuses a PATCH of %s', (_label, path, body, headers) => {
     const { client } = fakeClient();
-    expect(() => fenceCastCreateClient(client, { members: [] })).toThrow(/journaled members/);
+    expect(() => fenceCastCreateClient(client, castFence).patchWithOptions(path, body, headers)).toThrow(/Production write fence/);
+  });
+
+  test('refuses to build without journaled members or a parent account', () => {
+    const { client } = fakeClient();
+    expect(() => fenceCastCreateClient(client, { parentAccountId: FOUNDATION, members: [] })).toThrow(/journaled members/);
+    expect(() => fenceCastCreateClient(client, { members: castFence.members })).toThrow(/parent account/);
   });
 });
 
