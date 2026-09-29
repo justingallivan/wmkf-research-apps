@@ -1,6 +1,6 @@
 # Scheduled email: engine hardening, then queued-reminder re-addressing
 
-Status: **DRAFT, revision 1 (2026-09-29, Session 551). Narrowed by the owner in S551 after the measurement below: Part A, engine hardening for every program, now leads, and Part B, Liaison re-addressing, is a smaller follow-on. Revision 0 (S549) was split out of `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` after Codex round 3 on that plan. Revision 1 has not been reviewed. Nothing built.**
+Status: **DRAFT, revision 1 (2026-09-29, Session 551; owner decisions A-1, A-2, B-1 and B-2 recorded in S551). Narrowed by the owner in S551 after the measurement below: Part A, engine hardening for every program, now leads, and Part B, Liaison re-addressing, is a smaller follow-on. Revision 0 (S549) was split out of `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` after Codex round 3 on that plan. Revision 1 has not been reviewed. Nothing built.**
 
 ## Why
 
@@ -31,13 +31,14 @@ All line numbers are as of `b9f05ae5d`.
 
 A1. **Send intent is the point of no return.** Once `send_requested_at` is set, the ordinary path reconciles only, as the test-Request path does today: accepted → record sent and finalize; otherwise → no `sendEmail`, and the row is marked unconfirmed (A2). This applies to send-now as well as the cron.
 
-A2. **Unconfirmed is an error code, not a new status** (owner decision A-1; recommended because it needs no status CHECK migration). The row is set to `failed` with `last_error_code = 'scheduled_email_send_unconfirmed'`, and the lease is released.
+A2. **Unconfirmed is an error code, not a new status** (owner decision A-1, S551: error code; it needs no status CHECK migration). The row is set to `failed` with `last_error_code = 'scheduled_email_send_unconfirmed'`, and the lease is released.
 - This happens **immediately**, in the `uncertain` branch that today skips `recordFailure` (`scheduled-email-service.js:384-392`), so the row does not sit in `sending` with a live lease, invisible to the digest query, until the next claim.
+- One shared helper, `isSendUnconfirmed(row)`, is the only test for this state. Every reader of `failed` rows uses it (the digest grouping, the UI, the edit/approve/send-now guards and the due-send path), and each has a test. A reader that misses the code would treat the row as ordinary `failed`; in the send path, that is the duplicate this plan removes.
 - The due query keeps claiming it, but only for reconciliation (A1), so a late acceptance is recorded and finalized without anyone acting.
 - `claimScheduledEmailSend` clears `last_error_code` and increments `attempt_count` on every claim [VERIFIED via `scheduled-email-store.js:190-219`]. A reconciliation that is still unaccepted re-stamps the code before releasing the lease, and reconciliation claims do not count toward `attempt_count` (or the count is documented as including them; decide in review).
 - The digest lists it in a new **Needs attention** section, never under upcoming. Like approval-pending, the section repeats every day until the row is resolved, so no receipt or frozen membership is needed (this replaces revision 0's open requirement 3).
 - The UI shows "Send status is uncertain. Check the email history before trying again" (`EMAIL_SEND_OUTCOME_COPY.uncertain`) and offers only Stop. Edit, approve and send-now are refused for these rows.
-- A row stopped here that Dynamics later accepts stays stopped. Staff decided after checking the history (owner decision A-2: accept this, or add a late-acceptance check on stopped rows).
+- **Late acceptance after a stop** (owner decision A-2, S551: check). Stop can end a row that Dynamics is still processing; so can the source-eligibility cancel at `scheduled-email-service.js:315`, which runs after the claim even when a send was requested. A daily cron pass reconciles every row with `status = 'stopped'`, `send_requested_at` set and `stopped_at` within the last 7 days, whoever stopped it. It reads the activity and never calls `sendEmail`. If Dynamics accepted it, a new store write moves the row from `stopped` to `sent`, fenced on those same columns (`recordScheduledEmailSent` needs a lease the stopped row does not have), and then finalizes it. The deliverable is marked Reminder sent, and the row appears in the PD's sent FYI. The rule: stopped wins unless Dynamics proves the email went. Every row with send intent has a `dynamics_email_id` [VERIFIED via `scheduled-email-store.js:234-245`]. Nothing here needs a migration.
 
 A3. **A failed read of a stored activity is unknown, not absent.** When `dynamics_email_id` is set and the read fails, the attempt ends as a retryable failure. There is no correlation recovery and no create. Correlation recovery runs only when `dynamics_email_id` is null.
 
@@ -57,11 +58,11 @@ B1. **Where.** In `deliverScheduledEmail`, after a successful claim and before a
 
 B2. **What.** If the resolved Liaison email differs from the stored Cc (or a Cc is gained or dropped), `readdressScheduledEmail` runs under the caller's lease. It is fenced on lease token, version, `sending` status and null transport fields. It updates `cc_recipients` and `recipient_contact_ids`, increments `version` and `recipient_generation`, and keeps subject, body, signature and edits. The send then continues to the new recipients under the new generation. If a crash left a draft under the old generation, that draft is orphaned, not sent.
 
-B3. **Review posture.** The VIP check reruns for the new contact ids. If the row now requires approval and has none, the send stops for this run: under the lease, the row is set to `scheduled` with `approval_required = true` and `approved_at = NULL`, and the lease is released. The due query's approval filter then skips it, and the digest lists it as approval-pending (owner decision B-1: whether a prior approval carries over when only the Cc changed; recommended no).
+B3. **Review posture.** The VIP check reruns for the new contact ids. **Owner decision B-1 (S551): an approval never carries over a recipient change.** If the recipients changed and the recomputed posture requires approval, any prior approval is cleared and the send stops for this run: under the lease, the row is set to `scheduled` with `approval_required = true` and `approved_at = NULL`, and the lease is released. The due query's approval filter then skips it, and the digest lists it as approval-pending, with the reason "Recipient changed: the institution's Liaison changed since you approved it" when it had been approved. If the recomputed posture needs no approval (review-all off, and no VIP recipient), the send continues.
 
 B4. **Failure.** A Liaison or contact read failure is a retryable failure for this run. The row is never sent to the stored Cc because a read failed.
 
-B5. **Rows with an activity but no send intent** (a crash window) are not re-addressed and send as created, possibly to the former Liaison. With production at 0 queued rows, this gap is accepted and nothing is built for it (owner decision B-2). Surfacing these rows instead would need a Dataverse Liaison read during digest generation, a new dependency.
+B5. **Rows with an activity but no send intent** (a crash window) are not re-addressed and send as created, possibly to the former Liaison. **Owner decision B-2 (S551): the gap is accepted and nothing is built for it**, because it needs a failure inside that window and a Liaison change before the retry, and production has 0 queued rows. Handling it later would mean clearing the saved activity id under a new generation; A5's generation column makes that possible. Surfacing these rows instead would need a Dataverse Liaison read during digest generation, a new dependency.
 
 This removes revision 0's interim stop, so its open requirement 1 no longer applies.
 
@@ -79,12 +80,13 @@ This removes revision 0's interim stop, so its open requirement 1 no longer appl
 ## Tests
 
 - A1: send intent set and activity unaccepted → no second `sendEmail`, for cron and send-now; late acceptance on a later run → sent and finalized.
-- A2: an unconfirmed row is under Needs attention, not upcoming; edit, approve and send-now are refused; Stop works.
+- A2: an unconfirmed row is under Needs attention, not upcoming; edit, approve and send-now are refused; Stop works; each reader goes through `isSendUnconfirmed`.
+- A2 late acceptance: a stopped row with send intent that Dynamics accepts within 7 days → `sent`, finalized and in the FYI; after 7 days, or without send intent → untouched; the pass never calls `sendEmail`.
 - A3: a stored-activity read error → retryable failure, and no create or correlation lookup.
 - A4: an edit or approval on a row with an activity → 409, row unchanged.
 - A5: a crash between create and persist, then a PD handoff → the next send creates a new generation-1 activity and never recovers the generation-0 draft; the rebuild loses to a concurrent edit or approval by version; a generation-0 row created before the migration still recovers by today's key.
 - A6: `cancelForSource` with a foreign lease → no-op.
-- B: the Liaison changes after creation → the send goes to the new Cc with PD edits kept; a Liaison read failure → no send; a new VIP contact → approval-pending; a concurrent lease turnover → the re-address no-ops.
+- B: the Liaison changes after creation → the send goes to the new Cc with PD edits kept; an approved row that still needs approval → approval cleared, approval-pending with the reason; a Liaison read failure → no send; a new VIP contact → approval-pending; a concurrent lease turnover → the re-address no-ops.
 - Crash-safety tests run against live Postgres (the `.pg.test.js` pattern in the CI ledger job), not mocked SQL.
 
 ## Release
