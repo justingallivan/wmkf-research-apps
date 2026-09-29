@@ -1,4 +1,113 @@
-# Session 548 Prompt: Factory synthetic cast (after the Business Central answer), probe hardening, wave30 in production
+# Session 549 Prompt: first cast-bound production clone, then merge the cast (PR #357)
+
+## Session 548 Summary — 2026-09-28 PT (Opus; probe hardening, wave30 live, meeting-date fix, synthetic cast slices A + B built, reviewed and created in production)
+
+### What Was Completed
+
+1. **Probe section 12 hardened** (on `main`, `3dcf61bb0` → `155dc80d6`):
+   - An unreadable cloud-flow definition or unreadable count prints `INCOMPLETE` and sets exit 1.
+   - Flows are matched on their triggers and record actions.
+   - Create steps registered for every entity are found.
+   - `--cast=<dir>` writes a dated, id-free JSON receipt.
+   - Mailing-list counts, list type (static or dynamic), `akoya_mailinglistmember`, and create-workflow summaries.
+
+   Owner-run twice in production (`COMPLETE`); receipts are in `~/factory-receipts`.
+2. **wave30 in production** [VERIFIED: owner-run output]:
+   - Applied under a same-day `DATAVERSE_PROD_WRITE_ACK`, which the interlock requires for any local production write; probe section 1 shows PRESENT.
+   - `SYNTHETIC_REVIEWER_ISOLATION=on` in Vercel Production and redeployed; Review Manager and My Candidates loaded normally.
+   - Credentials runbook entry added (`e20162400`, `6d0d17e3f`); docs reconciled (`cdaa23454`).
+3. **Workbench Board Meeting date fix** (PR #356, merged `9380f3605`): the DateOnly `wmkf_meetingdate` is now rendered in UTC. The owner confirmed 1003302 shows Dec 11.
+4. **Open question 1 answered.**
+   - Business Central is not used (the platform owner).
+   - No contact-create automation adds a mailing-list membership.
+   - The one dynamic list, "Test 2", has 0 members and has never been used.
+5. **Cast slices A + B built** on `claude/factory-cast` (draft **PR #357**, 23 commits from `4316b19ec` to `f47703167`, **not merged**, Tier 2):
+   - **Spine:** 054 in place gains `test_request_cast_members` and `test_request_cast_bindings`. New receipt keys: `primaryContactId` (null allowed), `liaisonContactId`, `piContactId`, `researchLeaderContactId`. Fences: cast create, the one parent-attach PATCH, the suggestion binding, and per-lookup contact binds on the Request create.
+   - **Parallel tracks:** A, the cast runner; B1 + B2, create-body binding and the Foundation transition allowance; B3, the suggestion binder. The CLI adds `--create-cast [--confirm]` and `--bind-reviewer=<runId>`; a production `--reserve` reads the cast, and `--run-recheck` reads the run's own journaled Liaison.
+   - **One Codex adversarial round** (gpt-5.6-sol high) returned needs-attention with two high and three medium findings; all five were fixed (`a45251e21`, `fba5b87f9`).
+6. **Owner decisions S548**, recorded in the cast plan: addresses supplied at run time with default names; `--bind-reviewer` as its own mode; binding mandatory on every production reserve; 1003302 stays unbound; Find-tab enrichment of the cast reviewer accepted; **(6)** the PI and Liaison are Foundation children; **(7)** WMKF ORG LEADER and WMKF RESEARCH LEADER added as cast contacts. Decisions 6 and 7 are post-review changes and were not re-reviewed.
+7. **Cast in production (5 members, all verified; ledger `ledger_prod`):**
+   - PI `6ccbcbd1-079f-44ec-a9c2-9b74148a92be`, Liaison `e068fd4e-065e-4ba1-8b97-1e6c0f5507e1`, reviewer person `e5003660-35f1-41e1-a1c4-aa2e4ec6e591`, Org Leader `da554f3e-9df4-4bc4-bd1d-b7e2c54875b4`, Research Leader `bd7ae3bb-52aa-4d84-a6be-14a565f67849`.
+   - Contacts are children of the Foundation.
+   - The owner's Audit History reads are clean.
+   - The owner set the Foundation's Primary Contact to TEST · Factory Liaison.
+8. **Contact-role findings** [VERIFIED via workflow definitions and metadata; cast plan *Facts*]:
+   - AkoyaGO status drafts address **organization** fields. Invite: To the Organization Leader, Cc the Request's Research Leader. Not Invited: To the organization's Primary Contact, Cc the PI. Ineligible: To the Request's Liaison.
+   - The Liaison and Organization Leader flow **up** only (Request → organization).
+   - **Nothing copies an organization's Primary Contact down to its Requests.** The owner confirmed this empirically on 1003220.
+
+### Commits
+- On `main`: `3dcf61bb0`, `e20162400`, `6d0d17e3f`, `cdaa23454`, `de2482147`, `ce2731611`, `155dc80d6`, `7f55ec80d`, `3e77fe858`; PR #356 merge `9380f3605`; this handoff.
+- On `claude/factory-cast` (PR #357): `4316b19ec` through `f47703167`.
+
+## Next Items
+
+### Verified Open
+
+1. **Owner: set the Foundation's Organization Leader to WMKF ORG LEADER** in AkoyaGO, replacing Allison Keller (a real person).
+   Evidence: cast plan owner decision 7; `f47703167`.
+2. **First cast-bound production clone.** Run from `claude/factory-cast`: `--reserve` (it reads all five cast members) and `--advance` under the usual verify; then `--bind-reviewer=<runId>`; then the owner's Workbench checks. Expected first-time outcomes, none of them failures:
+   - The Foundation's Primary Contact should read unchanged, since it is already the cast Liaison.
+   - The payment-contact workflows now see a bound Liaison.
+   - A draft email regarding the clone would stop verify, correctly (`expectedRegardingEmails: 0`).
+   Evidence: cast plan *Order* 4 build record.
+3. **Merge PR #357** after the first clone succeeds (Tier 2, deliberate promotion). CI was green at `b31f9fdb5`; re-check at the final head.
+4. **Liaison sync gap (outside the Factory):** a Liaison changed on an organization never reaches its existing Requests, and this app emails the Request's copy (`recipients-service.js`). Tell the platform owner, and decide between a process change, a down-sync workflow, or app-side handling.
+   Evidence: cast plan *Facts* (contact roles), 1003220 check.
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 need renumbering; the latest on-disk migration is 054).
+2. **Liaison sync gap:** which fix, if any (item 4 above).
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a — unchanged from the MVP cut.
+2. Seven late-2026 `expiresAt` test fixtures (the earliest is 2026-10-08) — see `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+3. Cast ledger has no reset path: a member or binding left `needs_attention` needs its row cleared by hand (Track A recommendation, deferred).
+
+### Verify Before Acting
+
+1. **054 edits need explicit ALTERs on existing ledgers.** `CREATE TABLE IF NOT EXISTS` does not update a changed CHECK constraint. S548 ran `ALTER TABLE test_request_cast_members DROP/ADD CONSTRAINT test_request_cast_members_role_check` on `ledger_prod` and `ledger`; re-applying 054 with `psql -f` updates only the receipt function and new tables.
+2. **`--run-recheck` on run `7293496e` (1003302)** now fails on the Primary Contact change. That's expected: the owner made the change, and the run's baseline predates journaling.
+3. **Residue:**
+   - Test Requests 1003301 (deactivate now) and 1003302.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - This session's merged agent worktrees and branches (`worktree-agent-aac2d9d2ff10034ad`, `-a6f2ec1b747e97f24`, `-a7037be3ec38dad64`) under `.claude/worktrees/`.
+   - Older `.claude/worktrees` and `/private/tmp` worktrees from earlier sessions.
+
+   List and confirm before deleting any of them.
+4. **Production reads this session:** owner-requested one-offs (1003220 and 1002852 contacts, form placement, Research Leader counts, workflow recipients, automation that could sync the Liaison) were run from scratch scripts under the session scratchpad. Only the probe changes are in the repo.
+
+### Do Not Reopen Without New Decision
+
+1. MVP cut and deferrals; the program director is the cloning admin; the allowlist replaces D-R4/6d (owner, S546).
+2. `Pending` accepted at create; all rollup companions freed; wave30 in production (owner, S547).
+3. S548 owner decisions 1–7 in the cast plan, including a mandatory cast binding, Foundation-parented cast contacts, and accepted Find-tab enrichment of the cast reviewer.
+4. Open question 1 (Business Central and mailing lists) is closed.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (on the branch) | Cast plan: contact-role facts, decisions 1–7, *Order* 4 build record, Codex round, production record |
+| `lib/services/test-requests/cast-runner.js` / `cast-binding-runner.js` | Cast create, reuse, recovery and parent attach; suggestion binding |
+| `lib/services/test-requests/production-write-fence.js` | All production fences, including the cast ones |
+| `lib/services/test-requests/foundation-transition.js` | Transition contract: journaled Primary Contact, Liaison and cast-contact exclusion |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI: `--create-cast`, `--bind-reviewer`, `--reserve` with the cast |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe; section 12 hardened |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|rehearse-test-request|email-source|migration-054).*"
+docker exec wmkf-ledger-pg psql -U postgres -qc "DROP DATABASE IF EXISTS ledger_ci_new" -c "CREATE DATABASE ledger_ci_new"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_ci_new TEST_REQUEST_LEDGER_REQUIRE=1 npx jest --runInBand "tests/integration/.*\.pg\.test\.js"
+```
+
+---
+
+## Prior Session 548 Prompt: Factory synthetic cast (after the Business Central answer), probe hardening, wave30 in production
 
 ## Session 547 Summary — 2026-09-28 PT (Opus; MVP item 5 complete; status setter built, merged and characterized in production)
 
