@@ -8,6 +8,12 @@ The Research Liaison switch (the liaison plan) gives **new** grantee reminders t
 
 Re-addressing a queued row safely needs the shared scheduled-email engine hardened. Several of the hazards Codex found (duplicate send after recorded send intent, a PD-handoff rebuild that can adopt an older draft) exist for every program today, independent of the Liaison change.
 
+## Measurement (S551)
+
+**Result (owner-run, production, 2026-09-29, read-only) [DERIVED-FROM: the S551 session run of scratch probe `probe-queued-reminder-liaison-drift.js`; its output is not committed]:** the production ledger has **0** `grantee_abstract_reminder` rows in any status, so 0 are unsent. The owner confirmed the probe read the production Postgres host. The owner also said no grantee materials requests are outstanding, which is consistent: the cron creates a row only for an Invited deliverable with an invited date [VERIFIED via `lib/services/cron/grantee-deliverable-reminders-service.js:151-153`]. The owner's statement is an owner report, not a probe result.
+
+So no queued reminder carries a Liaison from before the switch. Every row the cron creates from now on gets the Liaison current at creation [VERIFIED via `grantee-deliverable-reminders-service.js:300-318,365`]. The remaining re-address exposure is an institution changing its Liaison while a row waits to send. The engine hazards under *Current engine facts* do not depend on this count.
+
 ## Current engine facts
 
 - The daily cron runs three passes in order: process deliverables (create or PD-handoff rebuild), send digests, deliver due messages [VERIFIED via `lib/services/cron/grantee-deliverable-reminders-service.js:173-209`].
