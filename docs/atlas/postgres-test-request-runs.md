@@ -3,7 +3,7 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable operation ledger for owner-run test request clones; local ledger use recorded, shared database status unverified."
+summary: "Durable operation ledger for owner-run test request clones; local ledger recorded for cast creation, shared database status unverified."
 canonical: false
 cataloged: 2026-09-23
 last_verified: 2026-09-29
@@ -20,13 +20,24 @@ mirror (scripts/setup-database.js, V55) define the durable run ledger for
 the Test Request Factory's "basic clone" stage
 (docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md, "Operation contract
 and recovery" and the "3. Basic clone" build-stage row). The owner-run record
-reports local-ledger use for the production clone and cast binding [VERIFIED
-via `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`,
-*Order* 5].
+names the local `ledger_prod` as the ledger for the production cast creation
+[VERIFIED via `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`,
+*Order* 4]. For the first cast-bound clone (run `e33fa857`, Request 1003303)
+and its `--bind-reviewer`, *Order* 5 does not name the ledger. The CLI
+structurally requires an operator-supplied `TEST_REQUEST_LEDGER_URL` for those
+modes and refuses one that is unset, equals a shared `POSTGRES_URL*` /
+`DATABASE_URL` value, or names a neon.tech host [VERIFIED via
+`scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]. That rules out
+the configured shared URLs and neon.tech hosts, but does not independently
+prove the supplied URL is local or which database was used; the
+exact owner-run target for that clone and binding is unverified (no direct
+record) [ASSUMED unknown].
 Whether migration 054 is applied to the shared Production/Preview Postgres
 database was not re-probed for the B4 plan revision [ASSUMED unknown]. Existing
-databases use `node scripts/apply-migrations.js`; the owner retains control of
-any shared-database application.
+shared databases use `node scripts/apply-migrations.js`; the owner retains
+control of any shared-database application. The local ledgers took 054 and
+its in-place amendments by owner-run `psql` (cast plan, *Order* 1 and 4), and
+the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
 
 ## Contract
 
@@ -34,6 +45,9 @@ any shared-database application.
   called by the bounded resumable runner
   `lib/services/test-requests/run-runner.js` (`advanceRun`, one step per
   call) through the CLI modes `--reserve` / `--advance` / `--run-inspect`
+  (and the production `--set-status` / `--status-recheck`, `--create-cast` /
+  `--bind-reviewer` and `--run-recheck` modes, which use the same ledger URL
+  check [VERIFIED via `scripts/rehearse-test-request-sandbox.mjs:1283-1341`])
   of `scripts/rehearse-test-request-sandbox.mjs`, which connect only to
   the operator-supplied `TEST_REQUEST_LEDGER_URL` (refused when unset, when
   it names a neon.tech host, or when it equals any shared `POSTGRES_URL*` /
@@ -279,16 +293,24 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
 
 ## Limits
 
-- The owner-run CLI writes to the local ledger for production test Requests
-  [VERIFIED via `scripts/rehearse-test-request-sandbox.mjs:1214-1299` and the
-  S549 owner-run record in the cast plan]. Shared Production/Preview database
-  migration status remains unverified; this B4 revision performs no live read.
+- The owner-run CLI refuses a ledger URL matching the configured shared
+  Production/Preview URLs or a neon.tech host for every ledger-driven mode [VERIFIED via
+  `scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]; the local
+  `ledger_prod` is recorded for the production cast creation (cast plan,
+  *Order* 4). Which local ledger the 1003303 clone and binding used is not
+  recorded (see the header). Shared Production/Preview database migration
+  status remains unverified; this B4 revision performs no live read.
 - Slice B4 plans a **separate** Potential Reviewer 1 operation table in new
   migration 055, with a new V56 fresh-install mirror after V55. Typed columns
   hold the slot snapshot and readback without changing the receipt grammar.
   Migration 055 must reconcile earlier applied 054 shapes before adding its
-  composite foreign key; each target's schema remains unverified. It is not
-  built or applied [PLANNED via the cast plan, *Order* 6 revision 3].
+  composite foreign key; each target's schema remains unverified. On the
+  operational local `ledger_prod` and `ledger` it is applied by an owner-run
+  `psql -f` after a read-only shape preflight, with a recorded application,
+  never by `apply-migrations.js`. On shared Production/Preview it only keeps
+  the tracked migrations consistent and is not a B4 runtime prerequisite. It
+  is not built or applied [PLANNED via the cast plan, *Order* 6 revision 3,
+  §6].
 - `test_request_run_resources.readback`/`source_provenance` are JSONB and
   the schema cannot itself forbid a caller from stuffing prohibited content
   (document bodies, tokens) into them — that discipline lives in the

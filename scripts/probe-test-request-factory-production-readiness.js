@@ -54,7 +54,8 @@
  *      With <dir>, a dated create-only JSON receipt (names, labels, counts,
  *      booleans; no ids, no raw definitions) is written there.
  *  13. With --reviewer-slots[=<dir>]: read-only metadata for Potential Reviewer
- *      1–5 auditing and Request-update automation. Unclassified Request/slot
+ *      1–5 auditing and Request-update automation (enabled Update and
+ *      UpdateMultiple steps, Request-filtered and all-entity). Unclassified Request/slot
  *      flow mentions and unreadable definitions make the section incomplete.
  *      With <dir>, write a dated receipt containing the target, names, labels,
  *      counts and booleans (no record ids or raw definitions).
@@ -534,9 +535,13 @@ function classifySlotUpdateFlow(parameters) {
   return { message: FLOW_MESSAGE[message], firesOn: !fields.length ? 'ANY column' : slots.length ? `a slot (${slots.join(',')})` : `other columns only (${filter})` };
 }
 
+// A single Update also runs steps registered on UpdateMultiple (merged message
+// pipelines): https://learn.microsoft.com/en-us/power-apps/developer/data-platform/bulk-operations#message-pipelines-merged
+const UPDATE_MESSAGES = new Set(['Update', 'UpdateMultiple']);
+
 /** null means the step cannot fire on a reviewer-slot update. */
 function classifySlotUpdateStep(step) {
-  if (step?.sdkmessageid?.name !== 'Update') return null;
+  if (!UPDATE_MESSAGES.has(step?.sdkmessageid?.name)) return null;
   const fields = String(step.filteringattributes || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
   if (!fields.length) return 'ANY column';
   const slots = fields.filter((field) => REVIEWER_SLOTS.includes(field));
@@ -591,28 +596,30 @@ async function printReviewerSlotReadiness(client, exportDir) {
 
   const steps = await getAll(client, '/sdkmessageprocessingsteps?$select=name,stage,mode,filteringattributes,ishidden' +
     '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename)' +
-    "&$filter=sdkmessageid/name eq 'Update' and statecode eq 0");
-  const updates = steps.filter((row) => row.sdkmessageid?.name === 'Update' && row.sdkmessagefilterid?.primaryobjecttypecode === 'akoya_request');
+    "&$filter=(sdkmessageid/name eq 'Update' or sdkmessageid/name eq 'UpdateMultiple') and statecode eq 0");
+  const updates = steps.filter((row) => UPDATE_MESSAGES.has(row.sdkmessageid?.name) && row.sdkmessagefilterid?.primaryobjecttypecode === 'akoya_request');
+  // The existing count names now cover both messages; allEnabledUpdateMultipleSteps is the UpdateMultiple subset.
   receipt.counts.allEnabledUpdateSteps = steps.length;
+  receipt.counts.allEnabledUpdateMultipleSteps = steps.filter((row) => row.sdkmessageid?.name === 'UpdateMultiple').length;
   receipt.counts.entityUpdateSteps = updates.length;
-  console.log(`   enabled Request Update steps: ${updates.length}`);
+  console.log(`   enabled Request Update/UpdateMultiple steps: ${updates.length}`);
   for (const row of updates) {
     const firesOn = classifySlotUpdateStep(row);
     if (!firesOn) continue;
-    receipt.steps.push({ name: row.name || '(unnamed)', type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn });
-    console.log(`   - ${firesOn}: ${stepLabel(row)}`);
+    receipt.steps.push({ name: row.name || '(unnamed)', message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn });
+    console.log(`   - ${firesOn} (${row.sdkmessageid.name}): ${stepLabel(row)}`);
   }
   // Dataverse can represent an all-entity registration as no filter row, a
   // filter with no primary type, or a filter whose primary type is 'none'.
-  const globalUpdates = steps.filter((row) => row.sdkmessageid?.name === 'Update'
+  const globalUpdates = steps.filter((row) => UPDATE_MESSAGES.has(row.sdkmessageid?.name)
     && (!row.sdkmessagefilterid || !row.sdkmessagefilterid.primaryobjecttypecode || row.sdkmessagefilterid.primaryobjecttypecode === 'none'));
   receipt.counts.globalUpdateSteps = globalUpdates.length;
   receipt.counts.hiddenGlobalUpdateSteps = globalUpdates.filter(stepIsHidden).length;
   receipt.counts.hiddenMicrosoftPlatformUpdateSteps = globalUpdates.filter(isPlatformStep).length;
-  console.log(`   enabled Update steps with no entity filter: ${globalUpdates.length} (hidden: ${receipt.counts.hiddenGlobalUpdateSteps}; hidden Microsoft platform: ${receipt.counts.hiddenMicrosoftPlatformUpdateSteps})`);
+  console.log(`   enabled Update/UpdateMultiple steps with no entity filter: ${globalUpdates.length} (hidden: ${receipt.counts.hiddenGlobalUpdateSteps}; hidden Microsoft platform: ${receipt.counts.hiddenMicrosoftPlatformUpdateSteps})`);
   for (const row of globalUpdates.filter((item) => !isPlatformStep(item))) {
-    receipt.steps.push({ name: row.name || '(unnamed)', type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn: 'ANY entity/column' });
-    console.log(`   - ANY entity/column: ${stepLabel(row)}`);
+    receipt.steps.push({ name: row.name || '(unnamed)', message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn: 'ANY entity/column' });
+    console.log(`   - ANY entity/column (${row.sdkmessageid.name}): ${stepLabel(row)}`);
   }
 
   const flows = await getAll(client, '/workflows?$select=name,clientdata&$filter=category eq 5 and statecode eq 1');

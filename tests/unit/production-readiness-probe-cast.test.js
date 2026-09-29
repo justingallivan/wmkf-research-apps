@@ -121,6 +121,8 @@ describe('reviewer-slot update classifiers', () => {
     expect(classifySlotUpdateStep({ ...step, filteringattributes: '' })).toBe('ANY column');
     expect(classifySlotUpdateStep({ ...step, filteringattributes: 'akoya_title' })).toBeNull();
     expect(classifySlotUpdateStep({ ...step, sdkmessageid: { name: 'Create' } })).toBeNull();
+    expect(classifySlotUpdateStep({ sdkmessageid: { name: 'UpdateMultiple' }, filteringattributes: 'wmkf_potentialreviewer2' })).toBe('a slot (wmkf_potentialreviewer2)');
+    expect(classifySlotUpdateStep({ sdkmessageid: { name: 'UpdateMultiple' }, filteringattributes: '' })).toBe('ANY column');
   });
 });
 
@@ -148,10 +150,16 @@ describe('reviewer-slot metadata census', () => {
         { name: 'Unreadable slot workflow', category: 0, mode: 0, triggeronupdateattributelist: 'wmkf_potentialreviewer2', xaml: null },
         { name: 'Slot business rule', category: 2, mode: 0, xaml: 'wmkf_potentialreviewer3' },
       ],
-      entitySteps: [{ name: 'Any-column step', stage: 40, mode: 1, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'akoya_request' }, filteringattributes: '' }],
+      entitySteps: [
+        { name: 'Any-column step', stage: 40, mode: 1, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'akoya_request' }, filteringattributes: '' },
+        { name: 'Request UpdateMultiple slot step', stage: 20, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'UpdateMultiple' }, sdkmessagefilterid: { primaryobjecttypecode: 'akoya_request' }, filteringattributes: 'wmkf_potentialreviewer1', plugintypeid: { typename: 'AkoyaGo.RequestMulti' } },
+        { name: 'Contact any-column step', stage: 40, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'contact' }, filteringattributes: '', plugintypeid: { typename: 'AkoyaGo.ContactOnly' } },
+      ],
       globalSteps: [
         { name: 'Hidden vendor step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: null, plugintypeid: { typename: 'AkoyaGo.Custom' }, sdkmessageprocessingstepid: inputId },
         { name: 'None-filter vendor step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'none' }, plugintypeid: { typename: 'AkoyaGo.NoneFilter' } },
+        { name: 'Empty-filter vendor step', stage: 40, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: '' }, plugintypeid: { typename: 'AkoyaGo.EmptyFilter' } },
+        { name: 'Global UpdateMultiple vendor step', stage: 40, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'UpdateMultiple' }, sdkmessagefilterid: { primaryobjecttypecode: 'none' }, plugintypeid: { typename: 'AkoyaGo.GlobalMulti' } },
         { name: 'Hidden platform step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: null, plugintypeid: { typename: 'Microsoft.Platform' } },
       ],
       flows: [
@@ -183,17 +191,21 @@ describe('reviewer-slot metadata census', () => {
         expect.objectContaining({ name: 'Any-column step', hidden: false, firesOn: 'ANY column' }),
         expect.objectContaining({ name: 'Hidden vendor step', hidden: true, firesOn: 'ANY entity/column' }),
         expect.objectContaining({ name: 'None-filter vendor step', hidden: true, firesOn: 'ANY entity/column' }),
+        expect.objectContaining({ name: 'Request UpdateMultiple slot step', message: 'UpdateMultiple', firesOn: 'a slot (wmkf_potentialreviewer1)' }),
+        expect.objectContaining({ name: 'Empty-filter vendor step', message: 'Update', firesOn: 'ANY entity/column' }),
+        expect.objectContaining({ name: 'Global UpdateMultiple vendor step', message: 'UpdateMultiple', firesOn: 'ANY entity/column' }),
       ]));
       expect(receipt.steps).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Hidden platform step' })]));
+      expect(receipt.steps).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Contact any-column step' })]));
       expect(receipt.flows).toEqual([expect.objectContaining({ name: 'Slot flow', firesOn: 'a slot (wmkf_potentialreviewer1)' })]);
       expect(receipt.incompleteReasons).toContain('1 cloud-flow definitions unreadable');
-      expect(receipt.counts).toEqual(expect.objectContaining({ activatedWorkflowsAndRules: 3, updateTriggeredWorkflows: 2, unreadableWorkflowsAndRules: 1, allEnabledUpdateSteps: 4, entityUpdateSteps: 1, globalUpdateSteps: 3, hiddenMicrosoftPlatformUpdateSteps: 1, flowsMentioningRequestOrSlot: 5, unclassifiedFlowTriggers: 3 }));
+      expect(receipt.counts).toEqual(expect.objectContaining({ activatedWorkflowsAndRules: 3, updateTriggeredWorkflows: 2, unreadableWorkflowsAndRules: 1, allEnabledUpdateSteps: 8, allEnabledUpdateMultipleSteps: 2, entityUpdateSteps: 2, globalUpdateSteps: 5, hiddenMicrosoftPlatformUpdateSteps: 1, flowsMentioningRequestOrSlot: 5, unclassifiedFlowTriggers: 3 }));
       expect(receipt.flowMentions).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Unreadable flow', readable: false })]));
       expect(receipt.section).toBe(13);
       expect(receipt.target).toBe('https://wmkf.crm.dynamics.com');
       const stepQueries = client.get.mock.calls.map(([path]) => path).filter((path) => path.startsWith('/sdkmessageprocessingsteps?'));
       expect(stepQueries).toHaveLength(1);
-      expect(stepQueries[0]).toContain("$filter=sdkmessageid/name eq 'Update' and statecode eq 0");
+      expect(stepQueries[0]).toContain("$filter=(sdkmessageid/name eq 'Update' or sdkmessageid/name eq 'UpdateMultiple') and statecode eq 0");
       expect(stepQueries[0]).not.toContain("primaryobjecttypecode eq 'akoya_request'");
       expect(write).toHaveBeenCalledWith(expect.stringContaining('reviewer-slot-readiness-receipt-'), expect.any(String), { flag: 'wx' });
       const saved = write.mock.calls[0][1];
