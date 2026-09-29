@@ -10,7 +10,7 @@ const {
   isPlatformStep,
   customWorkflowActivities,
   classifySlotUpdateFlow,
-  classifySlotUpdateStep,
+  classifySlotWriteStep,
   printReviewerSlotReadiness,
 } = require('../../scripts/probe-test-request-factory-production-readiness.js');
 
@@ -117,12 +117,14 @@ describe('reviewer-slot update classifiers', () => {
 
   test('an enabled Update step with the slot present is classified, including unfiltered steps', () => {
     const step = { sdkmessageid: { name: 'Update' }, filteringattributes: 'akoya_title,wmkf_potentialreviewer5' };
-    expect(classifySlotUpdateStep(step)).toBe('a slot (wmkf_potentialreviewer5)');
-    expect(classifySlotUpdateStep({ ...step, filteringattributes: '' })).toBe('ANY column');
-    expect(classifySlotUpdateStep({ ...step, filteringattributes: 'akoya_title' })).toBeNull();
-    expect(classifySlotUpdateStep({ ...step, sdkmessageid: { name: 'Create' } })).toBeNull();
-    expect(classifySlotUpdateStep({ sdkmessageid: { name: 'UpdateMultiple' }, filteringattributes: 'wmkf_potentialreviewer2' })).toBe('a slot (wmkf_potentialreviewer2)');
-    expect(classifySlotUpdateStep({ sdkmessageid: { name: 'UpdateMultiple' }, filteringattributes: '' })).toBe('ANY column');
+    expect(classifySlotWriteStep(step)).toBe('a slot (wmkf_potentialreviewer5)');
+    expect(classifySlotWriteStep({ ...step, filteringattributes: '' })).toBe('ANY column');
+    expect(classifySlotWriteStep({ ...step, filteringattributes: 'akoya_title' })).toBeNull();
+    expect(classifySlotWriteStep({ ...step, sdkmessageid: { name: 'Create' } })).toBeNull();
+    expect(classifySlotWriteStep({ sdkmessageid: { name: 'UpdateMultiple' }, filteringattributes: 'wmkf_potentialreviewer2' })).toBe('a slot (wmkf_potentialreviewer2)');
+    expect(classifySlotWriteStep({ sdkmessageid: { name: 'UpdateMultiple' }, filteringattributes: '' })).toBe('ANY column');
+    expect(classifySlotWriteStep({ sdkmessageid: { name: 'Upsert' }, filteringattributes: 'wmkf_potentialreviewer1' })).toBe('a slot (wmkf_potentialreviewer1)');
+    expect(classifySlotWriteStep({ sdkmessageid: { name: 'UpsertMultiple' }, filteringattributes: '' })).toBe('ANY column');
   });
 });
 
@@ -153,6 +155,7 @@ describe('reviewer-slot metadata census', () => {
       entitySteps: [
         { name: 'Any-column step', stage: 40, mode: 1, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'akoya_request' }, filteringattributes: '' },
         { name: 'Request UpdateMultiple slot step', stage: 20, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'UpdateMultiple' }, sdkmessagefilterid: { primaryobjecttypecode: 'akoya_request' }, filteringattributes: 'wmkf_potentialreviewer1', plugintypeid: { typename: 'AkoyaGo.RequestMulti' } },
+        { name: 'Request Upsert slot step', stage: 20, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'Upsert' }, sdkmessagefilterid: { primaryobjecttypecode: 'akoya_request' }, filteringattributes: 'wmkf_potentialreviewer1', plugintypeid: { typename: 'AkoyaGo.RequestUpsert' } },
         { name: 'Contact any-column step', stage: 40, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'contact' }, filteringattributes: '', plugintypeid: { typename: 'AkoyaGo.ContactOnly' } },
       ],
       globalSteps: [
@@ -160,6 +163,7 @@ describe('reviewer-slot metadata census', () => {
         { name: 'None-filter vendor step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'none' }, plugintypeid: { typename: 'AkoyaGo.NoneFilter' } },
         { name: 'Empty-filter vendor step', stage: 40, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: '' }, plugintypeid: { typename: 'AkoyaGo.EmptyFilter' } },
         { name: 'Global UpdateMultiple vendor step', stage: 40, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'UpdateMultiple' }, sdkmessagefilterid: { primaryobjecttypecode: 'none' }, plugintypeid: { typename: 'AkoyaGo.GlobalMulti' } },
+        { name: 'Global UpsertMultiple vendor step', stage: 40, mode: 0, ishidden: { Value: false }, sdkmessageid: { name: 'UpsertMultiple' }, sdkmessagefilterid: { primaryobjecttypecode: 'none' }, plugintypeid: { typename: 'AkoyaGo.GlobalUpsertMulti' } },
         { name: 'Hidden platform step', stage: 40, mode: 0, ishidden: { Value: true }, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: null, plugintypeid: { typename: 'Microsoft.Platform' } },
       ],
       flows: [
@@ -181,7 +185,7 @@ describe('reviewer-slot metadata census', () => {
       expect(receipt.incompleteReasons).toContain('workflow definition unreadable: Unreadable slot workflow');
       expect(receipt.incompleteReasons).toContain('Request flow trigger message unrecognized: Unknown message / trigger');
       expect(receipt.incompleteReasons).toContain('Request flow trigger shape unclassified: Alternate trigger / trigger');
-      expect(receipt.incompleteReasons).toContain('flow mentions Request or slot without a classified Request trigger: Action mention');
+      expect(receipt.dispositionRequired).toContain('flow mentions Request or slot without a classified Request trigger: Action mention');
       expect(receipt.workflows).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: 'Slot workflow', triggered: true, mode: 'real-time', readable: true }),
         expect.objectContaining({ name: 'Unreadable slot workflow', triggered: true, readable: false }),
@@ -192,20 +196,22 @@ describe('reviewer-slot metadata census', () => {
         expect.objectContaining({ name: 'Hidden vendor step', hidden: true, firesOn: 'ANY entity/column' }),
         expect.objectContaining({ name: 'None-filter vendor step', hidden: true, firesOn: 'ANY entity/column' }),
         expect.objectContaining({ name: 'Request UpdateMultiple slot step', message: 'UpdateMultiple', firesOn: 'a slot (wmkf_potentialreviewer1)' }),
+        expect.objectContaining({ name: 'Request Upsert slot step', message: 'Upsert', firesOn: 'a slot (wmkf_potentialreviewer1)' }),
         expect.objectContaining({ name: 'Empty-filter vendor step', message: 'Update', firesOn: 'ANY entity/column' }),
         expect.objectContaining({ name: 'Global UpdateMultiple vendor step', message: 'UpdateMultiple', firesOn: 'ANY entity/column' }),
+        expect.objectContaining({ name: 'Global UpsertMultiple vendor step', message: 'UpsertMultiple', firesOn: 'ANY entity/column' }),
       ]));
       expect(receipt.steps).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Hidden platform step' })]));
       expect(receipt.steps).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Contact any-column step' })]));
       expect(receipt.flows).toEqual([expect.objectContaining({ name: 'Slot flow', firesOn: 'a slot (wmkf_potentialreviewer1)' })]);
       expect(receipt.incompleteReasons).toContain('1 cloud-flow definitions unreadable');
-      expect(receipt.counts).toEqual(expect.objectContaining({ activatedWorkflowsAndRules: 3, updateTriggeredWorkflows: 2, unreadableWorkflowsAndRules: 1, allEnabledUpdateSteps: 8, allEnabledUpdateMultipleSteps: 2, entityUpdateSteps: 2, globalUpdateSteps: 5, hiddenMicrosoftPlatformUpdateSteps: 1, flowsMentioningRequestOrSlot: 5, unclassifiedFlowTriggers: 3 }));
+      expect(receipt.counts).toEqual(expect.objectContaining({ activatedWorkflowsAndRules: 3, updateTriggeredWorkflows: 2, unreadableWorkflowsAndRules: 1, allEnabledSlotWriteSteps: 10, allEnabledUpdateMultipleSteps: 2, allEnabledUpsertSteps: 1, allEnabledUpsertMultipleSteps: 1, requestSlotWriteSteps: 3, globalSlotWriteSteps: 6, hiddenMicrosoftPlatformSlotWriteSteps: 1, flowsMentioningRequestOrSlot: 5, unclassifiedFlowTriggers: 3 }));
       expect(receipt.flowMentions).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Unreadable flow', readable: false })]));
       expect(receipt.section).toBe(13);
       expect(receipt.target).toBe('https://wmkf.crm.dynamics.com');
       const stepQueries = client.get.mock.calls.map(([path]) => path).filter((path) => path.startsWith('/sdkmessageprocessingsteps?'));
       expect(stepQueries).toHaveLength(1);
-      expect(stepQueries[0]).toContain("$filter=(sdkmessageid/name eq 'Update' or sdkmessageid/name eq 'UpdateMultiple') and statecode eq 0");
+      expect(stepQueries[0]).toContain("$filter=(sdkmessageid/name eq 'Update' or sdkmessageid/name eq 'UpdateMultiple' or sdkmessageid/name eq 'Upsert' or sdkmessageid/name eq 'UpsertMultiple') and statecode eq 0");
       expect(stepQueries[0]).not.toContain("primaryobjecttypecode eq 'akoya_request'");
       expect(write).toHaveBeenCalledWith(expect.stringContaining('reviewer-slot-readiness-receipt-'), expect.any(String), { flag: 'wx' });
       const saved = write.mock.calls[0][1];
@@ -227,6 +233,7 @@ describe('reviewer-slot metadata census', () => {
       expect(receipt.counts.requestUpdateTriggers).toBe(0);
       expect(receipt.counts.requestNonUpdateTriggers).toBe(1);
       expect(receipt.flowMentions).toEqual([expect.objectContaining({ name: 'Request create flow', recognizedRequestTriggers: 1 })]);
+      expect(receipt.dispositionRequired).toEqual([]);
     } finally {
       log.mockRestore();
     }
@@ -239,7 +246,8 @@ describe('reviewer-slot metadata census', () => {
       const receipt = await printReviewerSlotReadiness(client);
       expect(receipt.complete).toBe(false);
       expect(receipt.counts.flowsRead).toBe(0);
-      expect(receipt.incompleteReasons).toContain('no activated cloud flows visible to the probe identity; flow coverage unverified');
+      expect(receipt.dispositionRequired).toContain('no activated cloud flows visible to the probe identity; confirm zero against an admin inventory');
+      expect(receipt.incompleteReasons).toEqual([]);
     } finally {
       log.mockRestore();
     }
@@ -256,7 +264,13 @@ describe('reviewer-slot metadata census', () => {
       const receipt = await printReviewerSlotReadiness(client);
       expect(receipt.complete).toBe(false);
       expect(receipt.counts.unclassifiedFlowTriggers).toBe(1);
-      expect(receipt.incompleteReasons).toHaveLength(1);
+      if (_label === 'action-only mention') {
+        expect(receipt.incompleteReasons).toEqual([]);
+        expect(receipt.dispositionRequired).toHaveLength(1);
+      } else {
+        expect(receipt.incompleteReasons).toHaveLength(1);
+        expect(receipt.dispositionRequired).toEqual([]);
+      }
     } finally {
       log.mockRestore();
     }
