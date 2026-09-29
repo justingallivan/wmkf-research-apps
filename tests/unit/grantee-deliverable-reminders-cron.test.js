@@ -4,6 +4,9 @@
  * VIP/digest decision layer (docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md): every
  * Invited row becomes a durable ledger entry on first sight; the cron never
  * sends recipient mail directly; digests are the only notification surface.
+ * Default fixtures have a blank program (Request-copy Liaison); the Research
+ * institution-Liaison cases are in the 'Liaison of record' block
+ * (docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md reader 2).
  *
  * @jest-environment node
  */
@@ -14,6 +17,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     queryAllRecords: jest.fn(),
+    queryRecords: jest.fn(),
     getRecord: jest.fn(),
     updateRecord: jest.fn(),
     createAndSendEmail: jest.fn(),
@@ -66,6 +70,7 @@ import {
   sendScheduledEmailDigest,
 } from '../../lib/services/scheduled-email-service';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
+import { RESEARCH_PROGRAM_IDS } from '../../shared/config/researchPrograms';
 import handler from '../../pages/api/cron/grantee-deliverable-reminders';
 
 function mockRes() {
@@ -99,6 +104,8 @@ const requestRow = (n, over = {}) => ({
   _wmkf_projectleader_value: `pi${n}`,
   _akoya_primarycontactid_value: `liaison${n}`,
   _wmkf_programdirector_value: `pd${n}`,
+  _akoya_programid_value: null,
+  _akoya_applicantid_value: null,
   ...over,
 });
 const contactRow = (id) => ({
@@ -123,6 +130,7 @@ beforeEach(() => {
   });
   NotificationService.notify.mockClear().mockResolvedValue({ id: 1 });
   DynamicsService.queryAllRecords.mockReset().mockResolvedValue({ records: [], totalCount: 0, capped: false });
+  DynamicsService.queryRecords.mockReset().mockRejectedValue(new Error('unexpected account read'));
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
   DynamicsService.createAndSendEmail.mockReset().mockResolvedValue({ emailId: 'email-1' });
   resolveSignatureForRequest.mockClear();
@@ -469,5 +477,112 @@ describe('Test Request isolation', () => {
     await handler(req(), res);
     expect(res.body.scheduled).toBe(1);
     expect(DynamicsService.getRecord.mock.calls.some(([, , o]) => String(o?.select).includes('wmkf_istestrequest'))).toBe(false);
+  });
+});
+
+describe('Liaison of record (Research)', () => {
+  const ACCOUNT = '22222222-2222-2222-2222-222222222222';
+  const research = (over = {}) => requestRow(1, {
+    _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
+    _akoya_applicantid_value: ACCOUNT,
+    _akoya_primarycontactid_value: 'liaison-copy',
+    ...over,
+  });
+  function wire({ request = research(), primaryContact = 'liaison-inst', contact = contactRow } = {}) {
+    DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+    DynamicsService.queryRecords.mockImplementation(async () => ({
+      records: [{ accountid: ACCOUNT, _primarycontactid_value: primaryContact }], totalCount: 1, hasMore: false,
+    }));
+    DynamicsService.getRecord.mockImplementation((entitySet, id) => {
+      if (entitySet === 'akoya_requests') return Promise.resolve(request);
+      if (entitySet === 'contacts') return contact(id);
+      if (entitySet === 'systemusers') return Promise.resolve(pdRow(id));
+      return Promise.reject(new Error(`unexpected ${entitySet}`));
+    });
+  }
+
+  test('the Request read selects every Liaison helper input', async () => {
+    wire();
+    await handler(req(), mockRes());
+    const select = DynamicsService.getRecord.mock.calls.find(([e]) => e === 'akoya_requests')[2].select.split(',');
+    expect(select).toEqual(expect.arrayContaining(['_akoya_programid_value', '_akoya_applicantid_value', '_akoya_primarycontactid_value']));
+  });
+
+  test('a new row is Cc the institution Primary Contact, never a differing Request copy', async () => {
+    wire();
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.scheduled).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+      toRecipients: ['pi1@example.edu'],
+      ccRecipients: ['liaison-inst@example.edu'],
+      recipientContactIds: ['pi1', 'liaison-inst'],
+    }));
+    expect(DynamicsService.getRecord).not.toHaveBeenCalledWith('contacts', 'liaison-copy', expect.anything());
+  });
+
+  test('none → a new PI-only row with no Cc', async () => {
+    wire({ primaryContact: null });
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.scheduled).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+      toRecipients: ['pi1@example.edu'],
+      ccRecipients: [],
+      recipientContactIds: ['pi1'],
+    }));
+  });
+
+  test.each([
+    ['the account read throws', { primaryContact: 'liaison-inst' }, () => DynamicsService.queryRecords.mockRejectedValue(new Error('dataverse 503'))],
+    ['the Liaison contact read throws', {
+      contact: (id) => (id === 'liaison-inst' ? Promise.reject(new Error('403')) : Promise.resolve(contactRow(id))),
+    }, () => {}],
+    ['the found Liaison has no email', {
+      contact: (id) => Promise.resolve(id === 'liaison-inst' ? { ...contactRow(id), emailaddress1: null } : contactRow(id)),
+    }, () => {}],
+  ])('%s → the row is skipped this run, never created PI-only', async (_label, options, arrange) => {
+    wire(options);
+    arrange();
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.skippedNoRecipient).toBe(1);
+    expect(res.body.scheduled).toBe(0);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test('an account row missing its Primary Contact lookup skips the row, never PI-only', async () => {
+    wire();
+    DynamicsService.queryRecords.mockResolvedValue({ records: [{ accountid: ACCOUNT }], totalCount: 1, hasMore: false });
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.skippedNoRecipient).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test('an existing row with the same PD keeps its stored recipients (the documented gap)', async () => {
+    wire();
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({
+      id: 'scheduled-1', pd_systemuser_id: 'pd1', status: 'scheduled', cc_recipients: ['liaison-copy@example.edu'],
+    });
+    await handler(req(), mockRes());
+    expect(scheduledEmailStore.reassignScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['the institution Liaison', 'liaison-inst', ['liaison-inst@example.edu']],
+    ['no Cc for none', null, []],
+  ])('a former PD\'s unsent row is rebuilt by the handoff with %s', async (_label, primaryContact, cc) => {
+    wire({ primaryContact });
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({ id: 'scheduled-1', pd_systemuser_id: 'pd-former', status: 'scheduled' });
+    scheduledEmailStore.reassignScheduledEmail.mockResolvedValue({ id: 'scheduled-1' });
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.reassigned).toBe(1);
+    expect(scheduledEmailStore.reassignScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+      pdSystemUserId: 'pd1',
+      toRecipients: ['pi1@example.edu'],
+      ccRecipients: cc,
+    }));
   });
 });

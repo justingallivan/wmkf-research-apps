@@ -1898,6 +1898,66 @@ test('T2 loadRecipients: network rejection leaves To/Cc blank', async () => {
   expect(screen.getByLabelText('To email')).toHaveValue('');
 });
 
+// Liaison plan reader 1: the server compares the Liaison staff saw with the
+// Liaison of record at send, so a failed recipients load blocks Send.
+test('recipients load failure: alert with Retry, Send disabled until a retry loads', async () => {
+  let fail = true;
+  await readyRender({
+    recipients: async () => (fail
+      ? { ok: false, status: 503, json: async () => ({ error: 'Recipients are temporarily unavailable.' }) }
+      : { ok: true, json: async () => ({
+        pi: { contactId: 'c-pi', name: 'Monika Raj', email: 'monika.raj@emory.edu', hasEmail: true },
+        liaison: { contactId: null, name: null, email: null, hasEmail: false },
+      }) }),
+  });
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/recipients could not be loaded/i));
+  fireEvent.change(screen.getByLabelText('To email'), { target: { value: 'typed@emory.edu' } });
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+
+  fail = false;
+  fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+  expect(screen.queryByText(/recipients could not be loaded/i)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeEnabled();
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
+  const call = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/send-invite') && o?.method === 'POST');
+  expect(JSON.parse(call[1].body)).toMatchObject({ ccEmail: '', liaisonSeen: { contactId: null, email: null } });
+});
+
+test('recipients load ordering: an old request\'s slower response landing last is ignored', async () => {
+  const requestA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const requestB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  let resolveA;
+  const slowA = new Promise((resolve) => { resolveA = resolve; });
+  const recipientsFor = (tag) => ({ ok: true, json: async () => ({
+    pi: { contactId: `c-pi-${tag}`, name: `PI ${tag}`, email: `pi-${tag}@x.edu`, hasEmail: true },
+    liaison: { contactId: `c-li-${tag}`, name: `Liaison ${tag}`, email: `li-${tag}@x.edu`, hasEmail: true },
+  }) });
+  global.fetch = jest.fn(async (url) => {
+    const u = String(url);
+    if (u.includes('/api/email-defaults/grantee-invite')) return { ok: true, json: async () => defaultEmailDefaults() };
+    if (u.includes('/grantee-deliverables/recipients')) return u.includes(requestA) ? slowA : recipientsFor('b');
+    if (u.includes('/grantee-deliverables/abstract')) {
+      return { ok: true, json: async () => ({ effective: null, effectiveHtml: '', effectiveField: null, etag: null, status: null, editable: true }) };
+    }
+    if (u.includes('/api/scheduled-emails/vip-flags')) return { ok: true, json: async () => ({ flags: [] }) };
+    throw new Error(`unexpected fetch ${u}`);
+  });
+
+  const { rerender } = render(<AwardeeTab requestId={requestA} />);
+  rerender(<AwardeeTab requestId={requestB} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('pi-b@x.edu'));
+  await act(async () => {
+    resolveA(recipientsFor('a'));
+    await slowA;
+  });
+  expect(screen.getByLabelText('To email')).toHaveValue('pi-b@x.edu');
+  expect(screen.getByLabelText('Cc email')).toHaveValue('li-b@x.edu');
+});
+
 test('T2 loadRecipients: malformed 2xx body leaves To/Cc blank (bare .json(), strict)', async () => {
   await readyRender({ recipients: async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }) });
   expect(screen.getByLabelText('To email')).toHaveValue('');
@@ -2021,6 +2081,7 @@ test('T2 send: request bytes are exact (POST, headers, body)', async () => {
     ccEmail: 'lorena.mclaren@emory.edu',
     subject: expectedSubject,
     bodyText: expectedBody,
+    liaisonSeen: { contactId: 'c-liaison', email: 'lorena.mclaren@emory.edu' },
   }));
 });
 

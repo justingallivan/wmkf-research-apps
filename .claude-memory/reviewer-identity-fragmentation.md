@@ -19,7 +19,7 @@ Do:
 
 Do not:
 - Store remittance/banking PII in Dataverse — onboard reviewers at bill.com, keep only status + the join pointer.
-- Join applicants on `akoya_primarycontactid` (=liaison); the PI is `wmkf_projectleader`.
+- Join applicants on `akoya_primarycontactid` (the Request's Liaison copy); the PI is `wmkf_projectleader`.
 - Run `--execute` table-drops autonomously — always grep live callers + back up first (as the W6 drop did: migration 018, 2026-06-04, with JSONL+Blob backup).
 
 Ground truth: `docs/atlas/postgres-researchers.md`, `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (rev3), `lib/services/backprop-reviewer-orcid.js`, `lib/dataverse/adapters/contact.js`; probe scripts (artifacts gitignored). Related: [[project-w6-table-drop-closed]], [[project-no-banking-pii-in-dataverse]], [[project-reviewer-identity-resolution-phase1]], [[project-institution-foundation-liaison]].

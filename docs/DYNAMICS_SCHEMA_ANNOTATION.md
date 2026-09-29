@@ -103,7 +103,7 @@ Not just grants — this table holds **all record types**: grant applications (1
 | Field | Meaning |
 |-------|---------|
 | `_akoya_applicantid_value` | → account: applicant institution (grantee) |
-| `_akoya_primarycontactid_value` | → contact: liaison / primary contact at institution |
+| `_akoya_primarycontactid_value` | → contact: the Request's copy of the primary contact; for Research the Liaison of record is the applicant account's `_primarycontactid_value` |
 | `_wmkf_projectleader_value` | → contact: PI / principal investigator |
 | `_wmkf_researchleader_value` | → contact: VPR / VP for research |
 | `_wmkf_ceo_value` | → contact: CEO / president / chancellor |

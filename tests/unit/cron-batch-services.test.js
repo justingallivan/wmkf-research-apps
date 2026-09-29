@@ -87,7 +87,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   grantRequestAdapter.getById.mockImplementation(async (id, opts) => {
     if (opts?.select === 'wmkf_wmkfprojectdescription') return { wmkf_wmkfprojectdescription: null, _etag: 'e1' };
-    return { akoya_requestid: id, akoya_requestnum: '1001', akoya_title: 'Award', _wmkf_projectleader_value: 'pi1', _akoya_primarycontactid_value: 'li1', _wmkf_programdirector_value: 'pd1' };
+    return { akoya_requestid: id, akoya_requestnum: '1001', akoya_title: 'Award', _wmkf_projectleader_value: 'pi1', _akoya_primarycontactid_value: 'li1', _wmkf_programdirector_value: 'pd1', _akoya_programid_value: null, _akoya_applicantid_value: null };
   });
   grantRequestAdapter.updateById.mockResolvedValue({});
   granteeDeliverableAdapter.update.mockResolvedValue({});
