@@ -174,9 +174,9 @@ describe('runCastCreate', () => {
     ]);
     expect(JSON.stringify(result)).not.toMatch(/example\.org/);
     expect(fenceModule.fenceCastCreateClient.mock.calls.map(([, f]) => f)).toEqual([
-      { members: [{ memberId: pi.memberId, entity: 'contact' }] },
-      { members: [{ memberId: liaison.memberId, entity: 'contact' }] },
-      { members: [{ memberId: reviewer.memberId, entity: 'wmkf_potentialreviewers' }] },
+      { members: [{ memberId: pi.memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'PI', address: 'owner+pi@example.org' }] },
+      { members: [{ memberId: liaison.memberId, entity: 'contact', firstName: 'TEST · Factory', lastName: 'Liaison', address: 'owner+liaison@example.org' }] },
+      { members: [{ memberId: reviewer.memberId, entity: 'wmkf_potentialreviewers', firstName: 'TEST · Factory', lastName: 'Reviewer', address: 'owner+reviewer@example.org' }] },
     ]);
   });
 
@@ -339,7 +339,7 @@ describe('buildCastBody', () => {
     for (const [role, entity] of [['pi', 'contact'], ['suggested_reviewer', 'wmkf_potentialreviewers']]) {
       const memberId = '77777777-7777-4777-8777-777777777777';
       const inner = { baseUrl: SANDBOX_URL, post: jest.fn(async () => ({ ok: true, status: 204 })) };
-      const fenced = actual.fenceCastCreateClient(inner, { members: [{ memberId, entity }] });
+      const fenced = actual.fenceCastCreateClient(inner, { members: [{ memberId, entity, firstName: 'TEST · Factory', lastName: 'X', address: 'a@b.org' }] });
       const body = buildCastBody({ role, memberId, firstName: 'TEST · Factory', lastName: 'X', address: 'a@b.org' });
       const path = entity === 'contact' ? '/contacts' : '/wmkf_potentialreviewerses';
       await fenced.post(path, body);

@@ -14,7 +14,7 @@ import {
   bundleSourceOf, compileBody, computeRunPlanDigest, MANIFEST_V4, runPreflight, sha256,
 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { captureFoundationBaseline } from '../../lib/services/test-requests/foundation-transition.js';
-import { assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
+import { assertLedgerReceipt, reviewerAddressSha256 } from '../../lib/services/test-requests/run-ledger.js';
 import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
@@ -28,7 +28,21 @@ const ORG_ID = '66666666-6666-4666-8666-666666666666';
 // Slice B: the production cast PI and Liaison contacts.
 const PI_ID = '88888888-8888-4888-8888-888888888888';
 const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
-const castMember = (role, memberId, overrides = {}) => ({ memberId, environment: 'production', role, entity: 'contact', status: 'verified', ...overrides });
+const OTHER_CONTACT = '12121212-1212-4121-8121-121212121212';
+const CAST_NAMES = { pi: 'PI', liaison: 'Liaison' };
+const castAddress = (role) => `cast-${role}@example.test`;
+const castMember = (role, memberId, overrides = {}) => ({
+  memberId, environment: 'production', role, entity: 'contact', status: 'verified',
+  firstName: 'TEST · Factory', lastName: CAST_NAMES[role], addressSha256: reviewerAddressSha256(castAddress(role)).addressSha256, ...overrides,
+});
+/** The live cast contact row as readCast reads it; `drift` overrides fields. */
+const castContactRow = (contactId, statecode, drift = {}) => {
+  const role = contactId === LIAISON_ID ? 'liaison' : 'pi';
+  return {
+    contactid: contactId, firstname: 'TEST · Factory', lastname: CAST_NAMES[role], emailaddress1: castAddress(role),
+    statecode, _parentcustomerid_value: null, ...drift,
+  };
+};
 const VERIFIED_CAST = [castMember('liaison', LIAISON_ID), castMember('pi', PI_ID)];
 
 function ok(body, status = 200) {
@@ -360,7 +374,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
   const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
   const PROD = 'https://wmkf.crm.dynamics.com';
 
-  function productionClient(postWithOptions, liveSourceVersion = 42, extraRoutes = null, castContactState = 0) {
+  function productionClient(postWithOptions, liveSourceVersion = 42, extraRoutes = null, castContactState = 0, castDrift = {}) {
     return {
       baseUrl: `${PROD}/api/data/v9.2`,
       postWithOptions,
@@ -395,14 +409,14 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         if (requestPath.startsWith('/sharepointdocumentlocations')) return ok({ value: [{ sharepointdocumentlocationid: 'parent-1', _parentsiteorlocation_value: 'site-x' }] });
         if (requestPath.startsWith('/systemusers')) return ok({ value: [{ systemuserid: APP_USER_ID, fullname: '# WMK: Research Review App Suite', accessmode: 4, isdisabled: false }] });
         const castContact = /^\/contacts\(([0-9a-f-]{36})\)/.exec(requestPath);
-        if (castContact && [PI_ID, LIAISON_ID].includes(castContact[1])) return ok({ contactid: castContact[1], statecode: castContactState });
+        if (castContact && [PI_ID, LIAISON_ID, OTHER_CONTACT].includes(castContact[1])) return ok(castContactRow(castContact[1], castContactState, castDrift));
         if (requestPath.startsWith('/contacts?')) return ok({ value: [] });
         throw new Error(`unexpected path: ${requestPath}`);
       },
     };
   }
 
-  async function runProductionCreate({ body, liveSourceVersion = 42, castMembers = VERIFIED_CAST, castContactState = 0 }) {
+  async function runProductionCreate({ body, liveSourceVersion = 42, castMembers = VERIFIED_CAST, castContactState = 0, castDrift = {} }) {
     const bundle = buildSourceBundle({
       sourceRow: {
         akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
@@ -429,7 +443,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     const postWithOptions = jest.fn();
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
-      deps: { client: productionClient(postWithOptions, liveSourceVersion, null, castContactState), graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
+      deps: { client: productionClient(postWithOptions, liveSourceVersion, null, castContactState, castDrift), graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
     });
     return { result, postWithOptions };
   }
@@ -452,12 +466,13 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
   });
 
   test('with the source unchanged, the same setup reaches the transport (the two refusals above are not vacuous)', async () => {
-    const { postWithOptions } = await runProductionCreate({ body: legitBody });
+    const { postWithOptions } = await runProductionCreate({
+      body: { ...legitBody, 'wmkf_ProjectLeader@odata.bind': `/contacts(${PI_ID})`, 'akoya_primarycontactid@odata.bind': `/contacts(${LIAISON_ID})` },
+    });
     expect(postWithOptions).toHaveBeenCalledTimes(1);
   });
 
   describe('cast PI and Liaison (slice B)', () => {
-    const OTHER_CONTACT = '12121212-1212-4121-8121-121212121212';
     const castBody = {
       ...legitBody,
       'wmkf_ProjectLeader@odata.bind': `/contacts(${PI_ID})`,
@@ -471,7 +486,16 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       expect(postWithOptions.mock.calls[0][1]).toEqual(castBody);
     });
 
-    test('the fence refuses a contact bind outside the manifest cast (castContactIds reach the fence)', async () => {
+    test('the fence refuses the PI and Liaison swapped (castBinds reach the fence per lookup)', async () => {
+      const { result, postWithOptions } = await runProductionCreate({
+        body: { ...legitBody, 'wmkf_ProjectLeader@odata.bind': `/contacts(${LIAISON_ID})`, 'akoya_primarycontactid@odata.bind': `/contacts(${PI_ID})` },
+      });
+      expect(result.outcome).toBe('needs_attention');
+      expect(result.errorMessage).toMatch(/Production write fence: Request bind .* is not approved/);
+      expect(postWithOptions).not.toHaveBeenCalled();
+    });
+
+    test('the fence refuses a contact bind outside the manifest cast (castBinds reach the fence)', async () => {
       const { result, postWithOptions } = await runProductionCreate({ body: { ...castBody, 'akoya_primarycontactid@odata.bind': `/contacts(${OTHER_CONTACT})` } });
       expect(result.outcome).toBe('needs_attention');
       expect(result.errorMessage).toMatch(/Production write fence: Request bind akoya_primarycontactid@odata.bind is not approved/);
@@ -479,10 +503,13 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     });
 
     test.each([
-      ['the ledger Liaison is not verified', { castMembers: [castMember('pi', PI_ID), castMember('liaison', LIAISON_ID, { status: 'dispatched' })] }, /cast liaison is not the journaled, verified/],
+      ['the ledger Liaison is not verified', { castMembers: [castMember('pi', PI_ID), castMember('liaison', LIAISON_ID, { status: 'dispatched' })] }, /cast is not bindable \(cast_member_unverified\)/],
       ['the ledger PI is a different contact', { castMembers: [castMember('pi', OTHER_CONTACT), castMember('liaison', LIAISON_ID)] }, /cast pi is not the journaled, verified/],
-      ['the ledger has no production cast', { castMembers: [] }, /cast pi is not the journaled, verified/],
-      ['a cast contact is inactive', { castContactState: 1 }, /cast pi contact is not active/],
+      ['the ledger has no production cast', { castMembers: [] }, /cast is not bindable \(cast_member_missing\)/],
+      ['a cast contact is inactive', { castContactState: 1 }, /cast is not bindable \(cast_member_drifted\).*statecode/],
+      ['a cast contact\'s email changed after reservation', { castDrift: { emailaddress1: 'someone-else@example.test' } }, /cast_member_drifted.*emailaddress1/],
+      ['a cast contact gained a parent account', { castDrift: { _parentcustomerid_value: ORG_ID } }, /cast_member_drifted.*_parentcustomerid_value/],
+      ['a cast contact was renamed', { castDrift: { lastname: 'Someone' } }, /cast_member_drifted.*lastname/],
     ])('the create lease refuses before the POST when %s', async (_label, options, message) => {
       const { result, postWithOptions } = await runProductionCreate({ body: castBody, ...options });
       expect(result.outcome).toBe('needs_attention');

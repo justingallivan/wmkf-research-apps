@@ -270,7 +270,7 @@ describe('runCastBinding', () => {
 });
 
 describe('the fence admits the runner body and nothing shaped otherwise', () => {
-  const fence = { bindingId: BINDING_ID, personId: PERSON_ID, destinationRequestId: REQUEST_ID, sourceRequestId: SOURCE_ID };
+  const fence = { bindingId: BINDING_ID, personId: PERSON_ID, destinationRequestId: REQUEST_ID, sourceRequestId: SOURCE_ID, label: CAST_SUGGESTION_LABEL };
   const body = buildCastSuggestionBody({ bindingId: BINDING_ID, personId: PERSON_ID, requestId: REQUEST_ID, meetingDate: '2026-06-04' });
 
   test('admits the runner body', async () => {
