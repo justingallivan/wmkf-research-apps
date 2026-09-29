@@ -49,6 +49,19 @@ Program ids and applicant ids compare case-insensitively. The batched form, `res
 
 Before the build, the owner runs a read-only production probe (session scratch script `probe-research-liaison-coverage.js`; counts only, no names, emails or ids). It covers active Research awardees and Research Requests with a meeting date today or later, both excluding test Requests. For each population it reports how many Request copies match the institution's Primary Contact, differ from it, would gain a Liaison, or would lose the Liaison Cc under rule 1. The result is recorded here; the probe is committed as a script in the build if kept.
 
+**Result (owner-requested run, production, 2026-09-29, read-only, complete) [DERIVED-FROM: probe output; contact GUIDs compared, not people]:**
+
+| | A. Active Research awardees | B. Research Requests, meeting date ≥ 2026-09-29 |
+|---|---|---|
+| Requests | 108 | 213 |
+| Distinct institutions (no Primary Contact) | 64 (1) | 133 (0) |
+| Request copy = institution Primary Contact | 23 | 168 |
+| Request copy differs (the Liaison changes) | 84 | 44 |
+| Request copy blank, institution set (Liaison gained) | 0 | 1 |
+| Liaison Cc dropped under rule 1 | 1 | 0 |
+
+Rule 1 costs almost nothing: one awardee loses its Liaison Cc. The switch itself changes the Liaison contact on most active awardees (84 of 108) and on about a fifth of upcoming Requests. Some of those differences may be duplicate contact rows for one person rather than a different person, so the address may or may not change (earlier SoCal probes found GUID divergence overstates person divergence; owner answer 8 accepts this).
+
 ## Phase 1 — readers switch; a queued reminder whose Liaison changed is stopped and shown
 
 ### 1. Awardee invitation — recipients and send
