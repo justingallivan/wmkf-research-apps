@@ -1,6 +1,6 @@
 # Research Liaison read from the applicant institution
 
-Status: **DRAFT, revision 5 (2026-09-29, Session 549; revision 4's round-4 review: needs-attention, one high and three medium, all answered below). Codex plan reviews: round 1 needs-attention (five high, two medium); round 2 needs-attention (four high, two medium); round 3 on revision 3 needs-attention (five high, one medium), five of the six on re-addressing queued reminders. Revision 4 splits the work (owner, S549): this plan covers the readers and new reminders; re-addressing queued reminders moves to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`. One more review before the build. Nothing built.** Branch `claude/liaison-from-institution`.
+Status: **DRAFT, revision 6 (2026-09-29, Session 549; round 4: one high and three medium; round 5: one medium; all answered below). Codex plan reviews: round 1 needs-attention (five high, two medium); round 2 needs-attention (four high, two medium); round 3 on revision 3 needs-attention (five high, one medium), five of the six on re-addressing queued reminders. Revision 4 splits the work (owner, S549): this plan covers the readers and new reminders; re-addressing queued reminders moves to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`. One more review before the build. Nothing built.** Branch `claude/liaison-from-institution`.
 
 ## Decision (owner with the AkoyaGO platform owner, 2026-09-29)
 
@@ -142,13 +142,13 @@ So the switch changes the actual Liaison recipient on 27 active awards and 35 up
 - **Dynamics Explorer:**
   - Today, `handleContactRequests` finds a contact's Requests with one query across eleven Request role lookups, capped at `top: 100`. It labels a match on `_akoya_primarycontactid_value` as "Primary Contact" [VERIFIED via `lib/services/dynamics-explorer/tools/get-related.js:497-538`]. The prompt calls the Request field the Liaison (`shared/config/prompts/dynamics-explorer.js:73,539,623`, per round 1).
   - Change: that role is relabelled "Request Primary Contact (copy)", and Research Liaison relationships come from the institution. The merge (answers round 3 finding 6):
-    1. **Accounts:** read the accounts whose `_primarycontactid_value` is the contact, up to 25; more than 25 marks the result incomplete.
-    2. **Research Requests:** for those account ids in one OR-chunk, read the Requests with a Research program and the handler's existing date filter and test-Request select, `top: 100`.
+    1. **Accounts:** read **all** accounts whose `_primarycontactid_value` is the contact, paging to completion (`queryAllAccounts`, `lib/dataverse/adapters/account.js:40`); account discovery is never truncated (round 5).
+    2. **Research Requests:** split the account ids into OR-chunks of at most 25. For each chunk, read the Requests with a Research program and the handler's existing date filter and test-Request select, ordered by `akoya_submitdate desc`, `top: 100`. Each chunk returns its own newest 100, so their union contains the overall newest 100.
     3. **Existing query:** unchanged apart from the label, now also selecting `akoya_requestid`.
     4. **Merge:** by lowercased `akoya_requestid`, with the roles of a Request in both results unioned (for example "PI, Liaison (institution)").
     5. **Order and cap:** sort by `akoya_submitdate` desc, then cap at 100.
     6. **Counts (round 4 finding 4):**
-       - When every source is complete (no query at its cap, account list not truncated), `totalCount` is the exact merged count.
+       - When no Request query hit its cap, `totalCount` is the exact merged count.
        - Otherwise `totalCount` is `null`, the result carries `returnedCount` and `hasMore: true`, and the tool text says the list is partial.
        - Both Request queries order by `akoya_submitdate desc` before capping, so the returned subset is the newest.
        - The prompt's truncation rule (`shared/config/prompts/dynamics-explorer.js:582`, per round 4) is updated so a null total is reported as "at least N".
@@ -200,7 +200,7 @@ Per reader:
 - **Applicant contacts:** SoCal keeps its account fallback. Research never uses the Request copy.
 - **Export and Explorer:**
   - Divergent Request and account fixtures. The Explorer Liaison relationship returns the current institution contact's Research Requests and labels the former Request-copy match as the copy. The export shows the relabelled caption.
-  - Explorer merge: a Request found by both queries appears once with both roles; more than 25 accounts, or a capped query, gives `hasMore: true` and `totalCount: null` with `returnedCount`; complete sources give the exact merged `totalCount`; a SoCal Request of an account the contact leads is not labelled Liaison (institution).
+  - Explorer merge: a Request found by both queries appears once with both roles; a capped Request query gives `hasMore: true` and `totalCount: null` with `returnedCount`; a contact leading more than 25 accounts, with the newest Request in an account past the first 25, still returns that Request first; complete sources give the exact merged `totalCount`; a SoCal Request of an account the contact leads is not labelled Liaison (institution).
 
 Every failure test asserts the transport or email-activity mock was not called, and every success test asserts the exact To and Cc sent. Each guard is mutation-checked, so the test fails when the guard is removed.
 
@@ -245,6 +245,8 @@ Round 4 (on revision 4; PI-only new rows confirmed compatible with the existing 
 2. (medium) Site visits collapsed `none` with a Liaison lacking email → PI-only only for `none`; `found` without email stays a 409; the snapshot records the case (reader 4).
 3. (medium) Awardee Retry had no stale-load guard → load sequence on every write (reader 1).
 4. (medium) Explorer `totalCount` unprovable when capped → `null` plus `returnedCount` when any source is incomplete; queries ordered before capping (reader 7).
+
+Round 5 (on revision 5): round-4 findings 1–3 closed. (medium) Explorer could not return the newest Requests after truncating accounts at 25 → account discovery reads all accounts; Request queries chunk the account ids, each ordered and capped, then one global sort and cap (reader 7).
 
 ## Docs to reconcile in the build
 
