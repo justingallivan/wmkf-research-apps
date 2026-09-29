@@ -86,12 +86,18 @@ test('automatic reminder: the candidate read and the claim share one predicate (
   expect(queryText(0)).toContain(predicate);
   expect(sql.mock.calls[0].slice(1)).toEqual([now.toISOString(), now.toISOString()]);
 
+  // Liaison plan reader 5: the claim also compares the contacts the sweep read
+  // and saves the refreshed set in the same UPDATE.
+  const before = { pi: { email: 'pi@example.edu' }, liaison: { email: 'old@example.edu' } };
+  const after = { pi: { email: 'pi@example.edu' }, liaison: { email: 'new@example.edu' }, liaisonStatus: 'found' };
   sql.mockResolvedValueOnce({ rows: [{ id: 'c1', reminder_count: 1 }] });
-  expect(await claimAutomaticReminder('c1', now)).toEqual({ id: 'c1', reminder_count: 1 });
+  expect(await claimAutomaticReminder('c1', now, before, after)).toEqual({ id: 'c1', reminder_count: 1 });
   expect(queryText(1)).toContain('UPDATE site_visit_material_collections SET last_reminder_at = NOW(), last_reminder_email_id = NULL, reminder_count = reminder_count + 1');
-  expect(queryText(1)).toContain(`WHERE id = ? AND ${predicate}`);
+  expect(queryText(1)).toContain('contacts = ?::jsonb WHERE id = ?');
+  expect(queryText(1)).toContain(`WHERE id = ? AND ${predicate} AND contacts = ?::jsonb RETURNING *`);
+  expect(sql.mock.calls[1].slice(1)).toEqual([JSON.stringify(after), 'c1', now.toISOString(), now.toISOString(), JSON.stringify(before)]);
   sql.mockResolvedValueOnce({ rows: [] });
-  expect(await claimAutomaticReminder('c1', now)).toBeNull();
+  expect(await claimAutomaticReminder('c1', now, before, after)).toBeNull();
 
   sql.mockResolvedValueOnce({ rows: [{ id: 'c1' }] });
   await attachReminderEmailId('c1', 'email-1');
