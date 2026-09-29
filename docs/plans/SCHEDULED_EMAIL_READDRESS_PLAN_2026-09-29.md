@@ -4,7 +4,7 @@ Status: **DRAFT, revision 1 (2026-09-29, Session 551). Narrowed by the owner in 
 
 ## Why
 
-The scheduled-email engine sends the grantee materials reminder (`grantee_abstract_reminder`, the only workflow the status table allows [VERIFIED via `scripts/setup-database.js:891-892`]) for every program. It has hazards that do not depend on the Liaison change: it can send the same email twice once a send has been requested, it can adopt a stale draft, and it can drop a PD's edit (*Current engine facts*). Part A fixes these.
+The scheduled-email engine sends the grantee materials reminder (`grantee_abstract_reminder`, the only workflow the status table allows [VERIFIED via `lib/db/migrations/036_scheduled_email_messages.sql:56-57`, mirrored at `scripts/setup-database.js:891-892`; no later migration alters it]) for every program. It has hazards that do not depend on the Liaison change: it can send the same email twice once a send has been requested, it can adopt a stale draft, and it can drop a PD's edit (*Current engine facts*). Part A fixes these.
 
 The Research Liaison switch gives **new** reminders the current Liaison. A row already queued keeps the recipients it was created with (liaison plan, owner answer 9). Production has no queued rows (*Measurement*), so the only remaining case is a Liaison change while a row waits to send. Part B covers it, reusing Part A's recipient generation.
 
@@ -32,7 +32,9 @@ All line numbers are as of `b9f05ae5d`.
 A1. **Send intent is the point of no return.** Once `send_requested_at` is set, the ordinary path reconciles only, as the test-Request path does today: accepted → record sent and finalize; otherwise → no `sendEmail`, and the row is marked unconfirmed (A2). This applies to send-now as well as the cron.
 
 A2. **Unconfirmed is an error code, not a new status** (owner decision A-1; recommended because it needs no status CHECK migration). The row is set to `failed` with `last_error_code = 'scheduled_email_send_unconfirmed'`, and the lease is released.
+- This happens **immediately**, in the `uncertain` branch that today skips `recordFailure` (`scheduled-email-service.js:384-392`), so the row does not sit in `sending` with a live lease, invisible to the digest query, until the next claim.
 - The due query keeps claiming it, but only for reconciliation (A1), so a late acceptance is recorded and finalized without anyone acting.
+- `claimScheduledEmailSend` clears `last_error_code` and increments `attempt_count` on every claim [VERIFIED via `scheduled-email-store.js:190-219`]. A reconciliation that is still unaccepted re-stamps the code before releasing the lease, and reconciliation claims do not count toward `attempt_count` (or the count is documented as including them; decide in review).
 - The digest lists it in a new **Needs attention** section, never under upcoming. Like approval-pending, the section repeats every day until the row is resolved, so no receipt or frozen membership is needed (this replaces revision 0's open requirement 3).
 - The UI shows "Send status is uncertain. Check the email history before trying again" (`EMAIL_SEND_OUTCOME_COPY.uncertain`) and offers only Stop. Edit, approve and send-now are refused for these rows.
 - A row stopped here that Dynamics later accepts stays stopped. Staff decided after checking the history (owner decision A-2: accept this, or add a late-acceptance check on stopped rows).
@@ -55,11 +57,11 @@ B1. **Where.** In `deliverScheduledEmail`, after a successful claim and before a
 
 B2. **What.** If the resolved Liaison email differs from the stored Cc (or a Cc is gained or dropped), `readdressScheduledEmail` runs under the caller's lease. It is fenced on lease token, version, `sending` status and null transport fields. It updates `cc_recipients` and `recipient_contact_ids`, increments `version` and `recipient_generation`, and keeps subject, body, signature and edits. The send then continues to the new recipients under the new generation. If a crash left a draft under the old generation, that draft is orphaned, not sent.
 
-B3. **Review posture.** The VIP check reruns for the new contact ids. If the row now requires approval and has none, the send stops for this run and the row appears as approval-pending (owner decision B-1: whether a prior approval carries over when only the Cc changed; recommended no).
+B3. **Review posture.** The VIP check reruns for the new contact ids. If the row now requires approval and has none, the send stops for this run: under the lease, the row is set to `scheduled` with `approval_required = true` and `approved_at = NULL`, and the lease is released. The due query's approval filter then skips it, and the digest lists it as approval-pending (owner decision B-1: whether a prior approval carries over when only the Cc changed; recommended no).
 
 B4. **Failure.** A Liaison or contact read failure is a retryable failure for this run. The row is never sent to the stored Cc because a read failed.
 
-B5. **Rows with an activity but no send intent** (a crash window) are not re-addressed. They send as created, and the Needs attention section lists them when the stored Cc differs. With production at 0 queued rows, this is accepted rather than built (owner decision B-2).
+B5. **Rows with an activity but no send intent** (a crash window) are not re-addressed and send as created, possibly to the former Liaison. With production at 0 queued rows, this gap is accepted and nothing is built for it (owner decision B-2). Surfacing these rows instead would need a Dataverse Liaison read during digest generation, a new dependency.
 
 This removes revision 0's interim stop, so its open requirement 1 no longer applies.
 
