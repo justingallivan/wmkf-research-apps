@@ -261,6 +261,55 @@ describe('canonicalizeDefinition', () => {
       expect(out).toBe("SELECT f('A  B')");
     });
   });
+
+  // Codex round-3 #6: double-quoted identifiers must be protected the same
+  // way string and dollar-quoted literals are — whitespace inside is
+  // preserved, and schema-prefix stripping applies only to an EXACT
+  // `"<schema>".` token pair, never to a schema-like substring inside a
+  // longer quoted identifier.
+  describe('Codex round-3 #6: quoted-identifier-aware canonicalization', () => {
+    test('different internal spacing inside a double-quoted identifier is NOT collapsed — the two CHECK bodies differ', () => {
+      const a = canonicalizeDefinition('CHECK ("a  b" = 1)', null);
+      const b = canonicalizeDefinition('CHECK ("a b" = 1)', null);
+      expect(a).not.toBe(b);
+      expect(a).toBe('CHECK ("a  b" = 1)');
+      expect(b).toBe('CHECK ("a b" = 1)');
+    });
+
+    test('a quoted identifier that merely CONTAINS the schema name as a substring is a different identifier from the bare one, not stripped', () => {
+      const a = canonicalizeDefinition('SELECT "public.foo"', 'public');
+      const b = canonicalizeDefinition('SELECT "foo"', 'public');
+      expect(a).not.toBe(b);
+      expect(a).toBe('SELECT "public.foo"');
+      expect(b).toBe('SELECT "foo"');
+    });
+
+    test('an EXACT quoted schema qualification ("schema".t) and the bare form (schema.t) both canonicalize to the bare table name', () => {
+      const quoted = canonicalizeDefinition('"public".t', 'public');
+      const bare = canonicalizeDefinition('public.t', 'public');
+      expect(quoted).toBe('t');
+      expect(bare).toBe('t');
+      expect(quoted).toBe(bare);
+    });
+
+    test('an escaped double-quote ("") inside an identifier does not end it early', () => {
+      const out = canonicalizeDefinition('SELECT "a""b"', null);
+      expect(out).toBe('SELECT "a""b"');
+    });
+
+    test('a Unicode-escape identifier (U&"...") is also treated as a protected token', () => {
+      const a = canonicalizeDefinition('SELECT U&"a  b"', null);
+      const b = canonicalizeDefinition('SELECT U&"a b"', null);
+      expect(a).not.toBe(b);
+      expect(a).toBe('SELECT U&"a  b"');
+    });
+
+    test('code outside any quoted identifier still collapses whitespace normally', () => {
+      const a = canonicalizeDefinition('SELECT   "x"   FROM   t', null);
+      const b = canonicalizeDefinition('SELECT "x" FROM t', null);
+      expect(a).toBe(b);
+    });
+  });
 });
 
 describe('approved-ahead extras (Codex round-1 Fix 4; Opus round-1 item 6: shape-verified, not name-only)', () => {
