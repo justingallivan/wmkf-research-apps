@@ -1,17 +1,22 @@
-# Session 552 Prompt: Review and promote staff Cancel/Retry recovery (branch-local)
+# Session 552 Prompt: Prepare post-presentation staff controls for promotion (branch-local)
 
 ## Current branch status (2026-09-29)
 
 **[VERIFIED via feature-branch source and focused offline tests]** Staff Cancel and Retry upload
-are now built on `codex/feature-request` in the Meeting Tracker card, guarded routes, service,
+are built on `codex/feature-request` in the Meeting Tracker card, guarded routes, service,
 and durable upload-intent store. Cancel requires a confirmed closed session and absent exact
 path before abandoning; Retry rechecks Graph and resumes a live session or starts a new session
 from byte zero only after a terminal 410 or a failed mint with no URL. The same actor, Request,
 active Site Visit, and immutable intent/path/generation are retained. No migration was added.
-The historical Graph-confirmed expiry cell remains PARTIAL; no live upload, deployment, alias,
-Production configuration, or SharePoint deletion occurred in this implementation. Zoom URL and
-transcript staff inputs remain unbuilt. The source branch needs final review/promotion before
-runtime acceptance. The Session 551 instructions below are historical context.
+The historical Graph-confirmed expiry cell remains PARTIAL. Zoom-link paste and transcript
+upload/finalize staff controls are also source-built on this branch and use the existing guarded
+producer routes. **[VERIFIED via 69 focused tests, type/lint/build gates, documentation gates,
+and two read-only Opus reviews]** Their client retry, request-switch, URL, and completion-notice
+paths have been checked offline; signed-in runtime acceptance is still pending. No live
+upload, deployment, alias, Production configuration, or SharePoint deletion occurred in these
+implementations. The source branch awaits a deliberate Preview deployment and signed-in
+acceptance before Production promotion. The
+Session 551 instructions below are historical context.
 
 ## Session 550 Summary
 

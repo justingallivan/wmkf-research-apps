@@ -8,9 +8,27 @@ import {
   uploadBrowserDirectGraphFile,
   withGraphBrowserUploadLock,
 } from '../../utils/graph-browser-upload';
+import { normalizeZoomPaste } from '../../../lib/services/post-presentation-materials/material-model';
+import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../config/requestDocument';
 import { Button } from '../Layout';
 
 const MP4_MAX_BYTES = 2_000_000_000;
+const TRANSCRIPT_MAX_BYTES = 25 * 1024 * 1024;
+const TRANSCRIPT_CONTENT_TYPES = Object.freeze({
+  vtt: 'text/vtt',
+  txt: 'text/plain',
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+});
+const PERMANENT_TRANSCRIPT_CODES = new Set([
+  'empty_file', 'file_too_large', 'extension_not_allowed', 'content_type_mismatch',
+  'vtt_header_invalid', 'signature_mismatch', 'post_presentation_content_mismatch',
+  'post_presentation_candidate_mismatch', 'post_presentation_replay_mismatch',
+  'post_presentation_generation_ambiguous', 'staged_upload_mismatch',
+  'staging_publicly_readable', 'staging_expired', 'staging_not_found',
+  'staging_rejected', 'filename_required', 'invalid_size',
+  'scan_infected',
+]);
 const FINALIZE_RETRY_DELAYS_MS = [750, 2_000];
 const STATUS_CHECK_TIMEOUT_MS = 75_000;
 
@@ -127,11 +145,39 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function transcriptContentType(file) {
+  const extension = file?.name?.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  if (!extension || !TRANSCRIPT_CONTENT_TYPES[extension]
+    || !Number.isSafeInteger(file.size) || file.size <= 0 || file.size > TRANSCRIPT_MAX_BYTES) {
+    throw new Error('Choose one VTT, plain-text transcript, PDF, or DOCX no larger than 25 MiB. Zoom chat.txt is meeting chat, not an audio transcript.');
+  }
+  return TRANSCRIPT_CONTENT_TYPES[extension];
+}
+
+function safeMaterialUrl(material) {
+  const candidate = material?.externalUrl || material?.webUrl;
+  if (typeof candidate !== 'string') return null;
+  try {
+    const url = new URL(candidate);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PostPresentationMaterialsCard({ requestId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
   const [file, setFile] = useState(null);
+  const [zoomText, setZoomText] = useState('');
+  const [zoomBusy, setZoomBusy] = useState(false);
+  const [zoomError, setZoomError] = useState(null);
+  const [transcriptFile, setTranscriptFile] = useState(null);
+  const [transcriptBusy, setTranscriptBusy] = useState(false);
+  const [transcriptProgress, setTranscriptProgress] = useState(null);
+  const [transcriptStagedId, setTranscriptStagedId] = useState(null);
+  const [transcriptError, setTranscriptError] = useState(null);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busyUploadId, setBusyUploadId] = useState(null);
@@ -147,7 +193,12 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   const [confirmReissue, setConfirmReissue] = useState(false);
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
+  const materialReadRef = useRef(0);
   const controllerRef = useRef(null);
+  const zoomOperationRef = useRef(null);
+  const transcriptStageRef = useRef(null);
+  const transcriptControllerRef = useRef(null);
+  const transcriptInputRef = useRef(null);
   const pauseControllerRef = useRef(null);
   const pauseRef = useRef(false);
   const recoveryBusyRef = useRef(null);
@@ -162,6 +213,7 @@ export default function PostPresentationMaterialsCard({ requestId }) {
       generationRef.current += 1;
       controllerRef.current?.abort();
       pauseControllerRef.current?.abort();
+      transcriptControllerRef.current?.abort();
       recoveryBusyRef.current = null;
     };
   }, []);
@@ -208,13 +260,15 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   const load = useCallback(async () => {
     if (!requestId) return;
     const generation = generationRef.current;
+    const readId = ++materialReadRef.current;
+    const isCurrentRead = () => current(generation) && readId === materialReadRef.current;
     setLoading(true);
     try {
       const result = await requestEnvelope(
         `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-materials`,
         { tolerantBody: true },
       );
-      if (!current(generation)) return;
+      if (!isCurrentRead()) return;
       if ([404, 503].includes(result.status)) {
         setUnavailable(true);
         return;
@@ -225,9 +279,9 @@ export default function PostPresentationMaterialsCard({ requestId }) {
       setError(null);
       void loadLink(generation);
     } catch (loadError) {
-      if (current(generation)) setError(loadError.message || 'Presentation materials could not be loaded.');
+      if (isCurrentRead()) setError(loadError.message || 'Presentation materials could not be loaded.');
     } finally {
-      if (current(generation)) setLoading(false);
+      if (isCurrentRead()) setLoading(false);
     }
   }, [loadLink, requestId]);
 
@@ -235,13 +289,25 @@ export default function PostPresentationMaterialsCard({ requestId }) {
     generationRef.current += 1;
     controllerRef.current?.abort();
     pauseControllerRef.current?.abort();
+    transcriptControllerRef.current?.abort();
     controllerRef.current = null;
     pauseControllerRef.current = null;
+    transcriptControllerRef.current = null;
+    zoomOperationRef.current = null;
+    transcriptStageRef.current = null;
     pauseRef.current = false;
     recoveryBusyRef.current = null;
     const timer = window.setTimeout(() => {
       setData(null);
       setFile(null);
+      setZoomText('');
+      setZoomBusy(false);
+      setZoomError(null);
+      setTranscriptFile(null);
+      setTranscriptBusy(false);
+      setTranscriptProgress(null);
+      setTranscriptStagedId(null);
+      setTranscriptError(null);
       setError(null);
       setNotice(null);
       setBusyUploadId(null);
@@ -272,8 +338,16 @@ export default function PostPresentationMaterialsCard({ requestId }) {
           { method: 'POST', body: {}, tolerantBody: true },
         );
         if (!current(generation)) return null;
-        setData(result);
-        setNotice('Recording saved.');
+        if (!Array.isArray(result?.materials)) throw new Error('The recording save was not confirmed. Retry Finish saving.');
+        materialReadRef.current += 1;
+        const currentRecording = result.materials.find((material) =>
+          Number(material.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING);
+        const superseded = result.requestDocumentId && currentRecording?.artifactId
+          && String(result.requestDocumentId).toLowerCase() !== String(currentRecording.artifactId).toLowerCase();
+        setNotice(`${superseded
+          ? 'Recording save completed, but a newer recording is current.'
+          : 'Recording saved.'}${result.reconciliationRequired
+          ? ' An earlier recording needs reconciliation.' : ''}`);
         setTransfer(null);
         return result;
       } catch (finalizeError) {
@@ -380,6 +454,158 @@ export default function PostPresentationMaterialsCard({ requestId }) {
         setPauseRequested(false);
         controllerRef.current = null;
         pauseControllerRef.current = null;
+      }
+    }
+  };
+
+  const saveZoom = async () => {
+    const generation = generationRef.current;
+    let normalized;
+    try {
+      normalized = normalizeZoomPaste(zoomText);
+    } catch (validationError) {
+      setZoomError(validationError.message);
+      return;
+    }
+    const prior = zoomOperationRef.current;
+    const operationId = prior?.requestId === requestId && prior?.url === normalized
+      ? prior.operationId : globalThis.crypto?.randomUUID?.();
+    if (!operationId) {
+      setZoomError('This browser cannot create a secure save identity.');
+      return;
+    }
+    zoomOperationRef.current = { requestId, url: normalized, operationId };
+    setZoomBusy(true);
+    setZoomError(null);
+    try {
+      const result = await requestJson(
+        `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-materials`,
+        { method: 'PATCH', body: { action: 'save_zoom', operationId, zoomText }, tolerantBody: true },
+      );
+      if (!current(generation)) return;
+      if (!Array.isArray(result?.materials)) throw new Error('The Zoom recording save was not confirmed. Retry with the same link.');
+      zoomOperationRef.current = null;
+      setZoomText('');
+      await load();
+      if (current(generation)) {
+        const currentRecording = result.materials.find((material) =>
+          Number(material.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING);
+        const currentIsZoom = currentRecording?.backing === 'external' && currentRecording.externalUrl === normalized;
+        setNotice(`${currentIsZoom
+          ? 'Zoom recording link saved.'
+          : 'This Zoom link was saved, but a newer recording is current. Review the current material.'}${result.reconciliationRequired
+          ? ' An earlier recording needs reconciliation.' : ''}`);
+      }
+    } catch (saveError) {
+      if (current(generation)) setZoomError(saveError.message || 'The Zoom recording link could not be saved. Retry with the same link.');
+    } finally {
+      if (current(generation)) setZoomBusy(false);
+    }
+  };
+
+  const uploadTranscript = async () => {
+    const selectedFile = transcriptFile;
+    let contentType;
+    try {
+      contentType = transcriptContentType(selectedFile);
+    } catch (validationError) {
+      setTranscriptError(validationError.message);
+      return;
+    }
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    transcriptControllerRef.current?.abort();
+    transcriptControllerRef.current = controller;
+    setTranscriptBusy(true);
+    setTranscriptError(null);
+    try {
+      let stage = transcriptStageRef.current;
+      if (!stage || stage.requestId !== requestId || stage.file !== selectedFile) {
+        setTranscriptProgress(0);
+        const token = await requestJson(
+          `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-uploads`,
+          {
+            method: 'POST',
+            body: { artifactType: 'transcript', filename: selectedFile.name, contentType, size: selectedFile.size },
+            signal: controller.signal,
+            tolerantBody: true,
+          },
+        );
+        if (!current(generation)) return;
+        const upload = token?.upload;
+        if (typeof upload?.stagingId !== 'string' || !upload.stagingId
+          || typeof upload.pathname !== 'string' || !upload.pathname
+          || typeof upload.clientToken !== 'string' || !upload.clientToken
+          || upload.contentType !== contentType || upload.access !== 'private') {
+          throw new Error('The transcript staging service returned an invalid upload contract.');
+        }
+        const { put } = await import('@vercel/blob/client');
+        if (!current(generation)) return;
+        await put(upload.pathname, selectedFile, {
+          access: 'private', token: upload.clientToken, contentType,
+          abortSignal: controller.signal,
+          onUploadProgress: ({ percentage }) => {
+            if (current(generation)) setTranscriptProgress(Math.round(percentage));
+          },
+        });
+        if (!current(generation)) return;
+        stage = { requestId, file: selectedFile, stagingId: upload.stagingId };
+        transcriptStageRef.current = stage;
+        setTranscriptStagedId(stage.stagingId);
+      }
+      const result = await requestJson(
+        `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-uploads/${encodeURIComponent(stage.stagingId)}/finalize`,
+        { method: 'POST', body: {}, signal: controller.signal, tolerantBody: true },
+      );
+      if (!current(generation)) return;
+      if (!Array.isArray(result?.materials)) throw new Error('The transcript save was not confirmed. Choose Finish transcript to retry.');
+      transcriptStageRef.current = null;
+      setTranscriptStagedId(null);
+      setTranscriptFile(null);
+      setTranscriptProgress(null);
+      if (transcriptInputRef.current) transcriptInputRef.current.value = '';
+      await load();
+      if (current(generation)) {
+        const currentTranscript = result.materials.find((material) =>
+          Number(material.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT);
+        const superseded = result.requestDocumentId && currentTranscript?.artifactId
+          && String(result.requestDocumentId).toLowerCase() !== String(currentTranscript.artifactId).toLowerCase();
+        setNotice(`${superseded
+          ? 'Transcript save completed, but a newer transcript is current.'
+          : 'Transcript saved.'}${result.reconciliationRequired
+          ? ' An earlier transcript needs reconciliation.' : ''}`);
+      }
+    } catch (uploadError) {
+      if (uploadError?.name !== 'AbortError' && current(generation)) {
+        const code = uploadError?.payload?.code || uploadError?.code;
+        const staged = transcriptStageRef.current?.requestId === requestId;
+        if (staged) await load();
+        if (!current(generation)) return;
+        const unusable = uploadError?.status === 422 || PERMANENT_TRANSCRIPT_CODES.has(code);
+        if (unusable) {
+          transcriptStageRef.current = null;
+          setTranscriptStagedId(null);
+          setTranscriptFile(null);
+          setTranscriptProgress(null);
+          if (transcriptInputRef.current) transcriptInputRef.current.value = '';
+        }
+        const retryHint = transcriptStageRef.current?.requestId === requestId
+          ? ' The staged file is retained; choose Finish transcript to retry.' : '';
+        const reason = code === 'scan_infected'
+          ? 'The transcript failed the malware scan. Choose another file.'
+          : code === 'post_presentation_generation_ambiguous'
+            ? 'The transcript save needs reconciliation. Reload and contact support before trying again.'
+            : unusable
+              ? 'The staged transcript cannot be used. Reselect the file and upload it again.'
+              : uploadError.message === code
+                ? 'The transcript could not be saved.'
+                : uploadError.message || 'The transcript could not be saved.';
+        setTranscriptError(`${reason}${retryHint}`);
+      }
+    } finally {
+      if (current(generation)) {
+        setTranscriptBusy(false);
+        if (transcriptControllerRef.current === controller) transcriptControllerRef.current = null;
       }
     }
   };
@@ -619,32 +845,84 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   return (
     <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm" data-testid="post-presentation-materials-card">
       <h2 className="text-xl font-semibold text-gray-900">Post-presentation materials</h2>
-      <p className="mt-1 text-sm text-gray-600">Upload a Zoom MP4 directly to the request’s governed SharePoint folder. File bytes do not pass through this application.</p>
+      <p className="mt-1 text-sm text-gray-600">Save a Zoom recording link, upload an MP4, or add a transcript for this Site Visit.</p>
       {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">{notice}</div>}
       {loading && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
 
-      {!loading && (
+      {(!loading || data) && (
         <>
-          <label htmlFor="post-presentation-mp4" className="mt-4 block text-sm font-medium text-gray-800">Zoom MP4</label>
-          <input
-            id="post-presentation-mp4"
-            type="file"
-            accept="video/mp4,.mp4"
-            disabled={Boolean(busyUploadId || recoveryBusyId)}
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
-            className="mt-2 block w-full rounded-lg border border-gray-300 p-2 text-sm"
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" disabled={!file || Boolean(busyUploadId || recoveryBusyId)} loading={busyUploadId === 'new'} onClick={begin}>Upload recording</Button>
-            {busyUploadId && transfer?.phase && !['paused', 'complete'].includes(transfer.phase) && (
-              <Button type="button" variant="outline" disabled={pauseRequested} onClick={() => {
-                pauseRef.current = true;
-                pauseControllerRef.current?.abort();
-                setPauseRequested(true);
-                setTransfer((value) => value ? { ...value, phase: 'pausing', etaSeconds: null } : value);
-              }}>Pause after fragment</Button>
-            )}
+          <div className="mt-5 rounded-lg border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-900">Zoom recording link</h3>
+            <p className="mt-1 text-xs text-gray-600">Paste one Zoom recording share link. If Zoom supplies a passcode, use a link with the passcode embedded. Saving a new recording replaces the current one.</p>
+            <label htmlFor="post-presentation-zoom-link" className="mt-3 block text-sm font-medium text-gray-800">Zoom recording link or copied Zoom message</label>
+            <textarea
+              id="post-presentation-zoom-link"
+              rows={3}
+              maxLength={12000}
+              value={zoomText}
+              disabled={zoomBusy}
+              onChange={(event) => {
+                zoomOperationRef.current = null;
+                setZoomText(event.target.value);
+                setZoomError(null);
+              }}
+              className="mt-2 block w-full rounded-lg border border-gray-300 p-2 text-sm"
+            />
+            {zoomError && <p role="alert" className="mt-2 text-sm text-red-700">{zoomError}</p>}
+            <Button type="button" size="sm" className="mt-3" loading={zoomBusy} disabled={!zoomText.trim() || Boolean(zoomBusy || busyUploadId || recoveryBusyId)} onClick={saveZoom}>Save Zoom link</Button>
+          </div>
+
+          <div className="mt-5 rounded-lg border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-900">Transcript</h3>
+            <p className="mt-1 text-xs text-gray-600">Upload VTT, a plain-text transcript, PDF, or DOCX (up to 25 MiB). Zoom’s chat.txt is meeting chat, not an audio transcript. Uploading a new transcript replaces the current one.</p>
+            <label htmlFor="post-presentation-transcript" className="mt-3 block text-sm font-medium text-gray-800">Transcript file</label>
+            <input
+              id="post-presentation-transcript"
+              ref={transcriptInputRef}
+              type="file"
+              accept=".vtt,.txt,.pdf,.docx,text/vtt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              disabled={transcriptBusy}
+              onChange={(event) => {
+                transcriptStageRef.current = null;
+                setTranscriptStagedId(null);
+                setTranscriptProgress(null);
+                setTranscriptError(null);
+                setTranscriptFile(event.target.files?.[0] || null);
+              }}
+              className="mt-2 block w-full rounded-lg border border-gray-300 p-2 text-sm"
+            />
+            {transcriptFile && <p className="mt-2 text-xs text-gray-600">Selected transcript: {transcriptFile.name}</p>}
+            {transcriptProgress !== null && <p className="mt-2 text-xs text-gray-600">Private staging upload: {transcriptProgress}%</p>}
+            {transcriptError && <p role="alert" className="mt-2 text-sm text-red-700">{transcriptError}</p>}
+            <Button type="button" size="sm" className="mt-3" loading={transcriptBusy} disabled={!transcriptFile || transcriptBusy} onClick={uploadTranscript}>
+              {transcriptStagedId ? 'Finish transcript' : 'Upload transcript'}
+            </Button>
+          </div>
+
+          <div className="mt-5 rounded-lg border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-900">MP4 recording</h3>
+            <p className="mt-1 text-xs text-gray-600">Upload a Zoom MP4 directly to the request’s governed SharePoint folder. File bytes do not pass through this application.</p>
+            <label htmlFor="post-presentation-mp4" className="mt-4 block text-sm font-medium text-gray-800">Zoom MP4</label>
+            <input
+              id="post-presentation-mp4"
+              type="file"
+              accept="video/mp4,.mp4"
+              disabled={Boolean(busyUploadId || recoveryBusyId || zoomBusy)}
+              onChange={(event) => setFile(event.target.files?.[0] || null)}
+              className="mt-2 block w-full rounded-lg border border-gray-300 p-2 text-sm"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" disabled={!file || Boolean(busyUploadId || recoveryBusyId || zoomBusy)} loading={busyUploadId === 'new'} onClick={begin}>Upload recording</Button>
+              {busyUploadId && transfer?.phase && !['paused', 'complete'].includes(transfer.phase) && (
+                <Button type="button" variant="outline" disabled={pauseRequested} onClick={() => {
+                  pauseRef.current = true;
+                  pauseControllerRef.current?.abort();
+                  setPauseRequested(true);
+                  setTransfer((value) => value ? { ...value, phase: 'pausing', etaSeconds: null } : value);
+                }}>Pause after fragment</Button>
+              )}
+            </div>
           </div>
 
           {transfer && (
@@ -666,10 +944,10 @@ export default function PostPresentationMaterialsCard({ requestId }) {
                   <li key={intent.uploadId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                     <div><p className="font-medium text-gray-900">{intent.filename}</p><p className="text-xs text-gray-500">{formatBytes(intent.size)} · {intent.state}</p></div>
                     <div className="flex gap-2">
-                      {intent.canResume && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId || recoveryBusyId)} onClick={() => resume(intent)}>Resume</Button>}
-                      {intent.canRetry && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId || recoveryBusyId)} loading={recoveryBusyId === intent.uploadId} onClick={() => retry(intent)}>Retry upload</Button>}
-                      {intent.canFinalize && <Button type="button" size="sm" disabled={Boolean(busyUploadId || recoveryBusyId)} loading={busyUploadId === intent.uploadId} onClick={() => finish(intent.uploadId)}>Finish saving</Button>}
-                      {intent.canCancel && !intent.canFinalize && <Button type="button" size="sm" variant="outline" disabled={Boolean(recoveryBusyId || (busyUploadId && busyUploadId !== intent.uploadId))} onClick={() => setConfirmCancelId(intent.uploadId)}>Cancel</Button>}
+                      {intent.canResume && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId || recoveryBusyId || zoomBusy)} onClick={() => resume(intent)}>Resume</Button>}
+                      {intent.canRetry && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId || recoveryBusyId || zoomBusy)} loading={recoveryBusyId === intent.uploadId} onClick={() => retry(intent)}>Retry upload</Button>}
+                      {intent.canFinalize && <Button type="button" size="sm" disabled={Boolean(busyUploadId || recoveryBusyId || zoomBusy)} loading={busyUploadId === intent.uploadId} onClick={() => finish(intent.uploadId)}>Finish saving</Button>}
+                      {intent.canCancel && !intent.canFinalize && <Button type="button" size="sm" variant="outline" disabled={Boolean(zoomBusy || recoveryBusyId || (busyUploadId && busyUploadId !== intent.uploadId))} onClick={() => setConfirmCancelId(intent.uploadId)}>Cancel</Button>}
                     </div>
                     {confirmCancelId === intent.uploadId && (
                       <div className="w-full rounded border border-amber-200 bg-amber-50 p-3 text-amber-950">
@@ -688,7 +966,13 @@ export default function PostPresentationMaterialsCard({ requestId }) {
 
           {data?.materials?.length > 0 && (
             <ul className="mt-5 divide-y divide-gray-100 rounded-lg border border-gray-200">
-              {data.materials.map((material) => <li key={material.artifactId} className="px-4 py-3 text-sm text-gray-800">{material.label || material.filename || material.artifactTypeLabel || 'Presentation material'}</li>)}
+              {data.materials.map((material) => {
+                const openUrl = safeMaterialUrl(material);
+                return <li key={material.artifactId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-gray-800">
+                  <span>{material.artifactTypeLabel || 'Presentation material'} · {material.backing === 'external' ? 'Zoom link' : material.filename}</span>
+                  {openUrl && <a href={openUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline">Open</a>}
+                </li>;
+              })}
             </ul>
           )}
 

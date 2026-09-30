@@ -105,7 +105,7 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   PRODUCTION NOT DEPLOYED.]** Recording, transcript, and transcript-summary have
   governed producers under the post-presentation rollout gates. The current visit
   card exposes browser-direct MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
-  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript staff inputs remain planned. The Staff
+  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript staff inputs are source-built/offline-tested. The Staff
   Deliberations tab reads the current three slots. Shared Postgres migration 055 was
   applied, while the Dataverse Wave 30 test was sandbox-only. Bounded Preview acceptance
   is closed and presentation access is off there. See the presentation-materials plan

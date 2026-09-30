@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview and Safari acceptance passed, staff Cancel and terminal-session Retry are source-built and offline-tested, Graph-confirmed terminal expiry remains unobserved, and Production promotion remains."
+summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview and Safari acceptance passed, staff Zoom-link and transcript controls plus Cancel/Retry are source-built and offline-tested, Graph-confirmed terminal expiry remains unobserved, and Production promotion remains."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -208,9 +208,15 @@ The card contains:
 
 The link controls do not send mail, alter recipients, or change a distribution ledger.
 
-The current branch card contains MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
-and Board-link controls. The Zoom-paste and transcript producer APIs are source-built, but their
-staff input controls remain planned. A failed unfinished intent offers Retry; the server then
+The current branch card contains Zoom-link save, transcript staging/finalize, MP4 upload,
+Pause/Resume, Finish saving, Cancel, Retry upload, and Board-link controls. Zoom paste accepts
+one eligible HTTPS share URL or Zoom's copied message with an embedded passcode link. Transcript
+upload sends VTT/TXT/PDF/DOCX bytes directly to private Blob staging, then finalizes the
+actor-bound staging ID through the governed producer; a staged file can retry finalize without
+resending bytes after a transient error within the 60-minute staging lifetime. Both controls
+guard request switches and keep current material Open links visible. These UI paths are
+source-built/offline-tested, not live accepted.
+A failed unfinished MP4 intent offers Retry; the server then
 checks the current Graph session and exact path before deciding whether to resume its confirmed
 range or create a new session from zero. Retry requires reselecting the same file. A complete item
 shows Finish saving instead of Cancel or Retry. Uncertain outcomes show a retained-for-reconciliation
@@ -1741,8 +1747,8 @@ inspect-only cleanup posture in access off/test, and slot-fenced finalize remain
 Cancel/Retry routes are in the security matrix and canonical counts.
 The historical Graph-confirmed expiry row remains PARTIAL; the owner chose the actionable
 recovery controls and fault-injection coverage in place of another passive expiry wait. The
-Zoom-paste and transcript staff inputs are still separate unbuilt UI work in the first-slice
-target flow, even though their producer APIs exist.
+Zoom-paste and transcript staff inputs are now source-built and offline-tested alongside their
+producer APIs. Signed-in runtime acceptance and release gates remain separate.
 
 ### Slice 5 — Internal and external consumers
 
@@ -1773,8 +1779,8 @@ Production write was performed for this slice.
   the shared Graph transport and historical benchmark receipts.
 - Review and promote the source-built Slice 4a Cancel/Retry controls before Production
   promotion. Keep the Graph-confirmed terminal-expiry cell PARTIAL without another passive wait.
-- Complete the Zoom-paste and transcript-upload staff inputs before claiming the full first-slice
-  user flow; their source-built server producers alone are not UI evidence.
+- Exercise the source-built Zoom-paste and transcript-upload staff controls in a bounded,
+  owner-approved signed-in runtime acceptance before claiming the full first-slice user flow.
 - Owner-applied schema/migration and readiness enablement.
 - Signed-in Meeting Tracker smoke with one Zoom link, one transcript, and one owner-approved,
   registry-bound retained test MP4 (retention per §15 step 6).
