@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Staff site-visit video released in Production (parallel Codex session during 553)
+
+**Milestone:** Staff can add a Zoom recording link or upload an MP4 after a Site Visit in Meeting Tracker, then watch the current recording from Staff Deliberations; a separate 60-day materials-only link is available for Board sharing.
+**Sessions:** Codex feature build and bounded Preview acceptance, then 2026-09-29 Production release and staff check.
+**Ship state:**
+- PR #365 merged the compatible runtime; Production Dataverse Wave 30 and migration 055 were verified. PR #368 fixed a playback status message.
+- Marked TEST Request #1003302 passed synthetic MP4 upload, replacement, Safari Watch/long-seek/Download integrity, private-window materials link, and signed-in staff Watch playback. The first replacement finalize needed one manual **Finish saving** retry.
+- Production schema readiness and general access read `on`; deployment `dpl_Gw8dTzcA1JaUc2ifQjbzbBe7wCoT` was Ready on both branded domains at release check. PRs #370 and #371 merged the acceptance and release records. The older full-briefing live audience was not tested and is not a staff-release gate.
+**Why it matters:** Staff can keep the Site Visit recording with the Request and open the current video from their normal deliberation workflow.
+**Pointers:** `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`; `docs/plans/evidence/post-presentation/production-bounded-2026-09-29.md`; PRs #365, #368, #370, #371.
+
 ## September 2026 — Integrity Screener in the Request Workbench (Session 552)
 
 **Milestone:** The Request Workbench has an Integrity tab. It screens a request's PI and Co-PIs (from Dataverse) against Retraction Watch, PubPeer and news, keeps request-linked screening history, and records an append-only lead-PD approval or hold.
