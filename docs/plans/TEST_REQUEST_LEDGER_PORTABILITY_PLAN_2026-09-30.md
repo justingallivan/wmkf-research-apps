@@ -35,6 +35,8 @@ One operational ledger, reachable from every machine the owner works on, still n
 
 ### Phase 1 — Tonight, home Mac (~20 min)
 
+Step-by-step brief for the agent on each machine: `docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md`.
+
 1. `dump` both `ledger_prod` and `ledger` with the helper; keep the printed digests and counts in `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md` (digests and counts only, never the dump).
 2. Wait for the shared folder to sync; the office side compares digests before restoring.
 3. Next office morning: compare digests, `restore` both here (`createdb` for the absent `ledger_prod`, `--replace` for the residue-laden `ledger`); compare counts to the evidence file; record the restore in the same evidence file. Codex's blocked B4 steps become runnable.
