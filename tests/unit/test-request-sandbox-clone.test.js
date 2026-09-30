@@ -203,24 +203,32 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain("verification.failures.push(...reverifyFailures.map((failure) => `final file check: ${failure}`))");
   });
 
-  test('ledger-driven modes refuse an unset or shared-production TEST_REQUEST_LEDGER_URL', () => {
+  test('ledger-driven modes refuse an unset or shared-production ledger URL (Codex round-1 Fix 1/4/7)', () => {
     expect(script).toContain("if (!url) {");
-    expect(script).toContain('TEST_REQUEST_LEDGER_URL is required for ledger-driven modes');
+    expect(script).toContain('is required for ledger-driven modes');
     // Phase 2 of the ledger portability plan: the blanket neon.tech refusal
     // is replaced by the tracked host registry plus the database-name rule.
     expect(script).not.toMatch(/neon\\?\.tech/);
-    expect(script).toContain("import { classifyLedgerUrl } from '../lib/db/ledger-registry.js';");
+    expect(script).toContain("import { classifyLedgerUrl, selectLedgerVariable } from '../lib/db/ledger-registry.js';");
     expect(script).toContain('classifyLedgerUrl(url, { target, sharedUrls })');
     expect(script).toContain('must not be the shared Production/Preview database');
     expect(script).toContain('does not name a registered ledger host');
-    // --ledger-check alone must not be refused by the parser's sandbox default.
-    expect(script).toContain('requireLedgerUrl(args.targetExplicit ? args.target : null)');
-    expect(script).toContain("parsed.targetExplicit = true;");
-    for (const mode of ['setStatus || args.statusRecheck', 'createCast || args.bindReviewer', 'runRecheck', 'reserve', 'advance']) {
+    // Codex round-1 Fix 7: every ledger-driven mode, including --ledger-check
+    // and --run-inspect, is target-bound; the variable itself is selected
+    // from the target rather than always TEST_REQUEST_LEDGER_URL, and the
+    // targetless special case is gone.
+    expect(script).toContain('selectLedgerVariable(target, process.env)');
+    expect(script).not.toContain('targetExplicit');
+    expect(script).not.toContain('--strict-ledger-check');
+    for (const mode of ['ledgerCheck', 'runInspect', 'setStatus || args.statusRecheck', 'createCast || args.bindReviewer', 'runRecheck', 'reserve', 'advance']) {
       const at = script.indexOf(`if (args.${mode}) {`);
       expect(at).toBeGreaterThan(-1);
-      expect(script.indexOf('requireLedgerUrl(args.target)', at) - at).toBeLessThan(120);
+      expect(script.indexOf('requireLedgerUrl(args.target)', at) - at).toBeLessThan(320);
     }
+    // Codex round-1 Fix 4: drift always throws (no strict flag); extras are
+    // checked against the tracked approved-ahead list.
+    expect(script).toContain('readApprovedAhead');
+    expect(script).toContain('unapprovedExtras');
   });
 
   test('--advance enters the script-only trusted DAL context before advancing any step (Stage C round 2, P1-B)', () => {

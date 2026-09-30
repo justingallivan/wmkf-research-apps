@@ -1,18 +1,29 @@
 #!/usr/bin/env node
 /**
  * check:factory-ledger — compare each configured Factory ledger with the
- * tracked schema fingerprint (docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md, Phase 3).
+ * tracked schema fingerprint (docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md, Phase 3;
+ * Codex round-1 Fix 6 maps each variable to its target and never prints OK
+ * for zero inspected ledgers; Fix 4 applies the approved-ahead rule to EXTRA
+ * objects).
  *
- *   node scripts/check-factory-ledger.js
- *       For each of TEST_REQUEST_LEDGER_URL and TEST_REQUEST_SANDBOX_LEDGER_URL
- *       that is set: refuse an unregistered URL, connect, read the structural
- *       fingerprint and compare with lib/db/ledger-schema-fingerprint.json.
- *       MISSING or DIFFERING objects fail (ledger behind the checkout or of a
- *       different shape); EXTRA objects only warn (ledger ahead of the
- *       checkout, e.g. a migration from an unmerged branch).
- *       Neither variable set → prints "skipped" and exits 0. An unreachable
- *       ledger prints a prominent UNREACHABLE warning and exits 0 (advisory);
- *       a refused URL or a behind/differing schema exits 1.
+ *   node scripts/check-factory-ledger.js [--allow-unreachable]
+ *       For each of TEST_REQUEST_LEDGER_URL (target production, database
+ *       ledger_prod) and TEST_REQUEST_SANDBOX_LEDGER_URL (target sandbox,
+ *       database ledger) that is set: refuse an unregistered URL or a
+ *       variable pointed at the wrong database for its target, connect
+ *       (retrying 3 times, 5s apart, for managed compute wake-up), read the
+ *       structural fingerprint and compare with
+ *       lib/db/ledger-schema-fingerprint.json. MISSING or DIFFERING objects
+ *       fail (ledger behind the checkout or of a different shape); EXTRA
+ *       objects fail unless every one of them is named in
+ *       lib/db/ledger-schema-ahead.json's approved-ahead list (a
+ *       not-yet-merged migration's known objects), in which case they warn.
+ *       Neither variable set → prints "skipped" and exits 0. A ledger still
+ *       unreachable after retries fails (exit 1) unless --allow-unreachable
+ *       is passed, in which case it prints UNREACHABLE and is counted, not
+ *       inspected. The final line always reads
+ *       "factory-ledger: N inspected, M unreachable, K skipped" — it never
+ *       says OK when N is 0.
  *
  *   node scripts/check-factory-ledger.js --write-expected
  *       Regenerates the tracked JSON: applies the checkout's ledger migration
@@ -45,7 +56,37 @@ function loadEnvLocal() {
   } catch (_) { /* no .env.local */ }
 }
 
-const LEDGER_VARS = ['TEST_REQUEST_LEDGER_URL', 'TEST_REQUEST_SANDBOX_LEDGER_URL'];
+/** Env variable name -> the CLI target it is expected to serve (Codex round-1 Fix 6/7). */
+const LEDGER_VAR_TARGETS = {
+  TEST_REQUEST_LEDGER_URL: 'production',
+  TEST_REQUEST_SANDBOX_LEDGER_URL: 'sandbox',
+};
+const LEDGER_VARS = Object.keys(LEDGER_VAR_TARGETS);
+
+const CONNECT_ATTEMPTS = 3;
+const CONNECT_RETRY_DELAY_MS = 5000;
+
+function sleep(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+/** Connects with up to CONNECT_ATTEMPTS tries, CONNECT_RETRY_DELAY_MS apart (managed compute wake-up). */
+async function connectWithRetry(url) {
+  const { Client } = require('pg');
+  let lastErr;
+  for (let attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt += 1) {
+    const client = new Client({ connectionString: url, connectionTimeoutMillis: 15000 });
+    try {
+      await client.connect();
+      return client;
+    } catch (err) {
+      lastErr = err;
+      await client.end().catch(() => {});
+      if (attempt < CONNECT_ATTEMPTS) await sleep(CONNECT_RETRY_DELAY_MS);
+    }
+  }
+  throw lastErr;
+}
 
 async function writeExpected(schemaLib) {
   const url = process.env.TEST_REQUEST_LEDGER_TEST_URL;
@@ -72,34 +113,36 @@ async function writeExpected(schemaLib) {
   }
 }
 
-async function checkOne(name, url, schemaLib, registry, expected) {
+/** @returns {'ok'|'fail'|'unreachable'} */
+async function checkOne(name, url, target, schemaLib, registry, expected, approvedAhead) {
   const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL']
     .map((n) => process.env[n]).filter(Boolean);
-  const verdict = registry.classifyLedgerUrl(url, { sharedUrls });
+  const verdict = registry.classifyLedgerUrl(url, { target, sharedUrls });
   if (!verdict.ok) {
-    console.error(`✗ ${name}: refused (${verdict.reason}); see lib/db/ledger-registry.js`);
-    return false;
+    console.error(`✗ ${name} (target=${target}): refused (${verdict.reason}); see lib/db/ledger-registry.js`);
+    return 'fail';
   }
   const database = verdict.effective.database;
-  const { Client } = require('pg');
-  const client = new Client({ connectionString: url, connectionTimeoutMillis: 15000 });
+  let client;
   try {
-    await client.connect();
+    client = await connectWithRetry(url);
   } catch (err) {
-    // Advisory: a paused managed compute or a network blip must not turn
-    // /start red. Refusals and schema drift below still fail.
-    console.warn(`⚠ ${name}: ledger UNREACHABLE (${verdict.label} host, database ${database}): ${err.message}`);
-    return true;
+    console.warn(`⚠ ${name}: ledger UNREACHABLE after ${CONNECT_ATTEMPTS} attempts (${verdict.label} host, database ${database}): ${err.message}`);
+    return 'unreachable';
   }
   try {
     const live = await schemaLib.readLedgerFingerprint(client);
     const diff = schemaLib.compareLedgerFingerprint(expected.fingerprint, live);
+    const unapproved = schemaLib.unapprovedExtras(diff, approvedAhead);
     const head = `${name}: ${verdict.label} host, database ${database}, expected from ${expected.generatedFrom.join(', ')}`;
-    if (diff.ok && diff.extra.length === 0) { console.log(`✓ ${head} — matches`); return true; }
-    console.log(`${diff.ok ? '⚠' : '✗'} ${head}`);
+    if (diff.ok && unapproved.length === 0) {
+      console.log(`✓ ${head}${diff.extra.length > 0 ? ' — matches (extra objects all approved-ahead)' : ' — matches'}`);
+      return 'ok';
+    }
+    console.log(`✗ ${head}`);
     console.log(schemaLib.formatLedgerDiff(diff));
-    if (diff.ok) console.log('  (extra objects only: this ledger is ahead of the checkout; not a failure)');
-    return diff.ok;
+    if (unapproved.length > 0) console.log(`  unapproved extra objects (not in lib/db/ledger-schema-ahead.json): ${unapproved.join(', ')}`);
+    return 'fail';
   } finally {
     await client.end();
   }
@@ -109,17 +152,35 @@ async function main() {
   loadEnvLocal();
   const schemaLib = await import('../lib/db/ledger-schema.js');
   if (process.argv.includes('--write-expected')) { await writeExpected(schemaLib); return; }
+  const allowUnreachable = process.argv.includes('--allow-unreachable');
   const registry = await import('../lib/db/ledger-registry.js');
   const configured = LEDGER_VARS.filter((v) => process.env[v]);
+  const skipped = LEDGER_VARS.length - configured.length;
   if (configured.length === 0) {
     console.log('factory-ledger: skipped (neither TEST_REQUEST_LEDGER_URL nor TEST_REQUEST_SANDBOX_LEDGER_URL is set)');
     return;
   }
   const expected = schemaLib.readExpectedFingerprint();
-  let ok = true;
-  for (const name of configured) ok = (await checkOne(name, process.env[name], schemaLib, registry, expected)) && ok;
-  if (!ok) { console.error(`factory-ledger FAILED. To rebuild the expectation after a migration change: ${schemaLib.REGENERATE_COMMAND}`); process.exit(1); }
-  console.log('factory-ledger OK');
+  const approvedAhead = schemaLib.readApprovedAhead();
+  let inspected = 0;
+  let unreachable = 0;
+  let failed = false;
+  for (const name of configured) {
+    const target = LEDGER_VAR_TARGETS[name];
+    const result = await checkOne(name, process.env[name], target, schemaLib, registry, expected, approvedAhead);
+    if (result === 'unreachable') {
+      unreachable += 1;
+      if (!allowUnreachable) failed = true;
+    } else {
+      inspected += 1;
+      if (result === 'fail') failed = true;
+    }
+  }
+  console.log(`factory-ledger: ${inspected} inspected, ${unreachable} unreachable, ${skipped} skipped`);
+  if (failed) {
+    console.error(`factory-ledger FAILED. To rebuild the expectation after a migration change: ${schemaLib.REGENERATE_COMMAND}`);
+    process.exit(1);
+  }
 }
 
 main().catch((err) => { console.error('Fatal:', err.message); process.exit(1); });
