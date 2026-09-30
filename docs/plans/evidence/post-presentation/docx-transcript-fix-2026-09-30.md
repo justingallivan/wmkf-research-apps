@@ -1,10 +1,16 @@
 # DOCX transcript finalization — 2026-09-30
 
-Status: source-built on `codex/transcript-docx-integrity`; no production promotion
-or repair performed. This receipt covers the DOCX upload defect, not the whole
-post-presentation feature's release state.
+Status: PR #375 merged as `2eaa0767078c8daf3030ea9ca9ed04cd05ec8d6c`
+and was deployed on 2026-09-30 [VERIFIED via GitHub and recorded release checks].
+Its initial Production release did not resolve every DOCX/VTT specimen. PR #379
+subsequently shipped the missing custom-properties OPC graph and Blob stream
+sizing fixes; the owner confirmed both formats worked in Production on request
+1002903. Current release/acceptance receipt:
+`docs/plans/evidence/post-presentation/transcript-package-and-blob-read-2026-09-30.md`.
+This document preserves PR #375's historical diagnosis and review scope; no
+agent-created Production upload or repair ran.
 
-## Incident evidence
+## Historical pre-PR #375 incident evidence
 
 [VERIFIED via bounded read-only Production probes on 2026-09-30] The staging row
 for `USC_MR_Transcript_Cleaned.docx` is
@@ -139,9 +145,12 @@ against the unchanged worktree diff before recording this result:
 `eabd04f42e1d916248a31d57b0eac57261e0d62f22ff2dbbf83339f109dcc427`.
 Full closure receipt:
 `docs/plans/evidence/post-presentation/opus-docx-followup-2026-09-30.md`.
-Production DOCX upload/download acceptance and owner-approved promotion remain
-outstanding. Once deployed, the user must reselect and upload the rejected
-file as a new staging operation; the old rejected receipt is not reopened.
+PR #375's owner-approved promotion is complete. Its original review did not
+prove Production acceptance. The later PR #379 release and owner's successful
+DOCX/VTT uploads on request 1002903 close the incident; see the current receipt
+linked above. The initial 1002860 screenshot/source attribution remains
+unconfirmed and is not claimed by that later test. Old rejected staging rows
+are not reopened.
 
 ## Bounded reconciliation
 
@@ -154,5 +163,6 @@ not DOCX acceptance. Broader post-presentation roadmap/deployment reconciliation
 is outside this fix. Relevant symbol searches cover candidate receipts,
 `wmkf_filesize`, `wmkf_contenthash`, generation recovery and cleanup; UI/download
 consumers use registry identity without comparing the stored ZIP to the source
-raw hash. Remaining uncertainty: the exact user's original DOCX and production
-acceptance of this branch.
+raw hash. Remaining forensic uncertainty: the deleted original DOCX and the initial
+screenshot attribution. Production promotion and the later request 1002903
+DOCX/VTT acceptance are complete as documented in the current receipt.

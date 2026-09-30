@@ -544,7 +544,7 @@ an exact unreferenced candidate where that scope supports candidate cleanup.
 
 For `post_presentation_transcript` (migration 055), the candidate binds the
 request/generation identity and exact Graph drive/item/name/version/ETag.
-**[SOURCE-BUILT on `codex/transcript-docx-integrity`, not production-accepted:]**
+**[PRODUCTION-LIVE via PRs #375 and #379 on 2026-09-30; DOCX/VTT accepted via owner report on request 1002903:]**
 DOCX finalization attests the stored package against the staged source using
 `attestDocxPackageAgainstSource`, accepting only its characterized SharePoint
 metadata changes. Candidate `sourceSha256`/`sourceSize` identify the original
@@ -559,7 +559,13 @@ prior receipt instead of authorizing deletion of edited bytes. Receipt persisten
 attestation remains required before registry publication. PDF/TXT/VTT retain
 exact raw-byte checks. No columns or status values change. See
 `docs/plans/evidence/post-presentation/docx-transcript-fix-2026-09-30.md` for
-characterization, failure handling, and release limitations.
+initial characterization and failure handling, and
+`docs/plans/evidence/post-presentation/transcript-package-and-blob-read-2026-09-30.md`
+for the completed release and owner acceptance. The shared private loader now
+reads bounded decoded bytes when wire length is absent or compressed, while
+known uncompressed length, source cap, actual hash and lease fences remain
+enforced. Only exact newly promoted DOCX custom-properties OPC links are
+tolerated; source content and existing relationships remain protected.
 
 Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
 and submit routes; staff replacement mint and finalize routes; external

@@ -1,12 +1,15 @@
 # Request 1002903 transcript follow-up — 2026-09-30
 
-Status: follow-up source fix on `codex/transcript-package-and-blob-read`, based on
-Production merge `2eaa0767078c8daf3030ea9ca9ed04cd05ec8d6c`. Not promoted.
+Status: DONE — PR #379 merged and deployed; the owner confirmed both DOCX and
+VTT uploads worked in Production after the release. [VERIFIED via GitHub,
+Vercel release checks and owner report on 2026-09-30] Source commit
+`90ea3f0a5600ec8140edf124df0c57308f189d25` merged as
+`ebbbc1307589021b1712afa650a2c070e115b5df` at 23:17:05 UTC.
 The owner authorized bounded probes on request 1002903 after reporting renewed
-DOCX and VTT failures. Earlier PR #375 receipts describe their historical scope;
-its production deployment does not constitute acceptance of these two specimens.
+DOCX and VTT failures following PR #375. The failure evidence below is historical
+pre-PR #379 evidence; it does not describe the accepted post-release uploads.
 
-## Production evidence and limits
+## Historical pre-release Production evidence and limits
 
 [VERIFIED via bounded read-only Dataverse/Postgres/Graph and Vercel log probes]
 Request 1002903 resolves to `17e1c7ae-c844-f111-88b5-000d3a3065b8`.
@@ -46,12 +49,17 @@ same result. [VERIFIED via installed SDK source and regression] Blob `get()`
 derives its size from `Content-Length`, using zero when the header is absent.
 The old loader rejected that zero without consuming the stream. [ASSUMED for
 the exact user's VTT] Its GET lacked that header: the original transport
-headers/bytes were not retained and the rejected Blob was deleted. The owner
-was asked for original file paths to confirm the specimens.
+headers/bytes were not retained and the rejected Blob was deleted. Original
+file paths were requested during diagnosis; source bytes and VTT
+transport headers were not obtained. Subsequent owner acceptance closes the
+upload issue without establishing a complete forensic comparison.
 
-The only transcript registry row for this request is the successfully saved
+At the pre-release probe, the only transcript registry row for this request
+was the successfully saved
 386446-byte PDF (`d9dc7327-1bbd-f111-aaae-000d3a361c1f`, created 22:06:23 UTC).
-The failed attempts did not replace it. The shared UI maps these permanent
+The failed attempts did not replace it. Registry membership was not re-probed
+after the owner’s successful DOCX/VTT uploads; this historical count is not a
+claim about the post-acceptance registry. The shared UI maps these permanent
 rejection codes to “The staged transcript cannot be used. Reselect the file
 and upload it again.”
 
@@ -86,6 +94,69 @@ Opus first review, authenticated through Max subscription OAuth outside the sand
 A separate local HTTP probe used the SDK's actual `undici.fetch`, with a server deliberately ignoring identity encoding: a 39-byte gzip response decoded to 1400 bytes while retaining both `content-encoding:gzip` and the wire Content-Length. This closes the reviewer's runtime-header assumption without production writes or credentials.
 
 Twenty scoped gate/self-test invocations passed sequentially (agent invariants; Request Document writers, trust-boundary GUID, route-service boundary, Atlas, doc currency, symbol refs, secrets, scaffolding and fact consistency pairs; docs catalog). Document checks were rerun after these receipts. Closure review: `docs/plans/evidence/post-presentation/opus-transcript-package-and-blob-read-2026-09-30.md`.
-No claim is made that these original files have passed production acceptance.
-After deliberate promotion, reselect each original as a new staging operation;
-rejected old rows cannot be reused. Preserve PDF as the current fallback.
+## Production release and owner acceptance
+
+[VERIFIED via GitHub deployment status and Vercel inspect at release]
+Production deployment `dpl_D9bz5jCdvAYuf2iPqmUxseT3mcTC` reached Ready and
+served the applications/reviews/grantees/submissions domains. GitHub deployment
+`6772260367` tied its success at 23:17:46 UTC (4:17 PM Pacific) to the exact
+PR #379 merge SHA above. Canonical sign-in returned HTTP 200; unauthenticated
+Meeting Tracker redirected to sign-in and returned 200. The bounded initial
+error-log query returned zero records; it was not an upload test.
+
+[VERIFIED via owner report on 2026-09-30] After being asked to reselect and
+upload the original DOCX and VTT on request #1002903, the owner reported:
+“They both worked.” Both formats passed the owner's Production acceptance test.
+No agent-created upload, registry repair, migration or flag change ran. PDF
+was also owner-confirmed working as a fallback. No remaining acceptance or
+implementation item is open for this incident. Rejected old staging rows are
+not reopened; future uploads use a newly selected source.
+
+Historical release rollback baseline: commit `883aec528ac5e3d922947ef914afa227962108e5`,
+Ready deployment `dpl_GHvx9V2LzTki92rL8npKR777uxfM`. The recorded rollback target
+was `https://wmkfresearchapps-gtuqfqpx3-justin-gallivans-projects.vercel.app`.
+Deployment rollback restores code, not durable upload/registry writes; recheck
+current Production state before any future rollback.
+
+## Bounded closeout reconciliation
+
+Mode A: the changed fact is PR #379's completed Production promotion and
+owner-confirmed DOCX/VTT acceptance. Authoritative evidence is the GitHub merge
+and deployment status, the recorded Vercel release checks, and the owner's
+human report. The caller/persistence/reader contract is traced above; no runtime
+code changed during closeout. Exact source forensic attribution remains
+ASSUMED as labeled in the historical incident evidence; acceptance is not
+inferred from tests or the pre-release PDF registry row.
+
+Restatement search covered docs, memory, session/root instructions, rules and
+skills, source, scripts and tests. This receipt and the earlier DOCX incident
+receipt had stale release/acceptance statements; both were structurally
+corrected. The Atlas transcript subsection’s stale source-built marker was
+replaced with the release and owner-acceptance evidence. The two Opus receipts are explicitly pre-release review snapshots
+and retain their original verdicts/limitations. The Atlas transcript subsection describes
+compatible source/stored receipt semantics and links the completed release.
+SESSION_PROMPT.md and DEVELOPMENT_LOG.md now record the release and owner test.
+Unrelated request-number matches, the broader post-presentation rollout
+roadmap and route-status catalogue, and other workstream carryovers are excluded;
+prior session instructions are retained in Git history rather than promoted
+into a current worklist. PR #379's body also records owner acceptance.
+
+Closeout checks passed sequentially: doc currency and self-test, document
+symbol references and self-test, docs catalog, fact consistency and self-test,
+Atlas and self-test, secrets and self-test, scaffolding and self-test, harness
+framing and self-test, and instruction architecture. Tracked agent invariants
+passed in the isolated checkout; all three local symlink invariants passed in
+the original checkout. Diff check passed. The advisory claim-evidence report
+was unavailable; no observation row was fabricated.
+
+Scoped reconciliation verdict: RECONCILED — the three live stale incident
+release/acceptance statements (two incident receipts and the Atlas transcript
+marker) were corrected; repeated scoped searches found zero remaining stale
+statements. The two Opus snapshots remain HISTORICAL, and the session handoff
+and milestone now AGREE with release/owner evidence. To disconfirm completion,
+GitHub merge records were re-read and the current receipts were searched for
+“Not promoted”, “not production-accepted”, and outstanding/pending acceptance;
+none remained in the scoped current statements. No claim is made that the
+broader rollout roadmap or route catalogue was audited. Remaining uncertainty
+is the deleted originals' forensic comparison, not an open release or
+acceptance action.

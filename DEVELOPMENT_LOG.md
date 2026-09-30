@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — DOCX and VTT transcript upload incident resolved (Session 558)
+
+**Milestone:** Site Visit transcript uploads now tolerate characterized SharePoint DOCX metadata promotion and nonempty private Blob streams without an uncompressed Content-Length.
+**Sessions:** Parallel Codex transcript diagnosis, OAuth Opus review, two owner-authorized releases, and Production acceptance on 2026-09-30.
+**Ship state:**
+
+- PR #375 (`2eaa07670`) introduced strict DOCX source/stored attestation and safe retry receipts; PR #379 (`ebbbc1307`, source `90ea3f0a5`) completed custom-properties OPC links and bounded decoded-stream sizing.
+- 589 tests / 19 suites, production build and scoped gates passed for the follow-up; Opus approved through subscription OAuth with API-key source none.
+- At release, deployment `dpl_D9bz5jCdvAYuf2iPqmUxseT3mcTC` was Ready on the branded domains; sign-in/Meeting Tracker smoke passed. [VERIFIED via GitHub and Vercel]
+- The owner confirmed DOCX and VTT both worked after reselecting/uploading on request 1002903; PDF also worked. [VERIFIED via owner report] No agent upload, migration or registry repair ran.
+
+**Why it matters:** Staff can finish the originally failing transcript uploads; successful Production tests close the incident.
+**Pointers:** `docs/plans/evidence/post-presentation/transcript-package-and-blob-read-2026-09-30.md`; `docs/plans/evidence/post-presentation/docx-transcript-fix-2026-09-30.md`; PRs #375 and #379.
+
 ## September 2026 — Staff site-visit video released in Production (parallel Codex session during 553)
 
 **Milestone:** Staff can add a Zoom recording link or upload an MP4 after a Site Visit in Meeting Tracker, then watch the current recording from Staff Deliberations; a separate 60-day materials-only link is available for Board sharing.
