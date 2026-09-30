@@ -26,7 +26,7 @@ function response(body, {
   return {
     ok,
     status,
-    json: async () => body,
+    json: async () => withRosterRetention(body),
     blob: async () => new Blob(['xlsx'], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     }),
@@ -36,6 +36,28 @@ function response(body, {
         : '',
     },
   };
+}
+
+function withRosterRetention(body) {
+  if (!body || !Array.isArray(body.active) || !Array.isArray(body.excluded)) return body;
+  if (body.retention?.version === 1 && Array.isArray(body.retention.rows)) return body;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const rows = new Map();
+  const add = (items, status) => {
+    for (const item of Array.isArray(items) ? items : []) {
+      const candidateKey = item?.candidateKey || reviewerCandidateKey(item);
+      if (candidateKey) rows.set(candidateKey, { candidateKey, status });
+    }
+  };
+  add(body.active, 'active');
+  add(body.excluded, 'excluded');
+  add(body.ineligible, 'ineligible');
+  add(body.blocked, 'blocked');
+  add(body.handled, 'saved');
+  for (const candidateKey of Array.isArray(body.savedKeys) ? body.savedKeys : []) {
+    rows.set(candidateKey, { candidateKey, status: 'saved' });
+  }
+  return { ...body, retention: { version: 1, rows: [...rows.values()] } };
 }
 
 function roster(active, excluded = []) {

@@ -14,6 +14,7 @@ jest.mock('../../shared/components/reviewers/sse', () => ({
 
 const REQ_A = 'aaaaaaaa-1111-1111-1111-111111111111';
 const REQ_B = 'bbbbbbbb-2222-2222-2222-222222222222';
+let rosterFixtureRows = new Map();
 
 const candidate = (name, email) => ({
   name,
@@ -50,10 +51,52 @@ function response(body, ok = true, status = ok ? 200 : 500) {
   return {
     ok,
     status,
-    json: async () => body,
+    json: async () => withRosterRetention(body),
     blob: async () => new Blob(['xlsx'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
     headers: { get: () => 'attachment; filename="reviewers.xlsx"' },
   };
+}
+
+function withRosterRetention(body) {
+  if (!body || !Array.isArray(body.active) || !Array.isArray(body.excluded)) return body;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const rows = new Map((body.retention?.version === 1 && Array.isArray(body.retention.rows)
+    ? body.retention.rows : []).map((row) => [row.candidateKey, row]));
+  const add = (items, status) => {
+    for (const item of Array.isArray(items) ? items : []) {
+      const candidateKey = item?.candidateKey || reviewerCandidateKey(item);
+      if (candidateKey) rows.set(candidateKey, { candidateKey, status });
+    }
+  };
+  add(body.active, 'active');
+  add(body.excluded, 'excluded');
+  add(body.ineligible, 'ineligible');
+  add(body.blocked, 'blocked');
+  add(body.handled, 'saved');
+  for (const candidateKey of Array.isArray(body.savedKeys) ? body.savedKeys : []) {
+    rows.set(candidateKey, { candidateKey, status: 'saved' });
+  }
+  rosterFixtureRows = rows;
+  return { ...body, retention: { version: 1, rows: [...rows.values()] } };
+}
+
+function rosterWriteResponse(options, recordedCount = null) {
+  const body = JSON.parse(options?.body || '{}');
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const count = recordedCount == null ? candidates.length : recordedCount;
+  const results = candidates.map((candidate, inputIndex) => {
+      const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+      const candidateKey = candidate?.candidateKey || reviewerCandidateKey(candidate) || null;
+    const result = {
+      inputIndex,
+      candidateKey,
+      existingAtAttempt: candidateKey ? rosterFixtureRows.has(candidateKey) : null,
+      outcome: inputIndex < count || recordedCount == null ? 'written' : 'failed',
+    };
+    if (result.outcome === 'failed') result.code = 'roster_write_failed';
+    return result;
+  });
+  return response({ success: results.every((result) => result.outcome !== 'failed'), recorded: count, outcomeVersion: 1, results });
 }
 
 function rosterResponse(active) {
@@ -84,6 +127,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  rosterFixtureRows = new Map();
   delete window.confirm;
   HTMLAnchorElement.prototype.click = originalAnchorClick;
   if (originalCreateObjectURL) URL.createObjectURL = originalCreateObjectURL;
@@ -423,6 +467,7 @@ test('stale refresh stops issuing roster writes after the first row', async () =
   ];
   const firstRosterWrite = deferred();
   let rosterWrites = 0;
+  let firstRosterWriteOptions;
   const refreshed = expiredRows.map((row, index) => ({
     ...row,
     email: `${index === 0 ? 'fresh-a' : 'fresh-b'}@example.edu`,
@@ -457,8 +502,11 @@ test('stale refresh stops issuing roster writes after the first row', async () =
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       rosterWrites += 1;
-      if (rosterWrites === 1) return firstRosterWrite.promise;
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      if (rosterWrites === 1) {
+        firstRosterWriteOptions = options;
+        return firstRosterWrite.promise;
+      }
+      return Promise.resolve(rosterWriteResponse(options));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -475,7 +523,7 @@ test('stale refresh stops issuing roster writes after the first row', async () =
   await waitFor(() => expect(rosterWrites).toBe(1));
   await act(async () => {
     rerender(<ReviewerSearchSection requestId={REQ_B} blobUrl="blob-b" proposalKey="proposal-b" />);
-    firstRosterWrite.resolve(response({ success: true, recorded: 1 }));
+    firstRosterWrite.resolve(rosterWriteResponse(firstRosterWriteOptions));
     await firstRosterWrite.promise;
   });
   expect(rosterWrites).toBe(1);

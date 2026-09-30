@@ -12,6 +12,30 @@ jest.mock('../../shared/components/reviewers/sse', () => ({
 }));
 
 const REQ = '11111111-1111-1111-1111-111111111111';
+let rosterFixtureRows = new Map();
+
+function withRosterRetention(body) {
+  if (!body || !Array.isArray(body.active) || !Array.isArray(body.excluded)) return body;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const rows = new Map((body.retention?.version === 1 && Array.isArray(body.retention.rows)
+    ? body.retention.rows : []).map((row) => [row.candidateKey, row]));
+  const add = (items, status) => {
+    for (const item of Array.isArray(items) ? items : []) {
+      const candidateKey = item?.candidateKey || reviewerCandidateKey(item);
+      if (candidateKey) rows.set(candidateKey, { candidateKey, status });
+    }
+  };
+  add(body.active, 'active');
+  add(body.excluded, 'excluded');
+  add(body.ineligible, 'ineligible');
+  add(body.blocked, 'blocked');
+  add(body.handled, 'saved');
+  for (const candidateKey of Array.isArray(body.savedKeys) ? body.savedKeys : []) {
+    rows.set(candidateKey, { candidateKey, status: 'saved' });
+  }
+  rosterFixtureRows = rows;
+  return { ...body, retention: { version: 1, rows: [...rows.values()] } };
+}
 
 const addressTrustReceipt = (email) => ({
   receiptId: `receipt-${email}`,
@@ -58,7 +82,26 @@ const applicantCandidate = {
 };
 
 function response(body, ok = true, status = ok ? 200 : 500) {
-  return { ok, status, json: async () => body, body: {} };
+  return { ok, status, json: async () => withRosterRetention(body), body: {} };
+}
+
+function rosterWriteResponse(options, recordedCount = null) {
+  const body = JSON.parse(options?.body || '{}');
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const count = recordedCount == null ? candidates.length : recordedCount;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const results = candidates.map((candidate, inputIndex) => {
+    const candidateKey = candidate?.candidateKey || reviewerCandidateKey(candidate) || null;
+    const result = {
+      inputIndex,
+      candidateKey,
+      existingAtAttempt: candidateKey ? rosterFixtureRows.has(candidateKey) : null,
+      outcome: inputIndex < count || recordedCount == null ? 'written' : 'failed',
+    };
+    if (result.outcome === 'failed') result.code = 'roster_write_failed';
+    return result;
+  });
+  return response({ success: results.every((result) => result.outcome !== 'failed'), recorded: count, outcomeVersion: 1, results });
 }
 
 function deferred() {
@@ -77,6 +120,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  rosterFixtureRows = new Map();
   delete window.confirm;
   global.fetch = jest.fn();
 });
@@ -520,6 +564,10 @@ test('removal blocks a same-request search until its refreshed roster arrives', 
       removedKeys: [generatedCandidate.candidateKey],
       active: [],
       excluded: [],
+      ineligible: [],
+      blocked: [],
+      handled: [],
+      savedKeys: [],
       allNames: [],
     }));
     await removal.promise;
@@ -528,6 +576,7 @@ test('removal blocks a same-request search until its refreshed roster arrives', 
 
 test('a search blocks prior-result removal until its roster write settles', async () => {
   const rosterWrite = deferred();
+  let rosterWriteOptions;
   const freshCandidate = {
     ...generatedCandidate,
     candidateKey: 'candidate:fresh',
@@ -549,6 +598,7 @@ test('a search blocks prior-result removal until its roster write settles', asyn
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      rosterWriteOptions = options;
       return rosterWrite.promise;
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
@@ -576,7 +626,7 @@ test('a search blocks prior-result removal until its roster write settles', asyn
   expect(screen.getByRole('button', { name: 'Remove previous results' })).toBeDisabled();
 
   await act(async () => {
-    rosterWrite.resolve(response({ success: true, recorded: 1 }));
+    rosterWrite.resolve(rosterWriteResponse(rosterWriteOptions));
     await rosterWrite.promise;
   });
 
@@ -687,6 +737,10 @@ test('a retained row stays selected when only another submitted key is deleted',
           rosterUpdatedAt: '2026-07-19T16:05:00.000Z',
         }],
         excluded: [],
+        ineligible: [],
+        blocked: [],
+        handled: [],
+        savedKeys: [],
         allNames: [retainedCandidate.name],
       }));
     }
@@ -721,7 +775,7 @@ test('continues after a terminal discovery read failure when the complete ranked
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(rosterWriteResponse(options));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });

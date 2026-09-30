@@ -16,6 +16,7 @@ const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
 const { readSseStream } = require('../../shared/components/reviewers/sse');
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+let rosterFixtureRows = new Map();
 const ORDINARY = {
   name: 'Ordinary Saved',
   email: 'applicant@example.edu',
@@ -32,7 +33,49 @@ const ORDINARY = {
 };
 
 function response(body, ok = true, status = ok ? 200 : 422) {
-  return { ok, status, json: async () => body };
+  return { ok, status, json: async () => withRosterRetention(body) };
+}
+
+function withRosterRetention(body) {
+  if (!body || !Array.isArray(body.active) || !Array.isArray(body.excluded)) return body;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const rows = new Map((body.retention?.version === 1 && Array.isArray(body.retention.rows)
+    ? body.retention.rows : []).map((row) => [row.candidateKey, row]));
+  const add = (items, status) => {
+    for (const item of Array.isArray(items) ? items : []) {
+      const candidateKey = item?.candidateKey || reviewerCandidateKey(item);
+      if (candidateKey) rows.set(candidateKey, { candidateKey, status });
+    }
+  };
+  add(body.active, 'active');
+  add(body.excluded, 'excluded');
+  add(body.ineligible, 'ineligible');
+  add(body.blocked, 'blocked');
+  add(body.handled, 'saved');
+  for (const candidateKey of Array.isArray(body.savedKeys) ? body.savedKeys : []) {
+    rows.set(candidateKey, { candidateKey, status: 'saved' });
+  }
+  rosterFixtureRows = rows;
+  return { ...body, retention: { version: 1, rows: [...rows.values()] } };
+}
+
+function rosterWriteResponse(options, recordedCount = null) {
+  const body = JSON.parse(options?.body || '{}');
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const count = recordedCount == null ? candidates.length : recordedCount;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const results = candidates.map((candidate, inputIndex) => {
+    const candidateKey = candidate?.candidateKey || reviewerCandidateKey(candidate) || null;
+    const result = {
+      inputIndex,
+      candidateKey,
+      existingAtAttempt: candidateKey ? rosterFixtureRows.has(candidateKey) : null,
+      outcome: inputIndex < count || recordedCount == null ? 'written' : 'failed',
+    };
+    if (result.outcome === 'failed') result.code = 'roster_write_failed';
+    return result;
+  });
+  return response({ success: results.every((result) => result.outcome !== 'failed'), recorded: count, outcomeVersion: 1, results });
 }
 
 function rosterEnvelope(active = [ORDINARY]) {
@@ -48,12 +91,13 @@ afterEach(() => {
   cleanup();
   global.fetch = jest.fn();
   readSseStream.mockReset();
+  rosterFixtureRows = new Map();
 });
 
 test('ordinary pre-response network loss reconciles the roster but cannot confirm a saved non-suggestion key', async () => {
   let rosterGets = 0;
   const onSaved = jest.fn();
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, options = {}) => {
     if (String(url).includes('/api/workbench/reviewer-roster?')) {
       rosterGets += 1;
       return Promise.resolve(response(rosterGets === 1 ? rosterEnvelope() : contract.rosterRecovery));
@@ -80,7 +124,7 @@ test('ordinary pre-response network loss reconciles the roster but cannot confir
 
 test('ordinary response JSON failure does not perform pre-response roster recovery', async () => {
   let rosterGets = 0;
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, options = {}) => {
     if (String(url).includes('/api/workbench/reviewer-roster?')) {
       rosterGets += 1;
       return Promise.resolve(response(rosterEnvelope()));
@@ -425,9 +469,9 @@ test('expired verification with an unchanged token remains retryable without ros
     if (url === '/api/reviewer-finder/enrich-contacts') {
       return Promise.resolve({ ok: true, status: 200, body: {} });
     }
-    if (url === '/api/workbench/reviewer-roster' ) {
+    if (url === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       rosterPosts += 1;
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(rosterWriteResponse(options));
     }
     throw new Error('unexpected fetch ' + url);
   });
@@ -459,7 +503,7 @@ test('expired verification with recorded=0 stays retryable and does not auto-sav
     automatedIdentityAttestation: 'expired-token',
   };
   let rosterPosts = 0;
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, options = {}) => {
     if (String(url).includes('/api/workbench/reviewer-roster?')) {
       return Promise.resolve(response(rosterEnvelope([expired])));
     }
@@ -480,9 +524,9 @@ test('expired verification with recorded=0 stays retryable and does not auto-sav
     if (url === '/api/reviewer-finder/enrich-contacts') {
       return Promise.resolve({ ok: true, status: 200, body: {} });
     }
-    if (url === '/api/workbench/reviewer-roster') {
+    if (url === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       rosterPosts += 1;
-      return Promise.resolve(response({ success: true, recorded: 0 }));
+      return Promise.resolve(rosterWriteResponse(options, 0));
     }
     throw new Error('unexpected fetch ' + url);
   });
@@ -545,7 +589,7 @@ test('multi-row refresh keeps recorded=0 retryable while acknowledging recorded=
     if (url === '/api/workbench/reviewer-roster') {
       const body = JSON.parse(options.body);
       rosterPosts.push(body.candidates[0].candidateKey);
-      return Promise.resolve(response({ success: true, recorded: body.candidates[0].candidateKey === second.candidateKey ? 1 : 0 }));
+      return Promise.resolve(rosterWriteResponse(options, body.candidates[0].candidateKey === second.candidateKey ? 1 : 0));
     }
     throw new Error('unexpected fetch ' + url);
   });

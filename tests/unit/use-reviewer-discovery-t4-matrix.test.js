@@ -6,9 +6,8 @@
  * (their responses are handed to readSseStream) and stay raw per the §2.6
  * allowlist. Only the runSearch roster-persist POST
  * (/api/workbench/reviewer-roster, line 268) is a JSON site and migrates.
- * It checks ONLY `rRes.ok` (no body read) — this file pins the exact request
- * bytes and both the success and non-2xx-body-never-read outcomes ahead of
- * migrating onto shared/utils/api-request.js.
+ * This file pins the exact request body and the rendered persistence recovery
+ * state around the versioned per-input outcome contract.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewerSearchSection from '../../shared/components/reviewers/ReviewerSearchSection';
@@ -35,11 +34,14 @@ const freshCandidate = {
   provenance: { kind: 'literature_retrieved', sources: ['openalex'], seedRole: 'query_seed', groundingWorkIds: [] },
 };
 
-function mockPipeline({ rosterPost }) {
+function mockPipeline({ rosterPost, written = false }) {
+  let rosterReads = 0;
   return jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({ success: true, active: [], excluded: [], allNames: [] }));
+      rosterReads += 1;
+      const active = rosterReads > 1 && written ? [freshCandidate] : [];
+      return Promise.resolve(response({ success: true, active, excluded: [], allNames: active.map((row) => row.name), retention: { version: 1, rows: active.map(({ candidateKey }) => ({ candidateKey, status: 'active' })) } }));
     }
     if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
@@ -68,7 +70,8 @@ afterEach(() => { global.fetch = jest.fn(); });
 test('runSearch roster-persist POST: exact body bytes/headers; success merges into the active roster', async () => {
   let sentOpts = null;
   global.fetch = mockPipeline({
-    rosterPost: (opts) => { sentOpts = opts; return response({ success: true, recorded: 1 }); },
+    written: true,
+    rosterPost: (opts) => { sentOpts = opts; return response({ success: true, recorded: 1, outcomeVersion: 1, results: [{ inputIndex: 0, candidateKey: freshCandidate.candidateKey, existingAtAttempt: false, outcome: 'written' }] }); },
   });
   mockSse();
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
@@ -82,7 +85,7 @@ test('runSearch roster-persist POST: exact body bytes/headers; success merges in
   expect(body.candidates[0].candidateKey).toBe(freshCandidate.candidateKey);
 });
 
-test('runSearch roster-persist POST: non-2xx (body never read) surfaces the fixed roster-note failure, candidates still shown', async () => {
+test('runSearch roster-persist POST: non-2xx keeps the card visible and offers explicit save reconciliation', async () => {
   global.fetch = mockPipeline({
     rosterPost: () => response({ error: 'db down' }, false, 500),
   });
@@ -90,10 +93,12 @@ test('runSearch roster-persist POST: non-2xx (body never read) surfaces the fixe
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
   await screen.findByLabelText(`Select ${freshCandidate.name}`);
-  expect(await screen.findByText("Couldn't save this search to the request — these candidates may re-appear on a future search.")).toBeInTheDocument();
+  expect(await screen.findByText("Couldn't confirm which results were saved. Use saved results to replace this search with the server roster.")).toBeInTheDocument();
+  expect(screen.getByTestId('reviewer-roster-persistence-status')).toHaveTextContent('Save not confirmed');
+  expect(screen.getByRole('button', { name: 'Retry checking saves' })).toBeInTheDocument();
 });
 
-test('runSearch roster-persist POST: network rejection surfaces the same fixed roster-note failure', async () => {
+test('runSearch roster-persist POST: network rejection keeps the card visible and offers explicit save reconciliation', async () => {
   global.fetch = mockPipeline({
     rosterPost: () => Promise.reject(new Error('offline')),
   });
@@ -101,5 +106,7 @@ test('runSearch roster-persist POST: network rejection surfaces the same fixed r
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
   await screen.findByLabelText(`Select ${freshCandidate.name}`);
-  expect(await screen.findByText("Couldn't save this search to the request — these candidates may re-appear on a future search.")).toBeInTheDocument();
+  expect(await screen.findByText("Couldn't confirm which results were saved. Use saved results to replace this search with the server roster.")).toBeInTheDocument();
+  expect(screen.getByTestId('reviewer-roster-persistence-status')).toHaveTextContent('Save not confirmed');
+  expect(screen.getByRole('button', { name: 'Retry checking saves' })).toBeInTheDocument();
 });

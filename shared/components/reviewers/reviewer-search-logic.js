@@ -104,6 +104,59 @@ export function candidateWasSaved(candidate, savedKeys = []) {
   return stableKeys.has(reviewerSaveKey(candidate));
 }
 
+/** Strictly parse the bounded roster POST contract; malformed 2xx bodies are unconfirmed. */
+export function parseReviewerRosterOutcomeResponse(data, expectedCount) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)
+    || data.outcomeVersion !== 1
+    || typeof data.success !== 'boolean'
+    || !Number.isInteger(data.recorded) || data.recorded < 0
+    || !Array.isArray(data.results) || data.results.length !== expectedCount) return null;
+  const byIndex = new Array(expectedCount);
+  const outcomes = new Set(['written', 'unchanged', 'failed', 'invalid']);
+  for (const row of data.results) {
+    if (!row || !Number.isInteger(row.inputIndex)
+      || row.inputIndex < 0 || row.inputIndex >= expectedCount
+      || byIndex[row.inputIndex]
+      || !outcomes.has(row.outcome)) return null;
+    const candidateKey = typeof row.candidateKey === 'string' && row.candidateKey.trim()
+      ? row.candidateKey.trim() : null;
+    const validAttempt = row.outcome !== 'invalid';
+    if (validAttempt && (!candidateKey || typeof row.existingAtAttempt !== 'boolean')) return null;
+    if (!validAttempt && row.existingAtAttempt !== null) return null;
+    if (['failed', 'invalid'].includes(row.outcome)
+      && (typeof row.code !== 'string' || !row.code.trim())) return null;
+    byIndex[row.inputIndex] = { ...row, candidateKey };
+  }
+  if (byIndex.some((row) => !row)) return null;
+  if (data.recorded !== byIndex.filter((row) => row.outcome === 'written').length) return null;
+  const failed = byIndex.some((row) => row.outcome === 'failed' || row.outcome === 'invalid');
+  if (data.success === failed) return null;
+  return { ...data, results: byIndex };
+}
+
+/** A complete all-status key inventory is the only proof that a key is absent. */
+export function parseReviewerRosterRetention(retention) {
+  if (!retention || retention.version !== 1 || !Array.isArray(retention.rows)) return null;
+  const statuses = new Set(['active', 'excluded', 'ineligible', 'saved', 'blocked', 'coi_dropped']);
+  const inventory = new Map();
+  for (const row of retention.rows) {
+    if (!row || typeof row.candidateKey !== 'string' || !row.candidateKey.trim()
+      || !statuses.has(row.status) || inventory.has(row.candidateKey)) return null;
+    inventory.set(row.candidateKey, row.status);
+  }
+  return inventory;
+}
+
+/** True only when a single-item detailed roster write confirms the exact submitted key. */
+export function hasExactReviewerRosterWriteAcknowledgement(data, candidateKey) {
+  const envelope = parseReviewerRosterOutcomeResponse(data, 1);
+  const result = envelope?.results[0];
+  return !!envelope?.success
+    && envelope.recorded === 1
+    && result?.outcome === 'written'
+    && result.candidateKey === candidateKey;
+}
+
 /**
  * Bind per-row save results back to the immutable roster key rendered by Find.
  *

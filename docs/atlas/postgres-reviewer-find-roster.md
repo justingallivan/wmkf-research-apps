@@ -2,7 +2,11 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-09-14 branch source/tests verify the dormant, exact-on
+**Last verified:** 2026-09-30 branch source/tests and independent review verify
+the save-outcome, retention and removal-projection contracts below; isolated
+PostgreSQL/browser release checks remain pending in
+`docs/plans/REVIEWER_ROSTER_SAVE_OUTCOMES_PLAN_2026-09-30.md`.
+2026-09-14 branch source/tests verify the dormant, exact-on
 institution-evidence projection and request/candidate-bound receipt described
 below; it is not enabled or deployment-verified. 2026-08-21 feature-branch source/tests verify the bounded
 prior-request context projection (deployment pending); 2026-08-20 in source/tests and signed-in Production UI smoke
@@ -154,8 +158,11 @@ cold search emitted the new authority envelope.
 
 - `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` reads the
   rendered roster and returns active/excluded/ineligible/blocked candidates,
-  canonical saved applicant suggestion keys (`savedKeys`), and the all-status
-  name union. `findCandidateBySuggestion(requestId, suggestionId)` reads only
+  canonical saved applicant suggestion keys (`savedKeys`), the all-status
+  name union, and `retention: { version: 1, rows: [{ candidateKey, status }] }`
+  for every returned Postgres row. Retention includes noncanonical saved and
+  COI-ledger keys without exposing their candidate blobs; it is read-only
+  correlation metadata, not identity or promotion authority. `findCandidateBySuggestion(requestId, suggestionId)` reads only
   the canonical `(request_id, suggestion:<id>)` row, rechecks the embedded
   suggestion id, and returns its `updated_at` token; applicant promotion fails
   closed when it is absent. `findIdentityConfirmation` is the fail-closed
@@ -176,8 +183,8 @@ cold search emitted the new authority envelope.
   available, so a search cannot silently omit applicant exclusions. A missing
   applicant-enrichment cache remains visible and idle until staff choose its verification action. The
   request/generation and AbortController guards prevent an explicit operation
-  for the prior request from painting the next request. `coi_dropped` contributes only
-  through `allNames`. Its temporary missing-mode compatibility GET performs
+  for the prior request from painting the next request. `coi_dropped` contributes to
+  `allNames` and the non-actionable retention inventory. Its temporary missing-mode compatibility GET performs
   the existing complete request-scoped
   `findByRequest(..., { selectedOnly:false, requireComplete:true })` read for
   every suggestion-anchored visible roster row. The additive `mode=cached`
@@ -222,33 +229,17 @@ cold search emitted the new authority envelope.
 
 ## Write paths
 
-- `lib/services/reviewer-roster-store.js` is the only roster JSONB mutation
-  surface. [VERIFIED via source/tests] Its cold path is
-  `recordSurfacedWithStageEvidence`, which validates bounded projected stage
-  evidence and returns per-candidate `recorded`, `partial`, or `skipped`
-  outcomes rather than a count. Its manual path is
-  `startStageRefresh`/`completeStageRefreshWithEvidence`/
-  `failStageRefresh`/`recoverExpiredStageRefresh`; it also has the provider-free
-  `finalizeCachedRosterEvidence` terminal repair and
-  `completeStructuredAddressVerification` for the paired staff action.
-  Every stage write is an exact `(request_id, candidate_key, updated_at)` CAS
-  under a **candidate-wide** refresh lease, not a per-stage lease. A second
-  active stage reports `refresh_in_progress`; an expired owner is persisted as
-  an incomplete retryable outcome before a retry can start. If upstream
-  invalidation temporarily leaves that exact owner's normal source hash
-  underivable, recovery uses only the opaque
-  `reviewer-stage-expired-lease-recovery:v1` server-derived
-  request/candidate/stage marker and still writes an incomplete receipt. The
-  planner exposes it only as `recover_expired_lease` with canonical reason
-  `prior_refresh_incomplete`. A missing/non-canonical attempt or start time,
-  non-allowlisted stage, live owner, or foreign-stage owner is never recovered:
-  it is `lease_repair_required` and the UI provides an operator-repair-only
-  state. Neither branch can make evidence current or authorize promotion. JSONB projectors
-  retain prior display evidence on failure and reject arbitrary browser patches.
-  Successful cold/manual writes apply the requested projected stage and
-  `roster_persistence` atomically when the upstream set is complete; a lost CAS
-  records neither as successful. `warmCacheVersion` denotes only the current
-  cache envelope, never that every stage or promotion condition is current.
+- `lib/services/reviewer-roster-store.js` owns roster JSONB mutations. The
+  browser cold-save path uses `recordSurfacedDetailed`, with one positional
+  `written`/`unchanged`/`failed`/`invalid` outcome per item; `recordSurfaced`
+  wraps the same writer and preserves the numeric changed-row count for
+  internal address-trust/applicant-enrichment consumers. Row errors remain
+  partial failures rather than rolling back successful sibling writes.
+  A guarded zero-row result means no row changed, not a database exception.
+  Measurement/cap cleanup cannot reverse an acknowledged row write; a later
+  read determines current retention. No API outcome field is stored as
+  candidate authority. These are branch source contracts for the 2026-09-30
+  save-outcome fix, not a production deployment claim.
 - `pages/api/workbench/reviewer-roster.js` handles record-on-results, Exclude,
   Promote, authenticated identity confirmation, roster-only website/affiliation
   draft edits, and scoped removal. The contact-draft action re-reads the exact
@@ -256,14 +247,24 @@ cold search emitted the new authority envelope.
   the structured address/identity actions, and no Dataverse person write occurs. Browser
   `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
   saved/blocked authority. Browser-authored blobs have staff authority stripped
-  and eligibility reconstructed only from a valid bound receipt.
-- `pages/api/workbench/enrich-recommended.js` is the connected cold applicant
-  producer. [VERIFIED via source/tests] it obtains Graph proposal binding
-  metadata before and after proposal-dependent analysis, discards a changed
-  authority/version, builds bounded applicant cold-stage evidence, and passes
-  it to `recordSurfacedWithStageEvidence` for per-candidate outcome accounting.
-  A display-only public-Blob fallback cannot authorize proposal-dependent
-  identity/coauthor evidence.
+  and eligibility reconstructed only from a valid bound receipt. POST returns
+  `outcomeVersion: 1`, the numeric `recorded` count and a complete original-index
+  result list with server-bound keys and server-derived `existingAtAttempt`.
+  Failed/invalid items make `success` false even on a processed HTTP-200 batch.
+  Optional `writeMode: 'insert_missing'` is restrictive: it forces the existing
+  `expectedUpdatedAt: null` conflict guard, rejects changed/missing submitted
+  keys, and rejects submitted deceased/emeritus evidence that now validates as
+  unknown. It never reinterprets a client hint as authority. Initial-save
+  receipt/eligibility policy is unchanged. GET and removal responses expose the
+  same retention inventory and apply the same Dataverse engagement reconciliation
+  before returning actionable buckets. A reconciliation failure after committed
+  removal leaves the client unconfirmed until a successful fresh read.
+- `pages/api/workbench/enrich-recommended.js` delegates applicant enrichment
+  to `lib/services/workbench/enrich-recommended-service.js`. Its existing
+  `recordSurfaced` call continues to receive a numeric count. The browser
+  save-outcome contract does not expand or replace that workflow. Earlier
+  descriptions of `recordSurfacedWithStageEvidence` are not the current store
+  API on this branch; this fix adds no stage-evidence persistence machinery.
 - `pages/api/workbench/reviewer-stage-refresh.js` is the explicit manual
   targeted-refresh surface. [VERIFIED via source/tests] its closed body accepts
   only `{ requestId, candidateKey, stage, expectedUpdatedAt }`; it rejects

@@ -52,6 +52,13 @@ function candidate(name, candidateKey, overrides = {}) {
 }
 
 function rosterSnapshot({ active = [], excluded = [], ineligible = [], blocked = [], handled = [], savedKeys = [] } = {}) {
+  const retentionRows = [
+    ...active.map((row) => ({ candidateKey: row.candidateKey, status: 'active' })),
+    ...excluded.map((row) => ({ candidateKey: row.candidateKey, status: 'excluded' })),
+    ...ineligible.map((row) => ({ candidateKey: row.candidateKey, status: 'ineligible' })),
+    ...blocked.map((row) => ({ candidateKey: row.candidateKey, status: 'blocked' })),
+    ...handled.map((row) => ({ candidateKey: row.candidateKey, status: 'saved' })),
+  ].filter((row) => row.candidateKey);
   return {
     success: true,
     active,
@@ -63,6 +70,7 @@ function rosterSnapshot({ active = [], excluded = [], ineligible = [], blocked =
     allNames: [...active, ...excluded, ...ineligible, ...blocked, ...handled]
       .map((row) => row?.name)
       .filter(Boolean),
+    retention: { version: 1, rows: retentionRows },
   };
 }
 
@@ -202,11 +210,17 @@ test('removal carries old timestamps but preserves newer active state and every 
     savedKeys: ['suggestion:applicant-saved'],
   });
   const removalBodies = [];
+  const firstRemoval = deferred();
+  let rosterReads = 0;
+  let currentSnapshot = initial;
   window.confirm = jest.fn(() => true);
 
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
-    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(response(initial));
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      rosterReads += 1;
+      return Promise.resolve(response(rosterReads === 1 ? initial : currentSnapshot));
+    }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
       expect(body.action).toBe('remove_previous_results');
@@ -216,20 +230,14 @@ test('removal carries old timestamps but preserves newer active state and every 
           { candidateKey: previous.candidateKey, updatedAt: previous.rosterUpdatedAt },
           { candidateKey: concurrentlyRefreshed.candidateKey, updatedAt: concurrentlyRefreshed.rosterUpdatedAt },
         ]);
-        return Promise.resolve(response({
-          ...afterRemoval,
-          removed: 1,
-          removedKeys: [previous.candidateKey],
-        }));
+        currentSnapshot = afterRemoval;
+        return firstRemoval.promise;
       }
       expect(body.candidateRefs).toEqual([
         { candidateKey: concurrentlyRefreshed.candidateKey, updatedAt: newerRetained.rosterUpdatedAt },
       ]);
-      return Promise.resolve(response({
-        ...afterSecondRemoval,
-        removed: 1,
-        removedKeys: [concurrentlyRefreshed.candidateKey],
-      }));
+      currentSnapshot = afterSecondRemoval;
+      return Promise.resolve(response({ ...afterSecondRemoval, removed: 1, removedKeys: [concurrentlyRefreshed.candidateKey] }));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -240,12 +248,20 @@ test('removal carries old timestamps but preserves newer active state and every 
   expect(retainedCheckbox).toBeChecked();
 
   fireEvent.click(screen.getByRole('button', { name: 'Remove previous results' }));
+  expect(screen.getByRole('button', { name: 'Removing…' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Run another search' })).toBeDisabled();
+  expect(removalBodies).toHaveLength(1);
+  await act(async () => {
+    firstRemoval.resolve(response({ ...afterRemoval, removed: 1, removedKeys: [previous.candidateKey] }));
+    await firstRemoval.promise;
+  });
 
   await waitFor(() => expect(screen.queryByLabelText(`Select ${previous.name}`)).not.toBeInTheDocument());
   expect(screen.getByLabelText(`Select ${concurrentlyRefreshed.name}`)).toBeChecked();
   expect(screen.getByText(applicant.name)).toBeInTheDocument();
   expect(screen.getByText(excluded.name)).toBeInTheDocument();
   expect(screen.getByText(ineligible.name)).toBeInTheDocument();
+  expect(rosterReads).toBe(1); // complete PATCH inventory is authoritative; no post-write GET race
   expect(screen.getByText(blocked.name)).toBeInTheDocument();
   expect(screen.getByText(handled.name)).toBeInTheDocument();
 
@@ -253,9 +269,47 @@ test('removal carries old timestamps but preserves newer active state and every 
   await waitFor(() => expect(removalBodies).toHaveLength(2));
 });
 
-test('failed exclusion of a transient active result restores the pruned row to rosterActive', async () => {
-  const exclusion = deferred();
+test('committed removal with a malformed roster snapshot preserves last verified rows and requires reviewer-state retry', async () => {
+  const previous = candidate('Previous result', 'candidate:previous', {
+    rosterUpdatedAt: '2026-09-18T10:00:00.000Z',
+  });
+  const initial = rosterSnapshot({ active: [previous] });
+  let rosterGets = 0;
+  let removals = 0;
+  window.confirm = jest.fn(() => true);
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      rosterGets += 1;
+      return Promise.resolve(response(rosterGets === 1 ? initial : rosterSnapshot()));
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      removals += 1;
+      return Promise.resolve(response({ success: true, removed: 1, removedKeys: [previous.candidateKey] }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQUEST_ID} blobUrl="blob" proposalKey="proposal" />);
+  expect(await screen.findByLabelText(`Select ${previous.name}`)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Remove previous results' }));
+  expect(await screen.findByText(/removed, but the complete roster could not be confirmed/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(`Select ${previous.name}`)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run another search' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Retry reviewer state' })).toBeEnabled();
+  expect(removals).toBe(1);
+  expect(rosterGets).toBe(1); // no second read can overwrite the last verified snapshot
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry reviewer state' }));
+  await waitFor(() => expect(rosterGets).toBe(2));
+  await waitFor(() => expect(screen.queryByLabelText(`Select ${previous.name}`)).not.toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Run reviewer search' })).toBeEnabled();
+});
+
+test('unconfirmed roster state keeps candidate actions disabled', async () => {
   const transient = candidate('Transient search result', 'candidate:transient');
+  const prior = { ...candidate('Earlier active result', 'candidate:prior'), rosterUpdatedAt: '2026-09-29T12:00:00Z' };
+  const excluded = candidate('Prior excluded result', 'candidate:excluded');
   readSseStream
     .mockImplementationOnce(async (_response, onEvent) => {
       onEvent({ event: 'result', data: { proposalInfo: { title: 'Proposal', keywords: 'materials' } } });
@@ -268,30 +322,29 @@ test('failed exclusion of a transient active result restores the pruned row to r
     });
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
-    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(response(rosterSnapshot()));
+    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(response(rosterSnapshot({ active: [prior], excluded: [excluded] })));
     if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       return Promise.resolve(response({ error: 'store unavailable' }, false));
     }
-    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') return exclusion.promise;
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') throw new Error('pending-save state must block roster mutations');
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
 
   render(<ReviewerSearchSection requestId={REQUEST_ID} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
   const card = await screen.findByText(transient.name);
-  fireEvent.click(card.closest('.border').querySelector('button[aria-label^="Not a fit"]'));
-
-  await act(async () => {
-    exclusion.resolve(response({ error: 'store unavailable' }, false));
-    await exclusion.promise;
-  });
+  expect(await screen.findByTestId('reviewer-roster-persistence-summary')).toBeInTheDocument();
+  const excludeButton = card.closest('.border').querySelector('button[aria-label^="Not a fit"]');
+  expect(excludeButton).toBeDisabled();
+  expect(screen.getByRole('button', { name: `Reconsider ${excluded.name}` })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Remove previous results' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /Run another search/ })).toBeDisabled();
+  expect(global.fetch.mock.calls.some(([, options = {}]) => options.method === 'PATCH')).toBe(false);
   expect(screen.getByText(transient.name)).toBeInTheDocument();
-  expect(screen.getByText(/Found in an earlier search/)).toBeInTheDocument();
   expect(screen.queryByText(/Unverified suggestions/)).not.toBeInTheDocument();
-  expect(screen.getByText("Couldn't exclude that reviewer — please try again.")).toBeInTheDocument();
 });
 
 

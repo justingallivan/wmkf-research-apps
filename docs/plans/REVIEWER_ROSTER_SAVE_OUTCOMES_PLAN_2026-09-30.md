@@ -2,8 +2,8 @@
 title: Reviewer roster save outcome and recovery plan — 2026-09-30
 domain: reviewer-workflow
 kind: plan
-status: proposed
-summary: Reviewed plan for explicit roster-save outcomes, accurate retained-state rendering, guarded save-only retry, and integrated failure tests; runtime implementation remains pending.
+status: active
+summary: Save-outcome fix implemented and approved by Sol and final review; 495 tests pass, with isolated PostgreSQL and browser/API release rehearsal still required.
 canonical: false
 owner: product-engineering
 related:
@@ -14,7 +14,42 @@ related:
 
 # Reviewer roster save outcome and recovery plan
 
-## Outcome and scope
+## Implementation and review status — 2026-09-30
+
+[VERIFIED via the branch diff from `e1202abb58b3535a77f22ea0c67beb5cc5ef2e4a`] The approved save-outcome fix is implemented on `codex/refactor-survey` in `/Users/gallivan/Code/WMKF_Apps-refactor`. Luna built the source and executable tests; a second Luna prepared the isolated PostgreSQL proof and existing CI-job registration. The orchestrator performed the final source review, verification and narrow durable-document reconciliation. No merge to `main`, deployment, production write or schema migration occurred.
+
+[VERIFIED via the implementation and executable tests] POST reports positional row outcomes without breaking numeric internal store callers. Only the authoritative roster read supplies durable buckets and future-search exclusion names. Failed saves remain visible with recovery controls; retries insert only missing, correlated, originally-new rows, and unknown outcomes require checking before recovery. Promotion prerequisites require exact acknowledgements. Removal applies the same engagement projection as GET. **Use saved results** replaces the attempted search's temporary cards with the fresh server roster.
+
+### Independent review and adjudication
+
+[VERIFIED via ordinary Sol CLI review sessions] Sol reviewed the complete frozen implementation, then the corrections and their immediate caller/consumer contracts. Both sessions used the ChatGPT OAuth subscription with provider API-key variables removed; no metered review product was invoked. Sol's read-only sandbox could not open CodeGraph, so Sol disclosed that limit and inspected source directly. The orchestrator used CodeGraph in this worktree before tracing the relevant code.
+
+| Finding | Original severity | Resolution and discriminating evidence |
+|---|---|---|
+| RSR-001: removal could re-expose an already-handled anchored reviewer | High | [VERIFIED via `reviewer-roster-endpoint.test.js` and `reviewer-roster-partial-save-flow.test.js`] Removal calls the real engagement reconciler in DAL context. The handler/helper test uses an invited adapter row; the rendered test keeps the handled reviewer non-actionable. A post-commit reconciliation failure stays an ambiguous 500 requiring recovery, not a claim that removal did not happen. |
+| RSR-002: PostgreSQL test expected a boolean from promotion finalization | Medium | [VERIFIED via `reviewer-roster-save-outcomes.pg.test.js` and `finalizeCandidatePromotion`] Assertion now expects `{ saved: true, candidateKey }`. Other exercised return shapes were audited. Actual PostgreSQL execution remains skipped below; a corrected assertion is not proof of SQL semantics. |
+| RSR-003: parser accepted a contradictory recorded count | Medium | [VERIFIED via `reviewer-search-logic.test.js` and rendered partial-save tests] The numeric count must equal the number of written outcomes. Under/over counts fail parsing; rendered recovery retains the actual saved roster row without another POST. |
+| ROOT-001: Use saved results discarded from an obsolete snapshot | Medium (orchestrator) | [VERIFIED via the rendered two-snapshot race test] The action discards every temporary card from the attempted search after a valid fresh GET; retained rows render from that snapshot. An initially written row removed elsewhere no longer survives as an ordinary temporary card. Unrelated applicant-candidate state is untouched. Reinstating the old discard calculation fails exactly this test; restoring the fix passes. |
+
+[VERIFIED via Sol round 2 and orchestrator final review] **Sol: READY, no remaining required findings and no optional items. Orchestrator: code-review ready, with the isolated release checks below still required.** All four findings were accepted and resolved; no wider refactor or policy change was required. The source/test/workflow fingerprint reviewed by Sol is `994d4395f4e3ff301d94c851e8dbe5740207e778fb7eb9480adad0dd6262cd40`; final documentation changes do not alter that source snapshot.
+
+### Verification and release boundary
+
+[VERIFIED via the orchestrator's combined Jest run] **495 tests passed in 35 suites**, zero failures or skips, covering roster store/route, Find rendering and recovery, address trust, promotion, applicant-enrichment compatibility, context changes and related consumers. The correction-only focused run also passed 184 tests in three suites. Scoped ESLint has no errors; the remaining controller effect warning also exists at the pinned baseline. `git diff --check` passes.
+
+[VERIFIED via sequential `npm run` gate and self-test commands after review corrections] **34 commands passed**: `check:types`, `check:api-routes`, `check:route-service-boundary`, `check:route-lifecycle-auth`, `check:trust-boundary-guid`, `check:dynamics-context-boundary`, `check:reviewer-engagement-boundary`, `check:status-enum-parity`, `check:atlas`, `check:doc-currency`, `check:fact-consistency`, `check:doc-symbol-refs`, `check:build-claim-freshness`, `check:docs-catalog`, `check:harness-framing`, `check:secret-scan`, `check:scaffolding-tokens`, `check:j27-register`, with every available associated self-test run sequentially. This includes the original five required pre-commit document/harness/secret checks. The documentation checks are repeated after this execution record is finalized.
+
+[VERIFIED via deliberate mutation runs and exact-byte restoration] Tests reject suppression of per-row failure codes, append-all transient exclusion names, removal of expired deceased/emeritus retry protection, removal of roster read guards during a same-request **changed-Blob** context transition, and the stale Use saved discard calculation. The changed-Blob test does not separately prove unchanged-generation read ordering. Restored source passed the combined suite; the later discard mutation restored identical bytes and its focused test passed again.
+
+[VERIFIED via the isolated-suite no-URL and required-mode commands] `tests/integration/reviewer-roster-save-outcomes.pg.test.js` discovers three tests and skips without `TEST_REQUEST_LEDGER_TEST_URL`; `TEST_REQUEST_LEDGER_REQUIRE=1` fails closed with that URL absent. It is registered in the existing PostgreSQL CI job. **Actual isolated PostgreSQL execution, SQL-guard mutation proof and signed-in browser/API rehearsal are SKIPPED and remain release prerequisites.** There is no `.env.local` in this worktree by design. No credentials were borrowed and no external database connection was made. Local mocked-SQL/rendered tests and review approval do not establish live SQL or deployment success.
+
+[ASSUMED] The runtime change remains Tier 2 under the cross-layer release rule. Deliberate promotion must wait for the named isolated release checks. Schema/migration/enum expansion, provider/identity-policy changes and unrelated cleanup are not part of this fix.
+
+## Approved design and pre-implementation evidence (historical)
+
+The remaining design, source line references, reproduction results and Fable reviews below describe the pinned pre-implementation baseline and approved requirements. Words such as "current," "today," "not implemented" and "future" in this historical record refer to that baseline, not the working implementation described above. `[PLANNED]` labels preserve acceptance requirements; they do not establish which requirements have passed verification on the implementation head.
+
+### Outcome and scope at plan approval
 
 [PLANNED] Staff must be able to distinguish search results that will survive a reload from results whose save failed. Preserve the current result cards when persistence fails, show an accurate warning, and provide a save-only retry. Only the server's persisted roster may populate durable roster buckets and cross-run search exclusions. This fixes the investigated bug; it does not implement survey candidates C1/C2 or require those refactors first.
 
@@ -241,4 +276,4 @@ related:
 
 [VERIFIED via the second-round report] Fable accepted N1/N3 as stated tradeoffs and marked N2/N4/N5/N7 resolved; N6 was resolved subject to R1's retry-specific completion. It found no additional issue in insert-only SQL, authority restrictions, other consumers, or the stated outcome contract. [PLANNED] The final text incorporates R1 and O1–O5 after that review; these additions have not received a third external review and remain unimplemented. No further review round was requested or run.
 
-[VERIFIED via the investigation described above] Current verdict: the bug is reproduced in isolated tests; production frequency is unknown. [PLANNED] This is the bounded implementation proposal, not a completed fix or production release approval.
+[VERIFIED via the investigation described above] Verdict at plan approval: the bug is reproduced in isolated tests; production frequency is unknown. [PLANNED] This is the bounded implementation proposal, not a completed fix or production release approval.

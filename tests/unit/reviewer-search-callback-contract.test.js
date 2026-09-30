@@ -10,7 +10,28 @@ const candidate = {
   addressTrustReceipt: { receiptId: 'synthetic-receipt', personConfirmed: true, email: 'callback@example.edu' },
   provenance: { kind: 'literature_retrieved', sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
 };
-const response = (data) => ({ ok: true, json: async () => data });
+const response = (data) => ({ ok: true, json: async () => withRosterRetention(data) });
+function withRosterRetention(body) {
+  if (!body || !Array.isArray(body.active) || !Array.isArray(body.excluded)) return body;
+  if (body.retention?.version === 1 && Array.isArray(body.retention.rows)) return body;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const rows = new Map();
+  const add = (items, status) => {
+    for (const item of Array.isArray(items) ? items : []) {
+      const candidateKey = item?.candidateKey || reviewerCandidateKey(item);
+      if (candidateKey) rows.set(candidateKey, { candidateKey, status });
+    }
+  };
+  add(body.active, 'active');
+  add(body.excluded, 'excluded');
+  add(body.ineligible, 'ineligible');
+  add(body.blocked, 'blocked');
+  add(body.handled, 'saved');
+  for (const candidateKey of Array.isArray(body.savedKeys) ? body.savedKeys : []) {
+    rows.set(candidateKey, { candidateKey, status: 'saved' });
+  }
+  return { ...body, retention: { version: 1, rows: [...rows.values()] } };
+}
 afterEach(() => { jest.restoreAllMocks(); });
 
 test('one current successful promotion calls onSaved exactly once without arguments', async () => {

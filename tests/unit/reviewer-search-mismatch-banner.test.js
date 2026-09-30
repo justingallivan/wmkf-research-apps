@@ -54,7 +54,19 @@ beforeEach(() => {
           success: true,
           active: activeCandidates,
           excluded: [],
+          ineligible: [],
+          blocked: [],
+          handled: [],
+          savedKeys: [],
           allNames: [APPLICANT_MISMATCH.name, SEARCH_MISMATCH.name],
+          retention: {
+            version: 1,
+            rows: activeCandidates.map((candidate) => ({
+              candidateKey: candidate.candidateKey
+                || require('../../lib/utils/reviewer-candidate-key').reviewerCandidateKey(candidate),
+              status: 'active',
+            })),
+          },
         }),
       });
     }

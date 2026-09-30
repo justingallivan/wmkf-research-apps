@@ -39,6 +39,15 @@ function response(body, ok = true, status = ok ? 200 : 422) {
   return { ok, status, json: async () => body };
 }
 
+function rosterSnapshot(candidate) {
+  return response({
+    success: true,
+    active: [candidate],
+    excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [candidate.name],
+    retention: { version: 1, rows: [{ candidateKey: candidate.candidateKey, status: 'active' }] },
+  });
+}
+
 afterEach(() => {
   jest.clearAllMocks();
   readSseStream.mockReset();
@@ -46,12 +55,12 @@ afterEach(() => {
 });
 
 test('saveSelected: save-candidates POST sends exact body bytes/headers; a malformed 2xx body is tolerated to {} (no crash, D1-preserve)', async () => {
-  const c = candidate('Ada Lovelace', 'ada@example.edu');
+  const c = candidate('Ada Lovelace', 'ada@example.edu', { candidateKey: 'candidate:ada' });
   let sentOpts = null;
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({ success: true, active: [c], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [c.name] }));
+      return Promise.resolve(rosterSnapshot(c));
     }
     if (target === '/api/reviewer-finder/save-candidates') {
       sentOpts = options;
@@ -83,11 +92,11 @@ test('saveSelected: save-candidates POST sends exact body bytes/headers; a malfo
 // non-2xx unparseable body falls back to the status-embedded message — both
 // already true on unmodified code, so no source change was made here.
 test('saveSelected: D1 confirmation — a non-2xx {error} body is already surfaced verbatim (guarded-elsewhere, no fix needed)', async () => {
-  const c = candidate('Ada Lovelace', 'ada@example.edu');
+  const c = candidate('Ada Lovelace', 'ada@example.edu', { candidateKey: 'candidate:ada' });
   global.fetch = jest.fn((url) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({ success: true, active: [c], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [c.name] }));
+      return Promise.resolve(rosterSnapshot(c));
     }
     if (target === '/api/reviewer-finder/save-candidates') {
       return Promise.resolve(response({ error: 'save-candidates service down' }, false, 500));
@@ -103,11 +112,11 @@ test('saveSelected: D1 confirmation — a non-2xx {error} body is already surfac
 });
 
 test('saveSelected: D1 confirmation — a 502 unparseable body already falls back to the status-embedded message (guarded-elsewhere, no fix needed)', async () => {
-  const c = candidate('Ada Lovelace', 'ada@example.edu');
+  const c = candidate('Ada Lovelace', 'ada@example.edu', { candidateKey: 'candidate:ada' });
   global.fetch = jest.fn((url) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({ success: true, active: [c], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [c.name] }));
+      return Promise.resolve(rosterSnapshot(c));
     }
     if (target === '/api/reviewer-finder/save-candidates') {
       return Promise.resolve({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
@@ -135,7 +144,7 @@ test('applicant promotion: POST sends exact body bytes/headers; a malformed 2xx 
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({ success: true, active: [c], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [c.name] }));
+      return Promise.resolve(rosterSnapshot(c));
     }
     if (target === '/api/workbench/promote-applicant-reviewer') {
       sentOpts = options;

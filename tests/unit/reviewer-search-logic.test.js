@@ -26,10 +26,57 @@ import {
   dedupeReviewerCandidates,
   reviewerCandidateKey,
   withReviewerCandidateKey,
+  parseReviewerRosterOutcomeResponse,
+  parseReviewerRosterRetention,
+  hasExactReviewerRosterWriteAcknowledgement,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
 import { projectCanonicalApplicantContact } from '../../lib/utils/applicant-known-reviewer.js';
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
+
+describe('reviewer-roster persistence response contracts', () => {
+  test('requires a complete unique positional outcome envelope', () => {
+    const body = {
+      outcomeVersion: 1,
+      success: false,
+      recorded: 1,
+      results: [
+        { inputIndex: 0, candidateKey: 'candidate:one', existingAtAttempt: false, outcome: 'written' },
+        { inputIndex: 1, candidateKey: 'candidate:two', existingAtAttempt: false, outcome: 'failed', code: 'roster_write_failed' },
+      ],
+    };
+    expect(parseReviewerRosterOutcomeResponse(body, 2)?.results).toHaveLength(2);
+    expect(parseReviewerRosterOutcomeResponse({ ...body, results: body.results.slice(0, 1) }, 2)).toBeNull();
+    expect(parseReviewerRosterOutcomeResponse({ ...body, results: [body.results[0], { ...body.results[1], inputIndex: 0 }] }, 2)).toBeNull();
+    expect(parseReviewerRosterOutcomeResponse({ ...body, recorded: 0 }, 2)).toBeNull();
+    expect(parseReviewerRosterOutcomeResponse({ ...body, recorded: 2 }, 2)).toBeNull();
+  });
+
+  test('only accepts complete unique known-status retention inventories', () => {
+    expect(parseReviewerRosterRetention({ version: 1, rows: [
+      { candidateKey: 'candidate:one', status: 'active' },
+      { candidateKey: 'candidate:two', status: 'coi_dropped' },
+    ] })).toEqual(new Map([['candidate:one', 'active'], ['candidate:two', 'coi_dropped']]));
+    expect(parseReviewerRosterRetention({ version: 1, rows: [{ candidateKey: 'candidate:one', status: 'mystery' }] })).toBeNull();
+    expect(parseReviewerRosterRetention({ version: 1, rows: [
+      { candidateKey: 'candidate:one', status: 'active' },
+      { candidateKey: 'candidate:one', status: 'excluded' },
+    ] })).toBeNull();
+  });
+
+  test('accepts promotion refresh only for an exact one-row written acknowledgement', () => {
+    const response = {
+      success: true,
+      recorded: 1,
+      outcomeVersion: 1,
+      results: [{ inputIndex: 0, candidateKey: 'candidate:exact', existingAtAttempt: true, outcome: 'written' }],
+    };
+    expect(hasExactReviewerRosterWriteAcknowledgement(response, 'candidate:exact')).toBe(true);
+    expect(hasExactReviewerRosterWriteAcknowledgement({ ...response, results: [{ ...response.results[0], outcome: 'failed', code: 'roster_write_failed' }], success: false }, 'candidate:exact')).toBe(false);
+    expect(hasExactReviewerRosterWriteAcknowledgement(response, 'candidate:other')).toBe(false);
+    expect(hasExactReviewerRosterWriteAcknowledgement({ success: true, recorded: 1 }, 'candidate:exact')).toBe(false);
+  });
+});
 
 test.each([
   'person_inactive',

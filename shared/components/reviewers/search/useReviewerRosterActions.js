@@ -2,27 +2,28 @@
  * Ownership: operation hook: owns roster action commands; controller owns state and view modules render.
  */
 import { useCallback } from 'react';
-import { pruneCandidateForRoster } from '../reviewer-search-logic';
+import { parseReviewerRosterRetention, pruneCandidateForRoster } from '../reviewer-search-logic';
 import { candKey, dedupeByName } from './candidateKeys';
 import { requestJson, requestEnvelope } from '../../../utils/api-request';
 
 export default function useReviewerRosterActions({
   requestId,
   genRef,
+  runningRef,
   busy,
   removingPrevious,
   rosterNames,
   previousSearchKeys,
   previousSearchRefs,
   reloadRoster,
+  applyRosterSnapshot,
+  invalidateRosterReads,
+  setRosterLoaded,
+  setRosterLoadFailed,
   setCandidates,
   setRecCandidates,
   setRosterActive,
   setRosterExcluded,
-  setRosterIneligible,
-  setRosterBlocked,
-  setRosterHandled,
-  setRosterSavedKeys,
   setRosterNames,
   setSelected,
   setRosterNote,
@@ -30,8 +31,9 @@ export default function useReviewerRosterActions({
 }) {
   const excludeCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
-    if (!key || !requestId) return;
+    if (!key || !requestId || busy || (runningRef && runningRef.current !== null)) return;
     const myGen = genRef.current;
+    if (runningRef) runningRef.current = myGen;
     const pruned = pruneCandidateForRoster(cand);
     setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
@@ -54,8 +56,10 @@ export default function useReviewerRosterActions({
         setRosterActive((prev) => dedupeByName([pruned, ...prev]));
         setRosterNote("Couldn't exclude that reviewer — please try again.");
       }
+    } finally {
+      if (runningRef?.current === myGen) runningRef.current = null;
     }
-  }, [requestId, genRef, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setRosterNote]);
+  }, [requestId, genRef, runningRef, busy, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setRosterNote]);
 
   // Exclude an ephemeral unverified suggestion. Same durable PATCH (the server
   // exclude is an upsert, so no prior roster row is needed), but the rollback
@@ -64,8 +68,9 @@ export default function useReviewerRosterActions({
   // it into rosterActive (it was never active).
   const excludeUnverifiedCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
-    if (!key || !requestId) return;
+    if (!key || !requestId || busy || (runningRef && runningRef.current !== null)) return;
     const myGen = genRef.current;
+    if (runningRef) runningRef.current = myGen;
     const pruned = pruneCandidateForRoster(cand);
     const nameAlreadyInRoster = rosterNames.includes(cand.name);
     setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
@@ -83,17 +88,20 @@ export default function useReviewerRosterActions({
         setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
         if (!nameAlreadyInRoster) {
           setRosterNames((prev) => prev.filter((name) => name !== cand.name));
-        }
-        setRosterNote("Couldn't exclude that reviewer — please try again.");
       }
+      setRosterNote("Couldn't exclude that reviewer — please try again.");
+      }
+    } finally {
+      if (runningRef?.current === myGen) runningRef.current = null;
     }
-  }, [requestId, genRef, rosterNames, setRosterExcluded, setRosterNames, setRosterNote]);
+  }, [requestId, genRef, runningRef, busy, rosterNames, setRosterExcluded, setRosterNames, setRosterNote]);
 
   // Promote an excluded candidate back to the active, selectable list.
   const promoteCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
-    if (!key || !requestId) return;
+    if (!key || !requestId || busy || (runningRef && runningRef.current !== null)) return;
     const myGen = genRef.current;
+    if (runningRef) runningRef.current = myGen;
     setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterActive((prev) => dedupeByName([cand, ...prev]));
     try {
@@ -125,15 +133,19 @@ export default function useReviewerRosterActions({
         setRosterExcluded((prev) => dedupeByName([cand, ...prev]));
         setRosterNote("Couldn't return that reviewer to the active list — please try again.");
       }
+    } finally {
+      if (runningRef?.current === myGen) runningRef.current = null;
     }
-  }, [requestId, genRef, reloadRoster, setRosterExcluded, setRosterActive, setRosterNote]);
+  }, [requestId, genRef, runningRef, busy, reloadRoster, setRosterExcluded, setRosterActive, setRosterNote]);
 
   const removePreviousResults = useCallback(async () => {
-    if (!requestId || busy || removingPrevious || previousSearchRefs.length === 0) return;
+    if (!requestId || busy || removingPrevious || (runningRef && runningRef.current !== null) || previousSearchRefs.length === 0) return;
     const count = previousSearchKeys.size;
     if (!window.confirm(`Remove ${count} previously found reviewer${count === 1 ? '' : 's'} from this request? Applicant-recommended, saved, excluded, and COI records will be kept.`)) return;
     const myGen = genRef.current;
+    if (runningRef) runningRef.current = myGen;
     setRemovingPrevious(true);
+    invalidateRosterReads?.();
     setRosterNote(null);
     try {
       const { ok, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
@@ -148,27 +160,33 @@ export default function useReviewerRosterActions({
       });
       if (genRef.current !== myGen) return;
       if (!ok || !data.success) throw new Error(data.error || 'remove failed');
-      setRosterActive(Array.isArray(data.active) ? data.active : []);
-      setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
-      setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
-      setRosterBlocked(Array.isArray(data.blocked) ? data.blocked : []);
-      setRosterHandled(Array.isArray(data.handled) ? data.handled : []);
-      setRosterSavedKeys(Array.isArray(data.savedKeys) ? data.savedKeys : []);
-      setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
+      if (genRef.current !== myGen) return;
+      if (!(parseReviewerRosterRetention(data.retention) instanceof Map)) {
+        setRosterLoaded(false);
+        setRosterLoadFailed(true);
+        setRosterNote('Previous results were removed, but the complete roster could not be confirmed. Retry reviewer state before continuing.');
+      } else {
+        applyRosterSnapshot(data);
+        setRosterLoaded(true);
+        setRosterLoadFailed(false);
+        setRosterNote(`${data.removed || 0} previous search result${data.removed === 1 ? '' : 's'} removed.`);
+      }
       setSelected((prev) => {
         const next = new Set(prev);
         for (const key of Array.isArray(data.removedKeys) ? data.removedKeys : []) next.delete(key);
         return next;
       });
-      setRosterNote(`${data.removed || 0} previous search result${data.removed === 1 ? '' : 's'} removed.`);
     } catch {
       if (genRef.current === myGen) {
-        setRosterNote("Couldn't remove the previous search results — please try again.");
+        setRosterLoaded(false);
+        setRosterLoadFailed(true);
+        setRosterNote('The removal may have completed, but the current roster could not be confirmed. Retry reviewer state before continuing.');
       }
     } finally {
       if (genRef.current === myGen) setRemovingPrevious(false);
+      if (runningRef?.current === myGen) runningRef.current = null;
     }
-  }, [requestId, busy, removingPrevious, previousSearchRefs, previousSearchKeys, genRef, setRemovingPrevious, setRosterNote, setRosterActive, setRosterExcluded, setRosterIneligible, setRosterBlocked, setRosterHandled, setRosterSavedKeys, setRosterNames, setSelected]);
+  }, [requestId, busy, removingPrevious, previousSearchRefs, previousSearchKeys, genRef, runningRef, setRemovingPrevious, setRosterNote, setRosterLoaded, setRosterLoadFailed, setSelected, applyRosterSnapshot, invalidateRosterReads]);
 
   return { excludeCandidate, excludeUnverifiedCandidate, promoteCandidate, removePreviousResults };
 }

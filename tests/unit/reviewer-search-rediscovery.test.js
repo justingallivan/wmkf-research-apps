@@ -40,6 +40,7 @@ const rosterTwin = {
 };
 
 function rosterResponse(active) {
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
   return {
     ok: true,
     status: 200,
@@ -52,6 +53,13 @@ function rosterResponse(active) {
       handled: [],
       savedKeys: [],
       allNames: active.map((c) => c.name),
+      retention: {
+        version: 1,
+        rows: active.map((candidate) => ({
+          candidateKey: candidate.candidateKey || reviewerCandidateKey(candidate),
+          status: 'active',
+        })),
+      },
     }),
   };
 }

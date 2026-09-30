@@ -246,7 +246,13 @@ test('producer envelope: roster GET is the recovery snapshot after an ordinary u
   const res = response();
   await rosterHandler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
   expect(res.statusCode).toBe(200);
-  expect(serialized(res.body)).toEqual(contract.rosterRecovery);
+  expect(serialized(res.body)).toEqual({
+    ...contract.rosterRecovery,
+    retention: {
+      version: 1,
+      rows: [{ candidateKey: 'roster:ordinary', status: 'saved' }],
+    },
+  });
 });
 
 

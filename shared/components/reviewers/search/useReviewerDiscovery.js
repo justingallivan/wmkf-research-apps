@@ -10,11 +10,63 @@ import {
   filterExcluded,
   pruneCandidateForRoster,
   withReviewerCandidateKey,
+  reviewerCandidateKey,
+  parseReviewerRosterOutcomeResponse,
+  parseReviewerRosterRetention,
 } from '../reviewer-search-logic';
 import { rankByRelevance } from '../../../../lib/utils/relevance-score';
 import { withReviewerProvenance } from '../../../../lib/utils/reviewer-provenance';
 import { dedupeByName } from './candidateKeys';
 import { requestJson } from '../../../utils/api-request';
+
+function rosterAttemptIdentity(item) {
+  return `${item.originalIndex ?? item.inputIndex}:${item.displayKey || item.candidateKey || reviewerCandidateKey(item.candidate)}`;
+}
+
+function summarizeRosterPersistence(attempts, { retention, snapshot, correlationLost = false } = {}) {
+  const inventoryAvailable = retention instanceof Map;
+  const requiresReconciliation = !snapshot || !inventoryAvailable;
+  const currentAttempts = attempts.map((attempt) => ({
+    ...attempt,
+    retentionStatus: inventoryAvailable && attempt.serverCandidateKey
+      ? retention.get(attempt.serverCandidateKey) || null
+      : null,
+  }));
+  const latestDetailsItems = currentAttempts.filter((attempt) => (
+    attempt.outcome === 'failed' && attempt.existingAtAttempt === true && attempt.retentionStatus === 'active'
+  ));
+  const items = correlationLost
+    ? currentAttempts
+    : currentAttempts.filter((attempt) => !attempt.retentionStatus);
+  const retryItems = correlationLost || requiresReconciliation ? [] : items.filter((attempt) => (
+    attempt.serverCandidateKey
+    && attempt.existingAtAttempt === false
+    && ['written', 'unchanged', 'failed'].includes(attempt.outcome)
+  ));
+  const writtenKeys = currentAttempts.filter((attempt) => (
+    attempt.outcome === 'written' && attempt.retentionStatus === 'active'
+  )).map((attempt) => attempt.serverCandidateKey);
+  const shouldWarn = requiresReconciliation || correlationLost || items.length > 0 || latestDetailsItems.length > 0;
+  let summary = null;
+  if (!snapshot) summary = 'We couldn’t confirm the saved results. Retry checking before leaving this page.';
+  else if (!inventoryAvailable) summary = 'We couldn’t confirm the saved results. Retry checking before leaving this page.';
+  else if (correlationLost) summary = "Couldn't confirm which results were saved. Use saved results to replace this search with the server roster.";
+  else if (latestDetailsItems.length && items.length) summary = `${items.length} of ${currentAttempts.length} results weren't saved. ${latestDetailsItems.length === 1 ? 'Another result is' : `${latestDetailsItems.length} other results are`} retained, but the latest details were not saved; review the current card. Unsaved results are lost if you reload or start a new search.`;
+  else if (latestDetailsItems.length) summary = `${latestDetailsItems.length === 1 ? 'The result is' : `${latestDetailsItems.length} results are`} retained, but the latest details were not saved; review the current card.`;
+  else if (items.length) summary = `${items.length} of ${currentAttempts.length} results weren't saved. Keep this page open and retry saving. Unsaved results are lost if you reload or start a new search.`;
+  return {
+    mode: shouldWarn ? (requiresReconciliation || correlationLost ? 'unconfirmed' : 'partial') : 'confirmed',
+    attempts: currentAttempts,
+    items,
+    retryItems,
+    latestDetailsItems,
+    latestDetailsNotSaved: latestDetailsItems.length,
+    writtenKeys,
+    correlationLost,
+    requiresReconciliation,
+    summary,
+  };
+}
 
 export default function useReviewerDiscovery({
   blobUrl,
@@ -51,7 +103,207 @@ export default function useReviewerDiscovery({
   setRosterIneligible,
   setRosterNames,
   setRosterNote,
+  setTransientIneligible,
+  persistenceState,
+  setPersistenceState,
+  reloadRoster,
+  invalidateRosterReads,
+  setRosterLoaded,
 }) {
+  const persistAndReconcile = useCallback(async (items, expectedGeneration, writeMode = null, priorState = null) => {
+    let parsed = null;
+    let snapshot = null;
+    invalidateRosterReads?.();
+    try {
+      const response = await requestJson('/api/workbench/reviewer-roster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          candidates: items.map((item) => pruneCandidateForRoster(item.candidate)),
+          ...(writeMode ? { writeMode } : {}),
+        }),
+        tolerantBody: false,
+        fallbackMessage: 'reviewer-roster save failed',
+      });
+      parsed = parseReviewerRosterOutcomeResponse(response, items.length);
+    } catch {
+      parsed = null;
+    }
+    if (genRef.current !== expectedGeneration) return { stale: true, parsed, snapshot: null };
+    try {
+      snapshot = await reloadRoster(expectedGeneration);
+    } catch {
+      snapshot = null;
+    }
+    if (genRef.current !== expectedGeneration) return { stale: true, parsed, snapshot: null };
+    if (!snapshot) setRosterLoaded?.(false);
+    const retained = parseReviewerRosterRetention(snapshot?.retention);
+    const incoming = items.map((item, index) => {
+      const outcome = parsed?.results[index] || null;
+      const serverCandidateKey = outcome && outcome.outcome !== 'invalid' ? outcome.candidateKey : null;
+      return {
+        originalIndex: item.originalIndex ?? item.inputIndex ?? index,
+        displayKey: item.displayKey || item.candidateKey || reviewerCandidateKey(item.candidate),
+        candidate: serverCandidateKey ? { ...item.candidate, candidateKey: serverCandidateKey } : item.candidate,
+        serverCandidateKey,
+        existingAtAttempt: outcome?.existingAtAttempt ?? null,
+        outcome: outcome?.outcome || 'unconfirmed',
+        code: outcome?.code || null,
+      };
+    });
+    const retryIdentities = new Set(items.map(rosterAttemptIdentity));
+    const attemptsByIdentity = new Map((priorState?.attempts || [])
+      .filter((attempt) => !retryIdentities.has(rosterAttemptIdentity(attempt)))
+      .map((attempt) => [rosterAttemptIdentity(attempt), attempt]));
+    for (const attempt of incoming) attemptsByIdentity.set(rosterAttemptIdentity(attempt), attempt);
+    const attempts = [...attemptsByIdentity.values()];
+    for (const attempt of incoming) {
+      if (!attempt.serverCandidateKey) continue;
+      const wasInvalid = attempt.outcome === 'invalid';
+      if (wasInvalid) continue;
+      const rebinding = (candidate) => reviewerCandidateKey(candidate) === attempt.displayKey
+        ? { ...candidate, candidateKey: attempt.serverCandidateKey }
+        : candidate;
+      setCandidates((current) => current.map(rebinding));
+      setTransientIneligible((current) => current.map(rebinding));
+    }
+    const state = summarizeRosterPersistence(attempts, {
+      retention: retained,
+      snapshot,
+      correlationLost: !parsed || priorState?.correlationLost === true,
+    });
+    if (state.requiresReconciliation || state.correlationLost) setRosterLoaded?.(false);
+    setPersistenceState(state);
+    return { stale: false, parsed, snapshot, state, unresolved: state.items };
+  }, [requestId, genRef, invalidateRosterReads, reloadRoster, setRosterLoaded, setCandidates, setTransientIneligible, setPersistenceState]);
+
+  const retryCheckingSaves = useCallback(async () => {
+    const myGen = genRef.current;
+    if (runningRef.current !== null || !requestId) return;
+    runningRef.current = myGen;
+    setPhase('saving');
+    invalidateRosterReads?.();
+    try {
+      let snapshot = null;
+      try { snapshot = await reloadRoster(myGen); } catch { snapshot = null; }
+      if (genRef.current !== myGen) return;
+      if (!snapshot) {
+        setRosterLoaded?.(false);
+        setPersistenceState((state) => state && ({ ...state, requiresReconciliation: true, summary: 'We couldn’t confirm the saved results. Retry checking before leaving this page.' }));
+        return;
+      }
+      const retention = parseReviewerRosterRetention(snapshot.retention);
+      if (!retention) {
+        setRosterLoaded?.(false);
+        setPersistenceState((state) => state && ({
+          ...state,
+          requiresReconciliation: true,
+          summary: 'We couldn’t confirm the saved results. Retry checking before leaving this page.',
+        }));
+        return;
+      }
+      setRosterLoaded?.(true);
+      const nextState = persistenceState ? summarizeRosterPersistence(persistenceState.attempts, {
+        retention, snapshot, correlationLost: persistenceState.correlationLost,
+      }) : null;
+      setRosterLoaded?.(!nextState?.requiresReconciliation && !nextState?.correlationLost);
+      setPersistenceState(nextState);
+    } finally {
+      if (genRef.current === myGen) setPhase('results');
+      if (runningRef.current === myGen) runningRef.current = null;
+    }
+  }, [requestId, genRef, runningRef, invalidateRosterReads, reloadRoster, persistenceState, setPhase, setRosterLoaded, setPersistenceState]);
+
+  const useSavedResults = useCallback(async () => {
+    if (runningRef.current !== null || !requestId) return;
+    const myGen = genRef.current;
+    runningRef.current = myGen;
+    setPhase('saving');
+    let recoverySucceeded = false;
+    invalidateRosterReads?.();
+    try {
+      let snapshot = null;
+      try { snapshot = await reloadRoster(myGen); } catch { snapshot = null; }
+      if (genRef.current !== myGen) return;
+      if (!snapshot) {
+        setRosterLoaded?.(false);
+        setPersistenceState((state) => state && ({ ...state, requiresReconciliation: true, summary: 'We couldn’t confirm the saved results. Retry checking before leaving this page.' }));
+        return;
+      }
+      const retention = parseReviewerRosterRetention(snapshot.retention);
+      if (!retention) {
+        setRosterLoaded?.(false);
+        setPersistenceState((state) => state && ({ ...state, requiresReconciliation: true, summary: 'We couldn’t confirm the saved results. Retry checking before leaving this page.' }));
+        return;
+      }
+      setRosterLoaded?.(true);
+      // Use saved results replaces this search's transient cards with the fresh
+      // server roster. Drop every attempted card; retained rows are already
+      // represented by the snapshot, while absent rows must not stay actionable.
+      const keysToDiscard = new Set((persistenceState?.attempts || []).flatMap((item) => [
+        item.displayKey,
+        item.serverCandidateKey,
+        reviewerCandidateKey(item.candidate),
+      ]).filter(Boolean));
+      setCandidates((current) => current.filter((candidate) => !keysToDiscard.has(reviewerCandidateKey(candidate))));
+      setTransientIneligible((current) => current.filter((candidate) => !keysToDiscard.has(reviewerCandidateKey(candidate))));
+      setSelected((current) => new Set([...current].filter((key) => !keysToDiscard.has(key))));
+      setPersistenceState(null);
+      setRosterLoaded?.(true);
+      recoverySucceeded = true;
+    } finally {
+      if (genRef.current === myGen) setPhase(recoverySucceeded ? 'idle' : 'results');
+      if (runningRef.current === myGen) runningRef.current = null;
+    }
+  }, [requestId, genRef, runningRef, invalidateRosterReads, reloadRoster, persistenceState, setCandidates, setTransientIneligible, setSelected, setRosterLoaded, setPhase, setPersistenceState]);
+
+  const retrySavingResults = useCallback(async () => {
+    const myGen = genRef.current;
+    if (runningRef.current !== null || !requestId || !persistenceState?.retryItems?.length) return;
+    runningRef.current = myGen;
+    setPhase('saving');
+    try {
+      let current = null;
+      try { current = await reloadRoster(myGen); } catch { current = null; }
+      if (genRef.current !== myGen) return;
+      const retained = parseReviewerRosterRetention(current?.retention);
+      if (!retained) {
+        setRosterLoaded?.(false);
+        setPersistenceState((state) => state && ({ ...state, requiresReconciliation: true, summary: 'We couldn’t confirm the saved results. Retry checking before leaving this page.' }));
+        return;
+      }
+      setRosterLoaded?.(true);
+      const refreshedState = summarizeRosterPersistence(persistenceState.attempts, {
+        retention: retained, snapshot: current, correlationLost: persistenceState.correlationLost,
+      });
+      setRosterLoaded?.(!refreshedState.requiresReconciliation && !refreshedState.correlationLost);
+      if (refreshedState.correlationLost || refreshedState.requiresReconciliation) {
+        setPersistenceState(refreshedState);
+        return;
+      }
+      const candidatesToRetry = refreshedState.retryItems.filter((item) => (
+        item.existingAtAttempt === false
+        && item.serverCandidateKey
+        && !retained.has(item.serverCandidateKey)
+      ));
+      if (!candidatesToRetry.length) {
+        setPersistenceState(refreshedState);
+        return;
+      }
+      const retryInputs = candidatesToRetry.map((item, index) => ({
+        ...item,
+        inputIndex: index,
+        candidateKey: item.serverCandidateKey,
+      }));
+      const result = await persistAndReconcile(retryInputs, myGen, 'insert_missing', refreshedState);
+      if (result.stale || genRef.current !== myGen) return;
+    } finally {
+      if (genRef.current === myGen) setPhase('results');
+      if (runningRef.current === myGen) runningRef.current = null;
+    }
+  }, [requestId, genRef, runningRef, persistenceState, reloadRoster, persistAndReconcile, setPhase, setRosterLoaded, setPersistenceState]);
+
   const runSearch = useCallback(async () => {
     const myGen = genRef.current;
     if (!blobUrl || runningRef.current !== null || removingPrevious || noSourcesSelected || !rosterLoaded) return;
@@ -67,6 +319,8 @@ export default function useReviewerDiscovery({
     ]));
     const referredSeeds = parseReferredSeeds(referredSeedsText, referredBy);
     setPhase('running');
+    setPersistenceState(null);
+    setTransientIneligible([]);
     setError(null); setErrorMeta(null); setProgress([]); setCandidates([]); setUnverified([]); setIdentityComparison(null); setSelected(new Set());
     setPromotionNotice(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0); setExportError(null); setBlockedReferredSeeds([]);
     try {
@@ -245,10 +499,7 @@ export default function useReviewerDiscovery({
       ));
 
       setCandidates(eligibleCandidates);
-      setRosterIneligible((prev) => dedupeByName([
-        ...deceasedCandidates.map(pruneCandidateForRoster),
-        ...prev,
-      ]));
+      setTransientIneligible(deceasedCandidates);
       // Stamp the stable candidate key NOW (like keyedKept above): the rescue
       // flow records the row on the roster and then confirms identity with
       // possibly-edited contact fields, and only a carried stamp keeps both
@@ -265,27 +516,12 @@ export default function useReviewerDiscovery({
       // (S224). Verified (Claude) + database discoveries only; unverified stay
       // ephemeral. A failure degrades to "no dedup this run", never a broken panel.
       if (dedupedEnriched.length > 0 && requestId) {
-        try {
-          const pruned = dedupedEnriched.map(pruneCandidateForRoster);
-          const prunedEligible = pruned.filter((candidate) => candidate.eligibilityStatus !== 'deceased');
-          const prunedIneligible = pruned.filter((candidate) => candidate.eligibilityStatus === 'deceased');
-          await requestJson('/api/workbench/reviewer-roster', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requestId, candidates: pruned }),
-            tolerantBody: true,
-            fallbackMessage: 'reviewer-roster save failed',
-          });
-          if (genRef.current !== myGen) return; // newer search started — don't touch roster state
-          // Merge into the existing active roster (prior runs persist), pruned
-          // DTOs deduped by normalized name.
-          setRosterActive((prev) => dedupeByName([...prunedEligible, ...prev]));
-          setRosterIneligible((prev) => dedupeByName([...prunedIneligible, ...prev]));
-          setRosterNames((prev) => Array.from(new Set([...prev, ...dedupedEnriched.map((c) => c.name)])));
-          setRosterNote(null);
-        } catch {
-          if (genRef.current === myGen) setRosterNote("Couldn't save this search to the request — these candidates may re-appear on a future search.");
-        }
+        const items = dedupedEnriched.map((candidate, inputIndex) => ({
+          candidate,
+          inputIndex,
+          candidateKey: reviewerCandidateKey(candidate),
+        }));
+        await persistAndReconcile(items, myGen);
       }
       // Keep `phase` busy until the roster write settles. Otherwise a user can
       // remove prior results while this POST is still in flight, and the two
@@ -305,7 +541,7 @@ export default function useReviewerDiscovery({
     } finally {
       if (runningRef.current === myGen) runningRef.current = null;
     }
-  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, runningRef, genRef, pushProgress, setPhase, setError, setErrorMeta, setProgress, setCandidates, setUnverified, setIdentityComparison, setSelected, setPromotionNotice, setEnrichNote, setAnalysis, setExcludedRemoved, setExportError, setBlockedReferredSeeds, setRosterActive, setRosterIneligible, setRosterNames, setRosterNote]);
+  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, runningRef, genRef, pushProgress, setPhase, setError, setErrorMeta, setProgress, setCandidates, setUnverified, setIdentityComparison, setSelected, setPromotionNotice, setEnrichNote, setAnalysis, setExcludedRemoved, setExportError, setBlockedReferredSeeds, setTransientIneligible, setPersistenceState, persistAndReconcile]);
 
-  return { runSearch };
+  return { runSearch, retrySavingResults, retryCheckingSaves, useSavedResults };
 }

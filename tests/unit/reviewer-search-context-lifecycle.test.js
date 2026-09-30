@@ -49,6 +49,7 @@ function candidate(name, candidateKey) {
 }
 
 function rosterSnapshot(active) {
+  const retentionRows = active.map((row) => ({ candidateKey: row.candidateKey, status: 'active' }));
   return {
     success: true,
     active,
@@ -58,6 +59,7 @@ function rosterSnapshot(active) {
     handled: [],
     savedKeys: [],
     allNames: active.map((row) => row.name),
+    retention: { version: 1, rows: retentionRows },
   };
 }
 
@@ -103,6 +105,27 @@ test('a deferred roster response for request A cannot clobber the active request
   });
   await waitFor(() => expect(screen.getByLabelText('Select Request B reviewer')).toBeInTheDocument());
   expect(screen.queryByLabelText('Select Request A reviewer')).not.toBeInTheDocument();
+});
+
+test('an incomplete initial inventory stays blocked, then a valid retry restores readiness', async () => {
+  const active = candidate('Recovered roster reviewer', 'search:recovered');
+  let reads = 0;
+  global.fetch = jest.fn((url) => {
+    if (!String(url).includes('/api/workbench/reviewer-roster?')) throw new Error(`unexpected fetch ${url}`);
+    reads += 1;
+    if (reads === 1) {
+      return Promise.resolve(response({ ...rosterSnapshot([active]), retention: { version: 1, rows: [{ candidateKey: active.candidateKey, status: 'mystery' }] } }));
+    }
+    return Promise.resolve(response(rosterSnapshot([active])));
+  });
+
+  render(<ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" />);
+  const retry = await screen.findByRole('button', { name: 'Retry reviewer state' });
+  expect(retry).toBeEnabled();
+  expect(screen.queryByLabelText(`Select ${active.name}`)).not.toBeInTheDocument();
+  fireEvent.click(retry);
+  expect(await screen.findByLabelText(`Select ${active.name}`)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run reviewer search' })).toBeEnabled();
 });
 
 test('a proposalKey-only change preserves current fields and does not reload the roster', async () => {

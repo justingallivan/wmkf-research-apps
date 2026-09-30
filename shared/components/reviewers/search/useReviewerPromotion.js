@@ -8,6 +8,7 @@ import {
   isCandidateSelectable,
   mergeEnrichment,
   pruneCandidateForRoster,
+  hasExactReviewerRosterWriteAcknowledgement,
 } from '../reviewer-search-logic';
 import { formatSaveFailureDetails } from './presentation';
 import { candKey, dedupeByName } from './candidateKeys';
@@ -24,6 +25,7 @@ export default function useReviewerPromotion({
   analysis,
   displayCandidates,
   genRef,
+  runningRef,
   savingRef,
   pushProgress,
   reloadRoster,
@@ -40,6 +42,8 @@ export default function useReviewerPromotion({
   setRosterSavedKeys,
   setRosterNote,
   setSelected,
+  rosterLoaded = true,
+  persistencePending = false,
 }) {
   const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
     if (!requestId || !Array.isArray(staleCandidates) || staleCandidates.length === 0) {
@@ -104,9 +108,8 @@ export default function useReviewerPromotion({
       }
     }
 
-    // POST one row at a time because the roster endpoint returns a count, not
-    // per-row identifiers. A recorded=1 response is therefore an exact durable
-    // acknowledgement for this candidate; recorded=0 stays retryable.
+    // POST one row at a time and require the versioned outcome to acknowledge
+    // the exact roster key whose verification receipt was refreshed.
     const refreshed = [];
     for (const candidate of ready) {
       if (genRef.current !== expectedGeneration) {
@@ -124,7 +127,7 @@ export default function useReviewerPromotion({
       if (genRef.current !== expectedGeneration) {
         return { refreshed, failures, stale: true };
       }
-      if (rosterOk && rosterData.success && rosterData.recorded === 1) {
+      if (rosterOk && hasExactReviewerRosterWriteAcknowledgement(rosterData, candKey(candidate))) {
         refreshed.push(candidate);
       } else {
         failures.push({
@@ -142,7 +145,7 @@ export default function useReviewerPromotion({
 
   const saveSelected = useCallback(async (candidateKeys = selected) => {
     const myGen = genRef.current;
-    if (savingRef.current === myGen) return;
+    if (savingRef.current === myGen || runningRef.current !== null || !rosterLoaded || persistencePending) return;
     // Filter by isSelectable too (not just `selected`): a needs-identity-review row
     // can't be checked, but this guarantees one never reaches save-candidates even if
     // a stale `selected` entry survives a reclassification (defense-in-depth; the
@@ -151,6 +154,7 @@ export default function useReviewerPromotion({
     const chosen = displayCandidates.filter((c) => keysToSave.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
     savingRef.current = myGen;
+    runningRef.current = myGen;
     const isCurrent = () => genRef.current === myGen;
     setSavingCount(chosen.length);
     setPhase('saving');
@@ -592,6 +596,7 @@ export default function useReviewerPromotion({
       }
     } finally {
       if (savingRef.current === myGen) savingRef.current = null;
+      if (runningRef.current === myGen) runningRef.current = null;
       if (isCurrent()) setSavingCount(0);
     }
   }, [
@@ -601,6 +606,7 @@ export default function useReviewerPromotion({
     analysis,
     onSaved,
     genRef,
+    runningRef,
     savingRef,
     pushProgress,
     refreshExpiredVerification,
@@ -618,6 +624,8 @@ export default function useReviewerPromotion({
     setRosterSavedKeys,
     setRosterNote,
     setSelected,
+    rosterLoaded,
+    persistencePending,
   ]);
 
   return { refreshExpiredVerification, saveSelected };

@@ -87,7 +87,7 @@ function InstitutionPresentationNotice({
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false, repairRequest = null, repairRequestsUnavailable = false, onRetryRepairStatus }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, persistenceStatus = null, actionsDisabled = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false, repairRequest = null, repairRequestsUnavailable = false, onRetryRepairStatus }) {
   const [expanded, setExpanded] = useState(false);
   const cardRef = useRef(null);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
@@ -333,6 +333,11 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           </label>
         )}
         <div className="flex-1 min-w-0">
+          {persistenceStatus && (
+            <p className="mb-1 text-xs font-medium text-amber-800" data-testid="reviewer-roster-persistence-status">
+              {persistenceStatus === 'unconfirmed' ? 'Save not confirmed' : 'Not saved to this request'}
+            </p>
+          )}
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-gray-900 truncate">{c.name}</span>
             {c.seniorityEstimate && (
@@ -902,7 +907,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 type="button"
                 onClick={() => onAddToInvite(c)}
                 aria-label={`Add ${c.name} to Invite`}
-                disabled={addingToInvite}
+                disabled={addingToInvite || actionsDisabled}
                 className="rounded bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {addingToInvite ? 'Adding to Invite…' : 'Add to Invite'}
@@ -918,6 +923,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 type="button"
                 onClick={() => onExclude(c)}
                 aria-label={`Not a fit: ${c.name}`}
+                disabled={actionsDisabled}
                 className="ml-auto text-xs text-gray-500 hover:text-red-700"
                 title="Set aside — moves to the Excluded list and won't be surfaced again by a search for this request (recoverable)"
               >
@@ -929,6 +935,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 type="button"
                 onClick={() => onPromote(c)}
                 aria-label={`Reconsider ${c.name}`}
+                disabled={actionsDisabled}
                 className="text-xs text-blue-600 hover:text-blue-800 ml-auto"
                 title="Return to the active candidate list"
               >

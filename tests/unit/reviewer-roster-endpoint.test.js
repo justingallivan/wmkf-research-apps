@@ -32,9 +32,17 @@ jest.mock('../../lib/services/proposal-pi-identity', () => ({
 jest.mock('../../lib/services/proposal-participants', () => ({
   fetchCoPIs: (...args) => mockFetchCoPIs(...args),
 }));
+const mockFindSuggestionByRequest = jest.fn();
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  findByRequest: (...args) => mockFindSuggestionByRequest(...args),
+}));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   listForRequest: jest.fn(async () => ({ active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [] })),
   recordSurfaced: jest.fn(async () => 0),
+  recordSurfacedDetailed: jest.fn(async (_requestId, items) => ({
+    recorded: items.length,
+    results: items.map((candidate, inputIndex) => ({ inputIndex, candidateKey: candidate.candidateKey, outcome: 'written' })),
+  })),
   setExcluded: jest.fn(async () => {}),
   promote: jest.fn(async () => ({ name: 'Bob Roe' })),
   confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
@@ -180,7 +188,77 @@ describe('POST recordSurfaced', () => {
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: many } }, r);
     expect(r.statusCode).toBe(400);
-    expect(store.recordSurfaced).not.toHaveBeenCalled();
+    expect(store.recordSurfacedDetailed).not.toHaveBeenCalled();
+  });
+
+  it('keeps one positional outcome for invalid inputs and maps compacted write details to original indices', async () => {
+    store.recordSurfacedDetailed.mockImplementationOnce(async (_requestId, items) => ({
+      recorded: 1,
+      results: [
+        { inputIndex: 0, candidateKey: items[0].candidateKey, outcome: 'written' },
+        { inputIndex: 1, candidateKey: items[1].candidateKey, outcome: 'failed', code: 'row_write_failed' },
+      ],
+    }));
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [
+      { name: 'First Valid' },
+      { name: '   ' },
+      { name: 'Second Valid' },
+    ] } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toMatchObject({ success: false, recorded: 1, outcomeVersion: 1 });
+    expect(r.body.results).toHaveLength(3);
+    expect(r.body.results.map(({ inputIndex, outcome }) => [inputIndex, outcome])).toEqual([
+      [0, 'written'], [1, 'invalid'], [2, 'failed'],
+    ]);
+    expect(r.body.results[1]).toMatchObject({ candidateKey: null, existingAtAttempt: null, code: 'invalid_candidate' });
+    expect(r.body.results[2].existingAtAttempt).toBe(false);
+    expect(store.recordSurfacedDetailed).toHaveBeenCalledWith(REQ, expect.any(Array), {});
+  });
+
+  it.each(['deceased', 'emeritus'])('rejects insert-only retries for a submitted %s hint when the bound eligibility receipt is unknown', async (eligibilityStatus) => {
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      rosterCandidateKey: 'candidate:receipt-bound',
+      eligibilityEvidenceBound: false,
+    });
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, writeMode: 'insert_missing', candidates: [{
+      name: 'Receipt Bound',
+      candidateKey: 'candidate:receipt-bound',
+      eligibilityStatus,
+      automatedIdentityAttestation: 'signed',
+    }] } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(r.body.results).toEqual([expect.objectContaining({
+      inputIndex: 0,
+      outcome: 'invalid',
+      code: 'retry_eligibility_unconfirmed',
+      existingAtAttempt: null,
+    })]);
+    expect(store.recordSurfacedDetailed).not.toHaveBeenCalled();
+  });
+
+  it('uses the existing insert-only updatedAt guard for a same-key retry', async () => {
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      rosterCandidateKey: 'candidate:receipt-bound',
+      eligibilityEvidenceBound: false,
+    });
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, writeMode: 'insert_missing', candidates: [{
+      name: 'Receipt Bound',
+      candidateKey: 'candidate:receipt-bound',
+      automatedIdentityAttestation: 'signed',
+    }] } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(store.recordSurfacedDetailed).toHaveBeenCalledWith(REQ, expect.any(Array), {
+      writeMode: 'insert_missing',
+      expectedUpdatedAt: null,
+    });
   });
 
   it('rejects browser attempts to mint server-managed applicant suggestion rows', async () => {
@@ -197,7 +275,7 @@ describe('POST recordSurfaced', () => {
 
     expect(r.statusCode).toBe(400);
     expect(r.body).toMatchObject({ code: 'server_managed_applicant_candidate' });
-    expect(store.recordSurfaced).not.toHaveBeenCalled();
+    expect(store.recordSurfacedDetailed).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -215,7 +293,7 @@ describe('POST recordSurfaced', () => {
 
     expect(r.statusCode).toBe(400);
     expect(r.body).toMatchObject({ code: 'server_managed_applicant_candidate' });
-    expect(store.recordSurfaced).not.toHaveBeenCalled();
+    expect(store.recordSurfacedDetailed).not.toHaveBeenCalled();
   });
 
   it('re-derives an untrusted browser candidate key before writing the roster', async () => {
@@ -228,7 +306,7 @@ describe('POST recordSurfaced', () => {
     }] } }, r);
 
     expect(r.statusCode).toBe(200);
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].candidateKey).toEqual(expect.any(String));
     expect(passed[0].candidateKey).not.toBe('candidate:existing-victim');
     expect(store.findCandidatesByKeys).toHaveBeenCalledWith(
@@ -250,7 +328,7 @@ describe('POST recordSurfaced', () => {
       automatedIdentityAttestation: 'signed',
     }] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].candidateKey).toBe('candidate:receipt-bound');
   });
 
@@ -278,7 +356,7 @@ describe('POST recordSurfaced', () => {
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [candidate] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].candidateKey).toBe(candidateKey);
     expect(passed[0].affiliationAssertions).toHaveLength(1);
     expect(passed[0].institutionEvidenceAttestation).toBeUndefined();
@@ -306,7 +384,7 @@ describe('POST recordSurfaced', () => {
       institutionEvidenceAttestation: 'signed-for-victim',
     }] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].candidateKey).not.toBe('candidate:existing-victim');
     expect(passed[0].independentIdentity).toBeUndefined();
     expect(passed[0].affiliationAssertions).toBeUndefined();
@@ -338,7 +416,7 @@ describe('POST recordSurfaced', () => {
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [incoming] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].affiliationAssertions).toEqual(stored.affiliationAssertions);
     expect(hasServerInstitutionEvidenceReceipt({ requestId: REQ, candidate: passed[0] })).toBe(true);
   });
@@ -366,7 +444,7 @@ describe('POST recordSurfaced', () => {
       },
     }] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].serverIdentityDecisionReceipt).toMatchObject({
       version: 1,
       source: 'automated_resolver',
@@ -385,7 +463,7 @@ describe('POST recordSurfaced', () => {
       },
     }] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].serverIdentityDecisionReceipt).toBeUndefined();
   });
 
@@ -405,7 +483,7 @@ describe('POST recordSurfaced', () => {
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [incoming] } }, r);
 
     expect(r.statusCode).toBe(200);
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0]).toMatchObject({
       candidateKey,
       serverIdentityReviewReason: 'manual_contact_changed',
@@ -420,7 +498,7 @@ describe('POST recordSurfaced', () => {
     }] } }, r);
 
     expect(r.statusCode).toBe(200);
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].serverIdentityReviewReason).toBeUndefined();
   });
 
@@ -431,7 +509,7 @@ describe('POST recordSurfaced', () => {
       { name: '' }, // dropped (no name)
     ] } }, r);
     expect(r.statusCode).toBe(200);
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed).toHaveLength(1);
     expect(passed[0].name).toBe('Ann Lee');
     expect(passed[0].hIndex).toBe(9);
@@ -468,7 +546,7 @@ describe('POST recordSurfaced', () => {
       },
     }] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].pdIdentityConfirmed).toBeUndefined();
     expect(passed[0].pdIdentityConfirmationId).toBeUndefined();
     expect(passed[0].manualContactFields).toBeUndefined();
@@ -503,7 +581,7 @@ describe('POST recordSurfaced', () => {
       candidateKey: derivedCandidateKey,
     }] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0]).toMatchObject({
       email: 'verified@example.edu',
       website: 'https://example.edu/ann',
@@ -550,7 +628,7 @@ describe('POST recordSurfaced', () => {
       candidates: [{ ...resurfaced, candidateKey: derivedCandidateKey }],
     } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0]).toMatchObject({
       emailPersistAllowed: false,
       addressConflictPending: true,
@@ -602,7 +680,7 @@ describe('POST recordSurfaced', () => {
       candidates: [{ ...resurfaced, candidateKey: derivedCandidateKey }],
     } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0].email).toBe('verified@example.edu');
     expect(hasServerIdentityDecisionReceipt(passed[0])).toBe(true);
   });
@@ -616,7 +694,7 @@ describe('POST recordSurfaced', () => {
       eligibilityEvidence: { status: 'deceased', url: 'https://evil.example/fake' },
     }] } }, r);
 
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0]).toMatchObject({
       eligibilityStatus: 'unknown',
       eligibilityReason: null,
@@ -647,7 +725,7 @@ describe('POST recordSurfaced', () => {
       'signed',
       expect.objectContaining({ requestId: REQ }),
     );
-    const [, passed] = store.recordSurfaced.mock.calls[0];
+    const [, passed] = store.recordSurfacedDetailed.mock.calls[0];
     expect(passed[0]).toMatchObject({
       eligibilityStatus: 'deceased',
       eligibilityEvidence: {
@@ -1248,6 +1326,68 @@ describe('PATCH', () => {
       excluded: [{ name: 'Excluded Person' }],
       allNames: ['Applicant Person', 'Excluded Person', 'Saved Person'],
     });
+  });
+
+  it('remove_previous_results reconciles newly handled anchored rows before returning the PATCH snapshot', async () => {
+    const suggestionId = '22222222-2222-4222-8222-222222222222';
+    const anchoredActive = {
+      candidateKey: `suggestion:${suggestionId}`,
+      suggestionId,
+      name: 'Already Invited Reviewer',
+      rosterStatus: 'active',
+    };
+    const roster = {
+      active: [anchoredActive], excluded: [], ineligible: [], blocked: [], handled: [],
+      savedKeys: [], allNames: [anchoredActive.name],
+      retention: { version: 1, rows: [{ candidateKey: anchoredActive.candidateKey, status: 'active' }] },
+      removed: 1, removedKeys: ['candidate:old'],
+    };
+    store.removePreviousActiveSearchResults.mockResolvedValueOnce(roster);
+    mockFindSuggestionByRequest.mockResolvedValueOnce([{
+      wmkf_appreviewersuggestionid: suggestionId,
+      wmkf_selected: true,
+      wmkf_invited: true,
+    }]);
+    mockReconcileRosterEngagement.mockImplementationOnce(({ requestId, roster: removedRoster }) => (
+      jest.requireActual('../../lib/services/workbench/reviewer-roster-projection-service')
+        .reconcileRosterEngagement({ requestId, roster: removedRoster })
+    ));
+
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'remove_previous_results',
+      candidateRefs: [{ candidateKey: 'candidate:old', updatedAt: '2026-07-19T12:00:00.000Z' }],
+    } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(mockReconcileRosterEngagement).toHaveBeenCalledWith({ requestId: REQ, roster });
+    expect(mockFindSuggestionByRequest).toHaveBeenCalledWith(REQ, { selectedOnly: false, requireComplete: true });
+    expect(r.body.active).toEqual([]);
+    expect(r.body.handled).toEqual([expect.objectContaining({
+      candidateKey: anchoredActive.candidateKey,
+      name: anchoredActive.name,
+      stage: 'invited',
+    })]);
+    expect(r.body).toMatchObject({ removed: 1, removedKeys: ['candidate:old'] });
+  });
+
+  it('keeps a committed removal unconfirmed when engagement reconciliation fails', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    store.removePreviousActiveSearchResults.mockResolvedValueOnce({ removed: 1, removedKeys: ['candidate:old'] });
+    mockReconcileRosterEngagement.mockRejectedValueOnce(new Error('engagement read unavailable'));
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'remove_previous_results',
+      candidateRefs: [{ candidateKey: 'candidate:old', updatedAt: '2026-07-19T12:00:00.000Z' }],
+    } }, r);
+
+    expect(store.removePreviousActiveSearchResults).toHaveBeenCalled();
+    expect(r.statusCode).toBe(500);
+    expect(r.body).toEqual({ error: 'Reviewer roster operation failed' });
+    expect(consoleSpy).toHaveBeenCalledWith('reviewer-roster error:', 'engagement read unavailable');
+    consoleSpy.mockRestore();
   });
 
   it('remove_previous_results accepts bounded generated keys longer than 256 characters', async () => {

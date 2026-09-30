@@ -12,6 +12,7 @@ jest.mock('../../shared/components/reviewers/sse', () => ({
 }));
 
 const REQ = 'aaaaaaaa-1111-1111-1111-111111111111';
+let rosterFixtureRows = new Map();
 const candidate = (name, email) => ({
   name,
   email,
@@ -31,14 +32,57 @@ const candidate = (name, email) => ({
   },
 });
 
+function withRosterRetention(body) {
+  if (!body || !Array.isArray(body.active) || !Array.isArray(body.excluded)) return body;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const rows = new Map((body.retention?.version === 1 && Array.isArray(body.retention.rows)
+    ? body.retention.rows : []).map((row) => [row.candidateKey, row]));
+  const add = (items, status) => {
+    for (const item of Array.isArray(items) ? items : []) {
+      const candidateKey = item?.candidateKey || reviewerCandidateKey(item);
+      if (candidateKey) rows.set(candidateKey, { candidateKey, status });
+    }
+  };
+  add(body.active, 'active');
+  add(body.excluded, 'excluded');
+  add(body.ineligible, 'ineligible');
+  add(body.blocked, 'blocked');
+  add(body.handled, 'saved');
+  for (const candidateKey of Array.isArray(body.savedKeys) ? body.savedKeys : []) {
+    rows.set(candidateKey, { candidateKey, status: 'saved' });
+  }
+  rosterFixtureRows = rows;
+  return { ...body, retention: { version: 1, rows: [...rows.values()] } };
+}
+
+function rosterWriteResponse(options, recordedCount = null) {
+  const body = JSON.parse(options?.body || '{}');
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const count = recordedCount == null ? candidates.length : recordedCount;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const results = candidates.map((candidate, inputIndex) => {
+    const candidateKey = candidate?.candidateKey || reviewerCandidateKey(candidate) || null;
+    const result = {
+      inputIndex,
+      candidateKey,
+      existingAtAttempt: candidateKey ? rosterFixtureRows.has(candidateKey) : null,
+      outcome: inputIndex < count || recordedCount == null ? 'written' : 'failed',
+    };
+    if (result.outcome === 'failed') result.code = 'roster_write_failed';
+    return result;
+  });
+  return response({ success: results.every((result) => result.outcome !== 'failed'), recorded: count, outcomeVersion: 1, results });
+}
+
 function response(body, ok = true, status = ok ? 200 : 422) {
-  return { ok, status, json: async () => body };
+  return { ok, status, json: async () => withRosterRetention(body) };
 }
 
 afterEach(() => {
   jest.clearAllMocks();
   readSseStream.mockReset();
   global.fetch = jest.fn();
+  rosterFixtureRows = new Map();
 });
 
 test('applicant-excluded collision moves the exact candidate into terminal read-only state even on 422', async () => {
@@ -49,7 +93,7 @@ test('applicant-excluded collision moves the exact candidate into terminal read-
   };
   const key = reviewerSaveKey(blocked);
   expect(key).not.toBe(blocked.candidateKey);
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
       return Promise.resolve(response({
@@ -826,7 +870,7 @@ test('expired verification refresh targets only the indexed roster card when ano
       return Promise.resolve({ ok: true, status: 200, body: {} });
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(rosterWriteResponse(options));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -911,7 +955,7 @@ test('expired verification is refreshed durably and deselected for review withou
       expect(body.candidates).toHaveLength(1);
       expect(body.candidates[0].candidateKey).toBe(expired.candidateKey);
       expect(body.candidates[0].automatedIdentityAttestation).toBe('fresh-token');
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(rosterWriteResponse(options));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -1014,7 +1058,7 @@ test('mixed saved and expired rows reconcile independently before the refreshed 
       return Promise.resolve({ ok: true, status: 200, body: {} });
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(rosterWriteResponse(options));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });

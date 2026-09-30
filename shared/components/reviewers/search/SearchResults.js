@@ -8,6 +8,7 @@ import {
   canConfirmCandidateForPromotion,
   getCandidatePromotionDecision,
   isCandidateSelectable,
+  parseReviewerRosterRetention,
 } from '../reviewer-search-logic';
 import { activeInstitutionStage2Presentation } from '../../../utils/institution-stage2-presentation';
 
@@ -24,6 +25,11 @@ export default function SearchResults({
   displayCandidates,
   rosterExcluded,
   rosterIneligible,
+  rosterRetention,
+  persistenceState,
+  retrySavingResults,
+  retryCheckingSaves,
+  useSavedResults,
   rosterBlocked,
   phase,
   identityComparison,
@@ -73,6 +79,18 @@ export default function SearchResults({
   runSearch,
   progress,
 }) {
+  const persistenceByKey = new Map();
+  for (const item of persistenceState?.items || []) {
+    const status = persistenceState.requiresReconciliation || persistenceState.correlationLost || item.outcome === 'unconfirmed'
+      ? 'unconfirmed' : 'not_saved';
+    for (const key of [item.displayKey, item.serverCandidateKey, candKey(item.candidate)].filter(Boolean)) {
+      persistenceByKey.set(key, status);
+    }
+  }
+  for (const item of persistenceState?.latestDetailsItems || []) {
+    persistenceByKey.set(item.displayKey, 'not_saved');
+  }
+  const retainedStatuses = parseReviewerRosterRetention(rosterRetention) || new Map();
   return (
     <>
       {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
@@ -86,6 +104,28 @@ export default function SearchResults({
             </div>
           )}
           {rosterNote && rosterNote !== promotionNotice?.message && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{rosterNote}</div>}
+          {persistenceState?.summary && (
+            <div className="p-3 bg-amber-50 text-amber-900 rounded-lg text-sm" role="status" data-testid="reviewer-roster-persistence-summary">
+              <p>{persistenceState.summary}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {persistenceState.retryItems?.length > 0 && !persistenceState.requiresReconciliation && (
+                  <button type="button" onClick={retrySavingResults} disabled={phase === 'saving'} className="underline font-medium disabled:opacity-50">
+                    {phase === 'saving' ? 'Saving…' : 'Retry saving results'}
+                  </button>
+                )}
+                {(persistenceState.requiresReconciliation || persistenceState.correlationLost) && (
+                  <button type="button" onClick={retryCheckingSaves} disabled={phase === 'saving'} className="underline font-medium disabled:opacity-50">
+                    {phase === 'saving' ? 'Checking…' : 'Retry checking saves'}
+                  </button>
+                )}
+                {!persistenceState.requiresReconciliation && (persistenceState.correlationLost || persistenceState.items?.length > 0 || persistenceState.latestDetailsItems?.length > 0) && (
+                  <button type="button" onClick={useSavedResults} disabled={phase === 'saving'} className="underline font-medium disabled:opacity-50">
+                    Use saved results
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {previousSearchKeys.size > 0 && (
             <div className="flex items-center justify-between gap-3 p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
               <span>
@@ -178,6 +218,8 @@ export default function SearchResults({
                               return <CandidateCard
                                 key={candKey(c)}
                                 candidate={c}
+                                persistenceStatus={persistenceByKey.get(candKey(c)) || null}
+                                actionsDisabled={busy}
                                 previousResult={previousSearchKeys.has(candKey(c))}
                                 checked={selected.has(candKey(c))}
                                 onToggle={() => toggle(candKey(c))}
@@ -197,6 +239,8 @@ export default function SearchResults({
                             return <CandidateCard
                               key={candKey(c)}
                               candidate={c}
+                              persistenceStatus={persistenceByKey.get(candKey(c)) || null}
+                              actionsDisabled={busy}
                               previousResult={previousSearchKeys.has(candKey(c))}
                               readOnly
                               onExclude={excludeCandidate}
@@ -266,7 +310,7 @@ export default function SearchResults({
                   </summary>
                   <div className="space-y-2 mt-2">
                     {rosterExcluded.map((c) => (
-                      <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={promoteCandidate} />
+                      <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly actionsDisabled={busy} onPromote={promoteCandidate} />
                     ))}
                   </div>
                 </details>
@@ -280,9 +324,11 @@ export default function SearchResults({
                   <ul className="mt-2 space-y-1 text-xs text-red-800">
                     {rosterIneligible.map((candidate) => {
                       const evidence = candidate.eligibilityEvidence || candidate.contactEnrichment?.eligibilityEvidence;
+                      const retained = retainedStatuses.get(candKey(candidate));
                       return (
                         <li key={`ineligible-${candKey(candidate)}`}>
                           <span className="font-medium">{candidate.name}</span>
+                          {retained !== 'ineligible' && <span> · Current search indicates death, but the roster does not confirm ineligibility; this result is read-only for this search.</span>}
                           {evidence?.url && (
                             <>
                               {' · '}

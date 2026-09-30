@@ -22,8 +22,9 @@ import useReviewerContactActions from '../../shared/components/reviewers/search/
 const REQ = 'aaaaaaaa-1111-1111-1111-111111111111';
 const CAND = { candidateKey: 'suggestion:s-1', name: 'Ada Lovelace', email: 'ada@example.edu' };
 
-function Harness({ requestId = REQ, initialCandidate = CAND, initialUnverified = [] }) {
+function Harness({ requestId = REQ, initialCandidate = CAND, initialUnverified = [], reloadRoster = async () => null }) {
   const genRef = useRef(0);
+  const runningRef = useRef(null);
   const [candidates, setCandidates] = useState([initialCandidate]);
   const [recCandidates, setRecCandidates] = useState([]);
   const [rosterActive, setRosterActive] = useState([]);
@@ -38,7 +39,7 @@ function Harness({ requestId = REQ, initialCandidate = CAND, initialUnverified =
   const actions = useReviewerContactActions({
     requestId, genRef, unverified, setCandidates, setRecCandidates, setRosterActive,
     setRosterNote, setSelected, setEditingContact, setRepairRequestsByCandidateKey,
-    setConfirmingContact, setUnverified,
+    setConfirmingContact, setUnverified, reloadRoster, runningRef,
   });
 
   const run = (fn) => async () => {
@@ -195,7 +196,10 @@ test('confirmIdentityContact: unverified candidate records first (POST), then PA
       calls.push(opts);
       const body = JSON.parse(opts.body);
       if (body.action === undefined && body.candidates) {
-        return { ok: true, status: 200, json: async () => ({ success: true }) };
+        return { ok: true, status: 200, json: async () => ({
+          success: true, recorded: 1, outcomeVersion: 1,
+          results: [{ inputIndex: 0, candidateKey: CAND.candidateKey, existingAtAttempt: false, outcome: 'written' }],
+        }) };
       }
       return { ok: true, status: 200, json: async () => ({ success: true, confirmationId: 'c-1', candidate: { ...CAND, confirmed: true } }) };
     },
@@ -228,6 +232,54 @@ test('confirmIdentityContact: record-step 200 + {success:false} throws before th
   });
   render(<Harness initialUnverified={[CAND]} />);
   await act(async () => { screen.getByTestId('confirm-identity').click(); });
-  await waitFor(() => expect(screen.getByTestId('last-error').textContent).toBe('record failed'));
+  await waitFor(() => expect(screen.getByTestId('last-error').textContent).toMatch(/Could not confirm this suggestion/));
+  expect(confirmFired).toBe(false);
+});
+
+test('confirmIdentityContact: unchanged receipt needs an exact current active-row proof before PATCH', async () => {
+  const activeSnapshot = {
+    retention: { version: 1, rows: [{ candidateKey: CAND.candidateKey, status: 'active' }] },
+    active: [CAND],
+  };
+  let confirmFired = false;
+  global.fetch = mkFetch({
+    roster: (opts) => {
+      const body = JSON.parse(opts.body);
+      if (body.candidates) return { ok: true, status: 200, json: async () => ({
+        success: true, recorded: 0, outcomeVersion: 1,
+        results: [{ inputIndex: 0, candidateKey: CAND.candidateKey, existingAtAttempt: true, outcome: 'unchanged' }],
+      }) };
+      confirmFired = true;
+      return { ok: true, status: 200, json: async () => ({ success: true, confirmationId: 'c-1' }) };
+    },
+    addressTrust: () => ({ ok: true, status: 200, json: async () => ({ success: true, candidate: CAND }) }),
+  });
+  const reloadRoster = jest.fn(async () => activeSnapshot);
+  render(<Harness initialUnverified={[CAND]} reloadRoster={reloadRoster} />);
+  await act(async () => { screen.getByTestId('confirm-identity').click(); });
+  await waitFor(() => expect(confirmFired).toBe(true));
+  expect(reloadRoster).toHaveBeenCalledTimes(1);
+});
+
+test('confirmIdentityContact: unchanged receipt without exact active row blocks PATCH', async () => {
+  let confirmFired = false;
+  global.fetch = mkFetch({
+    roster: (opts) => {
+      const body = JSON.parse(opts.body);
+      if (body.candidates) return { ok: true, status: 200, json: async () => ({
+        success: true, recorded: 0, outcomeVersion: 1,
+        results: [{ inputIndex: 0, candidateKey: CAND.candidateKey, existingAtAttempt: true, outcome: 'unchanged' }],
+      }) };
+      confirmFired = true;
+      return { ok: true, status: 200, json: async () => ({ success: true, confirmationId: 'c-1' }) };
+    },
+    addressTrust: () => ({ ok: true, status: 200, json: async () => ({ success: true }) }),
+  });
+  render(<Harness initialUnverified={[CAND]} reloadRoster={async () => ({
+    retention: { version: 1, rows: [{ candidateKey: CAND.candidateKey, status: 'excluded' }] },
+    active: [],
+  })} />);
+  await act(async () => { screen.getByTestId('confirm-identity').click(); });
+  await waitFor(() => expect(screen.getByTestId('last-error').textContent).toMatch(/Could not confirm this suggestion is active/));
   expect(confirmFired).toBe(false);
 });

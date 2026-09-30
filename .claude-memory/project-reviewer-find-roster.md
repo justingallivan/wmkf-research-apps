@@ -13,7 +13,7 @@ metadata:
 Read when touching the Workbench Find tab, reviewer-search dedup/exclusion, or anything that reads/writes `reviewer_find_roster`. Also read before any "drop a reviewer Postgres table" carryover — this one is LIVE.
 
 ## What shipped (S224, `dee37aa`, deployed)
-Find-tab search candidates are no longer ephemeral. Every candidate a search surfaces for a request is recorded per-request and **suppressed from future searches for that request** — so a re-run finds NEW people instead of re-spending tokens. Surfaced candidates form a **durable roster**: an active selectable list (persists across reload) + a collapsed, recoverable **Excluded** section. **Exclude** sets aside (never deletes); **Promote back** restores to the active list. Saving stays the existing separate step (graduates to `status='saved'`, leaves the active list, stays deduped).
+Find-tab search candidates are no longer ephemeral. Candidates retained in the per-request roster are **suppressed from future searches for that request** — so a re-run finds NEW people instead of re-spending tokens. Successfully persisted candidates form a **durable roster**: an active selectable list (persists across reload) + a collapsed, recoverable **Excluded** section. **Exclude** sets aside (never deletes); **Promote back** restores to the active list. Saving stays the existing separate step (graduates to `status='saved'`, leaves the active list, stays deduped).
 
 ## Load-bearing design facts (don't relearn the hard way)
 - **`reviewer_find_roster` is OPERATIONAL / pre-save / per-request working state, NOT canonical reviewer identity.** Same class as the retained `search_cache`. Canonical saved reviewers stay in Dataverse `wmkf_appreviewersuggestion`. So adding this Postgres table is NOT a regression of the S219/migration-018 Postgres→Dataverse cutover. **Do not act on a "drop reviewer Postgres tables" carryover against it** (see [[feedback-verify-before-destructive-carryover]]).
@@ -22,6 +22,22 @@ Find-tab search candidates are no longer ephemeral. Every candidate a search sur
 - **Status model:** `active|excluded|ineligible|saved|coi_dropped`. A resolved identity plus a successfully fetched, candidate-anchored first-party page may record `ineligible`; browser roster POST additionally requires the server receipt to bind the request, immutable roster key, and eligibility evidence. It stays visible with its source, cannot be selected/saved/promoted, remains in cross-run dedup, and cannot be reactivated by a later unknown result. `recordSurfaced` never downgrades excluded/saved/COI-ledger curation. The cap evicts oldest active/saved only; durable excluded/ineligible/COI rows remain until future TTL cleanup.
 - **Identity-guard hazard (Codex post-impl HIGH):** `pruneCandidateForRoster` drops `contactEnrichment.identity`/`tierResults` but carries safe `identityPersistAllowed`/`scholarPersistAllowed` flags so a roster-RELOADED save still honors the resolver gate in `save-candidates.js`. If you change the prune DTO or the save gate, keep those flags wired.
 - **Eligibility receipt boundary:** new roster-managed save payloads require a valid server receipt carrying the immutable pre-enrichment `candidateKey`; missing/expired or legacy receipts without that key return `identity_attestation_required`. Only bare pre-roster payloads with neither an explicit roster candidate key nor an automated receipt retain the legacy correlation path.
+
+## Save-outcome implementation (2026-09-30 branch; not deployment evidence)
+
+The reviewed save-failure fix is tracked in
+`docs/plans/REVIEWER_ROSTER_SAVE_OUTCOMES_PLAN_2026-09-30.md`.
+`recordSurfacedDetailed` reports positional row outcomes; `recordSurfaced`
+remains a numeric wrapper for internal callers. POST's `success`/`recorded`
+are attempt results, not proof of current retention: the post-save GET's
+complete key/status inventory and buckets own that claim. Insert-missing
+retry preserves conflict guards and rejects changed keys or deceased/emeritus
+hints whose receipt now resolves unknown. No row outcome is identity authority,
+no new persisted status is introduced, and no provider search is implied by
+save recovery. Removal snapshots use the same engagement projection as GET.
+**Use saved results** discards the attempted search’s temporary cards and adopts
+the fresh server roster. Implementation verification and any remaining release checks
+belong in the plan; do not infer deployment from these branch contracts.
 
 ## Files
 Store `lib/services/reviewer-roster-store.js`; route `pages/api/workbench/reviewer-roster.js`; shared name-match `lib/utils/reviewer-name-match.js` (CJS, server+client); `pruneCandidateForRoster` in `shared/components/reviewers/reviewer-search-logic.js`; UI `ReviewerSearchSection.js` (display candidates and selection keyed by `candidateKey`). Atlas `docs/atlas/postgres-reviewer-find-roster.md`. Plan `~/.claude/plans/cosmic-yawning-starlight.md`.

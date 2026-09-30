@@ -49,6 +49,7 @@ function emptyRoster() {
     handled: [],
     savedKeys: [],
     allNames: [],
+    retention: { version: 1, rows: [] },
   });
 }
 
@@ -247,6 +248,7 @@ test('drops a late PubMed diagnostic after the request context changes', async (
       return Promise.resolve(response({
         success: true,
         active: [{
+          candidateKey: 'candidate:current-request',
           name: 'Current Request Reviewer',
           email: 'current@example.edu',
           identityStatus: 'confirmed',
@@ -259,6 +261,7 @@ test('drops a late PubMed diagnostic after the request context changes', async (
         handled: [],
         savedKeys: [],
         allNames: ['Current Request Reviewer'],
+        retention: { version: 1, rows: [{ candidateKey: 'candidate:current-request', status: 'active' }] },
       }));
     }
     if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(emptyRoster());
@@ -325,7 +328,10 @@ test('confirming an unverified suggestion records it on the roster BEFORE confir
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       const body = JSON.parse(options.body);
       calls.push({ kind: 'record', body });
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(response({
+        success: true, recorded: 1, outcomeVersion: 1,
+        results: [{ inputIndex: 0, candidateKey: body.candidates[0].candidateKey, existingAtAttempt: false, outcome: 'written' }],
+      }));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
@@ -406,7 +412,8 @@ test('a failed roster record write blocks confirm_identity and keeps the card re
   await submitConfirmModal('krishnan@uchicago.edu');
 
   // The modal surfaces the record failure and no confirmation was attempted.
-  await waitFor(() => expect(screen.getByText('store unavailable')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Could not confirm this suggestion on the request roster/)).toBeInTheDocument());
+  expect(screen.queryByText('store unavailable')).not.toBeInTheDocument();
   expect(patchActions).not.toContain('confirm_identity');
   expect(screen.getByText(/Unverified suggestions \(1\)/)).toBeInTheDocument();
 });
@@ -451,7 +458,13 @@ test('a failed exclusion restores the prior name membership before the next sear
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      const body = JSON.parse(options.body);
+      return Promise.resolve(response({
+        success: true, recorded: 1, outcomeVersion: 1,
+        results: body.candidates.map((candidate, inputIndex) => ({
+          inputIndex, candidateKey: candidate.candidateKey, existingAtAttempt: false, outcome: 'written',
+        })),
+      }));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       return Promise.resolve(response({ error: 'store unavailable' }, false));

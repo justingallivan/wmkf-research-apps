@@ -87,6 +87,8 @@ export default function ReviewerSearchSection({
     selected,
     rosterExcluded,
     rosterIneligible,
+    rosterRetention,
+    persistenceState,
     rosterBlocked,
     rosterLoaded,
     rosterLoadFailed,
@@ -116,6 +118,9 @@ export default function ReviewerSearchSection({
     confirmingContact,
     noSourcesSelected,
     retryRosterLoad,
+    retrySavingResults,
+    retryCheckingSaves,
+    useSavedResults,
     runSearch,
     enrichRecommended,
     previousSearchKeys,
@@ -222,6 +227,11 @@ export default function ReviewerSearchSection({
           displayCandidates={displayCandidates}
           rosterExcluded={rosterExcluded}
           rosterIneligible={rosterIneligible}
+          rosterRetention={rosterRetention}
+          persistenceState={persistenceState}
+          retrySavingResults={retrySavingResults}
+          retryCheckingSaves={retryCheckingSaves}
+          useSavedResults={useSavedResults}
           rosterBlocked={rosterBlocked}
           phase={phase}
           identityComparison={identityComparison}

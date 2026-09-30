@@ -17,6 +17,7 @@ if (typeof global.TextDecoder === 'undefined') global.TextDecoder = NodeTextDeco
 if (typeof global.ReadableStream === 'undefined') global.ReadableStream = NodeReadableStream;
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+let rosterFixtureRows = new Map();
 
 const rosterSnapshot = {
   success: true,
@@ -33,8 +34,50 @@ const response = (body, { ok = true, status = ok ? 200 : 500, stream = null } = 
   ok,
   status,
   body: stream,
-  json: async () => body,
+  json: async () => withRosterRetention(body),
 });
+
+function withRosterRetention(body) {
+  if (!body || !Array.isArray(body.active) || !Array.isArray(body.excluded)) return body;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const rows = new Map((body.retention?.version === 1 && Array.isArray(body.retention.rows)
+    ? body.retention.rows : []).map((row) => [row.candidateKey, row]));
+  const add = (items, status) => {
+    for (const item of Array.isArray(items) ? items : []) {
+      const candidateKey = item?.candidateKey || reviewerCandidateKey(item);
+      if (candidateKey) rows.set(candidateKey, { candidateKey, status });
+    }
+  };
+  add(body.active, 'active');
+  add(body.excluded, 'excluded');
+  add(body.ineligible, 'ineligible');
+  add(body.blocked, 'blocked');
+  add(body.handled, 'saved');
+  for (const candidateKey of Array.isArray(body.savedKeys) ? body.savedKeys : []) {
+    rows.set(candidateKey, { candidateKey, status: 'saved' });
+  }
+  rosterFixtureRows = rows;
+  return { ...body, retention: { version: 1, rows: [...rows.values()] } };
+}
+
+function rosterWriteResponse(options, recordedCount = null) {
+  const body = JSON.parse(options?.body || '{}');
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const count = recordedCount == null ? candidates.length : recordedCount;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const results = candidates.map((candidate, inputIndex) => {
+    const candidateKey = candidate?.candidateKey || reviewerCandidateKey(candidate) || null;
+    const result = {
+      inputIndex,
+      candidateKey,
+      existingAtAttempt: candidateKey ? rosterFixtureRows.has(candidateKey) : null,
+      outcome: inputIndex < count || recordedCount == null ? 'written' : 'failed',
+    };
+    if (result.outcome === 'failed') result.code = 'roster_write_failed';
+    return result;
+  });
+  return response({ success: results.every((result) => result.outcome !== 'failed'), recorded: count, outcomeVersion: 1, results });
+}
 
 function sseFrame(event, data) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -102,7 +145,7 @@ function installSearchFetch({ analyze, discover, enrich, roster = null, onRoster
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(enrich);
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       if (onRosterPost) return onRosterPost(options);
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(rosterWriteResponse(options));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -192,7 +235,7 @@ test('runs analyze, discover, enrich through real fragmented SSE and awaits prun
   expect(rosterBody.candidates[0].contactEnrichment.emailSource).toBe('institution_page');
 
   await act(async () => {
-    resolveRosterPost(response({ success: true, recorded: 3 }));
+    resolveRosterPost(rosterWriteResponse(rosterCall.options));
     await rosterPost;
   });
   await waitFor(() => expect(screen.getByRole('button', { name: 'Run another search' })).toBeEnabled());
@@ -203,6 +246,7 @@ test('runs analyze, discover, enrich through real fragmented SSE and awaits prun
     'POST /api/reviewer-finder/discover',
     'POST /api/reviewer-finder/enrich-contacts',
     'POST /api/workbench/reviewer-roster',
+    `GET /api/workbench/reviewer-roster?requestId=${encodeURIComponent(REQUEST_ID)}`,
   ]);
 });
 

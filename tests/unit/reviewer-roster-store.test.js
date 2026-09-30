@@ -31,12 +31,12 @@ function queryTextOf(callIndex) {
 describe('listForRequest', () => {
   test('partitions active/excluded/ineligible/blocked and collects allNames across EVERY status', async () => {
     sql.mockResolvedValueOnce({ rows: [
-      { status: 'active', display_name: 'Ann Lee', candidate: { name: 'Ann Lee' } },
-      { status: 'excluded', display_name: 'Bob Roe', candidate: { name: 'Bob Roe' } },
-      { status: 'ineligible', display_name: 'Pat Thiel', candidate: { name: 'Pat Thiel', eligibilityStatus: 'deceased' } },
-      { status: 'blocked', display_name: 'Eve Poe', candidate: { name: 'Eve Poe', promotionDecision: 'blocked_applicant_excluded' } },
+      { candidate_key: 'candidate:ann', status: 'active', display_name: 'Ann Lee', candidate: { name: 'Ann Lee' } },
+      { candidate_key: 'candidate:bob', status: 'excluded', display_name: 'Bob Roe', candidate: { name: 'Bob Roe' } },
+      { candidate_key: 'candidate:pat', status: 'ineligible', display_name: 'Pat Thiel', candidate: { name: 'Pat Thiel', eligibilityStatus: 'deceased' } },
+      { candidate_key: 'candidate:eve', status: 'blocked', display_name: 'Eve Poe', candidate: { name: 'Eve Poe', promotionDecision: 'blocked_applicant_excluded' } },
       { status: 'saved', candidate_key: 'suggestion:sug-9', display_name: 'Cy Poe', candidate: { name: 'Cy Poe', suggestionId: 'SUG-9' } },
-      { status: 'coi_dropped', display_name: 'Dee Coe', candidate: { name: 'Dee Coe', hasInstitutionCOI: true } },
+      { candidate_key: 'candidate:dee', status: 'coi_dropped', display_name: 'Dee Coe', candidate: { name: 'Dee Coe', hasInstitutionCOI: true } },
     ] });
     const out = await store.listForRequest(REQ);
     expect(out.active.map((c) => c.name)).toEqual(['Ann Lee']);
@@ -44,6 +44,14 @@ describe('listForRequest', () => {
     expect(out.ineligible.map((c) => c.name)).toEqual(['Pat Thiel']);
     expect(out.blocked.map((c) => c.name)).toEqual(['Eve Poe']);
     expect(out.savedKeys).toEqual(['suggestion:sug-9']);
+    expect(out.retention).toEqual({ version: 1, rows: [
+      { candidateKey: expect.any(String), status: 'active' },
+      { candidateKey: expect.any(String), status: 'excluded' },
+      { candidateKey: expect.any(String), status: 'ineligible' },
+      { candidateKey: expect.any(String), status: 'blocked' },
+      { candidateKey: 'suggestion:sug-9', status: 'saved' },
+      { candidateKey: expect.any(String), status: 'coi_dropped' },
+    ] });
     // allNames is the cross-run dedup union — must include saved + excluded + coi_dropped too.
     expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Pat Thiel', 'Eve Poe', 'Cy Poe', 'Dee Coe']);
   });
@@ -213,6 +221,30 @@ describe('removePreviousActiveSearchResults', () => {
 });
 
 describe('recordSurfaced', () => {
+  test('detailed outcomes are positional, bounded and preserve numeric wrapper semantics', async () => {
+    sql.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    sql.mockRejectedValueOnce(new Error('write unavailable'));
+    sql.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // cap
+    const detailed = await store.recordSurfacedDetailed(REQ, [
+      { name: 'Ann Lee', candidateKey: 'candidate:ann' },
+      { name: 'Bea Kay', candidateKey: 'candidate:bea' },
+      { name: '' },
+    ]);
+    expect(detailed).toMatchObject({ recorded: 1, results: [
+      { inputIndex: 0, outcome: 'written', candidateKey: 'candidate:ann' },
+      { inputIndex: 1, outcome: 'failed', code: 'roster_write_failed', candidateKey: 'candidate:bea' },
+      { inputIndex: 2, outcome: 'invalid', code: 'invalid_candidate' },
+    ] });
+    expect(await store.recordSurfaced(REQ, [])).toBe(0);
+  });
+
+  test('insert_missing uses the existing null expectedUpdatedAt guard to reject conflicts', async () => {
+    await store.recordSurfacedDetailed(REQ, [{ name: 'Ann Lee', candidateKey: 'candidate:ann' }], { expectedUpdatedAt: null });
+    const text = queryTextOf(0);
+    expect(text).toMatch(/reviewer_find_roster\.updated_at::text/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([false, '']));
+  });
+
   test('measurement records only a successful roster CAS, and its failure does not change the roster count', async () => {
     process.env.REVIEWER_INSTITUTION_MEASUREMENT = 'on';
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});

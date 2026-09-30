@@ -7,6 +7,7 @@ import {
 } from '../../../utils/reviewer-rediscovery';
 import { DEFAULT_REVIEWER_COUNT } from '../../../config/reviewerFinderPreferences';
 import { candKey } from './candidateKeys';
+import { parseReviewerRosterRetention } from '../reviewer-search-logic';
 import useReviewerRoster from './useReviewerRoster';
 import useReviewerRosterActions from './useReviewerRosterActions';
 import useReviewerDiscovery from './useReviewerDiscovery';
@@ -38,7 +39,6 @@ export default function useReviewerSearchController({
   repairCandidateKey = null,
 }) {
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
-  const busy = phase === 'running' || phase === 'saving';
   const [savingCount, setSavingCount] = useState(0);
   // Saved-pool projections: names feed the cross-run search exclusion union
   // (S224); the engaged-row identity index collapses re-discovered
@@ -68,6 +68,9 @@ export default function useReviewerSearchController({
   const [rosterHandled, setRosterHandled] = useState([]);
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
   const [rosterNames, setRosterNames] = useState([]);
+  const [rosterRetention, setRosterRetention] = useState(null);
+  const [transientIneligible, setTransientIneligible] = useState([]);
+  const [persistenceState, setPersistenceState] = useState(null);
   const [repairRequestsByCandidateKey, setRepairRequestsByCandidateKey] = useState({});
   const [repairRequestsUnavailable, setRepairRequestsUnavailable] = useState(false);
   // Gates the search button until the roster GET resolves, so a run can't skip
@@ -76,6 +79,8 @@ export default function useReviewerSearchController({
   const [rosterLoadFailed, setRosterLoadFailed] = useState(false);
   const [rosterNote, setRosterNote] = useState(null); // surfaced if a durable write fails
   const [removingPrevious, setRemovingPrevious] = useState(false);
+  const busy = phase === 'running' || phase === 'saving' || removingPrevious || !rosterLoaded
+    || persistenceState?.requiresReconciliation === true || persistenceState?.correlationLost === true;
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [error, setError] = useState(null);
   const [errorMeta, setErrorMeta] = useState(null);
@@ -118,9 +123,10 @@ export default function useReviewerSearchController({
   const excludeEditedRef = useRef(false);
   const mountedRef = useRef(true);
 
-  const { reloadRoster, retryRosterLoad } = useReviewerRoster({
+  const { applyRosterSnapshot, reloadRoster, retryRosterLoad, invalidateRosterReads } = useReviewerRoster({
     requestId,
     genRef,
+    runningRef,
     setRosterActive,
     setRosterExcluded,
     setRosterIneligible,
@@ -128,6 +134,7 @@ export default function useReviewerSearchController({
     setRosterHandled,
     setRosterSavedKeys,
     setRosterNames,
+    setRosterRetention,
     setRepairRequestsByCandidateKey,
     setRepairRequestsUnavailable,
     setRosterLoaded,
@@ -149,7 +156,7 @@ export default function useReviewerSearchController({
     setPhase('idle'); setSavingCount(0); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null); setIdentityComparison(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null); setExporting(false);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
-    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setRepairRequestsByCandidateKey({}); setRepairRequestsUnavailable(false); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
+    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setRosterRetention(null); setTransientIneligible([]); setPersistenceState(null); setRepairRequestsByCandidateKey({}); setRepairRequestsUnavailable(false); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
@@ -169,9 +176,11 @@ export default function useReviewerSearchController({
         try {
           const snapshot = await reloadRoster(myGen);
           if (genRef.current !== myGen) return;
-          if (snapshot) {
-            setRosterLoaded(true);
+          if (snapshot && parseReviewerRosterRetention(snapshot.retention)) {
+            // reloadRoster already validates the complete retention inventory
+            // before applying the snapshot or setting readiness.
           } else {
+            setRosterLoaded(false);
             setRosterLoadFailed(true);
             setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
           }
@@ -209,7 +218,7 @@ export default function useReviewerSearchController({
     }
   }, []);
 
-  const { runSearch } = useReviewerDiscovery({
+  const { runSearch, retrySavingResults, retryCheckingSaves, useSavedResults } = useReviewerDiscovery({
     blobUrl,
     requestId,
     excludeText,
@@ -243,6 +252,12 @@ export default function useReviewerSearchController({
     setRosterActive,
     setRosterIneligible,
     setRosterNames,
+    setTransientIneligible,
+    persistenceState,
+    setPersistenceState,
+    reloadRoster,
+    invalidateRosterReads,
+    setRosterLoaded,
     setRosterNote,
   });
 
@@ -295,6 +310,7 @@ export default function useReviewerSearchController({
     applicantDisplayCandidates,
     recVerifiedCount,
     recIdentityReviewCount,
+    allIneligible,
   } = useReviewerSearchProjection({
     proposalKey,
     recommended,
@@ -303,6 +319,9 @@ export default function useReviewerSearchController({
     candidates,
     rosterExcluded,
     rosterIneligible,
+    transientIneligible,
+    rosterRetention,
+    persistenceState,
     rosterHandled,
     recHandled,
     unverified,
@@ -329,21 +348,22 @@ export default function useReviewerSearchController({
   } = useReviewerRosterActions({
     requestId,
     genRef,
+    runningRef,
     busy,
     removingPrevious,
     rosterNames,
     previousSearchKeys,
     previousSearchRefs,
     reloadRoster,
+    applyRosterSnapshot,
     setCandidates,
     setRecCandidates,
     setRosterActive,
     setRosterExcluded,
-    setRosterIneligible,
-    setRosterBlocked,
-    setRosterHandled,
-    setRosterSavedKeys,
     setRosterNames,
+    invalidateRosterReads,
+    setRosterLoaded,
+    setRosterLoadFailed,
     setSelected,
     setRosterNote,
     setRemovingPrevious,
@@ -373,6 +393,8 @@ export default function useReviewerSearchController({
     setRepairRequestsByCandidateKey,
     setConfirmingContact,
     setUnverified,
+    reloadRoster,
+    runningRef,
   });
 
   const { refreshExpiredVerification, saveSelected } = useReviewerPromotion({
@@ -382,6 +404,7 @@ export default function useReviewerSearchController({
     analysis,
     displayCandidates,
     genRef,
+    runningRef,
     savingRef,
     pushProgress,
     reloadRoster,
@@ -398,6 +421,8 @@ export default function useReviewerSearchController({
     setRosterSavedKeys,
     setRosterNote,
     setSelected,
+    rosterLoaded,
+    persistencePending: persistenceState?.requiresReconciliation === true || persistenceState?.correlationLost === true,
   });
 
 
@@ -426,11 +451,17 @@ export default function useReviewerSearchController({
     identityComparison,
     selected,
     rosterExcluded,
-    rosterIneligible,
+    rosterIneligible: allIneligible,
+    transientIneligible,
+    rosterRetention,
     rosterBlocked,
     rosterLoaded,
     rosterLoadFailed,
     rosterNote,
+    persistenceState,
+    retrySavingResults,
+    retryCheckingSaves,
+    useSavedResults,
     removingPrevious,
     excludedOpen,
     error,

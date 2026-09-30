@@ -7,6 +7,8 @@ import {
   getCandidateEmailReadiness,
   getCandidatePromotionDecision,
   pruneCandidateForRoster,
+  parseReviewerRosterOutcomeResponse,
+  parseReviewerRosterRetention,
 } from '../reviewer-search-logic';
 import { candKey, dedupeByName } from './candidateKeys';
 import { requestEnvelope } from '../../../utils/api-request';
@@ -24,6 +26,8 @@ export default function useReviewerContactActions({
   setRepairRequestsByCandidateKey,
   setConfirmingContact,
   setUnverified,
+  reloadRoster,
+  runningRef,
 }) {
   // Apply a staff-entered MANUAL contact to transient candidate state. Used by
   // the lead "Use this email" promotion (Slice 4); the on-card Edit-contact
@@ -299,10 +303,12 @@ export default function useReviewerContactActions({
     const key = candKey(cand);
     if (!key || !requestId) return false;
     const myGen = genRef.current;
-    // An unverified Claude suggestion is ephemeral — it was never recorded on
-    // the durable roster (S224), but confirm_identity only updates an existing
-    // ACTIVE roster row. Record it first so the attestation has a row to bind
-    // to; recordSurfaced upserts, so a re-run after a partial failure is safe.
+    if (runningRef.current !== null) return false;
+    runningRef.current = myGen;
+    try {
+    // An unverified Claude suggestion is ephemeral, but confirm_identity only
+    // updates an existing ACTIVE row. Require an exact detailed write receipt;
+    // if the write reports unchanged, prove the exact key is currently active.
     const wasUnverified = unverified.some((u) => candKey(u) === key);
     if (wasUnverified) {
       const { ok: recordOk, data: recordData } = await requestEnvelope('/api/workbench/reviewer-roster', {
@@ -311,10 +317,26 @@ export default function useReviewerContactActions({
         body: JSON.stringify({ requestId, candidates: [pruneCandidateForRoster(cand)] }),
         tolerantBody: true,
       });
-      if (!recordOk || !recordData.success) {
-        throw new Error(recordData.error || 'Could not add this suggestion to the request roster. Please retry.');
-      }
       if (genRef.current !== myGen) return false;
+      const envelope = parseReviewerRosterOutcomeResponse(recordData, 1);
+      const result = envelope?.results[0];
+      const acknowledgedWrite = result?.outcome === 'written' && envelope?.recorded === 1;
+      const acknowledgedUnchanged = result?.outcome === 'unchanged' && envelope?.recorded === 0;
+      if (!recordOk || !envelope?.success || result?.candidateKey !== key
+        || (!acknowledgedWrite && !acknowledgedUnchanged)) {
+        throw new Error('Could not confirm this suggestion on the request roster. Retry the identity check.');
+      }
+      if (result.outcome === 'unchanged') {
+        let snapshot = null;
+        try { snapshot = await reloadRoster(myGen); } catch { snapshot = null; }
+        if (genRef.current !== myGen) return false;
+        const retention = parseReviewerRosterRetention(snapshot?.retention);
+        const exactActive = Array.isArray(snapshot?.active)
+          && snapshot.active.some((row) => candKey(row) === key);
+        if (!retention || retention.get(key) !== 'active' || !exactActive) {
+          throw new Error('Could not confirm this suggestion is active on the request roster. Retry the identity check.');
+        }
+      }
     }
     const confirmedCandidate = {
       ...cand,
@@ -352,8 +374,11 @@ export default function useReviewerContactActions({
       setRosterActive((prev) => dedupeByName([authoritativeConfirmed, ...prev]));
     }
     applyAuthoritativeRosterCandidate(key, authoritativeConfirmed);
-    return verifyAddressContact(authoritativeConfirmed, updates, evidence);
-  }, [requestId, genRef, unverified, verifyAddressContact, applyAuthoritativeRosterCandidate, setUnverified, setRosterActive]);
+    return await verifyAddressContact(authoritativeConfirmed, updates, evidence);
+    } finally {
+      if (runningRef.current === myGen) runningRef.current = null;
+    }
+  }, [requestId, genRef, runningRef, unverified, verifyAddressContact, applyAuthoritativeRosterCandidate, setUnverified, setRosterActive, reloadRoster]);
   return {
     setManualContact,
     persistManualContact,

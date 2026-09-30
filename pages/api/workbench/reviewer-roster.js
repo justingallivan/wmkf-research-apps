@@ -4,9 +4,13 @@
  * (`reviewer_find_roster` via `reviewer-roster-store`) reconciled on GET with
  * authoritative Dataverse engagement for every suggestion-anchored active row.
  *
- *   GET   ?requestId            → { active, excluded, ineligible, blocked, savedKeys, allNames, repairRequests }
+ *   GET   ?requestId            → { active, excluded, ineligible, blocked, savedKeys, allNames, retention, repairRequests }
  *   POST  { requestId, candidates }                  → record surfaced
  *     (active, or ineligible only with a bound server eligibility receipt)
+ *   POST  { requestId, candidates, writeMode:'insert_missing' } → bounded
+ *     insert-only recovery using expectedUpdatedAt:null; response has one
+ *     original-input-index outcome per candidate. Initial POST behavior remains
+ *     unchanged; missing/malformed outcome correlation must be reconciled via GET.
  *   PATCH { requestId, action:'exclude', candidate } → set aside
  *   PATCH { requestId, action:'promote', candidateKey } → excluded → active (returns blob; stale/no-op is 409)
  *   PATCH { requestId, action:'saved', candidates }  → rejected; promotion services own graduation
@@ -20,7 +24,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import {
-  recordSurfaced,
+  recordSurfacedDetailed,
   setExcluded,
   promote,
   confirmIdentity,
@@ -227,9 +231,9 @@ async function findProposalAuthorMatch(requestId, candidates) {
   return authorFilter.excluded[0] || null;
 }
 
-async function preserveStoredRosterAuthority(requestId, candidates) {
+async function preserveStoredRosterAuthority(requestId, candidates, preloadedRows = null) {
   const list = Array.isArray(candidates) ? candidates : [];
-  const storedRows = await findCandidatesByKeys(
+  const storedRows = preloadedRows || await findCandidatesByKeys(
     requestId,
     list.map((candidate) => candidate?.candidateKey).filter(Boolean),
   );
@@ -372,12 +376,15 @@ async function handleGet(req, res) {
 }
 
 async function handlePost(req, res) {
-  const { requestId, candidates } = req.body || {};
+  const { requestId, candidates, writeMode } = req.body || {};
   if (!validRequestId(requestId)) {
     return res.status(400).json({ error: 'Valid requestId (GUID) is required' });
   }
   if (!Array.isArray(candidates)) {
     return res.status(400).json({ error: 'candidates[] is required' });
+  }
+  if (writeMode !== undefined && writeMode !== 'insert_missing') {
+    return res.status(400).json({ error: 'Unsupported writeMode' });
   }
   if (candidates.length > MAX_CANDIDATES_PER_POST) {
     return res.status(400).json({ error: `Too many candidates (max ${MAX_CANDIDATES_PER_POST})` });
@@ -391,9 +398,13 @@ async function handlePost(req, res) {
   // Prune server-side too — never persist raw enrichment internals even if a
   // client sent them. Eligibility is server-issued evidence: overwrite the
   // browser's fields from the request/candidate-bound receipt, or clear them.
-  const pruned = (await Promise.all(candidates.map(async (candidate) => {
+  const indexed = await Promise.all(candidates.map(async (candidate, inputIndex) => {
+    const submittedCandidateKey = typeof candidate?.candidateKey === 'string'
+      ? candidate.candidateKey.trim() : '';
     const compact = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
-    if (!compact?.name) return null;
+    if (typeof compact?.name !== 'string' || !compact.name.trim()) {
+      return { inputIndex, submittedCandidateKey, candidate: null, invalidCode: 'invalid_candidate' };
+    }
     const receipt = await verifyAutomatedIdentityAttestation(
       compact.automatedIdentityAttestation,
       { requestId, candidate: compact },
@@ -408,6 +419,18 @@ async function handlePost(req, res) {
       : 'unknown';
     const preserveEvidence = eligibilityStatus !== 'unknown';
     const bound = bindServerRosterCandidateKey(compact, receipt);
+    const submittedEligibility = compact.eligibilityStatus
+      || compact.contactEnrichment?.eligibilityStatus
+      || 'unknown';
+    if (writeMode === 'insert_missing'
+      && submittedCandidateKey !== bound.candidateKey) {
+      return { inputIndex, submittedCandidateKey, candidate: null, invalidCode: 'retry_key_changed', candidateKey: bound.candidateKey || null };
+    }
+    if (writeMode === 'insert_missing'
+      && ['deceased', 'emeritus'].includes(submittedEligibility)
+      && eligibilityStatus === 'unknown') {
+      return { inputIndex, submittedCandidateKey, candidate: null, invalidCode: 'retry_eligibility_unconfirmed', candidateKey: bound.candidateKey || null };
+    }
     const institutionEvidenceBound = institutionEvidenceReceipt.valid
       && institutionEvidenceReceipt.candidateKey === bound.candidateKey;
     const identityReceipt = receipt.valid && receipt.identityDecisionBound === true
@@ -424,7 +447,7 @@ async function handlePost(req, res) {
       ? institutionEvidenceProjection(bound)
       : { independentIdentity: null, affiliationAssertions: [] };
     const boundWithoutInstitutionEvidence = stripClientInstitutionEvidence(bound);
-    return {
+    return { inputIndex, submittedCandidateKey, candidate: {
       ...boundWithoutInstitutionEvidence,
       ...(identityReceipt
         ? { serverIdentityDecisionReceipt: identityReceipt }
@@ -450,11 +473,55 @@ async function handlePost(req, res) {
         eligibilityReason: preserveEvidence ? compact.contactEnrichment?.eligibilityReason : null,
         eligibilityEvidence: preserveEvidence ? compact.contactEnrichment?.eligibilityEvidence : null,
       },
-    };
-  }))).filter(Boolean);
-  const authoritativePruned = await preserveStoredRosterAuthority(requestId, pruned);
-  const recorded = await recordSurfaced(requestId, authoritativePruned);
-  return res.status(200).json({ success: true, recorded });
+    } };
+  }));
+  const validEntries = indexed.filter((entry) => entry.candidate);
+  const finalCandidates = validEntries.map((entry) => entry.candidate);
+  // This read is both the existing authority preflight and the narrowly scoped
+  // recovery classification. It is server-derived and never grants write authority.
+  const preflightRows = await findCandidatesByKeys(
+    requestId,
+    finalCandidates.map((candidate) => candidate.candidateKey).filter(Boolean),
+  );
+  const existingKeys = new Set(preflightRows.map((candidate) => candidate.candidateKey));
+  const authoritativePruned = await preserveStoredRosterAuthority(requestId, finalCandidates, preflightRows);
+  const writeOptions = writeMode === 'insert_missing'
+    ? { writeMode, expectedUpdatedAt: null }
+    : {};
+  const detailed = authoritativePruned.length > 0
+    ? await recordSurfacedDetailed(requestId, authoritativePruned, writeOptions)
+    : { recorded: 0, results: [] };
+  const resultsByIndex = new Map();
+  for (const entry of indexed) {
+    if (!entry.candidate) {
+      resultsByIndex.set(entry.inputIndex, {
+        inputIndex: entry.inputIndex,
+        candidateKey: entry.candidateKey || null,
+        existingAtAttempt: null,
+        outcome: 'invalid',
+        code: entry.invalidCode || 'invalid_candidate',
+      });
+    }
+  }
+  for (const result of detailed.results) {
+    const source = validEntries[result.inputIndex];
+    resultsByIndex.set(source.inputIndex, {
+      ...result,
+      inputIndex: source.inputIndex,
+      existingAtAttempt: existingKeys.has(result.candidateKey),
+    });
+  }
+  const results = candidates.map((_, index) => resultsByIndex.get(index) || ({
+    inputIndex: index, candidateKey: null, existingAtAttempt: null, outcome: 'invalid', code: 'invalid_candidate',
+  }));
+  const hasFailure = results.some((result) => result.outcome === 'failed' || result.outcome === 'invalid');
+  return res.status(200).json({
+    success: !hasFailure,
+    recorded: detailed.recorded,
+    outcomeVersion: 1,
+    results,
+    ...(hasFailure ? { error: 'Some search results could not be saved.' } : {}),
+  });
 }
 
 async function handlePatch(req, res, access) {
@@ -672,7 +739,13 @@ async function handlePatch(req, res, access) {
       return res.status(400).json({ error: `candidateRefs[] must contain 1-${MAX_PREVIOUS_RESULT_KEYS} valid key/timestamp pairs` });
     }
     const result = await removePreviousActiveSearchResults(requestId, candidateRefs);
-    return res.status(200).json({ success: true, ...result });
+    // The DELETE has committed. Reconcile its refreshed projection exactly as
+    // GET does so an anchored suggestion that entered engagement meanwhile
+    // cannot be returned to Find as an actionable active row.
+    const reconciled = await withDalContext('workbench-reviewer-roster-remove', () => (
+      reconcileRosterEngagement({ requestId, roster: result })
+    ));
+    return res.status(200).json({ success: true, ...reconciled });
   }
 
   return res.status(400).json({ error: 'Unknown action (expected exclude | promote | saved | confirm_identity | update_contact_draft | remove_previous_results)' });

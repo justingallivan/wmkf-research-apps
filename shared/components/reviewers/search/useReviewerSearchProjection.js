@@ -4,7 +4,7 @@
 import { useMemo } from 'react';
 import { reviewerEngagementProjection } from '../../../utils/reviewer-engagement';
 import { partitionRediscoveredCandidates } from '../../../utils/reviewer-rediscovery';
-import { isCandidateSelectable } from '../reviewer-search-logic';
+import { isCandidateSelectable, parseReviewerRosterRetention } from '../reviewer-search-logic';
 import { provenanceGroupOf, withReviewerProvenance } from '../../../../lib/utils/reviewer-provenance';
 import { candKey, dedupeByName, isApplicantOriginCandidate } from './candidateKeys';
 
@@ -16,6 +16,9 @@ export default function useReviewerSearchProjection({
   candidates,
   rosterExcluded,
   rosterIneligible,
+  transientIneligible = [],
+  rosterRetention = null,
+  persistenceState = null,
   rosterHandled,
   recHandled,
   unverified,
@@ -28,9 +31,21 @@ export default function useReviewerSearchProjection({
   // independent of `phase` so the roster shows on reload without a fresh search.
   // recCandidates (enriched applicant-referred) prepend so fresh enrichment wins
   // over any stale roster copy of the same person.
+  const transientIneligibleKeys = useMemo(() => new Set(transientIneligible.map(candKey).filter(Boolean)), [transientIneligible]);
   const displayRosterActive = useMemo(() => rosterActive.filter((c) => (
-    !isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey)
-  )), [rosterActive, proposalKey]);
+    !transientIneligibleKeys.has(candKey(c))
+    && (!isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey))
+  )), [rosterActive, proposalKey, transientIneligibleKeys]);
+  const retentionByKey = useMemo(() => parseReviewerRosterRetention(rosterRetention) || new Map(), [rosterRetention]);
+  const allIneligible = useMemo(() => {
+    const seen = new Set();
+    return [...rosterIneligible, ...transientIneligible].filter((candidate, index) => {
+      const key = candKey(candidate) || `unkeyed:${candidate?.name || index}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rosterIneligible, transientIneligible]);
   const visibleRecCandidates = useMemo(() => recCandidates.filter((candidate) => (
     !terminalApplicantKeys.has(candKey(candidate))
   )), [recCandidates, terminalApplicantKeys]);
@@ -58,9 +73,36 @@ export default function useReviewerSearchProjection({
   // "re-found by search" entry. Everything downstream (selection, save,
   // provenance sections, unverified suppression) sees only the kept list.
   const { kept: displayCandidates, rediscovered: rediscoveredEngaged } = useMemo(() => {
-    const merged = dedupeByName([...visibleRecCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
+    const activeByKey = new Map(displayRosterActive.map((candidate) => [candKey(candidate), candidate]));
+    const preserveFields = [
+      'expertiseAreas', 'keywords', 'reasoning', 'generatedReasoning', 'identityNote',
+      'hIndex', 'i10Index', 'totalCitations', 'publicationCount5yr', 'publications',
+      'relevanceScore', 'verificationConfidence', 'lowPublicationCount', 'lowPublicationCountFound',
+    ];
+    const resolvedCurrentRun = candidates.flatMap((candidate) => {
+      const key = candKey(candidate);
+      const status = retentionByKey.get(key);
+      if (status && status !== 'active') return [];
+      const incumbent = activeByKey.get(key);
+      if (!incumbent) return [candidate];
+      if (persistenceState?.writtenKeys?.includes(key)) {
+        const displayOnly = Object.fromEntries(preserveFields
+          .filter((field) => candidate[field] !== undefined)
+          .map((field) => [field, candidate[field]]));
+        return [{ ...incumbent, ...displayOnly }];
+      }
+      return [incumbent];
+    });
+    const terminalKeys = new Set(['saved', 'excluded', 'ineligible', 'blocked', 'coi_dropped']);
+    const handledKeys = new Set(rosterHandled.map(candKey).filter(Boolean));
+    const keptTransient = resolvedCurrentRun.filter((candidate) => (
+      !terminalKeys.has(retentionByKey.get(candKey(candidate)))
+      && !handledKeys.has(candKey(candidate))
+      && !transientIneligibleKeys.has(candKey(candidate))
+    ));
+    const merged = dedupeByName([...visibleRecCandidates, ...keptTransient, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
     return partitionRediscoveredCandidates(merged, engagedSavedIndex);
-  }, [visibleRecCandidates, candidates, displayRosterActive, engagedSavedIndex]);
+  }, [visibleRecCandidates, candidates, displayRosterActive, engagedSavedIndex, retentionByKey, persistenceState, rosterHandled, transientIneligibleKeys]);
   const handledReviewers = useMemo(() => dedupeByName([
     ...recHandled,
     ...rosterHandled,
@@ -85,7 +127,7 @@ export default function useReviewerSearchProjection({
       rediscovered: true,
     })),
   ]), [recHandled, rosterHandled, recommended, rediscoveredEngaged]);
-  const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...rosterIneligible])
+  const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...allIneligible])
     .filter((candidate) => candidate.coauthorCheckStatus === 'incomplete');
   const incompleteCoiNames = incompleteCoiCandidates.map((candidate) => candidate.name).filter(Boolean);
   const incompleteCoiLabel = incompleteCoiNames.length === 0
@@ -122,7 +164,8 @@ export default function useReviewerSearchProjection({
       // people — their unverified twins must stay suppressed.
       ...rediscoveredEngaged.map(({ candidate }) => candKey(candidate)),
       ...rosterExcluded.map(candKey),
-      ...rosterIneligible.map(candKey),
+      ...allIneligible.map(candKey),
+      ...[...retentionByKey.entries()].filter(([, status]) => status !== 'active').map(([key]) => key),
     ].filter(Boolean)
   );
   const unverifiedToShow = unverified.filter((c) => !knownNameKeys.has(candKey(c)));
@@ -168,6 +211,7 @@ export default function useReviewerSearchProjection({
 
   return {
     displayRosterActive,
+    allIneligible,
     visibleRecCandidates,
     currentRunKeys,
     previousSearchCandidates,

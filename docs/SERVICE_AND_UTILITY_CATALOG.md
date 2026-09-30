@@ -225,7 +225,11 @@ If you're touching a service or utility, read its header before this catalog. If
   website/affiliation drafts (never an unverified email). Ordinary edits invalidate the
   prior exact contact authority and expose explicit re-confirmation; only the successful Dataverse
   promotion service can finalize exact keys as `saved`, while authoritative
-  applicant-excluded collisions become `blocked`.
+  applicant-excluded collisions become `blocked`. Detailed surfaced writes return
+  one positional outcome per input while the legacy wrapper keeps its numeric count;
+  roster reads include a complete all-status key/status retention inventory.
+  Insert-only recovery uses the existing null-`expectedUpdatedAt` concurrency guard,
+  and measurement failure cannot relabel a successful write.
 - **`workbench/reviewer-roster-projection-service.js`** — Read-only Find-roster
   overlay that completely batches one request's visible suggestion anchors
   through Dataverse, removes already-engaged rows from working-state buckets,

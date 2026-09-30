@@ -28,6 +28,7 @@ jest.mock('../../shared/components/reviewers/sse', () => ({
 
 const REQUEST_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const REQUEST_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+let rosterFixtureRows = new Map();
 
 function deferred() {
   let resolve;
@@ -40,7 +41,49 @@ function deferred() {
 }
 
 function response(body, ok = true, status = ok ? 200 : 500) {
-  return { ok, status, json: async () => body, body: {} };
+  return { ok, status, json: async () => withRosterRetention(body), body: {} };
+}
+
+function withRosterRetention(body) {
+  if (!body || !Array.isArray(body.active) || !Array.isArray(body.excluded)) return body;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const rows = new Map((body.retention?.version === 1 && Array.isArray(body.retention.rows)
+    ? body.retention.rows : []).map((row) => [row.candidateKey, row]));
+  const add = (items, status) => {
+    for (const item of Array.isArray(items) ? items : []) {
+      const candidateKey = item?.candidateKey || reviewerCandidateKey(item);
+      if (candidateKey) rows.set(candidateKey, { candidateKey, status });
+    }
+  };
+  add(body.active, 'active');
+  add(body.excluded, 'excluded');
+  add(body.ineligible, 'ineligible');
+  add(body.blocked, 'blocked');
+  add(body.handled, 'saved');
+  for (const candidateKey of Array.isArray(body.savedKeys) ? body.savedKeys : []) {
+    rows.set(candidateKey, { candidateKey, status: 'saved' });
+  }
+  rosterFixtureRows = rows;
+  return { ...body, retention: { version: 1, rows: [...rows.values()] } };
+}
+
+function rosterWriteResponse(options, recordedCount = null) {
+  const body = JSON.parse(options?.body || '{}');
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const count = recordedCount == null ? candidates.length : recordedCount;
+  const { reviewerCandidateKey } = require('../../lib/utils/reviewer-candidate-key');
+  const results = candidates.map((candidate, inputIndex) => {
+    const candidateKey = candidate?.candidateKey || reviewerCandidateKey(candidate) || null;
+    const result = {
+      inputIndex,
+      candidateKey,
+      existingAtAttempt: candidateKey ? rosterFixtureRows.has(candidateKey) : null,
+      outcome: inputIndex < count || recordedCount == null ? 'written' : 'failed',
+    };
+    if (result.outcome === 'failed') result.code = 'roster_write_failed';
+    return result;
+  });
+  return response({ success: results.every((result) => result.outcome !== 'failed'), recorded: count, outcomeVersion: 1, results });
 }
 
 function rosterSnapshot(active = [], extra = {}) {
@@ -86,6 +129,7 @@ function readyCandidate(name, candidateKey, overrides = {}) {
 afterEach(() => {
   jest.clearAllMocks();
   global.fetch = jest.fn();
+  rosterFixtureRows = new Map();
 });
 
 test('a missing applicant suggestion identity is a cache miss and triggers enrichment', async () => {
@@ -247,7 +291,7 @@ test('applicant enrichment and discovery remain independent pending streams', as
     if (target === '/api/reviewer-finder/analyze' && options.method === 'POST') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover' && options.method === 'POST') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts' && options.method === 'POST') return Promise.resolve(response({}));
-    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') return Promise.resolve(response({ success: true }));
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') return Promise.resolve(rosterWriteResponse(options));
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
 
@@ -455,7 +499,7 @@ test('confirmation remains visible and retryable when the committed confirmation
     if (target === '/api/reviewer-finder/analyze' || target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       calls.push({ action: 'record' });
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(rosterWriteResponse(options));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
@@ -534,7 +578,8 @@ function configureUnverifiedFlow({ unverified, rosterForRequest, recordResponse,
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       calls.push({ action: 'record' });
-      return recordResponse?.promise || Promise.resolve(recordResponse || response({ success: true, recorded: 1 }));
+      if (recordResponse?.promise) recordResponse.requestOptions = options;
+      return recordResponse?.promise || Promise.resolve(recordResponse || rosterWriteResponse(options));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
@@ -589,7 +634,7 @@ test('a stale ephemeral record cannot confirm identity after request replacement
   rerender(<ReviewerSearchSection requestId={REQUEST_B} blobUrl="blob-b" proposalKey="proposal-b" />);
   expect(await screen.findByLabelText(`Select ${candidateB.name}`)).toBeInTheDocument();
   await act(async () => {
-    record.resolve(response({ success: true, recorded: 1 }));
+    record.resolve(rosterWriteResponse(record.requestOptions));
     await record.promise;
   });
   expect(calls.map(({ action }) => action)).toEqual(['record']);
