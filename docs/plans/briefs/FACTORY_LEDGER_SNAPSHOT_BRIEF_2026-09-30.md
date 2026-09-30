@@ -57,7 +57,7 @@ docker exec wmkf-ledger-pg dropdb -U postgres ledger && docker exec wmkf-ledger-
 docker exec -i wmkf-ledger-pg pg_restore -U postgres -d ledger < "$SHARED/ledger-$STAMP.dump"
 ```
 
-Re-run the row-count block from the home section and compare with the evidence file. Append to the same evidence file: the date, `restored on office Mac`, the counts, and "current copy: office Mac and home Mac identical as of restore". Commit and push. The B4 ledger checks in `~/Code/WMKF_Apps-codex` can then run against `TEST_REQUEST_LEDGER_URL=postgres://postgres:<local password>@127.0.0.1:5433/ledger_prod` (set it in the shell, never commit it).
+Re-run the row-count block from the home section and compare with the evidence file. Append to the same evidence file: the date, `restored on office Mac`, the counts, and "current copy: office Mac and home Mac identical as of restore". Commit and push. The B4 ledger checks in `~/Code/WMKF_Apps-codex` can then run against `TEST_REQUEST_LEDGER_URL=postgres://postgres:<local password>@127.0.0.1:5433/ledger_prod` (set it in the shell, never commit it). **Codex must set that shell value:** the shared `.env.local` now carries the Neon ledger URL, and until PR #374 merges the released CLI's blanket `neon.tech` refusal rejects it with "must not be the shared Production/Preview database". That message is expected in the B4 worktree, not a blocker; the local container URL in the shell overrides it.
 
 ## Also tonight: load the managed ledger (D1, decided 2026-09-30)
 

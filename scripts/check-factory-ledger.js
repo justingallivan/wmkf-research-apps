@@ -10,7 +10,9 @@
  *       MISSING or DIFFERING objects fail (ledger behind the checkout or of a
  *       different shape); EXTRA objects only warn (ledger ahead of the
  *       checkout, e.g. a migration from an unmerged branch).
- *       Neither variable set → prints "skipped" and exits 0.
+ *       Neither variable set → prints "skipped" and exits 0. An unreachable
+ *       ledger prints a prominent UNREACHABLE warning and exits 0 (advisory);
+ *       a refused URL or a behind/differing schema exits 1.
  *
  *   node scripts/check-factory-ledger.js --write-expected
  *       Regenerates the tracked JSON: applies the checkout's ledger migration
@@ -84,8 +86,10 @@ async function checkOne(name, url, schemaLib, registry, expected) {
   try {
     await client.connect();
   } catch (err) {
-    console.error(`✗ ${name}: ledger unreachable (${verdict.label} host, database ${database}): ${err.message}`);
-    return false;
+    // Advisory: a paused managed compute or a network blip must not turn
+    // /start red. Refusals and schema drift below still fail.
+    console.warn(`⚠ ${name}: ledger UNREACHABLE (${verdict.label} host, database ${database}): ${err.message}`);
+    return true;
   }
   try {
     const live = await schemaLib.readLedgerFingerprint(client);

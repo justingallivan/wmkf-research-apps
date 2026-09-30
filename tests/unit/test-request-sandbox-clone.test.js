@@ -213,6 +213,9 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain('classifyLedgerUrl(url, { target, sharedUrls })');
     expect(script).toContain('must not be the shared Production/Preview database');
     expect(script).toContain('does not name a registered ledger host');
+    // --ledger-check alone must not be refused by the parser's sandbox default.
+    expect(script).toContain('requireLedgerUrl(args.targetExplicit ? args.target : null)');
+    expect(script).toContain("parsed.targetExplicit = true;");
     for (const mode of ['setStatus || args.statusRecheck', 'createCast || args.bindReviewer', 'runRecheck', 'reserve', 'advance']) {
       const at = script.indexOf(`if (args.${mode}) {`);
       expect(at).toBeGreaterThan(-1);

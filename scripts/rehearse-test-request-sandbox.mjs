@@ -257,7 +257,7 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--option=')) parsed.statusOption = arg.slice('--option='.length);
     else if (arg === '--rerun') parsed.rerun = true;
     else if (arg.startsWith('--status-recheck=')) parsed.statusRecheck = arg.slice('--status-recheck='.length);
-    else if (arg.startsWith('--target=')) parsed.target = arg.slice('--target='.length);
+    else if (arg.startsWith('--target=')) { parsed.target = arg.slice('--target='.length); parsed.targetExplicit = true; }
     else if (arg.startsWith('--director=')) parsed.director = arg.slice('--director='.length);
     else if (arg === '--create-cast') parsed.createCast = true;
     else if (arg.startsWith('--cast-pi=')) parsed.castPi = arg.slice('--cast-pi='.length);
@@ -430,7 +430,7 @@ function printHelp() {
   console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> --cast-org-leader=<address> --cast-research-leader=<address> [--confirm]');
   console.log('Bind the cast suggested reviewer to a ready production test Request (owner-run; needs DATAVERSE_ALLOW_PROD_READS=yes and DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer=<runId>');
   console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
-  console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL naming a registered ledger host (lib/db/ledger-registry.js; on the managed ledger, database ledger_prod for --target=production and ledger otherwise), never the shared Production/Preview database. Each such mode first compares the ledger schema with lib/db/ledger-schema-fingerprint.json; --ledger-check runs only that comparison, --strict-ledger-check also blocks on DIFFERS.');
+  console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL naming a registered ledger host (lib/db/ledger-registry.js; on the managed ledger, database ledger_prod for --target=production and ledger otherwise), never the shared Production/Preview database. Each such mode first compares the ledger schema with lib/db/ledger-schema-fingerprint.json; --ledger-check runs only that comparison (add --target=production to also assert the database name), --strict-ledger-check also blocks on DIFFERS.');
 }
 
 function writeNewJson(filePath, value) {
@@ -1328,7 +1328,10 @@ async function main() {
   applyDefaultReviewerAddress(args);
 
   if (args.ledgerCheck) {
-    const ledgerUrl = requireLedgerUrl(args.target);
+    // Standalone check: the database-name rule applies only when --target was
+    // given explicitly (the parser defaults target to sandbox, which would
+    // refuse a ledger_prod URL before reporting its schema).
+    const ledgerUrl = requireLedgerUrl(args.targetExplicit ? args.target : null);
     await ledgerSchemaCheck(ledgerUrl, { strict: args.strictLedgerCheck });
     return;
   }

@@ -449,6 +449,18 @@ blocks. GitHub CI runs both the gate and
 
 ### Repository and instruction integrity checks
 
+- `check:factory-ledger` compares each configured Test Request Factory ledger
+  (`TEST_REQUEST_LEDGER_URL`, `TEST_REQUEST_SANDBOX_LEDGER_URL`; local-only
+  variables) with the tracked structural fingerprint
+  `lib/db/ledger-schema-fingerprint.json`. A URL the ledger registry
+  (`lib/db/ledger-registry.js`) refuses, or a ledger with MISSING or DIFFERING
+  objects, fails; EXTRA objects (a ledger ahead of the checkout) and an
+  UNREACHABLE ledger only warn; with neither variable set it prints `skipped`
+  and passes. Regenerate the fingerprint after any `test_request_*` migration
+  change with `TEST_REQUEST_LEDGER_TEST_URL=<scratch> node scripts/check-factory-ledger.js --write-expected`
+  (the CI ledger job's `factory-ledger-fingerprint.pg.test.js` and the unit
+  suite both fail until you do). No self-test. Plan:
+  `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`.
 - `check:migrations-manifest` verifies that the sorted manifest exactly matches
   `lib/db/migrations/*.sql`; GitHub CI also checks the build did not regenerate
   an uncommitted manifest.
