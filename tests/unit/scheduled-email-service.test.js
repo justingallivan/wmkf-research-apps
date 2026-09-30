@@ -131,7 +131,7 @@ test('a transient eligibility read failure keeps the row retryable instead of st
   expect(deps.sendEmail).not.toHaveBeenCalled();
 });
 
-test('an ambiguous send error keeps the durable send intent for reconciliation instead of marking retryable failure', async () => {
+test('an ambiguous send error marks the row unconfirmed immediately (A2): send intent kept, lease released, never retryable', async () => {
   const deps = dependencies();
   deps.sendEmail.mockRejectedValueOnce(new Error('connection ended during SendEmail'));
 
@@ -139,8 +139,12 @@ test('an ambiguous send error keeps the durable send intent for reconciliation i
 
   expect(error).toMatchObject({ emailOutcome: 'uncertain', retryable: false });
   expect(deps.recordSendRequested).toHaveBeenCalledTimes(1);
-  expect(deps.recordFailure).not.toHaveBeenCalled();
+  // The row does not sit in `sending` with a live lease until the next claim:
+  // it is failed with the unconfirmed marker now, so the digest lists it.
+  expect(deps.recordFailure).toHaveBeenCalledTimes(1);
+  expect(deps.recordFailure.mock.calls[0][2]).toBe('scheduled_email_send_unconfirmed');
   expect(deps.recordSent).not.toHaveBeenCalled();
+  expect(deps.sendEmail).toHaveBeenCalledTimes(1);
 });
 
 test('a confirmed-deleted source (404) is stopped, not retried', async () => {
@@ -368,7 +372,12 @@ test('the digest-run claim SQL freezes membership and the reassign SQL guards at
     store.indexOf('/* --------------------------- digest run ledger'),
   );
   expect(reassignSection).toContain('pd_systemuser_id <> ${input.pdSystemUserId}');
-  expect(reassignSection).toContain("status IN ('scheduled', 'failed')");
+  // A5: a `sending` row whose lease expired (the crash-between-create-and-
+  // persist shape) is also reset; the lease predicate below excludes live ones.
+  expect(reassignSection).toContain("status IN ('scheduled', 'failed', 'sending')");
+  expect(reassignSection).toContain('recipient_generation = recipient_generation + 1');
+  expect(reassignSection).toContain('version = ${expectedVersion}');
+  expect(reassignSection).toContain('lease_token = NULL');
   expect(reassignSection).toContain('dynamics_email_id IS NULL');
   expect(reassignSection).toContain('send_requested_at IS NULL');
   expect(reassignSection).toContain('(locked_until IS NULL OR locked_until < NOW())');

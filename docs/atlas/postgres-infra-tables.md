@@ -424,6 +424,40 @@ owned by a different PD. [RECHECKED after lib/services/scheduled-email-store.js 
 [RECHECKED after lib/services/scheduled-email-service.js change: sendScheduledEmailDigest rewritten onto the run ledger 2026-08-26]
 [RECHECKED after lib/services/cron/grantee-deliverable-reminders-service.js change: drift rebuild + reassigned counter added 2026-08-26]
 
+**Part A engine hardening (branch `claude/scheduled-email-part-a`, 2026-09-30,
+S553) [SOURCE-BUILT + LIVE-POSTGRES-TESTED on a scratch database; migration
+059 NOT applied to the shared database; not merged]:** migration
+`059_scheduled_email_recipient_generation.sql` (fresh-install block V58) adds
+`recipient_generation INTEGER NOT NULL DEFAULT 0`, the only new column. Per
+`docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` A1–A7:
+`send_requested_at IS NOT NULL` is the durable no-resend predicate — the
+ordinary claim and due query refuse such rows in SQL, any failure after send
+intent stamps `last_error_code = 'scheduled_email_send_unconfirmed'` at once
+(status `failed`, lease released), and a separate 25-row reconciliation query
+(`listScheduledEmailReconciliationCandidates`, `updated_at ASC`) plus
+`claimScheduledEmailReconciliation` only read the stored activity back
+(accepted → `sent` + finalized; otherwise released with the marker kept). A
+stored activity read is classified: 404 →
+`scheduled_email_activity_missing` (excluded from automatic delivery and
+reconciliation; manual recovery), 403 → `scheduled_email_activity_forbidden`
+(excluded from the due query, retried read-only through the same lane via
+`claimScheduledEmailActivityRead`/`clearScheduledEmailActivityCode`), other
+errors → transient failure; absence is never inferred from a failed read.
+Edit/approve additionally require `dynamics_email_id IS NULL AND
+send_requested_at IS NULL`. `reassignScheduledEmail` is one version-fenced
+atomic reset (also accepts `sending` with an expired lease) that returns the
+row to `scheduled`, clears the lease and increments `recipient_generation`;
+the recipient correlation key is `wmkf-scheduled-recipient:<id>` at generation
+0 and `…:<id>:g<n>` after. `cancelScheduledEmailForSource` is lease-fenced
+inside a delivery attempt. Stopped rows with send intent are read back for 7
+days (`listStoppedScheduledEmailsWithSendIntent`,
+`recordStoppedScheduledEmailSent`): stopped wins unless Dynamics proves the
+send. The digest query is a per-PD `ROW_NUMBER()` window (100 rows per PD,
+`pd_total` for cap warnings) with a **Needs attention** section decided by
+`shared/utils/scheduled-email-attention.js`, the single display/guard helper
+also used by the action route and `pages/scheduled-emails.js`. Proof:
+`tests/integration/scheduled-email-engine.pg.test.js` (CI ledger job).
+
 **Retention:** daily maintenance defaults to 365 days and deletes only rows
 that are both `sent` and Dataverse-finalized, or explicitly `stopped`. Pending,
 failed, sending, and sent-but-unfinalized rows are ineligible so cleanup cannot

@@ -14,6 +14,10 @@ import {
   deliverScheduledEmail,
   projectScheduledEmail,
 } from '../../../lib/services/scheduled-email-service';
+import {
+  SCHEDULED_EMAIL_ATTENTION_COPY,
+  scheduledEmailActionsAllowed,
+} from '../../../shared/utils/scheduled-email-attention';
 
 const MAX_SUBJECT = 300;
 const MAX_BODY = 20000;
@@ -48,6 +52,25 @@ export default async function handler(req, res) {
     const { action, version } = req.body || {};
     if (!validVersion(version)) {
       return res.status(400).json({ error: 'A valid message version is required.' });
+    }
+
+    // Part A guards (A2/A3/A4): the shared helper is the single predicate, and
+    // pages/scheduled-emails.js disables the same actions from the same helper.
+    // The store's SQL fences repeat these conditions, so a bypass here still
+    // cannot mutate the row. Stop is always allowed on an open row.
+    const allowed = scheduledEmailActionsAllowed(existing);
+    const guardedActions = { edit: allowed.edit, approve: allowed.approve, send_now: allowed.sendNow };
+    if (action in guardedActions && !guardedActions[action]) {
+      if (allowed.reason) {
+        return res.status(409).json({ error: SCHEDULED_EMAIL_ATTENTION_COPY[allowed.reason], attentionReason: allowed.reason });
+      }
+      if (existing.dynamics_email_id || existing.send_requested_at) {
+        return res.status(409).json({
+          error: 'This message already has a Dynamics email, so it can no longer be edited, approved or re-sent. Stop it and send by hand if needed.',
+          attentionReason: null,
+        });
+      }
+      // Not an open row (sent/stopped/sending): the store's own fence answers.
     }
 
     let updated = null;

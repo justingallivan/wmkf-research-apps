@@ -5,6 +5,12 @@ import { useRouter } from 'next/router';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import { useProfile } from '../shared/context/ProfileContext';
 import EmailSendFeedback from '../shared/components/EmailSendFeedback';
+import {
+  SCHEDULED_EMAIL_ATTENTION,
+  SCHEDULED_EMAIL_ATTENTION_COPY,
+  scheduledEmailActionsAllowed,
+  scheduledEmailAttentionReason,
+} from '../shared/utils/scheduled-email-attention';
 import { requestJson, requestEnvelope } from '../shared/utils/api-request';
 
 function formatWhen(value) {
@@ -24,6 +30,11 @@ function statusLabel(message) {
   if (message.status === 'sent') return 'Sent';
   if (message.status === 'stopped') return 'Stopped';
   if (message.status === 'sending') return 'Sending';
+  // A2/A3: attention rows are decided by the shared helper, never by status.
+  const attention = scheduledEmailAttentionReason(message);
+  if (attention === SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED) return 'Send status is uncertain';
+  if (attention === SCHEDULED_EMAIL_ATTENTION.ACTIVITY_MISSING) return 'Needs attention — Dynamics email not found';
+  if (attention === SCHEDULED_EMAIL_ATTENTION.ACTIVITY_FORBIDDEN) return 'Needs attention — Dynamics email could not be read';
   const waitingApproval = message.approvalRequired && !message.approvedAt;
   if (message.status === 'failed') {
     return waitingApproval
@@ -217,7 +228,14 @@ export default function ScheduledEmailsPage() {
     }
   };
 
-  const editable = selected && ['scheduled', 'failed'].includes(selected.status);
+  // A2/A3/A4: one predicate for every action, shared with the route guard.
+  const actions = selected ? scheduledEmailActionsAllowed(selected) : null;
+  const editable = Boolean(actions?.edit);
+  const lockedReason = selected && !editable && ['scheduled', 'failed'].includes(selected.status)
+    ? (actions.reason
+      ? SCHEDULED_EMAIL_ATTENTION_COPY[actions.reason]
+      : 'This message already has a Dynamics email, so it can no longer be edited or approved. Stop it and send by hand if needed.')
+    : null;
   const draftDirty = Boolean(
     selected && (subject !== selected.subject || bodyText !== selected.bodyText),
   );
@@ -356,8 +374,13 @@ export default function ScheduledEmailsPage() {
                     <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
                       Your saved signature is appended automatically and cannot be edited for only this message.
                     </div>
-                    {editable && (
+                    {actions?.stop && (
                       <div>
+                        {lockedReason && (
+                          <p role="status" className="mb-3 text-right text-sm text-amber-700">
+                            {lockedReason}
+                          </p>
+                        )}
                         {draftDirty && (
                           <p className="mb-3 text-right text-sm text-amber-700">
                             Save your changes before approving or sending this message.
@@ -381,7 +404,7 @@ export default function ScheduledEmailsPage() {
                             variant="secondary"
                             size="sm"
                             type="button"
-                            disabled={saving || draftDirty}
+                            disabled={saving || draftDirty || !actions?.approve}
                             onClick={() => runAction('approve')}
                           >
                             Looks good
@@ -390,7 +413,7 @@ export default function ScheduledEmailsPage() {
                             variant="secondary"
                             size="sm"
                             type="button"
-                            disabled={saving || draftDirty}
+                            disabled={saving || draftDirty || !actions?.sendNow}
                             onClick={() => {
                               if (window.confirm('Send this message now?')) runAction('send_now');
                             }}
@@ -401,7 +424,7 @@ export default function ScheduledEmailsPage() {
                             variant="primary"
                             size="sm"
                             type="button"
-                            disabled={saving || !draftDirty || !subject.trim() || bodyText.trim().length < 10}
+                            disabled={saving || !editable || !draftDirty || !subject.trim() || bodyText.trim().length < 10}
                             loading={saving}
                             onClick={() => runAction('edit', { subject, bodyText })}
                           >

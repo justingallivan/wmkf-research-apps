@@ -47,6 +47,8 @@ jest.mock('../../lib/services/scheduled-email-store', () => ({
   listScheduledEmailDigestRows: jest.fn(async () => []),
   listDueScheduledEmails: jest.fn(async () => []),
   listUnfinalizedScheduledEmails: jest.fn(async () => []),
+  listScheduledEmailReconciliationCandidates: jest.fn(async () => []),
+  listStoppedScheduledEmailsWithSendIntent: jest.fn(async () => []),
 }));
 jest.mock('../../lib/services/scheduled-email-service', () => ({
   scheduledSendAtForInvitation: jest.fn((value) => new Date(new Date(value).getTime() + 12 * 86400000)),
@@ -54,6 +56,8 @@ jest.mock('../../lib/services/scheduled-email-service', () => ({
   sendScheduledEmailDigest: jest.fn(),
   deliverScheduledEmail: jest.fn(),
   finalizeScheduledEmail: jest.fn(),
+  reconcileScheduledEmailCandidate: jest.fn(),
+  reconcileStoppedScheduledEmail: jest.fn(),
 }));
 
 import { verifyCronSecret } from '../../lib/utils/cron-auth';
@@ -68,6 +72,8 @@ import {
   finalizeScheduledEmail,
   groupDigestRowsByPd,
   sendScheduledEmailDigest,
+  reconcileScheduledEmailCandidate,
+  reconcileStoppedScheduledEmail,
 } from '../../lib/services/scheduled-email-service';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import { RESEARCH_PROGRAM_IDS } from '../../shared/config/researchPrograms';
@@ -143,6 +149,10 @@ beforeEach(() => {
   scheduledEmailStore.listScheduledEmailDigestRows.mockReset().mockResolvedValue([]);
   scheduledEmailStore.listDueScheduledEmails.mockReset().mockResolvedValue([]);
   scheduledEmailStore.listUnfinalizedScheduledEmails.mockReset().mockResolvedValue([]);
+  scheduledEmailStore.listScheduledEmailReconciliationCandidates.mockReset().mockResolvedValue([]);
+  scheduledEmailStore.listStoppedScheduledEmailsWithSendIntent.mockReset().mockResolvedValue([]);
+  reconcileScheduledEmailCandidate.mockReset();
+  reconcileStoppedScheduledEmail.mockReset();
   groupDigestRowsByPd.mockReset().mockReturnValue([]);
   sendScheduledEmailDigest.mockReset();
   deliverScheduledEmail.mockReset();
@@ -323,6 +333,72 @@ test('due sends and digests: per-item failures are isolated and counted', async 
   expect(res.body.digestsSent).toBe(1);
 });
 
+test('the reconciliation pass runs from its own 25-row query after delivery and never sends (A2/A7)', async () => {
+  scheduledEmailStore.listScheduledEmailReconciliationCandidates.mockResolvedValue([
+    { id: 'intent-1', send_requested_at: '2026-09-01T00:00:00Z' },
+    { id: 'intent-2', send_requested_at: '2026-09-01T00:00:00Z' },
+    { id: 'forbidden-1', send_requested_at: null },
+    { id: 'skipped-1', send_requested_at: null },
+    { id: 'boom-1', send_requested_at: null },
+  ]);
+  reconcileScheduledEmailCandidate
+    .mockResolvedValueOnce({ sent: true })
+    .mockResolvedValueOnce({ unresolved: true, reason: 'not_accepted' })
+    .mockResolvedValueOnce({ cleared: true })
+    .mockResolvedValueOnce({ skipped: true })
+    .mockRejectedValueOnce(new Error('ledger down'));
+  const res = mockRes();
+  await handler(req(), res);
+  expect(scheduledEmailStore.listScheduledEmailReconciliationCandidates).toHaveBeenCalledWith({ limit: 25 });
+  expect(res.body).toMatchObject({
+    reconciled: 3,
+    reconciledSent: 1,
+    reconcileUnresolved: 1,
+    activityReadCleared: 1,
+    reconcileFailed: 1,
+    reminded: 0,
+  });
+  expect(res.body.failures).toEqual([{ requestNum: null, reason: 'scheduled reconcile failed for boom-1: ledger down' }]);
+  expect(deliverScheduledEmail).not.toHaveBeenCalled();
+  // Order: ordinary delivery is listed before reconciliation candidates.
+  const dueOrder = scheduledEmailStore.listDueScheduledEmails.mock.invocationCallOrder[0];
+  const reconcileOrder = scheduledEmailStore.listScheduledEmailReconciliationCandidates.mock.invocationCallOrder[0];
+  expect(dueOrder).toBeLessThan(reconcileOrder);
+});
+
+test('stopped rows with send intent are read back for seven days; late acceptance is counted (A2)', async () => {
+  scheduledEmailStore.listStoppedScheduledEmailsWithSendIntent.mockResolvedValue([
+    { id: 'stopped-1', status: 'stopped' },
+    { id: 'stopped-2', status: 'stopped' },
+  ]);
+  reconcileStoppedScheduledEmail
+    .mockResolvedValueOnce({ sent: true })
+    .mockResolvedValueOnce({ unresolved: true, reason: 'not_accepted' });
+  const res = mockRes();
+  await handler(req(), res);
+  expect(scheduledEmailStore.listStoppedScheduledEmailsWithSendIntent).toHaveBeenCalledWith({ days: 7 });
+  expect(res.body.stoppedLateAccepted).toBe(1);
+  expect(deliverScheduledEmail).not.toHaveBeenCalled();
+});
+
+test('a PD whose eligible digest rows exceed the per-PD window is counted and warned (A7)', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  scheduledEmailStore.listScheduledEmailDigestRows.mockResolvedValue([{ id: 'r1' }]);
+  groupDigestRowsByPd.mockReturnValue([
+    { pdSystemUserId: 'pd-big', sentFyi: [], total: 140, capped: true },
+    { pdSystemUserId: 'pd-small', sentFyi: [], total: 3, capped: false },
+  ]);
+  sendScheduledEmailDigest.mockResolvedValue({ sent: true });
+  const res = mockRes();
+  await handler(req(), res);
+  expect(scheduledEmailStore.listScheduledEmailDigestRows).toHaveBeenCalledWith({ perPdLimit: 100 });
+  expect(groupDigestRowsByPd).toHaveBeenCalledWith([{ id: 'r1' }], { perPdLimit: 100 });
+  expect(res.body.digestPdCapped).toBe(1);
+  expect(res.body.digestsSent).toBe(2);
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('digest capped for PD pd-big: 140 eligible rows, 100 shown'));
+  warn.mockRestore();
+});
+
 test('unfinalized sent rows are repaired without another send', async () => {
   scheduledEmailStore.listUnfinalizedScheduledEmails.mockResolvedValue([{ id: 'sent-1', status: 'sent' }]);
   const res = mockRes();
@@ -413,6 +489,13 @@ test('200 summary envelope pinned exactly', async () => {
     reassigned: 0,
     digestsSent: 0,
     digestFailed: 0,
+    digestPdCapped: 0,
+    reconciled: 0,
+    reconciledSent: 0,
+    reconcileUnresolved: 0,
+    reconcileFailed: 0,
+    activityReadCleared: 0,
+    stoppedLateAccepted: 0,
     stoppedNoLongerEligible: 0,
     preferenceFailed: 0,
     finalizeFailed: 0,
@@ -574,7 +657,7 @@ describe('Liaison of record (Research)', () => {
     ['no Cc for none', null, []],
   ])('a former PD\'s unsent row is rebuilt by the handoff with %s', async (_label, primaryContact, cc) => {
     wire({ primaryContact });
-    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({ id: 'scheduled-1', pd_systemuser_id: 'pd-former', status: 'scheduled' });
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({ id: 'scheduled-1', pd_systemuser_id: 'pd-former', status: 'scheduled', version: 4 });
     scheduledEmailStore.reassignScheduledEmail.mockResolvedValue({ id: 'scheduled-1' });
     const res = mockRes();
     await handler(req(), res);
@@ -583,6 +666,8 @@ describe('Liaison of record (Research)', () => {
       pdSystemUserId: 'pd1',
       toRecipients: ['pi1@example.edu'],
       ccRecipients: cc,
+      // A5: fenced on the version the cron just read.
+      expectedVersion: 4,
     }));
   });
 });

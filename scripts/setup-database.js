@@ -1781,6 +1781,17 @@ const v57Statements = [
       AND after_marker IS TRUE AND after_run_id = run_id AND slot1_after = member_id AND after_etag IS NOT NULL)),
   CONSTRAINT test_request_cast_slot_bindings_failure CHECK (status <> 'needs_attention' OR failure_code IS NOT NULL)
 )`,
+
+];
+
+// V58: scheduled-email recipient generation for the PD-handoff rebuild.
+// Mirrors migration 059 (docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md A5).
+// Generation 0 keeps the original correlation key; later generations suffix it.
+const v58Statements = [
+  `ALTER TABLE scheduled_email_messages
+    ADD COLUMN IF NOT EXISTS recipient_generation INTEGER NOT NULL DEFAULT 0`,
+  `COMMENT ON COLUMN scheduled_email_messages.recipient_generation IS
+    'Incremented by each PD-handoff rebuild; selects the Dynamics correlation key so an older generation''s draft is never adopted (generation 0 keeps the original key).'`,
 ];
 
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
@@ -2948,6 +2959,24 @@ async function runMigration() {
       await sql.query(v57Statements[i]);
     }
 
+    // Run V58 schema update (scheduled-email recipient generation; mirrors migration 059)
+    console.log(`\nApplying v58 schema updates - scheduled-email recipient generation (${v58Statements.length} statements)...`);
+    for (let i = 0; i < v58Statements.length; i++) {
+      const statement = v58Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v58-${i + 1}/${v58Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v58-${i + 1}/${v58Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v58-${i + 1}/${v58Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -3016,6 +3045,7 @@ async function runMigration() {
     console.log('\nV47 new tables (Cycle Dossier pilot):');
     console.log('  • cycle_dossiers, cycle_dossier_previews, cycle_dossier_entries,');
     console.log('    cycle_dossier_runs, cycle_dossier_control, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
+    console.log('\nV58 column (scheduled-email recipient generation): scheduled_email_messages.recipient_generation');
     console.log('\nV56 new tables (Post-presentation materials):');
     console.log('  • presentation_material_links (sealed materials-only external links)');
     console.log('  • presentation_material_uploads (durable browser-direct Graph upload intents)');
