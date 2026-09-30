@@ -25,10 +25,13 @@ const ORIGINAL_ARGV = process.argv;
 
 const LEDGER_URL = 'postgresql://role:pw@ep-restless-haze-b8zxkdcl-pooler.c-14.us-east-1.aws.neon.tech/ledger?sslmode=require';
 
-function runWriteExpected(env) {
+function runWriteExpected(env, { replace = false } = {}) {
   const calls = [];
   const exits = [];
-  process.env = { ...ORIGINAL_ENV, ...env };
+  // `replace` installs env verbatim so a key the test DELETED cannot come
+  // back from the shell (the unset case failed when the scratch URL was
+  // exported in the environment that ran jest).
+  process.env = replace ? { ...env } : { ...ORIGINAL_ENV, ...env };
   process.argv = ['node', 'scripts/check-factory-ledger.js', '--write-expected'];
   let doneResolve;
   const done = new Promise((resolve) => { doneResolve = resolve; });
@@ -125,7 +128,7 @@ describe('check-factory-ledger.js --write-expected refuses an unsafe TEST_REQUES
     try {
       const env = { ...ORIGINAL_ENV };
       delete env.TEST_REQUEST_LEDGER_TEST_URL;
-      const { calls, exits } = await runWriteExpected(env);
+      const { calls, exits } = await runWriteExpected(env, { replace: true });
       expect(exits).toEqual([1]);
       expect(calls.join(' ')).toMatch(/needs TEST_REQUEST_LEDGER_TEST_URL/);
       expect(pgClientCtor).not.toHaveBeenCalled();
