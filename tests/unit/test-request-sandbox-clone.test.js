@@ -223,6 +223,34 @@ describe('sandbox operator write boundary', () => {
     // requireLedgerUrl(args.target) and ledgerSchemaCheck(..., { mode: '...'
     // must occur strictly between this block's `if (args.X) {` and the next
     // `if (args.` dispatch, not merely somewhere later in the file.
+    // Codex round-3 #7 (generic, name-independent): EVERY dispatch block in
+    // main() that creates a Dataverse client must first take a target-bound
+    // ledger and pass the schema check, in that order, before createClient(.
+    // A future block (e.g. B4's bindReviewerSlot) is caught whatever it is called.
+    const mainStart = script.indexOf('async function main(');
+    expect(mainStart).toBeGreaterThan(-1);
+    const blockRe = /\n  if \(args\.[^\n]*\) \{/g;
+    blockRe.lastIndex = mainStart;
+    const starts = [];
+    let m;
+    while ((m = blockRe.exec(script)) !== null) starts.push(m.index);
+    expect(starts.length).toBeGreaterThan(5);
+    let clientBlocks = 0;
+    for (let i = 0; i < starts.length; i++) {
+      const at = starts[i];
+      // A dispatch block ends at its own closing brace at two-space indent.
+      const end = script.indexOf('\n  }', at + 1);
+      expect(end).toBeGreaterThan(at);
+      const block = script.slice(at, end);
+      const create = block.indexOf('createClient(');
+      if (create === -1) continue;
+      clientBlocks += 1;
+      const guard = block.indexOf('requireLedgerUrl(args.target)');
+      const check = block.indexOf('ledgerSchemaCheck(ledgerUrl, {');
+      expect({ block: block.slice(0, 60), guardBeforeCheck: guard > -1 && guard < check, checkBeforeClient: check > -1 && check < create })
+        .toEqual({ block: block.slice(0, 60), guardBeforeCheck: true, checkBeforeClient: true });
+    }
+    expect(clientBlocks).toBe(3);
     for (const mode of ['ledgerCheck', 'runInspect', 'setStatus || args.statusRecheck', 'createCast || args.bindReviewer', 'runRecheck', 'reserve', 'advance']) {
       const at = script.indexOf(`if (args.${mode}) {`);
       expect(at).toBeGreaterThan(-1);
