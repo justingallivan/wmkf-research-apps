@@ -104,6 +104,30 @@ test('capped junction reads fail closed; unresolved names remain visible but can
   expect(screenApplicants).not.toHaveBeenCalled();
 });
 
+test('a deleted or unreadable contact (real-shaped Dataverse 404/403 rejection) leaves the person unnamed instead of failing the tab', async () => {
+  for (const status of [404, 403]) {
+    const deleted = peopleDependencies({
+      grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
+      appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
+      contactAdapter: { getByIdWithSelect: jest.fn().mockRejectedValue(Object.assign(new Error('Dataverse error'), { serviceName: 'dataverse', status })) },
+    });
+    const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...deleted, sql: async () => ({ rows: [] }) });
+    expect(context.people[0]).toMatchObject({ contactId: PI_ID, name: '', role: 'PI' });
+    expect(context.review.status).toBe('identity_unavailable');
+    const screenApplicants = jest.fn();
+    await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+      ...deleted, sql: jest.fn(), IntegrityService: { screenApplicants },
+    })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'person_identity_unavailable' } });
+    expect(screenApplicants).not.toHaveBeenCalled();
+  }
+  const outage = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
+    contactAdapter: { getByIdWithSelect: jest.fn().mockRejectedValue(Object.assign(new Error('Dataverse error'), { serviceName: 'dataverse', status: 503 })) },
+  });
+  await expect(loadRequestIntegrityPeople(REQUEST_ID, outage)).rejects.toMatchObject({ status: 503 });
+});
+
 test('empty people and over-limit people are rejected before the paid engine', async () => {
   const engine = { screenApplicants: jest.fn() };
   const empty = peopleDependencies({

@@ -52,6 +52,7 @@ function reviewStatusLabel(status) {
     needs_review: 'Needs staff review',
     incomplete: 'Incomplete screen',
     roster_changed: 'People roster changed',
+    identity_unavailable: 'Person identity unavailable',
     approved: 'Integrity review complete',
     hold: 'Review on hold',
   };

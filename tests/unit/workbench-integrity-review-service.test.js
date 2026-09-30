@@ -192,6 +192,18 @@ test('approval rejects historical, cross-request, stale-roster, incomplete, and 
   expect(legacy.state.inserts).toHaveLength(0);
 });
 
+test('a current person with no usable name reports identity_unavailable, not roster_changed, and blocks approval', async () => {
+  const peopleDeps = dataverseDependencies({ people: [{ ...PERSON, name: '' }] });
+  peopleDeps.contactAdapter.getByIdWithSelect.mockRejectedValue(Object.assign(new Error('Dataverse error'), { serviceName: 'dataverse', status: 404 }));
+  const deps = dependenciesFor(peopleDeps);
+  const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, deps);
+  expect(context.review.status).toBe('identity_unavailable');
+  expect(context.review.canApprove).toBe(false);
+  await expect(recordWorkbenchIntegrityReview(reviewArgs(), deps))
+    .rejects.toMatchObject({ httpStatus: 409, body: { code: 'person_identity_unavailable' } });
+  expect(deps.state.inserts).toHaveLength(0);
+});
+
 test('hold is allowed for incomplete latest run but requires nonblank notes and bounded text', async () => {
   const incompleteRun = { ...RUN, results: [{ ...RESULT, sourceCoverageVersion: undefined }] };
   const emptyNotes = dependenciesFor(dataverseDependencies(), { runs: [incompleteRun] });
