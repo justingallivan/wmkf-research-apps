@@ -288,10 +288,11 @@ describe('migrations manifest includes 054 in order and its setup-database.js mi
     'utf8',
   ));
 
-  it('includes 054_test_request_runs.sql immediately after 053, allowing later migrations', () => {
-    const index = manifest.files.indexOf('054_test_request_runs.sql');
-    expect(index).toBeGreaterThan(0);
-    expect(manifest.files[index - 1]).toBe('053_pre_site_distribution_review_bundle.sql');
+  it('tracks 054_test_request_runs.sql directly after 053 and before later numbered migrations', () => {
+    const ledgerIndex = manifest.files.indexOf('054_test_request_runs.sql');
+    expect(ledgerIndex).toBeGreaterThan(0);
+    expect(manifest.files[ledgerIndex - 1]).toBe('053_pre_site_distribution_review_bundle.sql');
+    expect(manifest.files.indexOf('055_post_presentation_materials.sql')).toBeGreaterThan(ledgerIndex);
   });
 
   function normalize(sql) {

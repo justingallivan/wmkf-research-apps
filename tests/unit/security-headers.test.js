@@ -30,6 +30,15 @@ describe('security headers', () => {
     expect(headers['Cache-Control']).toBe('no-store, max-age=0');
   });
 
+  it('does not disclose presentation bearer paths through referrers or caches', async () => {
+    const rules = await nextConfig.headers();
+    for (const source of ['/external/presentation/:path*', '/api/external/presentation/:path*']) {
+      const headers = toHeaderMap(rules.find(rule => rule.source === source).headers);
+      expect(headers['Referrer-Policy']).toBe('no-referrer');
+      expect(headers['Cache-Control']).toBe('private, no-store, max-age=0');
+    }
+  });
+
   it('allows only same-origin framing of the Cycle Dossier PDF preview', async () => {
     const rules = await nextConfig.headers();
     const rule = rules.find(r => r.source === '/api/cycle-dossier/download');

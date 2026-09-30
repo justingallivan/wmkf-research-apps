@@ -30,9 +30,15 @@
    - Part B comes after it, on its own branch.
    - The plan's line numbers are as of `ed04b6c17`; the scheduled-email files have not changed since [VERIFIED via `git diff --name-only 8fc003931 507bf14ab`, which did not touch them].
 
-### Owner Decision Needed
+### Migration numbering (settled S552)
 
-1. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab`; migrations 056–057 need renumbering). Unchanged. Part A's migration will also need the next free number.
+1. **055** is `codex/feature-request`'s `055_post_presentation_materials.sql`. It is **already applied to shared Production** (2026-09-26 06:54Z, `codex-feature-request-2026-09-26`, alongside 054) but exists only on that unmerged branch. Treat the file as frozen: it must land on `main` byte-identical [VERIFIED via an owner-run read-only `schema_migrations` query, S552].
+2. **056–057** stay with the Integrity Screener Workbench tab; production shows them unapplied (no `integrity_screening_reviews`, no `integrity_screenings.request_id`). No renumbering needed.
+3. **058** (block V57) = Test Request Factory slice B4; **059** (V58) = scheduled-email Part A. Plans and Atlas updated.
+4. The Integrity branch now has `main` merged in, on `claude/integrity-workbench-tab` (latest merge `0b3e56011`, which includes `main` at `d8cfd9eda` / PR #364; local only, worktree `.claude/worktrees/integrity-workbench-tab`). `codex/integrity-workbench-tab` is untouched at `b1086302b`. All gates pass, apart from the two per-worktree symlink gates (`:ci` passes), and 17,225 unit tests pass. Not yet run: the e2e spec, and a `.pg.test.js` for 057's constraints (none exists). Next: push the branch, then a non-author implementation review.
+5. Preview's database was not read.
+6. **Production has an earlier 054, not `main`'s.** The last committed 054 on `codex/feature-request` before the 06:54Z apply is `af65a24bd` (2026-09-24). `main`'s 054 differs by +166/−14 across 15 later commits, including the Factory cast tables. Production's tracker says 054 is applied, so `apply-migrations.js` will never update it [VERIFIED via `git log --until` and `git diff`; ASSUMED the apply used committed branch state, not uncommitted edits; Production's actual table shape was not read]. This answers S550's question: B4's 058 **does** need the earlier-054 repair logic for shared Production. Next step, owner-run and read-only: read Production's `test_request_*` tables and `pg_get_functiondef('test_request_receipt_ok')`.
+7. Leads, not checked: whether Production's `migration_drift_ahead` alert has been firing for 055 since 09-26 (`lib/utils/migration-drift.js`); and the process fact that 054 and 055 reached shared Production via `apply-migrations.js` from a Codex worktree before either merged.
 
 ### Parked
 

@@ -85,6 +85,12 @@ function buildFixtures() {
       expectWarned: false,
     },
     {
+      name: 'presentation-token-guard',
+      source: "import { verifyPresentationToken } from '../../lib/external/verify-presentation-token';\nexport default function handler(req, res) { verifyPresentationToken(req.query.token); res.end(); }\n",
+      matrixRow: row('presentation-token-guard', 'External token', '`verifyPresentationToken`'),
+      expectWarned: false,
+    },
+    {
       name: 'intentional-none',
       source: "export default function handler(req, res) { res.json({ ok: true }); }\n",
       matrixRow: row('intentional-none', 'Public metadata', 'None'),
