@@ -14,8 +14,9 @@ or editing a migration that exists only on a branch.
 [VERIFIED 2026-09-29, Session 552, via an owner-run read-only production
 query] Shared Production `schema_migrations` holds
 `055_post_presentation_materials.sql` (applied 2026-09-26 06:54Z,
-`applied_by` `codex-feature-request-2026-09-26`, alongside 054). That file
-exists only on the unmerged `codex/feature-request`. `main`'s migrations
+`applied_by` `codex-feature-request-2026-09-26`, alongside 054). At the time the
+file existed only on the unmerged `codex/feature-request` (it merged later
+in PR #365). `main`'s migrations
 directory then ended at 054, so "the next number after `main`" would have
 collided.
 
@@ -33,9 +34,16 @@ collided.
   2026-09-26 [ASSUMED; the alert rows were not read].
 - `applied_by` defaults to the literal `apply-migrations.js` unless
   `APPLY_MIGRATIONS_APPLIED_BY` is set, so it proves *when*, rarely *who*.
-- Allocation as of S552: 055 feature-request (applied, frozen), 056–057
-  Integrity tab (unapplied), 058 B4, 059 scheduled-email Part A. The
+- Allocation as of S552 close: 055 post-presentation (applied 09-26, merged to
+  `main` in PR #365), 056–057 Integrity tab (applied 2026-09-30 by the owner,
+  merged in PR #366), 058 B4, 059 scheduled-email Part A (both not yet written). The
   fresh-install blocks in `scripts/setup-database.js` collide the same way
   (V56 feature-request, V57 B4, V58 Part A).
 - Checking Production needs the owner to run the query
   ([[feedback-never-self-authorize-prod-dataverse-reads]] covers the same posture).
+- Production's 054 was applied from `codex/feature-request` at `af65a24bd`
+  (2026-09-24), before `main`'s 15 later edits added the Factory cast tables;
+  its tracker row means `apply-migrations.js` will never update it. B4's 058
+  must repair it [VERIFIED via git history, S552; Production's table shape not read].
+- Auto-mode permissions block Claude from running `apply-migrations.js` against
+  the shared database even with owner authorization; the owner runs it with `!`.

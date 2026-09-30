@@ -124,9 +124,7 @@ lookup. The Workbench integrity service reads the request's PI/Co-PI identities
 from Dataverse and saves completed runs with this request ID. GET returns the
 latest linked run plus newest-first history pages of 20, with an optional
 request-scoped `beforeRunId` cursor. Each history row includes append-only PD
-review decisions from `integrity_screening_reviews`. **[SOURCE-BUILT on
-`claude/integrity-workbench-tab` for PR #366; migrations 056–057 are
-applied to the shared database on 2026-09-30 and verified by a schema probe (tracker rows, column, indexes and constraints) [VERIFIED, S552]; the branch is not merged or deployed.]**
+review decisions from `integrity_screening_reviews`. **[LIVE since 2026-09-30: PR #366 merged as `fdaec0b1f` and deployed to Production; migrations 056–057 applied and schema-verified the same day; production read-only smoke passed (S552)]**
 Existing standalone/manual runs remain
 request-unlinked. The standalone screener's history, detail, status-update and
 dismiss paths (`lib/services/integrity-service.js`) filter to
@@ -151,7 +149,7 @@ and the review table's primary key, both foreign keys and three CHECK
 constraints. `tests/integration/integrity-screening-reviews.pg.test.js` proves
 the same constraints in a scratch schema.
 
-### `integrity_screening_reviews` — SOURCE-BUILT (migration 057 applied to the shared database; 0 rows)
+### `integrity_screening_reviews` — LIVE (migration 057 applied 2026-09-30; 0 rows at apply)
 **Source of truth:** Postgres append-only review history, keyed to one
 `integrity_screenings` run and its Dataverse request GUID. Migration 057 stores
 server-resolved reviewer profile and Dynamics user identity, decision
@@ -167,9 +165,7 @@ the latest review summary and per-screen historical decisions. Only the latest
 screen is actionable. Approval requires the latest screened roster to match
 the live request roster and source coverage version 1 with all sources searched
 and no errors. A recorded approval means the integrity review is complete; it
-does not authorize funding or gate later workflow progression. **[SOURCE-BUILT
-on `claude/integrity-workbench-tab` for PR #366; migration 057 is
-applied to the shared database on 2026-09-30 and verified by a schema probe (tracker rows, column, indexes and constraints) [VERIFIED, S552]; the branch is not merged or deployed.]**
+does not authorize funding or gate later workflow progression. **[LIVE since 2026-09-30: PR #366 merged as `fdaec0b1f` and deployed; migration 057 applied and schema-verified (S552)]**
 
 ### `retractions` (68,248 rows)
 **Source of truth:** Postgres (manually refreshed via script — no live cron).

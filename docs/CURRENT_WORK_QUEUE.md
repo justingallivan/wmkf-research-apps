@@ -678,23 +678,22 @@ honorarium portal construction are implementation history or current operating r
 not become current work merely because their document status remains `active`.
 
 - **Integrity Screener in the Workbench, with PD approval (2026-09-26/27).**
-  [SOURCE-BUILT on `claude/integrity-workbench-tab` (PR #366); NOT merged,
-  NOT deployed; Postgres migrations 056 and 057 applied to the shared database
-  and verified 2026-09-30] The branch adds:
+  [LIVE since 2026-09-30: PR #366 merged as `fdaec0b1f`, Production deploy
+  `dpl_EbiwNNbuRgPGaAswWNGK7DsYyn7p`; migrations 056 and 057 applied and
+  schema-verified; read-only production smoke passed (S552)] It adds:
   - a gated Integrity tab that screens the request's PI and Co-PIs automatically;
   - request-linked screening history;
   - an append-only PD approval/hold audit (`approved` means a complete screen plus the
     lead PD's approval for the current roster).
   
   Evidence and PD decisions stay in Postgres. Luna implemented, Sol reviewed, and Codex
-  adjudicated the Claude Opus findings. Validation and residual limits are in the branch's
-  `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` (read with `git show
-  origin/codex/integrity-workbench-tab:<path>`).
+  adjudicated the Claude Opus findings. Validation and residual limits are in
+  `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` (on `main` since #366).
   
   **Open, not built:** one informational Dataverse flag, **Integrity review complete**
   (`wmkf_integrityreviewcomplete`), meaning a complete screen plus PD approval for the
   current roster; a screen alone is not enough. The investigation and a read-only
-  metadata probe are on the branch (`docs/plans/INTEGRITY_DATAVERSE_FLAG_INVESTIGATION_2026-09-26.md`):
+  metadata probe are on `main` (`docs/plans/INTEGRITY_DATAVERSE_FLAG_INVESTIGATION_2026-09-26.md`, `scripts/probe-request-integrity-metadata.js`):
   - production metadata checked, no existing equivalent column found by keyword;
   - sandbox metadata not checked.
   
@@ -702,14 +701,12 @@ not become current work merely because their document status remains `active`.
   changes (including edits made outside our apps), and durable retries when Dataverse sync
   fails.
   
-  **Numbering settled (S552):** 055 is `codex/feature-request`'s
-  `055_post_presentation_materials.sql`, already applied to shared Production;
-  Integrity keeps 056–057, which production shows unapplied [VERIFIED via an
-  owner-run read-only `schema_migrations` query]. Then B4 = 058, scheduled-email
-  Part A = 059. `main` (as of `d8cfd9eda`) is merged into `claude/integrity-workbench-tab`
-  (worktree `.claude/worktrees/integrity-workbench-tab`, local only); all gates and
-  unit tests pass there. **Before release:** a non-author implementation review, and
-  apply 056 then 057 only in an owner-authorized release.
+  **Release record (S552):** two review rounds (Claude code review, then Codex
+  adversarial gpt-5.6-sol); all fixed except finding 6 (strict SerpApi empty-result
+  wording, needs a real zero-result response) and finding 9 (repeated Dataverse/SQL
+  reads, performance only), both deferred. The owner chose not to restrict who may
+  re-screen an approved request. Migration numbering: 055 post-presentation (#365),
+  056–057 Integrity, 058 B4, 059 scheduled-email Part A.
   
   **Deferred:** the hard board-readiness gate waits for the staff recommendation/readiness
   workflow. Screening normally covers only applicants staff recommend for funding.
