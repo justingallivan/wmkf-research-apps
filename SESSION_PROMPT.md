@@ -9,7 +9,7 @@
 1. **Current PR check.** At `93447aeacdc22df60b5ad9f4cff0b47cbd55f61e`, all 12 checks passed; PR #369 was draft, mergeable and clean [VERIFIED via GitHub]. Runtime/probe/client remain unchanged from tested merge candidate `92ccbd0bd052c3ae49666c8776d3642d26dd53ce`, which incorporated six main docs commits at `570f53086`. Previous evidence: 67 startup gates/self-tests; 66 focused suites / 1,906 tests and 44 changed non-PG suites / 1,690 tests (overlapping), all passed.
 2. **Local and B4 Preview switches enabled.** Owner directed completion of remaining session work after the configuration action was proposed. Both literal switches now read `on` in Local, B4 branch Preview and Production; all wave29/wave30 marker checks returned HTTP 200 [VERIFIED via `b4-environment-switches-enabled-2026-09-30.json`]. Preview edits are branch-specific, under verified project `wmkf_research_apps` / `prj_56SJKzNer1aV38kKVoP8tl3X0lf3`, scope `justin-gallivans-projects`. Production and generic Development/Preview configuration were not changed. Development remains off/off. Every env pull used deleted mode-0600 temporary files; only key names and on/off states are recorded.
 3. **Local checkout isolation.** The existing `.env.local` symlink pointed into Claude's checkout. Replaced only this worktree's symlink with a private mode-0600 copy, preserved unrelated configuration and changed only the two switches. CLI and Next.js development loaders both resolve them to literal `on` [VERIFIED via loaders]. Claude's target file was untouched. Future credential changes must be synced explicitly to this new private copy.
-4. **Focused verification.** Six switch/capability/acceptance-job suites passed, 145 tests, including all-job pause, matching-lease release and resumption. No runtime source was edited and no live acceptance job was exercised. A new Preview build must capture the branch settings before use; recheck its deployment and latest PR checks after the push.
+4. **Focused verification.** Six switch/capability/acceptance-job suites passed, 145 tests, including all-job pause, matching-lease release and resumption. No runtime source was edited and no live acceptance job was exercised. Post-edit Preview at `1a86c10da` is Ready, with build recorded, and all 12 CI checks passed. Direct deployment-captured values remain UNKNOWN: CLI 61.1.0 refuses `env pull --id` for Ready deployments, and the deployment API exposes key names only. No runtime-value or live job-resumption claim is made. See deployment receipt and CI snapshot.
 5. **Owner packet.** `b4-owner-next-actions-2026-09-30.md` contains read-only ledger inventory/preflight commands, the Production query pointer and the six-item automation worksheet. No classification was self-authorized. The owner cannot access the other Mac until approximately nine hours after this chat decision.
 6. **Ledger remains unavailable.** This Mac has one Colima profile, one `wmkf-ledger-pg` Postgres container and one volume [VERIFIED via inventory]. `ledger_prod` is absent; `ledger` has only two early Factory tables and an old receipt function [VERIFIED via existing schema receipt]. No spare journal appeared in the Docker inventory. No database/schema/row/tracker was created. Local storage was a temporary CLI-phase decision; shared Postgres is planned for the form phase. No storage migration was begun.
 
@@ -17,7 +17,8 @@
 
 - `92ccbd0bd` — tested/probed runtime candidate after merge of main docs.
 - `93447aeac` — earlier release evidence/checklist/handoff; all 12 checks passed.
-- This session's configuration evidence/owner-packet commit — see `git log -1`; docs only. Local env is ignored and private; Vercel switches are external config.
+- `1a86c10da` — configuration evidence and owner recovery packet; all 12 checks passed and new Preview is Ready.
+- Final deployment/CI evidence commit — see `git log -1`; docs only. Local env is ignored and private; Vercel switches are external config.
 - Evidence index: `docs/plans/evidence/test-request-factory/b4-release-readiness-2026-09-30.md`; release contract: `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`.
 
 ## Next Items
@@ -32,7 +33,7 @@
 
 ### Verified Open / Configuration Follow-up
 
-1. Verify the new B4 Preview is Ready with both captured switches on after this session's push. Env edits do not alter old deployments. Runtime/client/probe source remains the named candidate; docs-only descendants preserve its section 13 source provenance.
+1. New B4 Preview Ready/build provenance is verified at `1a86c10da`; direct captured-switch readback is UNKNOWN because the CLI/API does not expose those values on a Ready deployment. Branch/project pull independently proves on/on. Resolve direct runtime verification before claiming deployed values or live job resumption. Runtime/client/probe source remains the named candidate; docs-only descendants preserve its section 13 source provenance.
 2. Synchronize this worktree's now-private Local env after future credential rotations. Do not write through the old Claude-checkout symlink or overwrite its file.
 
 ### Do Not Reopen Without New Decision
