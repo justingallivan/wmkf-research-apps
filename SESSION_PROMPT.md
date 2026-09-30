@@ -478,7 +478,7 @@ All on `main` (merged PRs #349, #350, #351 and direct Tier 0 commits): `5c96e171
 
 ### Verify Before Acting
 
-1. **Isolation is live in production.** If staff report "could not be confirmed as an ordinary request" on a Request email, check marker reads first; rollback is removing `TEST_REQUEST_ISOLATION` and redeploying.
+1. **Isolation is live in production (historical S546 instruction).** If staff report "could not be confirmed as an ordinary request" on a Request email, check marker reads first. The former switch-off rollback is superseded by B4: after B4 deployment, first redeploy the prior code before disabling either isolation switch. Turning off `SYNTHETIC_REVIEWER_ISOLATION` stops all existing-person reviewer binds and identity edits; turning off either switch pauses all reviewer-acceptance jobs. See `docs/CREDENTIALS_RUNBOOK.md` and the B4 plan's owner decisions 9–10.
 2. Sandbox residue (Requests 1000341–1000348) and local-ledger runs unchanged.
 
 ### Do Not Reopen Without New Decision

@@ -119,11 +119,11 @@ test('an unbound reviewer email stops the deadline change before any write', asy
 
 test('a binding lost after the deadline write prevents dispatch', async () => {
   assertReviewerDirectedEmailBound.mockResolvedValueOnce({ kind: 'ordinary' })
-    .mockRejectedValueOnce(new Error('unbound'));
+    .mockRejectedValueOnce(Object.assign(new Error('unbound'), { dispatched: false }));
   const result = await saveReviewerDueDateExtension({
     suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15',
   });
-  expect(result).toMatchObject({ ok: false, saved: true, notified: false });
+  expect(result).toMatchObject({ ok: false, saved: true, notified: false, retryable: true, reason: 'send_failed' });
   expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
   expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
 });

@@ -261,6 +261,8 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
       return sql.slice(start, end).replace(/\s+/g, ' ').trim();
     };
     expect(fnBody(setupSql)).toBe(fnBody(migration));
+    const slotMigration = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql'), 'utf8');
+    expect(fnBody(slotMigration)).toBe(fnBody(migration));
     expect(fnBody(migration)).not.toContain('\\');
   });
 
