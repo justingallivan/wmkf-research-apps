@@ -15,6 +15,10 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  // The Workbench page loads only with 'reviewers' (resolve-request), and the
+  // Integrity tab shows only with 'integrity-screener'; require both here.
+  const workbenchAccess = await requireAppAccess(req, res, 'reviewers');
+  if (!workbenchAccess) return;
   const access = await requireAppAccess(req, res, 'integrity-screener');
   if (!access) return;
   const allowed = await limiter(req, res);

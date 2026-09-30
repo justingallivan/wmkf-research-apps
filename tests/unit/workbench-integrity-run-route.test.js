@@ -37,10 +37,17 @@ beforeEach(() => {
   delete process.env.SERP_API_KEY;
 });
 
-test('requires Integrity app access before any model or service work', async () => {
+test.each([
+  ['reviewers', 1],
+  ['integrity-screener', 2],
+])('requires %s app access before any model or service work', async (deniedKey, deniedCall) => {
+  if (deniedCall === 2) requireAppAccess.mockResolvedValueOnce({ profileId: 77 });
   requireAppAccess.mockResolvedValueOnce(null);
+  const req = { method: 'POST', query: { requestId: '11111111-1111-4111-8111-111111111111' }, body: {} };
   const res = response();
-  await runHandler({ method: 'POST', query: { requestId: '11111111-1111-4111-8111-111111111111' }, body: {} }, res);
+  await runHandler(req, res);
+  expect(requireAppAccess).toHaveBeenCalledTimes(deniedCall);
+  expect(requireAppAccess).toHaveBeenNthCalledWith(deniedCall, req, res, deniedKey);
   expect(runWorkbenchIntegrityScreen).not.toHaveBeenCalled();
   expect(loadModelOverrides).not.toHaveBeenCalled();
 });
@@ -76,12 +83,17 @@ test('ignores body identity fields; uses authenticated actor and route GUID only
 });
 
 
-test('GET refuses denied access before loading request context', async () => {
+test.each([
+  ['reviewers', 1],
+  ['integrity-screener', 2],
+])('GET refuses denied %s access before loading request context', async (deniedKey, deniedCall) => {
+  if (deniedCall === 2) requireAppAccess.mockResolvedValueOnce({ profileId: 77 });
   requireAppAccess.mockResolvedValueOnce(null);
   const req = { method: 'GET', query: { requestId: '11111111-1111-4111-8111-111111111111' } };
   const res = response();
   await getHandler(req, res);
-  expect(requireAppAccess).toHaveBeenCalledWith(req, res, 'integrity-screener');
+  expect(requireAppAccess).toHaveBeenCalledTimes(deniedCall);
+  expect(requireAppAccess).toHaveBeenNthCalledWith(deniedCall, req, res, deniedKey);
   expect(getWorkbenchIntegrityContext).not.toHaveBeenCalled();
   expect(withDalContext).not.toHaveBeenCalled();
 });

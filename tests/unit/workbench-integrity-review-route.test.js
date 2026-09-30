@@ -26,12 +26,17 @@ beforeEach(() => {
   recordWorkbenchIntegrityReview.mockResolvedValue({ requestId: REQUEST_ID, review: { status: 'approved' } });
 });
 
-test('denied app access stops before DAL context and review service', async () => {
+test.each([
+  ['reviewers', 1],
+  ['integrity-screener', 2],
+])('denied %s access stops before DAL context and review service', async (deniedKey, deniedCall) => {
+  if (deniedCall === 2) requireAppAccess.mockResolvedValueOnce({ profileId: 42 });
   requireAppAccess.mockResolvedValueOnce(null);
   const req = { method: 'POST', query: { requestId: REQUEST_ID }, body: { screeningId: 10, decision: 'hold', notes: 'check' } };
   const res = response();
   await handler(req, res);
-  expect(requireAppAccess).toHaveBeenCalledWith(req, res, 'integrity-screener');
+  expect(requireAppAccess).toHaveBeenCalledTimes(deniedCall);
+  expect(requireAppAccess).toHaveBeenNthCalledWith(deniedCall, req, res, deniedKey);
   expect(recordWorkbenchIntegrityReview).not.toHaveBeenCalled();
   expect(withDalContext).not.toHaveBeenCalled();
 });
