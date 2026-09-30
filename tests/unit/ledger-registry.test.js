@@ -2,10 +2,12 @@
 import {
   MANAGED_LEDGER_HOSTS,
   LOCAL_LEDGER_HOSTS,
+  LEDGER_VAR_TARGETS,
   classifyLedgerHost,
   classifyLedgerUrl,
   expectedLedgerDatabase,
   selectLedgerVariable,
+  targetForLedgerVar,
 } from '../../lib/db/ledger-registry';
 
 const MANAGED = MANAGED_LEDGER_HOSTS[0];
@@ -32,7 +34,11 @@ test('the managed host must carry the database the target expects', () => {
   expect(classifyLedgerUrl(url(MANAGED, 'ledger'), { target: 'production' })).toMatchObject({ ok: false, reason: 'wrong_database:ledger_prod' });
   expect(classifyLedgerUrl(url(MANAGED, 'ledger_prod'), { target: 'sandbox' })).toMatchObject({ ok: false, reason: 'wrong_database:ledger' });
   expect(classifyLedgerUrl(url(MANAGED, 'neondb'), { target: 'production' })).toMatchObject({ ok: false });
-  // No target (e.g. --run-inspect): host rules only.
+  // classifyLedgerUrl's own default (target omitted): host rules only. No
+  // production caller relies on this any more — scripts/rehearse-test-request-sandbox.mjs's
+  // requireLedgerUrl, scripts/check-factory-ledger.js, and
+  // scripts/apply-ledger-migrations.js (Opus round-1 L1) all now resolve and
+  // pass an explicit target before calling classifyLedgerUrl.
   expect(classifyLedgerUrl(url(MANAGED, 'neondb'), {})).toMatchObject({ ok: true });
 });
 
@@ -104,6 +110,30 @@ describe('Codex round-1 Fix 1: effective destination, not URL text', () => {
     expect(verdict.effective).toEqual({ host: MANAGED, port: '5432', database: 'ledger_prod' });
     expect(Object.keys(verdict.effective)).not.toContain('user');
     expect(Object.keys(verdict.effective)).not.toContain('password');
+  });
+});
+
+describe('Opus round-1 L1: targetForLedgerVar / LEDGER_VAR_TARGETS (migration runner target derivation)', () => {
+  test('known variable names map to their CLI target', () => {
+    expect(LEDGER_VAR_TARGETS).toEqual({ TEST_REQUEST_LEDGER_URL: 'production', TEST_REQUEST_SANDBOX_LEDGER_URL: 'sandbox' });
+    expect(targetForLedgerVar('TEST_REQUEST_LEDGER_URL')).toBe('production');
+    expect(targetForLedgerVar('TEST_REQUEST_SANDBOX_LEDGER_URL')).toBe('sandbox');
+  });
+
+  test('an unrecognized variable name maps to null (the runner refuses rather than guessing)', () => {
+    expect(targetForLedgerVar('SOME_OTHER_VARIABLE')).toBeNull();
+    expect(targetForLedgerVar('')).toBeNull();
+  });
+
+  test('the migration runner\'s effective classification refuses the wrong database for its variable\'s target', () => {
+    // TEST_REQUEST_LEDGER_URL -> production -> must name ledger_prod.
+    const prodTarget = targetForLedgerVar('TEST_REQUEST_LEDGER_URL');
+    expect(classifyLedgerUrl(url(MANAGED, 'ledger'), { target: prodTarget })).toMatchObject({ ok: false, reason: 'wrong_database:ledger_prod' });
+    expect(classifyLedgerUrl(url(MANAGED, 'ledger_prod'), { target: prodTarget })).toMatchObject({ ok: true });
+    // TEST_REQUEST_SANDBOX_LEDGER_URL -> sandbox -> must name ledger.
+    const sandboxTarget = targetForLedgerVar('TEST_REQUEST_SANDBOX_LEDGER_URL');
+    expect(classifyLedgerUrl(url(MANAGED, 'ledger_prod'), { target: sandboxTarget })).toMatchObject({ ok: false, reason: 'wrong_database:ledger' });
+    expect(classifyLedgerUrl(url(MANAGED, 'ledger'), { target: sandboxTarget })).toMatchObject({ ok: true });
   });
 });
 

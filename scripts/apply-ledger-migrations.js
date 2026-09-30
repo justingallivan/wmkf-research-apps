@@ -72,7 +72,7 @@ async function main() {
   }
   loadEnvLocal();
   const url = process.env[urlEnv];
-  const { classifyLedgerUrl } = await import('../lib/db/ledger-registry.js');
+  const { classifyLedgerUrl, targetForLedgerVar } = await import('../lib/db/ledger-registry.js');
   const {
     listLedgerMigrationFiles, LEDGER_MIGRATIONS_DIR, LEDGER_TRACKER_TABLE,
     readLedgerFingerprint, compareLedgerFingerprint, formatLedgerDiff,
@@ -80,9 +80,17 @@ async function main() {
   const {
     decideFileAction, sha256Text, stripOuterTxn, tableNamesIn, fingerprintFilesInScratch,
   } = await import('../lib/db/ledger-migrations.js');
+  // Opus round-1 L1: derive the target from the variable name the same way
+  // check-factory-ledger.js does, so the managed-host database rule applies
+  // here too (previously classifyLedgerUrl ran with no target and accepted
+  // any database on the managed host).
+  const target = targetForLedgerVar(urlEnv);
+  if (!target) {
+    throw new Error(`${urlEnv} is not a recognized ledger variable (see lib/db/ledger-registry.js LEDGER_VAR_TARGETS); expected TEST_REQUEST_LEDGER_URL or TEST_REQUEST_SANDBOX_LEDGER_URL.`);
+  }
   const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL']
     .map((name) => process.env[name]).filter(Boolean);
-  const verdict = classifyLedgerUrl(url, { sharedUrls });
+  const verdict = classifyLedgerUrl(url, { target, sharedUrls });
   if (!verdict.ok) {
     throw new Error(`${urlEnv} is not an acceptable ledger (${verdict.reason}). See lib/db/ledger-registry.js.`);
   }
@@ -98,10 +106,33 @@ async function main() {
   await client.connect();
   let exitCode = 0;
   try {
-    await client.query(`CREATE TABLE IF NOT EXISTS ${LEDGER_TRACKER_TABLE} (
-      name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now(), applied_by TEXT, sha256 TEXT NOT NULL)`);
-    await client.query(`ALTER TABLE ${LEDGER_TRACKER_TABLE} ADD COLUMN IF NOT EXISTS sha256 TEXT`);
-    const tracked = new Map((await client.query(`SELECT name, sha256 FROM ${LEDGER_TRACKER_TABLE}`)).rows.map((r) => [r.name, { sha256: r.sha256 }]));
+    // Opus round-1 L4: --dry-run must execute no DDL. The tracker
+    // CREATE/ALTER are skipped, and the tracker is instead read with a
+    // query that tolerates either the table or the sha256 column being
+    // absent, reporting that fact instead of creating them.
+    let tracked;
+    if (dryRun) {
+      const regRow = await client.query('SELECT to_regclass($1) AS reg', [LEDGER_TRACKER_TABLE]);
+      const tableExists = !!regRow.rows[0].reg;
+      if (!tableExists) {
+        console.log('[dry-run] tracker absent (would be created)');
+        tracked = new Map();
+      } else {
+        const colRow = await client.query(
+          "SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = 'sha256'",
+          [LEDGER_TRACKER_TABLE],
+        );
+        const sha256ColumnExists = colRow.rows.length > 0;
+        if (!sha256ColumnExists) console.log('[dry-run] sha256 column absent (would be added)');
+        const selectSha256 = sha256ColumnExists ? 'sha256' : 'NULL::text AS sha256';
+        tracked = new Map((await client.query(`SELECT name, ${selectSha256} FROM ${LEDGER_TRACKER_TABLE}`)).rows.map((r) => [r.name, { sha256: r.sha256 }]));
+      }
+    } else {
+      await client.query(`CREATE TABLE IF NOT EXISTS ${LEDGER_TRACKER_TABLE} (
+        name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now(), applied_by TEXT, sha256 TEXT NOT NULL)`);
+      await client.query(`ALTER TABLE ${LEDGER_TRACKER_TABLE} ADD COLUMN IF NOT EXISTS sha256 TEXT`);
+      tracked = new Map((await client.query(`SELECT name, sha256 FROM ${LEDGER_TRACKER_TABLE}`)).rows.map((r) => [r.name, { sha256: r.sha256 }]));
+    }
 
     let applied = 0;
     let adopted = 0;
