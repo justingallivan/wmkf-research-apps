@@ -1551,7 +1551,7 @@ const v56Statements = [
     REFERENCES test_request_cast_bindings (run_id, member_id),
   CONSTRAINT test_request_cast_slot_bindings_expected_pair CHECK (expected_person_id = member_id),
   CONSTRAINT test_request_cast_slot_bindings_snapshot CHECK (
-    (snapshot_at IS NULL AND before_etag IS NULL AND status = 'planned')
+    (snapshot_at IS NULL AND before_etag IS NULL AND status IN ('planned', 'needs_attention'))
     OR (snapshot_at IS NOT NULL AND before_etag IS NOT NULL)),
   CONSTRAINT test_request_cast_slot_bindings_dispatched CHECK (status <> 'dispatched' OR dispatched_at IS NOT NULL),
   CONSTRAINT test_request_cast_slot_bindings_verified CHECK (

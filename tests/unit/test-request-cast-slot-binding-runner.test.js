@@ -7,7 +7,7 @@ const PERSON = '33333333-3333-4333-8333-333333333333';
 const OTHER = '44444444-4444-4444-8444-444444444444';
 const SOURCE = '55555555-5555-4555-8555-555555555555';
 
-function fixture({ slots = [null, null, null, null, null], patch = 'ok', journal = null } = {}) {
+function fixture({ slots = [null, null, null, null, null], patch = 'ok', journal = null, metadata = 'ok' } = {}) {
   let requestSlots = [...slots];
   let etag = 'W/"10"';
   let row = journal;
@@ -48,17 +48,21 @@ function fixture({ slots = [null, null, null, null, null], patch = 'ok', journal
       if (path.startsWith('/wmkf_potentialreviewerses(')) return { ok: true, body: {
         wmkf_potentialreviewersid: PERSON, statecode: 0, wmkf_issyntheticreviewer: true,
       } };
-      if (path.includes('/ManyToOneRelationships?')) return { ok: true, body: { value: [{
+      if (path.includes('/ManyToOneRelationships?')) {
+        if (metadata === 'unavailable') throw new Error('temporary metadata read failure');
+        return { ok: true, body: { value: [{
         ReferencingAttribute: 'wmkf_potentialreviewer1',
         ReferencedEntity: 'wmkf_potentialreviewers',
         ReferencingEntityNavigationPropertyName: 'wmkf_PotentialReviewer1',
       }] } };
+      }
       throw new Error(`unexpected read ${path}`);
     }),
     patchWithOptions: jest.fn(async () => {
       if (patch === 'lost') { requestSlots[0] = PERSON; etag = 'W/"11"'; throw new Error('lost response'); }
       if (patch === 'conflict_match') { requestSlots[0] = PERSON; etag = 'W/"11"'; return { ok: false, status: 412 }; }
       if (patch === 'conflict_other') { requestSlots[0] = OTHER; etag = 'W/"11"'; return { ok: false, status: 412 }; }
+      if (patch === 'unchanged_etag') { requestSlots[0] = PERSON; return { ok: true, status: 204 }; }
       requestSlots[0] = PERSON; etag = 'W/"11"'; return { ok: true, status: 204 };
     }),
     post: jest.fn(),
@@ -132,6 +136,21 @@ test('a nonmatching 412 stops without retry', async () => {
   await expect(runCastSlotBinding({ ...f, runId: RUN })).rejects.toMatchObject({ code: 'cast_slot_etag_conflict' });
   expect(f.client.patchWithOptions).toHaveBeenCalledTimes(1);
   expect(f.getRow()).toMatchObject({ status: 'needs_attention' });
+});
+
+test('a metadata read failure leaves the planned journal retriable without a PATCH', async () => {
+  const f = fixture({ metadata: 'unavailable' });
+  await expect(runCastSlotBinding({ ...f, runId: RUN })).rejects.toMatchObject({ code: 'cast_slot_metadata_unavailable' });
+  expect(f.getRow()).toMatchObject({ status: 'planned' });
+  expect(f.ledger.markCastSlotNeedsAttention).not.toHaveBeenCalled();
+  expect(f.client.patchWithOptions).not.toHaveBeenCalled();
+});
+
+test('a matching slot without a new row version stops for inspection', async () => {
+  const f = fixture({ patch: 'unchanged_etag' });
+  await expect(runCastSlotBinding({ ...f, runId: RUN })).rejects.toMatchObject({ code: 'cast_slot_readback_mismatch' });
+  expect(f.getRow()).toMatchObject({ status: 'needs_attention', failureCode: 'readback_mismatch' });
+  expect(f.client.patchWithOptions).toHaveBeenCalledTimes(1);
 });
 
 test('a dispatched journal resumes by readback without any second PATCH', async () => {

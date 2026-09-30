@@ -123,17 +123,33 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     if (db.end) await db.end();
   });
 
-  it.each(['current', 'earlier'])('055 installs the typed slot journal and current receipt grammar from %s 054', async (startingShape) => {
+  it.each(['current', 'earlier', 'three-role'])('055 installs the typed slot journal and current receipt grammar from %s 054', async (startingShape) => {
     const schema = `b4_fixture_${crypto.randomUUID().replace(/-/g, '')}`;
     const full054 = fs.readFileSync(MIGRATION_PATH, 'utf8');
     const earlier054 = full054.slice(0, full054.indexOf('-- Synthetic cast'));
+    const threeRole054 = full054.replace(
+      "role IN ('pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader')",
+      "role IN ('pi', 'liaison', 'suggested_reviewer')",
+    );
     const migration055 = fs.readFileSync(SLOT_MIGRATION_PATH, 'utf8');
     await db.transaction(async (tx) => {
       await tx.query(`CREATE SCHEMA ${schema}`);
       await tx.query(`SET LOCAL search_path TO ${schema}, public`);
-      await tx.query(startingShape === 'current' ? full054 : earlier054);
+      await tx.query(startingShape === 'current' ? full054 : startingShape === 'three-role' ? threeRole054 : earlier054);
       await tx.query(migration055);
       await tx.query(migration055); // idempotent on the same ledger
+      if (startingShape === 'three-role') {
+        await tx.query(`INSERT INTO test_request_cast_members
+          (member_id, environment, role, entity, first_name, last_name, address_sha256)
+          VALUES ($1::uuid, 'production', 'org_leader', 'contact', 'Test', 'Leader', $2::text)`,
+        [crypto.randomUUID(), 'a'.repeat(64)]);
+      }
+      const { rows: snapshotConstraint } = await tx.query(
+        `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+          WHERE conname = 'test_request_cast_slot_bindings_snapshot'
+            AND connamespace = $1::regnamespace`, [schema],
+      );
+      expect(snapshotConstraint[0].definition).toContain('needs_attention');
       const { rows: tables } = await tx.query(
         `SELECT to_regclass('test_request_cast_members') AS members,
                 to_regclass('test_request_cast_bindings') AS binding,
@@ -194,6 +210,15 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       idempotencyKey,
       plan: basePlan({ ...plan, runId: crypto.randomUUID(), planDigest: '933da5bc7f45ad93424e42d19e38986cc333b102d612b5849909517b4af073a3' }),
     })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
+  });
+
+  it('a reused run ID under a different key reports a deterministic destination conflict', async () => {
+    const plan = basePlan();
+    createdRunIds.push(plan.runId);
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    await ledger.reserveRun({ actorId, idempotencyKey: 'key-original', plan });
+    await expect(ledger.reserveRun({ actorId, idempotencyKey: 'key-other', plan }))
+      .rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_destination_conflict' });
   });
 
   it('slice 6a: reserves both basic and initial_assessment runs', async () => {
@@ -446,6 +471,14 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     const planned = await ledger.planCastSlotBinding(ids);
     expect(planned).toMatchObject({ status: 'planned', expectedPersonId: memberId,
       expectedRequestId: plan.destinationRequestId });
+    const stoppedBeforeSnapshot = await ledger.markCastSlotNeedsAttention({
+      ...ids, failureCode: 'request_drift', error: 'marker changed before snapshot',
+    });
+    expect(stoppedBeforeSnapshot).toMatchObject({ status: 'needs_attention', beforeEtag: null });
+    // Restore this disposable fixture row so the rest of the dispatch proof
+    // can exercise a fresh planned operation without creating another cast.
+    await db.query(`UPDATE test_request_cast_slot_bindings SET status = 'planned', failure_code = NULL, error = NULL
+      WHERE run_id = $1::uuid AND member_id = $2::uuid`, [run.runId, memberId]);
     expect(await ledger.markCastSlotDispatched(ids)).toBeNull();
     const snapshot = await ledger.recordCastSlotSnapshot({ ...ids, etag: 'W/"7"', slots: [null, null, null, null, null] });
     expect(snapshot).toMatchObject({ status: 'planned', beforeEtag: 'W/"7"' });

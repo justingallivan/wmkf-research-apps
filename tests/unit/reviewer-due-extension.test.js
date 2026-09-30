@@ -25,6 +25,9 @@ jest.mock('../../lib/services/email-signature.js', () => ({
 jest.mock('../../lib/services/dynamics-service.js', () => ({
   DynamicsService: { createAndSendEmail: jest.fn() },
 }));
+jest.mock('../../lib/services/test-requests/reviewer-directed-email.js', () => ({
+  assertReviewerDirectedEmailBound: jest.fn(),
+}));
 
 import {
   retryReviewerDueDateNotification,
@@ -37,6 +40,7 @@ import { getById as getSystemUserById } from '../../lib/dataverse/adapters/syste
 import { readRequiredEmailDefaults } from '../../lib/services/email-defaults';
 import { resolveSignatureForRequest } from '../../lib/services/email-signature';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { assertReviewerDirectedEmailBound } from '../../lib/services/test-requests/reviewer-directed-email.js';
 import { REVIEWER_EXTENSION_SEED_BODY } from '../../lib/seed/email-defaults/reviewer-actions';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
@@ -97,6 +101,31 @@ beforeEach(() => {
     customClosing: false,
   });
   DynamicsService.createAndSendEmail.mockResolvedValue({ emailId: 'email-1' });
+  assertReviewerDirectedEmailBound.mockResolvedValue({ kind: 'ordinary' });
+});
+
+test('an unbound reviewer email stops the deadline change before any write', async () => {
+  assertReviewerDirectedEmailBound.mockRejectedValueOnce(new Error('unbound'));
+  const result = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15',
+  });
+  expect(result).toMatchObject({ ok: false, reason: 'notification_unavailable' });
+  expect(assertReviewerDirectedEmailBound).toHaveBeenCalledWith({
+    suggestionId: SUGGESTION_ID, requestId: REQUEST_ID, recipients: ['confirmed@example.org'],
+  });
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('a binding lost after the deadline write prevents dispatch', async () => {
+  assertReviewerDirectedEmailBound.mockResolvedValueOnce({ kind: 'ordinary' })
+    .mockRejectedValueOnce(new Error('unbound'));
+  const result = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15',
+  });
+  expect(result).toMatchObject({ ok: false, saved: true, notified: false });
+  expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
 });
 
 afterAll(() => {

@@ -13,6 +13,13 @@ const getRequestById = jest.fn();
 const notify = jest.fn(async () => ({ id: 'alert-1' }));
 const getOpenAlertsByTypeAndRequestId = jest.fn(async () => []);
 const autoResolve = jest.fn(async () => 0);
+const assertReviewerIsolationReady = jest.fn();
+const resolveReviewerBindCapability = jest.fn(async () => ({ kind: 'ordinary' }));
+
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  assertReviewerIsolationReady: (...args) => assertReviewerIsolationReady(...args),
+  resolveReviewerBindCapability: (...args) => resolveReviewerBindCapability(...args),
+}));
 
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...args) => getRequestById(...args),
@@ -98,6 +105,8 @@ function failedWriteCandidate(email = 'found@example.edu') {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  assertReviewerIsolationReady.mockImplementation(() => undefined);
+  resolveReviewerBindCapability.mockResolvedValue({ kind: 'ordinary' });
   findById.mockResolvedValue({
     _wmkf_request_value: REQUEST_ID,
     _wmkf_potentialreviewer_value: PERSON_ID,
@@ -120,6 +129,40 @@ beforeEach(() => {
   notify.mockResolvedValue({ id: 'alert-1' });
   getOpenAlertsByTypeAndRequestId.mockResolvedValue([]);
   autoResolve.mockResolvedValue(0);
+});
+
+test.each(['verify', 'retry'])('reviewer switch outage blocks %s before roster or person writes', async (action) => {
+  assertReviewerIsolationReady.mockImplementationOnce(() => { throw new Error('switch off'); });
+  const result = action === 'verify'
+    ? await verifyPersonAndAddress({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, email: 'reviewer@example.edu' })
+    : await retryAddressCheck({ requestId: REQUEST_ID, candidateKey: 'suggestion:row' });
+  expect(result).toMatchObject({ success: false, code: 'reviewer_identity_edit_blocked' });
+  expect(findById).not.toHaveBeenCalled();
+  expect(findCandidatesByKeys).not.toHaveBeenCalled();
+  expect(attestAddress).not.toHaveBeenCalled();
+  expect(recordSurfaced).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+});
+
+test.each(['suggestion', 'roster', 'retry'])('a cast person blocks %s address action before any write', async (action) => {
+  resolveReviewerBindCapability.mockRejectedValueOnce(new Error('synthetic reviewer'));
+  findCandidatesByKeys.mockResolvedValue([{
+    candidateKey: 'suggestion:row', suggestionId: SUGGESTION_ID,
+    rosterStatus: 'active', conflictRecordUnavailable: true,
+  }]);
+  const result = action === 'suggestion'
+    ? await verifyPersonAndAddress({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, email: 'reviewer@example.edu' })
+    : action === 'roster'
+      ? await verifyPersonAndAddress({ requestId: REQUEST_ID, candidateKey: 'suggestion:row', email: 'reviewer@example.edu' })
+      : await retryAddressCheck({ requestId: REQUEST_ID, candidateKey: 'suggestion:row' });
+  expect(result).toMatchObject({ success: false, code: 'reviewer_identity_edit_blocked' });
+  expect(resolveReviewerBindCapability).toHaveBeenCalledWith({
+    personId: PERSON_ID, requestId: REQUEST_ID, allowSynthetic: false,
+  });
+  expect(attestAddress).not.toHaveBeenCalled();
+  expect(recordSurfaced).not.toHaveBeenCalled();
+  expect(clearAddressTrustBlocks).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
 });
 
 test('open repair projection keeps only server-owned candidate keys and one newest alert per candidate', async () => {
