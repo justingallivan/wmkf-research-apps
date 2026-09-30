@@ -20,6 +20,11 @@ export default async function handler(req, res) {
     // IntegrityService.dismissMatch / getDismissals (Postgres reads/writes); it
     // never reaches screenApplicants, which is the only model-resolving path.
     const { IntegrityService } = await import('../../../lib/services/integrity-service');
+    // Same ownership scope as history.js: a user may read or dismiss matches
+    // only on their own screenings.
+    const ownsScreening = async (screeningId) => Boolean(
+      await IntegrityService.getScreening(parseInt(screeningId), access.profileId)
+    );
 
     if (req.method === 'POST') {
       const {
@@ -61,6 +66,10 @@ export default async function handler(req, res) {
         });
       }
 
+      if (!(await ownsScreening(screeningId))) {
+        return res.status(404).json({ error: 'Screening not found' });
+      }
+
       const dismissed = await IntegrityService.dismissMatch(
         parseInt(screeningId),
         source,
@@ -83,6 +92,10 @@ export default async function handler(req, res) {
 
       if (!screeningId) {
         return res.status(400).json({ error: 'screeningId is required' });
+      }
+
+      if (!(await ownsScreening(screeningId))) {
+        return res.status(404).json({ error: 'Screening not found' });
       }
 
       const dismissals = await IntegrityService.getDismissals(parseInt(screeningId));
