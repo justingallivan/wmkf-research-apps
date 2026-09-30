@@ -1,3 +1,58 @@
+# Session 554-B4 Prompt: finish Factory reviewer B4 release readiness
+
+## Session 553-B4 Summary — 2026-09-29/30 PT (Codex; B4 runtime PR and CI)
+
+This is the handoff for `codex/factory-reviewer-b4-runtime` in the B4 worktree. The mainline Session 553 scheduled-email prompt is preserved below as history; it is a separate workstream.
+
+### What Was Completed
+
+1. **B4 runtime branch brought current with `main`.** Merged the post-presentation and Integrity migration allocations; B4 remains migration 058 and fresh-install block V57. The branch includes the reviewer binding and email guards, acceptance-job pause, slot journal and runner, and their tests [VERIFIED via branch source and `51bd67237`, `fe329603f`].
+2. **Draft PR #369 opened:** <https://github.com/justingallivan/wmkf-research-apps/pull/369>. The branch is mergeable; all GitHub checks passed at `da9afcc30`, including Jest, the PostgreSQL ledger job, Vercel Preview, security scans and the automatic Claude review [VERIFIED via `gh pr checks 369` and `gh pr view 369`, 2026-09-29/30]. The automatic review is not a new Opus review of the final test-fixture commit.
+3. **CI fixtures repaired.** The three reviewer integration suites now supply B4's literal isolation switch and complete ordinary-person projections. Their 232 focused tests passed; the full local `npm run test:ci` passed 1,178 suites and 18,419 tests, with 4 suites / 52 tests skipped by design [VERIFIED via local test output before `da9afcc30`].
+4. **Cross-computer state saved.** `codex/factory-reviewer-b4-runtime` was clean at `da9afcc30` before this handoff; `git ls-remote` confirmed the same commit on `origin`. PR #369 remains draft and has not deployed to Production [VERIFIED via branch/PR state]. No operational-ledger application or slot PATCH was performed by this Codex session [VERIFIED via session actions]; external state must be rechecked.
+
+### Commits
+
+- `51bd67237` — merge current main into the B4 runtime branch.
+- `fe329603f` — merge subsequent Session 553 main updates.
+- `da9afcc30` — align reviewer integration fixtures with B4 isolation gates.
+- This branch-only handoff commit (see `git log -1` after checkout).
+
+## Next Items
+
+### Verified Open
+
+1. **Resume B4 release preflight on the B4 branch, then deliberate promotion.** Recheck PR #369's head, mergeability and CI after fetching. Follow `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` §6 and its B4 release checklist: local/Preview/Production marker and literal switch verification; local `ledger_prod` and `ledger` 054/058 preflight, owner-run 058 apply and receipt; Production read-only section 13 probe, privilege and automation dispositions. Match the probe source commit to the release candidate. The slot PATCH is a separate, later operation with its own gate [VERIFIED via plan §6 and release checklist; checks are not yet recorded for this release].
+
+### Owner Action Pending
+
+1. **Live access and release decision.** This Codex worktree exposed no `TEST_REQUEST_LEDGER_URL` or Dataverse connection variables and only `.env.example`; the owner said live checks must wait until tomorrow's other computer. The Tier 2 strategy requires an explicit owner decision to merge because `main` auto-deploys [VERIFIED via environment-name/file check and `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §4]. Do not paste credentials into chat.
+
+### Verify Before Acting
+
+1. **Operational state may change overnight.** Re-read both local ledger schemas and current environment switch/marker values before applying 058 or promoting PR #369. Do not infer live state from passing CI or this handoff. Confirm any new `main` commits before updating the B4 branch [VERIFIED via B4 plan release checklist].
+
+### Do Not Reopen Without New Decision
+
+1. **Reviewer isolation policy.** The owner chose fail-closed existing-person binds when reviewer isolation is non-on and a pause of all acceptance jobs if either isolation switch is non-on. Keep those decisions when interpreting test failures [VERIFIED via B4 plan owner decisions and branch tests].
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` | B4 contract and release checklist |
+| `lib/db/migrations/058_test_request_cast_slot_bindings.sql` | B4 local-ledger slot journal migration |
+| `lib/services/test-requests/cast-slot-binding-runner.js` | One-slot guarded operation |
+| `tests/integration/test-request-run-ledger.pg.test.js` | Real PostgreSQL migration and crash-boundary tests |
+
+## Testing
+
+`npm run test:ci` and all PR #369 checks passed at `da9afcc30`. After any new code changes, run the relevant gates and tests again. The live release checks above remain open.
+
+---
+
+## Prior mainline prompt (separate scheduled-email workstream; preserved)
+
 # Session 553 Prompt: build Part A of the scheduled-email plan (engine hardening, migration 059)
 
 ## Session 552 Summary — 2026-09-29/30 PT (Opus; Integrity Workbench tab released, migration numbering settled)
