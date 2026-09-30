@@ -212,7 +212,11 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain("import { classifyLedgerUrl, selectLedgerVariable } from '../lib/db/ledger-registry.js';");
     expect(script).toContain('classifyLedgerUrl(url, { target, sharedUrls })');
     expect(script).toContain('must not be the shared Production/Preview database');
-    expect(script).toContain('does not name a registered ledger host');
+    // Opus round-1 M1: requireLedgerUrl throws on ANY !verdict.ok, not an
+    // enumerated reason list, so an unrecognized future reason cannot fall
+    // through and return the URL.
+    expect(script).toContain('if (!verdict.ok) {');
+    expect(script).toContain('is not an acceptable ledger (${verdict.reason})');
     // Codex round-1 Fix 7: every ledger-driven mode, including --ledger-check
     // and --run-inspect, is target-bound; the variable itself is selected
     // from the target rather than always TEST_REQUEST_LEDGER_URL, and the
@@ -220,10 +224,27 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain('selectLedgerVariable(target, process.env)');
     expect(script).not.toContain('targetExplicit');
     expect(script).not.toContain('--strict-ledger-check');
+    // Opus round-1 M1: requireLedgerUrl fails closed on a missing target,
+    // and there are zero no-argument calls left at HEAD (a future merge
+    // that reintroduces one, e.g. from B4, is a real regression, not a
+    // decorative one).
+    expect(script).toContain("if (typeof target !== 'string' || target.length === 0) {");
+    expect((script.match(/requireLedgerUrl\(\)/g) || []).length).toBe(0);
+    // Block-bound: for each write/read-only ledger-driven dispatch, BOTH
+    // requireLedgerUrl(args.target) and ledgerSchemaCheck(..., { mode: '...'
+    // must occur strictly between this block's `if (args.X) {` and the next
+    // `if (args.` dispatch, not merely somewhere later in the file.
     for (const mode of ['ledgerCheck', 'runInspect', 'setStatus || args.statusRecheck', 'createCast || args.bindReviewer', 'runRecheck', 'reserve', 'advance']) {
       const at = script.indexOf(`if (args.${mode}) {`);
       expect(at).toBeGreaterThan(-1);
-      expect(script.indexOf('requireLedgerUrl(args.target)', at) - at).toBeLessThan(320);
+      const nextDispatch = script.indexOf('\n  if (args.', at + 1);
+      const boundary = nextDispatch === -1 ? script.length : nextDispatch;
+      const requireAt = script.indexOf('requireLedgerUrl(args.target)', at);
+      const checkAt = script.indexOf('ledgerSchemaCheck(ledgerUrl, { mode:', at);
+      expect(requireAt).toBeGreaterThan(at);
+      expect(requireAt).toBeLessThan(boundary);
+      expect(checkAt).toBeGreaterThan(at);
+      expect(checkAt).toBeLessThan(boundary);
     }
     // Codex round-1 Fix 4: drift always throws (no strict flag); extras are
     // checked against the tracked approved-ahead list.

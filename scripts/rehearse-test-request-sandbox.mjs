@@ -767,6 +767,12 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
  * --run-inspect and --ledger-check, is target-bound.
  */
 function requireLedgerUrl(target) {
+  // Opus round-1 M1: a missing/empty target must fail closed, never fall
+  // through to classifyLedgerUrl's target=null host-only rules (which skip
+  // the managed database check).
+  if (typeof target !== 'string' || target.length === 0) {
+    throw new Error('requireLedgerUrl requires a non-empty --target; every ledger-driven mode is target-bound.');
+  }
   const varName = selectLedgerVariable(target, process.env);
   const url = process.env[varName];
   if (!url) {
@@ -776,14 +782,17 @@ function requireLedgerUrl(target) {
   const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL']
     .map((name) => process.env[name]).filter(Boolean);
   const verdict = classifyLedgerUrl(url, { target, sharedUrls });
-  if (verdict.reason === 'shared_database') {
-    throw new Error(`${varName} must not be the shared Production/Preview database.`);
-  }
-  if (verdict.reason === 'unregistered_host' || verdict.reason === 'unparseable' || verdict.reason === 'query_override' || verdict.reason === 'socket_destination' || verdict.reason === 'wrong_port') {
-    throw new Error(`${varName} does not name a registered ledger host (lib/db/ledger-registry.js); extending the registry is a reviewed commit.`);
-  }
-  if (verdict.reason && verdict.reason.startsWith('wrong_database:')) {
-    throw new Error(`${varName} on the managed ledger must name the ${verdict.reason.slice('wrong_database:'.length)} database for --target=${target}.`);
+  if (!verdict.ok) {
+    // Opus round-1 M1: throw on ANY refusal reason, not an enumerated list,
+    // so an unrecognized future reason can never fall through and return
+    // the URL.
+    if (verdict.reason === 'shared_database') {
+      throw new Error(`${varName} must not be the shared Production/Preview database.`);
+    }
+    if (verdict.reason && verdict.reason.startsWith('wrong_database:')) {
+      throw new Error(`${varName} on the managed ledger must name the ${verdict.reason.slice('wrong_database:'.length)} database for --target=${target}.`);
+    }
+    throw new Error(`${varName} is not an acceptable ledger (${verdict.reason}); see lib/db/ledger-registry.js.`);
   }
   return url;
 }
@@ -814,14 +823,16 @@ const LEDGER_CHECK_READ_ONLY_MODES = new Set(['run-inspect', 'ledger-check']);
 async function ledgerSchemaCheck(ledgerUrl, { mode = null } = {}) {
   const db = pgLedgerDb(ledgerUrl);
   let diff;
+  let live;
   try {
-    diff = compareLedgerFingerprint(readExpectedFingerprint().fingerprint, await readLedgerFingerprint(db));
+    live = await readLedgerFingerprint(db);
+    diff = compareLedgerFingerprint(readExpectedFingerprint().fingerprint, live);
   } finally {
     await db.end?.();
   }
   const database = new URL(ledgerUrl).pathname.replace(/^\//, '');
   const approvedAhead = readApprovedAhead();
-  const unapproved = unapprovedExtras(diff, approvedAhead);
+  const unapproved = unapprovedExtras(diff, approvedAhead, live);
 
   if (mode === 'ledger-check') {
     // Standalone diagnostic: print everything, throw on nothing.
