@@ -88,27 +88,50 @@ async function connectWithRetry(url, registry) {
   throw lastErr;
 }
 
-async function writeExpected(schemaLib) {
+/**
+ * Codex round-3 #4: --write-expected used to bypass the registry entirely
+ * (a raw `neon.tech` substring check and equality with just POSTGRES_URL,
+ * connecting with a bare `{ connectionString: url }`), so a hostless URL
+ * inherited ambient PGHOST and a percent-encoded `?host=` override reached
+ * the managed Neon hostname while the raw refusal returned false — a
+ * command documented as scratch-only could execute DDL against a shared
+ * database. It now goes through the exact same effective-destination
+ * classification, explicit client config, and post-connect identity check
+ * as every other ledger connection point, and additionally requires label
+ * `local` (a `write-expected` run against the managed host, even one that
+ * would otherwise validly classify, is never the intent of this command).
+ */
+async function writeExpected(schemaLib, registry) {
   const url = process.env.TEST_REQUEST_LEDGER_TEST_URL;
   if (!url) throw new Error('--write-expected needs TEST_REQUEST_LEDGER_TEST_URL (a scratch/local Postgres).');
-  if (/neon\.tech/i.test(url) || url === process.env.POSTGRES_URL) {
-    throw new Error('Refusing to build the expected fingerprint on the shared Production/Preview database.');
+  const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL', 'TEST_REQUEST_LEDGER_URL', 'TEST_REQUEST_SANDBOX_LEDGER_URL']
+    .map((n) => process.env[n]).filter(Boolean);
+  const verdict = registry.classifyLedgerUrl(url, { sharedUrls });
+  if (!verdict.ok) {
+    throw new Error(`TEST_REQUEST_LEDGER_TEST_URL is not an acceptable scratch destination (${verdict.reason}); see lib/db/ledger-registry.js.`);
+  }
+  if (verdict.label !== 'local') {
+    throw new Error(`TEST_REQUEST_LEDGER_TEST_URL must be a local scratch Postgres (classified as ${verdict.label}); refusing to regenerate the expected fingerprint against a real ledger.`);
   }
   const { Client } = require('pg');
-  const client = new Client({ connectionString: url });
+  const client = new Client(registry.buildLedgerClientConfig(url));
   await client.connect();
-  const schema = `ledger_fp_${crypto.randomBytes(4).toString('hex')}`;
   try {
-    await client.query(`CREATE SCHEMA ${schema}`);
-    await client.query(`SET search_path TO ${schema}`);
-    const files = schemaLib.listLedgerMigrationFiles();
-    for (const f of files) await client.query(fs.readFileSync(path.join(schemaLib.LEDGER_MIGRATIONS_DIR, f), 'utf8'));
-    const fingerprint = await schemaLib.readLedgerFingerprint(client);
-    const out = { generatedFrom: files, fingerprint };
-    fs.writeFileSync(schemaLib.LEDGER_FINGERPRINT_PATH, `${JSON.stringify(out, null, 2)}\n`);
-    console.log(`Wrote ${path.relative(process.cwd(), schemaLib.LEDGER_FINGERPRINT_PATH)} from ${files.join(', ')}`);
+    await registry.assertLedgerConnectionIdentity(client, verdict.effective, { checkPort: false });
+    const schema = `ledger_fp_${crypto.randomBytes(4).toString('hex')}`;
+    try {
+      await client.query(`CREATE SCHEMA ${schema}`);
+      await client.query(`SET search_path TO ${schema}`);
+      const files = schemaLib.listLedgerMigrationFiles();
+      for (const f of files) await client.query(fs.readFileSync(path.join(schemaLib.LEDGER_MIGRATIONS_DIR, f), 'utf8'));
+      const fingerprint = await schemaLib.readLedgerFingerprint(client);
+      const out = { generatedFrom: files, fingerprint };
+      fs.writeFileSync(schemaLib.LEDGER_FINGERPRINT_PATH, `${JSON.stringify(out, null, 2)}\n`);
+      console.log(`Wrote ${path.relative(process.cwd(), schemaLib.LEDGER_FINGERPRINT_PATH)} from ${files.join(', ')}`);
+    } finally {
+      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`).catch(() => {});
+    }
   } finally {
-    await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`).catch(() => {});
     await client.end();
   }
 }
@@ -166,9 +189,9 @@ async function checkOne(name, url, target, schemaLib, registry, expected, approv
 async function main() {
   loadEnvLocal();
   const schemaLib = await import('../lib/db/ledger-schema.js');
-  if (process.argv.includes('--write-expected')) { await writeExpected(schemaLib); return; }
-  const allowUnreachable = process.argv.includes('--allow-unreachable');
   const registry = await import('../lib/db/ledger-registry.js');
+  if (process.argv.includes('--write-expected')) { await writeExpected(schemaLib, registry); return; }
+  const allowUnreachable = process.argv.includes('--allow-unreachable');
   const configured = LEDGER_VARS.filter((v) => process.env[v]);
   const skipped = LEDGER_VARS.length - configured.length;
   if (configured.length === 0) {
