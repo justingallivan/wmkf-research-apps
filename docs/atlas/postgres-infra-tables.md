@@ -127,7 +127,11 @@ request-scoped `beforeRunId` cursor. Each history row includes append-only PD
 review decisions from `integrity_screening_reviews`. **[SOURCE-BUILT on
 `codex/integrity-workbench-tab`; migrations 056–057 are not applied, and the
 branch is not merged or deployed.]** Existing standalone/manual runs remain
-request-unlinked. The fresh-install schema includes both migrations.
+request-unlinked. The standalone screener's history, detail, status-update and
+dismiss paths (`lib/services/integrity-service.js`) filter to
+`request_id IS NULL`, so Workbench runs are reviewed only through
+`integrity_screening_reviews`. These filters need migration 056 to exist before
+that code is deployed. The fresh-install schema includes both migrations.
 
 ### `integrity_screening_reviews` — SOURCE-BUILT (migration 057; not applied)
 **Source of truth:** Postgres append-only review history, keyed to one
