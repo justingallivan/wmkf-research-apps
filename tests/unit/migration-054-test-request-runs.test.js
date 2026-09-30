@@ -290,10 +290,13 @@ describe('migration 054 and the later migration manifest', () => {
     'utf8',
   ));
 
-  it('tracks 054_test_request_runs.sql before later numbered migrations', () => {
+  it('tracks 054_test_request_runs.sql directly after 053 and before later numbered migrations', () => {
     const ledgerIndex = manifest.files.indexOf('054_test_request_runs.sql');
-    expect(ledgerIndex).toBeGreaterThanOrEqual(0);
+    expect(ledgerIndex).toBeGreaterThan(0);
+    expect(manifest.files[ledgerIndex - 1]).toBe('053_pre_site_distribution_review_bundle.sql');
     expect(manifest.files.indexOf('055_post_presentation_materials.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('056_integrity_screenings_request_id.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('057_integrity_screening_reviews.sql')).toBeGreaterThan(ledgerIndex);
     expect(manifest.files.indexOf('058_test_request_cast_slot_bindings.sql')).toBeGreaterThan(ledgerIndex);
   });
 

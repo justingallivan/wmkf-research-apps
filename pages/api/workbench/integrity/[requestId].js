@@ -1,0 +1,55 @@
+/** GET the latest persisted request-scoped integrity screening and its people. */
+// model-override-warming:ignore reason=integrity-context-read-only
+// The shared service also exports the POST runner; this handler only reads
+// Dataverse people and saved Postgres results and never resolves an LLM model.
+import { requireAppAccess } from '../../../../lib/utils/auth';
+import { withDalContext } from '../../../../lib/dataverse/core/context';
+import { ServiceHttpError } from '../../../../lib/services/service-http-error';
+import { getWorkbenchIntegrityContext } from '../../../../lib/services/workbench/integrity-service';
+import { isGuid } from '../../../../lib/utils/guid';
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  // The Workbench page loads only with 'reviewers' (resolve-request), and the
+  // Integrity tab shows only with 'integrity-screener'; require both here.
+  const workbenchAccess = await requireAppAccess(req, res, 'reviewers');
+  if (!workbenchAccess) return;
+  const access = await requireAppAccess(req, res, 'integrity-screener');
+  if (!access) return;
+
+  const rawRequestId = req.query.requestId;
+  const requestId = typeof rawRequestId === 'string' ? rawRequestId.trim() : '';
+  if (!isGuid(requestId)) return res.status(400).json({ error: 'requestId must be a GUID' });
+  const rawBeforeRunId = req.query.beforeRunId;
+  let beforeRunId = null;
+  if (rawBeforeRunId !== undefined) {
+    if (typeof rawBeforeRunId !== 'string' || !/^[1-9]\d*$/.test(rawBeforeRunId)) {
+      return res.status(400).json({ error: 'beforeRunId must be a positive screening id' });
+    }
+    beforeRunId = Number(rawBeforeRunId);
+    if (!Number.isSafeInteger(beforeRunId)) {
+      return res.status(400).json({ error: 'beforeRunId must be a positive screening id' });
+    }
+  }
+
+  return withDalContext('workbench-integrity-latest', async () => {
+    try {
+      const result = await getWorkbenchIntegrityContext({
+        requestId,
+        profileId: access.profileId,
+        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+        beforeRunId,
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body || { error: error.message });
+      }
+      console.error('workbench integrity latest error:', error);
+      return res.status(500).json({ error: 'Failed to load integrity screening' });
+    }
+  });
+}

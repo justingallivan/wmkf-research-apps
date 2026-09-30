@@ -35,7 +35,9 @@ episode shows why "the next number after `main`" could have collided.
 - `applied_by` defaults to the literal `apply-migrations.js` unless
   `APPLY_MIGRATIONS_APPLIED_BY` is set, so it proves *when*, rarely *who*.
 - Allocation as of S552: 055 feature-request (applied, frozen; now on main),
-  056–057 Integrity tab (then unapplied; recheck before release), 058 B4,
+  056–057 Integrity tab (then unapplied; subsequently applied to the shared
+  database, verified, and merged into main [VERIFIED via
+  `docs/atlas/postgres-infra-tables.md`, `git log origin/main`, 2026-09-30]), 058 B4,
   059 scheduled-email Part A. The fresh-install blocks are V56
   post-presentation, V57 B4, V58 scheduled-email Part A.
 - Checking Production needs the owner to run the query
