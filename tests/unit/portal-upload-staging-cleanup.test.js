@@ -452,3 +452,28 @@ describe('null candidate (existing behavior unaffected)', () => {
     expect(result.retained).toBe(0);
   });
 });
+
+
+describe('DOCX transcript cleanup uses stored bytes, never the source attestation exemption', () => {
+  test.each([true, false])('exact stored-byte digest matches: %s', async (matches) => {
+    const source = Buffer.from('original DOCX package');
+    const stored = Buffer.from('promoted DOCX package');
+    const candidate = {
+      driveId: 'drive', itemId: 'item', filename: 'transcript.docx',
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      sourceSha256: createHash('sha256').update(source).digest('hex'), sourceSize: source.length,
+      sha256: createHash('sha256').update(matches ? stored : source).digest('hex'), size: stored.length,
+      registrySize: source.length, eTag: 'old-etag', versionId: '1.0',
+    };
+    const metadata = { driveId: 'drive', id: 'item', name: candidate.filename, size: stored.length, eTag: 'new-etag', versionId: '2.0' };
+    const metadataSpy = jest.spyOn(GraphService, 'getFileMetadataById').mockResolvedValue(metadata);
+    const downloadSpy = jest.spyOn(GraphService, 'downloadFile').mockResolvedValue({ buffer: stored });
+    try {
+      const proof = await DEFAULT_CLEANUP_DEPENDENCIES.verifyPostPresentationTranscriptCandidateUnchanged(candidate);
+      if (matches) expect(proof).toMatchObject({ sha256: candidate.sha256, eTag: 'new-etag' });
+      else expect(proof).toBeNull();
+    } finally {
+      metadataSpy.mockRestore(); downloadSpy.mockRestore();
+    }
+  });
+});

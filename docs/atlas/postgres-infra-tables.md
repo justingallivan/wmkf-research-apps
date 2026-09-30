@@ -492,7 +492,7 @@ expected columns, 0 rows — empty until the branch merges.]**
 
 ## Portal upload staging
 
-### `portal_upload_staging` (migrations 031, 043, 049)
+### `portal_upload_staging` (migrations 031, 043, 049, 055)
 **Source of truth:** Postgres coordination ledger; published abstract/caption/image
 authority remains Dataverse + SharePoint.
 
@@ -507,6 +507,20 @@ drive/item/version/filename. This lets an expired-lease retry recognize a
 committed response drop, retire only the recorded predecessor, or delete only
 an exact unreferenced candidate where that scope supports candidate cleanup.
 `result_payload` makes consumed retries idempotent.
+
+For `post_presentation_transcript` (migration 055), the candidate binds the
+request/generation identity and exact Graph drive/item/name/version/ETag.
+**[SOURCE-BUILT on `codex/transcript-docx-integrity`, not production-accepted:]**
+DOCX finalization attests the stored package against the staged source using
+`attestDocxPackageAgainstSource`, accepting only its characterized SharePoint
+metadata changes. Candidate `sourceSha256`/`sourceSize` identify the original
+staged input; `sha256`/`size` identify the actual stored package for exact-byte
+cleanup. `registrySize` retains the size fenced immediately before a registry
+create so later metadata-only repacks can replay that row. Legacy receipts are
+upgraded using the original staged bytes. PDF/TXT/VTT retain exact raw-byte
+checks. No columns or status values change. See
+`docs/plans/evidence/post-presentation/docx-transcript-fix-2026-09-30.md` for
+characterization, failure handling, and release limitations.
 
 Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
 and submit routes; staff replacement mint and finalize routes; external
