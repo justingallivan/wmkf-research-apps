@@ -80,6 +80,7 @@ function Recording({ token, material }) {
             preload="metadata"
             onError={onError}
             onLoadedMetadata={onLoadedMetadata}
+            onPlaying={() => setStatus('')}
             onTimeUpdate={(event) => { lastTimeRef.current = event.currentTarget.currentTime; }}
             className="mt-3 aspect-video w-full rounded-lg bg-black"
           />
