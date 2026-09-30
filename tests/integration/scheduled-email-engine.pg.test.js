@@ -459,7 +459,7 @@ describeIf('scheduled email engine Part A (live Postgres, migrations 036 + 059)'
     expect(intentIds.every((id) => seen.has(id))).toBe(true);
     expect(d.sendEmail).not.toHaveBeenCalled();
     expect((await store.listDueScheduledEmails({ limit: 100 })).map((r) => r.id)).toEqual([ordinary.id]);
-  });
+  }, 60000);
 
   test('A7 forbidden fairness: 120 forbidden rows retry 25 per run, repeated 403s rotate, and a later successful read only clears the code', async () => {
     const forbiddenIds = await seedMany(120, { status: 'failed', dynamics_email_id: ACTIVITY, last_error_code: FORBIDDEN });
@@ -488,14 +488,26 @@ describeIf('scheduled email engine Part A (live Postgres, migrations 036 + 059)'
     const dueNow = (await store.listDueScheduledEmails({ limit: 200 })).map((r) => r.id);
     expect(dueNow).toHaveLength(26);
     for (const row of batch) expect(dueNow).toContain(row.id);
-  });
+  }, 60000);
 
   test('A7 digest fairness: every PD is represented, no PD contributes more than the window, the overflowing PD is flagged, and only selected FYI ids are receipted', async () => {
-    const seedPd = async (pd, count, extra = {}) => {
-      for (let i = 0; i < count; i++) await seed({ pdSystemUserId: pd, scheduledSendAt: new Date(Date.parse('2026-01-01T00:00:00Z') + i * 3600000).toISOString(), set: extra });
-    };
+    // One statement per PD (620 rows total): row-at-a-time seeding exceeded
+    // jest's default timeout on the CI runner (S553).
+    const seedPd = (pd, count, sent = false) => mockPg.client.query(
+      `INSERT INTO scheduled_email_messages
+         (id, workflow_type, source_record_id, request_id, deliverable_id, pd_systemuser_id, pd_name, pd_email,
+          to_recipients, recipient_name, subject, body_text, signature_text, scheduled_send_at,
+          status, dynamics_email_id, send_requested_at, sent_at)
+       SELECT gen_random_uuid(), 'grantee_abstract_reminder', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(),
+              $1::uuid, 'PD', 'pd@example.org', '["pi@example.edu"]'::jsonb, 'PI', 'Subject', 'Body text', 'Sig',
+              TIMESTAMPTZ '2026-01-01T00:00:00Z' + (g * INTERVAL '1 hour'),
+              $3, CASE WHEN $3 = 'sent' THEN $4::uuid END,
+              CASE WHEN $3 = 'sent' THEN NOW() END, CASE WHEN $3 = 'sent' THEN NOW() END
+         FROM generate_series(0, $2::int - 1) AS g`,
+      [pd, count, sent ? 'sent' : 'scheduled', ACTIVITY],
+    );
     await seedPd(PD_A, 120);
-    await seedPd(PD_B, 300, { status: 'sent', dynamics_email_id: ACTIVITY, send_requested_at: new Date(), sent_at: new Date() });
+    await seedPd(PD_B, 300, true);
     await seedPd(PD_C, 200);
     const rows = await store.listScheduledEmailDigestRows({ perPdLimit: 100 });
     const groups = service.groupDigestRowsByPd(rows, { perPdLimit: 100 });
@@ -518,13 +530,15 @@ describeIf('scheduled email engine Part A (live Postgres, migrations 036 + 059)'
     expect(receipted).toBe(100);
     const remaining = await mockPg.client.query("SELECT COUNT(*)::int AS n FROM scheduled_email_messages WHERE status = 'sent' AND digest_fyi_at IS NULL");
     expect(remaining.rows[0].n).toBe(200);
-  });
+  }, 60000);
 
   test('A2 digest grouping: an unconfirmed row is under Needs attention, never upcoming', async () => {
     await seed({ set: { status: 'failed', dynamics_email_id: ACTIVITY, send_requested_at: new Date(), last_error_code: UNCONFIRMED } });
     await seed({ set: { status: 'failed', dynamics_email_id: ACTIVITY, last_error_code: MISSING } });
     await seed();
-    const [group] = service.groupDigestRowsByPd(await store.listScheduledEmailDigestRows());
+    const groups = service.groupDigestRowsByPd(await store.listScheduledEmailDigestRows());
+    expect(groups).toHaveLength(1);
+    const group = groups.find((g) => g.pdSystemUserId === PD_A);
     expect(group.needsAttention).toHaveLength(2);
     expect(group.upcoming).toHaveLength(1);
     expect(group.approvalPending).toHaveLength(0);
