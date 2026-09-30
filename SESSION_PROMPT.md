@@ -1,6 +1,6 @@
-# Session 558-B4 Prompt: resume ledger checks after tomorrow's home-Mac restore
+# Session 559-B4 Prompt: resume ledger checks after tomorrow's home-Mac restore
 
-## Session 557-B4 Summary — 2026-09-30 PT (Codex; automation evidence, prior Opus P2 fix)
+## Session 558-B4 Summary — 2026-09-30 PT (Codex; automation evidence, prior Opus P2 fix)
 
 **B4 runtime MERGED/DEPLOYED by explicit owner decision; ledger/Local and slot-operation readiness remain incomplete.** Stay on `codex/factory-reviewer-b4-runtime` in `/Users/gallivan/Code/WMKF_Apps-codex`. Never touch Claude's checkout, scheduled-email surfaces, 059/V58 or push main. No Production migration, Dataverse write, slot PATCH, email or live job drain ran.
 
@@ -53,7 +53,43 @@ Rollback: prior Ready `dpl_HSLQZ6jvdtpJyhSz4L7fxmMBCmkA` / `cd177c471e`; restore
 
 ### Evidence and handoff
 
-Runtime candidate: `40ab24f3e`. Evidence directory: `docs/plans/evidence/test-request-factory/`; fix report/tests/provenance plus release index `b4-release-readiness-2026-09-30.md`. Contract: `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`. Bounded /sweep reconciles current plan/report/handoff and explicitly historical initial Opus verdict/reproduction. Production runtime shipped by explicit owner merge instruction; milestone evidence is in b4-production-promotion-2026-09-30.md within this branch’s authorized B4 surface. No storage architecture changed. Advisory claim-evidence pilot report unavailable (local state unreadable); no row fabricated.
+Runtime candidate: `40ab24f3e`. Evidence directory: `docs/plans/evidence/test-request-factory/`; fix report/tests/provenance plus release index `b4-release-readiness-2026-09-30.md`. Contract: `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`. Bounded /sweep reconciles current plan/report/handoff and explicitly historical initial Opus verdict/reproduction. Production runtime shipped by explicit owner merge instruction; milestone evidence is in b4-production-promotion-2026-09-30.md and the stop-time DEVELOPMENT_LOG.md entry “Factory reviewer B4 runtime promoted.” No storage architecture changed. Advisory claim-evidence pilot report unavailable (local state unreadable); no row fabricated.
+
+### Stop receipt — Session 558-B4
+
+[VERIFIED via GitHub at stop] All nine post-merge check runs succeeded on `a18882a0b7` (including Jest, PostgreSQL ledger, Playwright and all CodeQL analyses); Vercel status also succeeded. Prior Production READY and signed-in Chrome home/Workbench-list smoke remain the deployment evidence. No new runtime change or live operation ran at stop.
+
+[VERIFIED via remote source at `54b847e31`] PR #374 is still OPEN. Its existing CLI modes already use requireLedgerUrl(args.target), but that branch's CLI does not yet include the new B4 slot mode. Therefore its second-landing reconciliation/fingerprint obligations remain relevant; verify their final integration in #374 rather than duplicating Claude's work here. No merge/rebase of #374 and no Claude-checkout access.
+
+Milestone determination: Production capability shipped; DEVELOPMENT_LOG.md now records “Factory reviewer B4 runtime promoted (Session 558-B4)” on this branch. CLAUDE.md needs no mutable-catalog update. Current handoff/evidence are updated; scheduled-email history after the preservation marker is unchanged. No new Factory run/cast/status ID was produced. Future such lines must name the actual ledger host/database beside the ID.
+
+Advisory report: `npm run report:claim-evidence-pilot -- --current` returned unavailable (local state could not be read). No observation row fabricated. No memory-router growth/change occurred in this stop pass. Next session reads this branch's Session 559-B4 prompt; remaining Local/ledger/slot checks stay status-labeled above.
+
+### Session commits
+
+- `aa8f24a34` — docs(factory): record owner-authorized B4 Production promotion
+- `09b00d7c1` — docs(factory): resolve lookup-only automation dispositions
+- `60fdda4e1` — docs(factory): record Connor automation classifications
+- `725931e49` — docs(factory): collect production automation disposition evidence
+- `ab812c2ac` — docs(factory): record restored shared env link and Local switch readiness
+- `dda75c1d3` — docs(factory): record home-Mac ledger restore blocker and PR integration handoff
+- `e04553e76` — docs(factory): record verified inactive-slot fix and refreshed B4 readiness
+- `40ab24f3e` — fix(reviewers): preserve inactive ordinary applicant slots for repair
+- `0dcda0359` — Record OAuth Opus review and confirmed inactive reviewer slot regression
+- `e17b93685` — Record B4 Preview provenance, passing CI and captured-env readback limitation
+- `1a86c10da` — Record B4 Local and branch Preview switch readiness and owner recovery steps
+- `93447aeac` — Record B4 release preflight evidence and owner blockers
+- `92ccbd0bd` — Merge remote-tracking branch 'origin/main' into codex/factory-reviewer-b4-runtime
+
+The stop documentation commit follows this list. All commits are pushed only to codex/factory-reviewer-b4-runtime; main deployment came through owner-authorized PR #369. Documentation-only follow-ups after the merge are on this branch, not silently pushed to main.
+
+### Key updated files
+
+- SESSION_PROMPT.md: Session 559-B4 carryover and this stop record.
+- DEVELOPMENT_LOG.md: B4 Production milestone.
+- docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md: release status and remaining requirements.
+- docs/plans/evidence/test-request-factory/b4-production-promotion-2026-09-30.md and JSON: source, CI, deployment, smoke, rollback and unknowns.
+- Other B4 evidence companions retain the fix/review, metadata dispositions, ledger location and owner procedures.
 
 ---
 

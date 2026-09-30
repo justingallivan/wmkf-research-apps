@@ -144,7 +144,7 @@
   "slotPatchRun": false,
   "ledgerOperationRun": false,
   "postmergeCi": {
-    "observedAt": "2026-09-30T22:32:06.316939+00:00",
+    "observedAt": "2026-09-30T22:37:40.084526+00:00",
     "checks": [
       {
         "conclusion": "success",
@@ -192,5 +192,6 @@
         "status": "completed"
       }
     ]
-  }
+  },
+  "stopMilestoneLog": "DEVELOPMENT_LOG.md: Factory reviewer B4 runtime promoted (Session 558-B4)"
 }
