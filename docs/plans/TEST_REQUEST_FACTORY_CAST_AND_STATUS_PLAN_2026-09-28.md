@@ -249,6 +249,8 @@ Postgres crash-boundary tests must kill at plan, dispatch, PATCH response loss, 
 
 ### B4 release checklist status — 2026-09-30
 
+Owner ledger update: operational ledgers are on the home Mac only; all ledger-dependent steps are blocked: ledger not on this machine until tomorrow's restore. Current procedure and PR #374 second-landing obligations are recorded in `docs/plans/evidence/test-request-factory/b4-ledger-location-update-2026-09-30.md`. Managed Neon schema provisioning does not establish restored cast/run ownership. Do not merge/rebase #374 or bypass this branch's expected Neon refusal. Every new run/cast/status handoff line must name the actual ledger host label/database beside the run ID.
+
 Evidence and owner procedure: `docs/plans/evidence/test-request-factory/b4-release-readiness-2026-09-30.md`. The runtime candidate is `40ab24f3e9da5af0259aa481014621cdd7837d37`; evidence-only descendants preserve that runtime/probe/client source. Section 13 was refreshed at that clean commit with matching switch/privilege evidence. No runtime promotion, migration apply or slot PATCH was performed.
 
 | Release item | Status and evidence |
@@ -257,10 +259,10 @@ Evidence and owner procedure: `docs/plans/evidence/test-request-factory/b4-relea
 | Independent Claude Opus review | P2 FIXED at `40ab24f3e`: ordinary inactive server-read slots reach repair hydration, other callers remain strict. 45 suites / 1,712 tests and 18 source verification commands passed. Fresh OAuth Opus 5.5: FIX VERIFIED BY SOURCE, no P0–P2. Evidence: `b4-inactive-slot-fix-2026-09-30.md`; initial review remains history. |
 | Local / Preview / Production wave29/wave30 | PASS: all required attributes returned present using each configuration; all resolve to Production Dataverse. |
 | Both literal isolation switches | Configuration PASS: Local, B4 branch Preview and Production freshly read `on`/`on`; Local and branch Preview enabled with owner direction. Post-edit Preview at `1a86c10da` is Ready; captured-value readback UNKNOWN (CLI/API limitation). Evidence: `b4-environment-switches-enabled-2026-09-30.json`; six matrix suites / 145 tests passed. |
-| Local ledger_prod 054/058 preflight/apply/record | BLOCKED: database absent from this Colima instance; owner does not know its location. Apply/post-apply receipt not run. |
-| Local ledger 054/058 preflight/apply/record | BLOCKED: only two earliest Factory tables, no tracker/cast/slot tables; receipt function differs. Its operational ownership is unknown. No migration applied. |
+| Local ledger_prod 054/058 preflight/apply/record | blocked: ledger not on this machine. Owner confirms home Mac wmkf-ledger-pg/ledger_prod; wait for tomorrow's snapshot/restore, then §6. No apply/post-apply receipt here. See `b4-ledger-location-update-2026-09-30.md`. |
+| Local ledger 054/058 preflight/apply/record | blocked: ledger not on this machine. Owner confirms home Mac wmkf-ledger-pg/ledger. This Mac's ledger is stale residue; do not improvise against it. Wait for tomorrow's restore, then §6. |
 | Shared Production 054 owner query / 058 receipt | Owner query drafted at `docs/plans/evidence/test-request-factory/b4-schema-preflight.sql`; runnable recovery commands and disposition worksheet at `b4-owner-next-actions-2026-09-30.md` in that directory. Owner execution/application pending. Production/Preview tracker consistency UNKNOWN; shared 058 is not a runtime prerequisite (§6). |
-| Cast normalized email digest vs owned local journal | BLOCKED by unavailable production cast journal; no identity fabricated or adopted from a name/email lookup. |
+| Cast normalized email digest vs owned local journal | blocked: ledger not on this machine until restored from home Mac wmkf-ledger-pg/ledger_prod. Never infer ownership by name/email. Managed schema exists per owner; operational history restore is pending. |
 | Clean committed section 13 / Process visibility | REFRESHED at `40ab24f3e`: clean committed probe/client, Global effective prvReadWorkflow, 14 readable activated flows, no hard incomplete reasons; same six owner dispositions pending. See `b4-dataverse-fix-supplement-2026-09-30.json` and 18:31 section 13 receipt. |
 | Automation classification and eventual slot gate | BLOCKED pending owner dispositions and indirect-chain review of all listed custom steps / all activated flows. `complete=false`; no slot PATCH. |
 | Deliberate Tier 2 promotion / post-deploy job resumption | Owner decision pending; PR remains draft. Must recheck effective deployment switches and resumption after authorized promotion. |

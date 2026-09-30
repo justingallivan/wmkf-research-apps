@@ -1,4 +1,4 @@
-# Session 557-B4 Prompt: recover owned ledgers and complete owner release gates
+# Session 557-B4 Prompt: resume ledger checks after tomorrow's home-Mac restore
 
 ## Session 556-B4 Summary — 2026-09-30 PT (Codex; Opus P2 fix)
 
@@ -15,11 +15,18 @@
 
 ### Owner actions pending — unchanged
 
-1. Recover existing operational ledger_prod/ledger and ownership history on the other Mac/backups (unavailable for approximately nine hours after the earlier chat decision). This Colima instance has no ledger_prod; ledger only two early Factory tables/old receipt function. Do not recreate a journal or adopt Dataverse identities by name/email. No schema/tracker/row created here.
-2. Run §6 read-only preflight on actual ledgers, then owner-run versioned single-transaction 058 apply and record source/hash/UTC/post-shape. Never run apply-migrations.js on local ledgers; observed ledger lacks earlier tables that 058 alone does not restore. Compare server-read cast email digest with recovered owned journal.
+1. **blocked: ledger not on this machine.** Owner confirms operational wmkf-ledger-pg/ledger_prod and wmkf-ledger-pg/ledger exist only on the home Mac. Tomorrow's snapshot/restore unblocks reads; this Mac's ledger is stale residue and must not be used for B4 checks. Preserve operational ownership history and compare dump digests/row counts using the remote brief linked in b4-ledger-location-update-2026-09-30.md. No schema/tracker/row created here.
+2. §6 schema/receipt preflight/apply/record and owned cast address-digest check: **blocked: ledger not on this machine** until restore. Afterwards use an owner-supplied shell-only local ledger override; never commit URL/password or run app apply-migrations.js on local ledgers. Record actual host label/database with source/hash/UTC/post-shape and beside every future run/cast/status ID.
 3. Owner runs b4-schema-preflight.sql on shared Production, inspects historical tracker, then applies 058 through existing-DB process when preflight permits. Shared Production/Preview consistency UNKNOWN; shared 058 is not a B4 runtime prerequisite. Agent never applies Production migrations.
 4. Six automation dispositions plus indirect-chain review of every listed custom step/all activated flows remain open. Manual trigger dispositions need parameter values/invocation/Request action evidence. `b4-owner-next-actions-2026-09-30.md` contains recovery commands/worksheet. Slot gate BLOCKED; complete=false.
 5. Keep PR draft until explicit owner Tier 2 promotion (main auto-deploys). Recheck CI, effective deployed switches, dated metadata and eventual job resumption. A future runtime change requires a matching clean-commit readiness probe.
+
+### Ledger integration boundary — owner update 2026-09-30
+
+- Owner reports managed Neon project wmkf-factory-ledger, no Vercel project connection, databases managed-ledger/ledger_prod and managed-ledger/ledger, 054+058 applied. Operational data restore is pending; no managed database probe/apply here.
+- PR #374 (claude/factory-ledger-registry) is Claude's registry/runner/fingerprint surface under review. Do not merge/rebase it or edit its implementation. This B4 CLI's blanket Neon refusal is expected, not a blocker. Whichever PR lands second must update the B4 slot-path requireLedgerUrl call to requireLedgerUrl(args.target), then regenerate lib/db/ledger-schema-fingerprint.json after 058 is on main with the #374 script against scratch Postgres; otherwise CI ledger and Jest fail.
+- This worktree's .env.local is verified PRIVATE mode-0600 regular file, not a shared symlink; neither TEST_REQUEST_LEDGER_URL nor TEST_REQUEST_SANDBOX_LEDGER_URL is present. Shared env updates do not propagate. No secret synchronization performed; shell-local restored ledger override does not depend on this file.
+- New restore brief/portability plan and revised stop skill are read-only remote refs from #374 at 124ba6739, absent from this branch. Pointer/evidence: docs/plans/evidence/test-request-factory/b4-ledger-location-update-2026-09-30.md. Every new Factory run/cast/status handoff names the actual ledger beside its run ID; no such operation occurred here.
 
 ### Do not reopen
 
@@ -1980,6 +1987,13 @@ older preview environments, and Azure callbacks were left alone.
   client-request-layer Preview cleanup, reviewer follow-ups) were not re-probed
   during this closeout. Use their authoritative plans and live checks before
   making them a worklist. Do not delete another task's preview or worktree.
+
+### Ledger integration boundary — owner update 2026-09-30
+
+- Owner reports managed Neon project wmkf-factory-ledger, no Vercel project connection, databases managed-ledger/ledger_prod and managed-ledger/ledger, 054+058 applied. Operational data restore is pending; no managed database probe/apply here.
+- PR #374 (claude/factory-ledger-registry) is Claude's registry/runner/fingerprint surface under review. Do not merge/rebase it or edit its implementation. This B4 CLI's blanket Neon refusal is expected, not a blocker. Whichever PR lands second must update the B4 slot-path requireLedgerUrl call to requireLedgerUrl(args.target), then regenerate lib/db/ledger-schema-fingerprint.json after 058 is on main with the #374 script against scratch Postgres; otherwise CI ledger and Jest fail.
+- This worktree's .env.local is verified PRIVATE mode-0600 regular file, not a shared symlink; neither TEST_REQUEST_LEDGER_URL nor TEST_REQUEST_SANDBOX_LEDGER_URL is present. Shared env updates do not propagate. No secret synchronization performed; shell-local restored ledger override does not depend on this file.
+- New restore brief/portability plan and revised stop skill are read-only remote refs from #374 at 124ba6739, absent from this branch. Pointer/evidence: docs/plans/evidence/test-request-factory/b4-ledger-location-update-2026-09-30.md. Every new Factory run/cast/status handoff names the actual ledger beside its run ID; no such operation occurred here.
 
 ### Do not reopen without new evidence
 

@@ -1,48 +1,26 @@
 # B4 owner actions — 2026-09-30
 
-**Release remains blocked; PR #369 remains draft.** Local/B4 Preview/Production switch configuration and marker availability passed. This packet supplies the remaining owner procedures; it does not authorize a migration, Dataverse write or slot PATCH. The owner cannot access the other Mac until approximately nine hours after the chat decision.
+**Release remains blocked; PR #369 remains draft.** Local/B4 Preview/Production switch configuration and marker availability passed. This packet supplies the remaining owner procedures; it does not authorize a migration, Dataverse write or slot PATCH. The operational ledgers are confirmed on the home Mac only; every ledger-dependent check is blocked: ledger not on this machine until tomorrow's restore.
 
-## Recover the existing journal
+## Snapshot/restore the confirmed home-Mac journals
 
-On the other Mac, inspect the existing Docker installation without recreating containers or databases:
+[OWNER-REPORTED, 2026-09-30] The operational databases are wmkf-ledger-pg/ledger_prod and wmkf-ledger-pg/ledger on the home Mac. This Mac's local ledger is stale residue. Do not investigate or apply migrations to that residue as a substitute. The new [restore brief](https://github.com/justingallivan/wmkf-research-apps/blob/124ba673998a4676578fe169d283fbab80ac70f2/docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md) and [portability plan](https://github.com/justingallivan/wmkf-research-apps/blob/124ba673998a4676578fe169d283fbab80ac70f2/docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md) are read-only remote references from PR #374, absent from this branch; follow the owner's restore process tomorrow, compare digests/row counts and preserve journal history before B4 checks.
 
-```bash
-docker context ls
-docker ps -a --format '{{.Names}} {{.Image}} {{.Status}}'
-docker volume ls
-```
+The separate managed-ledger databases now have 054+058 schema per owner report, but the operational-record restore remains pending. Do not connect through this B4 CLI's expected Neon refusal or change its guard. For local work after restore, use an owner-supplied shell-only TEST_REQUEST_LEDGER_URL override to 127.0.0.1:5433/ledger_prod; never commit URL/password. This worktree's .env.local remains the private copy and has neither new ledger key. [Details and second-landing integration obligations](b4-ledger-location-update-2026-09-30.md).
 
-If the known `wmkf-ledger-pg` container is already running, list its database names:
-
-```bash
-docker exec wmkf-ledger-pg psql -X -U postgres -d postgres \
-  -v ON_ERROR_STOP=1 \
-  -c "SELECT datname FROM pg_database WHERE NOT datistemplate ORDER BY datname"
-```
-
-If `ledger_prod` exists, run the committed read-only query against it. Repeat for `ledger` only after identifying it as the intended operational sandbox ledger:
-
-```bash
-docker exec -i wmkf-ledger-pg psql -X -U postgres -d ledger_prod \
-  -v ON_ERROR_STOP=1 \
-  < docs/plans/evidence/test-request-factory/b4-schema-preflight.sql
-```
-
-Use the query from this B4 branch's named commit; preserve database name, source commit, UTC time and schema output. If the migration tracker exists, separately read the tracker query at the end of the SQL file. Schema presence alone does not establish ownership history: the journal must contain the existing clone/cast/binding records. Do not paste cast addresses or record IDs into release evidence. If the database is absent there too, locate a backup before proposing restoration; an empty replacement does not establish ownership of existing Dataverse objects.
-
-This Mac's Docker inventory found one Colima profile, one Postgres container and one volume. Its `ledger_prod` is absent and its `ledger` is an early two-table shape. No recovery, migration or database creation was attempted. The CLI-phase local storage choice and later shared-storage intent are in the production plan; moving storage remains a separate decision requiring preservation of journal history.
+After restore, use the read-only [schema query](b4-schema-preflight.sql) at a named B4 source commit. Record ledger label/database, source/UTC/schema evidence; schema presence alone does not prove journal ownership. For every new Factory run/cast/status line, name its actual ledger beside the run ID.
 
 ## Schema preflight and owner apply
 
 The read-only [schema query](b4-schema-preflight.sql) reports all `test_request_*` columns, constraints, indexes and installed receipt-function definitions. Run it on the intended shared Production target and return sanitized schema/tracker output. Do not infer shared state from local state.
 
-For each recovered local operational ledger, follow §6 of the [B4 plan](../../TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md): preflight/classify shape → explicit owner-run single-transaction 058 apply → record source SHA, migration SHA-256, database, UTC and post-apply shape. Stop for incompatible shape. Extend a tracker only when it already contains its historical rows. Never run the all-migrations runner on the local ledgers. Shared Production application remains owner-run through the existing-database versioned process; shared 058 is not a B4 runtime prerequisite.
+For each restored local operational ledger, follow §6 of the [B4 plan](../../TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md): preflight/classify shape → explicit owner-run single-transaction 058 apply → record source SHA, migration SHA-256, database, UTC and post-apply shape. Stop for incompatible shape. Extend a tracker only when it already contains its historical rows. Never run the all-migrations runner on the local ledgers. Shared Production application remains owner-run through the existing-database versioned process; shared 058 is not a B4 runtime prerequisite.
 
 058 SHA-256: `b90730eccebbba2d779cd6ce80b66874fb375307395f83494a6165459e4847b4`. No migration was applied by this session.
 
 ## Automation disposition worksheet
 
-[VERIFIED via the committed section 13 receipt](reviewer-slot-readiness-receipt-2026-09-30T16-20-11-291Z.json) The six open items below are real probe results. No owner classification is recorded. Effective Process read was Global at the dated probe; all 14 activated flow definitions were readable, with no hard incomplete reasons.
+[VERIFIED via the committed section 13 receipt](reviewer-slot-readiness-receipt-2026-09-30T18-31-30-343Z.json) The six open items below are real probe results. No owner classification is recorded. Effective Process read was Global at the dated probe; all 14 activated flow definitions were readable, with no hard incomplete reasons.
 
 | Item | Observed trigger / scope | Evidence the owner still needs | Disposition |
 |---|---|---|---|
