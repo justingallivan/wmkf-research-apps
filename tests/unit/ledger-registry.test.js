@@ -8,6 +8,8 @@ import {
   expectedLedgerDatabase,
   selectLedgerVariable,
   targetForLedgerVar,
+  buildLedgerClientConfig,
+  assertLedgerConnectionIdentity,
 } from '../../lib/db/ledger-registry';
 
 const MANAGED = MANAGED_LEDGER_HOSTS[0];
@@ -146,5 +148,68 @@ describe('Codex round-1 Fix 7: selectLedgerVariable', () => {
   });
   test('sandbox falls back to TEST_REQUEST_LEDGER_URL for single-variable local setups', () => {
     expect(selectLedgerVariable('sandbox', {})).toBe('TEST_REQUEST_LEDGER_URL');
+  });
+});
+
+describe('Opus round-2 item 1: buildLedgerClientConfig ignores ambient PG* variables', () => {
+  const ORIGINAL_ENV = process.env;
+  beforeEach(() => {
+    process.env = {
+      ...ORIGINAL_ENV,
+      PGPORT: '6543',
+      PGDATABASE: 'shadow',
+      PGUSER: 'hostile',
+      PGOPTIONS: '-c search_path=shadow',
+    };
+  });
+  afterEach(() => { process.env = ORIGINAL_ENV; });
+
+  test('the config is built entirely from the URL, never from PGPORT/PGDATABASE/PGUSER', () => {
+    const cfg = buildLedgerClientConfig(`postgresql://role:pw@${MANAGED}/ledger_prod`);
+    expect(cfg).toEqual({
+      host: MANAGED,
+      port: 5432,
+      database: 'ledger_prod',
+      user: 'role',
+      password: 'pw',
+      ssl: expect.anything(),
+    });
+    expect(cfg.port).not.toBe(6543);
+    expect(cfg.database).not.toBe('shadow');
+    expect(cfg.user).not.toBe('hostile');
+  });
+
+  test('port defaults to 5432 when the URL omits it, never from PGPORT', () => {
+    const cfg = buildLedgerClientConfig(`postgresql://role:pw@${MANAGED}/ledger_prod`);
+    expect(cfg.port).toBe(5432);
+  });
+
+  test('options is absent from the config (Neon\'s pooler rejects any options startup parameter; see the post-connect identity check instead)', () => {
+    const cfg = buildLedgerClientConfig(`postgresql://role:pw@${MANAGED}/ledger_prod`);
+    expect('options' in cfg).toBe(false);
+  });
+
+  test('throws when the URL is missing a host, database, or user', () => {
+    expect(() => buildLedgerClientConfig('postgresql:///onlydb')).toThrow(/host/);
+    expect(() => buildLedgerClientConfig(`postgresql://role@${MANAGED}/`)).toThrow(/database/);
+  });
+});
+
+describe('Opus round-2 item 1: assertLedgerConnectionIdentity', () => {
+  test('passes when the live db/schema/port match the expected effective tuple', async () => {
+    const db = { query: jest.fn(async () => ({ rows: [{ db: 'ledger_prod', schema: 'public', port: 5432 }] })) };
+    await expect(assertLedgerConnectionIdentity(db, { database: 'ledger_prod', port: '5432' })).resolves.toMatchObject({ db: 'ledger_prod' });
+  });
+  test('throws when the live database differs (e.g. a PGDATABASE override)', async () => {
+    const db = { query: jest.fn(async () => ({ rows: [{ db: 'shadow', schema: 'public', port: 5432 }] })) };
+    await expect(assertLedgerConnectionIdentity(db, { database: 'ledger_prod', port: '5432' })).rejects.toThrow(/identity mismatch/);
+  });
+  test('throws when the live schema is not public (e.g. a PGOPTIONS search_path override)', async () => {
+    const db = { query: jest.fn(async () => ({ rows: [{ db: 'ledger_prod', schema: 'shadow', port: 5432 }] })) };
+    await expect(assertLedgerConnectionIdentity(db, { database: 'ledger_prod', port: '5432' })).rejects.toThrow(/identity mismatch/);
+  });
+  test('throws when the live port differs', async () => {
+    const db = { query: jest.fn(async () => ({ rows: [{ db: 'ledger_prod', schema: 'public', port: 6543 }] })) };
+    await expect(assertLedgerConnectionIdentity(db, { database: 'ledger_prod', port: '5432' })).rejects.toThrow(/identity mismatch/);
   });
 });

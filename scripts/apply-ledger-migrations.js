@@ -72,10 +72,12 @@ async function main() {
   }
   loadEnvLocal();
   const url = process.env[urlEnv];
-  const { classifyLedgerUrl, targetForLedgerVar } = await import('../lib/db/ledger-registry.js');
+  const {
+    classifyLedgerUrl, targetForLedgerVar, buildLedgerClientConfig, assertLedgerConnectionIdentity,
+  } = await import('../lib/db/ledger-registry.js');
   const {
     listLedgerMigrationFiles, LEDGER_MIGRATIONS_DIR, LEDGER_TRACKER_TABLE,
-    readLedgerFingerprint, compareLedgerFingerprint, formatLedgerDiff,
+    readLedgerFingerprint, compareLedgerFingerprint, formatLedgerDiff, readApprovedAhead,
   } = await import('../lib/db/ledger-schema.js');
   const {
     decideFileAction, sha256Text, stripOuterTxn, tableNamesIn, fingerprintFilesInScratch,
@@ -100,12 +102,18 @@ async function main() {
   const files = listLedgerMigrationFiles(LEDGER_MIGRATIONS_DIR);
   const fileSql = new Map(files.map((f) => [f, fs.readFileSync(path.join(LEDGER_MIGRATIONS_DIR, f), 'utf8')]));
   const fileChecksum = new Map(files.map((f) => [f, sha256Text(fileSql.get(f))]));
+  const approvedAhead = readApprovedAhead();
 
   const { Client } = require('pg');
-  const client = new Client({ connectionString: url });
+  const client = new Client(buildLedgerClientConfig(url));
   await client.connect();
   let exitCode = 0;
   try {
+    // Opus round-2 item 1: verify the LIVE connection actually landed on
+    // the classified destination (ambient PGOPTIONS can still redirect
+    // current_schema even though buildLedgerClientConfig pins every other
+    // destination field explicitly; see the registry module's comment).
+    await assertLedgerConnectionIdentity(client, verdict.effective, { checkPort: verdict.label === 'managed-ledger' });
     // Opus round-1 L4: --dry-run must execute no DDL. The tracker
     // CREATE/ALTER are skipped, and the tracker is instead read with a
     // query that tolerates either the table or the sha256 column being
@@ -146,6 +154,7 @@ async function main() {
 
       let liveHasObjects = false;
       let scratchDiff = null;
+      let liveFingerprint = null;
       if (!trackedRow) {
         const names = tableNamesIn(fileSql.get(f));
         if (names.length > 0) {
@@ -156,14 +165,23 @@ async function main() {
           liveHasObjects = rows.length > 0;
         }
         if (liveHasObjects) {
+          // Opus round-2 item 5 (Codex #6): --dry-run must issue only
+          // SELECT queries. fingerprintFilesInScratch executes BEGIN,
+          // CREATE SCHEMA, SET LOCAL, the migration bodies, and ROLLBACK —
+          // real DDL even though it rolls back — so a dry run skips it
+          // entirely and reports the file as indeterminate instead.
+          if (dryRun) {
+            console.log(`[would need adoption analysis] ${f} (run without --dry-run to compare; the comparison uses a rolled-back scratch schema)`);
+            continue;
+          }
           const scratchFp = await fingerprintFilesInScratch(client, filesUpToHere, LEDGER_MIGRATIONS_DIR, readLedgerFingerprint);
-          const liveFp = await readLedgerFingerprint(client);
-          scratchDiff = compareLedgerFingerprint(scratchFp, liveFp);
+          liveFingerprint = await readLedgerFingerprint(client);
+          scratchDiff = compareLedgerFingerprint(scratchFp, liveFingerprint);
         }
       }
 
       const decision = decideFileAction({
-        file: f, currentChecksum, trackedRow, liveHasObjects, scratchDiff, acceptTrackedChecksums,
+        file: f, currentChecksum, trackedRow, liveHasObjects, scratchDiff, acceptTrackedChecksums, approvedAhead, liveFingerprint,
       });
 
       if (decision.action === 'skip') { console.log(`[skip]      ${f}`); skipped += 1; continue; }

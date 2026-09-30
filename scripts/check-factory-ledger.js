@@ -71,11 +71,11 @@ function sleep(ms) {
 }
 
 /** Connects with up to CONNECT_ATTEMPTS tries, CONNECT_RETRY_DELAY_MS apart (managed compute wake-up). */
-async function connectWithRetry(url) {
+async function connectWithRetry(url, registry) {
   const { Client } = require('pg');
   let lastErr;
   for (let attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt += 1) {
-    const client = new Client({ connectionString: url, connectionTimeoutMillis: 15000 });
+    const client = new Client({ ...registry.buildLedgerClientConfig(url), connectionTimeoutMillis: 15000 });
     try {
       await client.connect();
       return client;
@@ -125,12 +125,27 @@ async function checkOne(name, url, target, schemaLib, registry, expected, approv
   const database = verdict.effective.database;
   let client;
   try {
-    client = await connectWithRetry(url);
+    client = await connectWithRetry(url, registry);
   } catch (err) {
     console.warn(`⚠ ${name}: ledger UNREACHABLE after ${CONNECT_ATTEMPTS} attempts (${verdict.label} host, database ${database}): ${err.message}`);
     return 'unreachable';
   }
   try {
+    // Opus round-2 item 1: verify the LIVE connection landed on the
+    // classified destination (ambient PGOPTIONS can still redirect
+    // current_schema even though buildLedgerClientConfig pins every other
+    // destination field explicitly). This is a hard failure, never folded
+    // into "unreachable"/--allow-unreachable: the connection DID succeed,
+    // it just landed somewhere other than where it should have. Local
+    // Docker/Colima ledgers report a different inet_server_port() than the
+    // host-mapped port the client dialed, so the port check is skipped for
+    // those.
+    try {
+      await registry.assertLedgerConnectionIdentity(client, verdict.effective, { checkPort: verdict.label === 'managed-ledger' });
+    } catch (err) {
+      console.error(`✗ ${name}: ${err.message}`);
+      return 'fail';
+    }
     const live = await schemaLib.readLedgerFingerprint(client);
     const diff = schemaLib.compareLedgerFingerprint(expected.fingerprint, live);
     const unapproved = schemaLib.unapprovedExtras(diff, approvedAhead, live);
