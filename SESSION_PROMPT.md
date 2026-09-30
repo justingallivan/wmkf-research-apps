@@ -42,7 +42,12 @@
 
 ### Verify Before Acting
 
-1. **`POSTGRES_URL` exposure (S551).** The owner pasted the production connection string, including its password, into this session's chat. Rotation is the owner's call; see `docs/CREDENTIALS_RUNBOOK.md`.
+1. **`POSTGRES_URL` rotation (S551): home Mac DONE, office Mac OPEN.** The owner pasted the production connection string, with its password, into the S551 chat.
+   - The owner rotated the `neondb_owner` password via Vercel's Neon integration; Vercel updated the Postgres variables.
+   - The home Mac's two real env files are synced: `WMKF_Apps/.env.local`, which five worktree `.env.local` symlinks share, and the feature-request worktree's `.env.presentation-proof.local`. A `select 1` check connected, and the backups were deleted.
+   - Production was redeployed as `wmkfresearchapps-irht4mpyn` (aliased to `reviews.wmkeck.org`, Ready).
+   - **Open:** the office Mac, using the owner's brief `~/Downloads/office-mac-postgres-sync-brief.md` (dry run, then `--apply` on approval). The first post-redeploy cron run was not checked for auth errors.
+   - `docs/CREDENTIALS_RUNBOOK.md` has no Postgres rotation procedure; adding one was offered, not done.
 2. **Why Vercel skipped the production build of `61dafcb81`:** still not diagnosed.
 3. **Residue** (list and confirm before deleting any of it):
    - Test Requests 1003301, 1003302 and 1003303.
