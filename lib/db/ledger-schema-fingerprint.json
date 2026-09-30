@@ -5,6 +5,11 @@
   "fingerprint": {
     "tables": {
       "test_request_cast_bindings": {
+        "relkind": "r",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
         "columns": [
           {
             "name": "binding_id",
@@ -118,9 +123,15 @@
             "definition": "CREATE UNIQUE INDEX test_request_cast_bindings_pkey ON test_request_cast_bindings USING btree (binding_id)"
           }
         ],
-        "triggers": []
+        "triggers": [],
+        "policies": []
       },
       "test_request_cast_members": {
+        "relkind": "r",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
         "columns": [
           {
             "name": "member_id",
@@ -283,9 +294,15 @@
             "definition": "CREATE UNIQUE INDEX test_request_cast_members_pkey ON test_request_cast_members USING btree (member_id)"
           }
         ],
-        "triggers": []
+        "triggers": [],
+        "policies": []
       },
       "test_request_run_resources": {
+        "relkind": "r",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
         "columns": [
           {
             "name": "resource_id",
@@ -461,9 +478,15 @@
             "definition": "CREATE INDEX test_request_run_resources_run_step_idx ON test_request_run_resources USING btree (run_id, step)"
           }
         ],
-        "triggers": []
+        "triggers": [],
+        "policies": []
       },
       "test_request_run_reviewer_assignments": {
+        "relkind": "r",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
         "columns": [
           {
             "name": "assignment_id",
@@ -588,9 +611,15 @@
             "definition": "CREATE UNIQUE INDEX test_request_run_reviewer_assignments_run_source ON test_request_run_reviewer_assignments USING btree (run_id, source_person_id)"
           }
         ],
-        "triggers": []
+        "triggers": [],
+        "policies": []
       },
       "test_request_runs": {
+        "relkind": "r",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
         "columns": [
           {
             "name": "run_id",
@@ -972,9 +1001,15 @@
             "definition": "CREATE INDEX test_request_runs_status_idx ON test_request_runs USING btree (status)"
           }
         ],
-        "triggers": []
+        "triggers": [],
+        "policies": []
       },
       "test_request_status_changes": {
+        "relkind": "r",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
         "columns": [
           {
             "name": "change_id",
@@ -1134,7 +1169,8 @@
             "definition": "CREATE UNIQUE INDEX test_request_status_changes_run_sequence ON test_request_status_changes USING btree (run_id, sequence)"
           }
         ],
-        "triggers": []
+        "triggers": [],
+        "policies": []
       }
     },
     "functions": [

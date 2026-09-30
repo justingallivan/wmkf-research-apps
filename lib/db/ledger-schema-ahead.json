@@ -4,6 +4,11 @@
       "migration": "058_test_request_cast_slot_bindings.sql",
       "tables": {
         "test_request_cast_slot_bindings": {
+          "relkind": "r",
+          "rowSecurity": {
+            "enabled": false,
+            "forced": false
+          },
           "columns": [
             {
               "name": "run_id",
@@ -249,7 +254,8 @@
               "definition": "CREATE UNIQUE INDEX test_request_cast_slot_bindings_pkey ON test_request_cast_slot_bindings USING btree (run_id, member_id)"
             }
           ],
-          "triggers": []
+          "triggers": [],
+          "policies": []
         }
       }
     }

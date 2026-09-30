@@ -147,6 +147,24 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
       expect(diff.ok).toBe(false);
       expect(diff.differing.some((d) => d.includes('function test_request_receipt_ok'))).toBe(true);
     });
+
+    // Codex round-3 #5: relation kind and RLS/policy state were not
+    // fingerprinted at all — a table with FORCE RLS and an added policy
+    // compared clean against the baseline.
+    test('ENABLE ROW LEVEL SECURITY under the same table name is reported as differing', async () => {
+      await client.query('ALTER TABLE test_request_runs ENABLE ROW LEVEL SECURITY;');
+      const live = await readLedgerFingerprint(client);
+      const diff = compareLedgerFingerprint(baseline, live);
+      expect(diff.ok).toBe(false);
+      expect(diff.differing.some((d) => d.includes('table test_request_runs row security'))).toBe(true);
+    });
+
+    test('a CREATE POLICY under the same table is reported as extra', async () => {
+      await client.query(`CREATE POLICY test_request_runs_all ON test_request_runs FOR SELECT USING (true);`);
+      const live = await readLedgerFingerprint(client);
+      const diff = compareLedgerFingerprint(baseline, live);
+      expect(diff.extra.some((e) => e === 'policy test_request_runs.test_request_runs_all')).toBe(true);
+    });
   });
 
   /**
