@@ -678,8 +678,9 @@ honorarium portal construction are implementation history or current operating r
 not become current work merely because their document status remains `active`.
 
 - **Integrity Screener in the Workbench, with PD approval (2026-09-26/27).**
-  [SOURCE-BUILT on `codex/integrity-workbench-tab`, head `b1086302b`; NOT merged,
-  NOT deployed; Postgres migrations 056 and 057 unapplied] The branch adds:
+  [SOURCE-BUILT on `claude/integrity-workbench-tab` (PR #366); NOT merged,
+  NOT deployed; Postgres migrations 056 and 057 applied to the shared database
+  and verified 2026-09-30] The branch adds:
   - a gated Integrity tab that screens the request's PI and Co-PIs automatically;
   - request-linked screening history;
   - an append-only PD approval/hold audit (`approved` means a complete screen plus the

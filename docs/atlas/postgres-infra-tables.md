@@ -118,6 +118,58 @@ future-cycle reconciliation; see the roster Contact-link plan F5.
 ### `integrity_screenings` (41 rows), `screening_dismissals` (0 rows)
 **Source of truth:** Postgres.
 Per-applicant screening history. `retractions` (68,248 rows) is the Retraction Watch dataset (org-wide).
+**Request linkage/history:** Migration 056 adds nullable `request_id UUID` plus
+the `idx_integrity_screenings_request_latest` partial index for newest-first
+lookup. The Workbench integrity service reads the request's PI/Co-PI identities
+from Dataverse and saves completed runs with this request ID. GET returns the
+latest linked run plus newest-first history pages of 20, with an optional
+request-scoped `beforeRunId` cursor. Each history row includes append-only PD
+review decisions from `integrity_screening_reviews`. **[SOURCE-BUILT on
+`claude/integrity-workbench-tab` for PR #366; migrations 056–057 are
+applied to the shared database on 2026-09-30 and verified by a schema probe (tracker rows, column, indexes and constraints) [VERIFIED, S552]; the branch is not merged or deployed.]**
+Existing standalone/manual runs remain
+request-unlinked. The standalone screener's history, detail, status-update and
+dismiss paths (`lib/services/integrity-service.js`) filter to
+`request_id IS NULL`, so Workbench runs are reviewed only through
+`integrity_screening_reviews`. These filters make migration 056 a prerequisite
+for the standalone screener as well as the Workbench routes. The fresh-install
+schema includes both migrations.
+
+**Blocking release order for PR #366:** before this branch is deployed,
+migrations 056 and 057 must be applied in order to the shared Postgres database
+with `node scripts/apply-migrations.js`, then verified with a read-only schema
+probe. The probe must confirm both `schema_migrations` tracker rows and the
+physical schema: nullable UUID `integrity_screenings.request_id`,
+`idx_integrity_screenings_request_latest`, the
+`integrity_screening_reviews` table with its foreign keys and decision/notes
+constraints, and both review-history indexes. Do not deploy on tracker rows
+alone, and do not add runtime column detection or a legacy-query fallback; the
+schema probe is the release gate. **Gate passed 2026-09-30 (S552):** 056 and 057
+were applied by the owner (`applied_by` `owner-s552-pr366`), and a read-only
+probe confirmed both tracker rows, the nullable UUID column, all three indexes,
+and the review table's primary key, both foreign keys and three CHECK
+constraints. `tests/integration/integrity-screening-reviews.pg.test.js` proves
+the same constraints in a scratch schema.
+
+### `integrity_screening_reviews` — SOURCE-BUILT (migration 057 applied to the shared database; 0 rows)
+**Source of truth:** Postgres append-only review history, keyed to one
+`integrity_screenings` run and its Dataverse request GUID. Migration 057 stores
+server-resolved reviewer profile and Dynamics user identity, decision
+(`approved` or `hold`), notes (maximum 2,000 characters; hold requires a
+non-empty note), and creation time. The request ID is stored for request-scoped
+history; the service verifies request ownership before appending and reading
+decisions. Indexes support newest-first request and screening reads.
+
+**Write/read paths:** `pages/api/workbench/integrity/[requestId]/review` appends
+through `lib/services/workbench/integrity-service.js`; only the request's lead
+Program Director or a fresh-role superuser can submit. The GET context returns
+the latest review summary and per-screen historical decisions. Only the latest
+screen is actionable. Approval requires the latest screened roster to match
+the live request roster and source coverage version 1 with all sources searched
+and no errors. A recorded approval means the integrity review is complete; it
+does not authorize funding or gate later workflow progression. **[SOURCE-BUILT
+on `claude/integrity-workbench-tab` for PR #366; migration 057 is
+applied to the shared database on 2026-09-30 and verified by a schema probe (tracker rows, column, indexes and constraints) [VERIFIED, S552]; the branch is not merged or deployed.]**
 
 ### `retractions` (68,248 rows)
 **Source of truth:** Postgres (manually refreshed via script — no live cron).

@@ -1,0 +1,325 @@
+/** @jest-environment node */
+import {
+  getLatestRequestIntegrityRun,
+  getWorkbenchIntegrityContext,
+  loadRequestIntegrityPeople,
+  runWorkbenchIntegrityScreen,
+  WORKBENCH_INTEGRITY_MAX_PEOPLE,
+  WORKBENCH_INTEGRITY_TIME_BUDGET_MS,
+} from '../../lib/services/workbench/integrity-service';
+import { ServiceHttpError } from '../../lib/services/service-http-error';
+
+const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
+const PI_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const COPI_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+function peopleDependencies(overrides = {}) {
+  return {
+    grantRequestAdapter: {
+      getById: jest.fn().mockResolvedValue({
+        akoya_requestid: REQUEST_ID,
+        _wmkf_projectleader_value: PI_ID,
+        _akoya_applicantid_value_formatted: 'Request Institution',
+      }),
+    },
+    appRequestPersonAdapter: {
+      queryAllPersons: jest.fn().mockResolvedValue({
+        records: [
+          { _wmkf_contact_value: PI_ID.toUpperCase(), wmkf_role: 100000001, wmkf_Contact: { fullname: 'Wrong Copi Role', adx_organizationname: 'Other' } },
+          { _wmkf_contact_value: PI_ID, wmkf_role: 100000000, wmkf_Contact: { fullname: 'Priya Investigator', adx_organizationname: 'PI Institution' } },
+          { _wmkf_contact_value: COPI_ID, wmkf_role: 100000001, wmkf_Contact: { firstname: 'Casey', lastname: 'Collaborator', adx_organizationname: 'CoPI Institution' } },
+          { _wmkf_contact_value: COPI_ID, wmkf_role: 100000001, wmkf_Contact: { fullname: 'Duplicate' } },
+        ],
+        totalCount: 4,
+        capped: false,
+      }),
+    },
+    contactAdapter: { getByIdWithSelect: jest.fn() },
+    ...overrides,
+  };
+}
+
+test('UNIONs project leader and PI/Co-PI junction, dedupes lowercase GUIDs, and gives PI precedence', async () => {
+  const deps = peopleDependencies();
+  const people = await loadRequestIntegrityPeople(REQUEST_ID, deps);
+  expect(people).toEqual([
+    { contactId: PI_ID, name: 'Priya Investigator', institution: 'PI Institution', role: 'PI' },
+    { contactId: COPI_ID, name: 'Casey Collaborator', institution: 'CoPI Institution', role: 'Co-PI' },
+  ]);
+  expect(deps.appRequestPersonAdapter.queryAllPersons).toHaveBeenCalledWith({
+    select: '_wmkf_contact_value,wmkf_role,wmkf_authorposition',
+    expand: 'wmkf_Contact($select=fullname,firstname,lastname,adx_organizationname,_parentcustomerid_value)',
+    filter: `_wmkf_request_value eq ${REQUEST_ID} and (wmkf_role eq 100000000 or wmkf_role eq 100000001)`,
+    orderby: 'wmkf_authorposition asc,createdon asc',
+  });
+  expect(deps.contactAdapter.getByIdWithSelect).not.toHaveBeenCalled();
+});
+
+test('request institution falls back only to the current Project Leader, not a distinct junction PI', async () => {
+  const distinctPi = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const deps = peopleDependencies({
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({
+      records: [{ _wmkf_contact_value: distinctPi, wmkf_role: 100000000, wmkf_Contact: { fullname: 'Junction PI' } }],
+      capped: false,
+    }) },
+    contactAdapter: { getByIdWithSelect: jest.fn().mockResolvedValue(null) },
+  });
+  const people = await loadRequestIntegrityPeople(REQUEST_ID, deps);
+  expect(people).toEqual([
+    { contactId: PI_ID, name: '', institution: 'Request Institution', role: 'PI' },
+    { contactId: distinctPi, name: 'Junction PI', institution: '', role: 'PI' },
+  ]);
+});
+
+test('no identities returns empty people; junction failures propagate instead of hiding Co-PIs', async () => {
+  const deps = peopleDependencies({ appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) } });
+  deps.grantRequestAdapter.getById.mockResolvedValue({ akoya_requestid: REQUEST_ID });
+  expect(await loadRequestIntegrityPeople(REQUEST_ID, deps)).toEqual([]);
+  deps.appRequestPersonAdapter.queryAllPersons.mockRejectedValue(new Error('junction unavailable'));
+  await expect(loadRequestIntegrityPeople(REQUEST_ID, deps)).rejects.toThrow('junction unavailable');
+});
+
+test('capped junction reads fail closed; unresolved names remain visible but cannot be screened', async () => {
+  const capped = peopleDependencies({ appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: true }) } });
+  await expect(loadRequestIntegrityPeople(REQUEST_ID, capped)).rejects.toThrow('capped');
+  const malformed = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: Array.from({ length: WORKBENCH_INTEGRITY_MAX_PEOPLE + 1 }, (_, i) => ({ _wmkf_contact_value: `${String(i + 1).padStart(8, '0')}-1111-4111-8111-111111111111`, wmkf_role: 100000001, wmkf_Contact: { fullname: `Person ${i}` } })), capped: false }) },
+  });
+  await expect(loadRequestIntegrityPeople(REQUEST_ID, malformed)).rejects.toMatchObject({ body: { code: 'person_limit_exceeded' } });
+  expect(malformed.contactAdapter.getByIdWithSelect).not.toHaveBeenCalled();
+
+  const unresolved = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
+    contactAdapter: { getByIdWithSelect: jest.fn().mockResolvedValue(null) },
+  });
+  const screenApplicants = jest.fn();
+  const result = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...unresolved, sql: async () => ({ rows: [] }) });
+  expect(result.people[0]).toMatchObject({ contactId: PI_ID, name: '', role: 'PI' });
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...unresolved,
+    sql: jest.fn(),
+    IntegrityService: { screenApplicants },
+  })).rejects.toMatchObject({ body: { code: 'person_identity_unavailable' } });
+  expect(screenApplicants).not.toHaveBeenCalled();
+});
+
+test('a deleted named junction contact is explicitly identity-unavailable and cannot be screened', async () => {
+  const deleted = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [{
+      _wmkf_contact_value: COPI_ID,
+      wmkf_role: 100000001,
+      wmkf_Contact: { fullname: 'Named Junction Contact' },
+    }], capped: false }) },
+    contactAdapter: { getByIdWithSelect: jest.fn().mockRejectedValue(Object.assign(new Error('Dataverse record is unavailable'), {
+      serviceName: 'dataverse', status: 404, dataverseCode: '0x80040217',
+    })) },
+  });
+  const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...deleted, sql: async () => ({ rows: [] }) });
+  expect(context.people[0]).toMatchObject({
+    contactId: COPI_ID, name: 'Named Junction Contact', role: 'Co-PI', identityUnavailable: true,
+  });
+  expect(context.review.status).toBe('identity_unavailable');
+  const screenApplicants = jest.fn();
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...deleted, sql: jest.fn(), IntegrityService: { screenApplicants },
+  })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'person_identity_unavailable' } });
+  expect(screenApplicants).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['forbidden contact read', { serviceName: 'dataverse', status: 403 }],
+  ['generic Dataverse 404', { serviceName: 'dataverse', status: 404 }],
+])('%s propagates instead of being treated as a deleted contact', async (_label, shape) => {
+  const unavailable = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
+    contactAdapter: { getByIdWithSelect: jest.fn().mockRejectedValue(Object.assign(new Error('Dataverse error'), shape)) },
+  });
+  await expect(loadRequestIntegrityPeople(REQUEST_ID, unavailable)).rejects.toMatchObject(shape);
+});
+
+test('contact hydration outages propagate', async () => {
+  const outage = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
+    contactAdapter: { getByIdWithSelect: jest.fn().mockRejectedValue(Object.assign(new Error('Dataverse error'), { serviceName: 'dataverse', status: 503 })) },
+  });
+  await expect(loadRequestIntegrityPeople(REQUEST_ID, outage)).rejects.toMatchObject({ status: 503 });
+});
+
+test('run maps an unavailable Retraction Watch corpus to 503 and saves nothing', async () => {
+  const sqlCalls = [];
+  const db = async (parts, ...values) => { sqlCalls.push(parts.join('?')); return { rows: [] }; };
+  const engine = { async *screenApplicants() { throw Object.assign(new Error('Retraction Watch corpus unavailable'), { code: 'retraction_corpus_unavailable' }); } };
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...peopleDependencies(), sql: db, IntegrityService: engine,
+  })).rejects.toMatchObject({ httpStatus: 503, body: { code: 'retraction_corpus_unavailable' } });
+  expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
+});
+
+test('run stops with 503 when the time budget runs out, before the next person and before any insert', async () => {
+  const sqlCalls = [];
+  const db = async (parts) => { sqlCalls.push(parts.join('?')); return { rows: [] }; };
+  let clock = 0;
+  let screened = 0;
+  const engine = { async *screenApplicants(applicants) {
+    for (let i = 0; i < applicants.length; i += 1) { yield { type: 'progress', applicantIndex: i }; screened += 1; clock += 250_000; }
+    yield { type: 'complete', results: [] };
+  } };
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...peopleDependencies(), sql: db, IntegrityService: engine, now: () => clock,
+  })).rejects.toMatchObject({ httpStatus: 503, body: { code: 'screening_time_budget_exceeded' } });
+  expect(screened).toBe(1);
+  expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
+});
+
+test('run aborts an in-flight generator step at the deadline and saves nothing', async () => {
+  const sqlCalls = [];
+  const db = async (parts) => { sqlCalls.push(parts.join('?')); return { rows: [] }; };
+  let receivedSignal = null;
+  const engine = { async *screenApplicants(_applicants, _key, _serpKey, _actorId, options) {
+    receivedSignal = options.signal;
+    yield { type: 'progress' };
+    await new Promise((resolve) => options.signal.addEventListener('abort', resolve, { once: true }));
+    throw options.signal.reason;
+  } };
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...peopleDependencies(), sql: db, IntegrityService: engine, timeBudgetMs: 5,
+  })).rejects.toMatchObject({ httpStatus: 503, body: { code: 'screening_time_budget_exceeded' } });
+  expect(receivedSignal).toBeInstanceOf(AbortSignal);
+  expect(receivedSignal.aborted).toBe(true);
+  expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
+});
+
+test('a complete event arriving after the deadline is rejected before insert', async () => {
+  const sqlCalls = [];
+  const db = async (parts) => { sqlCalls.push(parts.join('?')); return { rows: [] }; };
+  let clock = 0;
+  const engine = { async *screenApplicants() {
+    yield { type: 'progress' };
+    clock = WORKBENCH_INTEGRITY_TIME_BUDGET_MS + 1;
+    yield { type: 'complete', results: [{ matchCount: 0 }] };
+  } };
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...peopleDependencies(), sql: db, IntegrityService: engine, now: () => clock,
+  })).rejects.toMatchObject({ httpStatus: 503, body: { code: 'screening_time_budget_exceeded' } });
+  expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
+});
+
+test('a missing actor profile is a 401 before any Dataverse or paid work', async () => {
+  const deps = peopleDependencies();
+  const screenApplicants = jest.fn();
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: null, claudeApiKey: 'key' }, {
+    ...deps, sql: jest.fn(), IntegrityService: { screenApplicants },
+  })).rejects.toMatchObject({ httpStatus: 401, body: { code: 'profile_required' } });
+  expect(deps.grantRequestAdapter.getById).not.toHaveBeenCalled();
+  expect(screenApplicants).not.toHaveBeenCalled();
+});
+
+test('empty people and over-limit people are rejected before the paid engine', async () => {
+  const engine = { screenApplicants: jest.fn() };
+  const empty = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
+  });
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 7, claudeApiKey: 'key' }, { ...empty, IntegrityService: engine, sql: jest.fn() }))
+    .rejects.toMatchObject({ body: { code: 'no_people' } });
+
+  const records = Array.from({ length: WORKBENCH_INTEGRITY_MAX_PEOPLE + 1 }, (_, index) => ({
+    _wmkf_contact_value: `${String(index + 1).padStart(8, '0')}-1111-4111-8111-111111111111`,
+    wmkf_role: 100000001,
+    wmkf_Contact: { fullname: `Person ${index}` },
+  }));
+  const tooMany = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records, capped: false }) },
+  });
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 7, claudeApiKey: 'key' }, { ...tooMany, IntegrityService: engine, sql: jest.fn() }))
+    .rejects.toMatchObject({ body: { code: 'person_limit_exceeded' } });
+  expect(engine.screenApplicants).not.toHaveBeenCalled();
+});
+
+test('schema preflight and linked persistence are awaited; insert failures fail the run', async () => {
+  const engine = { screenApplicants: jest.fn(async function* (applicants, key, serpKey, actorId, options) {
+    expect(applicants).toEqual([{ name: 'Priya Investigator', role: 'PI', institution: 'PI Institution' }]);
+    expect(actorId).toBeNull();
+    expect(options).toMatchObject({ strictSourceErrors: true, signal: expect.any(AbortSignal) });
+    expect(options.deadlineAt).toEqual(expect.any(Number));
+    yield { type: 'complete', results: [{ matchCount: 2 }] };
+  }) };
+  const sqlCalls = [];
+  const db = async (parts, ...values) => {
+    const query = parts.join('?');
+    sqlCalls.push({ query, values });
+    if (query.includes('SELECT id, created_at')) return { rows: [] };
+    return { rows: [{ id: 42, created_at: '2026-09-26T10:00:00Z', screened_names: [], results: [{ matchCount: 2 }], match_count: 2, status: 'pending' }] };
+  };
+  const onePerson = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [{ _wmkf_contact_value: PI_ID, wmkf_role: 100000000, wmkf_Contact: { fullname: 'Priya Investigator', adx_organizationname: 'PI Institution' } }], capped: false }) },
+  });
+  const result = await runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 7, claudeApiKey: 'key' }, { ...onePerson, IntegrityService: engine, sql: db });
+  expect(sqlCalls[0].query).toContain('WHERE request_id = ?');
+  expect(sqlCalls[0].query).toContain('ORDER BY created_at DESC, id DESC');
+  expect(sqlCalls[1].query).toContain('request_id');
+  expect(sqlCalls[1].query).toContain('RETURNING id, created_at');
+  expect(sqlCalls[1].values).toContain(7);
+  expect(sqlCalls[1].values).toContain(REQUEST_ID);
+  expect(result.run).toMatchObject({ id: 42, matchCount: 2, status: 'pending' });
+
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 7, claudeApiKey: 'key' }, {
+    ...onePerson,
+    IntegrityService: engine,
+    sql: async (parts) => {
+      if (parts.join('?').includes('SELECT id, created_at')) return { rows: [] };
+      throw new Error('database unavailable');
+    },
+  })).rejects.toThrow('database unavailable');
+  expect(engine.screenApplicants).toHaveBeenCalledTimes(2);
+});
+
+test('real-shaped Dataverse 404 maps to request 404 before Postgres or screening', async () => {
+  const dataverse404 = Object.assign(new Error('dataverse failed (404): not found'), {
+    serviceName: 'dataverse', status: 404, isTransient: false,
+  });
+  const sql = jest.fn();
+  const engine = { screenApplicants: jest.fn() };
+  const deps = peopleDependencies({ grantRequestAdapter: { getById: jest.fn().mockRejectedValue(dataverse404) } });
+  await expect(getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...deps, sql }))
+    .rejects.toMatchObject({ httpStatus: 404, message: 'Request not found' });
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 7, claudeApiKey: 'key' }, {
+    ...deps, sql, IntegrityService: engine,
+  })).rejects.toMatchObject({ httpStatus: 404, message: 'Request not found' });
+  expect(sql).not.toHaveBeenCalled();
+  expect(engine.screenApplicants).not.toHaveBeenCalled();
+
+  const nullRequest = peopleDependencies({ grantRequestAdapter: { getById: jest.fn().mockResolvedValue(null) } });
+  await expect(getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...nullRequest, sql }))
+    .rejects.toMatchObject({ httpStatus: 404 });
+  expect(sql).not.toHaveBeenCalled();
+});
+
+test('latest run reader returns null when empty and projects the newest persisted row', async () => {
+  const rows = [{ id: 9, created_at: '2026-09-26T10:00:00Z', screened_names: [], results: [], match_count: 0, status: 'pending' }];
+  const db = jest.fn(async () => ({ rows }));
+  await expect(getLatestRequestIntegrityRun(REQUEST_ID, { sql: jest.fn(async () => ({ rows: [] })) })).resolves.toBeNull();
+  await expect(getLatestRequestIntegrityRun(REQUEST_ID, { sql: db })).resolves.toEqual({
+    id: 9, createdAt: rows[0].created_at, screenedNames: [], results: [], matchCount: 0, status: 'pending',
+  });
+  expect(db).toHaveBeenCalledTimes(1);
+  expect(db.mock.calls[0].slice(1)).toContain(REQUEST_ID);
+});
+
+
+test('migration 056 and fresh-install setup both define nullable request linkage and latest index', () => {
+  const fs = require('fs');
+  const migration = fs.readFileSync('lib/db/migrations/056_integrity_screenings_request_id.sql', 'utf8');
+  const setup = fs.readFileSync('scripts/setup-database.js', 'utf8');
+  expect(migration).toMatch(/ADD COLUMN IF NOT EXISTS request_id UUID/);
+  expect(migration).toMatch(/idx_integrity_screenings_request_latest[\s\S]*request_id, created_at DESC, id DESC/);
+  expect(setup).toMatch(/CREATE TABLE IF NOT EXISTS integrity_screenings[\s\S]*request_id UUID/);
+  expect(setup).toMatch(/idx_integrity_screenings_request_latest[\s\S]*request_id, created_at DESC, id DESC/);
+});
