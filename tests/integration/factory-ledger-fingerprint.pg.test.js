@@ -198,7 +198,9 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
           CHECK (status IN ('pending', 'dispatched', 'verified'));
       `);
       const result = await verifyTrackedPrefix(client, {
-        trackedFiles: [file054],
+        // The tracked prefix is every ledger file the checkout applied to this
+        // schema (054 alone before B4 merges, 054 + 058 after).
+        trackedFiles: listLedgerMigrationFiles(),
         migrationsDir: LEDGER_MIGRATIONS_DIR,
         readLedgerFingerprint,
         approvedAhead: [],
@@ -210,7 +212,9 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
     test('054 tracked, checksum-matching, and untouched -> ok (nothing drifted)', async () => {
       const file054 = listLedgerMigrationFiles()[0];
       const result = await verifyTrackedPrefix(client, {
-        trackedFiles: [file054],
+        // The tracked prefix is every ledger file the checkout applied to this
+        // schema (054 alone before B4 merges, 054 + 058 after).
+        trackedFiles: listLedgerMigrationFiles(),
         migrationsDir: LEDGER_MIGRATIONS_DIR,
         readLedgerFingerprint,
         approvedAhead: [],

@@ -376,8 +376,13 @@ describe('approved-ahead extras (Codex round-1 Fix 4; Opus round-1 item 6: shape
   test('readApprovedAhead reads the tracked file as an array of entries', () => {
     const approved = readApprovedAhead();
     expect(Array.isArray(approved)).toBe(true);
-    expect(approved[0].migration).toBe('058_test_request_cast_slot_bindings.sql');
-    expect(approved[0].tables.test_request_cast_slot_bindings).toBeDefined();
+    // Empty once every ledger migration is on main; while an entry exists it
+    // must name its migration and carry table shapes, never a bare name list.
+    for (const entry of approved) {
+      expect(typeof entry.migration).toBe('string');
+      expect(entry.tables && typeof entry.tables === 'object').toBe(true);
+      for (const shape of Object.values(entry.tables)) expect(Array.isArray(shape.columns)).toBe(true);
+    }
   });
   test('readApprovedAhead returns an empty array when the file is missing', () => {
     expect(readApprovedAhead('/nonexistent/path.json')).toEqual([]);
