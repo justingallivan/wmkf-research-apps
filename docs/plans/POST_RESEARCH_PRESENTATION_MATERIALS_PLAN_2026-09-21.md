@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview and Safari acceptance passed, staff Zoom-link and transcript controls plus Cancel/Retry are source-built and offline-tested, Graph-confirmed terminal expiry remains unobserved, and Production promotion remains."
+summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview Safari media and staff Zoom-link/transcript acceptance passed, Cancel/Retry remain offline-tested, Graph-confirmed terminal expiry remains unobserved, and Production promotion remains."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -214,8 +214,11 @@ one eligible HTTPS share URL or Zoom's copied message with an embedded passcode 
 upload sends VTT/TXT/PDF/DOCX bytes directly to private Blob staging, then finalizes the
 actor-bound staging ID through the governed producer; a staged file can retry finalize without
 resending bytes after a transient error within the 60-minute staging lifetime. Both controls
-guard request switches and keep current material Open links visible. These UI paths are
-source-built/offline-tested, not live accepted.
+guard request switches and keep current material Open links visible. The Zoom-link save and
+transcript staging/finalize paths passed a bounded signed-in Preview check on synthetic sandbox
+Request `1000350` on 2026-09-29; see the
+[acceptance receipt](evidence/post-presentation/zoom-transcript-preview-2026-09-29.md).
+The synthetic Zoom URL does not prove playback. Cancel/Retry remain offline-tested.
 A failed unfinished MP4 intent offers Retry; the server then
 checks the current Graph session and exact path before deciding whether to resume its confirmed
 range or create a new session from zero. Retry requires reselecting the same file. A complete item
@@ -985,17 +988,18 @@ without disabling legacy briefing members. In `test` mode, any other request ret
 disabled/404 before a presentation write or Graph resolution. The
 mode is a rollout guard, separate from the code-owned chunk-size policy. Record it in the
 credential runbook and route/security tests. The unfinished Factory branch remains outside this
-feature and supplies no test Request.
+feature runtime. Its guarded sandbox CLI supplied the isolated marked test Request `1000350`
+for the 2026-09-29 acceptance; the Factory product flow remains unfinished.
 
 | Route | Method | Contract |
 |---|---|---|
 | `/api/meeting-tracker/visits/[requestId]/presentation-materials` | GET | Current Recording/Transcript/Summary winners, conflicts, supported formats, and the authenticated actor's unfinished intent descriptors; no upload secret. |
 | same | PATCH | Exact action to save/replace a Zoom link; request and actor are server-owned. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript and recording source-built/offline-tested:** transcript begins bounded private-Blob staging; recording writes an immutable durable intent before creating a browser-direct Graph session and returns the code-owned 10 MiB contract. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads` | POST | **Transcript signed-in Preview accepted on synthetic VTT; recording source-built/offline-tested:** transcript begins bounded private-Blob staging; recording writes an immutable durable intent before creating a browser-direct Graph session and returns the code-owned 10 MiB contract. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/resume` | POST | **Source-built/offline-tested and local/sandbox Chrome/Safari-tested:** independently reauthorize creating actor/request/visit, verify the bounded local-file fingerprint, resolve the exact path, and check live Graph status. Return the no-store URL plus one validated sequential open-ended or exact-to-file-end range only while live; for an exact committed item return finalize-only state and no URL. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/cancel` | POST | **Source-built/offline-tested §7.2.2:** exact-empty-body, same-actor/request/visit and access checks, lease-fenced Graph cancellation plus exact-path proof; only an absent path permits abandoned with no candidate or Request Document. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/retry` | POST | **Source-built/offline-tested §7.2.2:** exact fingerprint body, live-session or terminal/no-item proof, lease-fenced fresh session under the same intent; a lost-response replay returns that live session, and a new range starts at zero. |
-| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript and recording source-built/offline-tested:** lease-fenced, request-bound finalize/recovery. MP4 re-resolves the exact stable candidate, validates bounded signature/malware facts, then uses the Recording slot fence and durable replay. |
+| `/api/meeting-tracker/visits/[requestId]/presentation-uploads/[uploadId]/finalize` | POST | **Transcript signed-in Preview accepted on synthetic VTT; recording source-built/offline-tested:** lease-fenced, request-bound finalize/recovery. MP4 re-resolves the exact stable candidate, validates bounded signature/malware facts, then uses the Recording slot fence and durable replay. |
 | `/api/meeting-tracker/visits/[requestId]/presentation-link` | GET, POST | **Source-built/offline-tested:** GET current link; POST exact `ensure` or compare-and-swap `reissue`, behind both Meeting Tracker and post-presentation readiness/access checks. |
 | Existing `/api/workbench/site-visit/logistics?requestId=…` | GET | Continue `requireAppAccess(req, res, 'reviewers')`; preserve the legacy `materials` array and add a distinct `presentationMaterials` projection/status for `useSiteVisitContext` and `StaffDeliberationsTab`. Zoom-backed winners must not be filtered out by the legacy SharePoint-web-URL predicate. While readiness is off, return the legacy payload with `presentationMaterialsStatus: 'disabled'`, not a false empty collection; do not 503 the existing logistics read. |
 | `/api/external/presentation/[token]/context` | GET | **Source-built/offline-tested:** fail-closed context-only token/IP limiter, verify presentation token, return minimal material descriptors. Its buckets are separate from media actions. |
@@ -1747,8 +1751,10 @@ inspect-only cleanup posture in access off/test, and slot-fenced finalize remain
 Cancel/Retry routes are in the security matrix and canonical counts.
 The historical Graph-confirmed expiry row remains PARTIAL; the owner chose the actionable
 recovery controls and fault-injection coverage in place of another passive expiry wait. The
-Zoom-paste and transcript staff inputs are now source-built and offline-tested alongside their
-producer APIs. Signed-in runtime acceptance and release gates remain separate.
+Zoom-paste and transcript staff inputs are source-built and offline-tested alongside their
+producer APIs. Their bounded signed-in Preview acceptance passed on synthetic sandbox Request
+`1000350` on 2026-09-29; the external materials-only link and real Zoom playback were not tested.
+Production release gates remain separate.
 
 ### Slice 5 — Internal and external consumers
 
@@ -1779,8 +1785,10 @@ Production write was performed for this slice.
   the shared Graph transport and historical benchmark receipts.
 - Review and promote the source-built Slice 4a Cancel/Retry controls before Production
   promotion. Keep the Graph-confirmed terminal-expiry cell PARTIAL without another passive wait.
-- Exercise the source-built Zoom-paste and transcript-upload staff controls in a bounded,
-  owner-approved signed-in runtime acceptance before claiming the full first-slice user flow.
+- **[PASSED 2026-09-29]** Exercise Zoom-paste and transcript-upload staff controls in a bounded,
+  owner-approved signed-in Preview runtime acceptance. The synthetic fixture proves save,
+  finalize, staff readback, and transcript byte/hash integrity; it does not prove real Zoom
+  playback or the external materials-only consumer.
 - Owner-applied schema/migration and readiness enablement.
 - Signed-in Meeting Tracker smoke with one Zoom link, one transcript, and one owner-approved,
   registry-bound retained test MP4 (retention per §15 step 6).

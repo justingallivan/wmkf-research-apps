@@ -101,11 +101,11 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   reported 22 exact / 0 absent / 0 divergent, and
   `MEETING_TRACKER_SCHEMA_READY` evaluates exact-on. The grant-protected
   runtime and UI are live.
-- **[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; BOUNDED PREVIEW ACCEPTED 2026-09-26;
+- **[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; BOUNDED PREVIEW ACCEPTED 2026-09-26 AND 2026-09-29;
   PRODUCTION NOT DEPLOYED.]** Recording, transcript, and transcript-summary have
   governed producers under the post-presentation rollout gates. The current visit
   card exposes browser-direct MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
-  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript staff inputs are source-built/offline-tested. The Staff
+  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript staff inputs passed a bounded signed-in Preview save/finalize/readback on synthetic sandbox Request `1000350`. Real Zoom playback and the external materials-only page were not tested in that run. The Staff
   Deliberations tab reads the current three slots. Shared Postgres migration 055 was
   applied, while the Dataverse Wave 30 test was sandbox-only. Bounded Preview acceptance
   is closed and presentation access is off there. See the presentation-materials plan

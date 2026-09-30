@@ -1,3 +1,28 @@
+# Session 553 Prompt: Zoom link and transcript Preview acceptance (branch-local)
+
+## Current result — 2026-09-29 PT
+
+**[VERIFIED via signed-in Chrome, sandbox Dataverse, Microsoft Graph, and Vercel readback]**
+On `codex/feature-request` at `e777c4b05`, the owner-approved bounded Preview test passed:
+synthetic Zoom link save, synthetic 203-byte VTT staging/finalize, staff readback after reload,
+and exact Graph download byte count/SHA-256 matching the source and Request Document hash.
+The separate marked sandbox Request is `1000350` / `4424f6e5-7409-45ad-a96e-5f7d89896ce5`;
+its active synthetic Site Visit is `80a066f6-2ad9-45a5-a329-564f8484f9b8`. The factory's
+guarded one-create GoVerify bypass was owner-approved and verified restored active. The
+[acceptance receipt](docs/plans/evidence/post-presentation/zoom-transcript-preview-2026-09-29.md)
+records the two retained Request Document IDs and the bounded evidence.
+
+**[VERIFIED cleanup]** Branch-scoped Preview `POST_PRESENTATION_MATERIALS_ACCESS` reads `off`.
+The registered Preview alias was restored to its observed prior deployment
+`dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2`, the feature-branch alias to
+`dpl_8C7qZ4XqvZp64DPUTb2QeqtXAa9d`, and the temporary redeployment was removed after
+both alias readbacks. Production was untouched. Retained Request `1000334` was untouched.
+
+The synthetic Zoom URL does not prove real playback; no Board materials-only link was generated
+for the new Request. MP4 Cancel/Retry and Graph-confirmed terminal expiry remain offline/partial
+as described in the presentation-materials plan. Production promotion remains a separate
+owner-approved step. The Session 552 section below is historical.
+
 # Session 552 Prompt: Prepare post-presentation staff controls for promotion (branch-local)
 
 ## Current branch status (2026-09-29)
