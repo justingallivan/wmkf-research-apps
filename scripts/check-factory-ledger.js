@@ -113,14 +113,14 @@ async function writeExpected(schemaLib) {
   }
 }
 
-/** @returns {'ok'|'fail'|'unreachable'} */
+/** @returns {'ok'|'fail'|'refused'|'unreachable'} */
 async function checkOne(name, url, target, schemaLib, registry, expected, approvedAhead) {
   const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL']
     .map((n) => process.env[n]).filter(Boolean);
   const verdict = registry.classifyLedgerUrl(url, { target, sharedUrls });
   if (!verdict.ok) {
     console.error(`✗ ${name} (target=${target}): refused (${verdict.reason}); see lib/db/ledger-registry.js`);
-    return 'fail';
+    return 'refused';
   }
   const database = verdict.effective.database;
   let client;
@@ -133,7 +133,7 @@ async function checkOne(name, url, target, schemaLib, registry, expected, approv
   try {
     const live = await schemaLib.readLedgerFingerprint(client);
     const diff = schemaLib.compareLedgerFingerprint(expected.fingerprint, live);
-    const unapproved = schemaLib.unapprovedExtras(diff, approvedAhead);
+    const unapproved = schemaLib.unapprovedExtras(diff, approvedAhead, live);
     const head = `${name}: ${verdict.label} host, database ${database}, expected from ${expected.generatedFrom.join(', ')}`;
     if (diff.ok && unapproved.length === 0) {
       console.log(`✓ ${head}${diff.extra.length > 0 ? ' — matches (extra objects all approved-ahead)' : ' — matches'}`);
@@ -163,6 +163,7 @@ async function main() {
   const expected = schemaLib.readExpectedFingerprint();
   const approvedAhead = schemaLib.readApprovedAhead();
   let inspected = 0;
+  let refused = 0;
   let unreachable = 0;
   let failed = false;
   for (const name of configured) {
@@ -171,12 +172,17 @@ async function main() {
     if (result === 'unreachable') {
       unreachable += 1;
       if (!allowUnreachable) failed = true;
+    } else if (result === 'refused') {
+      // Opus round-1 L6: a refused URL never connected, so it was not
+      // inspected — count it separately, never folded into "inspected".
+      refused += 1;
+      failed = true;
     } else {
       inspected += 1;
       if (result === 'fail') failed = true;
     }
   }
-  console.log(`factory-ledger: ${inspected} inspected, ${unreachable} unreachable, ${skipped} skipped`);
+  console.log(`factory-ledger: ${inspected} inspected, ${refused} refused, ${unreachable} unreachable, ${skipped} skipped`);
   if (failed) {
     console.error(`factory-ledger FAILED. To rebuild the expectation after a migration change: ${schemaLib.REGENERATE_COMMAND}`);
     process.exit(1);

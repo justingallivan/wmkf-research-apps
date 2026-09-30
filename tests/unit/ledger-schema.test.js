@@ -65,6 +65,34 @@ test('a changed column type, nullability, or default fails as differing', () => 
   expect(formatLedgerDiff(d)).toContain('DIFFERS   column test_request_runs.status');
 });
 
+// Opus round-1 L5: one isolated mutation per column field, so deleting any
+// single comparison (type, nullable, or default alone) in
+// compareLedgerFingerprint fails a targeted assertion, not just a test that
+// happens to also mutate another field.
+describe('Opus round-1 L5: isolated column-field mutations', () => {
+  test('type only', () => {
+    const live = base();
+    live.tables.test_request_runs.columns[1] = col('status', 'varchar', false, "'pending'::text");
+    const d = compareLedgerFingerprint(base(), live);
+    expect(d.ok).toBe(false);
+    expect(d.differing[0]).toContain('column test_request_runs.status');
+  });
+  test('nullability only', () => {
+    const live = base();
+    live.tables.test_request_runs.columns[1] = col('status', 'text', true, "'pending'::text");
+    const d = compareLedgerFingerprint(base(), live);
+    expect(d.ok).toBe(false);
+    expect(d.differing[0]).toContain('column test_request_runs.status');
+  });
+  test('default only', () => {
+    const live = base();
+    live.tables.test_request_runs.columns[1] = col('status', 'text', false, "'queued'::text");
+    const d = compareLedgerFingerprint(base(), live);
+    expect(d.ok).toBe(false);
+    expect(d.differing[0]).toContain('column test_request_runs.status');
+  });
+});
+
 test('a changed CHECK body fails as differing under the same constraint name', () => {
   const live = base();
   live.tables.test_request_runs.constraints[1] = cons('test_request_runs_status_check', 'c', "CHECK (status = ANY (ARRAY['pending', 'done', 'archived']))");
@@ -100,6 +128,34 @@ test('a changed function return type, language, volatility, or body hash fails a
   const d = compareLedgerFingerprint(base(), live);
   expect(d.ok).toBe(false);
   expect(d.differing[0]).toContain('function test_request_receipt_ok(receipt jsonb)');
+});
+
+// Opus round-1 L5: one isolated mutation per function field, so deleting
+// any single comparison (returnType, language, or volatile alone) at
+// lib/db/ledger-schema.js fails a targeted assertion. bodyHash is already
+// covered above.
+describe('Opus round-1 L5: isolated function-field mutations', () => {
+  test('returnType only', () => {
+    const live = base();
+    live.functions[0] = fn('test_request_receipt_ok(receipt jsonb)', { returnType: 'text' });
+    const d = compareLedgerFingerprint(base(), live);
+    expect(d.ok).toBe(false);
+    expect(d.differing[0]).toContain('function test_request_receipt_ok(receipt jsonb)');
+  });
+  test('language only', () => {
+    const live = base();
+    live.functions[0] = fn('test_request_receipt_ok(receipt jsonb)', { language: 'plpgsql' });
+    const d = compareLedgerFingerprint(base(), live);
+    expect(d.ok).toBe(false);
+    expect(d.differing[0]).toContain('function test_request_receipt_ok(receipt jsonb)');
+  });
+  test('volatile only', () => {
+    const live = base();
+    live.functions[0] = fn('test_request_receipt_ok(receipt jsonb)', { volatile: 'v' });
+    const d = compareLedgerFingerprint(base(), live);
+    expect(d.ok).toBe(false);
+    expect(d.differing[0]).toContain('function test_request_receipt_ok(receipt jsonb)');
+  });
 });
 
 test('a ledger ahead of the checkout (extra table, column, index, trigger, function) is ok with warnings', () => {
@@ -138,18 +194,51 @@ describe('canonicalizeDefinition', () => {
   });
 });
 
-describe('approved-ahead extras (Codex round-1 Fix 4)', () => {
-  test('unapprovedExtras filters out only objects named in the approved-ahead set', () => {
-    const diff = { extra: ['table test_request_cast_slot_bindings', 'table something_unexpected'] };
-    const approved = new Set(['table test_request_cast_slot_bindings']);
-    expect(unapprovedExtras(diff, approved)).toEqual(['table something_unexpected']);
+describe('approved-ahead extras (Codex round-1 Fix 4; Opus round-1 item 6: shape-verified, not name-only)', () => {
+  const approvedShape = () => ({
+    columns: [col('binding_id', 'uuid', false)],
+    constraints: [cons('test_request_cast_slot_bindings_pkey', 'p', 'PRIMARY KEY (binding_id)')],
+    indexes: [idx('test_request_cast_slot_bindings_pkey', 'CREATE UNIQUE INDEX ... (binding_id)', true, true)],
+    triggers: [],
   });
-  test('readApprovedAhead reads the tracked file', () => {
+  const approvedAhead = () => [{ migration: '058_test_request_cast_slot_bindings.sql', tables: { test_request_cast_slot_bindings: approvedShape() } }];
+
+  test('a table extra with a name-only match (no objects entry, no tables entry) is unapproved', () => {
+    const diff = { extra: ['table something_unexpected'] };
+    expect(unapprovedExtras(diff, approvedAhead())).toEqual(['table something_unexpected']);
+  });
+
+  test('a table extra approved by shape, with a live fingerprint that compares clean, is NOT unapproved', () => {
+    const diff = { extra: ['table test_request_cast_slot_bindings'] };
+    const liveFingerprint = { tables: { test_request_cast_slot_bindings: approvedShape() } };
+    expect(unapprovedExtras(diff, approvedAhead(), liveFingerprint)).toEqual([]);
+  });
+
+  test('a name-only match with a DIFFERENT live shape is unapproved (this is the point of shape verification)', () => {
+    const diff = { extra: ['table test_request_cast_slot_bindings'] };
+    const driftedLive = { tables: { test_request_cast_slot_bindings: { ...approvedShape(), columns: [col('binding_id', 'text', false)] } } };
+    expect(unapprovedExtras(diff, approvedAhead(), driftedLive)).toEqual(['table test_request_cast_slot_bindings']);
+  });
+
+  test('a table extra approved by shape with NO live fingerprint supplied is unapproved (fail closed)', () => {
+    const diff = { extra: ['table test_request_cast_slot_bindings'] };
+    expect(unapprovedExtras(diff, approvedAhead())).toEqual(['table test_request_cast_slot_bindings']);
+  });
+
+  test('the legacy name-only "objects" list still covers non-table extras', () => {
+    const diff = { extra: ['column test_request_runs.later'] };
+    const legacy = [{ migration: 'x.sql', objects: ['column test_request_runs.later'] }];
+    expect(unapprovedExtras(diff, legacy)).toEqual([]);
+  });
+
+  test('readApprovedAhead reads the tracked file as an array of entries', () => {
     const approved = readApprovedAhead();
-    expect(approved instanceof Set).toBe(true);
+    expect(Array.isArray(approved)).toBe(true);
+    expect(approved[0].migration).toBe('058_test_request_cast_slot_bindings.sql');
+    expect(approved[0].tables.test_request_cast_slot_bindings).toBeDefined();
   });
-  test('readApprovedAhead returns an empty set when the file is missing', () => {
-    expect(readApprovedAhead('/nonexistent/path.json')).toEqual(new Set());
+  test('readApprovedAhead returns an empty array when the file is missing', () => {
+    expect(readApprovedAhead('/nonexistent/path.json')).toEqual([]);
   });
 });
 
