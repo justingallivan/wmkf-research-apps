@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-09-29T23:47:46.299565+00:00",
+  "target": "Production",
+  "probeSourceCommit": "2519baa62",
+  "section13Receipt": "reviewer-slot-readiness-receipt-2026-09-29T23-47-05-267Z.json",
+  "processReadEvidence": {
+    "observedAt": "2026-09-29T23:13:42.263852+00:00",
+    "privilege": "prvReadWorkflow",
+    "depth": "Global"
+  },
+  "productionSwitchEvidence": {
+    "observedAt": "2026-09-29T23:13:42.263852+00:00",
+    "values": {
+      "SYNTHETIC_REVIEWER_ISOLATION": "on",
+      "TEST_REQUEST_ISOLATION": "on"
+    },
+    "method": "Vercel production env run with --cwd /private/tmp (no local .env fallback)"
+  },
+  "firstSlotPatchCleared": false,
+  "notes": "Process privilege and switch checks predate this section-13 rerun; recheck for the future B4 runtime release. No production writes made."
+}

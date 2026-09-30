@@ -57,8 +57,9 @@
  *      1–5 auditing and Request-update automation (enabled Update and
  *      UpdateMultiple, Upsert and UpsertMultiple steps, Request-filtered and
  *      all-entity). Unreadable or unrecognized definitions are hard blocks;
- *      manual API-connection triggers, action-only mentions and zero visible
- *      flows need distinct owner dispositions.
+ *      dynamic trigger tables hard-block; manual API-connection triggers,
+ *      action-only mentions and zero visible flows need distinct owner
+ *      dispositions. The receipt summarizes every visible flow trigger.
  *      With <dir>, write a dated receipt containing the target, names, labels,
  *      counts and booleans (no record ids or raw definitions).
  *
@@ -526,6 +527,79 @@ function mentionsRequestOrSlot(value) {
   return /\bakoya_requests?\b/i.test(source) || slotMentions(source).length > 0;
 }
 
+/** A subscription target must be a literal logical name to rule out Request. */
+function subscriptionTarget(parameters) {
+  if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters)) return { kind: 'none', entity: null };
+  const keys = Object.keys(parameters).filter((key) => key.startsWith('subscriptionRequest/'));
+  if (!keys.length) return { kind: 'none', entity: null };
+  const entity = parameters['subscriptionRequest/entityname'];
+  if (typeof entity !== 'string' || !/^[a-z][a-z0-9_]*$/.test(entity)) return { kind: 'dynamic-or-unknown', entity: null };
+  return { kind: 'literal', entity };
+}
+
+function tableTarget(parameters) {
+  if (!parameters || typeof parameters !== 'object' || !Object.hasOwn(parameters, 'table')) return { kind: 'none', table: null };
+  const table = parameters.table;
+  if (typeof table !== 'string' || !/^[a-z][a-z0-9_]*$/.test(table)) return { kind: 'dynamic-or-unknown', table: null };
+  return { kind: 'literal', table };
+}
+
+function hasTriggerExpression(value) {
+  if (typeof value === 'string') return value.startsWith('@') || value.includes('@{');
+  if (!value || typeof value !== 'object') return false;
+  return Object.values(value).some(hasTriggerExpression);
+}
+
+function safeIdentifier(value) {
+  return typeof value === 'string' && /^[A-Za-z][A-Za-z0-9._-]{0,79}$/.test(value) ? value : 'unknown';
+}
+
+function flowMessageNumber(value) {
+  if (typeof value === 'number') return Number.isInteger(value) ? value : null;
+  return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : null;
+}
+
+function literalFilterColumns(value) {
+  if (value == null || value === '') return [];
+  if (typeof value !== 'string') return null;
+  const fields = value.split(',').map((field) => field.trim().toLowerCase()).filter(Boolean);
+  return fields.every((field) => /^[a-z][a-z0-9_]*$/.test(field)) ? fields : null;
+}
+
+/** Sanitized trigger evidence for every visible activated flow. */
+function slotTriggerSummary(name, trigger, target) {
+  const parameters = trigger?.inputs?.parameters;
+  const rawMessage = parameters?.['subscriptionRequest/message'];
+  const table = tableTarget(parameters);
+  return {
+    name, type: safeIdentifier(trigger?.type), kind: safeIdentifier(trigger?.kind),
+    subscriptionTarget: target.kind, entity: target.entity,
+    tableTarget: table.kind, table: table.table,
+    message: rawMessage == null ? null : (flowMessageNumber(rawMessage) ?? 'dynamic-or-unknown'),
+  };
+}
+
+function stepFilterCategory(step) {
+  if (!step.sdkmessagefilterid) return 'absent lookup';
+  const entity = step.sdkmessagefilterid.primaryobjecttypecode;
+  return entity === 'none' ? 'none' : entity ? 'literal' : 'empty entity';
+}
+
+function probeSourceProvenance() {
+  const { execFileSync } = require('child_process');
+  const cwd = require('path').resolve(__dirname, '..');
+  try {
+    return {
+      commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim(),
+      probeDirty: Boolean(execFileSync('git', ['status', '--porcelain', '--', 'scripts/probe-test-request-factory-production-readiness.js'], { cwd, encoding: 'utf8' }).trim()),
+      clientDirty: Boolean(execFileSync('git', ['status', '--porcelain', '--', 'lib/dataverse/client.js'], { cwd, encoding: 'utf8' }).trim()),
+      branch: execFileSync('git', ['branch', '--show-current'], { cwd, encoding: 'utf8' }).trim() || null,
+    };
+  } catch {
+    return { commit: null, probeDirty: null, clientDirty: null, branch: null };
+  }
+}
+
 /** The observed Power Automate manual API-connection shape has no Dataverse subscription. */
 function isManualApiConnectionTrigger(name, trigger) {
   const parameters = trigger?.inputs?.parameters;
@@ -538,12 +612,12 @@ function isManualApiConnectionTrigger(name, trigger) {
 /** null means no Request Update trigger; otherwise classify the exact filter list. */
 function classifySlotUpdateFlow(parameters) {
   if (parameters?.['subscriptionRequest/entityname'] !== 'akoya_request') return null;
-  const message = Number(parameters?.['subscriptionRequest/message']);
+  const message = flowMessageNumber(parameters?.['subscriptionRequest/message']);
   if (![3, 4, 6, 7].includes(message)) return null;
-  const filter = String(parameters?.['subscriptionRequest/filteringattributes'] || '');
-  const fields = filter.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const fields = literalFilterColumns(parameters?.['subscriptionRequest/filteringattributes']);
+  if (fields === null) return { message: FLOW_MESSAGE[message], firesOn: 'dynamic-or-unknown filter' };
   const slots = fields.filter((field) => REVIEWER_SLOTS.includes(field));
-  return { message: FLOW_MESSAGE[message], firesOn: !fields.length ? 'ANY column' : slots.length ? `a slot (${slots.join(',')})` : `other columns only (${filter})` };
+  return { message: FLOW_MESSAGE[message], firesOn: !fields.length ? 'ANY column' : slots.length ? `a slot (${slots.join(',')})` : `other columns only (${fields.join(',')})` };
 }
 
 // A single Update also runs steps registered on UpdateMultiple (merged message
@@ -555,7 +629,8 @@ const SLOT_WRITE_MESSAGES = new Set(['Update', 'UpdateMultiple', 'Upsert', 'Upse
 /** null means the step cannot fire on a reviewer-slot update. */
 function classifySlotWriteStep(step) {
   if (!SLOT_WRITE_MESSAGES.has(step?.sdkmessageid?.name)) return null;
-  const fields = String(step.filteringattributes || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const fields = literalFilterColumns(step.filteringattributes);
+  if (fields === null) return 'dynamic-or-unknown filter';
   if (!fields.length) return 'ANY column';
   const slots = fields.filter((field) => REVIEWER_SLOTS.includes(field));
   return slots.length ? `a slot (${slots.join(',')})` : null;
@@ -566,12 +641,16 @@ function stepIsHidden(step) {
 }
 
 /** Section 13: metadata only; every unreadable definition makes the receipt incomplete. */
-async function printReviewerSlotReadiness(client, exportDir) {
+async function printReviewerSlotReadiness(client, exportDir, source = probeSourceProvenance()) {
   console.log('\n13. Potential Reviewer slot update readiness (metadata only)');
   const receipt = {
     section: 13, target: PRODUCTION_URL, generatedAt: new Date().toISOString(), complete: false,
-    incompleteReasons: [], dispositionRequired: [], auditing: {}, workflows: [], steps: [], flows: [], flowMentions: [], unclassifiedFlowTriggers: [], counts: {},
+    source, incompleteReasons: [], dispositionRequired: [], auditing: {},
+    workflows: [], steps: [], flows: [], flowMentions: [], flowTriggerSummaries: [], flowTriggerReviewEntries: [], counts: {},
   };
+  if (!/^[0-9a-f]{40}$/.test(source?.commit || '') || source?.probeDirty !== false || source?.clientDirty !== false) {
+    receipt.incompleteReasons.push('probe source not a committed clean tree');
+  }
   const entity = await client.get("/EntityDefinitions(LogicalName='akoya_request')?$select=IsAuditEnabled");
   if (!entity.ok || typeof entity.body?.IsAuditEnabled?.Value !== 'boolean') receipt.incompleteReasons.push('Request entity auditing unreadable');
   receipt.auditing.entity = entity.body?.IsAuditEnabled?.Value ?? null;
@@ -595,15 +674,17 @@ async function printReviewerSlotReadiness(client, exportDir) {
   for (const row of workflows) {
     const readable = Boolean(row.xaml);
     const mentions = readable ? slotMentions(row.xaml) : [];
-    if (triggered.includes(row) || mentions.length || !readable) {
-      const item = {
-        name: row.name || '(unnamed)', kind: row.category === 2 ? 'business rule' : 'workflow',
-        mode: row.category === 0 ? (row.mode === 1 ? 'real-time' : 'background') : null,
-        triggered: triggered.includes(row), mentions, readable,
-      };
-      receipt.workflows.push(item);
-      console.log(`   - ${item.kind} ${item.name}: ${item.triggered ? 'slot-triggered' : 'mentions'} ${mentions.join(',')} (${readable ? 'readable' : 'UNREADABLE'})`);
-    }
+    const updateAttributes = literalFilterColumns(row.triggeronupdateattributelist);
+    const item = {
+      name: row.name || '(unnamed)', kind: row.category === 2 ? 'business rule' : 'workflow',
+      mode: row.category === 0 ? (row.mode === 1 ? 'real-time' : 'background') : null,
+      triggered: triggered.includes(row), mentions, readable,
+      updateAttributes: updateAttributes === null ? 'dynamic-or-unknown' : updateAttributes,
+    };
+    receipt.workflows.push(item);
+    if (item.triggered || mentions.length || !readable) console.log(`   - ${item.kind} ${item.name}: ${item.triggered ? 'slot-triggered' : 'mentions'} ${mentions.join(',')} (${readable ? 'readable' : 'UNREADABLE'})`);
+    if (updateAttributes === null) receipt.incompleteReasons.push(`Request workflow update filter dynamic or unknown: ${item.name}`);
+    if (item.triggered) receipt.dispositionRequired.push(`Request workflow can fire on reviewer-slot update: ${item.name}`);
     if (!readable) receipt.incompleteReasons.push(`workflow definition unreadable: ${row.name || '(unnamed)'}`);
   }
 
@@ -619,9 +700,11 @@ async function printReviewerSlotReadiness(client, exportDir) {
   console.log(`   enabled Request Update/UpdateMultiple/Upsert/UpsertMultiple steps: ${requestSteps.length}`);
   for (const row of requestSteps) {
     const firesOn = classifySlotWriteStep(row);
-    if (!firesOn) continue;
-    receipt.steps.push({ name: row.name || '(unnamed)', message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn });
-    console.log(`   - ${firesOn} (${row.sdkmessageid.name}): ${stepLabel(row)}`);
+    const name = row.name || '(unnamed)';
+    const filteringColumns = literalFilterColumns(row.filteringattributes);
+    receipt.steps.push({ name, message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), entityFilter: stepFilterCategory(row), filteringColumns: filteringColumns === null ? 'dynamic-or-unknown' : filteringColumns, firesOn: firesOn || 'other columns only' });
+    if (firesOn) console.log(`   - ${firesOn} (${row.sdkmessageid.name}): ${stepLabel(row)}`);
+    if (filteringColumns === null) receipt.incompleteReasons.push(`Request step update filter dynamic or unknown: ${name}`);
   }
   // Dataverse can represent an all-entity registration as no filter row, a
   // filter with no primary type, or a filter whose primary type is 'none'.
@@ -632,8 +715,10 @@ async function printReviewerSlotReadiness(client, exportDir) {
   receipt.counts.hiddenMicrosoftPlatformSlotWriteSteps = globalSteps.filter(isPlatformStep).length;
   console.log(`   enabled Update/UpdateMultiple/Upsert/UpsertMultiple steps with no entity filter: ${globalSteps.length} (hidden: ${receipt.counts.hiddenGlobalSlotWriteSteps}; hidden Microsoft platform: ${receipt.counts.hiddenMicrosoftPlatformSlotWriteSteps})`);
   for (const row of globalSteps.filter((item) => !isPlatformStep(item))) {
-    receipt.steps.push({ name: row.name || '(unnamed)', message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), firesOn: 'ANY entity/column' });
+    const filteringColumns = literalFilterColumns(row.filteringattributes);
+    receipt.steps.push({ name: row.name || '(unnamed)', message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), entityFilter: stepFilterCategory(row), filteringColumns: filteringColumns === null ? 'dynamic-or-unknown' : filteringColumns, firesOn: filteringColumns === null ? 'dynamic-or-unknown filter' : filteringColumns.length ? 'other columns only' : 'ANY entity/column' });
     console.log(`   - ANY entity/column (${row.sdkmessageid.name}): ${stepLabel(row)}`);
+    if (filteringColumns === null) receipt.incompleteReasons.push(`global step update filter dynamic or unknown: ${row.name || '(unnamed)'}`);
   }
 
   const flows = await getAll(client, '/workflows?$select=name,clientdata&$filter=category eq 5 and statecode eq 1');
@@ -641,53 +726,101 @@ async function printReviewerSlotReadiness(client, exportDir) {
   let requestUpdate = 0;
   let requestNonUpdate = 0;
   let manualApiConnectionTriggers = 0;
+  let hardBlockedFlowTriggers = 0;
+  let actionOnlyTriggerDispositions = 0;
   for (const flow of flows) {
+    const name = flow.name || '(unnamed)';
     const rawMention = mentionsRequestOrSlot(flow.clientdata);
     const classified = classifyFlowDefinition(flow.clientdata);
     if (!classified.readable) {
       unreadable += 1;
-      if (rawMention) receipt.flowMentions.push({ name: flow.name || '(unnamed)', readable: false, recognizedRequestTriggers: 0, unclassifiedRequestTriggers: 0 });
+      receipt.flowTriggerSummaries.push({ name, readable: false, triggers: [] });
+      if (rawMention) receipt.flowMentions.push({ name, readable: false, recognizedRequestTriggers: 0, unclassifiedRequestTriggers: 0, manualApiConnectionTriggers: 0, actionOnlyTriggerDispositions: 0 });
       continue;
     }
     let recognizedRequestTriggers = 0;
     let unclassifiedRequestTriggers = 0;
     let manualTriggersInFlow = 0;
-    for (const [triggerName, trigger] of Object.entries(classified.definition.triggers || {})) {
+    let actionOnlyInFlow = 0;
+    const triggers = classified.definition.triggers;
+    if (!triggers || typeof triggers !== 'object' || Array.isArray(triggers) || !Object.keys(triggers).length) {
+      unreadable += 1;
+      receipt.incompleteReasons.push(`cloud-flow triggers missing or unreadable: ${name}`);
+      receipt.flowTriggerSummaries.push({ name, readable: false, triggers: [] });
+      if (rawMention) receipt.flowMentions.push({ name, readable: false, recognizedRequestTriggers: 0, unclassifiedRequestTriggers: 0, manualApiConnectionTriggers: 0, actionOnlyTriggerDispositions: 0 });
+      continue;
+    }
+    const triggerSummaries = [];
+    for (const [triggerName, trigger] of Object.entries(triggers)) {
       const parameters = trigger?.inputs?.parameters;
-      if (parameters?.['subscriptionRequest/entityname'] === 'akoya_request') {
-        const message = Number(parameters['subscriptionRequest/message']);
+      const target = subscriptionTarget(parameters);
+      const summary = slotTriggerSummary(triggerName, trigger, target);
+      triggerSummaries.push(summary);
+      const slotUpdate = target.entity === 'akoya_request' ? classifySlotUpdateFlow(parameters) : null;
+      if (!trigger || typeof trigger !== 'object' || Array.isArray(trigger)) {
+        summary.classification = 'hard block: unreadable trigger shape';
+        unclassifiedRequestTriggers += 1;
+        receipt.flowTriggerReviewEntries.push({ name, trigger: triggerName, reason: 'unreadable trigger shape' });
+        receipt.incompleteReasons.push(`cloud-flow trigger shape unreadable: ${name} / ${triggerName}`);
+      } else if (slotUpdate?.firesOn === 'dynamic-or-unknown filter') {
+        summary.classification = 'hard block: dynamic Request update filter';
+        requestUpdate += 1;
+        unclassifiedRequestTriggers += 1;
+        receipt.flows.push({ name, trigger: triggerName, ...slotUpdate });
+        receipt.flowTriggerReviewEntries.push({ name, trigger: triggerName, reason: 'dynamic Request update filter' });
+        receipt.incompleteReasons.push(`Request update filter dynamic or unknown: ${name} / ${triggerName}`);
+      } else if (target.kind === 'dynamic-or-unknown' || summary.tableTarget === 'dynamic-or-unknown' || hasTriggerExpression(trigger.inputs)) {
+        summary.classification = 'hard block: dynamic or unknown trigger table';
+        unclassifiedRequestTriggers += 1;
+        receipt.flowTriggerReviewEntries.push({ name, trigger: triggerName, reason: 'dynamic or unknown trigger table' });
+        receipt.incompleteReasons.push(`cloud-flow trigger table dynamic or unknown: ${name} / ${triggerName}`);
+      } else if (target.entity === 'akoya_request') {
+        const message = flowMessageNumber(parameters['subscriptionRequest/message']);
         if (Object.hasOwn(FLOW_MESSAGE, message)) {
+          summary.classification = 'Request subscription';
           recognizedRequestTriggers += 1;
-          const match = classifySlotUpdateFlow(parameters);
+          const match = slotUpdate;
           if (match) {
             requestUpdate += 1;
-            receipt.flows.push({ name: flow.name || '(unnamed)', trigger: triggerName, ...match });
-            console.log(`   - cloud flow ${flow.name || '(unnamed)'} / ${triggerName}: ${match.message}, fires on ${match.firesOn}`);
+            receipt.flows.push({ name, trigger: triggerName, ...match });
+            if (match.firesOn === 'ANY column' || match.firesOn.startsWith('a slot (')) {
+              receipt.dispositionRequired.push(`Request flow can fire on reviewer-slot update: ${name} / ${triggerName}`);
+            }
+            console.log(`   - cloud flow ${name} / ${triggerName}: ${match.message}, fires on ${match.firesOn}`);
           } else {
             requestNonUpdate += 1;
           }
         } else {
+          summary.classification = 'hard block: unknown Request message';
           unclassifiedRequestTriggers += 1;
-          receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'unrecognized Request message' });
-          receipt.incompleteReasons.push(`Request flow trigger message unrecognized: ${flow.name || '(unnamed)'} / ${triggerName}`);
+          receipt.flowTriggerReviewEntries.push({ name, trigger: triggerName, reason: 'unrecognized Request message' });
+          receipt.incompleteReasons.push(`Request flow trigger message unrecognized: ${name} / ${triggerName}`);
         }
       } else if (rawMention && isManualApiConnectionTrigger(triggerName, trigger)) {
+        summary.classification = 'manual API connection: owner disposition';
         manualApiConnectionTriggers += 1;
         manualTriggersInFlow += 1;
-        receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'manual API-connection trigger without Dataverse subscription' });
-        receipt.dispositionRequired.push(`manual API-connection trigger in Request/slot-mentioning flow requires owner classification: ${flow.name || '(unnamed)'} / ${triggerName}`);
+        receipt.flowTriggerReviewEntries.push({ name, trigger: triggerName, reason: 'manual API-connection trigger without Dataverse subscription' });
+        receipt.dispositionRequired.push(`manual API-connection trigger in Request/slot-mentioning flow requires owner classification: ${name} / ${triggerName}`);
       } else if (mentionsRequestOrSlot(trigger)) {
+        summary.classification = 'hard block: unknown Request trigger shape';
         unclassifiedRequestTriggers += 1;
-        receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: triggerName, reason: 'unclassified Request trigger shape' });
-        receipt.incompleteReasons.push(`Request flow trigger shape unclassified: ${flow.name || '(unnamed)'} / ${triggerName}`);
+        receipt.flowTriggerReviewEntries.push({ name, trigger: triggerName, reason: 'unclassified Request trigger shape' });
+        receipt.incompleteReasons.push(`Request flow trigger shape unclassified: ${name} / ${triggerName}`);
+      } else if (rawMention) {
+        summary.classification = 'other trigger: owner disposition for Request/slot actions';
+        actionOnlyTriggerDispositions += 1;
+        actionOnlyInFlow += 1;
+        receipt.flowTriggerReviewEntries.push({ name, trigger: triggerName, reason: 'Request/slot mention outside this trigger' });
+        receipt.dispositionRequired.push(`flow mentions Request or slot without a classified Request trigger: ${name} / ${triggerName}`);
+      } else {
+        summary.classification = target.kind === 'literal' ? 'other literal Dataverse subscription' : 'no Request/slot mention';
       }
     }
+    receipt.flowTriggerSummaries.push({ name, readable: true, triggers: triggerSummaries });
+    hardBlockedFlowTriggers += unclassifiedRequestTriggers;
     if (rawMention) {
-      receipt.flowMentions.push({ name: flow.name || '(unnamed)', readable: true, recognizedRequestTriggers, unclassifiedRequestTriggers, manualApiConnectionTriggers: manualTriggersInFlow });
-      if (!recognizedRequestTriggers && !unclassifiedRequestTriggers && !manualTriggersInFlow) {
-        receipt.unclassifiedFlowTriggers.push({ name: flow.name || '(unnamed)', trigger: '(none)', reason: 'mention without classified Request trigger' });
-        receipt.dispositionRequired.push(`flow mentions Request or slot without a classified Request trigger: ${flow.name || '(unnamed)'}`);
-      }
+      receipt.flowMentions.push({ name, readable: true, recognizedRequestTriggers, unclassifiedRequestTriggers, manualApiConnectionTriggers: manualTriggersInFlow, actionOnlyTriggerDispositions: actionOnlyInFlow });
     }
   }
   receipt.counts.flowsRead = flows.length;
@@ -695,12 +828,14 @@ async function printReviewerSlotReadiness(client, exportDir) {
   receipt.counts.requestUpdateTriggers = requestUpdate;
   receipt.counts.requestNonUpdateTriggers = requestNonUpdate;
   receipt.counts.manualApiConnectionTriggers = manualApiConnectionTriggers;
-  receipt.counts.unclassifiedFlowTriggers = receipt.unclassifiedFlowTriggers.length;
+  receipt.counts.hardBlockedFlowTriggers = hardBlockedFlowTriggers;
+  receipt.counts.actionOnlyTriggerDispositions = actionOnlyTriggerDispositions;
+  receipt.counts.triggerReviewEntries = receipt.flowTriggerReviewEntries.length;
   receipt.counts.unreadableFlows = unreadable;
   if (flows.length === 0) receipt.dispositionRequired.push('no activated cloud flows visible to the probe identity; confirm zero against an admin inventory');
   if (unreadable) receipt.incompleteReasons.push(`${unreadable} cloud-flow definitions unreadable`);
-  console.log(`   flows read: ${flows.length}; Request/slot mention superset: ${receipt.flowMentions.length}; Request update triggers: ${requestUpdate}; manual API-connection triggers for disposition: ${manualApiConnectionTriggers}; trigger/mention review entries: ${receipt.unclassifiedFlowTriggers.length}; unreadable definitions: ${unreadable}`);
-  for (const item of receipt.unclassifiedFlowTriggers) console.log(`   - REVIEW ${item.name} / ${item.trigger}: ${item.reason}`);
+  console.log(`   flows read: ${flows.length}; Request/slot mention superset: ${receipt.flowMentions.length}; Request update triggers: ${requestUpdate}; manual API-connection triggers for disposition: ${manualApiConnectionTriggers}; trigger/mention review entries: ${receipt.flowTriggerReviewEntries.length}; unreadable definitions: ${unreadable}`);
+  for (const item of receipt.flowTriggerReviewEntries) console.log(`   - REVIEW ${item.name} / ${item.trigger}: ${item.reason}`);
   // Completeness covers the visible definitions only. The release gate separately
   // requires effective organization-wide Process read or an admin inventory.
   receipt.complete = receipt.incompleteReasons.length === 0 && receipt.dispositionRequired.length === 0;
