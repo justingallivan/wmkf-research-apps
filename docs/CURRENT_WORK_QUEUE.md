@@ -701,8 +701,14 @@ not become current work merely because their document status remains `active`.
   changes (including edits made outside our apps), and durable retries when Dataverse sync
   fails.
   
-  **Before release:** recheck migration numbering (055 is claimed by the unmerged
-  `codex/feature-request`) and apply 056 then 057 only in an owner-authorized release.
+  **Numbering settled (S552):** 055 is `codex/feature-request`'s
+  `055_post_presentation_materials.sql`, already applied to shared Production;
+  Integrity keeps 056–057, which production shows unapplied [VERIFIED via an
+  owner-run read-only `schema_migrations` query]. Then B4 = 058, scheduled-email
+  Part A = 059. `main` (as of `d8cfd9eda`) is merged into `claude/integrity-workbench-tab`
+  (worktree `.claude/worktrees/integrity-workbench-tab`, local only); all gates and
+  unit tests pass there. **Before release:** a non-author implementation review, and
+  apply 056 then 057 only in an owner-authorized release.
   
   **Deferred:** the hard board-readiness gate waits for the staff recommendation/readiness
   workflow. Screening normally covers only applicants staff recommend for funding.
