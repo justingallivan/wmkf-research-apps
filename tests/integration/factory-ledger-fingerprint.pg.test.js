@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { Client } from 'pg';
 import {
   LEDGER_MIGRATIONS_DIR,
@@ -12,6 +13,7 @@ import {
   readExpectedFingerprint,
   readLedgerFingerprint,
 } from '../../lib/db/ledger-schema';
+import { decideFileAction, tableNamesIn, fingerprintFilesInScratch } from '../../lib/db/ledger-migrations';
 
 /**
  * Live-Postgres proof that lib/db/ledger-schema-fingerprint.json equals "the
@@ -144,6 +146,66 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
       const diff = compareLedgerFingerprint(baseline, live);
       expect(diff.ok).toBe(false);
       expect(diff.differing.some((d) => d.includes('function test_request_receipt_ok'))).toBe(true);
+    });
+  });
+
+  /**
+   * Codex round-1 Fix 3: a ledger that was hand-built from an OLDER shape of
+   * 054 (before checksums existed) must not be silently adopted. Applies
+   * 054 as of commit af65a24bd — before the changes that added the cast
+   * tables and widened several CHECK bodies — into a scratch schema, then
+   * runs the same adopt decision the migration runner uses against the
+   * CURRENT checkout's files. It must refuse (drift), never adopt.
+   */
+  describe('historical-upgrade case: an older hand-built 054 shape refuses to adopt', () => {
+    let gitAvailable = true;
+    let historicalSql;
+    beforeAll(() => {
+      try {
+        historicalSql = execFileSync('git', ['show', 'af65a24bd:lib/db/migrations/054_test_request_runs.sql'], { cwd: process.cwd(), encoding: 'utf8' });
+      } catch {
+        gitAvailable = false;
+      }
+    });
+
+    (TEST_URL ? test : test.skip)('adopting against the current files refuses rather than silently baselining', async () => {
+      if (!gitAvailable) return;
+      const historicalSchema = `ledger_hist_${crypto.randomBytes(4).toString('hex')}`;
+      const histClient = new Client({ connectionString: TEST_URL });
+      await histClient.connect();
+      try {
+        await histClient.query(`CREATE SCHEMA ${historicalSchema}`);
+        await histClient.query(`SET search_path TO ${historicalSchema}`);
+        await histClient.query(historicalSql);
+
+        const files = listLedgerMigrationFiles();
+        const currentFile = files[0]; // 054_test_request_runs.sql
+        const currentSql = fs.readFileSync(path.join(LEDGER_MIGRATIONS_DIR, currentFile), 'utf8');
+        const names = tableNamesIn(currentSql);
+        const { rows } = await histClient.query(
+          'SELECT 1 FROM pg_tables WHERE schemaname = current_schema() AND tablename = ANY($1) LIMIT 1',
+          [names],
+        );
+        const liveHasObjects = rows.length > 0;
+        expect(liveHasObjects).toBe(true); // the historical shape already has test_request_runs etc.
+
+        const scratchFp = await fingerprintFilesInScratch(histClient, [currentFile], LEDGER_MIGRATIONS_DIR, readLedgerFingerprint);
+        const liveFp = await readLedgerFingerprint(histClient);
+        const scratchDiff = compareLedgerFingerprint(scratchFp, liveFp);
+
+        const decision = decideFileAction({
+          file: currentFile,
+          currentChecksum: 'irrelevant-for-untracked-path',
+          trackedRow: null,
+          liveHasObjects,
+          scratchDiff,
+        });
+        expect(decision.action).toBe('refuse');
+        expect(scratchDiff.missing.length + scratchDiff.differing.length).toBeGreaterThan(0);
+      } finally {
+        await histClient.query(`DROP SCHEMA IF EXISTS ${historicalSchema} CASCADE`).catch(() => {});
+        await histClient.end();
+      }
     });
   });
 });
