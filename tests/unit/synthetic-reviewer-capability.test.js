@@ -94,6 +94,45 @@ test('an inactive person gets a distinct repair reason and cannot bind', async (
   expect(args.requestAdapter.getById).not.toHaveBeenCalled();
 });
 
+test.each([false, null])('repair opt-in accepts inactive ordinary marker %s only after an exact positive read', async (marker) => {
+  const args = fixture({ marked: marker });
+  args.allowInactiveOrdinary = true;
+  args.personAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: PERSON, statecode: 1, wmkf_issyntheticreviewer: marker,
+  });
+  await expect(resolveReviewerBindCapability(args)).resolves.toMatchObject({ kind: 'ordinary', person: { statecode: 1 } });
+  expect(args.resolveTestState).not.toHaveBeenCalled();
+});
+
+test.each([true, undefined, 'false', 0])('repair opt-in never accepts an inactive synthetic or unrecognized marker %p', async (marker) => {
+  const args = fixture({ marked: marker });
+  args.allowInactiveOrdinary = true;
+  args.personAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: PERSON, statecode: 1, wmkf_issyntheticreviewer: marker,
+  });
+  await expect(resolveReviewerBindCapability(args)).rejects.toMatchObject({ code: 'reviewer_person_inactive' });
+  expect(args.requestAdapter.getById).not.toHaveBeenCalled();
+});
+
+test.each([false, undefined, 'true', 1])('inactive ordinary exception requires the literal boolean true (%p)', async (allowInactiveOrdinary) => {
+  const args = fixture({ marked: false });
+  args.allowInactiveOrdinary = allowInactiveOrdinary;
+  args.personAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: PERSON, statecode: 1, wmkf_issyntheticreviewer: false,
+  });
+  await expect(resolveReviewerBindCapability(args)).rejects.toMatchObject({ code: 'reviewer_person_inactive' });
+});
+
+test.each([
+  { wmkf_potentialreviewersid: PERSON, statecode: 1 },
+  { wmkf_potentialreviewersid: RUN, statecode: 1, wmkf_issyntheticreviewer: false },
+])('repair opt-in still refuses a missing marker or wrong exact identity', async (person) => {
+  const args = fixture({ marked: false });
+  args.allowInactiveOrdinary = true;
+  args.personAdapter.getById.mockResolvedValue(person);
+  await expect(resolveReviewerBindCapability(args)).rejects.toMatchObject({ code: 'reviewer_person_unavailable' });
+});
+
 test('a marked person refuses when Request isolation is off', async () => {
   const args = fixture();
   args.env = { SYNTHETIC_REVIEWER_ISOLATION: 'on', TEST_REQUEST_ISOLATION: 'off' };

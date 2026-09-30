@@ -222,5 +222,5 @@ test('passes acting user + request-derived label/cycle/programArea to the adapte
     grantCycleCode: 'J26',
     programArea: 'Science',
     matchReason: 'Recommended by applicant (legacy reviewer slot).',
-  }, { actingUserSystemId: 'u-1' });
+  }, { actingUserSystemId: 'u-1', allowInactiveOrdinary: true });
 });
