@@ -47,5 +47,11 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   (2026-09-24), before `main`'s 15 later edits added the Factory cast tables;
   its tracker row means `apply-migrations.js` will never update it. B4's 058
   must repair it [VERIFIED via git history, S552; Production's table shape not read].
+- [VERIFIED 2026-09-30, S553, owner-run read-only query] Production `schema_migrations`
+  holds 054, 055, 056, 057 and 059. 058 is absent from the app database; it was
+  adopted on the two managed Neon ledgers by `npm run ledger:apply`. 059 was applied
+  alone through a one-off owner-run script (BEGIN; body; tracker INSERT; COMMIT,
+  `applied_by` `claude-part-a-2026-09-30`) because `apply-migrations.js` has no
+  per-file filter and would have applied 058 to the app database too.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against
   the shared database even with owner authorization; the owner runs it with `!`.
