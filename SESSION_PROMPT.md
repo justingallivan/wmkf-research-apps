@@ -1,56 +1,49 @@
-# Session 555-B4 Prompt: resolve Factory reviewer B4 release blockers
+# Session 556-B4 Prompt: recover Factory ledgers and finish owner readiness
 
-## Session 554-B4 Summary — 2026-09-30 PT (Codex; release preflight)
+## Session 555-B4 Summary — 2026-09-30 PT (Codex; configuration readiness)
 
-**Release readiness is BLOCKED. PR #369 remains draft.** Work stayed in `/Users/gallivan/Code/WMKF_Apps-codex` on `codex/factory-reviewer-b4-runtime`. Claude's other checkout, scheduled-email runtime, migration 059 and V58 were not modified. The original Factory need is to create test Requests from an existing Request with files; clones and cast creation exist, but this B4 reviewer runtime has not been promoted. This session measured release prerequisites and recorded owner actions; it did not expand the implementation.
+**B4 release remains BLOCKED; PR #369 stays draft.** Work stayed on `codex/factory-reviewer-b4-runtime` in `/Users/gallivan/Code/WMKF_Apps-codex`. Claude's checkout and scheduled-email surfaces, migration 059 and V58 were not modified. No Production migration, Dataverse write, slot PATCH, email or live job drain was run.
 
 ### What Was Completed
 
-1. **Main sync, tests and PR check.** Merged the six docs-only main commits through `570f53086`, without conflict, as `92ccbd0bd`; pushed the B4 branch. All 67 startup gate/self-test runs passed, 66 focused suites / 1,906 tests and all 44 changed non-PG suites / 1,690 tests passed (overlapping). At runtime candidate `92ccbd0bd`, all 12 PR checks passed including Jest, PostgreSQL 16 and Vercel Preview; PR #369 was draft, mergeable and clean [VERIFIED via git, Jest and recorded GitHub check snapshot].
-2. **Environment/marker reads.** Authenticated Vercel project inventory, project inspection and the PR link identify `wmkf_research_apps` / `prj_56SJKzNer1aV38kKVoP8tl3X0lf3` under `justin-gallivans-projects`. This worktree has no Vercel link; explicit project/scope was used. Every pull used a mode-0600 temporary file deleted afterwards. Both switches are Production `on`; Local, Development and branch Preview `off` (non-literal-on; no raw values recorded). After explicit owner authorization in this chat, metadata reads confirmed all wave29/wave30 markers for Local, Preview and Production. All three configurations target Production Dataverse [VERIFIED via sanitized switch and metadata receipts]. No env file/switch was changed.
-3. **Local ledger preflight found blockers.** Started the existing stopped Colima Postgres container without recreation. At 127.0.0.1:5433 only `ledger` and `postgres` exist; `ledger_prod` returns 3D000. `ledger` has only the two earliest Factory tables, no tracker/cast/slot tables, and a receipt function differing from 058. The owner does not know the production ledger location or this ledger's operational ownership. No ledger migration/database/tracker/row was created [VERIFIED via local catalog/preflight receipt; intended operational ownership UNKNOWN].
-4. **Production query prepared for the owner.** `b4-schema-preflight.sql` is read-only, reports test_request_* columns/constraints/indexes and `pg_get_functiondef` for the receipt function. Its optional tracker query is in the final comment. It ran only against local `ledger`; Production execution and 058 apply remain owner-run. Shared Production/Preview migration consistency is UNKNOWN for this session, and shared 058 is not a B4 runtime prerequisite [VERIFIED via session actions and §6].
-5. **Production section 13 recorded.** Owner explicitly authorized read-only Production Dataverse metadata/privilege/bound-cast checks on 2026-09-30. Committed clean probe/client source at `92ccbd0bd052c3ae49666c8776d3642d26dd53ce` produced `reviewer-slot-readiness-receipt-2026-09-30T16-20-11-291Z.json`. Effective `prvReadWorkflow` depth is Global. All 14 activated flows were readable; hard incomplete reasons are empty. Six custom-step/flow owner dispositions remain open, so `complete=false`. Missing local cast journal blocks the email-digest comparison; no cast identity was fabricated or discovered by name/email [VERIFIED via receipts and session actions].
-6. **Evidence and release checklist updated.** See `docs/plans/evidence/test-request-factory/b4-release-readiness-2026-09-30.md` for the owner procedure, exact blockers, evidence links and bounded contract/sweep audit. No Production migration, Dataverse write, slot PATCH, email or deployment was performed. No production milestone shipped; no DEVELOPMENT_LOG entry required.
+1. **Current PR check.** At `93447aeacdc22df60b5ad9f4cff0b47cbd55f61e`, all 12 checks passed; PR #369 was draft, mergeable and clean [VERIFIED via GitHub]. Runtime/probe/client remain unchanged from tested merge candidate `92ccbd0bd052c3ae49666c8776d3642d26dd53ce`, which incorporated six main docs commits at `570f53086`. Previous evidence: 67 startup gates/self-tests; 66 focused suites / 1,906 tests and 44 changed non-PG suites / 1,690 tests (overlapping), all passed.
+2. **Local and B4 Preview switches enabled.** Owner directed completion of remaining session work after the configuration action was proposed. Both literal switches now read `on` in Local, B4 branch Preview and Production; all wave29/wave30 marker checks returned HTTP 200 [VERIFIED via `b4-environment-switches-enabled-2026-09-30.json`]. Preview edits are branch-specific, under verified project `wmkf_research_apps` / `prj_56SJKzNer1aV38kKVoP8tl3X0lf3`, scope `justin-gallivans-projects`. Production and generic Development/Preview configuration were not changed. Development remains off/off. Every env pull used deleted mode-0600 temporary files; only key names and on/off states are recorded.
+3. **Local checkout isolation.** The existing `.env.local` symlink pointed into Claude's checkout. Replaced only this worktree's symlink with a private mode-0600 copy, preserved unrelated configuration and changed only the two switches. CLI and Next.js development loaders both resolve them to literal `on` [VERIFIED via loaders]. Claude's target file was untouched. Future credential changes must be synced explicitly to this new private copy.
+4. **Focused verification.** Six switch/capability/acceptance-job suites passed, 145 tests, including all-job pause, matching-lease release and resumption. No runtime source was edited and no live acceptance job was exercised. A new Preview build must capture the branch settings before use; recheck its deployment and latest PR checks after the push.
+5. **Owner packet.** `b4-owner-next-actions-2026-09-30.md` contains read-only ledger inventory/preflight commands, the Production query pointer and the six-item automation worksheet. No classification was self-authorized. The owner cannot access the other Mac until approximately nine hours after this chat decision.
+6. **Ledger remains unavailable.** This Mac has one Colima profile, one `wmkf-ledger-pg` Postgres container and one volume [VERIFIED via inventory]. `ledger_prod` is absent; `ledger` has only two early Factory tables and an old receipt function [VERIFIED via existing schema receipt]. No spare journal appeared in the Docker inventory. No database/schema/row/tracker was created. Local storage was a temporary CLI-phase decision; shared Postgres is planned for the form phase. No storage migration was begun.
 
-### Commits
+### Evidence and Commits
 
-- `92ccbd0bd` — merge main's six docs commits into the B4 runtime branch; tested/probed runtime candidate.
-- Evidence/checklist/handoff commit — see `git log -1`; it must contain only docs/evidence, with runtime/probe/client unchanged from the candidate.
+- `92ccbd0bd` — tested/probed runtime candidate after merge of main docs.
+- `93447aeac` — earlier release evidence/checklist/handoff; all 12 checks passed.
+- This session's configuration evidence/owner-packet commit — see `git log -1`; docs only. Local env is ignored and private; Vercel switches are external config.
+- Evidence index: `docs/plans/evidence/test-request-factory/b4-release-readiness-2026-09-30.md`; release contract: `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`.
 
 ## Next Items
 
 ### Owner Action Pending
 
-1. **Locate the actual operational ledgers and their existing audit records.** This Colima instance lacks `ledger_prod`; `ledger` does not prove the prior cast/clone ownership. Do not recreate a production cast journal or adopt rows from Dataverse name/email matches. Re-run §6 preflight on the actual targets, then the owner explicitly applies 058 and records SHA/hash/UTC/post-apply shape. Never use `apply-migrations.js` on local ledgers. 058 alone does not restore every missing earlier 054 table on this observed `ledger` [VERIFIED via preflight and migration source].
-2. **Local/Preview switch readiness.** Both literal isolation switches must become `on` and be re-read before B4 runtime enablement. Production already passed this dated check. No configuration mutation was authorized/performed in this session [VERIFIED via switch receipt].
-3. **Production 054 shape and shared 058.** Run `docs/plans/evidence/test-request-factory/b4-schema-preflight.sql` read-only on the intended Production target; if tracker exists, read its rows too. Return sanitized schema/tracker output, explicitly apply 058 through the existing-DB versioned process from a named commit, then record post-apply evidence. This agent must never apply Production migrations [owner guardrail; query drafted, not run there].
-4. **Automation dispositions / indirect chains.** Three custom steps and three flows need owner classification, including separate evidence for manual triggers and their invocation/Request actions. Review all listed custom steps and every activated flow, including those filtered to other columns; no clearance is inferred from “Deprecated” names. At the eventual first PATCH recheck every flow/definition, effective Process visibility, owned cast address digest, exact marked Request/run/person and concrete ETag [VERIFIED via section 13 receipt and checklist].
-5. **Promotion remains explicit.** PR #369 stays draft until the owner decides otherwise; merging main auto-deploys. Recheck head/CI and effective switches before promotion, then verify job resumption after deployment. No slot PATCH was authorized or run [VERIFIED via PR state, release strategy and session actions].
+1. **Recover existing operational ledgers and ownership history.** Check the other Mac/backups using the packet. Do not recreate an empty cast journal or adopt Dataverse identities by name/email. Run §6 preflight against the actual ledgers, then owner-run 058 apply and record post-apply shape/source/hash/UTC. Never run `apply-migrations.js` against local ledgers. Observed `ledger` is missing earlier 054 tables that 058 alone does not restore.
+2. **Cast email-digest comparison.** Use the recovered owned cast journal to compare the server-read normalized address with `test_request_cast_members.address_sha256`. This remains blocked by ledger recovery.
+3. **Production 054 query / shared consistency.** Owner runs `b4-schema-preflight.sql`, reads existing tracker history, and applies 058 through the existing-DB versioned process from a named commit when preflight permits. Agent never applies Production migrations. Shared Production/Preview migration consistency is UNKNOWN; shared 058 is not a B4 runtime prerequisite.
+4. **Automation dispositions and first-slot gate.** Section 13 receipt at `92ccbd0bd` has effective Global `prvReadWorkflow`, 14 readable activated flows, zero hard incomplete reasons, and six open owner dispositions (`complete=false`). Use the packet worksheet. Before any first PATCH, recheck all activated flow definitions, all custom/other-column step chains, effective Process visibility, exact marked Request/run/person, owned cast address digest and concrete ETag. No slot PATCH authorization exists.
+5. **Promotion decision.** Leave PR #369 draft until the owner explicitly decides to promote; main auto-deploys. Recheck current head/CI, deployment-captured switches and dated metadata at the eventual release. Verify job resumption after Production deployment.
 
-### Verified Open After Owner Prerequisites
+### Verified Open / Configuration Follow-up
 
-1. Re-run affected live checks, compare server-read cast normalized email digest with the recovered owned journal, and record post-apply receipts. Missing ledger/switch/disposition evidence cannot be bypassed by passing CI. Probe source must match the eventual release candidate; current evidence source is `92ccbd0bd` plus docs-only descendants.
+1. Verify the new B4 Preview is Ready with both captured switches on after this session's push. Env edits do not alter old deployments. Runtime/client/probe source remains the named candidate; docs-only descendants preserve its section 13 source provenance.
+2. Synchronize this worktree's now-private Local env after future credential rotations. Do not write through the old Claude-checkout symlink or overwrite its file.
 
 ### Do Not Reopen Without New Decision
 
-1. Fail-closed existing-person binds when reviewer isolation is non-on; pause all acceptance jobs if either switch is non-on. Do not work around these to unblock Local/Preview.
-2. Migration allocation: B4 = 058 / V57; Claude scheduled-email = 059 / V58. Stay on this branch/directory; never touch the other checkout or push to main.
-3. `--bind-reviewer` is suggestion-only; the slot operation has its separate preview and exact-Request confirmation. This session did not run it.
+1. Fail-closed binds and pause all acceptance jobs when either switch is non-on. No switch-only rollback after promotion: deploy prior code first.
+2. B4 owns 058/V57; Claude owns scheduled-email 059/V58. Stay on this branch/directory, never push main or touch the other checkout.
+3. `--bind-reviewer` remains suggestion-only. Slot preview/exact-Request confirmation is a separate owner-run operation.
 
-## Key Files Reference
+## Testing and Milestone Determination
 
-| File | Purpose |
-|---|---|
-| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` | B4 release contract and current blocked checklist |
-| `docs/plans/evidence/test-request-factory/b4-release-readiness-2026-09-30.md` | Evidence index, owner query/apply procedure and blockers |
-| `docs/plans/evidence/test-request-factory/b4-schema-preflight.sql` | Owner-run read-only 054/058 physical-schema query |
-| `docs/plans/evidence/test-request-factory/reviewer-slot-readiness-receipt-2026-09-30T16-20-11-291Z.json` | Committed-source Production section 13 receipt |
-| `lib/db/migrations/058_test_request_cast_slot_bindings.sql` | Named migration; SHA-256 recorded in evidence |
-
-## Testing
-
-All startup gates, focused/changed B4 tests and candidate CI passed. All 20 relevant evidence doc drift/Atlas/secret/scaffolding/harness/invariant gate/self-test runs passed after staging; JSON and whitespace validation passed. The local schema receipt uses the candidate’s abbreviated SHA because its installed SQL function contains the external provider keyword and Gitleaks otherwise misclassifies a full Git SHA as a token. Full SHA provenance remains in the companion evidence/section 13 receipt; no scanner exemption added. The advisory claim-evidence pilot report was unavailable (local state unreadable); no observation row was fabricated. No local live-PG fixture suite was run against the operational ledgers; the candidate's required CI PostgreSQL suite passed. Runtime/probe/client changes require a new clean-source probe; docs-only descendants retain the named runtime candidate evidence.
+Six focused suites / 145 tests passed after configuration changes. All 20 relevant documentation/Atlas/secret/invariant gate/self-test runs passed sequentially. JSON and whitespace validation passed. The advisory claim-evidence pilot report was unavailable because local state could not be read; no observation row was fabricated. Current receipts contain no raw env values, live identity IDs or credentials; temporary env directories are deleted. No Production capability shipped and no strategic storage change was made; no DEVELOPMENT_LOG entry is required.
 
 ---
 
