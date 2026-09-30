@@ -195,6 +195,64 @@ describe('Codex round-3 #2: decideTrackedPrefixVerification', () => {
     });
     expect(decision).toEqual({ ok: true });
   });
+
+  // Opus round-3 M1: before this fix, a prefix extra with an EMPTY
+  // approvedAhead was always unapproved and refused the whole run — even
+  // when the extra is simply an object a LATER, not-yet-tracked checkout
+  // file (e.g. 058) already creates. decideFileAction's own `adopt` path
+  // never got a chance to run. laterFilesFingerprint (the scratch
+  // fingerprint of applying EVERY checkout file) lets that specific case
+  // through, but only when the live shape is EXACTLY what the later file
+  // itself would produce.
+  describe('Opus round-3 M1: a prefix extra a later checkout file already explains', () => {
+    const SLOT_BINDINGS_SHAPE = {
+      columns: [{ name: 'run_id', type: 'uuid', nullable: false, default: null }],
+      constraints: [],
+      indexes: [],
+      triggers: [],
+    };
+
+    test('054 tracked, prefix diff shows an extra 058 table, approvedAhead empty, laterFilesFingerprint has the same shape -> ok', () => {
+      const decision = decideTrackedPrefixVerification({
+        prefixDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+        approvedAhead: [],
+        liveFingerprint: { tables: { test_request_cast_slot_bindings: SLOT_BINDINGS_SHAPE } },
+        laterFilesFingerprint: { tables: { test_request_cast_slot_bindings: SLOT_BINDINGS_SHAPE } },
+      });
+      expect(decision).toEqual({ ok: true });
+    });
+
+    test('same, but the live table shape differs from the later file -> refuse', () => {
+      const laterShape = { ...SLOT_BINDINGS_SHAPE, columns: [{ name: 'run_id', type: 'uuid', nullable: false, default: null }, { name: 'member_id', type: 'uuid', nullable: false, default: null }] };
+      const decision = decideTrackedPrefixVerification({
+        prefixDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+        approvedAhead: [],
+        liveFingerprint: { tables: { test_request_cast_slot_bindings: SLOT_BINDINGS_SHAPE } },
+        laterFilesFingerprint: { tables: { test_request_cast_slot_bindings: laterShape } },
+      });
+      expect(decision.ok).toBe(false);
+      expect(decision.reason).toMatch(/unapproved extra object/);
+    });
+
+    test('an extra no later file explains (absent from laterFilesFingerprint entirely) -> refuse', () => {
+      const decision = decideTrackedPrefixVerification({
+        prefixDiff: { missing: [], differing: [], extra: ['table test_request_hand_added'] },
+        approvedAhead: [],
+        liveFingerprint: { tables: { test_request_hand_added: SLOT_BINDINGS_SHAPE } },
+        laterFilesFingerprint: { tables: {} },
+      });
+      expect(decision.ok).toBe(false);
+    });
+
+    test('missing/differing on the prefix itself stay fatal even with a laterFilesFingerprint present', () => {
+      const decision = decideTrackedPrefixVerification({
+        prefixDiff: { missing: ['table test_request_status_changes'], differing: [], extra: [] },
+        laterFilesFingerprint: { tables: { test_request_status_changes: SLOT_BINDINGS_SHAPE } },
+      });
+      expect(decision.ok).toBe(false);
+      expect(decision.reason).toMatch(/drifted from the live ledger/);
+    });
+  });
 });
 
 /**

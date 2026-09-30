@@ -234,6 +234,85 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
   });
 
   /**
+   * Opus round-3 M1: before this fix, a live-but-untracked LATER file (058,
+   * applied by hand ahead of its tracker row) made verifyTrackedPrefix
+   * refuse the WHOLE run — the 054 prefix's scratch fingerprint compared
+   * against a live schema that also has 058's objects always finds them
+   * "extra", and with an empty approvedAhead there is nothing to exempt
+   * them. decideFileAction's own `adopt` path for 058 never got a chance to
+   * run. This proves the fix: 058 (fetched from the B4 branch, since this
+   * checkout does not have it yet) is applied directly to the live schema
+   * without a tracker row; a scratch migrations directory containing BOTH
+   * 054 and 058 stands in for what the checkout's `allFiles` will be once
+   * 058 is merged, so laterFilesFingerprint can recognize the extra as
+   * something a later file already explains.
+   */
+  describe('Opus round-3 M1: a live, untracked LATER file no longer blocks the whole run', () => {
+    let gitAvailable = true;
+    let file058Sql;
+    let tempMigrationsDir;
+    const FILE_054 = '054_test_request_runs.sql';
+    const FILE_058 = '058_test_request_cast_slot_bindings.sql';
+
+    beforeAll(() => {
+      try {
+        file058Sql = execFileSync('git', ['show', `origin/codex/factory-reviewer-b4-runtime:lib/db/migrations/${FILE_058}`], { cwd: process.cwd(), encoding: 'utf8' });
+      } catch {
+        gitAvailable = false;
+        return;
+      }
+      tempMigrationsDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'ledger-m1-'));
+      fs.writeFileSync(path.join(tempMigrationsDir, FILE_054), fs.readFileSync(path.join(LEDGER_MIGRATIONS_DIR, FILE_054), 'utf8'));
+      fs.writeFileSync(path.join(tempMigrationsDir, FILE_058), file058Sql);
+    });
+
+    afterAll(() => {
+      if (tempMigrationsDir) fs.rmSync(tempMigrationsDir, { recursive: true, force: true });
+    });
+
+    afterEach(async () => {
+      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await client.query(`CREATE SCHEMA ${schema}`);
+      await client.query(`SET search_path TO ${schema}`);
+      for (const f of listLedgerMigrationFiles()) {
+        await client.query(fs.readFileSync(path.join(LEDGER_MIGRATIONS_DIR, f), 'utf8'));
+      }
+    });
+
+    (TEST_URL ? test : test.skip)('054 tracked, 058 live-but-untracked, approvedAhead empty -> verifyTrackedPrefix ok, then decideFileAction adopts 058', async () => {
+      if (!gitAvailable) return;
+      // Simulate a ledger where 058 was hand-applied ahead of its tracker row.
+      await client.query(file058Sql);
+
+      const result = await verifyTrackedPrefix(client, {
+        trackedFiles: [FILE_054],
+        allFiles: [FILE_054, FILE_058],
+        migrationsDir: tempMigrationsDir,
+        readLedgerFingerprint,
+        approvedAhead: [],
+      });
+      expect(result).toEqual({ ok: true });
+
+      // Now prove decideFileAction's own per-file path reaches 'adopt' for
+      // 058 — the fix's whole point is that this path gets a chance to run
+      // at all, rather than the run refusing before it is ever reached.
+      const scratchFp = await fingerprintFilesInScratch(client, [FILE_054, FILE_058], tempMigrationsDir, readLedgerFingerprint);
+      const liveFingerprint = await readLedgerFingerprint(client);
+      const scratchDiff = compareLedgerFingerprint(scratchFp, liveFingerprint);
+      const decision = decideFileAction({
+        file: FILE_058,
+        currentChecksum: 'irrelevant-for-untracked-path',
+        trackedRow: null,
+        liveHasObjects: true,
+        scratchDiff,
+        approvedAhead: [],
+        liveFingerprint,
+      });
+      expect(decision).toEqual({ action: 'adopt' });
+    });
+  });
+
+  /**
    * Codex round-1 Fix 3: a ledger that was hand-built from an OLDER shape of
    * 054 (before checksums existed) must not be silently adopted. Applies
    * 054 as of commit af65a24bd — before the changes that added the cast
