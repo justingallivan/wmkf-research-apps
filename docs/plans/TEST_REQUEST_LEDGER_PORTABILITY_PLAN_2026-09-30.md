@@ -23,21 +23,21 @@ One operational ledger, reachable from every machine the owner works on, still n
 
 - **D1 — Where the ledger lives.** Options in *Phase 2*. Recommendation: a second, dedicated Neon project (`wmkf-factory-ledger`), separate credentials, never linked to the Vercel project.
 - **D2 — Local Docker ledgers after the move.** Recommendation: keep the container for the live-Postgres test suites only (`TEST_REQUEST_LEDGER_TEST_URL`); retire `ledger_prod` locally once the managed copy is verified and one dump is archived.
-- **D3 — Interim transport** for the next few days. Dumps are written to a non-synced directory (`~/wmkf-ledger-snapshots/`, never `~/Desktop` or `~/Documents`, which may be iCloud-synced) and encrypted with a passphrase before they leave the machine; the transport (iCloud, USB, mail-to-self) is then the owner's choice and the encrypted archive is deleted from it after the restore is verified. Dumps carry production Request and contact GUIDs, address digests and journal JSON; they are not credentials, but their full sensitivity has not been audited, so they are treated as sensitive.
+- **D3 — Interim transport: DECIDED (owner, 2026-09-30, S553).** Dumps are written directly to the owner's shared documents folder, which both Macs reach, unencrypted. The owner accepts that posture for these files (production Request and contact GUIDs, address digests, journal JSON; no credentials). Digests are compared on both sides before a restore.
 
 ## Phases
 
 ### Phase 0 — Today, office (no ledger access needed; ~1 h)
 
 1. **Codex on B4:** every checklist step that needs `ledger_prod` or `ledger` is recorded as *blocked: ledger not on this machine*, not improvised against the stale local `ledger`. Everything else on the B4 checklist proceeds.
-2. **Snapshot helper (Tier 0 script, this plan's first build item):** `scripts/factory-ledger-snapshot.sh dump|restore --db=ledger_prod|ledger --file=<path>`. `dump` runs `pg_dump -Fc` inside `wmkf-ledger-pg`, writes the file, prints its SHA-256 and the row counts of every `test_request_*` table. `dump` writes only under a non-synced directory and encrypts by default (`--plain` to skip). `restore` creates the database when it is absent (this Mac has no `ledger_prod`), refuses if the target already has rows unless `--replace` is passed (which drops and recreates it; the office `ledger` needs this because of residue), then `pg_restore`s and prints the same counts so the two sides can be compared. No credentials in output.
+2. **Snapshot helper (Tier 0 script, this plan's first build item):** `scripts/factory-ledger-snapshot.sh dump|restore --db=ledger_prod|ledger --file=<path>`. `dump` runs `pg_dump -Fc` inside `wmkf-ledger-pg`, writes the file, prints its SHA-256 and the row counts of every `test_request_*` table. `dump` writes to the path given (the shared folder under D3). `restore` creates the database when it is absent (this Mac has no `ledger_prod`), refuses if the target already has rows unless `--replace` is passed (which drops and recreates it; the office `ledger` needs this because of residue), then `pg_restore`s and prints the same counts so the two sides can be compared. No credentials in output.
 3. **Ledger identity in handoffs:** from this session on, any handoff or evidence file that records a Factory run names the ledger host and database (`wmkf-ledger-pg/ledger_prod` today) beside the run id. Add the line to the `/stop` skill's checklist.
 
 ### Phase 1 — Tonight, home Mac (~20 min)
 
 1. `dump` both `ledger_prod` and `ledger` with the helper; keep the printed digests and counts in `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md` (digests and counts only, never the dump).
-2. Encrypt the two files (`tar | openssl enc -aes-256-cbc -pbkdf2`; passphrase in the password manager) and move only the archive by the D3 transport.
-3. Next office morning: decrypt into the non-synced directory, compare digests, `restore` both here (`createdb` for the absent `ledger_prod`, `--replace` for the residue-laden `ledger`); compare counts to the evidence file; record the restore in the same evidence file. Codex's blocked B4 steps become runnable.
+2. Wait for the shared folder to sync; the office side compares digests before restoring.
+3. Next office morning: compare digests, `restore` both here (`createdb` for the absent `ledger_prod`, `--replace` for the residue-laden `ledger`); compare counts to the evidence file; record the restore in the same evidence file. Codex's blocked B4 steps become runnable.
 
 This is the stopgap. It is manual in both directions and must be repeated after every home-Mac Factory command until Phase 2 lands, so the evidence file must say which copy is current.
 
