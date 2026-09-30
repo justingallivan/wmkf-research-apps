@@ -22,7 +22,9 @@ No MP4 Watch/long-seek test was performed with this fixture.
 `dpl_8C7qZ4XqvZp64DPUTb2QeqtXAa9d`. Branch-scoped Preview
 `POST_PRESENTATION_MATERIALS_ACCESS` reads `off`, and temporary redeployment
 `dpl_wzudtJ6a3SDWiaA9apRD6cZkoZDQ` was removed. The replacement link displayed an
-unavailable message through the restored Preview alias. Production was untouched. MP4
+unavailable message through the restored Preview alias. Production deployment, runtime
+configuration, Dataverse, and SharePoint were untouched; the sandbox link issuance and reissue
+wrote two rows to the shared Preview/Production Postgres link ledger. MP4
 Cancel/Retry and Graph-confirmed terminal expiry remain offline/partial, and Production
 promotion remains separate. The Session 553 section below is historical.
 
@@ -44,7 +46,9 @@ records the two retained Request Document IDs and the bounded evidence.
 The registered Preview alias was restored to its observed prior deployment
 `dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2`, the feature-branch alias to
 `dpl_8C7qZ4XqvZp64DPUTb2QeqtXAa9d`, and the temporary redeployment was removed after
-both alias readbacks. Production was untouched. Retained Request `1000334` was untouched.
+both alias readbacks. Production deployment, runtime configuration, and Dataverse were untouched;
+the Preview transcript-staging path used the shared Preview/Production Postgres database.
+Retained Request `1000334` was untouched.
 
 The synthetic Zoom URL does not prove real playback; no Board materials-only link was generated
 for the new Request. MP4 Cancel/Retry and Graph-confirmed terminal expiry remain offline/partial

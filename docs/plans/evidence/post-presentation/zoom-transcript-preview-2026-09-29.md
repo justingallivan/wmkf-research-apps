@@ -18,7 +18,7 @@
 | Recording | Synthetic `https://us02web.zoom.us/rec/share/WMKFSANDBOXTEST20260929?pwd=WMKFSANDBOXTEST` saved as current external Recording, slot version 1, Request Document `44899a5b-66bc-f111-aaad-70a8a5b1c1c6`; no SharePoint item. |
 | Transcript | Synthetic `WEBVTT` file saved as current SharePoint-backed Transcript, slot version 1, Request Document `ed1cc369-66bc-f111-aaad-70a8a5b1c1c6`; 203 source and downloaded bytes with matching SHA-256 and registry hash. |
 
-The Zoom URL is deliberately synthetic. This acceptance proves input, persistence, and staff readback; it does **not** prove that Zoom playback works or that a real passcode is valid. No Board presentation link was generated, so the external materials-only consumer remains untested for these two new materials. No MP4 upload, Cancel, Retry, Production deployment, or Production data/configuration write occurred.
+The Zoom URL is deliberately synthetic. This acceptance proves input, persistence, and staff readback; it does **not** prove that Zoom playback works or that a real passcode is valid. No Board presentation link was generated in this producer run, so its external consumer was not tested then. No MP4 upload, Cancel, Retry, Production deployment, Production runtime-configuration change, or Production Dataverse write occurred. The transcript-staging path used the shared Preview/Production Postgres database; the Request Documents and transcript file were retained in sandbox Dataverse and its governed SharePoint folder.
 
 ## Preview cleanup
 
