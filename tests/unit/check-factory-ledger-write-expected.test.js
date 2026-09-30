@@ -94,11 +94,46 @@ describe('check-factory-ledger.js --write-expected refuses an unsafe TEST_REQUES
     expect(calls.join(' ')).toMatch(/shared_database/);
   }, 10000);
 
-  test('an unset TEST_REQUEST_LEDGER_TEST_URL is refused with a clear message', async () => {
-    const env = { ...ORIGINAL_ENV };
-    delete env.TEST_REQUEST_LEDGER_TEST_URL;
-    const { calls, exits } = await runWriteExpected(env);
-    expect(exits).toEqual([1]);
-    expect(calls.join(' ')).toMatch(/needs TEST_REQUEST_LEDGER_TEST_URL/);
+  // Opus round-3 L4: this test deletes TEST_REQUEST_LEDGER_TEST_URL from
+  // process.env, but the SCRIPT's own loadEnvLocal() reads the real
+  // .env.local off disk and refills any variable that is unset — a machine
+  // that keeps TEST_REQUEST_LEDGER_TEST_URL there (a natural place for the
+  // regenerate command) would have made this test silently connect and run
+  // real DDL instead of testing the refusal path at all. node:fs's
+  // readFileSync is mocked to report .env.local as absent (ENOENT) for
+  // every OTHER path it is real, so loadEnvLocal cannot refill anything, and
+  // `pg`'s Client is mocked to prove it is never even constructed — the
+  // strongest possible guarantee this test can never reach real DDL on any
+  // machine, not just this repo's current .env.local.
+  test('an unset TEST_REQUEST_LEDGER_TEST_URL is refused with a clear message (never refilled from a real .env.local, never connects)', async () => {
+    const pgClientCtor = jest.fn();
+    jest.doMock('pg', () => ({ Client: pgClientCtor }));
+    jest.doMock('node:fs', () => {
+      const real = jest.requireActual('node:fs');
+      return {
+        ...real,
+        readFileSync: (p, ...args) => {
+          if (typeof p === 'string' && p.endsWith('.env.local')) {
+            const err = new Error('ENOENT: no such file or directory, open .env.local');
+            err.code = 'ENOENT';
+            throw err;
+          }
+          return real.readFileSync(p, ...args);
+        },
+      };
+    });
+    try {
+      const env = { ...ORIGINAL_ENV };
+      delete env.TEST_REQUEST_LEDGER_TEST_URL;
+      const { calls, exits } = await runWriteExpected(env);
+      expect(exits).toEqual([1]);
+      expect(calls.join(' ')).toMatch(/needs TEST_REQUEST_LEDGER_TEST_URL/);
+      expect(pgClientCtor).not.toHaveBeenCalled();
+    } finally {
+      // Never let this mock leak into later tests in this file, which rely
+      // on the real node:fs to require the real script/migration files.
+      jest.dontMock('node:fs');
+      jest.dontMock('pg');
+    }
   }, 10000);
 });
