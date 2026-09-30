@@ -1,6 +1,6 @@
 # B4 ledger location and restore handoff — 2026-09-30
 
-**Ledger-dependent B4 steps: blocked: ledger not on this machine, until tomorrow's restore.** Location is now owner-confirmed; do not investigate or migrate the stale residue database here. PR #369 remains draft. No ledger connection, migration, run, cast/status change or slot PATCH was performed in this update.
+**Ledger-dependent B4 steps: blocked: ledger not on this machine, until tomorrow's restore.** Location is now owner-confirmed; do not investigate or migrate the stale residue database here. PR #369 subsequently merged/deployed by explicit owner decision; [promotion receipt](b4-production-promotion-2026-09-30.md). Ledger-dependent checks remain blocked. No ledger connection, migration, run, cast/status change or slot PATCH was performed in this update.
 
 ## Evidence and source boundary
 
@@ -16,7 +16,7 @@
 
 ## Second-landing integration obligations
 
-Whichever of #369 and #374 lands second must reconcile the B4 slot-mode branch with requireLedgerUrl(args.target), preserving the target-aware database selection and fingerprint check. Do not change the B4 guard ahead of #374 or merge/rebase #374 into this branch.
+PR #369 landed first on 2026-09-30. PR #374 must reconcile the B4 slot-mode branch with requireLedgerUrl(args.target), preserving the target-aware database selection and fingerprint check. Do not change the B4 guard ahead of #374 or merge/rebase #374 into this branch.
 
 After 058 is on main, the second landing must regenerate the tracked fingerprint against a disposable scratch Postgres database, using the script supplied by #374:
 
