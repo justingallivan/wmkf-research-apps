@@ -1,6 +1,6 @@
 # Test Request Factory ledger: portability and single source of truth
 
-Status: **DRAFT, revision 0 (2026-09-30, S553). Written after the B4 release preflight stalled in the office because the operational ledger exists only on the home Mac. Nothing built. Owner decisions D1–D3 open.**
+Status: **DRAFT, revision 1 (2026-09-30, S553). Written after the B4 release preflight stalled in the office because the operational ledger exists only on the home Mac. D1 and D3 decided; the managed ledger exists with its schema applied (Phase 2 item 3, first half); the registry, runner and fingerprint check are not built. D2 open.**
 
 ## Problem
 
@@ -21,7 +21,7 @@ One operational ledger, reachable from every machine the owner works on, still n
 
 ## Owner decisions
 
-- **D1 — Where the ledger lives.** Options in *Phase 2*. Recommendation: a second, dedicated Neon project (`wmkf-factory-ledger`), separate credentials, never linked to the Vercel project.
+- **D1 — Where the ledger lives: DECIDED (owner, 2026-09-30, S553).** Neon project `wmkf-factory-ledger`, created through the Vercel Marketplace (Neon is managed under Vercel; there is no separate Neon account), **not connected to any Vercel project**, region AWS US East 1 (the app database is us-west-2; accepted for owner-run tooling), Launch plan. Databases `ledger_prod` and `ledger` on branch `main`, default `_owner` role. Migrations 054 (`main`) and 058 (`origin/codex/factory-reviewer-b4-runtime`) applied to both by the session, in that order, on 2026-09-30 [VERIFIED: seven `test_request_*` tables and `test_request_receipt_ok` present in each]. Connection strings live only in each Mac's `.env.local` as `TEST_REQUEST_LEDGER_URL` (ledger_prod) and `TEST_REQUEST_SANDBOX_LEDGER_URL` (ledger).
 - **D2 — Local Docker ledgers after the move.** Recommendation: keep the container for the live-Postgres test suites only (`TEST_REQUEST_LEDGER_TEST_URL`); retire `ledger_prod` locally once the managed copy is verified and one dump is archived.
 - **D3 — Interim transport: DECIDED (owner, 2026-09-30, S553).** Dumps are written directly to the owner's shared documents folder, which both Macs reach, unencrypted. The owner accepts that posture for these files (production Request and contact GUIDs, address digests, journal JSON; no credentials). Digests are compared on both sides before a restore.
 
@@ -60,7 +60,7 @@ This is the stopgap. It is manual in both directions and must be repeated after 
 
 1. `lib/services/test-requests/ledger-registry.js` (tracked, reviewed like `target-registry.js`): the allowed ledger hostnames, each labelled `production-ledger` or `sandbox-ledger`, plus `localhost`/`127.0.0.1` labelled `local`. `requireLedgerUrl` becomes: URL set; hostname in the registry; not equal to any configured shared URL; and, for `--target=production`, labelled `production-ledger` or `local`. Extending the registry is a commit, not an env edit. The `neon.tech` regex goes away, replaced by the allowlist (an unregistered Neon host is refused the same as any other unregistered host).
 2. `TEST_REQUEST_LEDGER_URL` (production ledger) and `TEST_REQUEST_SANDBOX_LEDGER_URL` (sandbox) documented in `docs/CREDENTIALS_RUNBOOK.md` (which does not mention `TEST_REQUEST_LEDGER_URL` today [VERIFIED 2026-09-30 by grep]) and `lib/utils/tracked-secrets.js`, stored in each machine's `.env.local` only, never in Vercel. Rotation procedure: Neon console reset, update both Macs, same as the office sync done in S553.
-3. Migrate: restore the Phase 1 dump into the new project, run the Phase 3 schema check, then run one read-only `--run-inspect` against it from each Mac. Only then retire the local `ledger_prod` (D2).
+3. Migrate: restore the Phase 1 dump into the new project (the brief's Neon section; `--clean --no-owner` then re-apply 058 for parity), run the Phase 3 schema check, then run one read-only `--run-inspect` against it from each Mac once the registry admits the host. Only then retire the local `ledger_prod` (D2).
 4. Update the cast plan §6 and the B4 release checklist to name the managed ledger instead of "local `ledger_prod` and `ledger`"; update the Atlas ledger page header.
 5. **Review:** the registry and the new `requireLedgerUrl` loosen a fence that went through Codex review, so they get one Codex adversarial round before merge, on their own Tier 1 branch (CLI and scripts only, no app runtime).
 

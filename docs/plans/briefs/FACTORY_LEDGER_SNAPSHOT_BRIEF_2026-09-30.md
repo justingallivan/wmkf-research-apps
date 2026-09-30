@@ -59,6 +59,31 @@ docker exec -i wmkf-ledger-pg pg_restore -U postgres -d ledger < "$SHARED/ledger
 
 Re-run the row-count block from the home section and compare with the evidence file. Append to the same evidence file: the date, `restored on office Mac`, the counts, and "current copy: office Mac and home Mac identical as of restore". Commit and push. The B4 ledger checks in `~/Code/WMKF_Apps-codex` can then run against `TEST_REQUEST_LEDGER_URL=postgres://postgres:<local password>@127.0.0.1:5433/ledger_prod` (set it in the shell, never commit it).
 
+## Also tonight: load the managed ledger (D1, decided 2026-09-30)
+
+The Neon project `wmkf-factory-ledger` now holds empty `ledger_prod` and `ledger` databases with the 054 + 058 schema. Add the same two variables to the home Mac's `.env.local` (values from the Neon console **Connect** dialog, pooled, one per database; paste in an editor, never in chat):
+
+```
+TEST_REQUEST_LEDGER_URL=<ledger_prod connection string>
+TEST_REQUEST_SANDBOX_LEDGER_URL=<ledger connection string>
+```
+
+Then restore each dump into Neon through the container's `pg_restore` (the dump's owner is the local `postgres` role, so ownership and grants are dropped; `--clean` replaces the empty schema with the dump's, and 058 is re-applied afterwards so the shape matches the migration file):
+
+```bash
+cd /Users/gallivan/Code/WMKF_Apps
+set -a; source .env.local; set +a
+docker exec -i wmkf-ledger-pg pg_restore --clean --if-exists --no-owner --no-privileges -d "$TEST_REQUEST_LEDGER_URL"         < "$SHARED/ledger_prod-$STAMP.dump"
+docker exec -i wmkf-ledger-pg pg_restore --clean --if-exists --no-owner --no-privileges -d "$TEST_REQUEST_SANDBOX_LEDGER_URL" < "$SHARED/ledger-$STAMP.dump"
+git show origin/codex/factory-reviewer-b4-runtime:lib/db/migrations/058_test_request_cast_slot_bindings.sql > /tmp/058.sql
+for u in "$TEST_REQUEST_LEDGER_URL" "$TEST_REQUEST_SANDBOX_LEDGER_URL"; do docker exec -i wmkf-ledger-pg psql "$u" -v ON_ERROR_STOP=1 -f - < /tmp/058.sql; done
+rm /tmp/058.sql
+```
+
+Row counts on Neon (same query as above, but `docker exec -i wmkf-ledger-pg psql "$TEST_REQUEST_LEDGER_URL" -tAc "..."`) go into the evidence file beside the local counts. `set -a; source` exports every `.env.local` value into that shell only; close the shell afterwards. Nothing prints a connection string.
+
+The Factory CLI still refuses `neon.tech` hosts until the plan's Phase 2 registry lands, so nothing runs against Neon yet; the office restore into the local container is still what unblocks B4 tomorrow.
+
 ## After either side runs a Factory command
 
 Until Phase 2, whichever Mac last ran a ledger-driven command holds the current copy. Dump again from that Mac with a new `STAMP`, update the evidence file's "current copy" line, and restore on the other side before running anything there.

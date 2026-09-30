@@ -89,6 +89,8 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | Variable | Purpose | Notes |
 |----------|---------|-------|
 | `POSTGRES_URL` | Database connection | Auto-set when Vercel Postgres is linked |
+| `TEST_REQUEST_LEDGER_URL` | Test Request Factory **operational ledger** (`ledger_prod` in Neon project `wmkf-factory-ledger`, a Vercel Marketplace resource **not connected to any Vercel project**; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md` D1) | Manual, **local `.env.local` on each owner Mac only — never a Vercel variable**; rotate in the Neon console (reset role password) and update every Mac. The CLI refuses the app's `POSTGRES_URL*`/`DATABASE_URL` for this variable. Until the plan's Phase 2 registry lands the CLI also refuses `neon.tech` hosts, so the local `wmkf-ledger-pg` container remains the working ledger. |
+| `TEST_REQUEST_SANDBOX_LEDGER_URL` | Factory **sandbox ledger** (`ledger` database, same Neon project) | Same as above |
 | `BLOB_READ_WRITE_TOKEN` | File upload storage (public shared store `phase-ii-summaries-blob`) | Auto-set when Vercel Blob is linked |
 | `DVX_BLOB_RW_TOKEN` | Dataverse Bulk Export private store (`dvx-export-private`) RW token | Manual — see "Private Blob store provisioning" below |
 | `INTAKE_BLOB_RW_TOKEN` | Applicant intake drain private store (`intake-applicant-private`, `store_Eaui32n6i2wYMS6E`, `iad1`) RW token | Manual — same provisioning shape as DVX |
