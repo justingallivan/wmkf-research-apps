@@ -203,32 +203,21 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain("verification.failures.push(...reverifyFailures.map((failure) => `final file check: ${failure}`))");
   });
 
-  test('ledger-driven modes refuse an unset or shared-production ledger URL (Codex round-1 Fix 1/4/7)', () => {
-    expect(script).toContain("if (!url) {");
-    expect(script).toContain('is required for ledger-driven modes');
-    // Phase 2 of the ledger portability plan: the blanket neon.tech refusal
-    // is replaced by the tracked host registry plus the database-name rule.
-    expect(script).not.toMatch(/neon\\?\.tech/);
-    expect(script).toContain("import { classifyLedgerUrl, selectLedgerVariable } from '../lib/db/ledger-registry.js';");
-    expect(script).toContain('classifyLedgerUrl(url, { target, sharedUrls })');
-    expect(script).toContain('must not be the shared Production/Preview database');
-    // Opus round-1 M1: requireLedgerUrl throws on ANY !verdict.ok, not an
-    // enumerated reason list, so an unrecognized future reason cannot fall
-    // through and return the URL.
-    expect(script).toContain('if (!verdict.ok) {');
-    expect(script).toContain('is not an acceptable ledger (${verdict.reason})');
-    // Codex round-1 Fix 7: every ledger-driven mode, including --ledger-check
-    // and --run-inspect, is target-bound; the variable itself is selected
-    // from the target rather than always TEST_REQUEST_LEDGER_URL, and the
-    // targetless special case is gone.
-    expect(script).toContain('selectLedgerVariable(target, process.env)');
-    expect(script).not.toContain('targetExplicit');
+  test('ledger-driven modes are dispatched through the ledger guard (Codex round-1 Fix 1/4/7; Opus round-2 item 6)', () => {
+    // Opus round-2 item 6 (Codex round-2 #7): requireLedgerUrl and
+    // ledgerSchemaCheck moved to lib/db/ledger-guard.js so their SAFETY
+    // BEHAVIOR is executable and unit-tested (tests/unit/ledger-guard.test.js),
+    // not just their presence in this dispatch source — a literal-source
+    // check alone cannot catch a deleted throw inside those functions. The
+    // pins below stay here only for what still lives in THIS file: the
+    // import and the dispatch call placement.
+    expect(script).toContain("import { requireLedgerUrl, ledgerSchemaCheck } from '../lib/db/ledger-guard.js';");
     expect(script).not.toContain('--strict-ledger-check');
-    // Opus round-1 M1: requireLedgerUrl fails closed on a missing target,
-    // and there are zero no-argument calls left at HEAD (a future merge
-    // that reintroduces one, e.g. from B4, is a real regression, not a
-    // decorative one).
-    expect(script).toContain("if (typeof target !== 'string' || target.length === 0) {");
+    // Zero no-argument calls left at HEAD (a future merge that reintroduces
+    // one, e.g. from B4, is a real regression, not a decorative one) —
+    // ledger-guard.js's own requireLedgerUrl fails closed on a missing
+    // target (tests/unit/ledger-guard.test.js), but this still pins that no
+    // call site in THIS script forgets to pass args.target.
     expect((script.match(/requireLedgerUrl\(\)/g) || []).length).toBe(0);
     // Block-bound: for each write/read-only ledger-driven dispatch, BOTH
     // requireLedgerUrl(args.target) and ledgerSchemaCheck(..., { mode: '...'
@@ -246,10 +235,9 @@ describe('sandbox operator write boundary', () => {
       expect(checkAt).toBeGreaterThan(at);
       expect(checkAt).toBeLessThan(boundary);
     }
-    // Codex round-1 Fix 4: drift always throws (no strict flag); extras are
-    // checked against the tracked approved-ahead list.
-    expect(script).toContain('readApprovedAhead');
-    expect(script).toContain('unapprovedExtras');
+    // Drift-always-throws and the approved-ahead extra rule (Codex round-1
+    // Fix 4) now live in lib/db/ledger-guard.js's ledgerSchemaCheck, covered
+    // executably by tests/unit/ledger-guard.test.js.
   });
 
   test('--advance enters the script-only trusted DAL context before advancing any step (Stage C round 2, P1-B)', () => {

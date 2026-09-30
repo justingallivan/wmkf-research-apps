@@ -103,10 +103,7 @@ import {
 } from '../lib/services/test-requests/basic-clone-steps.js';
 import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
 import { recheckFoundationTransition } from '../lib/services/test-requests/foundation-transition.js';
-import { classifyLedgerUrl, selectLedgerVariable } from '../lib/db/ledger-registry.js';
-import {
-  compareLedgerFingerprint, formatLedgerDiff, readApprovedAhead, readExpectedFingerprint, readLedgerFingerprint, unapprovedExtras,
-} from '../lib/db/ledger-schema.js';
+import { requireLedgerUrl, ledgerSchemaCheck } from '../lib/db/ledger-guard.js';
 import { fieldFor, recheckStatusChange, runStatusChange } from '../lib/services/test-requests/status-change-runner.js';
 import { CAST_DEFAULT_NAMES, CAST_ROLE_ORDER, planCastAddresses, readCast, runCastCreate } from '../lib/services/test-requests/cast-runner.js';
 import { runCastBinding } from '../lib/services/test-requests/cast-binding-runner.js';
@@ -749,118 +746,6 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
     updateRehearsalReceipt(receiptPath, receipt);
     throw error;
   }
-}
-
-/**
- * Refuse to run a ledger-driven mode against anything but a registered ledger
- * (lib/db/ledger-registry.js): the URL must be set, must not equal a configured
- * shared Production/Preview database URL, must name a registered host, and on
- * a managed host must name the database the target expects (ledger_prod for
- * --target=production, ledger otherwise).
- *
- * Codex round-1 Fix 7: the connection variable is selected FROM the target
- * (selectLedgerVariable), not always TEST_REQUEST_LEDGER_URL — a
- * --target=sandbox run reads TEST_REQUEST_SANDBOX_LEDGER_URL when it is
- * configured, falling back to TEST_REQUEST_LEDGER_URL for single-variable
- * local setups. `target` is always a concrete string now (the parser
- * defaults it to 'sandbox'); every ledger-driven mode, including
- * --run-inspect and --ledger-check, is target-bound.
- */
-function requireLedgerUrl(target) {
-  // Opus round-1 M1: a missing/empty target must fail closed, never fall
-  // through to classifyLedgerUrl's target=null host-only rules (which skip
-  // the managed database check).
-  if (typeof target !== 'string' || target.length === 0) {
-    throw new Error('requireLedgerUrl requires a non-empty --target; every ledger-driven mode is target-bound.');
-  }
-  const varName = selectLedgerVariable(target, process.env);
-  const url = process.env[varName];
-  if (!url) {
-    throw new Error(`${varName} is required for ledger-driven modes (--reserve, --advance, --run-inspect, ...) with --target=${target}.`);
-  }
-  console.log(`[ledger] using ${varName} for --target=${target}`);
-  const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL']
-    .map((name) => process.env[name]).filter(Boolean);
-  const verdict = classifyLedgerUrl(url, { target, sharedUrls });
-  if (!verdict.ok) {
-    // Opus round-1 M1: throw on ANY refusal reason, not an enumerated list,
-    // so an unrecognized future reason can never fall through and return
-    // the URL.
-    if (verdict.reason === 'shared_database') {
-      throw new Error(`${varName} must not be the shared Production/Preview database.`);
-    }
-    if (verdict.reason && verdict.reason.startsWith('wrong_database:')) {
-      throw new Error(`${varName} on the managed ledger must name the ${verdict.reason.slice('wrong_database:'.length)} database for --target=${target}.`);
-    }
-    throw new Error(`${varName} is not an acceptable ledger (${verdict.reason}); see lib/db/ledger-registry.js.`);
-  }
-  return url;
-}
-
-/**
- * Read-only ledger inspection modes: MISSING/DIFFERING still throw (drift is
- * never safe to operate against), but an unapproved EXTRA only warns — these
- * modes make no writes, so an ahead-of-checkout ledger is informational.
- * `ledger-check` is stricter still: the standalone diagnostic never throws
- * at all, so an operator can always see the full diff.
- */
-const LEDGER_CHECK_READ_ONLY_MODES = new Set(['run-inspect', 'ledger-check']);
-
-/**
- * Ledger schema check (portability plan Phase 3; Codex round-1 Fix 4 makes
- * drift blocking by default and extras subject to an approved-ahead list).
- * Compares the ledger's structural fingerprint with the tracked
- * lib/db/ledger-schema-fingerprint.json before any ledger-driven mode runs.
- *
- * MISSING or DIFFERING objects always refuse, for every mode except the
- * `--ledger-check` diagnostic (which prints the full diff and never throws).
- * EXTRA objects are checked against lib/db/ledger-schema-ahead.json's
- * approved-ahead list: extras that are all approved only warn; any extra NOT
- * in that list refuses for write modes (reserve, advance, set-status,
- * status-recheck, create-cast, bind-reviewer, run-recheck) and warns for the
- * read-only `--run-inspect` and `--ledger-check`.
- */
-async function ledgerSchemaCheck(ledgerUrl, { mode = null } = {}) {
-  const db = pgLedgerDb(ledgerUrl);
-  let diff;
-  let live;
-  try {
-    live = await readLedgerFingerprint(db);
-    diff = compareLedgerFingerprint(readExpectedFingerprint().fingerprint, live);
-  } finally {
-    await db.end?.();
-  }
-  const database = new URL(ledgerUrl).pathname.replace(/^\//, '');
-  const approvedAhead = readApprovedAhead();
-  const unapproved = unapprovedExtras(diff, approvedAhead, live);
-
-  if (mode === 'ledger-check') {
-    // Standalone diagnostic: print everything, throw on nothing.
-    if (diff.ok && unapproved.length === 0) {
-      console.log(`[ledger-check] ${database}: matches lib/db/ledger-schema-fingerprint.json`);
-    } else {
-      console.warn(`[ledger-check] ${database}: schema differs from the checkout's fingerprint (diagnostic only; not blocking):\n${formatLedgerDiff(diff)}`);
-      if (unapproved.length > 0) console.warn(`[ledger-check] unapproved extra objects (not in lib/db/ledger-schema-ahead.json):\n${unapproved.map((e) => `  extra     ${e}`).join('\n')}`);
-    }
-    return diff;
-  }
-
-  if (diff.missing.length > 0 || diff.differing.length > 0) {
-    throw new Error(`Ledger ${database} does not match lib/db/ledger-schema-fingerprint.json:\n${formatLedgerDiff(diff)}\nApply the checkout's ledger migrations (npm run ledger:apply -- --url-env=TEST_REQUEST_LEDGER_URL) or regenerate the fingerprint if the files changed.`);
-  }
-  if (unapproved.length > 0) {
-    const message = `Ledger ${database} has extra objects not in lib/db/ledger-schema-ahead.json's approved-ahead list:\n${unapproved.map((e) => `  extra     ${e}`).join('\n')}`;
-    if (LEDGER_CHECK_READ_ONLY_MODES.has(mode)) {
-      console.warn(`[ledger-check] ${message}`);
-    } else {
-      throw new Error(message);
-    }
-  } else if (diff.extra.length > 0) {
-    console.log(`[ledger-check] ${database}: extra objects are all approved-ahead (lib/db/ledger-schema-ahead.json)`);
-  } else {
-    console.log(`[ledger-check] ${database}: matches lib/db/ledger-schema-fingerprint.json`);
-  }
-  return diff;
 }
 
 /**
