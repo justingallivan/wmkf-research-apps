@@ -127,7 +127,7 @@
     "cors": "^2.8.6",
     "csv-parse": "^7.0.2",
     "docx": "^9.7.1",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.16",
     "exceljs": "^4.4.0",
     "express-rate-limit": "^8.6.1",
     "formidable": "^3.5.4",
