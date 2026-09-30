@@ -78,6 +78,14 @@ The in-place edits to 054 are the drift source. Two build items:
 3. Make `tests/integration/test-request-run-ledger.pg.test.js` and `test-request-run-runner.pg.test.js` schema-scoped like the newer suites, so residue in a local `ledger` database cannot fail them (they fail on this Mac today for that reason while passing in CI). Not done in S553.
 4. Memory entry: *feedback-operational-state-must-be-reachable-from-every-workstation* — any owner-run tool that keeps durable state must name where that state lives, and the location must not be one machine.
 
+
+**Staleness acknowledgements (S553, after the Opus round-1 fix-up commits c8eeb59d9..146aaa962; each on one line for the Stop hook):**
+- [RECHECKED after scripts/rehearse-test-request-sandbox.mjs change: requireLedgerUrl now throws on a missing target and any non-ok verdict, every ledger-driven dispatch calls ledgerSchemaCheck with a mode; tests/unit/test-request-sandbox-clone.test.js bounds each block]
+- [RECHECKED after lib/db/ledger-registry.js change: LEDGER_VAR_TARGETS/targetForLedgerVar added; pg PGHOST/PGPORT/PGDATABASE fallback documented in the header; tests/unit/ledger-registry.test.js]
+- [RECHECKED after scripts/apply-ledger-migrations.js change: target-bound by variable name; --dry-run executes no DDL and tolerates an absent tracker or sha256 column]
+- [RECHECKED after scripts/check-factory-ledger.js change: refused URLs counted separately from inspected; final line is N inspected, R refused, M unreachable, K skipped]
+- [RECHECKED after lib/db/ledger-schema.js change: unapprovedExtras approves an extra table only when its live fingerprint compares clean against lib/db/ledger-schema-ahead.json; isolated field mutations covered in tests/unit/ledger-schema.test.js]
+
 ## Order and dependencies
 
 Phase 0 → Phase 1 (tonight) → D1 → Phase 2 and Phase 3 in parallel on separate branches (Tier 1: CLI and scripts only, no app runtime) → Phase 4. B4's ledger-dependent checks can run on the restored local copy after Phase 1; they do not wait for Phase 2.
