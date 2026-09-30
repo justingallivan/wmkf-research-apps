@@ -1,0 +1,42 @@
+{
+  "head": "40ab24f3e9da5af0259aa481014621cdd7837d37",
+  "base": "0dcda035988f19b2fcd3b75bb35b77bda7d83557",
+  "diffSha256": "6a1ab271518774989cc8b05a97a3d4d88182078431a4aceec55dd7d5b14474e1",
+  "authentication": "claude.ai OAuth subscription; API key and alternate provider env removed",
+  "scope": "P2 inactive ordinary applicant slot fix, no production operations",
+  "resolvedModel": "claude-opus-5-5",
+  "elapsedSeconds": 96,
+  "readOperations": 18,
+  "resultSubtype": "success",
+  "exitCode": 0,
+  "permissionDenials": [],
+  "modelUsageNames": [
+    "claude-opus-5-5"
+  ],
+  "pr": 369,
+  "url": "https://github.com/justingallivan/wmkf-research-apps/pull/369",
+  "branch": "codex/factory-reviewer-b4-runtime",
+  "authMethod": "claude.ai",
+  "subscriptionType": "max",
+  "usageCostAuthorizedByOwner": true,
+  "requestedModel": "opus",
+  "completedAt": "2026-09-30T18:34:53.109959+00:00",
+  "rawReviewSha256": "422b1d47f7239e579f403271e82b1cb8537f5cb44cffd3848cd6e5bdb4095c9a",
+  "verdict": "fix_verified_by_source",
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "githubCommentPosted": false,
+  "rootVerification": {
+    "testSuitesPassed": 45,
+    "testsPassed": 1712,
+    "sourceGateLintTypeCommandsPassed": 18,
+    "redBeforeFix": {
+      "failed": 2,
+      "passed": 7
+    },
+    "liveMutationTests": false
+  }
+}

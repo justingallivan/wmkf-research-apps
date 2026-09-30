@@ -55,6 +55,7 @@
     "054_test_request_runs.sql",
     "055_post_presentation_materials.sql",
     "056_integrity_screenings_request_id.sql",
-    "057_integrity_screening_reviews.sql"
+    "057_integrity_screening_reviews.sql",
+    "058_test_request_cast_slot_bindings.sql"
   ]
 }

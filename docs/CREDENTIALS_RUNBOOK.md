@@ -139,6 +139,8 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 | `DATAVERSE_PROD_WRITE_ACK` | `"<purpose> <YYYY-MM-DD>"` — operator ack for local scripts writing prod; honored only for deployment class `local` and only when the date is today (UTC) | Per-invocation operator shell only — never committed, never set in Vercel |
 | `DATAVERSE_REHEARSAL_GRANT` | JSON Mode-D rehearsal grant (`purpose`/`ops`/`entitySets`/`recordIds` (GUID-only)/`expiresAt`); `$batch` and alternate-key writes are never grant-coverable | Per-rehearsal, removed after; never in production env unless a Mode-D rehearsal is live |
 
+**B4 deployment contract [VERIFIED via branch source, 2026-09-29]:** The “fails open” descriptions above apply only to the older read-side fences. B4 requires `SYNTHETIC_REVIEWER_ISOLATION=on` before any existing-person reviewer bind or identity edit, including ordinary people. A marked synthetic reviewer also requires `TEST_REQUEST_ISOLATION=on` and an exact server-read Request/person binding. If either switch is off, unset, or invalid, the acceptance drain pauses **all** jobs before Contact, honorarium, or BILL writes; maintenance reports the configuration pause as failed. Keep both switches at literal `on` in every environment receiving B4. For a B4 rollback, redeploy the prior code before disabling either switch; disabling a switch alone interrupts reviewer workflows. Verify the environment's wave29 and wave30 columns before deploying B4.
+
 ### Optional — Research APIs
 
 | Variable | Purpose | Source | Cost |

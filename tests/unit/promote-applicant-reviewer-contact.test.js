@@ -13,6 +13,12 @@
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ session: { user: { dynamicsSystemuserId: 'sys-1' } } })),
 }));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  resolveReviewerBindCapability: jest.fn(async ({ personId }) => ({
+    kind: 'ordinary',
+    person: await require('../../lib/dataverse/adapters/potential-reviewer').getById(personId),
+  })),
+}));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));

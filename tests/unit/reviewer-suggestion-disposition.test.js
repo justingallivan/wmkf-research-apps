@@ -67,6 +67,15 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_reviewduedateoverride: null,
 };
 
+function setOrdinaryBindFixture() {
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+  DynamicsService.getRecord.mockResolvedValue({
+    wmkf_potentialreviewersid: PR_ID,
+    wmkf_issyntheticreviewer: false,
+    statecode: 0,
+  });
+}
+
 let original;
 beforeEach(() => {
   original = {
@@ -81,6 +90,7 @@ beforeEach(() => {
   DynamicsService.updateRecord = jest.fn().mockResolvedValue({});
 });
 afterEach(() => {
+  delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
   DynamicsService.queryRecords = original.queryRecords;
   DynamicsService.getRecord = original.getRecord;
   DynamicsService.createRecord = original.createRecord;
@@ -726,6 +736,7 @@ describe('updateLifecycle fails closed on excluded rows for EVERY write', () => 
 });
 
 describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
+  beforeEach(setOrdinaryBindFixture);
   test('creates a recommended, unselected, applicant-sourced row when none exists', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: [] });
 
@@ -991,6 +1002,7 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
 });
 
 describe('upsert never converts an excluded row into a candidate', () => {
+  beforeEach(setOrdinaryBindFixture);
   test('skips mutation and flags skippedExcluded when an excluded row already exists', async () => {
     // findByPotentialReviewerAndRequest (queryRecords) returns the existing
     // excluded engagement row.
@@ -1082,6 +1094,7 @@ describe('upsert never converts an excluded row into a candidate', () => {
 });
 
 describe('upsert relevance-score range guard', () => {
+  beforeEach(setOrdinaryBindFixture);
   test('0-100 relevance scores reach Dataverse unchanged', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: [] });
 

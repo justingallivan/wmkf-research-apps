@@ -113,10 +113,11 @@ const originalFetch = global.fetch;
 beforeEach(() => {
   jest.clearAllMocks();
   expectedFetchRejections = [];
-  for (const key of ['DYNAMICS_URL', 'DATAVERSE_TARGET_INTERLOCK', 'REVIEWER_EMAIL_DELIVERY_MODE']) savedEnv[key] = process.env[key];
+  for (const key of ['DYNAMICS_URL', 'DATAVERSE_TARGET_INTERLOCK', 'REVIEWER_EMAIL_DELIVERY_MODE', 'SYNTHETIC_REVIEWER_ISOLATION']) savedEnv[key] = process.env[key];
   process.env.DYNAMICS_URL = 'https://reviewer-harness.invalid';
   process.env.DATAVERSE_TARGET_INTERLOCK = 'off'; // Synthetic host; real DAL enforcement stays on.
   process.env.REVIEWER_EMAIL_DELIVERY_MODE = 'send';
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
   transport = createReviewerEngagementTransport({
     [SET]: [row()],
     [REQUESTS]: [{ akoya_requestid: REQUEST, akoya_requestnum: 'REQ-BASELINE', wmkf_meetingdate: null }],
@@ -126,6 +127,8 @@ beforeEach(() => {
       wmkf_emailaddress: 'reviewer@example.org',
       wmkf_emailsource: 'orcid',
       wmkf_identitystatus: 'confirmed',
+      wmkf_issyntheticreviewer: false,
+      statecode: 0,
     }],
   });
   global.fetch = jest.fn(transport.fetch);
@@ -966,7 +969,9 @@ describe('F3 generic staff correction regressions', () => {
     [{ wmkf_completedat: COMPLETED }, {}, 'correction_closed'],
     [{ _wmkf_request_value: OTHER }, {}, 'correction_request_changed'],
     [{ _wmkf_request_value: null }, {}, 'correction_request_changed'],
-    [{}, { authorizedRequestId: undefined }, 'correction_missing_authorized_request'],
+    // B4 refuses the mixed identity edit before the response-only correction
+    // validates its authorized Request.
+    [{}, { authorizedRequestId: undefined }, 'reviewer_identity_edit_blocked'],
     ...[null, '*', '', 'W/" "', ' W/"12"', 'W/"12" ', 'malformed'].map((etag) =>
       [{ _etag: etag }, {}, 'correction_version_unavailable']),
   ])('F3 regression: invalid source %j / binding %j fails before token or mixed person effects (%s)', async (fields, options, code) => {
@@ -975,7 +980,16 @@ describe('F3 generic staff correction regressions', () => {
     // A body-provided binding is never authority, even when it matches the row
     // that moved away from the Request authorized by the route.
     await expect(correct({ ...MIXED_CORRECTION, authorizedRequestId: OTHER }, options))
-      .rejects.toMatchObject({ httpStatus: code === 'correction_missing_authorized_request' ? 400 : 409, body: { code } });
+      .rejects.toMatchObject({ httpStatus: 409, body: { code } });
+    expect(writes()).toEqual([]);
+    assertHistoryUnchanged(before);
+  });
+
+  test('F3 response-only correction still requires an authorized Request', async () => {
+    seedCorrection();
+    const before = history();
+    await expect(correct({ invited: false }, { authorizedRequestId: undefined }))
+      .rejects.toMatchObject({ httpStatus: 400, body: { code: 'correction_missing_authorized_request' } });
     expect(writes()).toEqual([]);
     assertHistoryUnchanged(before);
   });
@@ -1071,8 +1085,10 @@ describe('F3 generic staff correction regressions', () => {
   test('F3 regression: a nonterminal concurrent edit cannot upgrade the version captured by the service', async () => {
     seedCorrection();
     const originalVersion = transport.get(SET, ID)._etag;
+    let suggestionReads = 0;
     const pause = transport.pauseNext((request) => request.method === 'GET'
-      && request.entitySet === SET && request.key === ID, { stage: 'after' });
+      && request.entitySet === SET && request.key === ID
+      && ++suggestionReads === 2, { stage: 'after' });
     const outcome = correct(MIXED_CORRECTION).then((value) => ({ value }), (error) => ({ error }));
     await pause.reached;
     transport.patch(SET, ID, { wmkf_notes: 'Another staff edit wins' });

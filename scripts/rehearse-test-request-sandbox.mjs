@@ -107,6 +107,7 @@ import { requireLedgerUrl, ledgerSchemaCheck } from '../lib/db/ledger-guard.js';
 import { fieldFor, recheckStatusChange, runStatusChange } from '../lib/services/test-requests/status-change-runner.js';
 import { CAST_DEFAULT_NAMES, CAST_ROLE_ORDER, planCastAddresses, readCast, runCastCreate } from '../lib/services/test-requests/cast-runner.js';
 import { runCastBinding } from '../lib/services/test-requests/cast-binding-runner.js';
+import { inspectCastSlotBinding, runConfirmedCastSlotBinding } from '../lib/services/test-requests/cast-slot-binding-runner.js';
 import { TEST_REQUEST_EMAIL_ALLOWLIST_KEY, parseAllowlistValue } from '../lib/services/test-requests/email-allowlist.js';
 import * as odata from '../lib/dataverse/core/odata.js';
 import { recipeSeedsPreSite, recipeSeedsReviewers } from '../lib/services/test-requests/recipe-capabilities.js';
@@ -226,6 +227,8 @@ export function parseArgs(argv) {
     castResearchLeader: null,
     confirm: false,
     bindReviewer: null,
+    bindReviewerSlot: null,
+    confirmSlotRequest: null,
   };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
@@ -265,15 +268,20 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--cast-research-leader=')) parsed.castResearchLeader = arg.slice('--cast-research-leader='.length);
     else if (arg === '--confirm') parsed.confirm = true;
     else if (arg.startsWith('--bind-reviewer=')) parsed.bindReviewer = arg.slice('--bind-reviewer='.length);
+    else if (arg.startsWith('--bind-reviewer-slot=')) parsed.bindReviewerSlot = arg.slice('--bind-reviewer-slot='.length);
+    else if (arg.startsWith('--confirm-slot-request=')) parsed.confirmSlotRequest = arg.slice('--confirm-slot-request='.length);
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
-  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.createCast ? '--create-cast' : null, parsed.bindReviewer];
+  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.createCast ? '--create-cast' : null, parsed.bindReviewer, parsed.bindReviewerSlot];
   if (modes.filter(Boolean).length > 1) {
-    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, --run-inspect, --run-recheck, --set-status, --status-recheck, --create-cast, or --bind-reviewer.');
+    throw new Error('Choose exactly one run mode, including --bind-reviewer-slot.');
   }
-  if ((parsed.createCast || parsed.bindReviewer) && parsed.target !== 'production') {
-    throw new Error('--create-cast and --bind-reviewer are valid only with --target=production.');
+  if ((parsed.createCast || parsed.bindReviewer || parsed.bindReviewerSlot) && parsed.target !== 'production') {
+    throw new Error('Cast commands are valid only with --target=production.');
+  }
+  if (parsed.confirmSlotRequest && (!parsed.bindReviewerSlot || !RUN_ID.test(parsed.confirmSlotRequest))) {
+    throw new Error('--confirm-slot-request requires --bind-reviewer-slot and an exact Request GUID.');
   }
   if (parsed.createCast && !(parsed.castPi && parsed.castLiaison && parsed.castReviewer && parsed.castOrgLeader && parsed.castResearchLeader)) {
     throw new Error('--create-cast requires --cast-pi=, --cast-liaison=, --cast-reviewer=, --cast-org-leader= and --cast-research-leader= (allowlisted addresses).');
@@ -391,8 +399,8 @@ export function parseArgs(argv) {
       parsed.reviewerAddressFlags = parsedFlags;
     }
   }
-  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.bindReviewer].filter(Boolean)) {
-    if (!RUN_ID.test(runId)) throw new Error('--advance/--run-inspect/--run-recheck/--set-status/--status-recheck/--bind-reviewer take a run ID GUID.');
+  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.bindReviewer, parsed.bindReviewerSlot].filter(Boolean)) {
+    if (!RUN_ID.test(runId)) throw new Error('Run modes take a run ID GUID.');
   }
   if (parsed.advance && (!parsed.manifest || !parsed.bundle)) {
     throw new Error('--advance requires --manifest and --bundle.');
@@ -427,6 +435,8 @@ function printHelp() {
   console.log('Recheck a production run\'s Foundation account against its pre-create baseline (read-only; plan P5\'s later check): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --run-recheck=<runId>');
   console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> --cast-org-leader=<address> --cast-research-leader=<address> [--confirm]');
   console.log('Bind the cast suggested reviewer to a ready production test Request (owner-run; needs DATAVERSE_ALLOW_PROD_READS=yes and DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer=<runId>');
+  console.log('Preview the separate Potential Reviewer 1 slot operation (read-only): ... --target=production --bind-reviewer-slot=<runId>');
+  console.log('After reviewing that preview, confirm its exact Request GUID to permit one fenced slot PATCH (owner-run; needs DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer-slot=<runId> --confirm-slot-request=<requestGuid>');
   console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
   console.log('Ledger-driven modes are target-bound (--target=production reads TEST_REQUEST_LEDGER_URL; any other target reads TEST_REQUEST_SANDBOX_LEDGER_URL when set, else TEST_REQUEST_LEDGER_URL), naming a registered ledger host (lib/db/ledger-registry.js; on the managed ledger, database ledger_prod for --target=production and ledger otherwise), never the shared Production/Preview database. Each such mode compares the ledger schema with lib/db/ledger-schema-fingerprint.json and always refuses on MISSING/DIFFERING and on an EXTRA object not in lib/db/ledger-schema-ahead.json\'s approved-ahead list (write modes only; --run-inspect and --ledger-check warn instead). --ledger-check runs only that comparison as a read-only diagnostic that never throws (add --target=production to check the production ledger; default target is sandbox).');
 }
@@ -1198,14 +1208,37 @@ async function readTargetAllowlist(client) {
 
 /**
  * Synthetic cast (cast-and-status plan, slices A + B): --create-cast creates
- * or resumes the reused PI, Liaison and suggested-reviewer person (prints
- * the plan and stops without --confirm); --bind-reviewer attaches the cast
- * reviewer to one ready production test Request. Output carries no addresses.
+ * or resumes the reused cast; --bind-reviewer attaches the suggestion only.
+ * The separate --bind-reviewer-slot previews its exact target and requires
+ * an explicit matching Request GUID to permit a slot write.
  */
 export async function runCastMode(client, args, ledgerUrl) {
   const db = pgLedgerDb(ledgerUrl);
   try {
     const ledger = createRunLedger(db);
+    if (args.bindReviewerSlot) {
+      if (args.confirmSlotRequest) {
+        const ack = process.env.DATAVERSE_PROD_WRITE_ACK || '';
+        const today = new Date().toISOString().slice(0, 10);
+        if (!ack.match(/^(.*)\s+(\d{4}-\d{2}-\d{2})$/)
+          || !ack.trim().endsWith(` ${today}`)
+          || !ack.slice(0, -today.length).trim()) {
+          throw new Error('A current DATAVERSE_PROD_WRITE_ACK is required before slot journal dispatch.');
+        }
+      }
+      const preview = await inspectCastSlotBinding({ client, ledger, runId: args.bindReviewerSlot });
+      if (!args.confirmSlotRequest) {
+        console.log(JSON.stringify({ mode: 'CAST_SLOT_PREVIEW', ...preview,
+          next: 'After the owner readiness gate, rerun with --confirm-slot-request=<the Request GUID above> and DATAVERSE_PROD_WRITE_ACK.' }, null, 2));
+        return;
+      }
+      const result = await runConfirmedCastSlotBinding({
+        client, ledger, runId: args.bindReviewerSlot, confirmedRequestId: args.confirmSlotRequest,
+      });
+      console.log(JSON.stringify({ mode: 'CAST_SLOT_RESULT', runId: args.bindReviewerSlot,
+        requestId: preview.requestId, ...result }, null, 2));
+      return;
+    }
     if (args.bindReviewer) {
       const result = await runCastBinding({ client, ledger, runId: args.bindReviewer });
       console.log(JSON.stringify({ mode: 'CAST_REVIEWER_BOUND', runId: args.bindReviewer, ...result }, null, 2));
@@ -1292,9 +1325,12 @@ async function main() {
     await runStatusMode(statusClient, args, ledgerUrl);
     return;
   }
-  if (args.createCast || args.bindReviewer) {
+  if (args.createCast || args.bindReviewer || args.bindReviewerSlot) {
+    // Merge resolution (PR #369 × PR #374): every cast mode, including B4's
+    // slot binding, takes the target-bound ledger and passes the schema check
+    // before any Dataverse client exists.
     const ledgerUrl = requireLedgerUrl(args.target);
-    await ledgerSchemaCheck(ledgerUrl, { mode: args.createCast ? 'create-cast' : 'bind-reviewer' });
+    await ledgerSchemaCheck(ledgerUrl, { mode: args.createCast ? 'create-cast' : (args.bindReviewerSlot ? 'bind-reviewer-slot' : 'bind-reviewer') });
     // The cast person create is a sanctioned marker write (wmkf_potentialreviewerses).
     const castClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl), allowTestRequestMarkerWrites: true });
     await runCastMode(castClient, args, ledgerUrl);

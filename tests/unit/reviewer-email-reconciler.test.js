@@ -22,7 +22,11 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
   getForEmailReconcile: jest.fn(async () => ({})),
   findByEmailCandidates: jest.fn(async () => ({ none: true })),
+  findAllByExactEmail: jest.fn(async () => []),
   update: jest.fn(async () => undefined),
+}));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability.js', () => ({
+  assertReviewerIsolationReady: jest.fn(),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   __esModule: true,
@@ -89,6 +93,7 @@ beforeEach(() => {
   AlertService.getOpenAutoResolveKeysByType.mockResolvedValue([ALERT_KEY(SUG)]);
   potentialReviewerAdapter.getForEmailReconcile.mockResolvedValue({}); // person has no email
   potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ none: true });
+  potentialReviewerAdapter.findAllByExactEmail.mockResolvedValue([]);
   suggestionAdapter.findByPotentialReviewerAndRequest.mockResolvedValue(null);
   potentialReviewerAdapter.update.mockResolvedValue(undefined);
   researcherAdapter.updateById.mockResolvedValue(undefined);
@@ -101,6 +106,18 @@ test('WRITE: ownerless vetted email → written to the person with vetted source
   // S387: address + vetted source in ONE patch, never a follow-up source write.
   expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON, { email: 'ava.mercer@example.org', emailSource: 'claude_search' }, expect.anything());
   expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(PERSON, { emailSource: 'claude_search' }, expect.anything());
+});
+
+test('a cast email owner hidden from ordinary candidate search blocks reconciliation', async () => {
+  seed(vettedCandidate());
+  potentialReviewerAdapter.findAllByExactEmail.mockResolvedValueOnce([{
+    wmkf_potentialreviewersid: KEEPER,
+    wmkf_issyntheticreviewer: true,
+  }]);
+  const result = await reconcileReviewerEmails({});
+  expect(result.alerted).toEqual([expect.objectContaining({ reason: 'synthetic_email_owner' })]);
+  expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+  expect(suggestionAdapter.repointToPotentialReviewer).not.toHaveBeenCalled();
 });
 
 test('Find-row anchor: reconciles a roster candidate stamped with suggestionId after save-candidates', async () => {
@@ -478,4 +495,3 @@ test('Stage 1c: test-request rows never take up the batch; the next page of ordi
   expect(r.skippedTestRequest).toBe(1);
   expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'ava.mercer@example.org' }]);
 });
-

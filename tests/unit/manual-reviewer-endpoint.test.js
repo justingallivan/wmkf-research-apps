@@ -10,6 +10,10 @@ jest.mock('../../lib/utils/auth', () => ({
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
 }));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  assertReviewerIsolationReady: jest.fn(),
+  resolveReviewerBindCapability: jest.fn(async () => ({ kind: 'ordinary' })),
+}));
 
 const getRecord = jest.fn(async () => ({
   akoya_requestid: '11111111-1111-1111-1111-111111111111',
@@ -30,6 +34,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   create: (...a) => createReviewer(...a),
   getById: (...a) => getReviewerById(...a),
   setContactLink: (...a) => setContactLink(...a),
+  findAllByExactEmail: jest.fn(async () => []),
 }));
 
 const getContactById = jest.fn();

@@ -1,0 +1,129 @@
+{
+  "baseRefOid": "570f53086325e7988ebf95f4e6f4a1f86cfe7676",
+  "headRefOid": "40ab24f3e9da5af0259aa481014621cdd7837d37",
+  "isDraft": true,
+  "mergeStateStatus": "CLEAN",
+  "mergeable": "MERGEABLE",
+  "number": 369,
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:29:23Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758850170/job/110035919204",
+      "name": "claude-review",
+      "startedAt": "2026-09-30T18:28:44Z",
+      "status": "COMPLETED",
+      "workflowName": "Claude Code Review"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:30:00Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758844586/job/110035905679",
+      "name": "Analyze (actions)",
+      "startedAt": "2026-09-30T18:29:18Z",
+      "status": "COMPLETED",
+      "workflowName": "CodeQL"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:29:07Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758850212/job/110035919737",
+      "name": "Trivy CVE Scan",
+      "startedAt": "2026-09-30T18:28:45Z",
+      "status": "COMPLETED",
+      "workflowName": "Dependency Scan"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:28:54Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758850176/job/110035918981",
+      "name": "Gitleaks",
+      "startedAt": "2026-09-30T18:28:44Z",
+      "status": "COMPLETED",
+      "workflowName": "Secret Scanning"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:30:24Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758850228/job/110035918967",
+      "name": "Static Analysis (Semgrep)",
+      "startedAt": "2026-09-30T18:28:44Z",
+      "status": "COMPLETED",
+      "workflowName": "Security Scan"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:33:23Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758850202/job/110035920009",
+      "name": "Jest",
+      "startedAt": "2026-09-30T18:28:44Z",
+      "status": "COMPLETED",
+      "workflowName": "Tests"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:31:40Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758844586/job/110035906060",
+      "name": "Analyze (javascript-typescript)",
+      "startedAt": "2026-09-30T18:28:42Z",
+      "status": "COMPLETED",
+      "workflowName": "CodeQL"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:29:37Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758844586/job/110035906494",
+      "name": "Analyze (python)",
+      "startedAt": "2026-09-30T18:28:42Z",
+      "status": "COMPLETED",
+      "workflowName": "CodeQL"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:29:32Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/36758850202/job/110035919717",
+      "name": "Run ledger (PostgreSQL 16)",
+      "startedAt": "2026-09-30T18:28:44Z",
+      "status": "COMPLETED",
+      "workflowName": "Tests"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:29:29Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/justingallivan/wmkf-research-apps/runs/110036220002",
+      "name": "CodeQL",
+      "startedAt": "2026-09-30T18:29:26Z",
+      "status": "COMPLETED",
+      "workflowName": ""
+    },
+    {
+      "__typename": "StatusContext",
+      "context": "Vercel",
+      "startedAt": "2026-09-30T18:29:13Z",
+      "state": "SUCCESS",
+      "targetUrl": "https://vercel.com/justin-gallivans-projects/wmkf_research_apps/CyDcqDmccwVPwRS94WsSv3aGf5Hf"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-30T18:29:14Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://vercel.com/github",
+      "name": "Vercel Preview Comments",
+      "startedAt": "2026-09-30T18:29:14Z",
+      "status": "COMPLETED",
+      "workflowName": ""
+    }
+  ],
+  "url": "https://github.com/justingallivan/wmkf-research-apps/pull/369",
+  "observedAt": "2026-09-30T18:42:58.195156+00:00"
+}

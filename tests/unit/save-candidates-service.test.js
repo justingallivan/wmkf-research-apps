@@ -18,8 +18,13 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   update: jest.fn(async () => undefined),
   getByIdForMerge: jest.fn(async () => ({ wmkf_potentialreviewersid: 'PID-1', _etag: 'W/"1"' })),
   getByEmail: jest.fn(async () => null),
+  findAllByExactEmail: jest.fn(async () => []),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
   deleteExactNew: jest.fn(async () => undefined),
+}));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability.js', () => ({
+  assertReviewerIsolationReady: jest.fn(),
+  resolveReviewerBindCapability: jest.fn(async () => ({ kind: 'ordinary' })),
 }));
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
   getInstitutionById: jest.fn(async () => null),
