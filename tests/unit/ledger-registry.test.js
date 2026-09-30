@@ -109,6 +109,20 @@ describe('Codex round-1 Fix 1: effective destination, not URL text', () => {
     expect(classifyLedgerUrl(ipv6Candidate, { target: 'production', sharedUrls: [configured] })).toMatchObject({ ok: false, reason: 'shared_database' });
   });
 
+  // Opus round-3 L3: an unparseable configured shared URL used to be
+  // silently SKIPPED by the comparison loop, so a candidate that might
+  // actually BE that shared database passed with no comparison run at all.
+  // 'postgresql://@' is a probe pg-connection-string's own parser actually
+  // throws on (verified: parse('postgresql://@') -> "Invalid URL"), so
+  // effectiveTuple genuinely returns null for it, exercising the real
+  // failure path rather than a string the parser happens to tolerate.
+  test('an unparseable configured shared URL fails closed as shared_unparseable, not silently skipped', () => {
+    const candidate = 'postgresql://r:p@127.0.0.1:5433/db';
+    const unparseableShared = 'postgresql://@';
+    expect(classifyLedgerUrl(candidate, { target: 'production', sharedUrls: [unparseableShared] }))
+      .toMatchObject({ ok: false, reason: 'shared_unparseable' });
+  });
+
   test('a DIFFERENT database on the same endpoint is not shared', () => {
     const configured = 'postgresql://role:pw@127.0.0.1:5433/shared_db';
     const candidate = 'postgresql://role:pw@127.0.0.1:5433/ledger';
