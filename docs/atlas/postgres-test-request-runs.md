@@ -3,7 +3,7 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable operation ledger for owner-run test request clones; local ledger recorded for cast creation, 054 applied to shared Production (Preview unverified)."
+summary: "Durable operation ledger for owner-run test request clones; local ledger recorded for cast creation, 054 applied to shared Production (Preview unverified); managed Neon ledger provisioned 2026-09-30 behind a tracked host registry and schema fingerprint check (branch, unmerged)."
 canonical: false
 cataloged: 2026-09-23
 last_verified: 2026-09-29
@@ -14,6 +14,8 @@ related:
 ---
 
 # Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` / `test_request_status_changes` / `test_request_cast_members` / `test_request_cast_bindings` (Postgres)
+
+**Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the hand-carried dump/restore in `docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md` migrates the data. On branch `claude/factory-ledger-registry` (unmerged): `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are local-only `.env.local` variables (`docs/CREDENTIALS_RUNBOOK.md`).
 
 **[VERIFIED via source, 2026-09-29]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
