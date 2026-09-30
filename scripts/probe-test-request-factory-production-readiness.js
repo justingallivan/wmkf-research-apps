@@ -544,10 +544,15 @@ function tableTarget(parameters) {
   return { kind: 'literal', table };
 }
 
-function hasTriggerExpression(value) {
-  if (typeof value === 'string') return value.startsWith('@') || value.includes('@{');
+function hasTriggerExpression(value, path = []) {
+  if (typeof value === 'string') {
+    // Observed connection/auth wiring is not a table selector. Keep the
+    // exemptions exact; expressions at every other input path hard-block.
+    if (['host.connection.name', 'authentication'].includes(path.join('.'))) return false;
+    return value.startsWith('@') || value.includes('@{');
+  }
   if (!value || typeof value !== 'object') return false;
-  return Object.values(value).some(hasTriggerExpression);
+  return Object.entries(value).some(([key, child]) => hasTriggerExpression(child, [...path, key]));
 }
 
 function safeIdentifier(value) {

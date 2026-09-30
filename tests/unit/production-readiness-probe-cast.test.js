@@ -395,6 +395,29 @@ describe('reviewer-slot metadata census', () => {
     }
   });
 
+  test('observed connection and authentication expressions do not masquerade as table expressions', async () => {
+    const client = clientFor({ flows: [
+      { name: 'Manual Request action', clientdata: flow({
+        triggers: { manual: { type: 'Request', kind: 'ApiConnection', inputs: { host: { connection: { name: "@parameters('$connections')" } }, parameters: { dataset: 'org', table: 'akoya_requests' } } } },
+      }) },
+      { name: 'Other entity Request action', clientdata: flow({
+        triggers: { changed: { type: 'OpenApiConnectionWebhook', inputs: { authentication: "@parameters('$authentication')", parameters: { 'subscriptionRequest/entityname': 'akoya_goapplystatustracking', 'subscriptionRequest/message': 1 } } } },
+        actions: { read: { inputs: { parameters: { entityName: 'akoya_requests' } } } },
+      }) },
+    ] });
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const receipt = await printReviewerSlotReadiness(client);
+      expect(receipt.incompleteReasons).toEqual([]);
+      expect(receipt.counts.manualApiConnectionTriggers).toBe(1);
+      expect(receipt.counts.actionOnlyTriggerDispositions).toBe(1);
+      expect(receipt.dispositionRequired).toHaveLength(2);
+      expect(receipt.flowTriggerSummaries).toHaveLength(2);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   test('reports every trigger in a mixed Request flow, including the unrelated second trigger', async () => {
     const client = clientFor({ flows: [{ name: 'Mixed flow', clientdata: flow({
       triggers: {
