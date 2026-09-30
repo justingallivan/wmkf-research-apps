@@ -32,12 +32,11 @@ regexes = ['''^\s*"(idempotencyKey|generationKey|[A-Za-z]*[Ss]ha256|contentHash|
 paths = ['''^docs/plans/evidence/test-request-factory/[a-z0-9-]+-run-inspect-[0-9-]+\.json$''']
 
 [[allowlists]]
-description = "Synthetic test-secret values in external-token verifier fixtures, including the retired presentation proof test still scanned in branch history."
+description = "Fixture EXTERNAL_LINK_SECRET values in focused external-token verifier unit tests (never real; set on process.env inside the test)."
 targetRules = ["generic-api-key"]
 condition = "AND"
 regexTarget = "line"
-regexes = ['''^const SECRET = '[a-z0-9-]*test-secret-[a-z0-9-]*';$''']
+regexes = ['''const SECRET = '[a-z0-9-]*test-secret-[a-z0-9-]*';''']
 paths = [
   '''^tests/unit/verify-briefing-token\.test\.js$''',
-  '''^tests/unit/presentation-media-proof-service\.test\.js$''',
 ]
