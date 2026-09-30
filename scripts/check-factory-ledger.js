@@ -80,7 +80,7 @@ async function checkOne(name, url, schemaLib, registry, expected) {
     console.error(`✗ ${name}: refused (${verdict.reason}); see lib/db/ledger-registry.js`);
     return false;
   }
-  const database = new URL(url).pathname.replace(/^\//, '');
+  const database = verdict.effective.database;
   const { Client } = require('pg');
   const client = new Client({ connectionString: url, connectionTimeoutMillis: 15000 });
   try {

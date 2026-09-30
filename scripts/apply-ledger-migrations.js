@@ -65,7 +65,7 @@ async function main() {
   if (!verdict.ok) {
     throw new Error(`${urlEnv} is not an acceptable ledger (${verdict.reason}). See lib/db/ledger-registry.js.`);
   }
-  const database = new URL(url).pathname.replace(/^\//, '');
+  const database = verdict.effective.database;
   console.log(`Ledger: ${verdict.label} host, database ${database} (from ${urlEnv})${dryRun ? ' — DRY RUN' : ''}`);
 
   const files = listLedgerMigrationFiles(LEDGER_MIGRATIONS_DIR);
