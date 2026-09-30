@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { decideFileAction, sha256Text, tableNamesIn, stripOuterTxn } from '../../lib/db/ledger-migrations';
+import { decideFileAction, sha256Text, tableNamesIn, stripOuterTxn, decideTrackedPrefixVerification } from '../../lib/db/ledger-migrations';
 
 // Opus round-2 item 4: a genuinely clean scratch diff has NO extra either —
 // the prior fixture used a diff containing an extra table and still called
@@ -128,6 +128,70 @@ describe('Codex round-1 Fix 3: decideFileAction', () => {
     });
     expect(decision.action).toBe('refuse');
     expect(decision.reason).toMatch(/unapproved extra object/);
+  });
+});
+
+/**
+ * Codex round-3 #2: a tracked row's matching checksum only proves the
+ * migration file's TEXT hasn't changed since it was applied — it says
+ * nothing about whether the live ledger's objects still match what that
+ * file's SQL would produce. decideTrackedPrefixVerification is the pure
+ * decision over a scratch-vs-live comparison of the tracked, checksum-
+ * matching PREFIX of files, run before the per-file loop even considers its
+ * first file.
+ */
+describe('Codex round-3 #2: decideTrackedPrefixVerification', () => {
+  test('no prefix to verify (nothing tracked yet) -> ok', () => {
+    expect(decideTrackedPrefixVerification({ prefixDiff: null })).toEqual({ ok: true });
+  });
+
+  test('a clean comparison -> ok', () => {
+    expect(decideTrackedPrefixVerification({ prefixDiff: { missing: [], differing: [], extra: [] } })).toEqual({ ok: true });
+  });
+
+  // The required case: a tracked, checksum-matching 054 whose live objects
+  // have drifted (e.g. a hand-dropped/altered CHECK constraint under the
+  // same name) must refuse the WHOLE run — before the loop even reaches
+  // 058 — not just skip 054 and move on.
+  test('054 checksum-matches but its live prefix diff has a differing object -> refuse before 058 is considered', () => {
+    const decision = decideTrackedPrefixVerification({
+      prefixDiff: { missing: [], differing: ['constraint test_request_runs.test_request_runs_status_check'], extra: [] },
+    });
+    expect(decision.ok).toBe(false);
+    expect(decision.reason).toMatch(/drifted from the live ledger/);
+  });
+
+  test('a missing object -> refuse', () => {
+    const decision = decideTrackedPrefixVerification({
+      prefixDiff: { missing: ['table test_request_status_changes'], differing: [], extra: [] },
+    });
+    expect(decision.ok).toBe(false);
+    expect(decision.reason).toMatch(/drifted from the live ledger/);
+  });
+
+  test('an unapproved extra object -> refuse', () => {
+    const decision = decideTrackedPrefixVerification({
+      prefixDiff: { missing: [], differing: [], extra: ['table test_request_hand_added'] },
+      approvedAhead: [],
+      liveFingerprint: { tables: { test_request_hand_added: {} } },
+    });
+    expect(decision.ok).toBe(false);
+    expect(decision.reason).toMatch(/unapproved extra object/);
+  });
+
+  test('an extra object that is exactly shape-approved by the ahead list -> ok', () => {
+    const APPROVED_TABLE_SHAPE = {
+      columns: [{ name: 'binding_id', type: 'uuid', nullable: false, default: null }],
+      constraints: [],
+      indexes: [],
+      triggers: [],
+    };
+    const decision = decideTrackedPrefixVerification({
+      prefixDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+      approvedAhead: [{ migration: '058_test_request_cast_slot_bindings.sql', tables: { test_request_cast_slot_bindings: APPROVED_TABLE_SHAPE } }],
+      liveFingerprint: { tables: { test_request_cast_slot_bindings: APPROVED_TABLE_SHAPE } },
+    });
+    expect(decision).toEqual({ ok: true });
   });
 });
 

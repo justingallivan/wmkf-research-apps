@@ -38,6 +38,15 @@
  * (only meaningful when the operator has confirmed the file has not changed
  * since it was actually applied).
  *
+ * Codex round-3 #2: before any per-file action, the tracked AND
+ * checksum-matching prefix of files is re-fingerprinted in a rolled-back
+ * scratch schema and compared against the LIVE ledger (a matching checksum
+ * only proves the file's text is unchanged, not that nothing was hand-patched
+ * live since). Any drift refuses the WHOLE run before file[0] is even
+ * considered. Skipped under --dry-run (it is real DDL, rolled back, in a
+ * scratch schema) — dry runs print "[prefix verification requires a
+ * non-dry run]" instead.
+ *
  * The app's apply-migrations.js is deliberately NOT reused: it applies the
  * whole manifest and writes the app's schema_migrations table.
  */
@@ -80,7 +89,7 @@ async function main() {
     readLedgerFingerprint, compareLedgerFingerprint, formatLedgerDiff, readApprovedAhead,
   } = await import('../lib/db/ledger-schema.js');
   const {
-    decideFileAction, sha256Text, stripOuterTxn, tableNamesIn, fingerprintFilesInScratch,
+    decideFileAction, sha256Text, stripOuterTxn, tableNamesIn, fingerprintFilesInScratch, verifyTrackedPrefix,
   } = await import('../lib/db/ledger-migrations.js');
   // Opus round-1 L1: derive the target from the variable name the same way
   // check-factory-ledger.js does, so the managed-host database rule applies
@@ -142,12 +151,42 @@ async function main() {
       tracked = new Map((await client.query(`SELECT name, sha256 FROM ${LEDGER_TRACKER_TABLE}`)).rows.map((r) => [r.name, { sha256: r.sha256 }]));
     }
 
+    // Codex round-3 #2: before applying/adopting/accepting anything, prove
+    // the TRACKED, checksum-matching prefix of files still matches the live
+    // ledger's actual objects — a tracked row's matching checksum only
+    // proves the file's TEXT is unchanged, not that nothing was hand-patched
+    // live since it was applied, and the per-file loop below only ever
+    // re-derives a comparison for UNTRACKED files. Refuses the WHOLE run,
+    // before file[0] is even considered, on any drift. Skipped under
+    // --dry-run: it runs real DDL (rolled back) in a scratch schema, which
+    // --dry-run must never do.
+    let prefixVerificationFailed = false;
+    if (dryRun) {
+      console.log('[prefix verification requires a non-dry run]');
+    } else {
+      const trackedPrefixFiles = files.filter((f) => {
+        const row = tracked.get(f);
+        return !!row && row.sha256 === fileChecksum.get(f);
+      });
+      const prefixVerification = await verifyTrackedPrefix(client, {
+        trackedFiles: trackedPrefixFiles,
+        migrationsDir: LEDGER_MIGRATIONS_DIR,
+        readLedgerFingerprint,
+        approvedAhead,
+      });
+      if (!prefixVerification.ok) {
+        console.error(`[refuse]    ${prefixVerification.reason}`);
+        exitCode = 1;
+        prefixVerificationFailed = true;
+      }
+    }
+
     let applied = 0;
     let adopted = 0;
     let acceptedChecksums = 0;
     let skipped = 0;
     const filesUpToHere = [];
-    for (const f of files) {
+    for (const f of (prefixVerificationFailed ? [] : files)) {
       filesUpToHere.push(f);
       const currentChecksum = fileChecksum.get(f);
       const trackedRow = tracked.get(f) || null;

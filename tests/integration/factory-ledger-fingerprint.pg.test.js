@@ -13,7 +13,9 @@ import {
   readExpectedFingerprint,
   readLedgerFingerprint,
 } from '../../lib/db/ledger-schema';
-import { decideFileAction, tableNamesIn, fingerprintFilesInScratch } from '../../lib/db/ledger-migrations';
+import {
+  decideFileAction, tableNamesIn, fingerprintFilesInScratch, verifyTrackedPrefix,
+} from '../../lib/db/ledger-migrations';
 
 /**
  * Live-Postgres proof that lib/db/ledger-schema-fingerprint.json equals "the
@@ -164,6 +166,66 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
       const live = await readLedgerFingerprint(client);
       const diff = compareLedgerFingerprint(baseline, live);
       expect(diff.extra.some((e) => e === 'policy test_request_runs.test_request_runs_all')).toBe(true);
+    });
+  });
+
+  /**
+   * Codex round-3 #2: a tracked row's matching checksum only proves the
+   * migration file's TEXT hasn't changed — it says nothing about whether the
+   * live ledger's objects still match what that file's SQL would produce.
+   * Applies 054, mutates one CHECK constraint under the same name (a
+   * live-only hand patch an unchanged, still-tracked file would never
+   * reveal to decideFileAction's per-file loop, since that loop only
+   * re-derives a comparison for UNTRACKED files), then calls the exported
+   * orchestration function directly — not the CLI script — and proves it
+   * refuses before any file would be considered.
+   */
+  describe('Codex round-3 #2: verifyTrackedPrefix catches live-only drift under a tracked, checksum-matching file', () => {
+    afterEach(async () => {
+      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await client.query(`CREATE SCHEMA ${schema}`);
+      await client.query(`SET search_path TO ${schema}`);
+      for (const f of listLedgerMigrationFiles()) {
+        await client.query(fs.readFileSync(path.join(LEDGER_MIGRATIONS_DIR, f), 'utf8'));
+      }
+    });
+
+    test('054 is tracked and checksum-matching, but its live CHECK has drifted -> refuse', async () => {
+      const file054 = listLedgerMigrationFiles()[0]; // 054_test_request_runs.sql
+      await client.query(`
+        ALTER TABLE test_request_runs DROP CONSTRAINT test_request_runs_status_check;
+        ALTER TABLE test_request_runs ADD CONSTRAINT test_request_runs_status_check
+          CHECK (status IN ('pending', 'dispatched', 'verified'));
+      `);
+      const result = await verifyTrackedPrefix(client, {
+        trackedFiles: [file054],
+        migrationsDir: LEDGER_MIGRATIONS_DIR,
+        readLedgerFingerprint,
+        approvedAhead: [],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.reason).toMatch(/drifted from the live ledger/);
+    });
+
+    test('054 tracked, checksum-matching, and untouched -> ok (nothing drifted)', async () => {
+      const file054 = listLedgerMigrationFiles()[0];
+      const result = await verifyTrackedPrefix(client, {
+        trackedFiles: [file054],
+        migrationsDir: LEDGER_MIGRATIONS_DIR,
+        readLedgerFingerprint,
+        approvedAhead: [],
+      });
+      expect(result).toEqual({ ok: true });
+    });
+
+    test('no tracked files -> ok (nothing to verify yet)', async () => {
+      const result = await verifyTrackedPrefix(client, {
+        trackedFiles: [],
+        migrationsDir: LEDGER_MIGRATIONS_DIR,
+        readLedgerFingerprint,
+        approvedAhead: [],
+      });
+      expect(result).toEqual({ ok: true });
     });
   });
 
