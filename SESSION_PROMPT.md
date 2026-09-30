@@ -41,8 +41,7 @@
 
 ### Owner Action Pending
 
-1. **Cleanup command** (blocked for Claude by auto-mode; all four branches are verified merged and the worktrees clean):
-   `cd /Users/gallivan/Code/WMKF_Apps && for w in integrity-workbench-tab integrity-dismiss-ownership liaison-from-institution; do git worktree remove --force .claude/worktrees/$w; done; git worktree prune -v; git branch -d claude/integrity-workbench-tab claude/integrity-dismiss-ownership codex/integrity-workbench-tab claude/liaison-from-institution; git push origin --delete claude/integrity-workbench-tab claude/integrity-dismiss-ownership codex/integrity-workbench-tab claude/liaison-from-institution`
+1. **Cleanup: DONE (owner-run, end of S552).** Removed the `integrity-workbench-tab`, `integrity-dismiss-ownership` and `liaison-from-institution` worktrees; pruned the five dead `/private/tmp/wmkf-*` worktree records; deleted `claude/integrity-workbench-tab`, `claude/integrity-dismiss-ownership`, `codex/integrity-workbench-tab` and `claude/liaison-from-institution` locally and on `origin`.
 2. **Office Mac `POSTGRES_URL` sync** (from S551; not rechecked).
 
 ### Parked
@@ -52,13 +51,14 @@
 
 ### Verify Before Acting
 
-1. **Production 054 shape.** Before B4's 058, have the owner run a read-only query of Production's `test_request_*` tables and `pg_get_functiondef('test_request_receipt_ok')`.
-2. **`migration_drift_ahead` alert.** It should have fired for 055 from 09-26 until #365 deployed. Whether it did is unchecked (`lib/utils/migration-drift.js`).
-3. **Residue** (list and confirm before deleting any of it):
+1. **Dependabot: 3 new alerts on `main` (2 high, 1 moderate)**, reported by GitHub on the S552 cleanup push. Not triaged. Check `gh api repos/justingallivan/wmkf-research-apps/dependabot/alerts` and `npm audit --omit=dev` before any bump.
+2. **Production 054 shape.** Before B4's 058, have the owner run a read-only query of Production's `test_request_*` tables and `pg_get_functiondef('test_request_receipt_ok')`.
+3. **`migration_drift_ahead` alert.** It should have fired for 055 from 09-26 until #365 deployed. Whether it did is unchecked (`lib/utils/migration-drift.js`).
+4. **Residue** (list and confirm before deleting any of it):
    - Test Requests 1003301, 1003302 and 1003303.
    - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`. S552's test used a temporary schema in `ledger_ci_s548` and dropped it.
-4. **Why Vercel skipped the production build of `61dafcb81`:** still not diagnosed.
-5. `docs/CREDENTIALS_RUNBOOK.md` has no Postgres rotation procedure. Adding one was offered in S551.
+5. **Why Vercel skipped the production build of `61dafcb81`:** still not diagnosed.
+6. `docs/CREDENTIALS_RUNBOOK.md` has no Postgres rotation procedure. Adding one was offered in S551.
 
 ### Do Not Reopen Without New Decision
 
