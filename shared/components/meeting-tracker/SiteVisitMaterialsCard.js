@@ -155,7 +155,13 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
     seenEmails.add(email);
     return true;
   }) : [];
-  const missingSavedLiaison = Boolean(collection && !collection.contacts?.liaison?.email);
+  // liaisonStatus is recorded by the current resolution: 'none' is a confirmed
+  // absence (PI-only send); a legacy snapshot without it is unverified.
+  const liaisonStatus = collection?.contacts?.liaisonStatus;
+  const liaisonNote = !collection ? ''
+    : liaisonStatus === 'none' ? ' · No institution Liaison'
+      : !liaisonStatus ? ' · Liaison not verified'
+        : !collection.contacts?.liaison?.email ? ' · Liaison email missing from saved recipients' : '';
 
   return (
     <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm" data-testid="site-visit-materials-card">
@@ -187,7 +193,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Sent to</dt>
               <dd className="mt-1">
                 {contacts.length ? contacts.map((person) => `${person.name || person.email}${person.email ? ` (${person.email})` : ''}`).join(', ') : 'No contacts on file'}
-                {missingSavedLiaison ? ' · primary contact email missing from saved recipients' : ''}
+                {liaisonNote}
                 {collection.invitedAt ? ` · invited ${formatDateTime(collection.invitedAt)}` : ' · invitation not sent'}
                 {collection.lastReminderAt ? ` · reminded ${formatDateTime(collection.lastReminderAt)}` : ''}
               </dd>

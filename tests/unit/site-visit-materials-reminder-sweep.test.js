@@ -1,4 +1,10 @@
-/** @jest-environment node */
+/**
+ * @jest-environment node
+ *
+ * Contacts are re-resolved before prepare (`resolveContacts`, the manual
+ * remind's path) and compared-and-swapped by the claim
+ * (docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md reader 5).
+ */
 import { sweepMaterialsReminders } from '../../lib/services/site-visit-materials/reminder-sweep';
 import { prepareMaterialsReminderEmail } from '../../lib/services/site-visit-materials/collection-service';
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
@@ -17,6 +23,10 @@ function row(overrides = {}) {
     reminder_count: 0, created_by: PC, token_ciphertext: 'sealed', ...overrides,
   };
 }
+const REFRESHED = { pi: { role: 'pi', name: 'Pat', email: 'pi@example.edu' }, liaison: { role: 'liaison', name: 'Lee', email: 'lee@example.edu' }, liaisonStatus: 'found' };
+function recipientsRequired() {
+  return Object.assign(new Error('Add an email address for the Liaison.'), { code: 'site_visit_materials_recipients_required' });
+}
 const PDF = { wmkf_requestdocumentid: 'd1', _wmkf_request_value: R1, wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, wmkf_sharepointitemid: 'i', wmkf_filename: '1003222 Site Visit Presentation.pdf', modifiedon: '2026-10-01T00:00:00Z' };
 
 function deps(overrides = {}) {
@@ -26,6 +36,7 @@ function deps(overrides = {}) {
     claim: jest.fn(async (id) => row({ id, reminder_count: 1, last_reminder_at: NOW })),
     attachEmailId: jest.fn(async () => row()),
     getRequest: jest.fn(async () => REQUEST),
+    resolveContacts: jest.fn(async () => REFRESHED),
     findDocumentsByRequest: jest.fn(async () => ({ records: [PDF] })),
     findActiveSiteVisit: jest.fn(async () => ({ scheduledstart: '2026-10-07T16:00:00Z', wmkf_ianatimezone: 'America/Los_Angeles' })),
     getSender: jest.fn(async () => ({ email: 'pc@wmkeck.org', systemUserId: PC })),
@@ -41,13 +52,16 @@ test('claims before sending, names only the missing items, sends from the creati
   const d = deps();
   const result = await sweepMaterialsReminders({}, d);
   expect(d.listDue).toHaveBeenCalledWith(NOW);
-  expect(d.claim).toHaveBeenCalledWith('c1', NOW);
+  expect(d.resolveContacts).toHaveBeenCalledWith(R1, REQUEST);
+  expect(d.claim).toHaveBeenCalledWith('c1', NOW, row().contacts, REFRESHED);
+  expect(d.resolveContacts.mock.invocationCallOrder[0]).toBeLessThan(d.prepareReminder.mock.invocationCallOrder[0]);
   expect(d.prepareReminder.mock.invocationCallOrder[0]).toBeLessThan(d.claim.mock.invocationCallOrder[0]);
   expect(d.claim.mock.invocationCallOrder[0]).toBeLessThan(d.sendReminder.mock.invocationCallOrder[0]);
   expect(d.findActiveSiteVisit.mock.invocationCallOrder[0]).toBeLessThan(d.claim.mock.invocationCallOrder[0]);
   const prep = d.prepareReminder.mock.calls[0][0];
   expect(prep.missing.map((item) => item.key)).toEqual(['presentation_source', 'participant_bios']);
   expect(prep).toMatchObject({ actorId: PC, request: REQUEST });
+  expect(prep.row.contacts).toEqual(REFRESHED);
   const args = d.sendReminder.mock.calls[0][0];
   expect(args).toMatchObject({ fromEmail: 'pc@wmkeck.org', actorId: PC, sequence: 1, prepared: { subject: 'Configured reminder', bodyText: 'Configured body' } });
   expect(args.row.reminder_count).toBe(1);
@@ -64,7 +78,7 @@ test('nothing missing, no sender mailbox, and a lost claim each skip without sen
   expect(await sweepMaterialsReminders({}, noSender)).toMatchObject({ skippedNoSender: 1, sent: 0, errors: [{ id: 'c1', error: 'collection creator has no mailbox' }] });
   expect(noSender.claim).not.toHaveBeenCalled();
 
-  const noRecipient = deps({ listDue: async () => [row({ contacts: { pi: { role: 'pi', name: 'Pat', email: null } } })] });
+  const noRecipient = deps({ resolveContacts: async () => { throw recipientsRequired(); } });
   expect(await sweepMaterialsReminders({}, noRecipient)).toMatchObject({ skippedNoRecipient: 1, sent: 0 });
   expect(noRecipient.claim).not.toHaveBeenCalled();
 
@@ -213,5 +227,41 @@ describe('Test Request isolation (Stage 1b)', () => {
     const result = await sweepMaterialsReminders({ maxBatch: 1 }, d);
     expect(result).toMatchObject({ skippedTestRequest: 3, scanned: 1, sent: 1 });
     expect(d.claim).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('refreshed contacts (Liaison of record)', () => {
+  test('none → the refreshed PI-only set is prepared, claimed and sent from the returned row', async () => {
+    const piOnly = { pi: REFRESHED.pi, liaison: null, liaisonStatus: 'none' };
+    const d = deps({
+      resolveContacts: jest.fn(async () => piOnly),
+      claim: jest.fn(async (id, _now, _expected, contacts) => row({ id, reminder_count: 1, contacts })),
+    });
+    expect(await sweepMaterialsReminders({}, d)).toMatchObject({ sent: 1 });
+    expect(d.prepareReminder.mock.calls[0][0].row.contacts).toEqual(piOnly);
+    expect(d.claim).toHaveBeenCalledWith('c1', NOW, row().contacts, piOnly);
+    expect(d.sendReminder.mock.calls[0][0].row.contacts).toEqual(piOnly);
+  });
+
+  test('a found Liaison without an email skips before prepare and claim, never PI-only', async () => {
+    const d = deps({ resolveContacts: jest.fn(async () => { throw recipientsRequired(); }) });
+    expect(await sweepMaterialsReminders({}, d)).toMatchObject({ skippedNoRecipient: 1, sent: 0 });
+    expect(d.prepareReminder).not.toHaveBeenCalled();
+    expect(d.claim).not.toHaveBeenCalled();
+  });
+
+  test('a contacts read failure is a row error before prepare and claim', async () => {
+    const d = deps({ resolveContacts: jest.fn(async () => { throw Object.assign(new Error('Liaison unavailable'), { code: 'site_visit_primary_contact_unavailable' }); }) });
+    const result = await sweepMaterialsReminders({}, d);
+    expect(result).toMatchObject({ sent: 0, skippedNoRecipient: 0 });
+    expect(result.errors).toEqual([{ id: 'c1', error: 'Liaison unavailable' }]);
+    expect(d.prepareReminder).not.toHaveBeenCalled();
+    expect(d.claim).not.toHaveBeenCalled();
+  });
+
+  test('a lost contacts compare-and-swap sends nothing', async () => {
+    const d = deps({ claim: jest.fn(async () => null) });
+    expect(await sweepMaterialsReminders({}, d)).toMatchObject({ claimLost: 1, sent: 0 });
+    expect(d.sendReminder).not.toHaveBeenCalled();
   });
 });

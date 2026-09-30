@@ -31,6 +31,21 @@
  *     scripts/export-test-request-source-bundle.mjs \
  *     --source-request-number=<number> --out=/absolute/private/bundle.json \
  *     --with-reviewers --source-marker-column=absent
+ *
+ * The Pre-Site section (bundle v4, slice 4a "Recipe 4") is likewise OFF by
+ * default and requires `--with-reviewers` too (v4 extends v3). Pass
+ * `--with-pre-site` to include the source's current Pre-Site draft (eight
+ * section fields plus the parsed proposal-core envelope), its abstract, and
+ * (slice 4c) `personnel` (the Principal Investigator display name and the
+ * Co-PI display names, read from the parent Request and its Co-PI junction,
+ * never from the document row) -- a source Request with no resolvable PI
+ * refuses the export outright, since a Pre-Site clone cannot render without
+ * one (owner decision 2026-09-27: names only, no Contact write):
+ *
+ *   DATAVERSE_ALLOW_PROD_READS=yes node --env-file=/absolute/.env.local \
+ *     scripts/export-test-request-source-bundle.mjs \
+ *     --source-request-number=<number> --out=/absolute/private/bundle.json \
+ *     --with-reviewers --source-marker-column=absent --with-pre-site
  */
 
 import fs from 'fs';
@@ -51,6 +66,20 @@ import {
   summarizeSourceBundle,
 } from '../lib/services/test-requests/source-bundle.js';
 import { createReviewerSourceDependencies } from '../lib/services/test-requests/source-bundle-reviewers.js';
+import { readPreSiteVisitDraftForExport } from '../lib/services/test-requests/source-bundle-presite.js';
+import { PRE_SITE_SECTION_FIELDS } from '../lib/services/test-requests/source-bundle.js';
+// Pure, dependency-free formatter (no `this`, calls no DynamicsService/
+// adapter code, issues no reads) -- turns the raw
+// `_wmkf_projectleader_value@OData.Community.Display.V1.FormattedValue`
+// annotation this script's own client.get() returns into
+// `_wmkf_projectleader_value_formatted`, the SAME field name
+// personnelRoster/requireIdentity read production-side
+// (proposal-core-service.js:151-163,288). Reusing this formatter (rather
+// than hand-rolling the same annotation-suffix-stripping logic here) keeps
+// the field name in sync with the app's own convention without adopting
+// DynamicsService/the adapter layer's read path.
+import { processAnnotations } from '../lib/services/dynamics/annotations.js';
+import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../shared/config/requestDocument.js';
 
 const require = createRequire(import.meta.url);
 const { getAccessToken, createClient } = require('../lib/dataverse/client.js');
@@ -65,13 +94,14 @@ const SOURCE_SELECT = [
 export function parseArgs(argv) {
   const parsed = {
     sourceRequestNumber: null, out: null, help: false,
-    withReviewers: false, sourceMarkerColumn: null,
+    withReviewers: false, sourceMarkerColumn: null, withPreSite: false,
   };
   for (const arg of argv) {
     if (arg.startsWith('--source-request-number=')) parsed.sourceRequestNumber = arg.slice('--source-request-number='.length);
     else if (arg.startsWith('--out=')) parsed.out = arg.slice('--out='.length);
     else if (arg === '--with-reviewers') parsed.withReviewers = true;
     else if (arg.startsWith('--source-marker-column=')) parsed.sourceMarkerColumn = arg.slice('--source-marker-column='.length);
+    else if (arg === '--with-pre-site') parsed.withPreSite = true;
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -95,6 +125,11 @@ export function parseArgs(argv) {
   }
   if (parsed.withReviewers && parsed.sourceMarkerColumn !== 'present' && parsed.sourceMarkerColumn !== 'absent') {
     throw new Error('--with-reviewers requires --source-marker-column=present|absent.');
+  }
+  // Bundle v4 (slice 4a, Recipe 4): the Pre-Site section extends v3, never
+  // stands alone (buildSourceBundle enforces this again, defensively).
+  if (parsed.withPreSite && !parsed.withReviewers) {
+    throw new Error('--with-pre-site requires --with-reviewers (bundle v4 extends v3).');
   }
   return parsed;
 }
@@ -156,6 +191,133 @@ export function buildReviewerDependencies(args, { client, graph }) {
   });
 }
 
+// Explicit $select allowlist: the ONLY columns this read-only production
+// read ever names, so the input snapshot/fingerprint/generation key/
+// lifecycle-history/claim token/AI-run link are never read off the wire in
+// the first place (data-minimization boundary #1; source-bundle-presite.js's
+// own projection is boundary #2, defense-in-depth).
+const PRE_SITE_DOCUMENT_SELECT = [
+  'wmkf_requestdocumentid', '_wmkf_request_value', 'wmkf_artifacttype', 'wmkf_contenttype',
+  'wmkf_operationstatus', 'wmkf_lifecyclestate', 'wmkf_producer', 'wmkf_presiteproposalcorejson',
+  ...PRE_SITE_SECTION_FIELDS,
+].join(',');
+
+// Codex round (slice 4c): also selects _wmkf_projectleader_value, with the
+// annotation header so the Web API returns its own
+// `@OData.Community.Display.V1.FormattedValue` -- the SAME field
+// `personnelRoster`/`requireIdentity` read production-side
+// (proposal-core-service.js:151-163,288), never a separate PI lookup this
+// script would have to keep in sync with the app's own.
+async function getRequestForPreSite(client, requestId) {
+  const body = bodyOrThrow(
+    'source Request Pre-Site pointer read',
+    await client.get(
+      `/akoya_requests(${requestId})?$select=akoya_requestid,_wmkf_currentpresitevisit_value,_wmkf_projectleader_value`,
+      { Prefer: 'odata.include-annotations="*"' },
+    ),
+  );
+  return processAnnotations(body);
+}
+
+// wmkf_apprequestperson.wmkf_role option value for Co-PI. Byte-mirrors
+// lib/dataverse/adapters/app-request-person.js's local ROLE_COPI constant
+// (that adapter's own doc: "the same constant proposal-participants.js used
+// inline") -- kept local here too, for the same reason: this script never
+// calls DynamicsService/the adapter (every read here goes through its OWN
+// verified-production `client`, not the env-configured DAL), so the query
+// shape is byte-mirrored instead of reused by reference.
+const CO_PI_ROLE = 100000001;
+
+// Byte-mirrors app-request-person.js's queryCoPIs: same select/expand/
+// filter/orderby/top, executed through this script's own client.
+async function listCoPIRecords(client, requestId) {
+  const filter = encodeURIComponent(`_wmkf_request_value eq ${requestId} and wmkf_role eq ${CO_PI_ROLE}`);
+  const params = [
+    '$select=_wmkf_contact_value,wmkf_authorposition',
+    `$expand=${encodeURIComponent('wmkf_Contact($select=fullname,firstname,lastname)')}`,
+    `$filter=${filter}`,
+    `$orderby=${encodeURIComponent('wmkf_authorposition asc,createdon asc')}`,
+    '$top=50',
+  ].join('&');
+  const body = bodyOrThrow(
+    'source Co-PI junction read',
+    await client.get(`/wmkf_apprequestpersons?${params}`),
+  );
+  return body.value || [];
+}
+
+// Byte-mirrors proposal-participants.js's fetchCoPIs dedupe/name-join logic
+// (dedupe by contact id, fullname else firstname+lastname, drop unnamed).
+function coPiNamesFromRecords(records) {
+  const byContactId = new Map();
+  for (const row of records || []) {
+    const contactId = row._wmkf_contact_value;
+    if (!contactId || byContactId.has(contactId)) continue;
+    const contact = row.wmkf_Contact;
+    const name = contact?.fullname
+      || [contact?.firstname, contact?.lastname].filter(Boolean).join(' ').trim();
+    if (!name) continue;
+    byContactId.set(contactId, name);
+  }
+  return Array.from(byContactId.values());
+}
+
+async function getCoPIsForPreSite(client, requestId) {
+  return coPiNamesFromRecords(await listCoPIRecords(client, requestId));
+}
+
+// Bounded, unpaged read (Opus round-1 P3-4): a source request legitimately
+// has only a handful of Pre-Site rows across its reopen/correction history,
+// so hitting the page cap or seeing a continuation link means the read is
+// no longer complete -- refuse rather than silently choose a candidate from
+// a partial page.
+const PRE_SITE_DOCUMENT_READ_CAP = 50;
+
+async function listPreSiteDocuments(client, requestId) {
+  const filter = encodeURIComponent(
+    `_wmkf_request_value eq ${requestId} and wmkf_artifacttype eq ${REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT}`,
+  );
+  const body = bodyOrThrow(
+    'source Pre-Site request-document read',
+    await client.get(`/wmkf_requestdocuments?$select=${PRE_SITE_DOCUMENT_SELECT}&$filter=${filter}&$top=${PRE_SITE_DOCUMENT_READ_CAP}`),
+  );
+  const rows = body.value || [];
+  if (rows.length >= PRE_SITE_DOCUMENT_READ_CAP || body['@odata.nextLink']) {
+    throw new Error(
+      `Source Pre-Site request-document read is not complete (reached the ${PRE_SITE_DOCUMENT_READ_CAP}-row cap or a continuation link exists); refusing rather than choosing from a partial page.`,
+    );
+  }
+  return rows;
+}
+
+/**
+ * `null` (no Pre-Site dependencies) unless `--with-pre-site` was passed;
+ * parseArgs already refused `--with-pre-site` without `--with-reviewers`.
+ * `readAbstract` is a separate, equally narrow $select read (never through
+ * `SOURCE_SELECT`, which the Basic create body/plan digest already bind to
+ * -- P4 owner decision: `wmkf_abstract` must never enter that projection).
+ */
+export function buildPreSiteDependencies(args, { client }) {
+  if (!args.withPreSite) return null;
+  return {
+    readPreSiteVisitDraft: (source) => readPreSiteVisitDraftForExport(
+      { requestId: source.akoya_requestid },
+      {
+        getRequest: (requestId) => getRequestForPreSite(client, requestId),
+        listPreSiteDocuments: (requestId) => listPreSiteDocuments(client, requestId),
+        getCoPIs: (requestId) => getCoPIsForPreSite(client, requestId),
+      },
+    ),
+    readAbstract: async (source) => {
+      const body = bodyOrThrow(
+        'source Request abstract read',
+        await client.get(`/akoya_requests(${source.akoya_requestid})?$select=akoya_requestid,wmkf_abstract`),
+      );
+      return body.wmkf_abstract ?? null;
+    },
+  };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
@@ -164,6 +326,7 @@ async function main() {
       + '[--with-reviewers --source-marker-column=present|absent]');
     console.log('  --with-reviewers: include the confidential reviewers[] section (bundle v3). Off by default (writes the plain v2 bundle).');
     console.log('  --source-marker-column=present|absent: required with --with-reviewers, no default. Whether the PRODUCTION host has wave30\'s wmkf_issyntheticreviewer column -- NOT read from SYNTHETIC_REVIEWER_ISOLATION (that switch governs the app\'s own reads on whatever host this process points at; the exporter reads production while a later sandbox seeder may run against a sandbox with different schema state).');
+    console.log('  --with-pre-site: include the preSiteVisit section and abstract (bundle v4). Requires --with-reviewers (v4 extends v3). Off by default.');
     return;
   }
   const hostname = productionHost();
@@ -176,6 +339,10 @@ async function main() {
   // dependencies are given to the exporter at all, so it writes exactly the
   // pre-Stage-A v2 bundle (golden-digest-identical).
   const reviewerDeps = buildReviewerDependencies(args, { client, graph: SOURCE_BUNDLE_DEPENDENCIES });
+  // Slice 4a: same posture for the Pre-Site section -- no dependencies at
+  // all unless --with-pre-site was explicitly passed, so a plain or
+  // --with-reviewers-only export stays exactly v2/v3 (golden-digest-identical).
+  const preSiteDeps = buildPreSiteDependencies(args, { client });
 
   const bundle = await withDalContext('export-test-request-source-bundle', () => (
     exportTestRequestSourceBundle({
@@ -194,6 +361,10 @@ async function main() {
         discoverReviewers: reviewerDeps.discoverReviewers,
         hydrateReviewer: reviewerDeps.hydrateReviewer,
         readCurrentReviewerIdentity: reviewerDeps.readCurrentReviewerIdentity,
+      } : {}),
+      ...(preSiteDeps ? {
+        readPreSiteVisitDraft: preSiteDeps.readPreSiteVisitDraft,
+        readAbstract: preSiteDeps.readAbstract,
       } : {}),
     })
   ));

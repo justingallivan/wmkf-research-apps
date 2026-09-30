@@ -90,6 +90,12 @@ const EXEMPT_FILES = new Set([
   // (raw client.js reads/writes bound to one explicit sandbox host, never
   // process.env.DYNAMICS_URL); no entity adapter can exist for it.
   'lib/services/test-requests/reviews-sandbox-deps.js',
+  // Test Request Factory `pre_site_visit` recipe sandbox deps (slice 4b):
+  // the same deliberately org-bound sandbox service pattern as
+  // ia-sandbox-deps.js/reviews-sandbox-deps.js, including a named
+  // sandbox-only wmkf_ai_runs write for the stub run (never
+  // DynamicsService/logAiRun/writeRunRow); no entity adapter can exist for it.
+  'lib/services/test-requests/presite-sandbox-deps.js',
 ]);
 
 const EXEMPT_DIRS = [

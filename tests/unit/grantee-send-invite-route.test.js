@@ -2,6 +2,9 @@
  * POST /api/workbench/grantee-deliverables/send-invite — chunk 3c.
  * PI in To, liaison in Cc; generate-first guard; already-submitted 409; server
  * mints + injects the magic-link; status Drafted→Invited (non-downgrade).
+ * The Request row has a blank program and no Request copy (no Liaison), so the
+ * default `liaisonSeen` is the explicit none; the Research rule and the
+ * stale-Liaison interlock are covered in grantee-send-invite-workbench-service.
  *
  * @jest-environment node
  */
@@ -47,8 +50,16 @@ function mockRes() {
 const body = (over = {}) => ({
   requestId: GUID, toEmail: 'monika.raj@emory.edu', ccEmail: 'lorena.mclaren@emory.edu',
   subject: 'Your Keck grant deliverables', bodyText: 'Dear Dr. Raj, please submit your deliverables.',
+  liaisonSeen: { contactId: null, email: null },
   ...over,
 });
+const REQUEST_ROW = {
+  akoya_requestid: GUID,
+  akoya_requestnum: '1002794',
+  _akoya_programid_value: null,
+  _akoya_applicantid_value: null,
+  _akoya_primarycontactid_value: null,
+};
 const reqOf = (b) => ({ method: 'POST', body: b, headers: {} });
 function deliverable(status) {
   return {
@@ -62,7 +73,7 @@ beforeEach(() => {
   requireAppAccess.mockReset().mockResolvedValue({
     profileId: 'p', session: { user: { azureEmail: 'pd@wmkeck.org', dynamicsSystemuserId: 'sys-1' } },
   });
-  DynamicsService.getRecord.mockReset().mockResolvedValue({ akoya_requestid: GUID, akoya_requestnum: '1002794' });
+  DynamicsService.getRecord.mockReset().mockResolvedValue(REQUEST_ROW);
   DynamicsService.createAndSendEmail.mockReset().mockResolvedValue({ emailId: 'email-1' });
   ensureDeliverableForRequest.mockReset().mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.DRAFTED));
   patchDeliverable.mockReset().mockResolvedValue({});
@@ -253,4 +264,41 @@ test('omitting ccEmail passes cc: undefined to the send (no CC party)', async ()
   await handler(reqOf(body({ ccEmail: '' })), res);
   expect(res.statusCode).toBe(200);
   expect(DynamicsService.createAndSendEmail.mock.calls[0][0].cc).toBeUndefined();
+});
+
+describe('liaisonSeen (closed, required observation)', () => {
+  const LIAISON = '44444444-4444-4444-4444-444444444444';
+
+  test.each([
+    ['missing', undefined],
+    ['null', null],
+    ['an array', []],
+    ['missing email', { contactId: null }],
+    ['missing contactId', { email: null }],
+    ['an extra key', { contactId: null, email: null, name: 'x' }],
+    ['a non-GUID contactId', { contactId: 'li-1', email: null }],
+    ['a numeric email', { contactId: null, email: 5 }],
+    ['an overlong email', { contactId: null, email: `${'a'.repeat(320)}@x.edu` }],
+  ])('%s → 400 before any read or send', async (_label, liaisonSeen) => {
+    const res = mockRes();
+    await handler(reqOf(body({ liaisonSeen })), res);
+    expect(res.statusCode).toBe(400);
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+    expect(ensureDeliverableForRequest).not.toHaveBeenCalled();
+    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a Liaison that appeared since compose → 409 liaison_changed, nothing minted or sent', async () => {
+    DynamicsService.getRecord.mockImplementation(async (entity) => (
+      entity === 'contacts'
+        ? { contactid: LIAISON, fullname: 'New Liaison', emailaddress1: 'new@emory.edu' }
+        : { ...REQUEST_ROW, _akoya_primarycontactid_value: LIAISON }
+    ));
+    const res = mockRes();
+    await handler(reqOf(body()), res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual({ error: 'The Liaison changed; reload before sending.', code: 'liaison_changed' });
+    expect(mintForRequest).not.toHaveBeenCalled();
+    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+  });
 });

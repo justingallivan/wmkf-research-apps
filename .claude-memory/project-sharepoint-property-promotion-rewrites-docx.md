@@ -1,12 +1,12 @@
 ---
 name: project-sharepoint-property-promotion-rewrites-docx
-description: "SharePoint property promotion rewrites every DOCX uploaded to the akoyaGO library (adds customXml items/props/rels, rewrites core.xml, custom.xml, [Content_Types].xml, document.xml.rels, leaves [trash] entries) while every word/ part stays byte-identical; raw package digests never survive an upload round-trip. Verified live 2026-09-24."
+description: "SharePoint property promotion rewrites every DOCX uploaded to the akoyaGO library (adds customXml items/props/rels, rewrites core.xml, custom.xml, [Content_Types].xml, document.xml.rels, leaves [trash] entries) while every word/ part stays byte-identical; a template carrying another library's customXml has those items rewritten in place; raw package digests never survive an upload round-trip. Verified live 2026-09-24 and 2026-09-27."
 metadata:
   node_type: memory
   status: active
   type: project
   originSessionId: 0e6440df-6b18-41ae-9f22-49d30a1ed82f
-  modified: 2026-09-25T03:51:59.723Z
+  modified: 2026-09-27T17:40:00.000Z
 ---
 
 **Fact (verified 2026-09-24, Session 542, live sandbox Request 1000342):** a DOCX
@@ -25,6 +25,14 @@ exactly this and was replaced by
 `lib/services/test-requests/docx-package-attestation.js` (lands on `main` with PR #336), which normalizes only <!-- doc-symbol-refs:ignore reason=lands-with-pr-336 -->
 these characterized mutations. Earlier memory notes that Word Online re-saves
 re-serialize the package too; this is the upload-time counterpart.
+
+**Extension (verified 2026-09-27, Session 544, sandbox Request 1000348):** a
+package that already carries SharePoint customXml from ANOTHER library (the
+Pre-Site v6 template) has its `item1` contentTypeSchema, `item3` properties and
+`itemProps1` rewritten in place to the destination library's content type; the
+other customXml and rels parts stay byte-identical, and five `[trash]` entries
+appeared. The attestation accepts this for renders only
+(`validateSharePointRewrite`); an uploader-supplied source keeps byte identity.
 
 **How to apply:** never assert byte identity across a SharePoint upload
 round-trip; compare `word/` parts (governed hash) plus a characterized allowlist

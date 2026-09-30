@@ -163,6 +163,9 @@ export default function AwardeeTab({ requestId, context }) {
   const [sendStep, setSendStep] = useState(null);
   const [sendReceipt, setSendReceipt] = useState(null);
   const [recipients, setRecipients] = useState(null);
+  // 'loading' | 'loaded' | 'failed'. Send needs loaded recipients: the server
+  // compares the Liaison staff saw with the Liaison of record at send.
+  const [recipientsState, setRecipientsState] = useState('loading');
   // The signed-in PD's own per-contact VIP review flags ("flag them where you
   // see them"): flagged recipients make future automated mail wait for that
   // PD's approval. Null until loaded so the toggles don't flash unchecked.
@@ -198,6 +201,7 @@ export default function AwardeeTab({ requestId, context }) {
   const prevProfileIdRef = useRef(undefined);
   const subjectDirtyRef = useRef(false);
   const defaultLoadSeqRef = useRef(0);
+  const recipientsLoadSeqRef = useRef(0);
   const abstractLoadSeqRef = useRef(0);
   const abstractSaveSeqRef = useRef(0);
 
@@ -263,16 +267,27 @@ export default function AwardeeTab({ requestId, context }) {
     }
   }, []);
 
+  // Every write checks that this load is still the latest for the current
+  // request, so a slow response (or an older Retry) cannot land last.
   const loadRecipients = useCallback(async () => {
     if (!requestId) return;
     const loadRequestId = requestId;
+    const seq = recipientsLoadSeqRef.current + 1;
+    recipientsLoadSeqRef.current = seq;
+    const isLatest = () => recipientsLoadSeqRef.current === seq && currentRequestIdRef.current === loadRequestId;
+    setRecipients(null);
+    setRecipientsState('loading');
     try {
       const data = await requestJson(`/api/workbench/grantee-deliverables/recipients?requestId=${encodeURIComponent(loadRequestId)}`);
-      if (currentRequestIdRef.current !== loadRequestId) return;
+      if (!isLatest()) return;
       setRecipients(data);
       setToEmail(data.pi?.email || '');
       setCcEmail(data.liaison?.email || '');
-    } catch { /* recipients are optional context; staff can still type them */ }
+      setRecipientsState('loaded');
+    } catch {
+      if (!isLatest()) return;
+      setRecipientsState('failed');
+    }
   }, [requestId]);
 
   const loadVipFlags = useCallback(async () => {
@@ -538,7 +553,14 @@ export default function AwardeeTab({ requestId, context }) {
     try {
       const { ok: sendOk, data, error: sendError } = await requestEnvelope('/api/workbench/grantee-deliverables/send-invite', {
         method: 'POST',
-        body: { requestId, toEmail, ccEmail, subject: fillInviteSubject(subject, { title: awardTitle }), bodyText: body },
+        body: {
+          requestId,
+          toEmail,
+          ccEmail,
+          subject: fillInviteSubject(subject, { title: awardTitle }),
+          bodyText: body,
+          liaisonSeen: { contactId: recipients?.liaison?.contactId ?? null, email: recipients?.liaison?.email ?? null },
+        },
         fallbackMessage: 'The invitation was not sent.',
       });
       if (!sendOk && sendError?.parseError) {
@@ -846,6 +868,7 @@ export default function AwardeeTab({ requestId, context }) {
     && isEmail(toEmail)
     && ccAddressesValid
     && !sending
+    && recipientsState === 'loaded'
     && emailDefaults.loaded
     && !emailDefaultsUnavailable
     && !emailDefaultsNotConfigured
@@ -1198,6 +1221,12 @@ export default function AwardeeTab({ requestId, context }) {
       {subTab === 'invitation' && (
       <section className="space-y-2">
         <h4 className="text-sm font-medium text-gray-800">Invitation</h4>
+        {recipientsState === 'failed' && (
+          <div role="alert" className="flex items-center gap-2 text-sm text-red-700">
+            Recipients could not be loaded, so the invitation cannot be sent yet.
+            <button type="button" onClick={loadRecipients} className="text-xs text-blue-700 underline">Retry</button>
+          </div>
+        )}
         <label className="block text-sm">To (PI)
           <input aria-label="To email" value={toEmail} onChange={(e) => setToEmail(e.target.value)} className="w-full border rounded p-1" />
           {recipients?.pi?.name && <span className="text-xs text-gray-500"> {recipients.pi.name}</span>}

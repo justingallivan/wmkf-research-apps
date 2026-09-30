@@ -357,6 +357,29 @@ describe('journalPlannedResource', () => {
   });
 });
 
+describe('MVP item 5: the production Foundation transition resources', () => {
+  const baseline = {
+    kind: 'foundation_transition', organizationId: BASE_PLAN.destinationRequestId,
+    foundationProjectionSha256: 'a'.repeat(64), foundationGoverifyResultSha256: 'b'.repeat(64), foundationGuidestarSha256: 'd'.repeat(64), foundationContactsSha256: 'c'.repeat(64),
+    count: 10, capturedAt: '2026-09-28T18:00:00.000Z', goverifyTriggerAt: '2026-08-03T18:15:12Z', exemptionCheckedAt: '2026-08-03',
+  };
+  it.each([
+    ['the fence_source baseline', 'fence_source', baseline],
+    ['the verify outcome', 'verify', { kind: 'foundation_transition', outcome: 'not_refreshed' }],
+  ])('the real ledger journals %s', async (_label, step, plannedIdentity) => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([runRow({ lease_token: 'tok-1', lease_generation: 1, locked_until: new Date(Date.now() + 60000).toISOString(), lease_live: true })]);
+    queueRows([{ next_sequence: 1 }]);
+    queueRows([{ resource_id: 1, run_id: BASE_PLAN.runId, sequence: 1, step, resource_kind: 'foundation_transition', system: 'dataverse', planned_identity: plannedIdentity, outcome: 'planned' }]);
+    const ledger = createRunLedger(db);
+    await ledger.journalPlannedResource({
+      runId: BASE_PLAN.runId, leaseToken: 'tok-1', leaseGeneration: 1,
+      step, resourceKind: 'foundation_transition', system: 'dataverse', plannedIdentity,
+    });
+    expect(calls[2].text).toContain('INSERT INTO test_request_run_resources');
+  });
+});
+
 describe('slice 6a: initial_assessment recipe token', () => {
   it('assertReservePlan accepts both basic and initial_assessment', () => {
     expect(assertReservePlan({
@@ -482,12 +505,30 @@ describe('slice 6a: IA attempt-marker timestamp keys', () => {
 
 describe('slice 6c-i: reviews recipe token', () => {
   it('LEDGER_RECIPES includes reviews alongside basic and initial_assessment', () => {
-    expect(LEDGER_RECIPES).toEqual(['basic', 'initial_assessment', 'reviews']);
+    expect(LEDGER_RECIPES).toEqual([
+      'basic', 'initial_assessment', 'reviews', 'pre_site_visit', 'final_writeup', 'site_visit_materials',
+    ]);
   });
 
   it('assertReservePlan accepts the reviews recipe', () => {
     expect(assertReservePlan({
       actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: { ...BASE_PLAN, recipe: 'reviews' },
+    })).toBeTruthy();
+  });
+});
+
+// Slice 4a: pre_site_visit/final_writeup/site_visit_materials are accepted as
+// LEDGER RECIPE TOKENS (the ledger's finite enum), but have no built step
+// order yet (RECIPE_STEP_ORDER in run-runner.js) -- reservation of one of
+// these recipes must still fail closed before any Dataverse call. That
+// refusal lives in the CLI's --recipe validation (scripts/rehearse-test-
+// request-sandbox.mjs), not here; assertReservePlan alone (the ledger's own
+// gate) accepts any LEDGER_RECIPES token, by design, since a future slice
+// builds their step order without touching this file again.
+describe('slice 4a: new cumulative recipe tokens accepted by the ledger enum', () => {
+  it.each(['pre_site_visit', 'final_writeup', 'site_visit_materials'])('assertReservePlan accepts %s', (recipe) => {
+    expect(assertReservePlan({
+      actorId: cliActorId('actor-1'), idempotencyKey: 'key-1', plan: { ...BASE_PLAN, recipe },
     })).toBeTruthy();
   });
 });
@@ -883,5 +924,66 @@ describe('slice 6c-i: listRunReviewerAssignments never selects the plaintext add
     expect(rows).toHaveLength(1);
     expect(rows[0]).not.toHaveProperty('address');
     expect(rows[0].addressSha256).toBe('a'.repeat(64));
+  });
+});
+
+describe('status setter journal (cast-and-status plan, slice C)', () => {
+  const CHANGE_ID = '99999999-9999-4999-8999-999999999999';
+  const plan = (overrides = {}) => ({
+    runId: BASE_PLAN.runId, changeId: CHANGE_ID, field: 'wmkf_phaseiistatus',
+    optionBefore: null, optionAfter: 100000002, etagBefore: 'W/"12345"', ...overrides,
+  });
+  const row = (overrides = {}) => ({
+    change_id: CHANGE_ID, run_id: BASE_PLAN.runId, sequence: 1, field: 'wmkf_phaseiistatus', option_before: null,
+    option_after: 100000002, etag_before: 'W/"12345"', status: 'planned', rerun: false, effects: null, error: null, ...overrides,
+  });
+
+  it('plans a change with the next per-run sequence and maps the row', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row()]);
+    const change = await createRunLedger(db).planStatusChange(plan());
+    expect(change).toMatchObject({ changeId: CHANGE_ID, sequence: 1, field: 'wmkf_phaseiistatus', optionAfter: 100000002, status: 'planned' });
+    expect(calls[0].text).toContain('INSERT INTO test_request_status_changes');
+    expect(calls[0].text).toContain('COALESCE(MAX(sequence), 0) + 1');
+  });
+
+  it.each([
+    ['a non-status field', { field: 'akoya_requeststatus' }],
+    ['a non-integer option', { optionAfter: '100000002' }],
+    ['a weak or wildcard ETag', { etagBefore: '*' }],
+    ['a non-GUID change ID', { changeId: 'x' }],
+  ])('refuses %s before any SQL', async (_label, overrides) => {
+    const { db, calls } = createFakeDb();
+    await expect(createRunLedger(db).planStatusChange(plan(overrides))).rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('completes only from applied and validates the effects receipt', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'complete' })]);
+    const effects = { kind: 'status_change', emailIds: [CHANGE_ID], requestStatusSha256: 'a'.repeat(64), count: 1 };
+    await createRunLedger(db).completeStatusChange({ changeId: CHANGE_ID, effects });
+    expect(calls[0].text).toContain("WHERE change_id = $1::uuid AND status = 'applied'");
+    await expect(createRunLedger(createFakeDb().db).completeStatusChange({ changeId: CHANGE_ID, effects: { requestStatus: 'Phase II Pending' } }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    await expect(createRunLedger(createFakeDb().db).completeStatusChange({ changeId: CHANGE_ID, effects: { emailIds: ['not-a-guid'] } }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
+  it('records late recheck effects only on a finished change, validating the receipt', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'complete' })]);
+    await createRunLedger(db).recordLateStatusChangeEffects({ changeId: CHANGE_ID, effects: { kind: 'status_change', paymentIds: [CHANGE_ID] } });
+    expect(calls[0].text).toContain("status IN ('complete', 'needs_attention')");
+    await expect(createRunLedger(createFakeDb().db).recordLateStatusChangeEffects({ changeId: CHANGE_ID, effects: { note: 'x' } }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+  });
+
+  it('records needs_attention with sanitized error text from any open state', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'needs_attention' })]);
+    await createRunLedger(db).markStatusChangeNeedsAttention({ changeId: CHANGE_ID, error: new Error('Authorization: Bearer abc.def') });
+    expect(calls[0].text).toContain("status IN ('planned', 'dispatched', 'applied')");
+    expect(calls[0].params[1]).not.toContain('abc.def');
   });
 });

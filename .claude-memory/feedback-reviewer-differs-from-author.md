@@ -31,6 +31,8 @@ rescue to fix, you review"). Keep honoring that until the owner lifts it; it
 applies to review findings, not to mechanical gate fixes the owner already
 approved.
 
+**Rule 3: plan-review rounds end when findings shrink to edge cases.** Session 551 (2026-09-29): a scheduled-email plan went through three Codex adversarial rounds; each Codex-rescue fix added machinery (four columns, backoff, rotation), the owner approved a simplification ("What is the cost of leaving it if it's written and sound?", then "Fine. Simplify."), and after round 3 said "We're chasing tails here" and closed plan review, leaving remaining risk to live tests and the implementation review. When a round's fixes add mechanism for volumes production does not have, propose the smallest fix and tell the owner the rounds are converging instead of queueing another one. Note that round 2 reviewed Codex-authored text, which Rule 1 weighs lightly.
+
 **How to apply:** when delegating a fix, name the reviewer in the plan
 (author Codex → reviewer Claude; author Claude/Sonnet → reviewer Codex). Related:
 [[feedback-codex-delegation-review-vs-rescue-routing]],

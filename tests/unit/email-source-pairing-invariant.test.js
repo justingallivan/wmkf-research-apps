@@ -67,6 +67,17 @@ const EXEMPT = new Set([
   // authority is the run ledger's reviewer-assignment row (D-R2), never this
   // field, for a factory-created synthetic person.
   'lib/services/reviewer-engagement/seed-synthetic-review.js',
+  // Test Request Factory synthetic cast (cast-and-status plan, slice A): the
+  // cast suggested-reviewer person is created with the same deliberate omission
+  // as the seeder above -- no `wmkf_emailsource`, so it never reads as
+  // staff-attested. Its address provenance is the cast ledger
+  // (`test_request_cast_members.address_sha256`, owner-supplied at run time),
+  // and the production fence (`CAST_PERSON_COLUMNS`) admits no other column.
+  'lib/services/test-requests/cast-runner.js',
+  // The production write fence's cast-person `expected` projection is a
+  // COMPARISON object -- the values a fenced POST must carry -- not a write
+  // payload; the body it checks is the cast runner's (exempt above).
+  'lib/services/test-requests/production-write-fence.js',
 ]);
 
 function listFiles(dir) {

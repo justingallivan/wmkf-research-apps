@@ -54,6 +54,7 @@ import {
 import {
   readSourceBundle,
   summarizeSourceBundle,
+  assertBundleHasPreSiteSectionForRecipe,
   assertBundleHasReviewerSectionForRecipe,
 } from '../lib/services/test-requests/source-bundle.js';
 import {
@@ -65,6 +66,10 @@ import {
 import {
   READBACK_FIELDS,
   SANDBOX_URL,
+  TARGET_URLS,
+  resolveProgramDirector,
+  targetEnvironmentOf,
+  targetHostOf,
   SOURCE_SELECT,
   bodyOrThrow,
   buildCloneManifest,
@@ -96,7 +101,14 @@ import {
   validateCloneManifest,
   verifyClone,
 } from '../lib/services/test-requests/basic-clone-steps.js';
-import { advanceRun, recipeLeaseSeconds } from '../lib/services/test-requests/run-runner.js';
+import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
+import { recheckFoundationTransition } from '../lib/services/test-requests/foundation-transition.js';
+import { fieldFor, recheckStatusChange, runStatusChange } from '../lib/services/test-requests/status-change-runner.js';
+import { CAST_DEFAULT_NAMES, CAST_ROLE_ORDER, planCastAddresses, readCast, runCastCreate } from '../lib/services/test-requests/cast-runner.js';
+import { runCastBinding } from '../lib/services/test-requests/cast-binding-runner.js';
+import { TEST_REQUEST_EMAIL_ALLOWLIST_KEY, parseAllowlistValue } from '../lib/services/test-requests/email-allowlist.js';
+import * as odata from '../lib/dataverse/core/odata.js';
+import { recipeSeedsPreSite, recipeSeedsReviewers } from '../lib/services/test-requests/recipe-capabilities.js';
 import {
   LEDGER_RECIPES, cliActorId, createRunLedger, idempotencyKeyDigest, reviewerAddressSha256,
 } from '../lib/services/test-requests/run-ledger.js';
@@ -153,7 +165,7 @@ export function defaultReviewerAddressFor(base, sourcePersonId) {
  * .env.local) and before any Dataverse read, so a bad value fails fast.
  */
 export function applyDefaultReviewerAddress(args, env = process.env) {
-  if (!args.reserve || args.recipe !== 'reviews') return;
+  if (!args.reserve || !recipeSeedsReviewers(args.recipe)) return;
   const base = env[DEFAULT_REVIEWER_ADDRESS_ENV];
   if (base) {
     defaultReviewerAddressFor(base, '00000000-0000-4000-8000-000000000000');
@@ -170,7 +182,10 @@ function resolveActorId(actor) {
   throw new Error('--actor must be admin:<guid>, user:<guid>, or an OS username (stored as its cli:<16 hex> digest).');
 }
 
-function parseArgs(argv) {
+// Exported (slice 4a) so a test can prove --recipe fails closed for a
+// LEDGER_RECIPES token with no built RECIPE_STEP_ORDER entry, before any
+// Dataverse read or ledger write.
+export function parseArgs(argv) {
   const parsed = {
     prepare: null,
     execute: null,
@@ -194,6 +209,22 @@ function parseArgs(argv) {
     manifest: null,
     steps: 1,
     runInspect: null,
+    runRecheck: null,
+    setStatus: null,
+    statusField: null,
+    statusOption: null,
+    rerun: false,
+    statusRecheck: null,
+    target: 'sandbox',
+    director: null,
+    createCast: false,
+    castPi: null,
+    castLiaison: null,
+    castReviewer: null,
+    castOrgLeader: null,
+    castResearchLeader: null,
+    confirm: false,
+    bindReviewer: null,
   };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--prepare=')) parsed.prepare = arg.slice('--prepare='.length);
@@ -216,12 +247,64 @@ function parseArgs(argv) {
     else if (arg.startsWith('--manifest=')) parsed.manifest = arg.slice('--manifest='.length);
     else if (arg.startsWith('--steps=')) parsed.steps = Number(arg.slice('--steps='.length));
     else if (arg.startsWith('--run-inspect=')) parsed.runInspect = arg.slice('--run-inspect='.length);
+    else if (arg.startsWith('--run-recheck=')) parsed.runRecheck = arg.slice('--run-recheck='.length);
+    else if (arg.startsWith('--set-status=')) parsed.setStatus = arg.slice('--set-status='.length);
+    else if (arg.startsWith('--field=')) parsed.statusField = arg.slice('--field='.length);
+    else if (arg.startsWith('--option=')) parsed.statusOption = arg.slice('--option='.length);
+    else if (arg === '--rerun') parsed.rerun = true;
+    else if (arg.startsWith('--status-recheck=')) parsed.statusRecheck = arg.slice('--status-recheck='.length);
+    else if (arg.startsWith('--target=')) parsed.target = arg.slice('--target='.length);
+    else if (arg.startsWith('--director=')) parsed.director = arg.slice('--director='.length);
+    else if (arg === '--create-cast') parsed.createCast = true;
+    else if (arg.startsWith('--cast-pi=')) parsed.castPi = arg.slice('--cast-pi='.length);
+    else if (arg.startsWith('--cast-liaison=')) parsed.castLiaison = arg.slice('--cast-liaison='.length);
+    else if (arg.startsWith('--cast-reviewer=')) parsed.castReviewer = arg.slice('--cast-reviewer='.length);
+    else if (arg.startsWith('--cast-org-leader=')) parsed.castOrgLeader = arg.slice('--cast-org-leader='.length);
+    else if (arg.startsWith('--cast-research-leader=')) parsed.castResearchLeader = arg.slice('--cast-research-leader='.length);
+    else if (arg === '--confirm') parsed.confirm = true;
+    else if (arg.startsWith('--bind-reviewer=')) parsed.bindReviewer = arg.slice('--bind-reviewer='.length);
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
-  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect];
+  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.createCast ? '--create-cast' : null, parsed.bindReviewer];
   if (modes.filter(Boolean).length > 1) {
-    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, or --run-inspect.');
+    throw new Error('Choose exactly one of --prepare, --execute, --inspect, --reserve, --advance, --run-inspect, --run-recheck, --set-status, --status-recheck, --create-cast, or --bind-reviewer.');
+  }
+  if ((parsed.createCast || parsed.bindReviewer) && parsed.target !== 'production') {
+    throw new Error('--create-cast and --bind-reviewer are valid only with --target=production.');
+  }
+  if (parsed.createCast && !(parsed.castPi && parsed.castLiaison && parsed.castReviewer && parsed.castOrgLeader && parsed.castResearchLeader)) {
+    throw new Error('--create-cast requires --cast-pi=, --cast-liaison=, --cast-reviewer=, --cast-org-leader= and --cast-research-leader= (allowlisted addresses).');
+  }
+  if (!parsed.createCast && (parsed.castPi || parsed.castLiaison || parsed.castReviewer || parsed.castOrgLeader || parsed.castResearchLeader || parsed.confirm)) {
+    throw new Error('--cast-* addresses and --confirm are valid only with --create-cast.');
+  }
+  // Production plan P1 / MVP list item 1: the destination is an explicit
+  // operator choice, never inferred from the environment.
+  if (!Object.hasOwn(TARGET_URLS, parsed.target)) throw new Error('--target must be sandbox or production.');
+  if (parsed.target === 'production') {
+    if (parsed.prepare || parsed.execute || parsed.inspect) {
+      throw new Error('--target=production supports only --reserve, --advance and the read-only preflight; the legacy one-shot paths are sandbox-only.');
+    }
+    if (parsed.bypassGoverify) throw new Error('--bypass-goverify is never valid with --target=production.');
+    if (parsed.reserve && (parsed.recipe !== 'basic' || !parsed.director)) {
+      throw new Error('--target=production --reserve requires --recipe=basic (the default) and --director=<your sign-in>.');
+    }
+  }
+  if ((parsed.setStatus || parsed.statusRecheck) && parsed.target !== 'production') {
+    throw new Error('--set-status and --status-recheck are valid only with --target=production.');
+  }
+  if (parsed.setStatus && (!['phase1', 'phase2'].includes(parsed.statusField) || !String(parsed.statusOption || '').trim())) {
+    throw new Error('--set-status requires --field=phase1|phase2 and --option="<live option label>".');
+  }
+  if (!parsed.setStatus && (parsed.statusField || parsed.statusOption || parsed.rerun)) {
+    throw new Error('--field, --option and --rerun are valid only with --set-status.');
+  }
+  if (parsed.runRecheck && parsed.target !== 'production') {
+    throw new Error('--run-recheck is valid only with --target=production.');
+  }
+  if (parsed.director && !(parsed.reserve && parsed.target === 'production')) {
+    throw new Error('--director is valid only with --target=production --reserve.');
   }
   if (parsed.execute && !parsed.receipt) throw new Error('--execute requires --receipt.');
   if (!parsed.execute && !parsed.inspect && parsed.receipt) throw new Error('--receipt is valid only with --execute or --inspect.');
@@ -250,11 +333,21 @@ function parseArgs(argv) {
   if (!LEDGER_RECIPES.includes(parsed.recipe)) {
     throw new Error(`--recipe must be one of: ${LEDGER_RECIPES.join(', ')}.`);
   }
+  // Slice 4a: pre_site_visit/final_writeup/site_visit_materials are valid
+  // LEDGER_RECIPES tokens (the ledger's enum accepts them so a future slice
+  // can build their steps without touching the migration/enum again), but
+  // RECIPE_STEP_ORDER (run-runner.js) has no entry for any of them yet --
+  // stepOrderForRecipe/nextStepFor would throw on first use. Refuse here,
+  // before any Dataverse read or ledger write, rather than let a run get
+  // reserved and immediately stick at recipe_step_not_built.
+  if (!Object.prototype.hasOwnProperty.call(RECIPE_STEP_ORDER, parsed.recipe)) {
+    throw new Error(`--recipe=${parsed.recipe} has no built step order yet; supported recipes are: ${Object.keys(RECIPE_STEP_ORDER).join(', ')}.`);
+  }
   // --reviewer-address is valid only with --reserve --recipe=reviews (D-R2/decision 4);
   // the reviews recipe requires at least one, since a run with zero
   // assignments is refused by the ledger.
-  if (parsed.reviewerAddress.length > 0 && (!parsed.reserve || parsed.recipe !== 'reviews')) {
-    throw new Error('--reviewer-address is valid only with --reserve --recipe=reviews.');
+  if (parsed.reviewerAddress.length > 0 && (!parsed.reserve || !recipeSeedsReviewers(parsed.recipe))) {
+    throw new Error('--reviewer-address is valid only with --reserve --recipe=reviews (or a later recipe that seeds reviewers).');
   }
   if (parsed.reserve) {
     parsed.actorId = resolveActorId(parsed.actor);
@@ -263,7 +356,7 @@ function parseArgs(argv) {
     } catch {
       throw new Error('--idempotency-key must be 1-200 printable ASCII characters (no spaces); the ledger stores only its SHA-256.');
     }
-    if (parsed.recipe === 'reviews') {
+    if (recipeSeedsReviewers(parsed.recipe)) {
       const SOURCE_PERSON_GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const parsedFlags = parsed.reviewerAddress.map((raw) => {
         const eq = raw.indexOf('=');
@@ -296,8 +389,8 @@ function parseArgs(argv) {
       parsed.reviewerAddressFlags = parsedFlags;
     }
   }
-  for (const runId of [parsed.advance, parsed.runInspect].filter(Boolean)) {
-    if (!RUN_ID.test(runId)) throw new Error('--advance/--run-inspect take a run ID GUID.');
+  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.bindReviewer].filter(Boolean)) {
+    if (!RUN_ID.test(runId)) throw new Error('--advance/--run-inspect/--run-recheck/--set-status/--status-recheck/--bind-reviewer take a run ID GUID.');
   }
   if (parsed.advance && (!parsed.manifest || !parsed.bundle)) {
     throw new Error('--advance requires --manifest and --bundle.');
@@ -327,6 +420,12 @@ function printHelp() {
   console.log('  --actor: admin:<guid> or user:<guid>, or an OS username; a username (default: the current OS user) is stored only as cli:<16 hex digest>.');
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
   console.log('Inspect a ledger run (read-only, no Dataverse): ... --run-inspect=<runId>');
+  console.log('Set Phase I or II Status on a ready production test Request (owner-run; writes need DATAVERSE_PROD_WRITE_ACK): ... --target=production --set-status=<runId> --field=phase1|phase2 --option="<live option label>" [--rerun]');
+  console.log('Recheck a status change for late effects (read-only): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --status-recheck=<runId>');
+  console.log('Recheck a production run\'s Foundation account against its pre-create baseline (read-only; plan P5\'s later check): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --run-recheck=<runId>');
+  console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> --cast-org-leader=<address> --cast-research-leader=<address> [--confirm]');
+  console.log('Bind the cast suggested reviewer to a ready production test Request (owner-run; needs DATAVERSE_ALLOW_PROD_READS=yes and DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer=<runId>');
+  console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
   console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL, which must not be the shared Production/Preview database.');
 }
 
@@ -360,7 +459,7 @@ async function getSourceRequestByNumber(client, requestNumber) {
 }
 
 /** Build the injected GraphService-shaped object and SharePoint target getter once per process. */
-async function buildGraphContext() {
+export async function buildGraphContext() {
   const { GraphService } = await import('../lib/services/graph-service.js');
   const { configuredSharePointTargetInfo } = await import('../lib/services/sharepoint-target-registry.js');
   const graph = {
@@ -374,6 +473,12 @@ async function buildGraphContext() {
     // site, matching ensureFolderPath/uploadFile's existing options passthrough.
     getFileMetadataById: (driveId, itemId, options) => GraphService.getFileMetadataById(driveId, itemId, options),
     downloadFile: (driveId, itemId) => GraphService.downloadFile(driveId, itemId),
+    // P3 (Opus round 1): the Pre-Site Visit recipe's steps (via
+    // presite-sandbox-deps.js's own passthrough wrapper) can call
+    // deleteFile -- upload-recovery's orphan cleanup on a create-only
+    // conflict -- so it must be reachable through this CLI's Graph object
+    // like every other Graph method the sandbox deps forward.
+    deleteFile: (driveId, itemId) => GraphService.deleteFile(driveId, itemId),
     getFileMetadataByPath: (library, folder, filename, options) => GraphService.getFileMetadataByPath(library, folder, filename, options),
     // Stage C: forwarded so the sandbox-bound Initial Assessment Board
     // snapshot step (ia-sandbox-deps.js createIaSandboxDeps) can be driven
@@ -662,7 +767,7 @@ function requireLedgerUrl() {
  * the synthetic-only lookup) and `--advance` of a `reviews` run.
  */
 export function assertSyntheticReviewerIsolationOnForReviews(recipe) {
-  if (recipe !== 'reviews') return;
+  if (!recipeSeedsReviewers(recipe)) return;
   if (!syntheticReviewerIsolationEnabled()) {
     throw new Error(
       'SYNTHETIC_REVIEWER_ISOLATION must be "on" in this process to reserve or advance a reviews-recipe run '
@@ -785,7 +890,7 @@ export async function resolveReviewerAssignments({
 
 export async function runReserve(client, args, ledgerUrl) {
   assertSyntheticReviewerIsolationOnForReviews(args.recipe);
-  if (args.recipe === 'reviews') {
+  if (recipeSeedsReviewers(args.recipe)) {
     // Same script-only precedent as runAdvance: a single-process,
     // single-invocation CLI, entered narrowly before the first sandbox-bound
     // dependency call this recipe needs.
@@ -796,6 +901,7 @@ export async function runReserve(client, args, ledgerUrl) {
   const preflight = await runPreflight(client, graph, sharePointTarget);
   const bundle = readSourceBundle(readJson(args.bundle));
   assertBundleHasReviewerSectionForRecipe(args.recipe, bundle);
+  assertBundleHasPreSiteSectionForRecipe(args.recipe, bundle);
   const source = bundle.source.request;
   if (source.akoya_requestnum !== args.sourceRequestNumber) {
     throw new Error(`Bundle source is Request ${source.akoya_requestnum}; --source-request-number attests ${args.sourceRequestNumber}. Refusing.`);
@@ -805,12 +911,31 @@ export async function runReserve(client, args, ledgerUrl) {
     throw new Error('Source Request must be a Grant Request matching the live Grant option.');
   }
   const cycle = resolveCloneCycle(source, args);
-  const manifest = buildCloneManifest(preflight, { ...cycle, source, testLabel: args.testLabel, bundle, recipe: args.recipe });
+  // The cloning admin is the clone's program director (owner, S546),
+  // resolved from their sign-in on the target, never a supplied GUID.
+  const target = args.target ?? 'sandbox';
+  const programDirector = target === 'production' ? await resolveProgramDirector(client, args.director) : null;
+  // Every production clone binds the synthetic cast PI and Liaison (owner,
+  // S548); the reservation refuses until the cast exists and reads back.
+  let cast = null;
+  if (target === 'production') {
+    const castDb = pgLedgerDb(ledgerUrl);
+    try {
+      const members = await readCast({ client, ledger: createRunLedger(castDb), environment: 'production', parentAccountId: preflight.foundation.accountid });
+      cast = { piContactId: members.pi.memberId, liaisonContactId: members.liaison.memberId, researchLeaderContactId: members.research_leader.memberId };
+    } finally {
+      await castDb.end();
+    }
+  }
+  const manifest = buildCloneManifest(preflight, {
+    ...cycle, source, testLabel: args.testLabel, bundle, recipe: args.recipe, programDirector, ...(cast ? { cast } : {}),
+  });
+  if (targetEnvironmentOf(manifest) !== target) throw new Error('Manifest target does not match --target.');
   if (!isBundleManifest(manifest)) throw new Error('The bounded ledger-driven runner only supports bundle (v4) manifests.');
 
   const { actorId } = args;
   let reviewerAssignments = [];
-  if (manifest.recipe === 'reviews') {
+  if (recipeSeedsReviewers(manifest.recipe)) {
     const resolutionDb = pgLedgerDb(ledgerUrl);
     try {
       const ledgerForResolution = createRunLedger(resolutionDb);
@@ -831,7 +956,7 @@ export async function runReserve(client, args, ledgerUrl) {
   // validate the review-file policy against the bundle's uploaded
   // reviewers BEFORE anything is written -- no manifest, no ledger row --
   // so a policy violation never strands a half-reserved run.
-  if (manifest.recipe === 'reviews') {
+  if (recipeSeedsReviewers(manifest.recipe)) {
     validateReviewFilePlan(bundle, reviewerAssignments.map((a) => a.sourcePersonId));
   }
   // The plan digest binds the ledger-relevant identities/hashes, never
@@ -860,8 +985,8 @@ export async function runReserve(client, args, ledgerUrl) {
     copyPolicyDigest: manifest.copyPolicy.digest,
     planDigest,
     createBodySha256: manifest.createBodySha256,
-    destinationEnvironment: 'sandbox',
-    destinationDataverseHost: new URL(SANDBOX_URL).hostname,
+    destinationEnvironment: targetEnvironmentOf(manifest),
+    destinationDataverseHost: targetHostOf(manifest),
     destinationRequestId: manifest.values.requestId,
     destinationLocationId: manifest.values.locationId,
     expectedAppUserId: manifest.expectedAppUserId,
@@ -917,6 +1042,9 @@ export async function runAdvance(client, args, ledgerUrl) {
   const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   enterDynamicsBypassForScript('rehearse-test-request-sandbox:advance');
   const manifest = readJson(args.manifest);
+  if (targetEnvironmentOf(manifest) !== (args.target ?? 'sandbox')) {
+    throw new Error(`Manifest target is ${targetEnvironmentOf(manifest)}; pass --target=${targetEnvironmentOf(manifest)} to advance it.`);
+  }
   assertSyntheticReviewerIsolationOnForReviews(manifest.recipe ?? 'basic');
   const bundle = readSourceBundle(readJson(args.bundle));
   const { graph, sharePointTarget } = await buildGraphContext();
@@ -1015,6 +1143,24 @@ export function summarizeReviewResources(resources, reviewerAssignments) {
   });
 }
 
+/**
+ * Slice 4b: a curated Pre-Site summary for `--run-inspect` -- ids, the
+ * generation-key digest and content hash, never section text/prompt bodies
+ * (every value here already passed run-ledger.js's no-text-invariant
+ * receipt validation at write time, same rationale as
+ * summarizeReviewResources above).
+ */
+export function summarizePresiteResources(resources) {
+  const aiRun = resources.find((r) => r.step === 'seed_presite_ai_run' && r.resourceKind === 'dataverse_ai_run');
+  const draft = resources.find((r) => r.step === 'seed_presite_draft' && r.resourceKind === 'dataverse_request_document');
+  if (!aiRun && !draft) return null;
+  return {
+    aiRunId: aiRun?.readback?.confirmedRunId ?? null,
+    requestDocumentId: draft?.readback?.requestDocumentId ?? null,
+    generationKeyDigest: draft?.plannedIdentity?.generationKey ?? null,
+  };
+}
+
 async function runRunInspect(runInspect, ledgerUrl) {
   const db = pgLedgerDb(ledgerUrl);
   try {
@@ -1024,10 +1170,100 @@ async function runRunInspect(runInspect, ledgerUrl) {
     const resources = await ledger.listRunResources(runInspect);
     // Never the plaintext address, only its digest (D-R2): listRunReviewerAssignments
     // never selects the `address` column, so there is nothing to redact here.
-    const reviewerAssignments = run.recipe === 'reviews' ? await ledger.listRunReviewerAssignments(runInspect) : [];
-    const reviewsSummary = run.recipe === 'reviews' ? summarizeReviewResources(resources, reviewerAssignments) : [];
+    const reviewerAssignments = recipeSeedsReviewers(run.recipe) ? await ledger.listRunReviewerAssignments(runInspect) : [];
+    const reviewsSummary = recipeSeedsReviewers(run.recipe) ? summarizeReviewResources(resources, reviewerAssignments) : [];
+    const presiteSummary = recipeSeedsPreSite(run.recipe) ? summarizePresiteResources(resources) : null;
     console.log(JSON.stringify({
-      mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments, reviewsSummary,
+      mode: 'READ_ONLY_RUN_INSPECT', run, resources, reviewerAssignments, reviewsSummary, presiteSummary,
+    }, null, 2));
+  } finally {
+    await db.end();
+  }
+}
+
+/**
+ * Status setter (cast-and-status plan, slice C): --set-status makes one Phase I
+ * or Phase II Status change (or resumes the run's open one); --status-recheck
+ * reports effects that arrived after the last change. Writes need
+ * DATAVERSE_PROD_WRITE_ACK inline; the recheck only reads.
+ */
+export async function runStatusMode(client, args, ledgerUrl) {
+  const db = pgLedgerDb(ledgerUrl);
+  try {
+    const ledger = createRunLedger(db);
+    const result = args.setStatus
+      ? await runStatusChange({ client, ledger, runId: args.setStatus, field: fieldFor(args.statusField), optionLabel: args.statusOption, rerun: args.rerun })
+      : await recheckStatusChange({ client, ledger, runId: args.statusRecheck });
+    console.log(JSON.stringify({ mode: args.setStatus ? 'STATUS_CHANGED' : 'READ_ONLY_STATUS_RECHECK', runId: args.setStatus || args.statusRecheck, ...result }, null, 2));
+  } finally {
+    await db.end();
+  }
+}
+
+/** The Admin test-Request allowlist, read from the target org (the local settings service may point at the sandbox). */
+async function readTargetAllowlist(client) {
+  const filter = odata.eq('wmkf_settingkey', TEST_REQUEST_EMAIL_ALLOWLIST_KEY);
+  const response = await client.get(`/wmkf_appsystemsettings?$select=wmkf_settingvalue&$filter=${encodeURIComponent(filter)}&$top=1`);
+  if (!response.ok) throw new Error(`Reading the test-Request allowlist failed (${response.status}).`);
+  return parseAllowlistValue(response.body?.value?.[0]?.wmkf_settingvalue ?? null);
+}
+
+/**
+ * Synthetic cast (cast-and-status plan, slices A + B): --create-cast creates
+ * or resumes the reused PI, Liaison and suggested-reviewer person (prints
+ * the plan and stops without --confirm); --bind-reviewer attaches the cast
+ * reviewer to one ready production test Request. Output carries no addresses.
+ */
+export async function runCastMode(client, args, ledgerUrl) {
+  const db = pgLedgerDb(ledgerUrl);
+  try {
+    const ledger = createRunLedger(db);
+    if (args.bindReviewer) {
+      const result = await runCastBinding({ client, ledger, runId: args.bindReviewer });
+      console.log(JSON.stringify({ mode: 'CAST_REVIEWER_BOUND', runId: args.bindReviewer, ...result }, null, 2));
+      return;
+    }
+    const addresses = {
+      pi: args.castPi, liaison: args.castLiaison, suggested_reviewer: args.castReviewer,
+      org_leader: args.castOrgLeader, research_leader: args.castResearchLeader,
+    };
+    const allowlist = await readTargetAllowlist(client);
+    planCastAddresses({ addresses, allowlist });
+    if (!args.confirm) {
+      console.log(JSON.stringify({
+        mode: 'CAST_PLAN_ONLY',
+        target: client.baseUrl,
+        members: CAST_ROLE_ORDER.map((role) => ({ role, ...CAST_DEFAULT_NAMES[role] })),
+        next: 'Re-run with --confirm (and DATAVERSE_PROD_WRITE_ACK) to create or resume these members.',
+      }, null, 2));
+      return;
+    }
+    // Cast contacts are children of the Foundation account (owner, S548).
+    const { accountid: parentAccountId } = await getFoundationSnapshot(client);
+    const result = await runCastCreate({ client, ledger, environment: 'production', addresses, allowlist, parentAccountId });
+    console.log(JSON.stringify({ mode: 'CAST_CREATED', ...result }, null, 2));
+  } finally {
+    await db.end();
+  }
+}
+
+/**
+ * Read-only: re-evaluates a production run's Foundation account and Contacts
+ * against its journaled pre-create baseline (foundation-transition.js). No
+ * ledger or Dataverse write. Prints outcome and failure text only.
+ */
+export async function runRecheck(client, runId, ledgerUrl) {
+  const db = pgLedgerDb(ledgerUrl);
+  try {
+    const ledger = createRunLedger(db);
+    const run = await ledger.getRun(runId);
+    if (!run) throw new Error(`No test request run found for ${runId}.`);
+    if (run.destinationEnvironment !== 'production') throw new Error(`Run ${runId} is not a production run.`);
+    const resources = await ledger.listRunResources(runId);
+    // The Liaison allowance comes only from this run's own journaled baseline.
+    const { failures, outcome } = await recheckFoundationTransition({ client, organizationId: run.expectedOrganizationId, resources });
+    console.log(JSON.stringify({
+      mode: 'READ_ONLY_FOUNDATION_RECHECK', runId, status: run.status, ok: failures.length === 0, outcome, failures,
     }, null, 2));
   } finally {
     await db.end();
@@ -1050,12 +1286,35 @@ async function main() {
     return;
   }
 
-  if (process.env.DYNAMICS_SANDBOX_URL !== SANDBOX_URL) {
+  const targetUrl = TARGET_URLS[args.target];
+  if (args.setStatus || args.statusRecheck) {
+    const ledgerUrl = requireLedgerUrl();
+    // No marker writes: a status change never touches the Test Request marker.
+    const statusClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
+    await runStatusMode(statusClient, args, ledgerUrl);
+    return;
+  }
+  if (args.createCast || args.bindReviewer) {
+    const ledgerUrl = requireLedgerUrl();
+    // The cast person create is a sanctioned marker write (wmkf_potentialreviewerses).
+    const castClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl), allowTestRequestMarkerWrites: true });
+    await runCastMode(castClient, args, ledgerUrl);
+    return;
+  }
+  if (args.runRecheck) {
+    const ledgerUrl = requireLedgerUrl();
+    const readClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
+    await runRecheck(readClient, args.runRecheck, ledgerUrl);
+    return;
+  }
+  if (args.target === 'sandbox' && process.env.DYNAMICS_SANDBOX_URL !== SANDBOX_URL) {
     throw new Error(`DYNAMICS_SANDBOX_URL must equal the registered sandbox ${SANDBOX_URL}.`);
   }
+  // A production write still needs the interlock's per-invocation
+  // DATAVERSE_PROD_WRITE_ACK, set by the owner inline on the command.
   const client = createClient({
-    resourceUrl: SANDBOX_URL,
-    token: await getAccessToken(SANDBOX_URL),
+    resourceUrl: targetUrl,
+    token: await getAccessToken(targetUrl),
     // The factory CLI is the one sanctioned writer of the Test Request marker.
     allowTestRequestMarkerWrites: true,
   });

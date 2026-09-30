@@ -4,7 +4,7 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-09-14
+last_verified: 2026-09-29
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
@@ -63,7 +63,9 @@ fallback.
 
 - **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** Meeting Tracker's
   visit GET offers read-only applicant attendee suggestions from the Request Project Leader and
-  liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
+  liaison. For Research the liaison is the Liaison of record, the applicant Account's Primary
+  Contact only (`lib/services/contacts/request-liaison.js`; the Request copy is not used); other
+  programs keep the Request Primary Contact, or the Account's Primary Contact when it is blank.
   `SiteVisitEditor` fills distinct missing attendees on new-visit forms; saved visits instead show
   missing applicants as one-click Add suggestions and preserve recorded attendees. The Activity
   and its parties change only when staff click Save. The Tracker GET explicitly opts into these

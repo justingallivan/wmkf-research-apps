@@ -1,4 +1,652 @@
-# Session 544 Prompt: Factory item 6 recipes 3–5 (plan one paragraph, one Codex plan review), then item 7
+# Session 552 Prompt: build Part A of the scheduled-email plan (engine hardening)
+
+## Session 551 Summary — 2026-09-29 PT (Opus; queued-reminder sizing, re-address plan r1–r5)
+
+### What Was Completed
+
+1. **Sized the queued-reminder problem.** An owner-run, read-only production probe (session scratch `probe-queued-reminder-liaison-drift.js`, not committed) found **0** `grantee_abstract_reminder` rows in any status. The owner confirmed the probe read the production Postgres host, and said no grantee materials requests are outstanding. Recorded in the plan's *Measurement (S551)*.
+2. **Rewrote the plan** `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, now **revision 5, ready to build**. The owner closed plan review after three Codex adversarial rounds (gpt-5.6-sol). Part A hardens the engine for every program; Part B re-addresses on a Liaison change.
+   - Part A adds one new column, `recipient_generation`.
+   - Main pieces: `send_requested_at` as the no-resend rule; a dedicated reconciliation claim that never sends; unconfirmed, missing and forbidden states shown under Needs attention; no edits once the activity exists; lease-fenced PD-handoff reset (including expired `sending` rows) and source cancel; separate ordinary and 25-row reconciliation queries; a per-PD 100-row digest cap.
+3. **Owner decisions, all settled (S551):**
+   - A-1: unconfirmed is an error code on `failed`, behind one helper.
+   - A-2: a 7-day late-acceptance check on stopped rows that had a send requested.
+   - B-1: an approval never survives a recipient change.
+   - B-2: the activity-without-send-intent gap is accepted, and detected.
+   - B-3: approval is re-checked at send time, tightening only.
+   - Send-now under B: the PD pressing send is the approval for a posture-only tightening; a recipient change still goes back for approval.
+   - The r4 simplification: no backoff, counters, rotation or extra columns.
+4. **PR #360 (B4)** was merged upstream as `507bf14ab` during the session. It was reviewed by Opus in Codex's worktree, not by this session.
+
+### Commits (all on `main`, pushed)
+- `ed04b6c17` measurement; `5a6aa0869`, `f5140cc75`, `0d69d8e73` r1 and decisions A-1, A-2, B-1, B-2; `c3f4efe57` line-number base; `62080921d` r2; `d031cef1b` r3; `27f557be9` r4 simplification; `420a9231a` B-3; `dd394d8fe` r5; `2fcc102b8` ready to build; plus this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Build Part A** of the scheduled-email plan (r5, *Part A* A1–A7 and *Tests*).
+   - Tier 2: a migration on the shared Postgres plus email-engine changes. Use its own branch, live-Postgres crash tests (the `.pg.test.js` pattern in the CI ledger job), and an implementation review before merge.
+   - Part B comes after it, on its own branch.
+   - The plan's line numbers are as of `ed04b6c17`; the scheduled-email files have not changed since [VERIFIED via `git diff --name-only 8fc003931 507bf14ab`, which did not touch them].
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab`; migrations 056–057 need renumbering). Unchanged. Part A's migration will also need the next free number.
+
+### Parked
+
+1. Deeper recipes, the admin form, slice 5a, the seven late-2026 `expiresAt` fixtures, and the cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer. Unchanged.
+3. Liaison follow-ups (not requested): an automatic recipients reload on a 409 `liaison_changed`; "Liaison not verified" on open materials collections; `{{liaisonFullName}}` refusals. Unchanged.
+
+### Verify Before Acting
+
+1. **`POSTGRES_URL` rotation (S551): home Mac DONE, office Mac OPEN.** The owner pasted the production connection string, with its password, into the S551 chat.
+   - The owner rotated the `neondb_owner` password via Vercel's Neon integration; Vercel updated the Postgres variables.
+   - The home Mac's two real env files are synced: `WMKF_Apps/.env.local`, which five worktree `.env.local` symlinks share, and the feature-request worktree's `.env.presentation-proof.local`. A `select 1` check connected, and the backups were deleted.
+   - Production was redeployed as `wmkfresearchapps-irht4mpyn` (aliased to `reviews.wmkeck.org`, Ready).
+   - **Open:** the office Mac, using the owner's brief `~/Downloads/office-mac-postgres-sync-brief.md` (dry run, then `--apply` on approval). The first post-redeploy cron run was not checked for auth errors.
+   - `docs/CREDENTIALS_RUNBOOK.md` has no Postgres rotation procedure; adding one was offered, not done.
+2. **Why Vercel skipped the production build of `61dafcb81`:** still not diagnosed.
+3. **Residue** (list and confirm before deleting any of it):
+   - Test Requests 1003301, 1003302 and 1003303.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - Worktree `.claude/worktrees/liaison-from-institution` (its branch is merged).
+   - `../WMKF_Apps-codex-b4`, now on `codex/b4-slot-readiness` (`523fbc071`, live Codex work).
+   - Five prunable `/private/tmp/wmkf-*` worktrees.
+
+### Do Not Reopen Without New Decision
+
+1. S551 decisions A-1, A-2, B-1, B-2, B-3, the r4 simplification, send-now under B, and the closing of plan review.
+2. S549–S550 decisions listed in the prior prompts below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` | Engine hardening and re-address plan r5 (ready to build) |
+| `lib/services/scheduled-email-service.js` | Send, reconcile and digest engine (Part A target) |
+| `lib/services/scheduled-email-store.js` | Ledger SQL: claims, fences, due and digest queries |
+| `lib/services/cron/grantee-deliverable-reminders-service.js` | Daily cron: create/handoff, digests, delivery, finalize |
+
+## Testing
+
+```bash
+npx jest tests/unit/scheduled-email tests/unit/grantee-deliverable-reminders
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<scratch-db> npx jest tests/integration --testPathPattern pg.test
+```
+
+---
+
+## Prior Session 551 Prompt: size the queued-reminder problem, then revise the re-address plan
+
+## Session 550 Summary — 2026-09-29 PT (Opus; Research Liaison switch built, reviewed, released; security bump)
+
+### What Was Completed
+
+1. **B4 plan revision reviewed (read-only, round 3; S550)** at `209877256` on `codex/factory-reviewer-b4`.
+   - The spot-checked file:line citations matched source. The `CREDENTIALS_RUNBOOK.md` and Atlas edits are correct fact fixes.
+   - The owner confirmed owner decisions 9–10 (switch-off stops all binds; either switch off pauses all acceptance jobs).
+   - Findings handed to Codex, which was still working:
+     - Probe section 13 marks any flow that mentions Requests INCOMPLETE, with no way for the owner to classify it, so it would block the slot PATCH forever.
+     - Preview switch values are unverified. Under decision 9, a B4 runtime push to Preview stops every reviewer bind there unless both switches are set first.
+     - The 055 "repair earlier-054" logic may be unnecessary. An owner-authorized `schema_migrations` read would settle it.
+   - Codex has since pushed `bd0c5739a`, `664d924a9` and `bde50dcd2`, and opened **PR #360**. S550 has not read these.
+2. **Research Liaison switch: built, reviewed, released.**
+   - Plan `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` r7; see its *Build record*.
+   - Helper `lib/services/contacts/request-liaison.js`, plus readers 1–7 and the docs reconcile.
+   - Tests: every guard was mutation-checked. New live-Postgres test `tests/integration/site-visit-materials-claim.pg.test.js`, added to the CI ledger job.
+   - A read-only sandbox probe verified that selected blank lookups return `null`.
+   - Codex adversarial implementation review (gpt-5.6-sol): needs-attention, one high and one medium, both fixed in `9d8947dcf`.
+   - PR #361 merged as `61dafcb81`; all 12 CI checks green.
+3. **Release:** Vercel made **no production deployment for `61dafcb81`**. The next merge, `9f408590e`, deployed to Production at 22:27Z and carries it [VERIFIED via `vercel ls --prod`; ancestry].
+   - Owner production check: on 997125 (UCLA) the Awardee tab Cc showed the institution Liaison (Jamie Lynn), not the Request copy.
+   - The candidate list came from an owner-run read-only probe (session scratch).
+4. **Security:** PR #362 (`9f408590e`), a lockfile-only bump: undici 6.29.0 and 7.30.0, ip-address 10.7.2.
+   - Cleared Dependabot alerts #88–#102 (published 2026-09-29; our code did not introduce them).
+   - `npm audit --omit=dev`: 0.
+
+### Commits
+- `main`: PR #361 merge `61dafcb81` (branch commits `14d0332c0`…`319bb3b47`); PR #362 merge `9f408590e` (`6e383975e`); `8861f9bec` (release record); this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Queued-reminder re-addressing** (`docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, draft r0, on `main`). This is the one remaining gap in rule 2 now that the switch is live. The plan lists six unresolved round-3 requirements, so revise before any Codex review.
+   - **First step (owner choice pending): size the problem.** Count queued, unsent `grantee_abstract_reminder` rows in `scheduled_email_messages` whose stored Cc differs from the current institution Liaison. This is a production Postgres plus Dataverse read, so the owner runs it; S550 proposed it but did not write the script.
+   - If the count is small: stop those rows, have staff send those reminders by hand, and split the engine hardening (no re-send after `send_requested_at`, a version-fenced PD-handoff rebuild) into its own plan, since it affects every program.
+   - Staff can edit a queued row's subject and body, or stop it, but not its recipients [VERIFIED via `pages/api/scheduled-emails/[id].js`, `lib/services/scheduled-email-store.js` `updateScheduledEmailDraft`].
+2. **B4 PR #360** (`codex/factory-reviewer-b4`, head `bde50dcd2`). Read what changed since `209877256`, including whether the S550 round-3 findings above were addressed. Review it as a non-author before any merge. It is plan plus probe only, no runtime code.
+
+### Owner Decision Needed
+
+1. **Re-address plan:** size first (recommended), or write revision 1 now.
+2. **Scheduled-email engine hardening:** when to take it up (a duplicate-send hazard after recorded send intent exists for every program).
+3. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab` in `../WMKF_Apps-codex`; migrations 056–057 need renumbering). Unchanged.
+
+### Parked
+
+1. Deeper recipes, the admin form, slice 5a, the seven late-2026 `expiresAt` fixtures, and the cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer. Unchanged.
+3. **Liaison follow-ups the owner may want** (not requested):
+   - An automatic recipients reload on a 409 `liaison_changed` (staff reload the page today).
+   - Open materials collections show "Liaison not verified" until refreshed.
+   - The seed materials templates use `{{liaisonFullName}}`, so a Research Request with no institution Liaison refuses materials email (0 upcoming per the measurement).
+
+### Verify Before Acting
+
+1. **Why Vercel skipped the production build of `61dafcb81`:** not diagnosed. Check the Vercel project's Git/production settings if it recurs.
+2. **Residue** (list and confirm before deleting any of it):
+   - Test Requests 1003301, 1003302 and 1003303.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`. S550's Postgres test used a temp schema in `ledger_ci_s548` and dropped it.
+   - Worktrees `.claude/worktrees/liaison-from-institution` (branch now merged) and `../WMKF_Apps-codex-b4` (live, Codex).
+   - Five prunable `/private/tmp/wmkf-*` worktrees and the older ones.
+3. **Two gates red only inside `.claude/worktrees/liaison-from-institution`:** `check:agent-invariants` and `check:agent-wiki` fail on the per-machine `.agents/skills` and memory symlinks the worktree lacks. The main checkout and the `:ci` variants are green.
+
+### Do Not Reopen Without New Decision
+
+1. S549–S550 owner decisions: the liaison answers 1–9; the Santa Monica College case; the split; B4 option A and owner decisions 9–10.
+2. Earlier decisions listed in the prompts below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/contacts/request-liaison.js` | Liaison of record helper (Research: institution Primary Contact) |
+| `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` | Liaison plan r7 + Build record (released) |
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` | Queued-reminder re-address plan r0 (next) |
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (B4 branch / PR #360) | B4 revision |
+
+## Testing
+
+```bash
+npx jest tests/unit/request-liaison.test.js tests/unit/grantee-send-invite-workbench-service.test.js tests/unit/site-visit-materials-reminder-sweep.test.js tests/unit/dynamics-explorer-contact-liaison.test.js
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<scratch-db> npx jest tests/integration/site-visit-materials-claim.pg.test.js
+```
+
+---
+
+## Prior Session 550 Prompt: build the Research Liaison switch; review Codex's B4 revision
+
+## Session 549 Summary — 2026-09-29 PT (Opus; first cast-bound clone, PR #357 merged, two plans through Codex review)
+
+### What Was Completed
+
+1. **First cast-bound production clone** (owner-run from `claude/factory-cast` at `f47703167`) [VERIFIED: owner-run output]:
+   - Run `e33fa857`, Request **1003303**, reached `ready` at 16:38:58Z, and the one-hour `--run-recheck` passed (`ok`, `not_refreshed`).
+   - The PI and Liaison show on the Awardee tab (To and Cc), with the TEST badge.
+   - `--bind-reviewer` created suggestion `0d1a990d`.
+   - The owner set the Foundation's Organization Leader to WMKF ORG LEADER, and also set Potential Reviewer 1 on 1003303 by hand.
+2. **The cast reviewer does not work in the app** (cast plan *Facts*, *Order* 5–6):
+   - The Find tab reads the Request's `wmkf_potentialreviewer1..5` slots, not suggestion rows.
+   - With the slot set, ingest is refused by `assertPersonBindable` (synthetic fence).
+   - The S548 "visibility" claim is marked STALE.
+   - Owner decision 8 (option A): admit a synthetic person on test Requests only.
+   - Slice B4 planned; Codex round 1 no-ship (four high, one medium). Revision handed to Codex on `codex/factory-reviewer-b4`.
+3. **PR #357 merged** (`75d58e331`), without B4. All 12 CI checks were green. The production deploy of the merge build was confirmed Ready.
+4. **Read-only production probes, owner-authorized** (session scratch scripts, not committed):
+   - Potential Reviewer slots: not audited, no slot-triggered automation.
+   - Liaison coverage: 108 active Research awards; 84 have a Request-copy Liaison contact different from the institution's Primary Contact; only 1 institution (Santa Monica College, 996068) has none. The owner accepts that case.
+   - Email comparison: the recipient actually changes on **27 active awards / 35 upcoming Requests**.
+5. **Liaison decision** (owner with the platform owner): the Research Liaison of record is the applicant institution's Primary Contact.
+   - Plan `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`, revision 7, on `claude/liaison-from-institution`.
+   - Six Codex rounds, then a Codex review-and-fix pass; verdict **ready to build**.
+   - Owner answers 5–9 are recorded in the plan (relabel export, Explorer via institution, one editable Cc with server check, measure first, split).
+6. **Split** (owner): re-addressing queued grantee reminders, plus the scheduled-email engine hardening it needs, moved to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` (draft r0, unreviewed; carries rounds 2–3 as open requirements).
+
+### Commits
+- `main`: `fa42b274b`, `4ccfc6ac4` (cast plan), PR #357 merge `75d58e331`, this handoff.
+- `claude/liaison-from-institution` (pushed, not merged): `9a28a4e82` … `fbe64a69b`; Codex's `3700653a4`.
+- `codex/factory-reviewer-b4` (pushed): brief `8dc5c3d40`, `221fc7896`; Codex's `175675b9e`, `92d175f14` (unreviewed).
+
+## Next Items
+
+### Verified Open
+
+1. **Build the Research Liaison switch** on `claude/liaison-from-institution`, in `.claude/worktrees/liaison-from-institution`, per plan revision 7 and its test matrix (Tier 2). Then run an implementation code review before any merge.
+   Evidence: plan Status line; Codex task report (ready to build).
+2. **Review Codex's B4 plan revision** on `codex/factory-reviewer-b4` (`../WMKF_Apps-codex-b4`), read-only, as a reviewer who is not the author. It touched 5 files, including `docs/CREDENTIALS_RUNBOOK.md` and `docs/atlas/postgres-test-request-runs.md`, beyond the brief's plan-plus-probe scope; check those edits.
+   Evidence: `git diff --stat 221fc7896 origin/codex/factory-reviewer-b4`.
+
+### Owner Decision Needed
+
+1. **B4 open questions** will come from Codex's revision: email contract ("allowlisted recipients" vs recipient binding), and whether manual add stays refused.
+2. **Scheduled-email engine plan:** when to take it up. It covers a duplicate-send hazard after recorded send intent that exists for every program today.
+3. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab` in `../WMKF_Apps-codex`; migrations 056–057 need renumbering). Unchanged.
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a; the seven late-2026 `expiresAt` fixtures; cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer by name or email (browse works); cause unknown (index or the `·`). Ask the platform owner if it matters.
+
+### Verify Before Acting
+
+1. **Residue:**
+   - Test Requests 1003301, 1003302 and **1003303** (Potential Reviewer 1 set by hand; suggestion `0d1a990d`).
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - Worktrees `.claude/worktrees/liaison-from-institution` and `../WMKF_Apps-codex-b4`, plus older ones.
+   
+   List and confirm before deleting any of them.
+2. **Session probes are gone with the scratchpad.** Their results are recorded in the liaison plan (*Measurement*) and cast plan (*Order* 5). Re-create from the plan text if a re-run is needed.
+
+### Do Not Reopen Without New Decision
+
+1. S549 owner decisions: option A for synthetic reviewers (cast decision 8); liaison answers 1–9; the Santa Monica College case accepted; the split.
+2. Earlier decisions listed in the Session 549 prompt below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` (branch) | Build plan r7: helper, six readers, export and Explorer, tests |
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` (branch) | Engine plan r0 for queued-reminder re-addressing |
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` | Cast plan: *Order* 5 clone record, 6 B4 and its round-1 findings |
+| `docs/plans/FACTORY_REVIEWER_B4_CODEX_BRIEF_2026-09-29.md` (B4 branch) | Codex brief for the B4 revision |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|rehearse-test-request|email-source|migration-054).*"
+```
+
+---
+
+## Prior Session 549 Prompt: first cast-bound production clone, then merge the cast (PR #357)
+
+## Session 548 Summary — 2026-09-28 PT (Opus; probe hardening, wave30 live, meeting-date fix, synthetic cast slices A + B built, reviewed and created in production)
+
+### What Was Completed
+
+1. **Probe section 12 hardened** (on `main`, `3dcf61bb0` → `155dc80d6`):
+   - An unreadable cloud-flow definition or unreadable count prints `INCOMPLETE` and sets exit 1.
+   - Flows are matched on their triggers and record actions.
+   - Create steps registered for every entity are found.
+   - `--cast=<dir>` writes a dated, id-free JSON receipt.
+   - Mailing-list counts, list type (static or dynamic), `akoya_mailinglistmember`, and create-workflow summaries.
+
+   Owner-run twice in production (`COMPLETE`); receipts are in `~/factory-receipts`.
+2. **wave30 in production** [VERIFIED: owner-run output]:
+   - Applied under a same-day `DATAVERSE_PROD_WRITE_ACK`, which the interlock requires for any local production write; probe section 1 shows PRESENT.
+   - `SYNTHETIC_REVIEWER_ISOLATION=on` in Vercel Production and redeployed; Review Manager and My Candidates loaded normally.
+   - Credentials runbook entry added (`e20162400`, `6d0d17e3f`); docs reconciled (`cdaa23454`).
+3. **Workbench Board Meeting date fix** (PR #356, merged `9380f3605`): the DateOnly `wmkf_meetingdate` is now rendered in UTC. The owner confirmed 1003302 shows Dec 11.
+4. **Open question 1 answered.**
+   - Business Central is not used (the platform owner).
+   - No contact-create automation adds a mailing-list membership.
+   - The one dynamic list, "Test 2", has 0 members and has never been used.
+5. **Cast slices A + B built** on `claude/factory-cast` (draft **PR #357**, 23 commits from `4316b19ec` to `f47703167`, **not merged**, Tier 2):
+   - **Spine:** 054 in place gains `test_request_cast_members` and `test_request_cast_bindings`. New receipt keys: `primaryContactId` (null allowed), `liaisonContactId`, `piContactId`, `researchLeaderContactId`. Fences: cast create, the one parent-attach PATCH, the suggestion binding, and per-lookup contact binds on the Request create.
+   - **Parallel tracks:** A, the cast runner; B1 + B2, create-body binding and the Foundation transition allowance; B3, the suggestion binder. The CLI adds `--create-cast [--confirm]` and `--bind-reviewer=<runId>`; a production `--reserve` reads the cast, and `--run-recheck` reads the run's own journaled Liaison.
+   - **One Codex adversarial round** (gpt-5.6-sol high) returned needs-attention with two high and three medium findings; all five were fixed (`a45251e21`, `fba5b87f9`).
+6. **Owner decisions S548**, recorded in the cast plan: addresses supplied at run time with default names; `--bind-reviewer` as its own mode; binding mandatory on every production reserve; 1003302 stays unbound; Find-tab enrichment of the cast reviewer accepted; **(6)** the PI and Liaison are Foundation children; **(7)** WMKF ORG LEADER and WMKF RESEARCH LEADER added as cast contacts. Decisions 6 and 7 are post-review changes and were not re-reviewed.
+7. **Cast in production (5 members, all verified; ledger `ledger_prod`):**
+   - PI `6ccbcbd1-079f-44ec-a9c2-9b74148a92be`, Liaison `e068fd4e-065e-4ba1-8b97-1e6c0f5507e1`, reviewer person `e5003660-35f1-41e1-a1c4-aa2e4ec6e591`, Org Leader `da554f3e-9df4-4bc4-bd1d-b7e2c54875b4`, Research Leader `bd7ae3bb-52aa-4d84-a6be-14a565f67849`.
+   - Contacts are children of the Foundation.
+   - The owner's Audit History reads are clean.
+   - The owner set the Foundation's Primary Contact to TEST · Factory Liaison.
+8. **Contact-role findings** [VERIFIED via workflow definitions and metadata; cast plan *Facts*]:
+   - AkoyaGO status drafts address **organization** fields. Invite: To the Organization Leader, Cc the Request's Research Leader. Not Invited: To the organization's Primary Contact, Cc the PI. Ineligible: To the Request's Liaison.
+   - The Liaison and Organization Leader flow **up** only (Request → organization).
+   - **Nothing copies an organization's Primary Contact down to its Requests.** The owner confirmed this empirically on 1003220.
+
+### Commits
+- On `main`: `3dcf61bb0`, `e20162400`, `6d0d17e3f`, `cdaa23454`, `de2482147`, `ce2731611`, `155dc80d6`, `7f55ec80d`, `3e77fe858`; PR #356 merge `9380f3605`; this handoff.
+- On `claude/factory-cast` (PR #357): `4316b19ec` through `f47703167`.
+
+## Next Items
+
+### Verified Open
+
+1. **Owner: set the Foundation's Organization Leader to WMKF ORG LEADER** in AkoyaGO, replacing Allison Keller (a real person).
+   Evidence: cast plan owner decision 7; `f47703167`.
+2. **First cast-bound production clone.** Run from `claude/factory-cast`: `--reserve` (it reads all five cast members) and `--advance` under the usual verify; then `--bind-reviewer=<runId>`; then the owner's Workbench checks. Expected first-time outcomes, none of them failures:
+   - The Foundation's Primary Contact should read unchanged, since it is already the cast Liaison.
+   - The payment-contact workflows now see a bound Liaison.
+   - A draft email regarding the clone would stop verify, correctly (`expectedRegardingEmails: 0`).
+   Evidence: cast plan *Order* 4 build record.
+3. **Merge PR #357** after the first clone succeeds (Tier 2, deliberate promotion). CI was green at `b31f9fdb5`; re-check at the final head.
+4. **Liaison sync gap (outside the Factory):** a Liaison changed on an organization never reaches its existing Requests, and this app emails the Request's copy (`recipients-service.js`). Tell the platform owner, and decide between a process change, a down-sync workflow, or app-side handling.
+   Evidence: cast plan *Facts* (contact roles), 1003220 check.
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 need renumbering; the latest on-disk migration is 054).
+2. **Liaison sync gap:** which fix, if any (item 4 above).
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a — unchanged from the MVP cut.
+2. Seven late-2026 `expiresAt` test fixtures (the earliest is 2026-10-08) — see `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+3. Cast ledger has no reset path: a member or binding left `needs_attention` needs its row cleared by hand (Track A recommendation, deferred).
+
+### Verify Before Acting
+
+1. **054 edits need explicit ALTERs on existing ledgers.** `CREATE TABLE IF NOT EXISTS` does not update a changed CHECK constraint. S548 ran `ALTER TABLE test_request_cast_members DROP/ADD CONSTRAINT test_request_cast_members_role_check` on `ledger_prod` and `ledger`; re-applying 054 with `psql -f` updates only the receipt function and new tables.
+2. **`--run-recheck` on run `7293496e` (1003302)** now fails on the Primary Contact change. That's expected: the owner made the change, and the run's baseline predates journaling.
+3. **Residue:**
+   - Test Requests 1003301 (deactivate now) and 1003302.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - This session's merged agent worktrees and branches (`worktree-agent-aac2d9d2ff10034ad`, `-a6f2ec1b747e97f24`, `-a7037be3ec38dad64`) under `.claude/worktrees/`.
+   - Older `.claude/worktrees` and `/private/tmp` worktrees from earlier sessions.
+
+   List and confirm before deleting any of them.
+4. **Production reads this session:** owner-requested one-offs (1003220 and 1002852 contacts, form placement, Research Leader counts, workflow recipients, automation that could sync the Liaison) were run from scratch scripts under the session scratchpad. Only the probe changes are in the repo.
+
+### Do Not Reopen Without New Decision
+
+1. MVP cut and deferrals; the program director is the cloning admin; the allowlist replaces D-R4/6d (owner, S546).
+2. `Pending` accepted at create; all rollup companions freed; wave30 in production (owner, S547).
+3. S548 owner decisions 1–7 in the cast plan, including a mandatory cast binding, Foundation-parented cast contacts, and accepted Find-tab enrichment of the cast reviewer.
+4. Open question 1 (Business Central and mailing lists) is closed.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (on the branch) | Cast plan: contact-role facts, decisions 1–7, *Order* 4 build record, Codex round, production record |
+| `lib/services/test-requests/cast-runner.js` / `cast-binding-runner.js` | Cast create, reuse, recovery and parent attach; suggestion binding |
+| `lib/services/test-requests/production-write-fence.js` | All production fences, including the cast ones |
+| `lib/services/test-requests/foundation-transition.js` | Transition contract: journaled Primary Contact, Liaison and cast-contact exclusion |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI: `--create-cast`, `--bind-reviewer`, `--reserve` with the cast |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe; section 12 hardened |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|rehearse-test-request|email-source|migration-054).*"
+docker exec wmkf-ledger-pg psql -U postgres -qc "DROP DATABASE IF EXISTS ledger_ci_new" -c "CREATE DATABASE ledger_ci_new"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_ci_new TEST_REQUEST_LEDGER_REQUIRE=1 npx jest --runInBand "tests/integration/.*\.pg\.test\.js"
+```
+
+---
+
+## Prior Session 548 Prompt: Factory synthetic cast (after the Business Central answer), probe hardening, wave30 in production
+
+## Session 547 Summary — 2026-09-28 PT (Opus; MVP item 5 complete; status setter built, merged and characterized in production)
+
+### What Was Completed
+
+1. **MVP item 5 complete.** Verify now checks the Foundation account against a digest-only pre-create baseline journaled at `fence_source` (transition contract: protected projection, Tax Status/BMF 509, GoVerify stamps in the run window, Request count unchanged or +1, all 15 rollups' `_date` free and `_state` Calculated, GuideStar digest, Contacts), plus a read-only `--run-recheck` (PR #352, #354). First production run (Request 1003301, run `25b392a0`) stopped at verify on two explained causes: the create plug-in rewrites Request Status to `Pending`, and non-Request rollups' `_date` companions moved. Second run (Request **1003302**, run `7293496e`) reached `ready` (`not_refreshed`) and passed the one-hour recheck [VERIFIED: owner-run output, 21:11Z].
+2. **Status setter (slice C) built, reviewed, merged (PR #355, `466b23fb9`).** `--target=production --set-status=<runId> --field=phase1|phase2 --option="<label>" [--rerun]` and `--status-recheck`. Transition table from the workflow definitions, payment/tracking-producing edges only from listed states, `If-Match` fence, ≥ 90 s quiet completion, replay guard, ledger table `test_request_status_changes` (054 in place). **Characterized in production:** 1003302 Phase II → Pending Committee Review set Request Status `Phase II Pending` (the business rules run on API updates), 0 emails/tracking/payments; owner's Audit History shows only those two fields; 1003302 visible in Workbench with the TEST badge.
+3. **Probes (owner-run, read-only):** sections 10 (Foundation unaudited columns), 11 (status fields, options, update-triggered workflows, exported definitions), 12 (cast readiness: contact/person/suggestion create automation, lookups, Request Status rules).
+4. **Plans:** `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (revision 2 after one Codex round); production plan records both runs, the platform owner's answers and the status-field findings.
+5. **Owner decisions:** accept `Pending` at create (now moved by the status setter); free all rollup companions; Liaison copy onto the Foundation's Primary Contact accepted (overwrites the 9/19 value); wave30 in production; owner-created synthetic addresses on the allowlist; test Requests are deactivated, not deleted (platform owner).
+6. **Codex config:** reviews run `--model gpt-5.6-sol` with `model_reasoning_effort = "high"` in `~/.codex/config.toml` (owner, S547; memory `feedback-codex-model-gpt56-sol`).
+
+### Commits
+All on `main` (merged PRs #352, #354, #355 and direct Tier 0 commits), from `dc571513d` through `73507229e`, and this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Probe section 12 hardening** (cast plan *Order* 2): fail as incomplete on a missing or unreadable activated flow definition, list Create steps registered for all entities, write a sanitized dated receipt.
+   Evidence: cast plan *Probe results → Limits*; Codex plan-review round 1 (medium).
+2. **wave30 in production** (cast plan *Order* 3; owner-run): apply `wave30-synthetic-reviewer-marker`, set `SYNTHETIC_REVIEWER_ISOLATION=on`, redeploy, confirm.
+   Evidence: cast plan owner decision 2; probe section 1 (wave30 absent).
+3. **Board Meeting date shows one day early in Workbench** (Dec 10 vs the Request's 12/11/2026 meeting date on 1003302): likely a date-only value rendered through UTC in the Workbench header [ASSUMED; not investigated]. Check whether it affects every Request.
+   Evidence: owner screenshot, 2026-09-28.
+
+### Owner Decision Needed
+
+1. **Platform owner: what `AkoyaGo.Sync_BusinessCentral` does on contact create**, and whether a new contact joins a mailing list. Blocks cast slices A + B (synthetic PI, Liaison, suggested reviewer).
+   Evidence: cast plan *Open questions* 1; probe section 12.
+2. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 unapplied, recheck numbering; latest on-disk migration is 054).
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a — unchanged from the MVP cut.
+2. Seven late-2026 `expiresAt` test fixtures (earliest 2026-10-08) — `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Verify Before Acting
+
+1. **Production test residue:** 1003301 (run `25b392a0`, `needs_attention`) and 1003302 (run `7293496e`, `ready`, Phase II Pending Committee Review) in `ledger_prod`. Deactivate (not delete) in AkoyaGO when finished; 1003301 can go now.
+2. **Local ledger databases** in `wmkf-ledger-pg`: `ledger` (sandbox runs, keep), `ledger_prod` (production runs), `ledger_ci_s547` (throwaway scratch from this session's PG suite run; safe to drop). 054 is edited in place: re-apply it with `psql -f` to `ledger_prod` after any 054 change.
+3. The create POST can exceed the client's 30 s timeout in production (first run); the resume path recovered it. If it recurs, consider a longer create timeout.
+
+### Do Not Reopen Without New Decision
+
+1. MVP cut and deferrals; program director = cloning admin; allowlist replaces D-R4/6d (owner, S546).
+2. `Pending` accepted at create; all rollup companions freed; Liaison copy onto the Foundation accepted; wave30 in production (owner, S547).
+3. GoVerify not bypassed in production; stub `wmkf_ai_run` stays.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` | Cast + status setter plan, probe results, decisions, order |
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Production plan: both runs, platform-owner answers, status-field reactions |
+| `lib/services/test-requests/foundation-transition.js` | Foundation transition contract |
+| `lib/services/test-requests/status-transitions.js` / `status-change-runner.js` | Status setter rules and runner |
+| `lib/services/test-requests/production-write-fence.js` | Basic-run fence and `fenceStatusChangeClient` |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe, sections 1–12 |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI: `--reserve`, `--advance`, `--run-recheck`, `--set-status`, `--status-recheck` |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|docx-package|presite|pre-rp|source-bundle|seed-synthetic|migration-054).*"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<fresh scratch db> TEST_REQUEST_LEDGER_REQUIRE=1 npx jest --runInBand "tests/integration/.*\.pg\.test\.js"
+```
+
+---
+
+## Prior Session 547 Prompt: Factory MVP item 5 — verify transition contract, then the first production basic run
+
+## Session 546 Summary — 2026-09-27/28 PT (Opus; owner cut item 7 to an MVP; slices 1, 2, 4 built, reviewed, merged; production enabled)
+
+### What Was Completed
+
+1. **Scope reset (owner).** The original ask (Codex session log, 2026-09-19): "It is very hard for me to create requests from scratch for testing. Could you design a system that could create a new request based on an existing one?" After eight days without a usable result, the owner accepted an **MVP build list** (production plan *MVP build list*): a production `basic` clone that lands before reviewer invite, nothing else until used. New memory `feedback-anchor-multisession-features-to-the-original-ask`.
+2. **Owner decisions** (production plan *Owner decisions*): Q2 shared Postgres for the form phase; program director = the cloning admin; test-Request email recipient allowlist (`@wmkeck.org` + admin-edited list), superseding D-R4/6d; `correct_meeting_date` never writes in production; Foundation rollup columns join the transition contract (open question 7); post-cap Codex gap (first-write exception) accepted, deferred to recipe 5; slice-4 dispatch-gap residual risk accepted; one Codex review per slice, owner decides.
+3. **Probes (owner-run):** production has no meeting-date business rule; app user cannot read audit (403); `CalculatedFieldsAsync` and rollups fire on any Request column; Foundation has eight Request-aggregating rollups. Wiki: `docs/agent-wiki/topics/dataverse-dynamics.md`.
+4. **Slice 1** (PR #349, `9ba8692a2`): `--target=production`, lease-time target check, production create body adds Phase II Pending + active Research grant program + PD (`--director`, re-checked at fence and create), body re-hash at create, production refusals.
+5. **Slice 2** (PR #350, `fe71c846f`): `production-write-fence.js` (closed POST shapes, destination-only Graph writes, source refused, deny-by-default) and live source-revision checks.
+6. **Slice 4** (PR #351, `3738af3f0`): email allowlist at create and dispatch (dispatch re-reads the activity's own parties, only for test requests); editor at Admin → Test Requests.
+7. **Production enablement:** wave29 applied (owner-run) and `TEST_REQUEST_ISOLATION=on` (Config) with redeploy `abv0745vo` Ready [VERIFIED `vercel ls --prod`, probe section 1].
+8. **Unrelated fix:** `reviewer-roster-endpoint.test.js` expiry fixture aged out on 2026-09-28 UTC (`5ced59d3b`); seven similar fixtures logged in `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Commits
+All on `main` (merged PRs #349, #350, #351 and direct Tier 0 commits): `5c96e1713`…`464021dd3` (probes, decisions, plan), `5ced59d3b`, `12a54ea10`, and this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **MVP item 5, part 1 — verify transition contract (build).** `verifyClone` (`lib/services/test-requests/basic-clone-steps.js`) still compares the whole Foundation snapshot (`compareSnapshots`, `foundationBaselineDigest` over `versionnumber`), so a production run would fail on the accepted GoVerify refresh and rollup moves. Replace, for the production target only, with open question 4's projection contract plus open question 7's rollup rule; `verifyClone` also fails on any regarding email, and a Draft email is expected (P5 expected-outcome note) — decide how verify names/tolerates it (owner decides on the first run). One Codex review.
+   Evidence: production plan open questions 4, 7 and *MVP build list* item 5.
+2. **MVP item 5, part 2 — first production run (owner runs every command).** `--target=production --reserve --recipe=basic --director=<sign-in>` then `--advance`, with `DATAVERSE_PROD_WRITE_ACK` inline; a fresh bundle export (≤ 6 h); local ledger container (Q2 CLI phase). Then the trimmed P5: snapshot/compare, one check about an hour after, owner's Audit History read. Then invite a synthetic reviewer on the clone to an allowlisted inbox.
+   Evidence: plan P5 (trimmed) and *MVP build list*.
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 unapplied, recheck numbering): review when the owner wants it.
+
+### Parked
+
+1. Slice 5a (`claude/factory-recipe5a`), deeper recipes (IA, reviews, Pre-Site, 5, 3), admin form (P7), P3 actor, readiness endpoint, dependency-builder parameterization, 24 h watch — deferred by the MVP cut; resume only on owner request.
+2. Uploaded-review live pass, GoVerify bypass intermittent failure (sandbox-only), live-ledger flake — unchanged.
+3. Seven late-2026 `expiresAt` test fixtures (earliest 2026-10-08) — `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Verify Before Acting
+
+1. **Isolation is live in production.** If staff report "could not be confirmed as an ordinary request" on a Request email, check marker reads first; rollback is removing `TEST_REQUEST_ISOLATION` and redeploying.
+2. Sandbox residue (Requests 1000341–1000348) and local-ledger runs unchanged.
+
+### Do Not Reopen Without New Decision
+
+1. The MVP cut and its deferrals (owner, S546).
+2. Program director = cloning admin; the email allowlist replaces D-R4/6d (owner, S546).
+3. Accepted residual risks: slice-4 dispatch gap; Codex's round-2 vendor-create dissent; post-cap first-write gap (deferred to recipe 5).
+4. GoVerify not bypassed in production; stub `wmkf_ai_run` stays.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Owner decisions, MVP build list, open questions 4/5/7 |
+| `lib/services/test-requests/basic-clone-steps.js` | Targets, production create fields, `verifyClone` (item 5 target) |
+| `lib/services/test-requests/production-write-fence.js` | Production write fence |
+| `lib/services/test-requests/email-allowlist.js` | Recipient allowlist; enforced in `lib/services/dynamics/email.js` |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI (`--target=production`, `--director`) |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe (sections 1–9, `--meeting-date`, `--history`) |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|docx-package|presite|pre-rp|source-bundle|seed-synthetic).*"
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-test-request-factory-production-readiness.js --director=jgallivan@wmkeck.org   # owner-run
+```
+
+---
+
+## Prior Session 546 Prompt: Factory item 7 — owner accepts the production plan, then build P1–P4; review the Integrity branch
+
+## Session 545 Summary — 2026-09-27 PT (Opus; recipe 5a built and parked, sandbox proofs stopped, production enablement planned and reviewed)
+
+### What Was Completed
+
+1. **Slice 5a built, then parked** on `claude/factory-recipe5a` (`3b86d7df4`, pushed, not merged, not reviewed). It builds `seed_abstract` and `render_pre_rp_brief` with complete sandbox dependencies, and `verify_presite` now advances when not last. It adds no `final_writeup` step order, and it edits migration 054 in place (two steps, three reason codes, a receipt key). The focused glob passed 57 suites / 1,656 tests (orchestrator re-run). It found that the Pre-RP brief needs a program director, which the clone does not copy.
+2. **Owner decision: sandbox live proofs stop after recipe 4.** Item 7 (production enablement) comes next; recipes 5 and 3 are finished as production runs. Recorded in the design doc (*Slice 5a built, then PARKED*; *Item 7 owner decisions* Q1–Q5).
+3. **Production enablement plan written and reviewed:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`. It went through contract-reconcile (named changes applied), then Codex plan review with `gpt-5.6-sol`: round 1 four highs, round 2 three highs, round 3 two highs. Every finding was revised except one, recorded as a dissent beside the owner decision. The loop closed at the cap.
+4. **Owner-run probe `scripts/probe-test-request-factory-production-readiness.js`** (GET-only; `--detail`, `--export-xaml`, `--history`) established:
+   - production lacks the marker columns;
+   - the production app user `53e97fb3-…` has **no System Administrator** role;
+   - production create automation (8 workflows, 4 flows, 4 AkoyaGo plug-ins) differs from the sandbox's;
+   - the **sandbox org has background processing disabled** (agent-wiki Dataverse note).
+5. **The Foundation account's audit history** (owner-read) shows that a Foundation-applicant create triggers the GoVerify refresh (`akoya_goverifytrigger`, `akoya_dexempt`, `akoya_taxstatus`, `wmkf_bmf509`), plus a primary-contact copy by an update workflow. Nothing else changed.
+6. **Owner decision: the evidence meets the design's "vendor create logic shown safe" rule** for a first production `basic` run under P5 (plan P0b).
+
+### Commits (all on `main` unless noted)
+- `3b86d7df4` slice 5a (branch `claude/factory-recipe5a`) · `aca4c07a0` decisions + draft plan · `5f4f439be` probe + sandbox census · `bdf4e54f4` wiki · `4acbf7448` production P0 · `efc399d33` automation characterized · `10e0c535e` contract-reconcile · `53d977686` / `47d213f36` / `ed25310de` Codex rounds 1–3 · `bada8e03a`, `4b9ec0220`, `52cbbfe94`, `870513946` P0b evidence and the evidence-bar decision.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Accept the production plan as reviewed**, or first run the default post-cap Codex check of the round-3 closures (S543 practice).
+   Evidence: plan Status line; `ed25310de`.
+2. **Confirm that staff set `wmkf_meetingdate` in AkoyaGO on real Requests.** It is the basic run's one post-create update; plan open question 5 marks it `[ASSUMED]`.
+3. **Q2, the ledger database for the form phase.** Recorded as the local container for the CLI and the shared Postgres for the form; owner undecided.
+4. **6d (reviewer email exception)**: not started.
+
+### Verified Open (after acceptance)
+
+1. **Build item 7 P1–P4** as slices with the S543/S544 process: target parameterization (Factory-built dependency seams, GoVerify bypass unreachable in production, stub AI run kept); the P2 exact-identity write fence at the three seams; P3 `REQUIRED` actor with the production app user plus the writer-gate edit; the P4 readiness endpoint. Then the P5 first `basic` run, with the owner running every production command.
+   Evidence: plan phases P1–P5.
+2. **Integrity Screener Workbench tab: review the Codex branch** `origin/codex/integrity-workbench-tab` at `b1086302b`, not merged. Migrations 056–057 are unapplied; recheck numbering.
+
+### Parked
+
+1. **Slice 5a** (`claude/factory-recipe5a`): its steps are the starting point for production recipe 5. Re-open trigger: the recipe-5 slice after P5. Plan P6 decides whether its 054 edits land before 054's first shared apply or become 055.
+2. **Uploaded-review live pass**, **GoVerify bypass intermittent failure** (sandbox-only now), **live-ledger flake**: unchanged from S544.
+
+### Verify Before Acting
+
+1. Sandbox residue from Requests 1000341–1000348 and local ledger runs (unchanged). The local ledger's 054 lacks 5a's steps; re-apply it before any 5a step runs.
+2. **Production schema:** wave29 and wave30 are absent in production [VERIFIED P0 2026-09-27]. The production order is apply, set the switches, redeploy, confirm the readiness endpoint, then run.
+
+### Do Not Reopen Without New Decision
+
+1. Sandbox live proofs stop after recipe 4 (owner, S545).
+2. GoVerify is not bypassed in production; its Foundation-account refresh is accepted (Q3; plan open question 4 transition contract).
+3. The stub `wmkf_ai_run` stays, in production too (`assertOwnedStubAiRun`).
+4. The evidence meets the vendor-create rule for a first basic run (owner, S545). Codex's dissent is recorded and not reopened.
+5. Program director: in production it is copied by GUID; the sandbox reserve-flag idea is moot.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Item 7 plan, evidence, decisions, open questions |
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Parent design; *Item 7 owner decisions*; 5a parking record |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run production probe (`--detail`, `--export-xaml=<dir>`, `--history[=N]`) |
+| `lib/services/test-requests/basic-clone-steps.js` | `CREATE_FIELDS`, `foundationBaselineDigest`, GoVerify bypass |
+| `lib/services/test-requests/run-runner.js` | Step bodies; `stepFenceSource`; `assertOwnedStubAiRun` |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|docx-package|presite|pre-rp|source-bundle|seed-synthetic).*"
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-test-request-factory-production-readiness.js --director=<sign-in> [--detail] [--history=10]   # owner-run only
+```
+
+---
+
+## Prior Session 545 Prompt: Factory recipe 5 (Pre-RP brief, site-visit start, Final Writeup), then recipe 3; review the Integrity branch
+
+## Session 544 Summary — 2026-09-26/27 PT (Opus; reviewer-address defaults, recipes 3–5 plan, recipe 4 built and live-proven)
+
+### What Was Completed
+
+1. **Reviewer addresses are never minted** (PR #343, `9b6fea389`): a local-only `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS` base inbox is plus-tagged per source reviewer when no `--reviewer-address` flag is given (flag wins). Live-checked on sandbox Request 1000346.
+2. **Recipes 3–5 planned**: owner decisions P1–P6 and invariant classes I1–I10 (design doc *Recipes 3–5 plan*), two Codex plan reviews. Order: 4 → 5 → 3. Recipe 4 copies 1003222's Pre-Site draft verbatim over a stub `wmkf_ai_run`; the sandbox app user is the Final Writeup actor; the abstract is seeded in recipe 5; consultant feedback dropped; materials collection is production-phase only.
+3. **Recipe 4 (`pre_site_visit`) built in three slices, each reviewed**: 4a (PR #344), 4b (PR #345: the four Pre-Site steps, sandbox deps, ledger dimension), 4c (PR #346: PI and Co-PI names from bundle v4, `TEST · ` prefixed in the sandbox loader; owner accepted that copied draft prose keeps the source names verbatim).
+4. **GoVerify bypass diagnostics** (PR #347, `d0c0b90d1`): the deactivation error now reaches the manual-recheck reason, ledger failure text and sidecar; the existing test had passed on a TypeError (mocked `patch`, code calls `patchWithOptions`). Runs `a1dd008d…`/`99c92d35…` failed the bypass for an unknown cause; it did not recur.
+5. **Recipe 4 live-proven** (PR #348, `f678b1d60`): run `a410efe2…` → sandbox Request 1000348 reached `ready`. The Pre-Site v6 template carries another library's SharePoint customXml, which SharePoint rewrites in place on upload (item1 schema, item3 properties, itemProps1). `validateSharePointRewrite` accepts that for the render baseline only; Codex round 1 needs-attention (narrowed: observed roots only, itemProps paired with its schema item, bytes counted; failure detail sanitized and bounded), round 2 approve.
+6. **Integrity Screener Workbench tab handed to Codex** (owner request; branch `codex/integrity-workbench-tab`), logged in main's docs (`6c4546afc`).
+
+### Commits (all on `main` via merged PRs)
+- PR #343 (reviewer default address) · #344 (4a) · #345 (4b) · #346 (4c) · #347 `d0c0b90d1` (bypass diagnostics) · #348 `f678b1d60` (promotion re-promotion rule, first `ready` run).
+
+## Next Items
+
+### Verified Open
+
+1. **Recipe 5 — Pre-RP brief, site-visit start, Final Writeup (next build).** Plan and owner decisions: design doc *Recipes 3–5 plan* (P3 sandbox app user as Final Writeup actor, P4 abstract seeded here). Build as slices with the S543/S544 process: invariant table and orchestrator mutation checks before any review, Codex capped at three rounds per slice, weigh findings as safety vs fidelity (`feedback-factory-safe-not-full-fidelity`).
+   Evidence: design doc; `RECIPE_STEP_ORDER` in `lib/services/test-requests/run-runner.js` has no recipe-5 entry yet.
+2. **Recipe 3 — site-visit materials (files only in the sandbox)**, after recipe 5.
+3. **Integrity Screener Workbench tab — review the Codex branch.** `origin/codex/integrity-workbench-tab` at `b1086302b`, not merged [VERIFIED `git merge-base`, 2026-09-27]. Next: Claude's read-only review → owner merge/release decision → the open Dataverse flag design. Migrations 056–057 unapplied; recheck numbering first.
+   Evidence: the branch's `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` (read with `git show`).
+4. **Item 7** (admin form, resume/retire, first shared apply of migration 054 and wave30 to production, production release). Carried requirement: deterministic reservation identity per actor + idempotency key.
+
+### Owner Decision Needed
+
+1. **6d (reviewer email exception)**: own slice, own plan review; not started.
+
+### Parked
+
+1. **Uploaded-review branch live pass** — re-open on the first clone of a source Request with an uploaded review (owner: no hand uploads to force it).
+2. **GoVerify bypass intermittent failure** (runs `a1dd008d…`, `99c92d35…`): the PATCH never committed (workflow `modifiedon` unchanged). Re-open trigger: the next occurrence, whose sidecar will now name the error.
+3. **Live-ledger suite flake** (unchanged from S543): re-open on a recurrence with a captured test name.
+
+### Verify Before Acting
+
+1. **Sandbox residue**: Requests 1000341–1000348 (IA rows, synthetic reviewers, suggestions, answers; the 1000347/1000348 stub AI runs and Pre-Site rows). Local ledger runs: `a410efe2…` ready; `126881bc…` (PI refusal, pre-4c), `a1dd008d…`, `99c92d35…` (bypass unverified) parked needs_attention [VERIFIED ledger query 2026-09-27]. First candidates for item 7's retire path; nothing to clean now.
+2. **Scratch database `ledger_test`** was created in `wmkf-ledger-pg` for the integration suites (`TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_test`); never point those suites at `ledger`, which holds the real runs.
+
+### Do Not Reopen Without New Decision
+
+1. Recipe 4 draft names copied verbatim (owner accepted limit, 4c review).
+2. Share-click Postgres issue on the clone is not a prerequisite (owner: esoteric).
+3. Stub `wmkf_ai_run` stays (owner: safe, not full fidelity).
+4. Migration 054 edited in place until item 7; wave30 production apply is item 7's.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Design, recipes 3–5 plan, every slice/review/live record |
+| `lib/services/test-requests/run-runner.js` | Recipe step order and step bodies (4b: `seed_presite_ai_run` … `verify_presite`) |
+| `lib/services/test-requests/presite-sandbox-deps.js` | Sandbox-bound Pre-Site deps, `TEST · ` personnel synthesis |
+| `lib/services/test-requests/docx-package-attestation.js` | Promotion attestor incl. `validateSharePointRewrite` (render only) |
+| `lib/services/test-requests/basic-clone-steps.js` | `createRequestWithGoverifyBypass` (now keeps `deactivationError`) |
+| `scripts/rehearse-test-request-sandbox.mjs`, `scripts/export-test-request-source-bundle.mjs` | Reserve/advance/inspect; bundle export (`--with-pre-site`, owner runs prod exports) |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|docx-package|presite|source-bundle|seed-synthetic).*"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_test npx jest tests/integration/test-request-run-runner   # scratch DB, not `ledger`
+```
+
+Live runs: run the rehearsal CLI from a checkout of the code under test, with the allow-rule prefix (`project-sandbox-rehearsal-bypass-allow-rule`); `--bypass-goverify` on the advance that reaches `create_request`.
+
+---
+
+## Prior Session 544 Prompt: Factory item 6 recipes 3–5 (plan one paragraph, one Codex plan review), then item 7
 
 ## Session 543 Summary — 2026-09-25/26 PT (Fable; slices 6c-i and 6c-ii built, reviewed, merged, live-proven)
 
@@ -21,6 +669,14 @@
    Process for the slices: the S543 process (invariant table + mutations checked by the orchestrator before any Opus round; Codex capped at three rounds per slice). Weigh review findings as safety versus fidelity (memory `feedback-factory-safe-not-full-fidelity`).
 2. **Item 7** (admin form, resume/retire, first shared apply of migration 054 and of wave30 to production, production release). Requirement carried: deterministic reservation identity per actor + idempotency key so retries reach the ledger's assignment comparison.
    Evidence: design doc slice 6c-i record (Codex round 1 declined finding 1).
+3. **Integrity Screener Workbench tab + PD approval — Codex branch, awaiting review and release (handed over 2026-09-27).**
+   `codex/integrity-workbench-tab` at `b1086302b`: built, not merged or deployed. Migrations 056–057 are unapplied; recheck numbering against `codex/feature-request`'s 055 before release.
+   - **Next, in order:**
+     1. Claude's read-only review of the branch.
+     2. The owner's merge and release decision.
+     3. The open Dataverse flag design: **Integrity review complete** means a complete screen plus PD approval for the current roster. The design needs invalidation for replacement screens, holds and roster changes (including edits outside our apps), plus durable sync retries. Sandbox metadata is still unchecked.
+   - **Deferred:** the board-readiness gate, until the staff recommendation/readiness workflow exists.
+   Evidence: the branch's `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` and `docs/plans/INTEGRITY_DATAVERSE_FLAG_INVESTIGATION_2026-09-26.md` (read with `git show origin/codex/integrity-workbench-tab:<path>`); queue entry in `docs/CURRENT_WORK_QUEUE.md` (Owner-requested product follow-ups).
 
 ### Owner Decision Needed
 

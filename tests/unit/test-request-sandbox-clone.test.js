@@ -168,7 +168,8 @@ describe('sandbox operator write boundary', () => {
     expect(script.indexOf('writeNewJson(args.manifestOut, manifest)')).toBeLessThan(script.indexOf('ledger.reserveRun('));
     expect(script).toContain('cliActorId(');
     expect(script).not.toMatch(/cli:\$\{/);
-    expect(script).toContain('destinationDataverseHost: new URL(SANDBOX_URL).hostname');
+    // Production plan P1: the reserved destination host comes from the manifest's pinned target.
+    expect(script).toContain('destinationDataverseHost: targetHostOf(manifest)');
     // --advance reports a finished run plainly instead of claiming a lease on it.
     expect(script).toContain("mode: 'NOT_ADVANCED'");
     // --run-inspect must not construct the Dataverse client at all.

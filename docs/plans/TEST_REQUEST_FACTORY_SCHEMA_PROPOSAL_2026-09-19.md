@@ -1,6 +1,6 @@
 # Test Request Factory — schema proposal
 
-Status: **SANDBOX SCHEMA APPLIED; TWO MARKED REQUESTS CREATED; APP-OWNED FOLDER/LOCATION PROVEN; READ-ONLY PREVIEW DEPLOYED; no create/copy route, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields persist through create. Request 1000339 additionally proves the app suite can create and own its exact SharePoint folder and Dataverse location (`evidence/test-request-factory/app-owned-location-rehearsal-2026-09-23.json`). Its meeting date was rewritten. The deployed Admin preview is non-writing and does not change the schema rollout boundary below.
+Status: **wave29 APPLIED IN PRODUCTION 2026-09-28 UTC (S546; production plan). Earlier status: SANDBOX SCHEMA APPLIED; TWO MARKED REQUESTS CREATED; APP-OWNED FOLDER/LOCATION PROVEN; READ-ONLY PREVIEW DEPLOYED; no create/copy route, production apply, or document-ready fixture.** Sandbox readback proves the four rehearsal fields persist through create. Request 1000339 additionally proves the app suite can create and own its exact SharePoint folder and Dataverse location (`evidence/test-request-factory/app-owned-location-rehearsal-2026-09-23.json`). Its meeting date was rewritten. The deployed Admin preview is non-writing and does not change the schema rollout boundary below.
 
 ## Proposed schema wave
 
@@ -199,7 +199,7 @@ Rollback is additive and leaves fields in place. First disable new factory creat
 - Production duplicate-location and recovery contract for the sandbox-proven app-owned path.
 - Deterministic meeting-date/default behavior: the manifest supplied `2099-12-01`, but create readback returned `2024-12-13`.
 
-Until these are resolved, sandbox schema stays additive and runtime create/copy execution remains disabled. The compiler is used only by the read-only Admin preview, which strips actionable payloads and reports blockers. Production schema is unapplied. The sandbox rehearsal proves Request plus app-owned folder/location creation, not that the Test Request Factory is production-ready.
+Until these are resolved, sandbox schema stays additive and runtime create/copy execution remains disabled. The compiler is used only by the read-only Admin preview, which strips actionable payloads and reports blockers. Production schema was unapplied at that time; **wave29 was applied in production on 2026-09-28 UTC (S546, owner-run), see the production plan**. The sandbox rehearsal proves Request plus app-owned folder/location creation, not that the Test Request Factory is production-ready.
 
 ## Review disposition
 

@@ -49,6 +49,10 @@ describe('Dynamics Explorer prompt contract', () => {
     expect(prompt).toContain('_wmkf_projectleader_value');
     // primary contact must be flagged as NOT the PI.
     expect(prompt).toMatch(/Primary Contact[^\n]*NOT the principal investigator/);
+    // Liaison plan reader 7: for Research the Liaison of record is the institution's Primary Contact.
+    expect(prompt).toMatch(/for Research programs, the Liaison of record/);
+    expect(prompt).toMatch(/"Request Primary Contact \(copy\)"/);
+    expect(prompt).toMatch(/"at least N"/);
   });
 
   test('guardrail lists are derived from constants (not transcribed)', () => {

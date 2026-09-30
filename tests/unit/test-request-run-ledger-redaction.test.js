@@ -198,6 +198,7 @@ describe('remaining text columns are finite or grammar-bound', () => {
       'fence_source', 'create_request', 'correct_meeting_date', 'provision_location', 'copy_file', 'observe', 'verify', 'ready',
       'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
       'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
+      'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite',
     ]);
   });
 

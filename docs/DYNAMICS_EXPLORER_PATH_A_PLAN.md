@@ -89,7 +89,7 @@ Replace baked GUIDs/codes with values resolved live at request time.
 
 ### A4 — Footgun guardrails from `constants.js` (replace `_note` guesses)
 Fold the probe-verified domain facts into the prompt's domain guidance + disambiguation logic, **imported by reference** from `constants.js:379-404` (generate an Explorer prompt summary; don't copy values):
-- `akoya_primarycontactid` = foundation **liaison, not PI**; `wmkf_projectleader` PI-fill is **program-conditional** (~98% Medical Research, ~0% elsewhere) → prevents the "0 results ⇒ no PI" confabulation and the contact-role conflation Codex just hand-fixed.
+- `akoya_primarycontactid` = foundation **liaison, not PI** **[SUPERSEDED 2026-09-29 for Research: the Liaison of record is the applicant institution's Primary Contact (`account.primarycontactid`), not the Request's `akoya_primarycontactid` copy; `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`.]**; `wmkf_projectleader` PI-fill is **program-conditional** (~98% Medical Research, ~0% elsewhere) → prevents the "0 results ⇒ no PI" confabulation and the contact-role conflation Codex just hand-fixed.
 - Era cutover (2023-12-03) + status→class map.
 - **Reconcile the `akoya_folio` drift:** prompt says `contains()` for `Paid/PAID`; memory `akoya-payment-field-semantics` + `constants.js` say `akoya_folio = "PAID"`. Fix the prompt to the probe-verified value.
 

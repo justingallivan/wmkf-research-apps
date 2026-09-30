@@ -481,6 +481,12 @@ describe('Disclosure golden — mixed era / program / declined-with-nulls', () =
     expect(p).toMatch(/USER-ATTESTED S159/);
     expect(p).toMatch(/probe-akoya-decline-by-program\.js/);
     expect(summary.primaryContactCaption).toMatch(/NOT the\s+PI/);
+    // Liaison plan reader 7: the column is the Request's copy, not the
+    // Research Liaison of record (the institution's Primary Contact).
+    expect(summary.primaryContactCaption).toMatch(/^Request Primary Contact \(copy\)/);
+    expect(summary.primaryContactCaption).toMatch(/Research programs the\s+Liaison of record is the applicant institution's Primary Contact/);
+    expect(p).toMatch(/Request Primary Contact \(copy\) is the Request's own akoya_primarycontactid/);
+    expect(p).not.toMatch(/foundation liaison/);
   });
 });
 

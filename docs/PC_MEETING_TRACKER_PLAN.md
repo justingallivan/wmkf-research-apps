@@ -148,7 +148,9 @@ calls the same service.
 - One visit editor per request: the fields the Activity already has, written through the existing
   logistics service. **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** the
   tracker GET also suggests applicant-side calendar attendees from the Request Project Leader
-  and liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
+  and liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank;
+  for Research, since 2026-09-29, the Account's Primary Contact only — the Liaison of record,
+  `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`).
   New-visit forms prefill distinct email addresses as required attendees. Saved visits keep their
   recorded attendees and show missing applicants as one-click Add suggestions, so removing a
   person stays removed across reloads. The Activity changes only when the PC reviews and saves.

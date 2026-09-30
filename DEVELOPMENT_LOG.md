@@ -10,6 +10,51 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Research Liaison of record comes from the applicant institution (Session 550)
+
+**Milestone:** For Research Requests, every app reader of the Liaison (the invitation, new grantee reminders, the Awardees list, site-visit materials and contacts, and Dynamics Explorer) now uses the applicant institution's Primary Contact instead of the stale Request copy. The Dataverse export relabels the copy.
+**Sessions:** 549 (owner decision with the AkoyaGO platform owner, measurement, six Codex plan rounds), 550 (build, Codex implementation review, release).
+**Ship state:**
+- PR #361 (`61dafcb81`), live via `9f408590e`: helper `lib/services/contacts/request-liaison.js` (fail-closed found/none), a stale-Liaison 409 at invitation send, PI-only only for a confirmed none, and a compare-and-swap on the materials automatic reminder claim with a live-Postgres proof in CI.
+- The owner's production check on 997125 showed the institution Liaison as the invitation Cc.
+- Not shipped: re-addressing reminders queued before the switch (`docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, draft).
+**Why it matters:** the Liaison recipient changes on 27 active awards and 35 upcoming Requests; staff stop emailing former Liaisons.
+**Pointers:** `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` (*Build record*).
+
+## September 2026 — Test Request Factory: synthetic cast bound to production clones (Sessions 548–549)
+
+**Milestone:** Production test Requests now carry a reused synthetic cast — PI, Liaison and Research Leader contacts under the Foundation, plus a WMKF Org Leader on the Foundation — so staff can exercise PI/Liaison email workflows on a clone without touching real people.
+**Sessions:** 548 (build, one Codex round), 549 (first cast-bound clone, merge).
+**Ship state:**
+- PR #357 (`75d58e331`): cast ledger and `--create-cast`, create-body binds with per-lookup fences, Foundation transition contract journaling the cast contacts, `--bind-reviewer`.
+- First cast-bound clone: run `e33fa857`, Request 1003303, `ready`, one-hour recheck clean; PI and Liaison confirmed on the Awardee tab.
+- Not shipped: the suggested reviewer is not usable in the app (the Find tab reads the Request's Potential Reviewer slots, and the synthetic fence refuses the person); slice B4 is in plan revision.
+**Why it matters:** clones are now realistic for contact-driven workflows; testing the reviewer workflow waits on B4.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (*Order* 4–6); `lib/services/test-requests/cast-runner.js`, `cast-binding-runner.js`.
+
+## September 2026 — Test Request Factory: first production clone verified; status setter live (Session 547)
+
+**Milestone:** The Factory produced its first verified production test Request (1003302), checked against a Foundation-account transition contract at creation and an hour later, and gained a status setter that moves a test Request's Phase I/II Status with the platform's reactions recorded; its first change made the clone visible in Workbench.
+**Sessions:** 547 (Opus; one Codex adversarial round per slice; owner decided every finding; two owner-run production runs).
+**Ship state:**
+- PR #352, #354: pre-create Foundation baseline and transition contract in `verify`, read-only `--run-recheck`; the first run (1003301) stopped on two explained causes (create plug-in sets `Pending`; all 15 rollups recalculate together).
+- Second run 1003302 `ready`, one-hour recheck passed; MVP item 5 complete.
+- PR #355 (`466b23fb9`): `--set-status` / `--status-recheck` with a transition table from the workflow definitions, `If-Match` fence, quiet completion, replay guard; first production change confirmed Request Status follows on API updates.
+**Why it matters:** a staff-usable production test Request now exists end to end; the next step, a synthetic PI/Liaison/suggested reviewer, waits only on the platform owner's Business Central answer.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`; `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`; `lib/services/test-requests/foundation-transition.js`, `status-change-runner.js`.
+
+## September 2026 — Test Request Factory production enablement: MVP scope, write fence, email allowlist; isolation live (Session 546)
+
+**Milestone:** After eight days of sandbox-first hardening, the owner cut item 7 to a production MVP (a basic clone that lands before reviewer invite, the cloning admin as program director, an email recipient allowlist) and production enablement shipped: wave29 applied in production and `TEST_REQUEST_ISOLATION=on` live.
+**Sessions:** 546 (Opus; one Codex adversarial round per slice; owner decided every finding).
+**Ship state:**
+- PR #349 (`9ba8692a2`): pinned `--target=production`; production clone lands Phase II Pending in the Research program with the cloning admin as PD; GoVerify bypass, legacy execute and non-basic recipes refused; meeting date never re-written.
+- PR #350 (`fe71c846f`): run-scoped production write fence (closed POST shapes, destination-only Graph writes, source refused) and live source-revision checks.
+- PR #351 (`3738af3f0`): test-Request email allowlist (`@wmkeck.org` + admin-edited list) at create and dispatch; dispatch-gap residual risk accepted.
+- Production: wave29 applied (owner-run) and isolation on (redeploy `abv0745vo`); no production clone created yet.
+**Why it matters:** the first usable result of the Factory is one owner-run command away; scope is now anchored to the original ask (memory `feedback-anchor-multisession-features-to-the-original-ask`).
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` (*Owner decisions*, *MVP build list*); `lib/services/test-requests/production-write-fence.js`, `email-allowlist.js`.
+
 ## September 2026 — Test Request Factory: synthetic reviewers and reviews recipe promoted and live-proven (Session 543)
 
 **Milestone:** A cloned test Request can now carry synthetic reviewers and their reviews copied from the source: marker-isolated synthetic person rows (`wmkf_issyntheticreviewer`, wave30), suggestions, answer rows and received stamps, with review files copied and DOCX packages attested against SharePoint's characterized property promotion, and a terminal verifier that marks the run ready.

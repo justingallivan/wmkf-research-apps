@@ -42,7 +42,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
     `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
-       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments')`,
+       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments', 'test_request_status_changes', 'test_request_cast_members', 'test_request_cast_bindings')`,
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
