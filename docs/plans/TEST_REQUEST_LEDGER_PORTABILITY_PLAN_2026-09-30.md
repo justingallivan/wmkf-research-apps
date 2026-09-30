@@ -1,6 +1,6 @@
 # Test Request Factory ledger: portability and single source of truth
 
-Status: **DRAFT, revision 5 (2026-09-30, S553). D1 and D3 decided; the managed ledger exists with 054 + 058 applied. Phase 2 items 1–2 and Phase 3 items 1–2 SOURCE-BUILT on branch `claude/factory-ledger-registry`, verified live against both Neon ledgers; not merged. The first Codex adversarial round (5 high, 2 medium) came back NO-SHIP and every finding but #5 (the B4 merge-conflict note, left for the orchestrator) is now fixed on the same branch — see "Codex round 1" below. The second Codex round (5 high, 2 medium) found real holes in the round-1 fixes; all but #5 are fixed on the branch (see "Codex round 2"), #5 is adjudicated below. The third Codex round (5 high, 2 medium, all new surfaces) is answered in full on the branch (owner decision: address all seven; see "Codex round 3"). A fourth Codex round is pending; its stopping rule: only the documented residuals may remain. Phase 1 (tonight's dump/restore) and Phase 2 item 3 (restore into Neon, then retire local) follow the brief. D2 open.**
+Status: **DRAFT, revision 6 (2026-09-30, S553). D1 and D3 decided; the managed ledger exists with 054 + 058 applied. Phase 2 items 1–2 and Phase 3 items 1–2 SOURCE-BUILT on branch `claude/factory-ledger-registry`, verified live against both Neon ledgers; not merged. The first Codex adversarial round (5 high, 2 medium) came back NO-SHIP and every finding but #5 (the B4 merge-conflict note, left for the orchestrator) is now fixed on the same branch — see "Codex round 1" below. The second Codex round (5 high, 2 medium) found real holes in the round-1 fixes; all but #5 are fixed on the branch (see "Codex round 2"), #5 is adjudicated below. The third Codex round (5 high, 2 medium, all new surfaces) is answered in full on the branch (owner decision: address all seven; see "Codex round 3"). A fourth Codex round is pending; its stopping rule: only the documented residuals may remain. Phase 1 (tonight's dump/restore) and Phase 2 item 3 (restore into Neon, then retire local) follow the brief. D2 open.**
 
 ## Problem
 
@@ -161,4 +161,17 @@ Opus re-checked commits 32fbbb8b5..df8f1d977 read-only and approved. Lows and th
 - [RECHECKED after scripts/apply-ledger-migrations.js change: tracked-prefix verification before any write; dry run reports it cannot verify]
 - [RECHECKED after scripts/check-factory-ledger.js change: --write-expected classified, local-only, identity-checked]
 - [RECHECKED after scripts/rehearse-test-request-sandbox.mjs change: none on this branch this round; the preview merge changes the cast block as described in item 7]
+
+## Opus round 3 (2026-09-30, S553; NEEDS-FIXES, one medium; all addressed in cbf196aef..4fdf0d055)
+
+- **M1 — the tracked-prefix check refused the real Neon ledgers after the merge (058 applied but untracked, `approvedAhead` empty) — fixed:** prefix extras are exempt when a later checkout file produces the same object with the same shape (the full file list is fingerprinted in the same rolled-back scratch pass); missing and differing stay fatal. Verified live by the builder: 054 tracked + 058 untracked → prefix ok, then `adopt` for 058.
+- L1 NULL-checksum tracked rows join the prefix before `--accept-tracked-checksums` can act; L2 tracker DDL now runs only after the identity check and prefix verification; L3 an unparseable configured shared URL fails closed (`shared_unparseable`); L4 the write-expected "unset" test mocks the env file and installs its environment verbatim; L5 the `""` identifier test now has teeth; L6 bare schema stripping requires an identifier boundary; L7 the ordering test also covers `} else if` / `} else` branches and blocks reusing the shared client; L8 the merged Atlas no longer claims no ledger carries 058 (fixed in the preview merge).
+- Preview merge rebuilt from `4fdf0d055` on `claude/factory-ledger-b4-preview`: same block resolution, Atlas fix, fingerprint regenerated with 058, `approvedAhead` emptied; the merged tree's ledger suites pass and both Neon ledgers match; `ledger:apply --dry-run` on the merged tree reports 054 skip and 058 pending adoption.
+
+- [RECHECKED after lib/db/ledger-migrations.js change: later-file exemption in verifyTrackedPrefix; NULL-checksum rows in the prefix]
+- [RECHECKED after scripts/apply-ledger-migrations.js change: tracker DDL after identity + prefix verification]
+- [RECHECKED after lib/db/ledger-registry.js change: shared_unparseable fails closed]
+- [RECHECKED after lib/db/ledger-schema.js change: identifier-boundary schema stripping]
+- [RECHECKED after scripts/check-factory-ledger.js change: none this round; write-expected test hardened only]
+- [RECHECKED after scripts/rehearse-test-request-sandbox.mjs change: none on this branch this round; ordering test widened]
 
