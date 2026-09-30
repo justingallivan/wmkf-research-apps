@@ -47,6 +47,9 @@ test('one playback error re-resolves and restores position; a second exposes man
   fireEvent.click(await screen.findByRole('button', { name: 'Watch recording' }));
   const video = document.querySelector('video');
   await waitFor(() => expect(video.src).toContain('attempt=1'));
+  expect(screen.getByRole('status')).toHaveTextContent('Resolving a fresh Microsoft media URL');
+  fireEvent.playing(video);
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
   Object.defineProperty(video, 'duration', { configurable: true, value: 200 });
   video.currentTime = 80;
   fireEvent.timeUpdate(video);
@@ -54,6 +57,8 @@ test('one playback error re-resolves and restores position; a second exposes man
   await waitFor(() => expect(video.src).toContain('attempt=2'));
   fireEvent.loadedMetadata(video);
   expect(video.currentTime).toBe(80);
+  fireEvent.playing(video);
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
   fireEvent.error(video);
   expect(screen.getByRole('button', { name: 'Resume watch' })).toBeInTheDocument();
 });
