@@ -53,17 +53,30 @@ Only the server-validated DOCX MIME selects package attestation. Fresh upload,
 409 exact-path recovery and recorded-candidate retry download the exact item;
 metadata before and after download must agree on drive/item/name/size/ETag and
 version. Missing visibility, missing stable receipt, network failure, metadata
-drift and download-length drift return retryable 503 without rejecting the
-staged source. Stable identity or package-content mismatch remains permanent
+drift, unconfirmed/non-positive size metadata and download-length drift return
+retryable 503 without rejecting the staged source. Stable identity or
+package-content mismatch remains permanent
 409. `attestDocxPackageAgainstSource` preserves source parts and permits only
 its characterized, shape- and size-bounded metadata changes; the broader
 render-only customXml rewrite option is not enabled.
 
 The same source SHA remains the generation input, registry input fingerprint
 and content hash. DOCX candidate `sourceSha256`/`sourceSize` preserve that
-original identity; candidate `sha256`/`size` describe the attested stored ZIP.
-Legacy candidate receipts upgrade only after source attestation. Candidate
-persistence remains lease-fenced and precedes Dataverse creation. `registrySize`
+original identity; candidate `sha256`/`size` describe the stable stored ZIP.
+Legacy candidate retries upgrade for publication only after source attestation.
+A fresh/conflict upload whose stable package fails attestation is also recorded
+under the staging lease before permanent rejection, solely to retain an exact
+orphan-cleanup receipt. A recorded retry keeps its prior receipt on rejection;
+edited bytes do not replace that earlier deletion receipt.
+The existing expiry cleanup still checks zero-row registry binding plus exact
+stored bytes/ETag; publication remains prohibited without successful attestation.
+If receipt persistence or lease renewal fails, that error propagates and the
+route retains staging rather than permanently rejecting it. Files without a
+stable exact identity/byte receipt remain outside automatic deletion authority.
+Rejection warnings contain request/staging IDs and at most eight fixed failure
+kinds with known package-part names or categories. Raw attestor messages,
+relationship targets, arbitrary ZIP filenames and document text are excluded.
+Candidate persistence remains lease-fenced and precedes Dataverse creation. `registrySize`
 is persisted to the actual size immediately before a new create; retries keep
 that value when replaying the exact request/generation/producer/drive/item row.
 This supports repeated SharePoint repacks even when an earlier create failed
@@ -88,7 +101,7 @@ registry replay after repeated repacks and failed creates, and cleanup using
 the stored digest rather than the source digest. The pre-fix characterization
 failed on the reported upload/retry paths; the fixed characterization passes.
 
-[VERIFIED via local commands] 383 tests passed across 11 suites: material
+[VERIFIED via final follow-up local commands] 394 tests passed across 11 suites: material
 service, routes, staff upload card, material model, strict DOCX attestation,
 portal staging cleanup, presentation-page reader, transcript formats, MP4
 recovery/cleanup and schema parity. Targeted ESLint and `git diff --check`
@@ -107,6 +120,25 @@ metadata races were classified permanently, and the registry size receipt
 could lag a later successful create. Both were corrected and exercised by
 new regressions. The reviewer reread the updated paths and returned READY
 with no remaining code findings. No paid review product was invoked.
+
+A separate user-requested Claude Opus review of commit `d4a83fee1` returned
+APPROVE with no blocking defects. Authentication was verified as `claude.ai`
+Max subscription OAuth outside the Codex sandbox; API/provider overrides were
+removed, and the observed `claude-opus-5-5` CLI session reported API-key source
+`none`. Read/Grep/Glob were its only tools, so this review did not independently
+execute tests. Its small recommendations are implemented in the follow-up:
+redacted rejection diagnostics, retained stable rejected-upload receipts,
+legacy-registry replay and retry-write ordering assertions, and retryable
+unconfirmed size metadata. The strict source comparator is unchanged.
+The focused follow-up review also returned APPROVE. Its cleanup residual was
+closed by retaining the prior receipt on rejected recorded retries; a final
+Opus closure check approved that safeguard with no blocking defects. All review
+sessions used the same verified subscription OAuth method and API-key source
+`none`. The orchestrator verified the final review's supplied input fingerprint
+against the unchanged worktree diff before recording this result:
+`eabd04f42e1d916248a31d57b0eac57261e0d62f22ff2dbbf83339f109dcc427`.
+Full closure receipt:
+`docs/plans/evidence/post-presentation/opus-docx-followup-2026-09-30.md`.
 Production DOCX upload/download acceptance and owner-approved promotion remain
 outstanding. Once deployed, the user must reselect and upload the rejected
 file as a new staging operation; the old rejected receipt is not reopened.

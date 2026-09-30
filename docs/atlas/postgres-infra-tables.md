@@ -517,8 +517,13 @@ metadata changes. Candidate `sourceSha256`/`sourceSize` identify the original
 staged input; `sha256`/`size` identify the actual stored package for exact-byte
 cleanup. `registrySize` retains the size fenced immediately before a registry
 create so later metadata-only repacks can replay that row. Legacy receipts are
-upgraded using the original staged bytes. PDF/TXT/VTT retain exact raw-byte
-checks. No columns or status values change. See
+upgraded using the original staged bytes. A stable DOCX that fails attestation
+also retains its exact stored-byte receipt under the staging lease before
+permanent rejection on fresh/conflict uploads, so the existing zero-row/exact-byte
+expiry cleanup can identify the orphan. Rejected recorded retries keep the
+prior receipt instead of authorizing deletion of edited bytes. Receipt persistence failure retains staging; successful
+attestation remains required before registry publication. PDF/TXT/VTT retain
+exact raw-byte checks. No columns or status values change. See
 `docs/plans/evidence/post-presentation/docx-transcript-fix-2026-09-30.md` for
 characterization, failure handling, and release limitations.
 

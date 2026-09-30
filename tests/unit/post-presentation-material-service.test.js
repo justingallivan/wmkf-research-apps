@@ -8,6 +8,7 @@ jest.mock('../../lib/services/portal-upload-staging.js', () => ({
 }));
 
 import {
+  _internal,
   finalizeMp4Upload,
   finalizeTranscriptUpload,
   getMp4UploadStatus,
@@ -1538,6 +1539,12 @@ test('DOCX records the size of a successful later create and preserves it across
   await f.finalize();
   f.file.candidate = f.d.recordPortalUploadCandidate.mock.calls.at(-1)[0].candidate;
   expect(f.file.candidate.registrySize).toBe(second.length);
+  const registrySizeWrite = f.d.recordPortalUploadCandidate.mock.calls.findLastIndex(
+    ([args]) => args.candidate.registrySize === second.length,
+  );
+  expect(registrySizeWrite).toBeGreaterThanOrEqual(0);
+  expect(f.d.recordPortalUploadCandidate.mock.invocationCallOrder[registrySizeWrite])
+    .toBeLessThan(f.d.createDocument.mock.invocationCallOrder.at(-1));
   const row = transcript(NEW_ID, 7, {
     wmkf_generationkey: f.file.candidate.generationKey, wmkf_inputfingerprint: docxHash(f.source),
     wmkf_filesize: second.length,
@@ -1562,4 +1569,113 @@ test('DOCX mismatched source receipt is rejected before Graph verification', asy
   await expect(f.finalize()).rejects.toMatchObject({ code: 'post_presentation_candidate_mismatch' });
   expect(f.d.getFileMetadataById).not.toHaveBeenCalled();
   expect(f.d.createDocument).not.toHaveBeenCalled();
+});
+
+
+test('DOCX legacy receipt replays a registry row created with the original source size', async () => {
+  const f = await docxFixture();
+  f.file.candidate = f.legacyCandidate;
+  const row = transcript(NEW_ID, 7, {
+    wmkf_generationkey: f.legacyCandidate.generationKey, wmkf_inputfingerprint: docxHash(f.source),
+    wmkf_filesize: f.source.length, wmkf_contenttype: DOCX_MIME, wmkf_filename: f.metadata.name,
+  });
+  f.d.findDocumentByGenerationKey.mockResolvedValue({ records: [row] });
+  f.d.findDocuments.mockResolvedValue({ records: [row] });
+  await expect(f.finalize()).resolves.toMatchObject({ requestDocumentId: NEW_ID, replayed: true });
+  expect(f.d.recordPortalUploadCandidate).toHaveBeenCalledWith(expect.objectContaining({
+    candidate: expect.objectContaining({ registrySize: f.source.length, size: f.stored.length }),
+  }));
+  expect(f.d.createDocument).not.toHaveBeenCalled();
+  expect(f.d.uploadFile).not.toHaveBeenCalled();
+});
+
+test.each(['new upload', 'path conflict'])('DOCX %s preserves a rejected stored-byte receipt under the staging lease', async (mode) => {
+  const f = await docxFixture((zip) => zip.file('word/document.xml', '<changed/>'));
+  if (mode === 'path conflict') f.d.uploadFile.mockRejectedValue(Object.assign(new Error('exists'), { status: 409 }));
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    await expect(f.finalize()).rejects.toMatchObject({ code: 'post_presentation_candidate_mismatch', httpStatus: 409 });
+    expect(f.d.recordPortalUploadCandidate).toHaveBeenCalledWith({
+      stagingId: STAGING_ID, leaseToken: 'blob-lease',
+      candidate: expect.objectContaining({
+        requestId: REQUEST_ID, generationKey: f.legacyCandidate.generationKey,
+        driveId: 'drive', itemId: 'item', filename: f.metadata.name,
+        eTag: f.metadata.eTag, sha256: docxHash(f.stored), size: f.stored.length,
+        sourceSha256: docxHash(f.source), sourceSize: f.source.length,
+      }),
+    });
+    expect(f.d.renewPortalUploadLease.mock.invocationCallOrder.at(-1))
+      .toBeLessThan(f.d.recordPortalUploadCandidate.mock.invocationCallOrder[0]);
+    expect(warning).toHaveBeenCalledWith('[post-presentation-materials] DOCX attestation rejected', expect.objectContaining({
+      requestId: REQUEST_ID, stagingId: STAGING_ID,
+      failures: expect.arrayContaining([{ part: 'word/document.xml', kind: 'content_changed' }]),
+    }));
+    expect(f.d.createDocument).not.toHaveBeenCalled();
+    expect(f.d.acquireSlotLease).not.toHaveBeenCalled();
+  } finally { warning.mockRestore(); }
+});
+
+test('DOCX diagnostics are bounded and exclude raw relationship targets and arbitrary ZIP filenames', () => {
+  const privateUrl = 'https://private.example/transcript?secret=diagnostic-test';
+  const error = Object.assign(new Error(`raw content ${privateUrl}`), { failures: [
+    `document relationship rId99 (${privateUrl}) is missing`,
+    'part customXml/item7.xml differs from the source',
+    'unexpected part private-person-name/notes.bin',
+    ...Array.from({ length: 20 }, () => `part docProps/custom.xml property ${privateUrl} does not hold exactly one vt scalar`),
+  ] });
+  const diagnostic = _internal.docxFailureDiagnostics(error);
+  expect(diagnostic.failureCount).toBe(23);
+  expect(diagnostic.failures).toHaveLength(8);
+  expect(diagnostic.failures).toEqual(expect.arrayContaining([
+    { part: 'word/_rels/document.xml.rels', kind: 'part_missing' },
+    { part: 'customXml/item7.xml', kind: 'content_changed' },
+    { part: 'other', kind: 'unsupported_shape' },
+  ]));
+  expect(JSON.stringify(diagnostic)).not.toContain(privateUrl);
+  expect(JSON.stringify(diagnostic)).not.toContain('private-person-name');
+  expect(JSON.stringify(diagnostic)).not.toContain('raw content');
+});
+
+test('DOCX failed rejection-receipt persistence propagates a transient error rather than permanent rejection', async () => {
+  const f = await docxFixture((zip) => zip.file('word/document.xml', '<changed/>'));
+  const unavailable = Object.assign(new Error('ledger unavailable'), { httpStatus: 503, code: 'ledger_unavailable' });
+  f.d.recordPortalUploadCandidate.mockRejectedValue(unavailable);
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    await expect(f.finalize()).rejects.toBe(unavailable);
+    expect(f.d.createDocument).not.toHaveBeenCalled();
+  } finally { warning.mockRestore(); }
+});
+
+test.each([0, -1, 1.5, null])('DOCX unconfirmed size %s remains retryable without download or receipt', async (size) => {
+  const f = await docxFixture();
+  f.d.getFileMetadataById.mockResolvedValue({ ...f.metadata, size });
+  await expect(f.finalize()).rejects.toMatchObject({ code: 'post_presentation_candidate_unavailable', httpStatus: 503 });
+  expect(f.d.downloadFile).not.toHaveBeenCalled();
+  expect(f.d.recordPortalUploadCandidate).not.toHaveBeenCalled();
+  expect(f.d.createDocument).not.toHaveBeenCalled();
+});
+
+
+test('DOCX rejected recorded retry retains the previous receipt instead of granting deletion authority over edited bytes', async () => {
+  const f = await docxFixture();
+  await f.finalize();
+  const prior = f.d.recordPortalUploadCandidate.mock.calls[0][0].candidate;
+  f.file.candidate = prior;
+  const zip = await JSZip.loadAsync(f.stored);
+  zip.file('word/document.xml', '<manual-edit/>');
+  const edited = await zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' });
+  f.d.getFileMetadataById.mockResolvedValue({ ...f.metadata, size: edited.length, eTag: 'manually-edited', versionId: '2.0' });
+  f.d.downloadFile.mockResolvedValue({ buffer: edited });
+  f.d.recordPortalUploadCandidate.mockClear();
+  f.d.createDocument.mockClear();
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    await expect(f.finalize()).rejects.toMatchObject({ code: 'post_presentation_candidate_mismatch' });
+    expect(f.d.recordPortalUploadCandidate).not.toHaveBeenCalled();
+    expect(f.file.candidate).toBe(prior);
+    expect(prior.sha256).toBe(docxHash(f.stored));
+    expect(prior.sha256).not.toBe(docxHash(edited));
+    expect(f.d.createDocument).not.toHaveBeenCalled();
+  } finally { warning.mockRestore(); }
 });

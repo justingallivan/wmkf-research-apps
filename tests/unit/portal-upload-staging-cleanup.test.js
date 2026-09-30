@@ -308,6 +308,27 @@ describe('post_presentation_transcript scope', () => {
     expect(result.retained).toBe(0);
   });
 
+  test('a rejected DOCX receipt stays available to exact orphan cleanup after the source Blob is deleted', async () => {
+    const rejected = {
+      ...candidate, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filename: '1003220-Transcript-upload.docx',
+      sourceSha256: 'a'.repeat(64), sourceSize: 10, sha256: 'b'.repeat(64), size: 20,
+    };
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT, status: 'rejected',
+      candidate: rejected, resourceId: rejected.requestId,
+    })]);
+    const deps = makeDependencies();
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.findDocumentByGenerationKey).toHaveBeenCalledWith(rejected.generationKey);
+    expect(deps.verifyPostPresentationTranscriptCandidateUnchanged).toHaveBeenCalledWith(rejected);
+    expect(deps.discardPostPresentationTranscriptCandidate).toHaveBeenCalledWith(rejected);
+    expect(deps.verifyPostPresentationTranscriptCandidateUnchanged.mock.invocationCallOrder[0])
+      .toBeLessThan(deps.discardPostPresentationTranscriptCandidate.mock.invocationCallOrder[0]);
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+    expect(result.retained).toBe(0);
+  });
+
   test('a proven zero-row generation lookup deletes only the exact persisted candidate', async () => {
     mockSql([candidateRow({
       scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
