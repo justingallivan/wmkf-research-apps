@@ -1,9 +1,11 @@
 /** @jest-environment node */
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import crypto from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { Client } from 'pg';
+import { SHARED_DATABASE_URL_VARS } from '../../lib/db/ledger-registry';
 import {
   LEDGER_MIGRATIONS_DIR,
   REGENERATE_COMMAND,
@@ -14,7 +16,7 @@ import {
   readLedgerFingerprint,
 } from '../../lib/db/ledger-schema';
 import {
-  decideFileAction, tableNamesIn, fingerprintFilesInScratch, verifyTrackedPrefix,
+  decideFileAction, fingerprintFilesInScratch, verifyTrackedPrefix, decideTrackedPrefixVerification,
 } from '../../lib/db/ledger-migrations';
 
 /**
@@ -161,6 +163,38 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
       expect(diff.differing.some((d) => d.includes('table test_request_runs row security'))).toBe(true);
     });
 
+    test('SET UNLOGGED is differing and cannot pass a later-file exemption or adoption', async () => {
+      const tableName = 'test_request_status_changes';
+      await client.query(`ALTER TABLE ${tableName} SET UNLOGGED;`);
+      const live = await readLedgerFingerprint(client);
+      const diff = compareLedgerFingerprint(baseline, live);
+      expect(diff.ok).toBe(false);
+      expect(diff.differing).toContain(`table ${tableName} relpersistence (p → u)`);
+
+      const prefixDecision = decideTrackedPrefixVerification({
+        prefixDiff: { missing: [], differing: [], extra: [`table ${tableName}`] },
+        approvedAhead: [],
+        liveFingerprint: live,
+        laterFilesFingerprint: baseline,
+      });
+      expect(prefixDecision.ok).toBe(false);
+      expect(prefixDecision.reason).toMatch(/unapproved extra object/);
+
+      const expectedTable = { tables: { [tableName]: baseline.tables[tableName] }, functions: [] };
+      const liveTable = { tables: { [tableName]: live.tables[tableName] }, functions: [] };
+      const adoptionDecision = decideFileAction({
+        file: 'synthetic_later_test_request_file.sql',
+        currentChecksum: 'irrelevant-for-untracked-path',
+        trackedRow: null,
+        beforeDiff: { missing: [], differing: [], extra: [`table ${tableName}`] },
+        throughDiff: compareLedgerFingerprint(expectedTable, liveTable),
+        approvedAhead: [],
+        liveFingerprint: live,
+      });
+      expect(adoptionDecision.action).toBe('refuse');
+      expect(adoptionDecision.reason).toMatch(/relpersistence/);
+    });
+
     test('a CREATE POLICY under the same table is reported as extra', async () => {
       await client.query(`CREATE POLICY test_request_runs_all ON test_request_runs FOR SELECT USING (true);`);
       const live = await readLedgerFingerprint(client);
@@ -296,19 +330,180 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
       // Now prove decideFileAction's own per-file path reaches 'adopt' for
       // 058 — the fix's whole point is that this path gets a chance to run
       // at all, rather than the run refusing before it is ever reached.
-      const scratchFp = await fingerprintFilesInScratch(client, [FILE_054, FILE_058], tempMigrationsDir, readLedgerFingerprint);
+      const beforeFp = await fingerprintFilesInScratch(client, [FILE_054], tempMigrationsDir, readLedgerFingerprint);
+      const throughFp = await fingerprintFilesInScratch(client, [FILE_054, FILE_058], tempMigrationsDir, readLedgerFingerprint);
       const liveFingerprint = await readLedgerFingerprint(client);
-      const scratchDiff = compareLedgerFingerprint(scratchFp, liveFingerprint);
+      const beforeDiff = compareLedgerFingerprint(beforeFp, liveFingerprint);
+      const throughDiff = compareLedgerFingerprint(throughFp, liveFingerprint);
       const decision = decideFileAction({
         file: FILE_058,
         currentChecksum: 'irrelevant-for-untracked-path',
         trackedRow: null,
-        liveHasObjects: true,
-        scratchDiff,
+        beforeDiff,
+        throughDiff,
         approvedAhead: [],
         liveFingerprint,
       });
       expect(decision).toEqual({ action: 'adopt' });
+    });
+  });
+
+  describe('prefix-state classification through the actual migration runner', () => {
+    const FIRST = '001_test_request_factory_base.sql';
+    const SECOND = '002_test_request_factory_extension.sql';
+    const firstSql = `
+      CREATE TABLE IF NOT EXISTS test_request_factory_base (
+        id UUID PRIMARY KEY,
+        name TEXT NOT NULL
+      );
+    `;
+    const secondSql = `
+      CREATE TABLE IF NOT EXISTS test_request_factory_base (
+        id UUID PRIMARY KEY,
+        name TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS test_request_factory_extension (
+        id UUID PRIMARY KEY,
+        base_id UUID NOT NULL REFERENCES test_request_factory_base(id),
+        note TEXT NOT NULL
+      );
+    `;
+    const databases = [];
+    let admin;
+
+    const databaseUrl = (name) => {
+      const parsed = new URL(TEST_URL);
+      parsed.pathname = `/${name}`;
+      return parsed.toString();
+    };
+
+    const createDatabase = async () => {
+      const name = `ledger_runner_${crypto.randomBytes(6).toString('hex')}`;
+      if (!/^[a-z0-9_]+$/.test(name)) throw new Error('unsafe generated database identifier');
+      await admin.query(`CREATE DATABASE ${name}`);
+      databases.push(name);
+      return databaseUrl(name);
+    };
+
+    const migrationsDir = ({ includeSecond = false } = {}) => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ledger-runner-'));
+      fs.writeFileSync(path.join(dir, FIRST), firstSql);
+      if (includeSecond) fs.writeFileSync(path.join(dir, SECOND), secondSql);
+      return dir;
+    };
+
+    const runRunner = (ledgerUrl, dir) => {
+      const env = { ...process.env, TEST_REQUEST_SANDBOX_LEDGER_URL: ledgerUrl };
+      // Keep every shared variable explicitly parseable and pointed at the
+      // original scratch database so a developer's .env.local cannot alter
+      // this subprocess's classification.
+      for (const name of SHARED_DATABASE_URL_VARS) env[name] = TEST_URL;
+      return spawnSync(process.execPath, [
+        path.join(process.cwd(), 'scripts/apply-ledger-migrations.js'),
+        '--url-env=TEST_REQUEST_SANDBOX_LEDGER_URL',
+        `--migrations-dir=${dir}`,
+      ], { cwd: process.cwd(), env, encoding: 'utf8' });
+    };
+
+    beforeAll(async () => {
+      admin = new Client({ connectionString: TEST_URL });
+      await admin.connect();
+    });
+
+    afterAll(async () => {
+      if (!admin) return;
+      for (const name of databases) {
+        await admin.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()', [name]);
+        await admin.query(`DROP DATABASE IF EXISTS ${name}`);
+      }
+      await admin.end();
+    });
+
+    test('tracked first file only -> repeated CREATE plus a new table is applied and tracked', async () => {
+      const ledgerUrl = await createDatabase();
+      const dir = migrationsDir();
+      try {
+        expect(runRunner(ledgerUrl, dir).status).toBe(0);
+        fs.writeFileSync(path.join(dir, SECOND), secondSql);
+        const result = runRunner(ledgerUrl, dir);
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain(`[apply ok]  ${SECOND}`);
+
+        const db = new Client({ connectionString: ledgerUrl });
+        await db.connect();
+        try {
+          const columns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'test_request_factory_extension' ORDER BY ordinal_position");
+          expect(columns.rows.map((r) => r.column_name)).toEqual(['id', 'base_id', 'note']);
+          const tracked = await db.query('SELECT name FROM ledger_schema_migrations ORDER BY name');
+          expect(tracked.rows.map((r) => r.name)).toEqual([FIRST, SECOND]);
+        } finally {
+          await db.end();
+        }
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    test('a partial second-file state with the new table in the wrong shape refuses', async () => {
+      const ledgerUrl = await createDatabase();
+      const dir = migrationsDir();
+      try {
+        expect(runRunner(ledgerUrl, dir).status).toBe(0);
+        fs.writeFileSync(path.join(dir, SECOND), secondSql);
+        const db = new Client({ connectionString: ledgerUrl });
+        await db.connect();
+        try {
+          await db.query('CREATE TABLE test_request_factory_extension (id UUID PRIMARY KEY, wrong_column TEXT NOT NULL)');
+        } finally {
+          await db.end();
+        }
+
+        const result = runRunner(ledgerUrl, dir);
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toMatch(/\[refuse\]/);
+
+        const verify = new Client({ connectionString: ledgerUrl });
+        await verify.connect();
+        try {
+          const tracked = await verify.query('SELECT name FROM ledger_schema_migrations ORDER BY name');
+          expect(tracked.rows.map((r) => r.name)).toEqual([FIRST]);
+        } finally {
+          await verify.end();
+        }
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    test('a fully-live second file is adopted and tracked without reapplying it', async () => {
+      const ledgerUrl = await createDatabase();
+      const dir = migrationsDir();
+      try {
+        expect(runRunner(ledgerUrl, dir).status).toBe(0);
+        fs.writeFileSync(path.join(dir, SECOND), secondSql);
+        const db = new Client({ connectionString: ledgerUrl });
+        await db.connect();
+        try {
+          await db.query(secondSql);
+        } finally {
+          await db.end();
+        }
+
+        const result = runRunner(ledgerUrl, dir);
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain(`[adopt]     ${SECOND}`);
+
+        const verify = new Client({ connectionString: ledgerUrl });
+        await verify.connect();
+        try {
+          const tracked = await verify.query('SELECT name FROM ledger_schema_migrations ORDER BY name');
+          expect(tracked.rows.map((r) => r.name)).toEqual([FIRST, SECOND]);
+        } finally {
+          await verify.end();
+        }
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -343,28 +538,22 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
 
         const files = listLedgerMigrationFiles();
         const currentFile = files[0]; // 054_test_request_runs.sql
-        const currentSql = fs.readFileSync(path.join(LEDGER_MIGRATIONS_DIR, currentFile), 'utf8');
-        const names = tableNamesIn(currentSql);
-        const { rows } = await histClient.query(
-          'SELECT 1 FROM pg_tables WHERE schemaname = current_schema() AND tablename = ANY($1) LIMIT 1',
-          [names],
-        );
-        const liveHasObjects = rows.length > 0;
-        expect(liveHasObjects).toBe(true); // the historical shape already has test_request_runs etc.
-
-        const scratchFp = await fingerprintFilesInScratch(histClient, [currentFile], LEDGER_MIGRATIONS_DIR, readLedgerFingerprint);
+        const beforeFp = { tables: {}, functions: [] };
+        const throughFp = await fingerprintFilesInScratch(histClient, [currentFile], LEDGER_MIGRATIONS_DIR, readLedgerFingerprint);
         const liveFp = await readLedgerFingerprint(histClient);
-        const scratchDiff = compareLedgerFingerprint(scratchFp, liveFp);
+        const beforeDiff = compareLedgerFingerprint(beforeFp, liveFp);
+        const throughDiff = compareLedgerFingerprint(throughFp, liveFp);
 
         const decision = decideFileAction({
           file: currentFile,
           currentChecksum: 'irrelevant-for-untracked-path',
           trackedRow: null,
-          liveHasObjects,
-          scratchDiff,
+          beforeDiff,
+          throughDiff,
+          liveFingerprint: liveFp,
         });
         expect(decision.action).toBe('refuse');
-        expect(scratchDiff.missing.length + scratchDiff.differing.length).toBeGreaterThan(0);
+        expect(throughDiff.missing.length + throughDiff.differing.length).toBeGreaterThan(0);
       } finally {
         await histClient.query(`DROP SCHEMA IF EXISTS ${historicalSchema} CASCADE`).catch(() => {});
         await histClient.end();

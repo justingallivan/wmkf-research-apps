@@ -1,14 +1,11 @@
 /** @jest-environment node */
 import {
-  decideFileAction, sha256Text, tableNamesIn, stripOuterTxn, decideTrackedPrefixVerification, selectTrackedPrefixFiles,
+  decideFileAction, sha256Text, stripOuterTxn, decideTrackedPrefixVerification, selectTrackedPrefixFiles,
 } from '../../lib/db/ledger-migrations';
 
-// Opus round-2 item 4: a genuinely clean scratch diff has NO extra either —
-// the prior fixture used a diff containing an extra table and still called
-// it "clean", which is exactly the bug Codex found (decideFileAction
-// ignored scratchDiff.extra and adopted anyway).
+// A genuinely clean prefix diff has no extra objects either; approved-ahead
+// entries are the only explicit exception.
 const CLEAN_DIFF = { missing: [], differing: [], extra: [] };
-const DIRTY_DIFF = { missing: ['table test_request_status_changes'], differing: [], extra: [] };
 
 const APPROVED_TABLE_SHAPE = {
   columns: [{ name: 'binding_id', type: 'uuid', nullable: false, default: null }],
@@ -57,62 +54,65 @@ describe('Codex round-1 Fix 3: decideFileAction', () => {
     expect(accepted).toEqual({ action: 'accept-checksum' });
   });
 
-  test('untracked, no live objects -> apply', () => {
+  test('untracked + live matches the prefix BEFORE the file -> apply', () => {
     const decision = decideFileAction({
       file: '054_test_request_runs.sql',
       currentChecksum: 'abc',
       trackedRow: null,
-      liveHasObjects: false,
+      beforeDiff: CLEAN_DIFF,
+      throughDiff: { missing: ['table test_request_runs'], differing: [], extra: [] },
     });
     expect(decision).toEqual({ action: 'apply' });
   });
 
-  test('untracked + clean (scratch diff has no missing/differing) -> adopt', () => {
+  test('untracked + live matches the prefix THROUGH the file -> adopt', () => {
     const decision = decideFileAction({
       file: '054_test_request_runs.sql',
       currentChecksum: 'abc',
       trackedRow: null,
-      liveHasObjects: true,
-      scratchDiff: CLEAN_DIFF,
+      beforeDiff: { missing: [], differing: [], extra: ['table test_request_runs'] },
+      throughDiff: CLEAN_DIFF,
     });
     expect(decision).toEqual({ action: 'adopt' });
   });
 
-  test('untracked + drift (scratch diff has missing or differing) -> refuse', () => {
+  test('untracked + partial state matching neither prefix -> refuse and name both mismatches', () => {
     const decision = decideFileAction({
-      file: '054_test_request_runs.sql',
+      file: '058_test_request_cast_slot_bindings.sql',
       currentChecksum: 'abc',
       trackedRow: null,
-      liveHasObjects: true,
-      scratchDiff: DIRTY_DIFF,
+      beforeDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+      throughDiff: { missing: [], differing: ['column test_request_cast_slot_bindings.member_id'], extra: [] },
     });
     expect(decision.action).toBe('refuse');
-    expect(decision.reason).toMatch(/differ from the checkout's migration/);
+    expect(decision.reason).toMatch(/BEFORE=.*test_request_cast_slot_bindings/);
+    expect(decision.reason).toMatch(/THROUGH=.*member_id/);
   });
 
-  test('Opus round-2 item 4: an unapproved extra (e.g. an extra trigger) refuses, never adopts silently', () => {
+  test('an unapproved extra (e.g. an extra trigger) makes both prefix states refuse', () => {
     const decision = decideFileAction({
       file: '054_test_request_runs.sql',
       currentChecksum: 'abc',
       trackedRow: null,
-      liveHasObjects: true,
-      scratchDiff: { missing: [], differing: [], extra: ['trigger test_request_runs.unexpected_side_effect'] },
+      beforeDiff: { missing: [], differing: [], extra: ['trigger test_request_runs.unexpected_side_effect'] },
+      throughDiff: { missing: [], differing: [], extra: ['trigger test_request_runs.unexpected_side_effect'] },
       approvedAhead: [],
     });
     expect(decision.action).toBe('refuse');
-    expect(decision.reason).toMatch(/unapproved extra object/);
+    expect(decision.reason).toMatch(/unapproved extra/);
     expect(decision.reason).toMatch(/unexpected_side_effect/);
   });
 
-  test('an extra table that is exactly shape-approved by lib/db/ledger-schema-ahead.json adopts', () => {
+  test('approved-ahead extras are ignored while THROUGH still identifies an already-live file -> adopt', () => {
+    const currentShape = { columns: [], constraints: [], indexes: [], triggers: [] };
     const decision = decideFileAction({
       file: '054_test_request_runs.sql',
       currentChecksum: 'abc',
       trackedRow: null,
-      liveHasObjects: true,
-      scratchDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+      beforeDiff: { missing: [], differing: [], extra: ['table test_request_runs', 'table test_request_cast_slot_bindings'] },
+      throughDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
       approvedAhead: APPROVED_AHEAD,
-      liveFingerprint: { tables: { test_request_cast_slot_bindings: APPROVED_TABLE_SHAPE } },
+      liveFingerprint: { tables: { test_request_runs: currentShape, test_request_cast_slot_bindings: APPROVED_TABLE_SHAPE } },
     });
     expect(decision).toEqual({ action: 'adopt' });
   });
@@ -123,13 +123,41 @@ describe('Codex round-1 Fix 3: decideFileAction', () => {
       file: '054_test_request_runs.sql',
       currentChecksum: 'abc',
       trackedRow: null,
-      liveHasObjects: true,
-      scratchDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+      beforeDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+      throughDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
       approvedAhead: APPROVED_AHEAD,
       liveFingerprint: { tables: { test_request_cast_slot_bindings: driftedShape } },
     });
     expect(decision.action).toBe('refuse');
-    expect(decision.reason).toMatch(/unapproved extra object/);
+    expect(decision.reason).toMatch(/unapproved extra/);
+  });
+
+  test('when approved-ahead makes both states acceptable, the closer raw THROUGH state adopts', () => {
+    const decision = decideFileAction({
+      file: '058_test_request_cast_slot_bindings.sql',
+      currentChecksum: 'abc',
+      trackedRow: null,
+      beforeDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+      throughDiff: CLEAN_DIFF,
+      approvedAhead: APPROVED_AHEAD,
+      liveFingerprint: { tables: { test_request_cast_slot_bindings: APPROVED_TABLE_SHAPE } },
+    });
+    expect(decision).toEqual({ action: 'adopt' });
+  });
+
+  test('an approved current-file object without the rest of that file is still partial and refuses', () => {
+    const decision = decideFileAction({
+      file: '058_test_request_cast_slot_bindings.sql',
+      currentChecksum: 'abc',
+      trackedRow: null,
+      beforeDiff: { missing: [], differing: [], extra: ['table test_request_cast_slot_bindings'] },
+      throughDiff: { missing: ['table test_request_second_object'], differing: [], extra: [] },
+      approvedAhead: APPROVED_AHEAD,
+      liveFingerprint: { tables: { test_request_cast_slot_bindings: APPROVED_TABLE_SHAPE } },
+    });
+    expect(decision.action).toBe('refuse');
+    expect(decision.reason).toMatch(/partial current-file objects already live/);
+    expect(decision.reason).toMatch(/test_request_second_object/);
   });
 });
 
@@ -293,18 +321,6 @@ describe('helpers', () => {
     expect(sha256Text('a')).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  test('tableNamesIn finds CREATE TABLE [IF NOT EXISTS] names', () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS test_request_runs (id uuid);
-      CREATE TABLE other_table (id uuid);
-    `;
-    expect(tableNamesIn(sql)).toEqual(['test_request_runs', 'other_table']);
-  });
-
-  test('tableNamesIn returns empty for a file with no CREATE TABLE', () => {
-    expect(tableNamesIn('ALTER TABLE x ADD COLUMN y text;')).toEqual([]);
-  });
-
   test('stripOuterTxn removes only standalone BEGIN;/COMMIT; lines', () => {
     const body = 'BEGIN;\nCREATE TABLE x (id uuid);\nCOMMIT;\n';
     expect(stripOuterTxn(body)).toBe('\nCREATE TABLE x (id uuid);\n');
@@ -370,8 +386,8 @@ describe('Opus round-2 item 5: apply-ledger-migrations.js --dry-run sends only S
           // identity right after connecting; answer it so the test
           // continues past that into the actual dry-run file loop.
           if (/current_database/i.test(text)) return { rows: [{ db: 'ledger', schema: 'public', port: 5432 }] };
-          // Simulate an untracked file whose objects already exist live —
-          // exactly the path that used to run scratch DDL under --dry-run.
+          // Keep a response for the retired pg_tables heuristic so this fake
+          // would still catch any accidental reintroduction of that query.
           if (/to_regclass/i.test(text)) return { rows: [{ reg: 'ledger_schema_migrations' }] };
           if (/information_schema\.columns/i.test(text)) return { rows: [{ x: 1 }] };
           if (/SELECT name, sha256 FROM/i.test(text)) return { rows: [] };
@@ -430,6 +446,7 @@ describe('Opus round-3 L2: tracker DDL runs only after identity check + prefix v
         query: jest.fn(async (text) => {
           calls.push(String(text));
           if (/current_database/i.test(text)) return { rows: [{ db: 'ledger', schema: 'public', port: 5432 }] };
+          if (/current_schema\(\) AS schema/i.test(text)) return { rows: [{ schema: 'public' }] };
           if (/to_regclass/i.test(text)) return { rows: [{ reg: null }] }; // tracker absent -> nothing tracked -> prefix verification is a no-op
           if (/pg_tables/i.test(text)) return { rows: [] };
           return { rows: [] };

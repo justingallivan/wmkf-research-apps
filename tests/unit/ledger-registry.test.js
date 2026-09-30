@@ -3,6 +3,7 @@ import {
   MANAGED_LEDGER_HOSTS,
   LOCAL_LEDGER_HOSTS,
   LEDGER_VAR_TARGETS,
+  SHARED_DATABASE_URL_VARS,
   classifyLedgerHost,
   classifyLedgerUrl,
   expectedLedgerDatabase,
@@ -32,6 +33,16 @@ test('the registry is exact hostnames: one managed pooled host, three local host
   // The app database's host and any other Neon host stay refused.
   expect(classifyLedgerHost('ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech')).toBeNull();
   expect(classifyLedgerHost('')).toBeNull();
+});
+
+test('shared database environment variables have one complete exported registry', () => {
+  expect(SHARED_DATABASE_URL_VARS).toEqual([
+    'POSTGRES_URL',
+    'POSTGRES_URL_NON_POOLING',
+    'POSTGRES_PRISMA_URL',
+    'DATABASE_URL',
+    'DATABASE_URL_UNPOOLED',
+  ]);
 });
 
 test('the managed host must carry the database the target expects', () => {
@@ -121,6 +132,24 @@ describe('Codex round-1 Fix 1: effective destination, not URL text', () => {
     const unparseableShared = 'postgresql://@';
     expect(classifyLedgerUrl(candidate, { target: 'production', sharedUrls: [unparseableShared] }))
       .toMatchObject({ ok: false, reason: 'shared_unparseable' });
+  });
+
+  test.each(['postgres:///appdb', 'postgres://', 'not a url', ''])(
+    'a configured shared URL without an explicit host and database fails closed: %s',
+    (shared) => {
+      const candidate = 'postgresql://r:p@127.0.0.1:5433/ledger';
+      expect(classifyLedgerUrl(candidate, { target: 'production', sharedUrls: [shared] }))
+        .toMatchObject({ ok: false, reason: 'shared_unparseable' });
+    },
+  );
+
+  test('a shared destination exposed only through DATABASE_URL_UNPOOLED is refused as shared_database', () => {
+    const configured = 'postgresql://app_role:pw@localhost:5433/shared_db';
+    const candidate = 'postgresql://ledger_role:pw@127.0.0.1:5433/shared_db';
+    const env = { DATABASE_URL_UNPOOLED: configured };
+    const sharedUrls = SHARED_DATABASE_URL_VARS.map((name) => env[name]).filter(Boolean);
+    expect(classifyLedgerUrl(candidate, { target: 'production', sharedUrls }))
+      .toMatchObject({ ok: false, reason: 'shared_database' });
   });
 
   test('a DIFFERENT database on the same endpoint is not shared', () => {

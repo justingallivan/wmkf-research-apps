@@ -22,6 +22,9 @@ const fn = (signature, { returnType = 'void', language = 'sql', volatile = 'i', 
 const base = () => ({
   tables: {
     test_request_runs: {
+      relkind: 'r',
+      relpersistence: 'p',
+      rowSecurity: { enabled: false, forced: false },
       columns: [col('run_id', 'uuid', false), col('status', 'text', false, "'pending'::text")],
       constraints: [cons('test_request_runs_pkey', 'p', 'PRIMARY KEY (run_id)'), cons('test_request_runs_status_check', 'c', "CHECK (status = ANY (ARRAY['pending', 'done']))")],
       indexes: [idx('test_request_runs_pkey', 'CREATE UNIQUE INDEX ... USING btree (run_id)', true, true), idx('test_request_runs_status_idx', 'CREATE INDEX ... USING btree (status)')],
@@ -63,6 +66,15 @@ test('a changed column type, nullability, or default fails as differing', () => 
   expect(d.ok).toBe(false);
   expect(d.differing[0]).toContain('column test_request_runs.status');
   expect(formatLedgerDiff(d)).toContain('DIFFERS   column test_request_runs.status');
+});
+
+test('a changed relation persistence fails with a clear differing message', () => {
+  const live = base();
+  live.tables.test_request_runs.relpersistence = 'u';
+  const d = compareLedgerFingerprint(base(), live);
+  expect(d.ok).toBe(false);
+  expect(d.differing).toContain('table test_request_runs relpersistence (p → u)');
+  expect(formatLedgerDiff(d)).toContain('DIFFERS   table test_request_runs relpersistence (p → u)');
 });
 
 // Opus round-1 L5: one isolated mutation per column field, so deleting any

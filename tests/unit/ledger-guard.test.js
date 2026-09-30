@@ -8,7 +8,7 @@
  * These tests exercise the actual behavior with an injectable fake db.
  */
 import { requireLedgerUrl, ledgerSchemaCheck, LEDGER_CHECK_READ_ONLY_MODES } from '../../lib/db/ledger-guard';
-import { MANAGED_LEDGER_HOSTS } from '../../lib/db/ledger-registry';
+import { MANAGED_LEDGER_HOSTS, SHARED_DATABASE_URL_VARS } from '../../lib/db/ledger-registry';
 
 const MANAGED = MANAGED_LEDGER_HOSTS[0];
 
@@ -81,6 +81,14 @@ describe('requireLedgerUrl (executed, not just grepped for)', () => {
   test('classifyLedgerUrl reason: shared_database', () => {
     const shared = 'postgresql://role:pw@ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech/verceldb';
     const env = { TEST_REQUEST_SANDBOX_LEDGER_URL: shared, POSTGRES_URL: shared };
+    expect(() => requireLedgerUrl('sandbox', env)).toThrow(/shared Production\/Preview database/);
+  });
+
+  test('uses the shared-variable registry, including DATABASE_URL_UNPOOLED', () => {
+    expect(SHARED_DATABASE_URL_VARS).toContain('DATABASE_URL_UNPOOLED');
+    const ledger = 'postgresql://ledger_role:pw@127.0.0.1:5433/shared_db';
+    const shared = 'postgresql://app_role:pw@localhost:5433/shared_db';
+    const env = { TEST_REQUEST_SANDBOX_LEDGER_URL: ledger, DATABASE_URL_UNPOOLED: shared };
     expect(() => requireLedgerUrl('sandbox', env)).toThrow(/shared Production\/Preview database/);
   });
 

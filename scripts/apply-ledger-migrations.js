@@ -8,6 +8,7 @@
  *   node scripts/apply-ledger-migrations.js --url-env=TEST_REQUEST_LEDGER_URL [--dry-run]
  *   node scripts/apply-ledger-migrations.js --url-env=TEST_REQUEST_SANDBOX_LEDGER_URL
  *   node scripts/apply-ledger-migrations.js --url-env=... --accept-tracked-checksums
+ *   node scripts/apply-ledger-migrations.js --url-env=... --migrations-dir=/tmp/ledger-migrations
  *
  * Takes the NAME of the env variable, never the URL, so nothing lands in
  * shell history. Refuses any URL the ledger registry rejects
@@ -20,19 +21,16 @@
  * Per file, one of four actions (lib/db/ledger-migrations.js
  * decideFileAction):
  *   skip     tracked, checksum matches — nothing to do.
- *   apply    untracked, and none of its objects exist live yet — run its SQL
+ *   apply    untracked, and the live fingerprint matches the checkout's
+ *            migration prefix immediately BEFORE this file — run its SQL
  *            and record it.
- *   adopt    untracked, its objects already exist live, and a semantic
- *            fingerprint comparison of "the checkout's files up to and
- *            including this one" against the live ledger is clean — record
- *            it WITHOUT re-running its SQL (this is what makes the runner
- *            safe on a hand-built ledger: it never silently re-applies an
- *            idempotent CREATE ... IF NOT EXISTS over a differently-shaped
- *            live table).
+ *   adopt    untracked, and the live fingerprint matches the checkout's
+ *            migration prefix THROUGH this file — record it WITHOUT
+ *            re-running its SQL.
  *   refuse   tracked with a changed checksum (file edited in place after
  *            being applied — write a new numbered migration instead), OR
- *            untracked with live objects that differ from what this file
- *            would produce.
+ *            untracked whose live fingerprint matches neither the BEFORE
+ *            nor THROUGH prefix state (partial or hand-patched state).
  * A legacy tracker row with no recorded checksum is "unknown": refuse until
  * --accept-tracked-checksums records the checkout's current checksum for it
  * (only meaningful when the operator has confirmed the file has not changed
@@ -85,6 +83,10 @@ async function main() {
   const urlEnvArg = process.argv.find((a) => a.startsWith('--url-env='));
   const dryRun = process.argv.includes('--dry-run');
   const acceptTrackedChecksums = process.argv.includes('--accept-tracked-checksums');
+  const migrationsDirArg = process.argv.find((a) => a.startsWith('--migrations-dir='));
+  const migrationsDir = migrationsDirArg
+    ? path.resolve(migrationsDirArg.slice('--migrations-dir='.length))
+    : null;
   const urlEnv = urlEnvArg?.slice('--url-env='.length);
   if (!urlEnv || !/^[A-Z0-9_]+$/.test(urlEnv)) {
     throw new Error('Pass --url-env=<ENV_VARIABLE_NAME> naming the ledger connection variable (never the URL itself).');
@@ -92,15 +94,19 @@ async function main() {
   loadEnvLocal();
   const url = process.env[urlEnv];
   const {
-    classifyLedgerUrl, targetForLedgerVar, buildLedgerClientConfig, assertLedgerConnectionIdentity,
+    classifyLedgerUrl, targetForLedgerVar, buildLedgerClientConfig, assertLedgerConnectionIdentity, SHARED_DATABASE_URL_VARS,
   } = await import('../lib/db/ledger-registry.js');
   const {
     listLedgerMigrationFiles, LEDGER_MIGRATIONS_DIR, LEDGER_TRACKER_TABLE,
     readLedgerFingerprint, compareLedgerFingerprint, formatLedgerDiff, readApprovedAhead,
   } = await import('../lib/db/ledger-schema.js');
   const {
-    decideFileAction, sha256Text, stripOuterTxn, tableNamesIn, fingerprintFilesInScratch, verifyTrackedPrefix, selectTrackedPrefixFiles,
+    decideFileAction, sha256Text, stripOuterTxn, fingerprintFilesInScratch, verifyTrackedPrefix, selectTrackedPrefixFiles,
   } = await import('../lib/db/ledger-migrations.js');
+  const effectiveMigrationsDir = migrationsDir || LEDGER_MIGRATIONS_DIR;
+  if (!fs.existsSync(effectiveMigrationsDir) || !fs.statSync(effectiveMigrationsDir).isDirectory()) {
+    throw new Error(`Migration directory does not exist or is not a directory: ${effectiveMigrationsDir}`);
+  }
   // Opus round-1 L1: derive the target from the variable name the same way
   // check-factory-ledger.js does, so the managed-host database rule applies
   // here too (previously classifyLedgerUrl ran with no target and accepted
@@ -109,7 +115,7 @@ async function main() {
   if (!target) {
     throw new Error(`${urlEnv} is not a recognized ledger variable (see lib/db/ledger-registry.js LEDGER_VAR_TARGETS); expected TEST_REQUEST_LEDGER_URL or TEST_REQUEST_SANDBOX_LEDGER_URL.`);
   }
-  const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL']
+  const sharedUrls = SHARED_DATABASE_URL_VARS
     .map((name) => process.env[name]).filter(Boolean);
   const verdict = classifyLedgerUrl(url, { target, sharedUrls });
   if (!verdict.ok) {
@@ -118,8 +124,8 @@ async function main() {
   const database = verdict.effective.database;
   console.log(`Ledger: ${verdict.label} host, database ${database} (from ${urlEnv})${dryRun ? ' — DRY RUN' : ''}`);
 
-  const files = listLedgerMigrationFiles(LEDGER_MIGRATIONS_DIR);
-  const fileSql = new Map(files.map((f) => [f, fs.readFileSync(path.join(LEDGER_MIGRATIONS_DIR, f), 'utf8')]));
+  const files = listLedgerMigrationFiles(effectiveMigrationsDir);
+  const fileSql = new Map(files.map((f) => [f, fs.readFileSync(path.join(effectiveMigrationsDir, f), 'utf8')]));
   const fileChecksum = new Map(files.map((f) => [f, sha256Text(fileSql.get(f))]));
   const approvedAhead = readApprovedAhead();
 
@@ -173,7 +179,7 @@ async function main() {
       const prefixVerification = await verifyTrackedPrefix(client, {
         trackedFiles: trackedPrefixFiles,
         allFiles: files,
-        migrationsDir: LEDGER_MIGRATIONS_DIR,
+        migrationsDir: effectiveMigrationsDir,
         readLedgerFingerprint,
         approvedAhead,
       });
@@ -196,43 +202,39 @@ async function main() {
     let adopted = 0;
     let acceptedChecksums = 0;
     let skipped = 0;
-    const filesUpToHere = [];
+    const filesBeforeHere = [];
     for (const f of (prefixVerificationFailed ? [] : files)) {
-      filesUpToHere.push(f);
       const currentChecksum = fileChecksum.get(f);
       const trackedRow = tracked.get(f) || null;
 
-      let liveHasObjects = false;
-      let scratchDiff = null;
+      let beforeDiff = null;
+      let throughDiff = null;
       let liveFingerprint = null;
       if (!trackedRow) {
-        const names = tableNamesIn(fileSql.get(f));
-        if (names.length > 0) {
-          const { rows } = await client.query(
-            'SELECT 1 FROM pg_tables WHERE schemaname = current_schema() AND tablename = ANY($1) LIMIT 1',
-            [names],
-          );
-          liveHasObjects = rows.length > 0;
+        // Prefix-state classification needs two rolled-back scratch schemas,
+        // so dry-run cannot decide apply vs adopt without issuing DDL. Keep
+        // dry-run SELECT-only and make that indeterminacy explicit.
+        if (dryRun) {
+          console.log(`[would need adoption analysis] ${f} (run without --dry-run to compare the prefix before and through this file; the comparisons use rolled-back scratch schemas)`);
+          filesBeforeHere.push(f);
+          continue;
         }
-        if (liveHasObjects) {
-          // Opus round-2 item 5 (Codex #6): --dry-run must issue only
-          // SELECT queries. fingerprintFilesInScratch executes BEGIN,
-          // CREATE SCHEMA, SET LOCAL, the migration bodies, and ROLLBACK —
-          // real DDL even though it rolls back — so a dry run skips it
-          // entirely and reports the file as indeterminate instead.
-          if (dryRun) {
-            console.log(`[would need adoption analysis] ${f} (run without --dry-run to compare; the comparison uses a rolled-back scratch schema)`);
-            continue;
-          }
-          const scratchFp = await fingerprintFilesInScratch(client, filesUpToHere, LEDGER_MIGRATIONS_DIR, readLedgerFingerprint);
-          liveFingerprint = await readLedgerFingerprint(client);
-          scratchDiff = compareLedgerFingerprint(scratchFp, liveFingerprint);
-        }
+
+        const throughFiles = [...filesBeforeHere, f];
+        const beforeFingerprint = filesBeforeHere.length === 0
+          ? { tables: {}, functions: [] }
+          : await fingerprintFilesInScratch(client, filesBeforeHere, effectiveMigrationsDir, readLedgerFingerprint);
+        const throughFingerprint = await fingerprintFilesInScratch(client, throughFiles, effectiveMigrationsDir, readLedgerFingerprint);
+        liveFingerprint = await readLedgerFingerprint(client);
+        beforeDiff = compareLedgerFingerprint(beforeFingerprint, liveFingerprint);
+        throughDiff = compareLedgerFingerprint(throughFingerprint, liveFingerprint);
       }
 
       const decision = decideFileAction({
-        file: f, currentChecksum, trackedRow, liveHasObjects, scratchDiff, acceptTrackedChecksums, approvedAhead, liveFingerprint,
+        file: f, currentChecksum, trackedRow, beforeDiff, throughDiff, acceptTrackedChecksums, approvedAhead, liveFingerprint,
       });
+
+      filesBeforeHere.push(f);
 
       if (decision.action === 'skip') { console.log(`[skip]      ${f}`); skipped += 1; continue; }
 
@@ -246,7 +248,8 @@ async function main() {
 
       if (decision.action === 'refuse') {
         console.error(`[refuse]    ${decision.reason}`);
-        if (scratchDiff) console.error(formatLedgerDiff(scratchDiff));
+        if (beforeDiff) console.error(`BEFORE prefix mismatch:\n${formatLedgerDiff(beforeDiff)}`);
+        if (throughDiff) console.error(`THROUGH prefix mismatch:\n${formatLedgerDiff(throughDiff)}`);
         exitCode = 1;
         break;
       }
@@ -254,7 +257,7 @@ async function main() {
       if (decision.action === 'adopt') {
         if (dryRun) { console.log(`[would adopt] ${f}`); continue; }
         await client.query(`INSERT INTO ${LEDGER_TRACKER_TABLE} (name, applied_by, sha256) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET sha256 = EXCLUDED.sha256`, [f, APPLIED_BY, currentChecksum]);
-        console.log(`[adopt]     ${f} (objects already exist live; recorded without re-applying its SQL)`);
+        console.log(`[adopt]     ${f} (live schema matches the prefix through this file; recorded without re-applying its SQL)`);
         adopted += 1;
         continue;
       }

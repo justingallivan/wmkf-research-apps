@@ -104,7 +104,7 @@ async function connectWithRetry(url, registry) {
 async function writeExpected(schemaLib, registry) {
   const url = process.env.TEST_REQUEST_LEDGER_TEST_URL;
   if (!url) throw new Error('--write-expected needs TEST_REQUEST_LEDGER_TEST_URL (a scratch/local Postgres).');
-  const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL', 'TEST_REQUEST_LEDGER_URL', 'TEST_REQUEST_SANDBOX_LEDGER_URL']
+  const sharedUrls = [...registry.SHARED_DATABASE_URL_VARS, 'TEST_REQUEST_LEDGER_URL', 'TEST_REQUEST_SANDBOX_LEDGER_URL']
     .map((n) => process.env[n]).filter(Boolean);
   const verdict = registry.classifyLedgerUrl(url, { sharedUrls });
   if (!verdict.ok) {
@@ -138,7 +138,7 @@ async function writeExpected(schemaLib, registry) {
 
 /** @returns {'ok'|'fail'|'refused'|'unreachable'} */
 async function checkOne(name, url, target, schemaLib, registry, expected, approvedAhead) {
-  const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL']
+  const sharedUrls = registry.SHARED_DATABASE_URL_VARS
     .map((n) => process.env[n]).filter(Boolean);
   const verdict = registry.classifyLedgerUrl(url, { target, sharedUrls });
   if (!verdict.ok) {

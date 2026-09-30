@@ -5,6 +5,7 @@
       "tables": {
         "test_request_cast_slot_bindings": {
           "relkind": "r",
+          "relpersistence": "p",
           "rowSecurity": {
             "enabled": false,
             "forced": false

@@ -70,17 +70,18 @@ describe('check-factory-ledger.js --write-expected refuses an unsafe TEST_REQUES
     // TEST_REQUEST_LEDGER_URL/TEST_REQUEST_SANDBOX_LEDGER_URL from
     // .env.local under the shared_database check (which is checked first).
     const url = LEDGER_URL.replace('/ledger?', '/ledger_scratch_probe?');
-    // Non-URL sentinels (truthy, so loadEnvLocal's `!process.env[k]` fallback
-    // never repopulates them from .env.local; unparseable, so
-    // classifyLedgerUrl's sharedUrls comparison silently skips them instead
-    // of colliding with this test's synthetic managed-host URL).
+    // A valid, different local destination keeps loadEnvLocal from
+    // repopulating any shared variable while allowing the shared comparison
+    // to complete (unparseable configured shared URLs now fail closed).
+    const differentShared = 'postgresql://role:pw@127.0.0.1:5433/not_the_candidate';
     const { calls, exits } = await runWriteExpected({
-      TEST_REQUEST_LEDGER_URL: 'unset-for-this-test',
-      TEST_REQUEST_SANDBOX_LEDGER_URL: 'unset-for-this-test',
-      POSTGRES_URL: 'unset-for-this-test',
-      POSTGRES_URL_NON_POOLING: 'unset-for-this-test',
-      POSTGRES_PRISMA_URL: 'unset-for-this-test',
-      DATABASE_URL: 'unset-for-this-test',
+      TEST_REQUEST_LEDGER_URL: differentShared,
+      TEST_REQUEST_SANDBOX_LEDGER_URL: differentShared,
+      POSTGRES_URL: differentShared,
+      POSTGRES_URL_NON_POOLING: differentShared,
+      POSTGRES_PRISMA_URL: differentShared,
+      DATABASE_URL: differentShared,
+      DATABASE_URL_UNPOOLED: differentShared,
       TEST_REQUEST_LEDGER_TEST_URL: url,
     });
     expect(exits).toEqual([1]);
