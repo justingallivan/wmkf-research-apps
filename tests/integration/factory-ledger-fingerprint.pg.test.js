@@ -65,4 +65,85 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
     const again = await readLedgerFingerprint(client);
     expect(compareLedgerFingerprint(readExpectedFingerprint().fingerprint, again)).toMatchObject({ ok: true, extra: [] });
   });
+
+  /**
+   * Codex round-1 Fix 2: the fingerprint must notice semantic drift under a
+   * STABLE object name, not just a renamed/missing object. Each case mutates
+   * one object of its class under the same name the baseline used, then
+   * proves compareLedgerFingerprint reports it as `differing` against the
+   * pre-mutation baseline (never `ok`).
+   */
+  describe('mutation detection: same-named semantic drift is reported as differing', () => {
+    let baseline;
+
+    beforeAll(async () => {
+      baseline = await readLedgerFingerprint(client);
+    });
+
+    afterEach(async () => {
+      // Restore a clean baseline for the next mutation case.
+      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await client.query(`CREATE SCHEMA ${schema}`);
+      await client.query(`SET search_path TO ${schema}`);
+      for (const f of listLedgerMigrationFiles()) {
+        await client.query(fs.readFileSync(path.join(LEDGER_MIGRATIONS_DIR, f), 'utf8'));
+      }
+    });
+
+    test('a CHECK body changed under the same constraint name', async () => {
+      await client.query(`
+        ALTER TABLE test_request_runs DROP CONSTRAINT test_request_runs_status_check;
+        ALTER TABLE test_request_runs ADD CONSTRAINT test_request_runs_status_check
+          CHECK (status IN ('pending', 'dispatched', 'verified'));
+      `);
+      const live = await readLedgerFingerprint(client);
+      const diff = compareLedgerFingerprint(baseline, live);
+      expect(diff.ok).toBe(false);
+      expect(diff.differing.some((d) => d.includes('constraint test_request_runs.test_request_runs_status_check'))).toBe(true);
+    });
+
+    test('a column default changed under the same column name', async () => {
+      await client.query("ALTER TABLE test_request_cast_bindings ALTER COLUMN status SET DEFAULT 'queued';");
+      const live = await readLedgerFingerprint(client);
+      const diff = compareLedgerFingerprint(baseline, live);
+      expect(diff.ok).toBe(false);
+      expect(diff.differing.some((d) => d.includes('column test_request_cast_bindings.status'))).toBe(true);
+    });
+
+    test('a partial-index predicate changed under the same index name', async () => {
+      const table = Object.keys(baseline.tables).find((t) => baseline.tables[t].indexes.some((i) => !i.primary && !i.unique));
+      const target = baseline.tables[table].indexes.find((i) => !i.primary && !i.unique);
+      await client.query(`DROP INDEX ${target.name};`);
+      const rebuilt = target.definition.replace(/^CREATE INDEX [^ ]+ ON /, `CREATE INDEX ${target.name} ON `);
+      await client.query(`${rebuilt} WHERE run_id IS NOT NULL;`);
+      const live = await readLedgerFingerprint(client);
+      const diff = compareLedgerFingerprint(baseline, live);
+      expect(diff.ok).toBe(false);
+      expect(diff.differing.some((d) => d.includes(`index ${table}.${target.name}`))).toBe(true);
+    });
+
+    test('index uniqueness changed under the same index name', async () => {
+      const table = Object.keys(baseline.tables).find((t) => baseline.tables[t].indexes.some((i) => !i.primary && !i.unique));
+      const target = baseline.tables[table].indexes.find((i) => !i.primary && !i.unique);
+      await client.query(`DROP INDEX ${target.name};`);
+      const col = target.definition.match(/\(([^)]+)\)\s*$/)?.[1] || target.definition.match(/\(([^)]+)\)/)[1];
+      await client.query(`CREATE UNIQUE INDEX ${target.name} ON ${table} (${col});`);
+      const live = await readLedgerFingerprint(client);
+      const diff = compareLedgerFingerprint(baseline, live);
+      expect(diff.ok).toBe(false);
+      expect(diff.differing.some((d) => d.includes(`index ${table}.${target.name}`))).toBe(true);
+    });
+
+    test('the receipt function body changed under the same signature', async () => {
+      await client.query(`
+        CREATE OR REPLACE FUNCTION test_request_receipt_ok(receipt jsonb) RETURNS boolean AS $$
+          SELECT receipt IS NOT NULL;
+        $$ LANGUAGE sql IMMUTABLE;
+      `);
+      const live = await readLedgerFingerprint(client);
+      const diff = compareLedgerFingerprint(baseline, live);
+      expect(diff.ok).toBe(false);
+      expect(diff.differing.some((d) => d.includes('function test_request_receipt_ok'))).toBe(true);
+    });
+  });
 });

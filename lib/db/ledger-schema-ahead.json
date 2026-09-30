@@ -1,0 +1,10 @@
+{
+  "approvedAhead": [
+    {
+      "migration": "058_test_request_cast_slot_bindings.sql",
+      "objects": [
+        "table test_request_cast_slot_bindings"
+      ]
+    }
+  ]
+}
