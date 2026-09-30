@@ -22,7 +22,7 @@ jest.mock('../../shared/config/reviewerFinderPreferences', () => ({ readEmailSig
 jest.mock('../../shared/components/reviewers/reviewer-modes', () => ({ computeCanManage: () => true }));
 jest.mock('../../lib/dataverse/core/interlock', () => ({ classifyTarget: () => 'sandbox' }));
 for (const name of ['reviewers/ReviewersTab', 'workbench/ReviewsTab', 'workbench/ProposalTab', 'workbench/StatusTab', 'workbench/AwardeeTab',
-  'workbench/InitialAssessmentTab', 'workbench/StaffDeliberationsTab', 'workbench/FinalWriteupTab']) {
+  'workbench/InitialAssessmentTab', 'workbench/StaffDeliberationsTab', 'workbench/FinalWriteupTab', 'workbench/IntegrityTab']) {
   jest.mock(`../../shared/components/${name}`, () => function Stub() { return <div />; });
 }
 jest.mock('../../shared/components/workbench/OverviewTab', () => function OverviewStub() { return <div data-testid="overview-tab" />; });
@@ -44,7 +44,15 @@ test('visibleTabsFor: the gated tab sits between Reviews and Staff Deliberations
   expect(visibleTabsFor(undefined).map((t) => t.key)).not.toContain('review-panel');
   expect(visibleTabsFor(() => 'yes').map((t) => t.key)).not.toContain('review-panel'); // strict true only
   // Every ungated tab survives regardless of access.
-  expect(visibleTabsFor(() => false)).toHaveLength(visibleTabsFor(() => true).length - 1);
+  const gatedCount = visibleTabsFor(() => true).filter((tab) => tab.gate).length;
+  expect(visibleTabsFor(() => false)).toHaveLength(visibleTabsFor(() => true).length - gatedCount);
+});
+
+test('Integrity is gated by the integrity-screener app grant and follows Proposal', () => {
+  const withGrant = visibleTabsFor((key) => key === 'integrity-screener').map((t) => t.key);
+  expect(withGrant[withGrant.indexOf('integrity') - 1]).toBe('proposal');
+  expect(visibleTabsFor(() => false).map((t) => t.key)).not.toContain('integrity');
+  expect(visibleTabsFor(() => true)).toContainEqual(expect.objectContaining({ key: 'integrity', gate: 'integrity-screener' }));
 });
 
 test('without the grant, the tab button is absent and ?tab=review-panel deep-links fall back to Overview (never a blank panel)', () => {

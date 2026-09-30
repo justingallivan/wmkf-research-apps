@@ -29,6 +29,7 @@ import { readEmailSignaturePreference } from '../../shared/config/reviewerFinder
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
+import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
@@ -49,6 +50,7 @@ import { classifyTarget } from '../../lib/dataverse/core/interlock';
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
+  { key: 'integrity', label: 'Integrity', gate: 'integrity-screener' },
   { key: 'initial-writeup', label: 'Initial Assessment' },
   { key: 'reviewers', label: 'Reviewers' },
   { key: 'reviews', label: 'Reviews' },
@@ -256,6 +258,8 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
         />
       ) : activeTab === 'proposal' ? (
         <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+      ) : activeTab === 'integrity' ? (
+        <IntegrityTab key={routeRequestId || ''} requestId={routeRequestId || ''} />
       ) : activeTab === 'initial-writeup' ? (
         <InitialAssessmentTab
           key={typeof requestId === 'string' ? requestId : ''}

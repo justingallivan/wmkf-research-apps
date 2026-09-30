@@ -40,6 +40,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import PreSiteDistributionPanel from './PreSiteDistributionPanel';
 import useSiteVisitContext from './useSiteVisitContext';
+import ResearchPresentationFollowUp from './ResearchPresentationFollowUp';
 import DeliberationStageRail from './DeliberationStageRail';
 import OverflowMenu from './OverflowMenu';
 import ResearchPresentationMaterialsCard from './ResearchPresentationMaterialsCard';
@@ -1122,6 +1123,13 @@ export default function StaffDeliberationsTab({
           </div>
         )}
       </Card>
+
+      {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
+        <ResearchPresentationFollowUp
+          status="loaded"
+          materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
+        />
+      )}
 
       <Card hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">

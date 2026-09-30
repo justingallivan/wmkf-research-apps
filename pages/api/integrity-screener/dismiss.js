@@ -70,7 +70,7 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Screening not found' });
       }
 
-      await IntegrityService.dismissMatch(
+      const dismissed = await IntegrityService.dismissMatch(
         parseInt(screeningId),
         source,
         sourceIdentifier || null,
@@ -78,6 +78,9 @@ export default async function handler(req, res) {
         reason,
         notes || null
       );
+      if (!dismissed) {
+        return res.status(404).json({ error: 'Screening not found' });
+      }
 
       return res.json({
         success: true,

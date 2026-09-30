@@ -14,10 +14,14 @@ jest.mock('../../lib/services/sharepoint-cleanup', () => ({ cleanupSharePointIte
 
 import { sql } from '@vercel/postgres';
 import { del } from '@vercel/blob';
+import { createHash } from 'node:crypto';
 import {
+  DEFAULT_CLEANUP_DEPENDENCIES,
   PORTAL_UPLOAD_SCOPES,
   cleanupExpiredPortalUploads,
 } from '../../lib/services/portal-upload-staging';
+import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument';
+import { GraphService } from '../../lib/services/graph-service';
 
 const REGISTRY_ID = '33333333-3333-4333-8333-333333333333';
 
@@ -38,6 +42,8 @@ function makeDependencies(overrides = {}) {
     isConsultantFeedbackBound: jest.fn().mockResolvedValue(false),
     getGranteeDeliverable: jest.fn().mockResolvedValue({ wmkf_imagefileref: null }),
     isSiteVisitMaterialSlotCurrent: jest.fn().mockResolvedValue(false),
+    verifyPostPresentationTranscriptCandidateUnchanged: jest.fn(async (candidate) => candidate),
+    discardPostPresentationTranscriptCandidate: jest.fn().mockResolvedValue(true),
     ...overrides,
   };
 }
@@ -55,6 +61,13 @@ function mockSql(rows) {
   // Every subsequent tagged-template call (clear-candidate / expire UPDATE / prune) resolves empty.
   sql.mockResolvedValue({ rows: [], rowCount: 0 });
 }
+
+test('cleanup selection excludes a finalizing row while its claim lease is live', async () => {
+  mockSql([]);
+  await cleanupExpiredPortalUploads({}, makeDependencies());
+  const selection = sql.mock.calls[0][0].join('');
+  expect(selection).toContain("NOT (status = 'finalizing' AND lease_expires_at >= NOW())");
+});
 
 describe('consultant_feedback scope', () => {
   test('an ambiguous generation-key match (more than one registry row) is retained, never discarded', async () => {
@@ -256,6 +269,127 @@ describe('grantee_image / staff_grantee_image scopes', () => {
     const deps = makeDependencies({ getGranteeDeliverable: jest.fn().mockResolvedValue({ wmkf_imagefileref: 'ref-2' }) });
     const result = await cleanupExpiredPortalUploads({}, deps);
     expect(result.retained).toBe(0);
+  });
+});
+
+describe('post_presentation_transcript scope', () => {
+  const candidate = {
+    requestId: '11111111-1111-4111-8111-111111111111',
+    generationKey: 'transcript-gk',
+    driveId: 'drive',
+    itemId: 'item',
+    filename: '1003220-Transcript-upload.pdf',
+    size: 8,
+    eTag: 'etag',
+    sha256: '64-character-test-hash-not-used-by-injected-verifier-00000000000000',
+  };
+
+  test('an exact Request Document match retains bytes even when the row is Superseded', async () => {
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
+      candidate,
+      resourceId: candidate.requestId,
+    })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{
+        wmkf_requestdocumentid: REGISTRY_ID,
+        _wmkf_request_value: candidate.requestId,
+        wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT,
+        wmkf_producer: 'meeting-tracker-post-presentation',
+        wmkf_generationkey: candidate.generationKey,
+        wmkf_sharepointdriveid: candidate.driveId,
+        wmkf_sharepointitemid: candidate.itemId,
+        wmkf_lifecyclestate: 999999,
+      }] }),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+    expect(result.retained).toBe(0);
+  });
+
+  test('a proven zero-row generation lookup deletes only the exact persisted candidate', async () => {
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
+      candidate,
+      resourceId: candidate.requestId,
+    })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [] }),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardPostPresentationTranscriptCandidate).toHaveBeenCalledWith(candidate);
+    expect(result.retained).toBe(0);
+  });
+
+  test('a proven zero-row lookup still retains a candidate whose stable item changed', async () => {
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
+      candidate,
+      resourceId: candidate.requestId,
+    })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [] }),
+      verifyPostPresentationTranscriptCandidateUnchanged: jest.fn().mockResolvedValue(null),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardPostPresentationTranscriptCandidate).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+    expect(result.retained).toBe(1);
+  });
+
+  test.each([
+    ['ambiguous', { records: [{}, {}] }],
+    ['identity mismatch', { records: [{
+      _wmkf_request_value: candidate.requestId,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT,
+      wmkf_producer: 'meeting-tracker-post-presentation',
+      wmkf_generationkey: candidate.generationKey,
+      wmkf_sharepointdriveid: candidate.driveId,
+      wmkf_sharepointitemid: 'different-item',
+    }] }],
+  ])('%s registry state retains the candidate', async (_label, registry) => {
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
+      candidate,
+      resourceId: candidate.requestId,
+    })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue(registry),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+    expect(result.retained).toBe(1);
+  });
+
+  test('default proof hash-verifies metadata drift and deletes only with the refreshed ETag', async () => {
+    const bytes = Buffer.from('%PDF-1.7');
+    const exact = {
+      ...candidate,
+      size: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      eTag: 'old-etag',
+      versionId: '1.0',
+    };
+    const metadata = {
+      siteId: 'site', driveId: exact.driveId, id: exact.itemId, name: exact.filename,
+      size: exact.size, eTag: 'new-etag', versionId: '2.0',
+    };
+    const metadataSpy = jest.spyOn(GraphService, 'getFileMetadataById')
+      .mockResolvedValueOnce(metadata)
+      .mockResolvedValueOnce(metadata);
+    const downloadSpy = jest.spyOn(GraphService, 'downloadFile').mockResolvedValue({ buffer: bytes });
+    const deleteSpy = jest.spyOn(GraphService, 'deleteFileWithEtag').mockResolvedValue(204);
+    const verified = await DEFAULT_CLEANUP_DEPENDENCIES
+      .verifyPostPresentationTranscriptCandidateUnchanged(exact);
+    expect(verified).toMatchObject({ eTag: 'new-etag', versionId: '2.0' });
+    await expect(DEFAULT_CLEANUP_DEPENDENCIES.discardPostPresentationTranscriptCandidate(verified))
+      .resolves.toBe(true);
+    expect(deleteSpy).toHaveBeenCalledWith(exact.driveId, exact.itemId, 'new-etag');
+    metadataSpy.mockRestore();
+    downloadSpy.mockRestore();
+    deleteSpy.mockRestore();
   });
 });
 

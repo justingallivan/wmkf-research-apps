@@ -32,6 +32,7 @@ beforeEach(() => {
   requireAppAccess.mockResolvedValue({ profileId: 7 });
   getScreening.mockImplementation(async (id, profileId) => (id === OWN && profileId === 7 ? { id } : null));
   getDismissals.mockResolvedValue([]);
+  dismissMatch.mockResolvedValue(true);
 });
 
 test('POST refuses to dismiss a match on another user\'s screening', async () => {

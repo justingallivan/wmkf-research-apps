@@ -157,6 +157,7 @@ test('an existing visit: the form loads it, sends activityId + etag, and a write
   global.fetch = jest.fn(async (url, options = {}) => {
     const target = String(url);
     if (target.includes('/recipients')) return response(recipients);
+    if (target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
     if (target.endsWith('/materials')) return response({ error: 'not enabled' }, 503);
     if (options.method === 'PATCH') return response({ error: 'The Site Visit changed or a different activity is active. Reload before saving.', code: 'site_visit_write_conflict' }, 409);
     gets += 1;

@@ -1,0 +1,171 @@
+/** @jest-environment node */
+
+import { GraphService } from '../../lib/services/graph-service';
+
+const originalFetch = global.fetch;
+
+function response(status, body = {}, headers = {}) {
+  const bytes = Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body));
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: jest.fn(async () => body),
+    text: jest.fn(async () => bytes.toString('utf8')),
+    arrayBuffer: jest.fn(async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
+    headers: { get: jest.fn((name) => headers[String(name).toLowerCase()] || null) },
+  };
+}
+
+beforeEach(() => {
+  global.fetch = jest.fn();
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('graph-token');
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site-1');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive-1');
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  GraphService.clearCaches();
+  global.fetch = originalFetch;
+});
+
+test('creates, reads, and cancels a browser-direct upload session without proxying bytes', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(200, {
+      uploadUrl: 'https://upload.example/session-secret',
+      expirationDateTime: '2026-09-22T13:00:00Z',
+      nextExpectedRanges: ['0-'],
+    }))
+    .mockResolvedValueOnce(response(200, {
+      expirationDateTime: '2026-09-22T13:00:00Z',
+      nextExpectedRanges: ['10485760-100665702'],
+    }))
+    .mockResolvedValueOnce(response(204));
+
+  await expect(GraphService.createBrowserUploadSession(
+    'akoya_request', 'Requests/Proof folder', 'proof.mp4', { conflictBehavior: 'fail' },
+  )).resolves.toMatchObject({
+    siteId: 'site-1', driveId: 'drive-1', uploadUrl: 'https://upload.example/session-secret',
+  });
+  expect(global.fetch.mock.calls[0][0]).toContain('/root:/Requests/Proof%20folder/proof.mp4:/createUploadSession');
+  expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer graph-token');
+  expect(global.fetch.mock.calls[0][1].body).toContain('"@microsoft.graph.conflictBehavior":"fail"');
+
+  await expect(GraphService.getBrowserUploadSessionStatus('https://upload.example/session-secret'))
+    .resolves.toMatchObject({ nextExpectedRanges: ['10485760-100665702'] });
+  expect(global.fetch.mock.calls[1][1].headers).toBeUndefined();
+
+  await expect(GraphService.cancelBrowserUploadSession('https://upload.example/session-secret'))
+    .resolves.toEqual({ outcome: 'cancelled', status: 204 });
+  expect(global.fetch.mock.calls[2][1].method).toBe('DELETE');
+  expect(global.fetch.mock.calls[2][1].headers).toBeUndefined();
+});
+
+test.each([
+  [404, 'gone'],
+  [410, 'expired'],
+])('upload-session cancellation preserves Microsoft %s as %s', async (status, outcome) => {
+  global.fetch.mockResolvedValueOnce(response(status));
+  await expect(GraphService.cancelBrowserUploadSession('https://upload.example/session-secret'))
+    .resolves.toEqual({ outcome, status });
+});
+
+test('upload-session status honors a shorter caller-owned timeout', async () => {
+  jest.useFakeTimers();
+  global.fetch.mockImplementation((_url, options) => new Promise((resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), {
+      name: 'AbortError',
+    })));
+  }));
+  const pending = GraphService.getBrowserUploadSessionStatus(
+    'https://upload.example/session-secret',
+    { timeoutMs: 25 },
+  );
+  const rejected = expect(pending).rejects.toMatchObject({ noResponse: true });
+  await jest.advanceTimersByTimeAsync(25);
+  await rejected;
+  jest.useRealTimers();
+});
+
+test('resolves one-shot media and reads only the requested signature range', async () => {
+  const metadata = {
+    id: 'item-1',
+    name: 'proof.mp4',
+    size: 80_000_000,
+    file: { mimeType: 'video/mp4' },
+    '@microsoft.graph.downloadUrl': 'https://media.example/one-shot',
+  };
+  global.fetch
+    .mockResolvedValueOnce(response(200, metadata))
+    .mockResolvedValueOnce(response(200, metadata))
+    .mockResolvedValueOnce(response(206, Buffer.alloc(32), { 'content-range': 'bytes 0-31/80000000' }));
+
+  await expect(GraphService.resolveMediaDownloadUrl('drive-1', 'item-1')).resolves.toMatchObject({
+    driveId: 'drive-1', itemId: 'item-1', downloadUrl: 'https://media.example/one-shot', mimeType: 'video/mp4',
+  });
+  await expect(GraphService.readMediaRange('drive-1', 'item-1', { start: 0, end: 31 })).resolves.toMatchObject({
+    itemId: 'item-1', bytes: Buffer.alloc(32), contentRange: 'bytes 0-31/80000000',
+  });
+  expect(global.fetch.mock.calls[2][0]).toBe('https://media.example/one-shot');
+  expect(global.fetch.mock.calls[2][1].headers).toEqual({ Range: 'bytes=0-31' });
+});
+
+test('rejects unsafe preauthenticated URLs and any unbounded range response before reading bytes', async () => {
+  global.fetch.mockResolvedValueOnce(response(200, {
+    uploadUrl: 'http://upload.example/session',
+    expirationDateTime: '2026-09-22T13:00:00Z',
+  }));
+  await expect(GraphService.createBrowserUploadSession('akoya_request', 'Folder', 'proof.mp4'))
+    .rejects.toThrow('unsafe upload URL');
+
+  const unbounded = response(200, Buffer.alloc(33));
+  global.fetch
+    .mockResolvedValueOnce(response(200, {
+      id: 'item-1', name: 'proof.mp4', size: 80_000_000, file: { mimeType: 'video/mp4' },
+      '@microsoft.graph.downloadUrl': 'https://media.example/one-shot',
+    }))
+    .mockResolvedValueOnce(unbounded);
+  await expect(GraphService.readMediaRange('drive-1', 'item-1', { start: 0, end: 31 }))
+    .rejects.toThrow('was not bounded');
+  expect(unbounded.arrayBuffer).not.toHaveBeenCalled();
+});
+
+const mediaMetadata = {
+  id: 'item-1', name: 'proof.mp4', size: 80_000_000, file: { mimeType: 'video/mp4' },
+  '@microsoft.graph.downloadUrl': 'https://media.example/one-shot',
+};
+
+test.each([408, 429, 500, 502, 503, 504])('range read retries transient Microsoft %s with a fresh URL', async (status) => {
+  global.fetch
+    .mockResolvedValueOnce(response(200, mediaMetadata))
+    .mockResolvedValueOnce(response(status))
+    .mockResolvedValueOnce(response(200, mediaMetadata))
+    .mockResolvedValueOnce(response(206, Buffer.alloc(32), { 'content-range': 'bytes 0-31/80000000' }));
+  await expect(GraphService.readMediaRange('drive-1', 'item-1')).resolves.toMatchObject({ bytes: Buffer.alloc(32) });
+  expect(global.fetch).toHaveBeenCalledTimes(4);
+  expect(global.fetch.mock.calls[3][1].headers).toEqual({ Range: 'bytes=0-31' });
+});
+
+test('range read stops after three transient attempts and never consumes their bodies', async () => {
+  const failures = [response(503), response(503), response(503)];
+  for (const failure of failures) {
+    global.fetch.mockResolvedValueOnce(response(200, mediaMetadata)).mockResolvedValueOnce(failure);
+  }
+  await expect(GraphService.readMediaRange('drive-1', 'item-1'))
+    .rejects.toThrow('after 3 attempts');
+  expect(global.fetch).toHaveBeenCalledTimes(6);
+  expect(failures.every((failure) => !failure.arrayBuffer.mock.calls.length)).toBe(true);
+});
+
+test('range read never retries a non-transient status or unbounded success', async () => {
+  global.fetch.mockResolvedValueOnce(response(200, mediaMetadata)).mockResolvedValueOnce(response(404));
+  await expect(GraphService.readMediaRange('drive-1', 'item-1')).rejects.toThrow('not bounded (404)');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+
+  global.fetch.mockClear();
+  const unbounded = response(200, Buffer.alloc(32));
+  global.fetch.mockResolvedValueOnce(response(200, mediaMetadata)).mockResolvedValueOnce(unbounded);
+  await expect(GraphService.readMediaRange('drive-1', 'item-1')).rejects.toThrow('not bounded (200)');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+  expect(unbounded.arrayBuffer).not.toHaveBeenCalled();
+});

@@ -3,8 +3,9 @@
  *
  * Token-authed, not user-authed: the opaque token in the URL is verified by
  * /api/external/briefing/[token]/context on every load. Read-only. Every
- * document opens through /document?member=<bounded id>; the page never sees
- * a SharePoint URL. Reviewer names are shown by owner decision D13.
+ * legacy document opens through /document?member=<bounded id>; current
+ * post-presentation rows use the non-buffering /open resolver. The page never
+ * sees a SharePoint URL. Reviewer names are shown by owner decision D13.
  */
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
@@ -91,6 +92,7 @@ export default function BriefingPage() {
   }, [token]);
 
   const documentHref = (member) => `/api/external/briefing/${encodeURIComponent(token)}/document?member=${encodeURIComponent(member)}`;
+  const presentationHref = (member) => `/api/external/briefing/${encodeURIComponent(token)}/open?member=${encodeURIComponent(member)}`;
 
   if (state.status === 'loading') {
     return <Shell title="Deliberation briefing"><p className="text-gray-600">Loading…</p></Shell>;
@@ -190,7 +192,7 @@ export default function BriefingPage() {
               <li key={material.member}>
                 <span className="font-medium text-gray-800">{material.label}:</span>{' '}
                 {material.available ? (
-                  <a className="text-blue-800 underline" href={documentHref(material.member)} {...(material.inline ? { target: '_blank', rel: 'noreferrer noopener' } : {})}>
+                  <a className="text-blue-800 underline" href={material.media ? presentationHref(material.member) : documentHref(material.member)} {...((material.inline || material.media) ? { target: '_blank', rel: 'noreferrer noopener' } : {})}>
                     {material.filename}
                   </a>
                 ) : (

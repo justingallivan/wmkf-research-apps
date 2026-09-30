@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-09-14. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-09-26. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger and explicitly dated migration readbacks below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -118,6 +118,58 @@ future-cycle reconciliation; see the roster Contact-link plan F5.
 ### `integrity_screenings` (41 rows), `screening_dismissals` (0 rows)
 **Source of truth:** Postgres.
 Per-applicant screening history. `retractions` (68,248 rows) is the Retraction Watch dataset (org-wide).
+**Request linkage/history:** Migration 056 adds nullable `request_id UUID` plus
+the `idx_integrity_screenings_request_latest` partial index for newest-first
+lookup. The Workbench integrity service reads the request's PI/Co-PI identities
+from Dataverse and saves completed runs with this request ID. GET returns the
+latest linked run plus newest-first history pages of 20, with an optional
+request-scoped `beforeRunId` cursor. Each history row includes append-only PD
+review decisions from `integrity_screening_reviews`. **[SOURCE-BUILT on
+`claude/integrity-workbench-tab` for PR #366; migrations 056–057 are
+applied to the shared database on 2026-09-30 and verified by a schema probe (tracker rows, column, indexes and constraints) [VERIFIED, S552]; the branch is not merged or deployed.]**
+Existing standalone/manual runs remain
+request-unlinked. The standalone screener's history, detail, status-update and
+dismiss paths (`lib/services/integrity-service.js`) filter to
+`request_id IS NULL`, so Workbench runs are reviewed only through
+`integrity_screening_reviews`. These filters make migration 056 a prerequisite
+for the standalone screener as well as the Workbench routes. The fresh-install
+schema includes both migrations.
+
+**Blocking release order for PR #366:** before this branch is deployed,
+migrations 056 and 057 must be applied in order to the shared Postgres database
+with `node scripts/apply-migrations.js`, then verified with a read-only schema
+probe. The probe must confirm both `schema_migrations` tracker rows and the
+physical schema: nullable UUID `integrity_screenings.request_id`,
+`idx_integrity_screenings_request_latest`, the
+`integrity_screening_reviews` table with its foreign keys and decision/notes
+constraints, and both review-history indexes. Do not deploy on tracker rows
+alone, and do not add runtime column detection or a legacy-query fallback; the
+schema probe is the release gate. **Gate passed 2026-09-30 (S552):** 056 and 057
+were applied by the owner (`applied_by` `owner-s552-pr366`), and a read-only
+probe confirmed both tracker rows, the nullable UUID column, all three indexes,
+and the review table's primary key, both foreign keys and three CHECK
+constraints. `tests/integration/integrity-screening-reviews.pg.test.js` proves
+the same constraints in a scratch schema.
+
+### `integrity_screening_reviews` — SOURCE-BUILT (migration 057 applied to the shared database; 0 rows)
+**Source of truth:** Postgres append-only review history, keyed to one
+`integrity_screenings` run and its Dataverse request GUID. Migration 057 stores
+server-resolved reviewer profile and Dynamics user identity, decision
+(`approved` or `hold`), notes (maximum 2,000 characters; hold requires a
+non-empty note), and creation time. The request ID is stored for request-scoped
+history; the service verifies request ownership before appending and reading
+decisions. Indexes support newest-first request and screening reads.
+
+**Write/read paths:** `pages/api/workbench/integrity/[requestId]/review` appends
+through `lib/services/workbench/integrity-service.js`; only the request's lead
+Program Director or a fresh-role superuser can submit. The GET context returns
+the latest review summary and per-screen historical decisions. Only the latest
+screen is actionable. Approval requires the latest screened roster to match
+the live request roster and source coverage version 1 with all sources searched
+and no errors. A recorded approval means the integrity review is complete; it
+does not authorize funding or gate later workflow progression. **[SOURCE-BUILT
+on `claude/integrity-workbench-tab` for PR #366; migration 057 is
+applied to the shared database on 2026-09-30 and verified by a schema probe (tracker rows, column, indexes and constraints) [VERIFIED, S552]; the branch is not merged or deployed.]**
 
 ### `retractions` (68,248 rows)
 **Source of truth:** Postgres (manually refreshed via script — no live cron).
@@ -584,6 +636,68 @@ is pinned by the latest `sent` `pre_site_distribution_attempts` row,
 reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
+
+### Post-presentation material ledgers — SHARED-SCHEMA LIVE; BOUNDED BRANCH PREVIEW ACCEPTED AND CLOSED
+
+**[VERIFIED via source, canonical migration runner, and shared-Neon readback 2026-09-26 on
+`codex/feature-request`.]** Migration
+`055_post_presentation_materials.sql`, mirrored by fresh-install V56, defines
+three additive tables for the post-research-presentation feature. Under explicit owner
+authorization, the canonical runner applied 055 to the shared Preview/Production Neon database
+at 2026-09-26T06:54:20Z. Exact readback found all three tables, all four named indexes, the
+expected constraints, and zero rows; a second runner invocation was an idempotent no-op. Only
+`codex/feature-request` Preview configuration is schema-ready and limited to approved sandbox
+Request `4236c2b3-b053-f111-bec7-6045bd015cb0`; corrected registered-alias deployment
+`dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr` is Ready and passed signed-in Chrome readiness/link issuance.
+Exact readback found one live link row for the approved Request and zero upload/lease rows.
+After Safari acceptance, exact cleanup restored the registered Preview alias to prior Factory
+deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` and reset this branch's presentation access to
+literal `off`; the link row, retained recording, and schema were not deleted. Production runtime
+configuration remains unchanged and destructive cleanup remains off. Slice 3's
+transcript producer, Slice 4's browser-direct MP4 intent/status/finalize routes, and Slice 5's
+independent 60-day link lifecycle plus token-verified materials-only consumer are source-built
+and offline-tested only on `codex/feature-request`.
+
+- `presentation_material_links` stores one non-revoked materials-only link per
+  Request: UUID/JTI, unique SHA-256 token digest, sealed token ciphertext,
+  expiry, creator/time, and revocation/supersession evidence. Raw tokens are
+  absent from the schema. `presentation-link-service.js` reuses one readable
+  live row, atomically replaces expired/unreadable state, and compare-and-swap
+  reissues only the inspected presentation row. `verify-presentation-token.js`
+  rechecks the distinct `presentation-materials` audience, request rollout,
+  digest, revocation, and expiry before every external context/media action.
+- `presentation_material_uploads` stores one actor/request/active-Site-Visit
+  bound browser-direct Graph intent before any preauthenticated URL is returned.
+  It records the bounded file fingerprint, code-owned path/generation identity,
+  lifecycle/lease/review-after state, the upload URL only as ciphertext, exact
+  Graph candidate facts, and the finalized Request Document identity. Stored
+  Graph expiry is advisory; independently authorized resume refreshes it from
+  live Graph state and it is not deletion authority. Daily maintenance claims
+  eligible rows and, unless both general access and the separate destructive
+  cleanup permission are literal `on`, remains inspect/refresh/record/alert-only.
+  Staff Cancel and terminal-session Retry share the intent lease with finalize and
+  cleanup. Cancel abandons only after confirmed session termination and an absent
+  exact path; Retry retains the same intent/path/generation and starts a newly
+  confirmed terminal session from byte zero. A candidate rejected by MP4 signature
+  or Graph malware validation remains a terminal `failed` intent and is omitted
+  from staff's unfinished-upload actions; status and finalize refuse replay.
+  Its exact item remains for the existing lease-fenced cleanup review, which
+  deletes an unbound item only under the separate general-access and
+  destructive-cleanup gates. If an exact Request Document was already created
+  before a later validation rejection, cleanup retains and alerts instead of
+  relabeling the rejected intent as finalized.
+- `presentation_material_slot_leases` is keyed by Request + Recording,
+  Transcript, or Transcript Summary artifact type and stores a paired
+  token/expiry plus a positive fence capped at 2,147,483,647.
+
+The same migration and every fresh-install definition enumerate the complete
+five-scope `portal_upload_staging` allowlist, adding
+`post_presentation_transcript` without removing the four live scopes. Exact shared-database
+readback confirmed that constraint. Slice 3's source-built cleanup reconciler recognizes the
+transcript candidate shape, but disabled destructive-cleanup controls provide no new deletion
+authority. The local acceptance finalized intent
+`e7236795-42d8-4018-8ee8-cdc66b953e9b` and retained its registry-bound SharePoint item; that
+disposable database/container is test evidence, not a deployed state store.
 
 ### `consultant_feedback` — PRODUCTION-LIVE Consultant Feedback slices 1–3 (migrations 048-049 applied; fresh-install v50-v51; 2026-09-14)
 
