@@ -192,6 +192,54 @@ describe('canonicalizeDefinition', () => {
     expect(canonicalizeDefinition(null, 'x')).toBeNull();
     expect(canonicalizeDefinition(undefined, 'x')).toBeNull();
   });
+
+  // Opus round-2 item 2 (Codex #2): whitespace collapsing and schema-prefix
+  // stripping must never reach inside a string literal or dollar-quoted
+  // block — a prior version ran both over the whole string, so two
+  // semantically different accepted values canonicalized identically.
+  describe('Opus round-2 item 2: literal-aware canonicalization', () => {
+    test('different internal spacing inside a single-quoted literal is NOT collapsed — the two CHECK bodies differ', () => {
+      const a = canonicalizeDefinition("CHECK (code = 'A  B')", null);
+      const b = canonicalizeDefinition("CHECK (code = 'A B')", null);
+      expect(a).not.toBe(b);
+      expect(a).toBe("CHECK (code = 'A  B')");
+      expect(b).toBe("CHECK (code = 'A B')");
+    });
+
+    test('a schema-like substring inside a string literal is preserved, not stripped as qualification', () => {
+      const out = canonicalizeDefinition("CHECK (note = 'ledger_fp_ab12.something')", 'ledger_fp_ab12');
+      expect(out).toBe("CHECK (note = 'ledger_fp_ab12.something')");
+    });
+
+    test('identical SQL with different spacing OUTSIDE any literal still canonicalizes equal', () => {
+      const a = canonicalizeDefinition("CHECK (code  =  'A B')", null);
+      const b = canonicalizeDefinition("CHECK (code = 'A B')", null);
+      expect(a).toBe(b);
+      expect(a).toBe("CHECK (code = 'A B')");
+    });
+
+    test('a dollar-quoted function body with internal double spaces differs from one with single spaces', () => {
+      const a = canonicalizeDefinition('$$SELECT  receipt  IS NOT NULL;$$', null);
+      const b = canonicalizeDefinition('$$SELECT receipt IS NOT NULL;$$', null);
+      expect(a).not.toBe(b);
+      expect(a).toBe('$$SELECT  receipt  IS NOT NULL;$$');
+    });
+
+    test('a tagged dollar-quoted block ($tag$...$tag$) is also treated as literal', () => {
+      const out = canonicalizeDefinition('$body$SELECT  1$body$', null);
+      expect(out).toBe('$body$SELECT  1$body$');
+    });
+
+    test("an escaped quote ('') inside a literal does not end the literal early", () => {
+      const out = canonicalizeDefinition("CHECK (name <> 'it''s  here')", null);
+      expect(out).toBe("CHECK (name <> 'it''s  here')");
+    });
+
+    test('schema qualification outside a literal is still stripped, alongside a literal elsewhere in the same string', () => {
+      const out = canonicalizeDefinition("SELECT ledger_fp_ab12.f('A  B')", 'ledger_fp_ab12');
+      expect(out).toBe("SELECT f('A  B')");
+    });
+  });
 });
 
 describe('approved-ahead extras (Codex round-1 Fix 4; Opus round-1 item 6: shape-verified, not name-only)', () => {
@@ -229,6 +277,30 @@ describe('approved-ahead extras (Codex round-1 Fix 4; Opus round-1 item 6: shape
     const diff = { extra: ['column test_request_runs.later'] };
     const legacy = [{ migration: 'x.sql', objects: ['column test_request_runs.later'] }];
     expect(unapprovedExtras(diff, legacy)).toEqual([]);
+  });
+
+  // Opus round-2 item 3: an approved table must compare EXACTLY (missing,
+  // differing, AND extra all empty). A prior version ignored the sub-diff's
+  // `extra`, so an approved shape plus one unapproved child object (column,
+  // constraint, index, or trigger) still passed as approved.
+  describe('Opus round-2 item 3: an approved table with one extra child object of each kind is unapproved', () => {
+    const diff = { extra: ['table test_request_cast_slot_bindings'] };
+    test('extra column', () => {
+      const live = { tables: { test_request_cast_slot_bindings: { ...approvedShape(), columns: [...approvedShape().columns, col('later', 'text', true)] } } };
+      expect(unapprovedExtras(diff, approvedAhead(), live)).toEqual(['table test_request_cast_slot_bindings']);
+    });
+    test('extra constraint', () => {
+      const live = { tables: { test_request_cast_slot_bindings: { ...approvedShape(), constraints: [...approvedShape().constraints, cons('extra_check', 'c', 'CHECK (true)')] } } };
+      expect(unapprovedExtras(diff, approvedAhead(), live)).toEqual(['table test_request_cast_slot_bindings']);
+    });
+    test('extra index', () => {
+      const live = { tables: { test_request_cast_slot_bindings: { ...approvedShape(), indexes: [...approvedShape().indexes, idx('later_idx', 'CREATE INDEX later_idx ...')] } } };
+      expect(unapprovedExtras(diff, approvedAhead(), live)).toEqual(['table test_request_cast_slot_bindings']);
+    });
+    test('extra trigger', () => {
+      const live = { tables: { test_request_cast_slot_bindings: { ...approvedShape(), triggers: [trg('unexpected_side_effect', 'CREATE TRIGGER unexpected_side_effect ...')] } } };
+      expect(unapprovedExtras(diff, approvedAhead(), live)).toEqual(['table test_request_cast_slot_bindings']);
+    });
   });
 
   test('readApprovedAhead reads the tracked file as an array of entries', () => {
