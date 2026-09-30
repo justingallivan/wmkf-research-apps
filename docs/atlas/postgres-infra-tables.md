@@ -125,8 +125,8 @@ from Dataverse and saves completed runs with this request ID. GET returns the
 latest linked run plus newest-first history pages of 20, with an optional
 request-scoped `beforeRunId` cursor. Each history row includes append-only PD
 review decisions from `integrity_screening_reviews`. **[SOURCE-BUILT on
-`claude/integrity-workbench-tab` for PR #366; migrations 056–057 are not
-verified on the shared database, and the branch is not merged or deployed.]**
+`claude/integrity-workbench-tab` for PR #366; migrations 056–057 are
+applied to the shared database on 2026-09-30 and verified by a schema probe (tracker rows, column, indexes and constraints) [VERIFIED, S552]; the branch is not merged or deployed.]**
 Existing standalone/manual runs remain
 request-unlinked. The standalone screener's history, detail, status-update and
 dismiss paths (`lib/services/integrity-service.js`) filter to
@@ -144,9 +144,14 @@ physical schema: nullable UUID `integrity_screenings.request_id`,
 `integrity_screening_reviews` table with its foreign keys and decision/notes
 constraints, and both review-history indexes. Do not deploy on tracker rows
 alone, and do not add runtime column detection or a legacy-query fallback; the
-schema probe is the release gate.
+schema probe is the release gate. **Gate passed 2026-09-30 (S552):** 056 and 057
+were applied by the owner (`applied_by` `owner-s552-pr366`), and a read-only
+probe confirmed both tracker rows, the nullable UUID column, all three indexes,
+and the review table's primary key, both foreign keys and three CHECK
+constraints. `tests/integration/integrity-screening-reviews.pg.test.js` proves
+the same constraints in a scratch schema.
 
-### `integrity_screening_reviews` — SOURCE-BUILT (migration 057; shared schema not verified)
+### `integrity_screening_reviews` — SOURCE-BUILT (migration 057 applied to the shared database; 0 rows)
 **Source of truth:** Postgres append-only review history, keyed to one
 `integrity_screenings` run and its Dataverse request GUID. Migration 057 stores
 server-resolved reviewer profile and Dynamics user identity, decision
@@ -163,8 +168,8 @@ screen is actionable. Approval requires the latest screened roster to match
 the live request roster and source coverage version 1 with all sources searched
 and no errors. A recorded approval means the integrity review is complete; it
 does not authorize funding or gate later workflow progression. **[SOURCE-BUILT
-on `claude/integrity-workbench-tab` for PR #366; migration 057 is not verified
-on the shared database, and the branch is not merged or deployed.]**
+on `claude/integrity-workbench-tab` for PR #366; migration 057 is
+applied to the shared database on 2026-09-30 and verified by a schema probe (tracker rows, column, indexes and constraints) [VERIFIED, S552]; the branch is not merged or deployed.]**
 
 ### `retractions` (68,248 rows)
 **Source of truth:** Postgres (manually refreshed via script — no live cron).
