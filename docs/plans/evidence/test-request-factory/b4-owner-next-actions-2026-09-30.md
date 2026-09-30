@@ -1,6 +1,6 @@
 # B4 owner actions — 2026-09-30
 
-**Release remains blocked; PR #369 remains draft.** Local/B4 Preview/Production switch configuration and marker availability passed. This packet supplies the remaining owner procedures; it does not authorize a migration, Dataverse write or slot PATCH. The operational ledgers are confirmed on the home Mac only; every ledger-dependent check is blocked: ledger not on this machine until tomorrow's restore.
+**Release remains blocked; PR #369 remains draft.** Local switches now read off/off and block literal-on readiness; B4 Preview/Production last read on/on, and dated marker checks passed. This packet supplies the remaining owner procedures; it does not authorize a migration, Dataverse write or slot PATCH. The operational ledgers are confirmed on the home Mac only; every ledger-dependent check is blocked: ledger not on this machine until tomorrow's restore.
 
 ## Snapshot/restore the confirmed home-Mac journals
 
@@ -20,18 +20,18 @@ For each restored local operational ledger, follow §6 of the [B4 plan](../../TE
 
 ## Automation disposition worksheet
 
-[VERIFIED via the committed section 13 receipt](reviewer-slot-readiness-receipt-2026-09-30T18-31-30-343Z.json) The six open items below are real probe results. No owner classification is recorded. Effective Process read was Global at the dated probe; all 14 activated flow definitions were readable, with no hard incomplete reasons.
+[VERIFIED via the committed section 13 receipt](reviewer-slot-readiness-receipt-2026-09-30T19-36-50-888Z.json) The six open items below are real probe results. No owner classification is recorded. Effective Process read was Global at the 19:36 probe; all 14 activated flow definitions were readable, with no hard incomplete reasons. [New metadata evidence](b4-automation-evidence-2026-09-30.md) records literal trigger parameters, nested actions, all six custom registrations and classic-workflow creation paths. The collector snapshot/hash are recorded separately from the clean committed section 13 source.
 
 | Item | Observed trigger / scope | Evidence the owner still needs | Disposition |
 |---|---|---|---|
 | `AkoyaGo.CalculatedFieldsAsync: Update of akoya_request` | Custom Request update step, any column | Actual vendor behavior on a slot update; Request writes and any indirect flow invocation | OPEN |
 | `AkoyaGo.RequestPreOperation: Update of akoya_request` | Custom global update step, any entity/column | Applicability to Request, slot effects and downstream automation | OPEN |
 | `AkoyaGo.RequestPostOperation: Update of akoya_request` | Custom global update step, any entity/column | Applicability to Request, slot effects and downstream automation | OPEN |
-| `GOapply Add Request to Review Group (Deprecated)` | `manual`; `Request` / `ApiConnection`; literal `akoya_requests`; no visible Dataverse subscription | Trigger parameter keys/values, invocation path, absence of subscription, all Request/slot actions and possible indirect invocation | OPEN |
-| `Bill.com - Push Payments` | `manual`; `Request` / `ApiConnection`; literal `akoya_requestpayments`; no visible Dataverse subscription | Same manual-trigger evidence, plus any Request/slot effects of payment actions | OPEN |
-| `GOapply AutoFill Next Phase (Deprecated)` | `When_a_row_is_added,_modified_or_deleted`; `OpenApiConnectionWebhook`; literal subscription entity `akoya_goapplystatustracking`; message `1` as read | Actual trigger semantics, Request/slot actions, and whether a slot update can reach it indirectly | OPEN |
+| `GOapply Add Request to Review Group (Deprecated)` | `manual`; `Request` / `ApiConnection`; literal `akoya_requests`; no visible Dataverse subscription | Collected: dataset=default.cds, table=akoya_requests, visible no-subscription shape and action tree. Still needed: actual callers/invocation routes, downstream effects and possible plug-in invocation | OPEN |
+| `Bill.com - Push Payments` | `manual`; `Request` / `ApiConnection`; literal `akoya_requestpayments`; no visible Dataverse subscription | Collected: dataset=default.cds, table=akoya_requestpayments and payment/external-action tree. Still needed: actual callers/invocation routes and indirect effects | OPEN |
+| `GOapply AutoFill Next Phase (Deprecated)` | `When_a_row_is_added,_modified_or_deleted`; `OpenApiConnectionWebhook`; literal subscription entity `akoya_goapplystatustracking`; message `1` as read | Collected: message 1 means Create/Added; Request read and CurrentPhase update on status tracking. Still needed: whether slot updates can indirectly create status tracking/reach it | OPEN |
 
-Each disposition must identify its evidence, reviewer and UTC time, explain direct and indirect effects, and state whether it clears this particular slot operation. A name containing “Deprecated” is not evidence of inactivity. Review every listed custom step, other-column Request workflow/step and all 14 activated flows; the six rows alone are not the full indirect-chain review. Do not interpret numeric message `1` without confirming its actual trigger contract.
+Each disposition must identify its evidence, reviewer and UTC time, explain direct and indirect effects, and state whether it clears this particular slot operation. A name containing “Deprecated” is not evidence of inactivity. Review every listed custom step, other-column Request workflow/step and all 14 activated flows; the six rows alone are not the full indirect-chain review. The new evidence links Microsoft’s confirmed message contract (`1` = Create/Added); that fact does not clear indirect reachability. Actual manual-flow callers and compiled vendor behavior remain UNKNOWN.
 
 Immediately before the eventual first slot PATCH, re-read every activated flow/definition and effective Process visibility; compare the server-read cast email digest with the recovered journal; verify the exact marked Request/run/person and a concrete ETag. A changed/unknown trigger shape, unreadable definition or unresolved owner disposition keeps the operation blocked. No slot PATCH is authorized here.
 

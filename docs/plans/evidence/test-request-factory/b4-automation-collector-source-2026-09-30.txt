@@ -1,0 +1,90 @@
+// Supplemental read-only metadata collector; run from the B4 repository root.
+// Requires the owner's explicit Production-read authorization. Never exports raw definitions.
+const fs = require('fs'), os = require('os'), path = require('path'), cp = require('child_process'), crypto = require('crypto');
+const root = process.cwd();
+const probe = require(path.join(root, 'scripts/probe-test-request-factory-production-readiness.js'));
+const { getAccessToken, createClient } = require(path.join(root, 'lib/dataverse/client.js'));
+const { classifyTarget } = require(path.join(root, 'lib/dataverse/core/interlock.js'));
+const hash = s => crypto.createHash('sha256').update(s).digest('hex');
+const uniq = xs => [...new Set(xs)].sort();
+const label = v => typeof v === 'string' ? v.replace(/https?:\/\/\S+/gi, '[url omitted]').replace(/[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}/gi, '[id omitted]').replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, '[email omitted]').slice(0, 512) : null;
+const logical = v => typeof v === 'string' && /^[a-z][a-z0-9_]{0,100}$/.test(v) ? v : null;
+const schemaRefs = v => uniq((JSON.stringify(v) || '').match(/\b(?:akoya|wmkf)_[A-Za-z0-9_]+\b/g) || []);
+const strings = v => typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
+const expressionActions = v => uniq(strings(v).flatMap(s => [...s.matchAll(/(?:body|outputs|actions)\(["']([^"']+)["']\)/g)].map(m => label(m[1]))));
+const actionIdentifier = v => typeof v === 'string' && /^[A-Za-z][A-Za-z0-9_.]{0,150}$/.test(v) ? v : { kind: shape(v) };
+const uriSummary = v => { let target = 'dynamic or unknown'; try { const u = new URL(v); target = classifyTarget(u.href); if (target === 'unknown') target = /(?:logic.azure.com|api.flow.microsoft.com)$/.test(u.hostname) ? 'possible external workflow endpoint' : 'external endpoint'; } catch {} return { kind: shape(v), targetClassification: target }; };
+const shape = v => v == null ? 'absent' : typeof v === 'string' ? (v.includes('@') ? 'expression' : 'literal omitted') : Array.isArray(v) ? 'array' : typeof v;
+function parameter(key, value) {
+  if (['table', 'entityName', 'subscriptionRequest/entityname'].includes(key)) return logical(value) || { kind: shape(value) };
+  if (key === 'dataset' || key === 'organization') return ['default', 'default.cds'].includes(value) ? value : { kind: shape(value), targetClassification: typeof value === 'string' && /^https:\/\//.test(value) ? classifyTarget(value) : 'not classified' };
+  if (['subscriptionRequest/message', 'subscriptionRequest/scope', 'subscriptionRequest/runas'].includes(key)) return typeof value === 'number' ? value : { kind: shape(value) };
+  if (key === 'subscriptionRequest/filteringattributes' && typeof value === 'string' && /^[a-z0-9_, ]*$/.test(value)) return value;
+  return { kind: shape(value), schemaReferences: schemaRefs(value) };
+}
+function actionRows(actions, parent = '') {
+  const rows = [];
+  for (const [name, a] of Object.entries(actions || {})) {
+    const location = parent ? `${parent}/${label(name)}` : label(name);
+    const inputs = a?.inputs || {}, p = inputs.parameters || {}, body = inputs.body || {};
+    const itemFields = uniq([...Object.keys(p).filter(k => k.startsWith('item/')).map(k => k.slice(5)), ...Object.keys(p.item || {}), ...Object.keys(body)]).filter(k => /^[A-Za-z][A-Za-z0-9_]*(?:@odata.bind)?$/.test(k));
+    const pathTables = typeof inputs.path === 'string' ? [...inputs.path.matchAll(/encodeURIComponent\('([a-z][a-z0-9_]+)'\)/g)].map(x => x[1]) : [];
+    rows.push({ location, type: label(a?.type), operationId: label(inputs.host?.operationId), apiName: label(inputs.host?.apiId?.split('/').pop()), method: label(inputs.method), actionName: p.actionName ? actionIdentifier(p.actionName) : undefined, boundActionName: p.actionName && p.entityName ? actionIdentifier(p.actionName) : undefined, parameterKeys: Object.keys(p).map(label).sort(), tableTargets: uniq([logical(p.entityName), logical(p.table), ...pathTables].filter(Boolean)), writtenBodyFieldNames: itemFields, inputSchemaReferences: schemaRefs(inputs), expressionActionReferences: expressionActions(inputs), usesTriggerBody: /triggerBody|triggerOutputs/.test(JSON.stringify(inputs)), recordLocator: shape(p.recordId ?? p.id ?? inputs.path), runAfter: Object.fromEntries(Object.entries(a?.runAfter || {}).map(([k,v]) => [label(k), Array.isArray(v) ? v.map(label) : ['unreadable']])), conditionSchemaReferences: schemaRefs(a?.expression), uri: inputs.uri ? uriSummary(inputs.uri) : undefined });
+    rows.push(...actionRows(a?.actions, location));
+    rows.push(...actionRows(a?.else?.actions, `${location}/else`));
+    rows.push(...actionRows(a?.default?.actions, `${location}/default`));
+    for (const [caseName, c] of Object.entries(a?.cases || {})) rows.push(...actionRows(c?.actions, `${location}/case:${label(caseName)}`));
+  }
+  return rows;
+}
+const git = args => cp.execFileSync('git', args, { encoding: 'utf8' }).trim();
+const source = { commit: git(['rev-parse', 'HEAD']), branch: git(['branch', '--show-current']), probeDirty: !!git(['status', '--porcelain', '--', 'scripts/probe-test-request-factory-production-readiness.js']), clientDirty: !!git(['status', '--porcelain', '--', 'lib/dataverse/client.js']), supplementalCollectorSha256: hash(fs.readFileSync(__filename)), supplementalCollectorCommittedAtCapture: false };
+const out = { generatedAt: new Date().toISOString(), source, authorization: 'Owner authorized read-only Production metadata collection in this chat, 2026-09-30.', disposition: 'OPEN; metadata collection does not classify compiled vendor behavior or authorize a slot PATCH.', limitations: ['No plug-in assembly content, secure/unsecure configuration, raw flow/XAML definitions, record IDs, connection references, headers, literal action data or credentials retained.', 'Schema references and matching workflow-ID references are lexical evidence, not execution or absence-of-chain proofs.', 'External callers, run-only permissions, runtime execution history and compiled vendor code were not read.'], errors: [], flows: [], customSteps: [], requestWorkflowsAndRules: [] };
+async function main() {
+  if (source.branch !== 'codex/factory-reviewer-b4-runtime' || source.probeDirty || source.clientDirty) throw new Error('source_guard');
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'b4-automation-env-'));
+  try {
+    const file = path.join(temp, '.env'); fs.writeFileSync(file, '', { mode: 0o600 });
+    const pull = cp.spawnSync('vercel', ['env', 'pull', file, '--yes', '--environment=production', '--project=prj_56SJKzNer1aV38kKVoP8tl3X0lf3', '--scope=justin-gallivans-projects'], { encoding: 'utf8' });
+    if (pull.status !== 0) throw new Error('env_pull_failed'); fs.chmodSync(file, 0o600);
+    const env = Object.fromEntries(fs.readFileSync(file, 'utf8').split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).map(l => { const at = l.indexOf('='); let v = l.slice(at + 1).trim(); if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1,-1); return [l.slice(0,at).trim(),v]; }));
+    if (classifyTarget(env.DYNAMICS_URL) !== 'production') throw new Error('target_guard');
+    out.targetClassification = 'production'; out.switches = Object.fromEntries(['TEST_REQUEST_ISOLATION', 'SYNTHETIC_REVIEWER_ISOLATION'].map(k => [k, env[k] === 'on' ? 'on' : 'off']));
+    for (const k of ['DYNAMICS_CLIENT_ID', 'DYNAMICS_CLIENT_SECRET', 'DYNAMICS_TENANT_ID']) { delete process.env[k]; if (env[k]) process.env[k] = env[k]; }
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on'; process.env.DATAVERSE_ALLOW_PROD_READS = 'yes'; delete process.env.VERCEL_ENV;
+    const raw = createClient({ resourceUrl: env.DYNAMICS_URL, token: await getAccessToken(env.DYNAMICS_URL) });
+    let gets = 0;
+    const client = { get: async url => { gets++; const r = await raw.get(url); if (!r.ok) throw new Error(`read_http_${r.status}`); return r; } };
+    async function all(url) { const rows=[]; for (let page=0; url; page++) { if(page >= 100) throw new Error('page_limit'); const r=await client.get(url); rows.push(...(r.body?.value || [])); url=r.body?.['@odata.nextLink']; if (url && !url.startsWith(env.DYNAMICS_URL + '/api/data/')) throw new Error('pagination_origin_guard'); } return rows; }
+    const users = await all(`/systemusers?$select=systemuserid,isdisabled&$filter=applicationid eq ${env.DYNAMICS_CLIENT_ID}`);
+    out.effectiveProcessRead = { appUserCount: users.length, appUserEnabled: users.length === 1 ? users[0].isdisabled === false : null, privilege: 'prvReadWorkflow', depths: [] };
+    if(users.length === 1) { const p=await client.get(`/systemusers(${users[0].systemuserid})/Microsoft.Dynamics.CRM.RetrieveUserPrivilegeByPrivilegeName(PrivilegeName='prvReadWorkflow',ExcludeTeamBasic=false)`); out.effectiveProcessRead.httpStatus=p.status; out.effectiveProcessRead.depths=uniq((p.body.RolePrivileges || []).map(x => x.Depth)); }
+    // Invoke the unchanged, committed section 13 directly; no unrelated record probes.
+    const priorLog = console.log; let receipt; console.log = () => {};
+    try { receipt = await probe.printReviewerSlotReadiness(client, 'docs/plans/evidence/test-request-factory', source); } finally { console.log = priorLog; }
+    out.section13 = { generatedAt: receipt.generatedAt, complete: receipt.complete, incompleteReasons: receipt.incompleteReasons, dispositionRequired: receipt.dispositionRequired, counts: receipt.counts };
+    const flows = await all('/workflows?$select=name,workflowid,clientdata&$filter=category eq 5 and statecode eq 1');
+    const classic = await all("/workflows?$select=name,workflowid,category,mode,triggeronupdateattributelist,xaml&$filter=primaryentity eq 'akoya_request' and type eq 1 and statecode eq 1");
+    const known = [...flows, ...classic];
+    const refs = (text, self) => known.filter(w => w.workflowid !== self && String(text).toLowerCase().includes(w.workflowid.toLowerCase())).map(w => label(w.name));
+    for(const f of flows) {
+      const c = probe.classifyFlowDefinition(f.clientdata);
+      if(!c.readable) { out.flows.push({ name: label(f.name), readable: false }); continue; }
+      const def = c.definition;
+      out.flows.push({ name: label(f.name), readable: true, definitionSha256: hash(f.clientdata), schemaReferences: schemaRefs(def), matchingWorkflowIdReferences: uniq(refs(f.clientdata, f.workflowid)), triggers: Object.entries(def.triggers || {}).map(([n,t]) => ({ name: label(n), type: label(t?.type), kind: label(t?.kind), operationId: label(t?.inputs?.host?.operationId), apiName: label(t?.inputs?.host?.apiId?.split('/').pop()), parameterKeys: Object.keys(t?.inputs?.parameters || {}).sort(), parameters: Object.fromEntries(Object.entries(t?.inputs?.parameters || {}).map(([k,v]) => [label(k), parameter(k,v)])), hasSubscriptionParameters: Object.keys(t?.inputs?.parameters || {}).some(k => k.startsWith('subscriptionRequest/')), inputSchemaReferences: schemaRefs(t?.inputs), schemaTopLevelKeys: Object.keys(t?.inputs?.schema?.properties || {}).map(label).sort() })), actions: actionRows(def.actions) });
+    }
+    for(const w of classic) {
+      const x = w.xaml || '';
+      out.requestWorkflowsAndRules.push({ name: label(w.name), category: w.category, mode: w.mode, updateAttributes: label(w.triggeronupdateattributelist), readable: !!x, definitionSha256: x ? hash(x) : null, creates: uniq([...x.matchAll(/<mxswa:CreateEntity[^>]*EntityName="([a-z0-9_]+)"/g)].map(m => m[1])), sets: uniq([...x.matchAll(/<mxswa:SetEntityProperty Attribute="([a-z0-9_]+)"[^>]*EntityName="([a-z0-9_]+)"/g)].map(m => `${m[2]}.${m[1]}`)), sendsEmail: /SendEmail/.test(x), customActivities: probe.customWorkflowActivities(x).map(label), schemaReferences: schemaRefs(x), matchingWorkflowIdReferences: uniq(refs(x,w.workflowid)) });
+    }
+    try {
+      const steps = await all('/sdkmessageprocessingsteps?$select=name,stage,mode,rank,filteringattributes,ishidden&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename;$expand=pluginassemblyid($select=name,version,isolationmode,sourcetype,ismanaged))&$filter=(sdkmessageid/name eq \'Update\' or sdkmessageid/name eq \'UpdateMultiple\' or sdkmessageid/name eq \'Upsert\' or sdkmessageid/name eq \'UpsertMultiple\') and statecode eq 0');
+      for(const s of steps) if (!probe.isPlatformStep(s) && (!s.sdkmessagefilterid?.primaryobjecttypecode || ['none','akoya_request'].includes(s.sdkmessagefilterid.primaryobjecttypecode))) out.customSteps.push({ name: label(s.name), message: label(s.sdkmessageid?.name), entityFilter: logical(s.sdkmessagefilterid?.primaryobjecttypecode), stage: s.stage, mode: s.mode, rank: s.rank, hidden: typeof s.ishidden === 'object' ? s.ishidden?.Value : s.ishidden, filteringAttributes: label(s.filteringattributes), type: label(s.plugintypeid?.typename), assembly: s.plugintypeid?.pluginassemblyid ? { name: label(s.plugintypeid.pluginassemblyid.name), version: label(s.plugintypeid.pluginassemblyid.version), isolationMode: s.plugintypeid.pluginassemblyid.isolationmode, sourceType: s.plugintypeid.pluginassemblyid.sourcetype, managed: s.plugintypeid.pluginassemblyid.ismanaged } : null });
+    } catch(e) { out.errors.push({ query: 'custom registration / assembly metadata', code: /^read_http_\d+$/.test(e.message) ? e.message : 'read_failed' }); }
+    out.readOnlyGetCount = gets; out.finishedAt = new Date().toISOString();
+    fs.writeFileSync('docs/plans/evidence/test-request-factory/b4-automation-metadata-2026-09-30.json', JSON.stringify(out,null,2)+'\n', { flag: 'wx' });
+    console.log(JSON.stringify({ flowCount: out.flows.length, customStepCount: out.customSteps.length, requestWorkflowCount: out.requestWorkflowsAndRules.length, section13: out.section13, errors: out.errors, getCount: gets }));
+  } finally { fs.rmSync(temp, { recursive:true, force:true }); }
+}
+if (require.main === module) main().catch(() => { console.error('Automation collection failed; raw error withheld.'); process.exitCode=1; });
+module.exports = { parameter, actionRows, label };
