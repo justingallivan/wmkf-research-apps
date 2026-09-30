@@ -128,6 +128,42 @@ test('a deleted or unreadable contact (real-shaped Dataverse 404/403 rejection) 
   await expect(loadRequestIntegrityPeople(REQUEST_ID, outage)).rejects.toMatchObject({ status: 503 });
 });
 
+test('run maps an unavailable Retraction Watch corpus to 503 and saves nothing', async () => {
+  const sqlCalls = [];
+  const db = async (parts, ...values) => { sqlCalls.push(parts.join('?')); return { rows: [] }; };
+  const engine = { async *screenApplicants() { throw Object.assign(new Error('Retraction Watch corpus unavailable'), { code: 'retraction_corpus_unavailable' }); } };
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...peopleDependencies(), sql: db, IntegrityService: engine,
+  })).rejects.toMatchObject({ httpStatus: 503, body: { code: 'retraction_corpus_unavailable' } });
+  expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
+});
+
+test('run stops with 503 when the time budget runs out, before the next person and before any insert', async () => {
+  const sqlCalls = [];
+  const db = async (parts) => { sqlCalls.push(parts.join('?')); return { rows: [] }; };
+  let clock = 0;
+  let screened = 0;
+  const engine = { async *screenApplicants(applicants) {
+    for (let i = 0; i < applicants.length; i += 1) { yield { type: 'progress', applicantIndex: i }; screened += 1; clock += 250_000; }
+    yield { type: 'complete', results: [] };
+  } };
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...peopleDependencies(), sql: db, IntegrityService: engine, now: () => clock,
+  })).rejects.toMatchObject({ httpStatus: 503, body: { code: 'screening_time_budget_exceeded' } });
+  expect(screened).toBe(1);
+  expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
+});
+
+test('a missing actor profile is a 401 before any Dataverse or paid work', async () => {
+  const deps = peopleDependencies();
+  const screenApplicants = jest.fn();
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: null, claudeApiKey: 'key' }, {
+    ...deps, sql: jest.fn(), IntegrityService: { screenApplicants },
+  })).rejects.toMatchObject({ httpStatus: 401, body: { code: 'profile_required' } });
+  expect(deps.grantRequestAdapter.getById).not.toHaveBeenCalled();
+  expect(screenApplicants).not.toHaveBeenCalled();
+});
+
 test('empty people and over-limit people are rejected before the paid engine', async () => {
   const engine = { screenApplicants: jest.fn() };
   const empty = peopleDependencies({

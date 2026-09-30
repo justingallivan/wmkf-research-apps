@@ -103,14 +103,13 @@ test.each([
   ['empty corpus', { rows: [{ available: false }] }],
   ['missing health result', { rows: [] }],
   ['health query failure', new Error('database unavailable')],
-])('strict screening fails closed when Retraction Watch corpus is unavailable: %s', async (_label, outcome) => {
+])('strict screening stops before any paid call when Retraction Watch corpus is unavailable: %s', async (_label, outcome) => {
   mockSql.mockReset();
   if (outcome instanceof Error) mockSql.mockRejectedValue(outcome);
   else mockSql.mockResolvedValue(outcome);
-  const result = await screen();
-  expect(result.sources.retraction_watch).toMatchObject({
-    searched: true, matches: [], error: 'Retraction Watch corpus unavailable',
-  });
+  await expect(screen()).rejects.toMatchObject({ code: 'retraction_corpus_unavailable' });
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(mockComplete).not.toHaveBeenCalled();
   expect(mockSql).toHaveBeenCalledTimes(1);
   expect(mockSql.mock.calls[0][0].join('?')).toContain('SELECT EXISTS');
 });
@@ -141,4 +140,26 @@ test('strict summary failure is exposed by the generator and cannot be approved 
   const result = await screen();
   expect(result.sources.pubpeer.error).toBe('Search result analysis failed');
   expect(result.sources.news.error).toBe('Search result analysis failed');
+});
+
+test('strict search requests carry a timeout; standalone requests are unchanged', async () => {
+  await IntegrityService.serpSearch('fixture', 'fixture', 10, 'google', strict);
+  expect(global.fetch.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  global.fetch.mockClear();
+  await IntegrityService.serpSearch('fixture', 'fixture');
+  expect(global.fetch.mock.calls[0]).toHaveLength(1);
+});
+
+test('strict mode keeps specific source-failure messages and names a timeout', async () => {
+  global.fetch.mockResolvedValue({ ok: false, status: 429, statusText: 'quota' });
+  await expect(IntegrityService.serpSearch('fixture', 'fixture', 10, 'google', strict)).rejects.toThrow('Search provider request failed');
+  global.fetch.mockResolvedValue({ ok: true, json: async () => ({ search_metadata: { status: 'Success' }, organic_results: [{ title: 'Missing link' }] }) });
+  await expect(IntegrityService.serpSearch('fixture', 'fixture', 10, 'google', strict)).rejects.toThrow('Search provider returned unusable results');
+  global.fetch.mockRejectedValue(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }));
+  await expect(IntegrityService.serpSearch('fixture', 'fixture', 10, 'google', strict)).rejects.toThrow('Search provider timed out');
+  global.fetch.mockRejectedValue(new Error('socket hang up at 10.0.0.1'));
+  await expect(IntegrityService.serpSearch('fixture', 'fixture', 10, 'google', strict)).rejects.toThrow(/^Search provider search failed$/);
+  mockComplete.mockResolvedValue({ text: '   ' });
+  await expect(IntegrityService.analyzeWithHaiku([{ title: 'Fixture', link: 'https://example.org', snippet: '' }], 'Fixture', 'fixture', strict))
+    .rejects.toThrow('Invalid response from Claude API');
 });
