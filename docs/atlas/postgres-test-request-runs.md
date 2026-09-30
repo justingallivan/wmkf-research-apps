@@ -3,7 +3,7 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable operation ledger for owner-run test request clones; local ledger recorded for cast creation, shared database status unverified."
+summary: "Durable operation ledger for owner-run test request clones; local ledger recorded for cast creation, 054 applied to shared Production (Preview unverified)."
 canonical: false
 cataloged: 2026-09-23
 last_verified: 2026-09-29
@@ -32,8 +32,11 @@ the configured shared URLs and neon.tech hosts, but does not independently
 prove the supplied URL is local or which database was used; the
 exact owner-run target for that clone and binding is unverified (no direct
 record) [ASSUMED unknown].
-Whether migration 054 is applied to the shared Production/Preview Postgres
-database was not re-probed for the B4 plan revision [ASSUMED unknown]. Existing
+Migration 054 is applied to the shared Production Postgres (2026-09-26 06:54Z,
+`applied_by` `codex-feature-request-2026-09-26`) [VERIFIED via an owner-run
+read-only `schema_migrations` query, S552], but from `codex/feature-request`, whose
+last committed 054 at that time was `af65a24bd` (2026-09-24), before the cast tables; the
+installed shape was not read. Preview's database is unverified. Existing
 shared databases use `node scripts/apply-migrations.js`; the owner retains
 control of any shared-database application. The local ledgers took 054 and
 its in-place amendments by owner-run `psql` (cast plan, *Order* 1 and 4), and
@@ -298,12 +301,15 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   `scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]; the local
   `ledger_prod` is recorded for the production cast creation (cast plan,
   *Order* 4). Which local ledger the 1003303 clone and binding used is not
-  recorded (see the header). Shared Production/Preview database migration
-  status remains unverified; this B4 revision performs no live read.
+  recorded (see the header). Shared Production has 054 applied (2026-09-26
+  06:54Z, `codex-feature-request-2026-09-26`) [VERIFIED via an owner-run
+  read-only `schema_migrations` query, S552]; Preview's database is unverified.
 - Slice B4 plans a **separate** Potential Reviewer 1 operation table in new
-  migration 055, with a new V56 fresh-install mirror after V55. Typed columns
+  migration 058, with a new V57 fresh-install mirror after V56 (S552: 055 and
+  V56 are taken by the unmerged `codex/feature-request`, whose 055 is already
+  applied to shared Production; Integrity claims 056–057). Typed columns
   hold the slot snapshot and readback without changing the receipt grammar.
-  Migration 055 must reconcile earlier applied 054 shapes before adding its
+  Migration 058 must reconcile earlier applied 054 shapes before adding its
   composite foreign key; each target's schema remains unverified. On the
   operational local `ledger_prod` and `ledger` it is applied by an owner-run
   `psql -f` after a read-only shape preflight, with a recorded application,
