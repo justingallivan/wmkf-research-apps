@@ -23,6 +23,7 @@
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
 - Sandbox rehearsal --bypass-goverify per-machine allow rule: project-sandbox-rehearsal-bypass-allow-rule.md
 - Local containers / ledger Postgres: project-local-docker-is-colima.md
+- Factory ledger location / owner-run durable state: feedback-operational-state-must-be-reachable-from-every-workstation.md; ../docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md
 
 ## Working Norms
 - Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md

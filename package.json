@@ -11,6 +11,8 @@
     "lint:fix": "eslint . --fix",
     "apply:migrations": "node scripts/apply-migrations.js",
     "check:migrations-manifest": "node scripts/check-migrations-manifest.js",
+    "check:factory-ledger": "node scripts/check-factory-ledger.js",
+    "ledger:apply": "node scripts/apply-ledger-migrations.js",
     "check:reviewer-reminder-hold": "node scripts/check-reviewer-reminder-hold.js",
     "check:reviewer-reminder-hold:self-test": "node scripts/check-reviewer-reminder-hold-self-test.js",
     "check:agent-invariants": "node scripts/check-agent-invariants.js",
