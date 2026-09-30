@@ -1,55 +1,34 @@
-# Session 556-B4 Prompt: resolve the Opus P2 and recover Factory ledgers
+# Session 557-B4 Prompt: recover owned ledgers and complete owner release gates
 
-## Session 555-B4 Summary — 2026-09-30 PT (Codex; configuration readiness)
+## Session 556-B4 Summary — 2026-09-30 PT (Codex; Opus P2 fix)
 
-**B4 release remains BLOCKED; PR #369 stays draft.** Work stayed on `codex/factory-reviewer-b4-runtime` in `/Users/gallivan/Code/WMKF_Apps-codex`. Claude's checkout and scheduled-email surfaces, migration 059 and V58 were not modified. No Production migration, Dataverse write, slot PATCH, email or live job drain was run.
+**The code P2 is FIXED; B4 release remains BLOCKED and PR #369 stays draft.** Stay on `codex/factory-reviewer-b4-runtime` in `/Users/gallivan/Code/WMKF_Apps-codex`. Never touch Claude's checkout, scheduled-email surfaces, 059/V58 or push main. No Production migration, Dataverse write, slot PATCH, email or live job drain ran.
 
-### What Was Completed
+### Completed and verified
 
-1. **Current PR check.** At `93447aeacdc22df60b5ad9f4cff0b47cbd55f61e`, all 12 checks passed; PR #369 was draft, mergeable and clean [VERIFIED via GitHub]. Runtime/probe/client remain unchanged from tested merge candidate `92ccbd0bd052c3ae49666c8776d3642d26dd53ce`, which incorporated six main docs commits at `570f53086`. Previous evidence: 67 startup gates/self-tests; 66 focused suites / 1,906 tests and 44 changed non-PG suites / 1,690 tests (overlapping), all passed.
-2. **Local and B4 Preview switches enabled.** Owner directed completion of remaining session work after the configuration action was proposed. Both literal switches now read `on` in Local, B4 branch Preview and Production; all wave29/wave30 marker checks returned HTTP 200 [VERIFIED via `b4-environment-switches-enabled-2026-09-30.json`]. Preview edits are branch-specific, under verified project `wmkf_research_apps` / `prj_56SJKzNer1aV38kKVoP8tl3X0lf3`, scope `justin-gallivans-projects`. Production and generic Development/Preview configuration were not changed. Development remains off/off. Every env pull used deleted mode-0600 temporary files; only key names and on/off states are recorded.
-3. **Local checkout isolation.** The existing `.env.local` symlink pointed into Claude's checkout. Replaced only this worktree's symlink with a private mode-0600 copy, preserved unrelated configuration and changed only the two switches. CLI and Next.js development loaders both resolve them to literal `on` [VERIFIED via loaders]. Claude's target file was untouched. Future credential changes must be synced explicitly to this new private copy.
-4. **Focused verification.** Six switch/capability/acceptance-job suites passed, 145 tests, including all-job pause, matching-lease release and resumption. No runtime source was edited and no live acceptance job was exercised. Post-edit Preview at `1a86c10da` is Ready, with build recorded, and all 12 CI checks passed. Direct deployment-captured values remain UNKNOWN: CLI 61.1.0 refuses `env pull --id` for Ready deployments, and the deployment API exposes key names only. No runtime-value or live job-resumption claim is made. See deployment receipt and CI snapshot.
-5. **Owner packet.** `b4-owner-next-actions-2026-09-30.md` contains read-only ledger inventory/preflight commands, the Production query pointer and the six-item automation worksheet. No classification was self-authorized. The owner cannot access the other Mac until approximately nine hours after this chat decision.
-6. **Ledger remains unavailable.** This Mac has one Colima profile, one `wmkf-ledger-pg` Postgres container and one volume [VERIFIED via inventory]. `ledger_prod` is absent; `ledger` has only two early Factory tables and an old receipt function [VERIFIED via existing schema receipt]. No spare journal appeared in the Docker inventory. No database/schema/row/tracker was created. Local storage was a temporary CLI-phase decision; shared Postgres is planned for the form phase. No storage migration was begun.
+1. **Inactive ordinary applicant slots restored for repair.** Pushed `40ab24f3e9da5af0259aa481014621cdd7837d37` adds default-false `allowInactiveOrdinary`. Only server-read slot ingestion opts in at its capability and adapter calls. Exact false/null marker and literal true required; inactive synthetic/unknown/missing/mismatched identities refused. Merge and all other binding callers remain strict. Existing hydration yields inactive/person_inactive repair card; promotion and identity edits remain strict. [VERIFIED via source and real-chain tests].
+2. **Tests and gates.** Permanent regression suite uses real ingestion, capability, suggestion adapter and hydration with mocked transport. Two ordinary-inactive cases red before fix; after fix, ten cases pass including defaults, synthetic, non-on and marker change between reads. Retry preserves selected/invited curation with no extra create/PATCH. 45 suites / 1,712 tests and 18 source gate/self-test/type/lint commands plus 20 relevant documentation/Atlas/secret/invariant/catalog commands passed [VERIFIED via Jest/gates]. No live write test.
+3. **Independent follow-up.** OAuth/subscription Opus 5.5 reviewed exact fix `0dcda0359` → `40ab24f3e`: FIX VERIFIED BY SOURCE, no P0–P2. Host-side Keychain method, API-key/alternate-provider env removed, only Read/Grep/Glob, no fallback; 18 read operations, 96 seconds, zero denials. Prior owner consent covered this method/usage. Opus source inspection and Codex execution evidence remain distinct. Current report: `b4-inactive-slot-fix-2026-09-30.md`; initial Opus report preserved as history.
+4. **Fresh matching release probe.** Production section 13 from clean committed probe/client at `40ab24f3e`: Global effective prvReadWorkflow, 14 readable activated flows, zero hard incomplete reasons, same six owner dispositions, complete=false. Fresh Local/B4 Preview/Production on/on; all nine marker reads present/HTTP 200. Private mode-0600 env pulls deleted. [VERIFIED via `b4-dataverse-fix-supplement-2026-09-30.json` and 18:31 receipt]. No owner classification inferred.
+5. **CI and PR.** All 12 checks passed at `40ab24f3e`, including Jest/PostgreSQL 16/Vercel; PR #369 draft, mergeable and clean [VERIFIED via `b4-ci-at-inactive-slot-fix-2026-09-30.json`]. Main/base `570f53086` already incorporated six docs commits (#370–#372). Evidence-only descendants preserve the new runtime/probe/client candidate. Recheck final head after documentation push.
+6. **Configuration history.** Local .env.local is this worktree's private mode-0600 copy (former symlink into Claude's checkout replaced here only). Future rotations require explicit synchronization. Only B4 branch Preview overrides were enabled; Production/generic Development/Preview untouched. Ready Preview build provenance recorded at `1a86c10da`; direct deployment-captured flag readback UNKNOWN (supported Ready-deployment reads expose key names only). No deployed flag or live resumption claim.
 
-7. **Independent Opus review.** Owner requested Claude Opus through OAuth and explicitly approved usage after automatic approval rejected the first launch. The rejected launch made no model call. A host-side `claude.ai` Max login was verified; Opus 5.5 reviewed pinned head `e17b93685` with only Read/Grep/Glob, no API-key/alternate-provider env, no fallback and zero permission denials. Verdict: one P2 inactive ordinary slot-ingestion regression; no P0/P1. Codex independently confirmed it with the real capability/service: inactive slot fails twice before hydration, active ordinary control reaches hydration (one mocked suite / two cases passed). No code fix was applied. See `b4-claude-opus-review-2026-09-30.md` and its provenance/reproduction files [VERIFIED via CLI result, source and isolated Jest].
+### Owner actions pending — unchanged
 
-### Evidence and Commits
+1. Recover existing operational ledger_prod/ledger and ownership history on the other Mac/backups (unavailable for approximately nine hours after the earlier chat decision). This Colima instance has no ledger_prod; ledger only two early Factory tables/old receipt function. Do not recreate a journal or adopt Dataverse identities by name/email. No schema/tracker/row created here.
+2. Run §6 read-only preflight on actual ledgers, then owner-run versioned single-transaction 058 apply and record source/hash/UTC/post-shape. Never run apply-migrations.js on local ledgers; observed ledger lacks earlier tables that 058 alone does not restore. Compare server-read cast email digest with recovered owned journal.
+3. Owner runs b4-schema-preflight.sql on shared Production, inspects historical tracker, then applies 058 through existing-DB process when preflight permits. Shared Production/Preview consistency UNKNOWN; shared 058 is not a B4 runtime prerequisite. Agent never applies Production migrations.
+4. Six automation dispositions plus indirect-chain review of every listed custom step/all activated flows remain open. Manual trigger dispositions need parameter values/invocation/Request action evidence. `b4-owner-next-actions-2026-09-30.md` contains recovery commands/worksheet. Slot gate BLOCKED; complete=false.
+5. Keep PR draft until explicit owner Tier 2 promotion (main auto-deploys). Recheck CI, effective deployed switches, dated metadata and eventual job resumption. A future runtime change requires a matching clean-commit readiness probe.
 
-- `92ccbd0bd` — tested/probed runtime candidate after merge of main docs.
-- `93447aeac` — earlier release evidence/checklist/handoff; all 12 checks passed.
-- `1a86c10da` — configuration evidence and owner recovery packet; all 12 checks passed and new Preview is Ready.
-- `e17b93685` — final deployment/CI evidence; all 12 checks passed at the reviewed head.
-- Independent Opus review evidence commit — see `git log -1`; docs only. Local env is ignored and private; Vercel switches are external config.
-- Evidence index: `docs/plans/evidence/test-request-factory/b4-release-readiness-2026-09-30.md`; release contract: `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`.
+### Do not reopen
 
-## Next Items
+- Fail-closed binds/person edits when reviewer isolation non-on; pause ALL acceptance jobs when either switch non-on. Deploy prior code before any switch-only rollback.
+- B4 owns 058/V57; Claude owns scheduled-email 059/V58. Bind-reviewer remains suggestion-only; slot preview/exact Request confirmation is separate owner-run work.
 
-### Owner Action Pending
+### Evidence and handoff
 
-1. **Recover existing operational ledgers and ownership history.** Check the other Mac/backups using the packet. Do not recreate an empty cast journal or adopt Dataverse identities by name/email. Run §6 preflight against the actual ledgers, then owner-run 058 apply and record post-apply shape/source/hash/UTC. Never run `apply-migrations.js` against local ledgers. Observed `ledger` is missing earlier 054 tables that 058 alone does not restore.
-2. **Cast email-digest comparison.** Use the recovered owned cast journal to compare the server-read normalized address with `test_request_cast_members.address_sha256`. This remains blocked by ledger recovery.
-3. **Production 054 query / shared consistency.** Owner runs `b4-schema-preflight.sql`, reads existing tracker history, and applies 058 through the existing-DB versioned process from a named commit when preflight permits. Agent never applies Production migrations. Shared Production/Preview migration consistency is UNKNOWN; shared 058 is not a B4 runtime prerequisite.
-4. **Automation dispositions and first-slot gate.** Section 13 receipt at `92ccbd0bd` has effective Global `prvReadWorkflow`, 14 readable activated flows, zero hard incomplete reasons, and six open owner dispositions (`complete=false`). Use the packet worksheet. Before any first PATCH, recheck all activated flow definitions, all custom/other-column step chains, effective Process visibility, exact marked Request/run/person, owned cast address digest and concrete ETag. No slot PATCH authorization exists.
-5. **Promotion decision.** Leave PR #369 draft until the owner explicitly decides to promote; main auto-deploys. Recheck current head/CI, deployment-captured switches and dated metadata at the eventual release. Verify job resumption after Production deployment.
-
-### Verified Open / Configuration Follow-up
-
-1. **Confirmed Opus P2: inactive ordinary applicant-slot ingestion bypasses repair hydration.** Source/reproduction verified; no fix applied. User asked for review, so runtime remains unchanged. Opus's opt-in ordinary-inactive recommendation is NOT TESTED; any implementation must preserve all settled isolation and active-synthetic guards. Review report: `docs/plans/evidence/test-request-factory/b4-claude-opus-review-2026-09-30.md`.
-
-2. New B4 Preview Ready/build provenance is verified at `1a86c10da`; direct captured-switch readback is UNKNOWN because the CLI/API does not expose those values on a Ready deployment. Branch/project pull independently proves on/on. Resolve direct runtime verification before claiming deployed values or live job resumption. Runtime/client/probe source remains the named candidate; docs-only descendants preserve its section 13 source provenance.
-3. Synchronize this worktree's now-private Local env after future credential rotations. Do not write through the old Claude-checkout symlink or overwrite its file.
-
-### Do Not Reopen Without New Decision
-
-1. Fail-closed binds and pause all acceptance jobs when either switch is non-on. No switch-only rollback after promotion: deploy prior code first.
-2. B4 owns 058/V57; Claude owns scheduled-email 059/V58. Stay on this branch/directory, never push main or touch the other checkout.
-3. `--bind-reviewer` remains suggestion-only. Slot preview/exact-Request confirmation is a separate owner-run operation.
-
-## Testing and Milestone Determination
-
-Six focused suites / 145 tests passed after configuration changes. All 20 relevant documentation/Atlas/secret/invariant gate/self-test runs passed sequentially. JSON and whitespace validation passed. The advisory claim-evidence pilot report was unavailable because local state could not be read; no observation row was fabricated. Current receipts contain no raw env values, live identity IDs or credentials; temporary env directories are deleted. No Production capability shipped and no strategic storage change was made; no DEVELOPMENT_LOG entry is required.
+Runtime candidate: `40ab24f3e`. Evidence directory: `docs/plans/evidence/test-request-factory/`; fix report/tests/provenance plus release index `b4-release-readiness-2026-09-30.md`. Contract: `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`. Bounded /sweep reconciles current plan/report/handoff and explicitly historical initial Opus verdict/reproduction. No Production capability shipped or storage architecture changed; no DEVELOPMENT_LOG entry required. Advisory claim-evidence pilot report unavailable (local state unreadable); no row fabricated.
 
 ---
 

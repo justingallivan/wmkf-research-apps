@@ -1,6 +1,6 @@
 # PR #369 — Claude Opus OAuth review, 2026-09-30
 
-**Verdict: CHANGES REQUIRED — one P2; no P0/P1 findings. PR stays draft.** The independent reviewer was Claude Opus 5.5 (`claude-opus-5-5`) through the owner's `claude.ai` Max OAuth session. The owner explicitly approved subscription/metered usage after the automatic approval notice. The CLI ran outside the Codex sandbox for Keychain access, with API-key/alternate-provider env vars removed, no fallback model, and only Read/Grep/Glob tools. No application/provider API key authenticated the review. No source was changed or GitHub comment posted.
+**Historical verdict at `e17b93685`: CHANGES REQUIRED — one P2; no P0/P1 findings.** Subsequently fixed at `40ab24f3e` and re-reviewed via OAuth with no P0–P2: [current fix report](b4-inactive-slot-fix-2026-09-30.md). PR stays draft for operational blockers. This report and its verbatim review preserve the earlier source/reproduction as history. The independent reviewer was Claude Opus 5.5 (`claude-opus-5-5`) through the owner's `claude.ai` Max OAuth session. The owner explicitly approved subscription/metered usage after the automatic approval notice. The CLI ran outside the Codex sandbox for Keychain access, with API-key/alternate-provider env vars removed, no fallback model, and only Read/Grep/Glob tools. No application/provider API key authenticated the review. No source was changed or GitHub comment posted.
 
 Reviewed head: `e17b93685b2a367d5da3a7016c366baec3b30d4d`; PR base: `570f53086325e7988ebf95f4e6f4a1f86cfe7676`. Exact diff SHA-256: `0066e8f20869ab53531e278f7b734968fa6c4c0c088f9952e04344f6f00e647b`. Runtime/probe/client remain unchanged from candidate `92ccbd0bd`. Opus completed 94 read operations in 539 seconds, with zero permission denials and successful exit. See [provenance](b4-claude-opus-review-provenance-2026-09-30.json).
 
@@ -14,7 +14,7 @@ The [reproduction source](b4-inactive-slot-reproduction-2026-09-30.txt) uses fix
 npm test -- --runInBand --silent   --testMatch '**/tmp/b4-opus-review/*.test.js'   --runTestsByPath tmp/b4-opus-review/inactive-slot-repro.test.js
 ```
 
-This confirms the current failure path, not the proposed fix. Opus's opt-in exemption recommendation remains NOT TESTED / ASSUMED, and no fix was applied. Any fix must preserve fail-closed non-on behavior, synthetic active-person requirements, and the existing refusal on other bind/person-edit paths. The operational ledger/schema/automation/promotion blockers remain separate.
+This confirms the historical failure at the reviewed head, before the fix. The recommendation was then NOT TESTED / ASSUMED and unapplied. The subsequent fix report records permanent regression coverage, strict defaults and preserved isolation/active-synthetic guards. This old failure reproduction is expected to fail on the repaired source. The operational ledger/schema/automation/promotion blockers remain separate.
 
 ## Independent Opus report — verbatim
 
