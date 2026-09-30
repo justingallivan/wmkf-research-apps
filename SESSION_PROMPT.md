@@ -12,10 +12,11 @@ The historical Graph-confirmed expiry cell remains PARTIAL. Zoom-link paste and 
 upload/finalize staff controls are also source-built on this branch and use the existing guarded
 producer routes. **[VERIFIED via 69 focused tests, type/lint/build gates, documentation gates,
 and two read-only Opus reviews]** Their client retry, request-switch, URL, and completion-notice
-paths have been checked offline; signed-in runtime acceptance is still pending. No live
-upload, deployment, alias, Production configuration, or SharePoint deletion occurred in these
-implementations. The source branch awaits a deliberate Preview deployment and signed-in
-acceptance before Production promotion. The
+paths have been checked offline; signed-in runtime acceptance is still pending. Commit
+`10277843f` was pushed; **[VERIFIED via the GitHub commit status]** its automatic Vercel Preview
+build succeeded. No live upload, manual deployment, alias move, access-mode change, Production
+configuration change, or SharePoint deletion occurred in these implementations. The source
+branch awaits bounded, owner-approved signed-in Preview acceptance before Production promotion. The
 Session 551 instructions below are historical context.
 
 ## Session 550 Summary
