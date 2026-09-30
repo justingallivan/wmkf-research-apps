@@ -1626,7 +1626,21 @@ describe('send-emails-service — Test Request isolation (Stage 1b)', () => {
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
     expect(resultOf(emitted).failed).toEqual([
-      expect.objectContaining({ suggestionId: SUG_OK, code: 'test_request_email_denied' }),
+      expect.objectContaining({ suggestionId: SUG_OK, code: 'test_request_reviewer_email_unbound' }),
+    ]);
+  });
+
+  test('a Request changing at the send-time binding check is a definite non-send', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mintAndStore.mockImplementationOnce(async () => {
+      REQUEST = { ...REQUEST, wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' };
+      return { jwt: 'aaa.bbb.ccc' };
+    });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).unconfirmed).toEqual([]);
+    expect(resultOf(emitted).failed).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, code: 'test_request_reviewer_email_unbound' }),
     ]);
   });
 

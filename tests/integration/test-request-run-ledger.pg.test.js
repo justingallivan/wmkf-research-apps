@@ -30,6 +30,7 @@ if (/neon\.tech/i.test(TEST_URL) || (process.env.POSTGRES_URL && TEST_URL === pr
 const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
+const SLOT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql');
 
 /** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
 async function assertLedgerSchemaCurrent(db, migrationSql) {
@@ -94,11 +95,13 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf8');
     if (!rows[0]?.reg) await db.query(migrationSql);
     await assertLedgerSchemaCurrent(db, migrationSql);
+    await db.query(fs.readFileSync(SLOT_MIGRATION_PATH, 'utf8'));
     ledger = createRunLedger(db);
   });
 
   afterAll(async () => {
     if (createdMemberIds.length) {
+      await db.query(`DELETE FROM test_request_cast_slot_bindings WHERE member_id = ANY($1::uuid[])`, [createdMemberIds]);
       await db.query(`DELETE FROM test_request_cast_bindings WHERE member_id = ANY($1::uuid[])`, [createdMemberIds]);
       await db.query(`DELETE FROM test_request_cast_members WHERE member_id = ANY($1::uuid[])`, [createdMemberIds]);
     }
@@ -118,6 +121,62 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       );
     }
     if (db.end) await db.end();
+  });
+
+  it.each(['current', 'earlier', 'three-role'])('055 installs the typed slot journal and current receipt grammar from %s 054', async (startingShape) => {
+    const schema = `b4_fixture_${crypto.randomUUID().replace(/-/g, '')}`;
+    const full054 = fs.readFileSync(MIGRATION_PATH, 'utf8');
+    const earlier054 = full054.slice(0, full054.indexOf('-- Synthetic cast'));
+    const threeRole054 = full054.replace(
+      "role IN ('pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader')",
+      "role IN ('pi', 'liaison', 'suggested_reviewer')",
+    );
+    const migration055 = fs.readFileSync(SLOT_MIGRATION_PATH, 'utf8');
+    await db.transaction(async (tx) => {
+      await tx.query(`CREATE SCHEMA ${schema}`);
+      await tx.query(`SET LOCAL search_path TO ${schema}, public`);
+      await tx.query(startingShape === 'current' ? full054 : startingShape === 'three-role' ? threeRole054 : earlier054);
+      await tx.query(migration055);
+      await tx.query(`ALTER TABLE test_request_cast_slot_bindings
+        DROP CONSTRAINT test_request_cast_slot_bindings_snapshot`);
+      await tx.query(`ALTER TABLE test_request_cast_slot_bindings
+        ADD CONSTRAINT test_request_cast_slot_bindings_snapshot CHECK (
+          (snapshot_at IS NULL AND before_etag IS NULL AND status = 'planned')
+          OR (snapshot_at IS NOT NULL AND before_etag IS NOT NULL))`);
+      await tx.query(migration055); // idempotent on the same ledger
+      if (startingShape === 'three-role') {
+        await tx.query(`INSERT INTO test_request_cast_members
+          (member_id, environment, role, entity, first_name, last_name, address_sha256)
+          VALUES ($1::uuid, 'production', 'org_leader', 'contact', 'Test', 'Leader', $2::text)`,
+        [crypto.randomUUID(), 'a'.repeat(64)]);
+      }
+      const { rows: snapshotConstraint } = await tx.query(
+        `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+          WHERE conname = 'test_request_cast_slot_bindings_snapshot'
+            AND connamespace = $1::regnamespace`, [schema],
+      );
+      expect(snapshotConstraint[0].definition).toContain('needs_attention');
+      const { rows: tables } = await tx.query(
+        `SELECT to_regclass('test_request_cast_members') AS members,
+                to_regclass('test_request_cast_bindings') AS binding,
+                to_regclass('test_request_cast_slot_bindings') AS slot`,
+      );
+      expect(Object.values(tables[0]).every(Boolean)).toBe(true);
+      const { rows: constraints } = await tx.query(
+        `SELECT conname FROM pg_constraint WHERE connamespace = $1::regnamespace
+           AND conname IN ('test_request_cast_bindings_one_per_run',
+             'test_request_cast_slot_bindings_suggestion_fk', 'test_request_cast_slot_bindings_verified')`,
+        [schema],
+      );
+      expect(constraints).toHaveLength(3);
+      const { rows: fn } = await tx.query(
+        `SELECT prosrc FROM pg_proc WHERE oid = 'test_request_receipt_ok(jsonb)'::regprocedure`,
+      );
+      const normalize = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+      const expected = full054.slice(full054.indexOf('$receipt$') + 9, full054.indexOf('$receipt$;'));
+      expect(normalize(fn[0].prosrc)).toBe(normalize(expected));
+      await tx.query(`DROP SCHEMA ${schema} CASCADE`);
+    });
   });
 
   it('two concurrent reserveRun calls with the same key yield one row and the same destination GUIDs', async () => {
@@ -157,6 +216,15 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       idempotencyKey,
       plan: basePlan({ ...plan, runId: crypto.randomUUID(), planDigest: '933da5bc7f45ad93424e42d19e38986cc333b102d612b5849909517b4af073a3' }),
     })).rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_conflict' });
+  });
+
+  it('a reused run ID under a different key reports a deterministic destination conflict', async () => {
+    const plan = basePlan();
+    createdRunIds.push(plan.runId);
+    const actorId = cliActorId(`actor-${crypto.randomUUID()}`);
+    await ledger.reserveRun({ actorId, idempotencyKey: 'key-original', plan });
+    await expect(ledger.reserveRun({ actorId, idempotencyKey: 'key-other', plan }))
+      .rejects.toMatchObject({ httpStatus: 409, code: 'test_request_run_destination_conflict' });
   });
 
   it('slice 6a: reserves both basic and initial_assessment runs', async () => {
@@ -380,6 +448,58 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     expect(stopped).toMatchObject({ status: 'needs_attention', error: 'readback mismatch' });
     expect(await ledger.getCastBinding({ runId: run.runId, memberId: member.memberId })).toMatchObject({ bindingId: binding.bindingId });
     await expect(ledger.markCastMemberVerified({ memberId: member.memberId, readback: { requestStatus: 'x' } })).rejects.toThrow(/receipt/i);
+  });
+
+  it('slot journal requires a ready run and verified suggestion, then fences dispatch and exact readback', async () => {
+    const memberId = crypto.randomUUID();
+    createdMemberIds.push(memberId);
+    await ledger.planCastMember({
+      memberId, environment: 'production', role: 'suggested_reviewer',
+      firstName: 'TEST · Factory', lastName: 'Reviewer',
+      addressSha256: reviewerAddressSha256('cast-reviewer@example.test').addressSha256,
+    });
+    await ledger.markCastMemberDispatched({ memberId });
+    await ledger.markCastMemberVerified({ memberId, readback: { matched: true } });
+    const plan = basePlan({ destinationEnvironment: 'production', destinationDataverseHost: 'production.crm.dynamics.com' });
+    createdRunIds.push(plan.runId);
+    const { run } = await ledger.reserveRun({
+      actorId: cliActorId(`actor-${crypto.randomUUID()}`), idempotencyKey: 'key-slot', plan,
+    });
+    const bindingId = crypto.randomUUID();
+    await ledger.planCastBinding({ bindingId, runId: run.runId, memberId });
+    const ids = { runId: run.runId, memberId, requestId: plan.destinationRequestId };
+    expect(await ledger.planCastSlotBinding(ids)).toBeNull();
+    await db.query(`UPDATE test_request_runs SET status = 'ready', destination_request_number = '1003303',
+      completed_at = NOW() WHERE run_id = $1::uuid`, [run.runId]);
+    expect(await ledger.planCastSlotBinding(ids)).toBeNull();
+    await ledger.markCastBindingDispatched({ bindingId });
+    await ledger.markCastBindingVerified({ bindingId, readback: { matched: true } });
+    const planned = await ledger.planCastSlotBinding(ids);
+    expect(planned).toMatchObject({ status: 'planned', expectedPersonId: memberId,
+      expectedRequestId: plan.destinationRequestId });
+    const stoppedBeforeSnapshot = await ledger.markCastSlotNeedsAttention({
+      ...ids, failureCode: 'request_drift', error: 'marker changed before snapshot',
+    });
+    expect(stoppedBeforeSnapshot).toMatchObject({ status: 'needs_attention', beforeEtag: null });
+    // Restore this disposable fixture row so the rest of the dispatch proof
+    // can exercise a fresh planned operation without creating another cast.
+    await db.query(`UPDATE test_request_cast_slot_bindings SET status = 'planned', failure_code = NULL, error = NULL
+      WHERE run_id = $1::uuid AND member_id = $2::uuid`, [run.runId, memberId]);
+    expect(await ledger.markCastSlotDispatched(ids)).toBeNull();
+    const snapshot = await ledger.recordCastSlotSnapshot({ ...ids, etag: 'W/"7"', slots: [null, null, null, null, null] });
+    expect(snapshot).toMatchObject({ status: 'planned', beforeEtag: 'W/"7"' });
+    const dispatched = await ledger.markCastSlotDispatched(ids);
+    expect(dispatched).toMatchObject({ status: 'dispatched' });
+    expect(await ledger.markCastSlotDispatched(ids)).toBeNull();
+    await expect(ledger.markCastSlotVerified({ ...ids, provenance: 'confirmed_patch', readback: {
+      etag: 'W/"8"', marker: false, runId: run.runId, slots: [memberId, null, null, null, null],
+    } })).rejects.toThrow(/test_request_cast_slot_bindings_verified/);
+    expect(await ledger.getCastSlotBinding(ids)).toMatchObject({ status: 'dispatched' });
+    const verified = await ledger.markCastSlotVerified({ ...ids, provenance: 'confirmed_patch', readback: {
+      etag: 'W/"8"', marker: true, runId: run.runId, slots: [memberId, null, null, null, null],
+    } });
+    expect(verified).toMatchObject({ status: 'verified', provenance: 'confirmed_patch', afterEtag: 'W/"8"' });
+    expect(await ledger.markCastSlotNeedsAttention({ ...ids, failureCode: 'occupied_slot', error: 'late error' })).toBeNull();
   });
 
   it('receipt grammar: the Foundation baseline may journal a null or GUID Primary Contact and a GUID Liaison; null stays refused elsewhere', async () => {

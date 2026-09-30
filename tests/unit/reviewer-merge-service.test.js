@@ -9,6 +9,13 @@
 import { jest } from '@jest/globals';
 import { planMerge, executeMerge, projectMergePlanForClient } from '../../lib/services/reviewer-merge.js';
 
+const priorReviewerSwitch = process.env.SYNTHETIC_REVIEWER_ISOLATION;
+beforeAll(() => { process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on'; });
+afterAll(() => {
+  if (priorReviewerSwitch === undefined) delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+  else process.env.SYNTHETIC_REVIEWER_ISOLATION = priorReviewerSwitch;
+});
+
 const KEEPER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const LOSER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const REQ1 = 'd1111111-1111-1111-1111-111111111111';

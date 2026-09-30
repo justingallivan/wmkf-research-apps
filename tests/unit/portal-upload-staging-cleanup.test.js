@@ -308,6 +308,27 @@ describe('post_presentation_transcript scope', () => {
     expect(result.retained).toBe(0);
   });
 
+  test('a rejected DOCX receipt stays available to exact orphan cleanup after the source Blob is deleted', async () => {
+    const rejected = {
+      ...candidate, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filename: '1003220-Transcript-upload.docx',
+      sourceSha256: 'a'.repeat(64), sourceSize: 10, sha256: 'b'.repeat(64), size: 20,
+    };
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT, status: 'rejected',
+      candidate: rejected, resourceId: rejected.requestId,
+    })]);
+    const deps = makeDependencies();
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.findDocumentByGenerationKey).toHaveBeenCalledWith(rejected.generationKey);
+    expect(deps.verifyPostPresentationTranscriptCandidateUnchanged).toHaveBeenCalledWith(rejected);
+    expect(deps.discardPostPresentationTranscriptCandidate).toHaveBeenCalledWith(rejected);
+    expect(deps.verifyPostPresentationTranscriptCandidateUnchanged.mock.invocationCallOrder[0])
+      .toBeLessThan(deps.discardPostPresentationTranscriptCandidate.mock.invocationCallOrder[0]);
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+    expect(result.retained).toBe(0);
+  });
+
   test('a proven zero-row generation lookup deletes only the exact persisted candidate', async () => {
     mockSql([candidateRow({
       scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
@@ -450,5 +471,30 @@ describe('null candidate (existing behavior unaffected)', () => {
     expect(del).toHaveBeenCalled();
     expect(result.deleted).toBe(1);
     expect(result.retained).toBe(0);
+  });
+});
+
+
+describe('DOCX transcript cleanup uses stored bytes, never the source attestation exemption', () => {
+  test.each([true, false])('exact stored-byte digest matches: %s', async (matches) => {
+    const source = Buffer.from('original DOCX package');
+    const stored = Buffer.from('promoted DOCX package');
+    const candidate = {
+      driveId: 'drive', itemId: 'item', filename: 'transcript.docx',
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      sourceSha256: createHash('sha256').update(source).digest('hex'), sourceSize: source.length,
+      sha256: createHash('sha256').update(matches ? stored : source).digest('hex'), size: stored.length,
+      registrySize: source.length, eTag: 'old-etag', versionId: '1.0',
+    };
+    const metadata = { driveId: 'drive', id: 'item', name: candidate.filename, size: stored.length, eTag: 'new-etag', versionId: '2.0' };
+    const metadataSpy = jest.spyOn(GraphService, 'getFileMetadataById').mockResolvedValue(metadata);
+    const downloadSpy = jest.spyOn(GraphService, 'downloadFile').mockResolvedValue({ buffer: stored });
+    try {
+      const proof = await DEFAULT_CLEANUP_DEPENDENCIES.verifyPostPresentationTranscriptCandidateUnchanged(candidate);
+      if (matches) expect(proof).toMatchObject({ sha256: candidate.sha256, eTag: 'new-etag' });
+      else expect(proof).toBeNull();
+    } finally {
+      metadataSpy.mockRestore(); downloadSpy.mockRestore();
+    }
   });
 });

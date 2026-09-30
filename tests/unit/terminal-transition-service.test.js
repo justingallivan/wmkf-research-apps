@@ -45,6 +45,10 @@ jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
   cancelReviewerAcceptanceJobsForSuggestion: (...args) =>
     cancelReviewerAcceptanceJobsForSuggestion(...args),
 }));
+const assertReviewerDirectedEmailBound = jest.fn();
+jest.mock('../../lib/services/test-requests/reviewer-directed-email', () => ({
+  assertReviewerDirectedEmailBound: (...args) => assertReviewerDirectedEmailBound(...args),
+}));
 
 const {
   renderAcceptedReleasePreviews,
@@ -98,6 +102,7 @@ const acceptedReleaseArgs = (overrides = {}) => args({
 });
 
 beforeEach(() => {
+  assertReviewerDirectedEmailBound.mockReset().mockResolvedValue({ kind: 'ordinary' });
   jest.clearAllMocks();
   findById.mockResolvedValue(row());
   updateLifecycle.mockResolvedValue(undefined);
@@ -563,6 +568,17 @@ test('release atomically withdraws an open unpaid honorarium and sends reviewed 
     honorariumCancelled: true,
     reviewOutcome: 'not_received',
   });
+});
+
+test('release keeps the state transition but blocks an unbound reviewer email', async () => {
+  assertReviewerDirectedEmailBound.mockRejectedValueOnce(new Error('unbound'));
+  const result = await transitionReviewersTerminal(acceptedReleaseArgs());
+  expect(applyStaffReviewerRelease).toHaveBeenCalledTimes(1);
+  expect(assertReviewerDirectedEmailBound).toHaveBeenCalledWith({
+    suggestionId: SUGGESTION, requestId: REQUEST, recipients: ['reviewer@example.org'],
+  });
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  expect(result.results[0].status).toBe('released_email_failed');
 });
 
 test('authorized honorarium fails closed before the reviewer transition', async () => {

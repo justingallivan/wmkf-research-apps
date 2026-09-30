@@ -98,6 +98,21 @@ describe('claimReviewerAcceptanceJobs', () => {
   });
 });
 
+describe('releaseReviewerAcceptanceJobLease', () => {
+  it('releases only the matching active lease and leaves retry state untouched', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ id: 1, status: 'queued', attempts: 3 }] });
+
+    const row = await store.releaseReviewerAcceptanceJobLease(1, 'lease-1');
+
+    expect(row).toMatchObject({ id: 1, attempts: 3 });
+    expect(sqlText(0)).toMatch(/locked_until = NULL/i);
+    expect(sqlText(0)).toMatch(/lease_token = NULL/i);
+    expect(sqlText(0)).toMatch(/WHERE id = .*AND lease_token = .*AND status = ANY/is);
+    expect(sqlText(0)).not.toMatch(/attempts\s*=/i);
+    expect(sqlText(0)).not.toMatch(/next_attempt_at\s*=/i);
+  });
+});
+
 describe('recordReviewerAcceptanceJobFailure', () => {
   it('clears the lease and leaves a retryable job non-terminal before the cap', async () => {
     sql.mockResolvedValueOnce({ rows: [{ id: 1, status: 'queued', attempts: 1 }] });

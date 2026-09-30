@@ -35,6 +35,9 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
   getByIdWithSelect: jest.fn(async () => null),
 }));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer.js', () => ({
+  getById: jest.fn(async (id) => ({ wmkf_potentialreviewersid: id, wmkf_issyntheticreviewer: false })),
+}));
 jest.mock('../../lib/dataverse/adapters/system-user', () => ({
   getByIdWithSelect: jest.fn(async () => null),
 }));
@@ -106,6 +109,8 @@ import {
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { buildReviewContext } from '../../lib/services/external-review/context-service';
 import { applyReviewerResponse } from '../../lib/services/external-review/respond-service';
+import { captureSelfReportedReviewerOrcid } from '../../lib/services/capture-self-reported-orcid';
+import { getById as getPotentialReviewerById } from '../../lib/dataverse/adapters/potential-reviewer.js';
 import { submitReview } from '../../lib/services/external-review/submit-service';
 
 const baseSuggestion = (over = {}) => ({
@@ -120,9 +125,53 @@ const baseSuggestion = (over = {}) => ({
   ...over,
 });
 const request = { akoya_requestid: 'request-1', akoya_requestnum: 'REQ-001', akoya_title: 'T' };
-const reviewer = { wmkf_name: 'Dr. R', wmkf_emailaddress: 'r@x.org' };
+const reviewer = {
+  wmkf_potentialreviewersid: '22222222-2222-4222-8222-222222222222',
+  wmkf_name: 'Dr. R',
+  wmkf_emailaddress: 'r@x.org',
+};
 
-beforeEach(() => jest.clearAllMocks());
+test.each(['off', '', 'invalid'])('a reviewer-isolation %s outage records a decline without person ORCID capture', async (switchValue) => {
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = switchValue;
+  const result = await applyReviewerResponse({
+    suggestion: baseSuggestion(), request, reviewer,
+    body: { action: 'decline', contactEdits: { orcid: '0000-0002-1825-0097' } },
+    ifMatch: 'W/"1"',
+  });
+  expect(result.ok).toBe(true);
+  expect(applyStage2aResponse).toHaveBeenCalled();
+  expect(captureSelfReportedReviewerOrcid).not.toHaveBeenCalled();
+});
+
+test('a reviewer-isolation outage does not copy a prefilled ORCID to the person', async () => {
+  delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+  const result = await applyReviewerResponse({
+    suggestion: baseSuggestion({ wmkf_reviewerorcid: '0000-0002-1825-0097' }),
+    request, reviewer, body: { action: 'decline' }, ifMatch: 'W/"1"',
+  });
+  expect(result.ok).toBe(true);
+  expect(captureSelfReportedReviewerOrcid).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['newly supplied', baseSuggestion(), { action: 'decline', contactEdits: { orcid: '0000-0002-1825-0097' } }],
+  ['prefilled', baseSuggestion({ wmkf_reviewerorcid: '0000-0002-1825-0097' }), { action: 'decline' }],
+])('a cast reviewer decline with %s ORCID does not write the person', async (_case, suggestion, body) => {
+  getPotentialReviewerById.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: reviewer.wmkf_potentialreviewersid,
+    wmkf_issyntheticreviewer: true,
+  });
+  const result = await applyReviewerResponse({ suggestion, request, reviewer, body, ifMatch: 'W/"1"' });
+  expect(result.ok).toBe(true);
+  expect(applyStage2aResponse).toHaveBeenCalled();
+  expect(captureSelfReportedReviewerOrcid).not.toHaveBeenCalled();
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+});
+afterEach(() => { delete process.env.SYNTHETIC_REVIEWER_ISOLATION; });
 
 describe('buildReviewContext', () => {
   it('hides only server-recognized generated filenames from the reviewer receipt', async () => {

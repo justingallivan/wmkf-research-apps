@@ -449,6 +449,41 @@ blocks. GitHub CI runs both the gate and
 
 ### Repository and instruction integrity checks
 
+- `check:factory-ledger -- --allow-unreachable` compares each configured Test
+  Request Factory ledger with the tracked SEMANTIC fingerprint
+  `lib/db/ledger-schema-fingerprint.json` (column defaults, constraint/index/
+  trigger definitions, index uniqueness, function bodies — not just names and
+  types). `TEST_REQUEST_LEDGER_URL` maps to target `production`
+  (database `ledger_prod`); `TEST_REQUEST_SANDBOX_LEDGER_URL` maps to target
+  `sandbox` (database `ledger`); each is validated against that target, so a
+  swapped or misdirected variable is refused, not silently accepted. A URL
+  the ledger registry (`lib/db/ledger-registry.js`) refuses — including a
+  connection-string query override (`?host=`, `?port=`, etc.) or a socket
+  destination — or a ledger with MISSING or DIFFERING objects, fails. An
+  EXTRA table only warns if it is named in the tracked
+  `lib/db/ledger-schema-ahead.json` approved-ahead list AND its live
+  fingerprint compares clean (no missing/differing) against that entry's
+  tracked shape — a name-only match with a different shape is NOT approved;
+  every other extra kind needs an exact name match in the list's legacy
+  `objects` array. A ledger still unreachable after 3 retries (5s apart)
+  fails UNLESS `--allow-unreachable` is passed (the `/start` gate line passes
+  it — unreachable is advisory at session start); with the flag it is
+  counted, not inspected. A refused URL is counted separately too (it never
+  connects, so it was not inspected). The final line always reads
+  `factory-ledger: N inspected, R refused, M unreachable, K skipped` — it
+  never prints a passing summary for zero inspected ledgers. With neither
+  variable set it prints `skipped` and passes. Regenerate the fingerprint
+  after any `test_request_*` migration change with
+  `TEST_REQUEST_LEDGER_TEST_URL=<scratch> node scripts/check-factory-ledger.js --write-expected`
+  (the CI ledger job's `factory-ledger-fingerprint.pg.test.js` and the unit
+  suite both fail until you do); when a not-yet-merged migration's extra
+  objects change, also regenerate `lib/db/ledger-schema-ahead.json` by
+  applying it into a scratch schema and diffing fingerprints. **When that
+  migration lands on `main`, regenerate the fingerprint AND empty
+  `approvedAhead`** — a stale shape entry would otherwise keep excusing a
+  future extra object that happens to share the same table name. No
+  self-test. Plan:
+  `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`.
 - `check:migrations-manifest` verifies that the sorted manifest exactly matches
   `lib/db/migrations/*.sql`; GitHub CI also checks the build did not regenerate
   an uncommitted manifest.

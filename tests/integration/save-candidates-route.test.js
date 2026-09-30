@@ -26,6 +26,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
   getByEmail: jest.fn(async () => null),
+  findAllByExactEmail: jest.fn(async () => []),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
@@ -79,12 +80,14 @@ function mockRes() {
 }
 
 let handler;
+const originalReviewerIsolation = process.env.SYNTHETIC_REVIEWER_ISOLATION;
 beforeAll(() => {
   handler = require('../../pages/api/reviewer-finder/save-candidates').default;
 });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
   requireAppAccess.mockResolvedValue({
     profileId: 'P1', session: { user: { dynamicsSystemuserId: 'SYS-1' } },
   });
@@ -96,6 +99,11 @@ beforeEach(() => {
     piResolution: { state: 'ok', reason: null },
     institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
   });
+});
+
+afterAll(() => {
+  if (originalReviewerIsolation === undefined) delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+  else process.env.SYNTHETIC_REVIEWER_ISOLATION = originalReviewerIsolation;
 });
 
 test('wrong method (GET) → 405', async () => {

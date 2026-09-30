@@ -1,3 +1,58 @@
+# Session 558-B4 Prompt: resume ledger checks after tomorrow's home-Mac restore
+
+## Session 557-B4 Summary — 2026-09-30 PT (Codex; automation evidence, prior Opus P2 fix)
+
+**The code P2 is FIXED; B4 release remains BLOCKED and PR #369 stays draft.** Stay on `codex/factory-reviewer-b4-runtime` in `/Users/gallivan/Code/WMKF_Apps-codex`. Never touch Claude's checkout, scheduled-email surfaces, 059/V58 or push main. No Production migration, Dataverse write, slot PATCH, email or live job drain ran.
+
+### New automation evidence — collection done, decisions open
+
+[VERIFIED via owner-authorized Production GETs, 19:36–19:37 UTC] Clean committed section 13/client at `ab812c2ac` preserve runtime source from reviewed `40ab24f3e`: Global effective Process depth, Production switches on/on, 14 readable active flows, zero hard incomplete reasons, same six dispositions, complete=false. Supplemental capture records 215 nested flow nodes, all six relevant custom registrations and all 68 Request workflow/rule summaries. Exact ad hoc collector source/hash are retained separately; it was not committed at capture. Evidence: `docs/plans/evidence/test-request-factory/b4-automation-evidence-2026-09-30.md`, its metadata JSON and 19:36 section 13 receipt.
+
+Both manual triggers have exact dataset `default.cds`, their recorded table names and no visible subscription. AutoFill message `1` is confirmed by Microsoft as Create/Added; it reads Request and updates status-tracking CurrentPhase. Some Request classic workflows create status tracking, so vendor-induced field changes could form an indirect path; reachability remains UNKNOWN. Actual manual callers/run-only permissions, external effects and compiled AkoyaGo behavior were not established. At that capture all six owner dispositions remained OPEN; later Connor/owner report classifies all six for this operation (see new section below); no slot PATCH/migration/flow/email/job/ledger operation ran. Local off/off and tomorrow’s ledger restore remain separate blockers. Pre-evidence-push head `ab812c2ac` had all 12 CI checks successful, PR draft/mergeable/clean; recheck after push. All 20 relevant documentation/secret/invariant gate and self-test commands passed sequentially; sanitizer/hash/receipt checks passed. Advisory pilot state unavailable; no observation row fabricated. No Production milestone shipped; no DEVELOPMENT_LOG entry required.
+
+### Connor and owner assessment — six dispositions resolved for lookup-only slot binding
+
+[OWNER-REPORTED via human chat, recorded 2026-09-30T21:54:46Z] Connor classified the two manual flows and AutoFill as acceptable for test records. After the Request-row distinction, the owner reported that meaningful downstream triggers such as Phase I → Phase II status changes are not touched in this operation. Accepted as operational classification for the three plug-ins and lookup-only indirect-chain concern. All six entries are now classified; no extra vendor-only evidence demand. Companion: docs/plans/evidence/test-request-factory/b4-connor-automation-assessment-2026-09-30.md.
+
+[VERIFIED via source at 60fdda4e1 and existing mocked-transport suites] Slot runner PATCHes one Request reviewer navigation bind; fence rejects extra keys/other mutations and requires the exact target/person/concrete ETag. No phase/status field is sent. Two suites / 103 tests passed; this proves app boundaries, not live vendor execution. The separate status-change runner is outside this classification. Raw probe complete=false/six entries remain dated machine output; companion supplies human dispositions. No Production read/write, slot PATCH, flow, migration, email or ledger operation ran. Release stays blocked on ledger restore/schema/digest, Local flags and remaining release prerequisites; fresh metadata/visibility required before any eventual PATCH. PR stays draft. No Production milestone/DEVELOPMENT_LOG entry required.
+
+### Previously completed and verified
+
+1. **Inactive ordinary applicant slots restored for repair.** Pushed `40ab24f3e9da5af0259aa481014621cdd7837d37` adds default-false `allowInactiveOrdinary`. Only server-read slot ingestion opts in at its capability and adapter calls. Exact false/null marker and literal true required; inactive synthetic/unknown/missing/mismatched identities refused. Merge and all other binding callers remain strict. Existing hydration yields inactive/person_inactive repair card; promotion and identity edits remain strict. [VERIFIED via source and real-chain tests].
+2. **Tests and gates.** Permanent regression suite uses real ingestion, capability, suggestion adapter and hydration with mocked transport. Two ordinary-inactive cases red before fix; after fix, ten cases pass including defaults, synthetic, non-on and marker change between reads. Retry preserves selected/invited curation with no extra create/PATCH. 45 suites / 1,712 tests and 18 source gate/self-test/type/lint commands plus 20 relevant documentation/Atlas/secret/invariant/catalog commands passed [VERIFIED via Jest/gates]. No live write test.
+3. **Independent follow-up.** OAuth/subscription Opus 5.5 reviewed exact fix `0dcda0359` → `40ab24f3e`: FIX VERIFIED BY SOURCE, no P0–P2. Host-side Keychain method, API-key/alternate-provider env removed, only Read/Grep/Glob, no fallback; 18 read operations, 96 seconds, zero denials. Prior owner consent covered this method/usage. Opus source inspection and Codex execution evidence remain distinct. Current report: `b4-inactive-slot-fix-2026-09-30.md`; initial Opus report preserved as history.
+4. **Fresh matching release probe.** Production section 13 from clean committed probe/client at `40ab24f3e`: Global effective prvReadWorkflow, 14 readable activated flows, zero hard incomplete reasons, same six owner dispositions, complete=false. At that 18:31 probe Local/B4 Preview/Production were on/on (historical Local result; shared-link restoration now gives Local off/off); all nine marker reads present/HTTP 200. Private mode-0600 env pulls deleted. [VERIFIED via `b4-dataverse-fix-supplement-2026-09-30.json` and 18:31 receipt]. No owner classification inferred.
+5. **CI and PR.** All 12 checks passed at `40ab24f3e`, including Jest/PostgreSQL 16/Vercel; PR #369 draft, mergeable and clean [VERIFIED via `b4-ci-at-inactive-slot-fix-2026-09-30.json`]. Main/base `570f53086` already incorporated six docs commits (#370–#372). Evidence-only descendants preserve the new runtime/probe/client candidate. Recheck final head after documentation push.
+6. **Current Local configuration.** Owner authorized restoring .env.local → ../WMKF_Apps/.env.local. Link restored; shared target untouched. Both ledger keys are now present via CLI/Next.js loaders, but shared TEST_REQUEST_ISOLATION and SYNTHETIC_REVIEWER_ISOLATION are off/off. Local literal-on readiness is BLOCKED until enabled for the B4 process/configuration; no shared flag edit or live operation ran. Receipt: b4-shared-env-link-2026-09-30.json. Earlier private-copy/on-on observations remain dated history. Only B4 branch Preview overrides were enabled; Production/generic Development/Preview untouched. Ready Preview build provenance recorded at `1a86c10da`; direct deployment-captured flag readback UNKNOWN (supported Ready-deployment reads expose key names only). No deployed flag or live resumption claim.
+
+### Owner actions pending — unchanged
+
+1. **blocked: ledger not on this machine.** Owner confirms operational wmkf-ledger-pg/ledger_prod and wmkf-ledger-pg/ledger exist only on the home Mac. Tomorrow's snapshot/restore unblocks reads; this Mac's ledger is stale residue and must not be used for B4 checks. Preserve operational ownership history and compare dump digests/row counts using the remote brief linked in b4-ledger-location-update-2026-09-30.md. No schema/tracker/row created here.
+2. §6 schema/receipt preflight/apply/record and owned cast address-digest check: **blocked: ledger not on this machine** until restore. Afterwards use an owner-supplied shell-only local ledger override; never commit URL/password or run app apply-migrations.js on local ledgers. Record actual host label/database with source/hash/UTC/post-shape and beside every future run/cast/status ID.
+3. Owner runs b4-schema-preflight.sql on shared Production, inspects historical tracker, then applies 058 through existing-DB process when preflight permits. Shared Production/Preview consistency UNKNOWN; shared 058 is not a B4 runtime prerequisite. Agent never applies Production migrations.
+4. DONE for this operation: all six automation dispositions and the lookup-only indirect concern are owner-classified. Companion b4-connor-automation-assessment-2026-09-30.md separates operational assessment from raw six-entry machine output. Recheck all activated definitions/steps and effective visibility immediately before an eventual owner-authorized slot PATCH. `b4-owner-next-actions-2026-09-30.md` contains recovery commands/worksheet. Slot gate BLOCKED; complete=false.
+5. Keep PR draft until explicit owner Tier 2 promotion (main auto-deploys). Recheck CI, effective deployed switches, dated metadata and eventual job resumption. A future runtime change requires a matching clean-commit readiness probe.
+
+### Ledger integration boundary — owner update 2026-09-30
+
+- Owner reports managed Neon project wmkf-factory-ledger, no Vercel project connection, databases managed-ledger/ledger_prod and managed-ledger/ledger, 054+058 applied. Operational data restore is pending; no managed database probe/apply here.
+- PR #374 (claude/factory-ledger-registry) merged to main as `66dd0974b` on 2026-09-30 after #369; the merge commit applied the slot-path `requireLedgerUrl(args.target)` resolution and regenerated the fingerprint with 058. [Superseded note follows as written before the merge.] Do not merge/rebase it or edit its implementation. This B4 CLI's blanket Neon refusal is expected, not a blocker. Whichever PR lands second must update the B4 slot-path requireLedgerUrl call to requireLedgerUrl(args.target), then regenerate lib/db/ledger-schema-fingerprint.json after 058 is on main with the #374 script against scratch Postgres; otherwise CI ledger and Jest fail.
+- Owner-authorized shared .env.local symlink is restored; both TEST_REQUEST_LEDGER_URL and TEST_REQUEST_SANDBOX_LEDGER_URL resolve present. Shared updates now propagate. CLI/Next.js resolve both isolation switches off/off, so Local B4 readiness must be re-established before checks. Never write through the shared link to change Claude's configuration without authorization; use owner-directed process/local overrides. After tomorrow's restore the separate shell-only local ledger override remains required by this branch's Neon guard.
+- New restore brief/portability plan and revised stop skill are read-only remote refs from #374 at 124ba6739, absent from this branch. Pointer/evidence: docs/plans/evidence/test-request-factory/b4-ledger-location-update-2026-09-30.md. Every new Factory run/cast/status handoff names the actual ledger beside its run ID; no such operation occurred here.
+
+### Do not reopen
+
+- Fail-closed binds/person edits when reviewer isolation non-on; pause ALL acceptance jobs when either switch non-on. Deploy prior code before any switch-only rollback.
+- B4 owns 058/V57; Claude owns scheduled-email 059/V58. Bind-reviewer remains suggestion-only; slot preview/exact Request confirmation is separate owner-run work.
+
+### Evidence and handoff
+
+Runtime candidate: `40ab24f3e`. Evidence directory: `docs/plans/evidence/test-request-factory/`; fix report/tests/provenance plus release index `b4-release-readiness-2026-09-30.md`. Contract: `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`. Bounded /sweep reconciles current plan/report/handoff and explicitly historical initial Opus verdict/reproduction. No Production capability shipped or storage architecture changed; no DEVELOPMENT_LOG entry required. Advisory claim-evidence pilot report unavailable (local state unreadable); no row fabricated.
+
+---
+
+## Prior mainline prompt (separate scheduled-email workstream; preserved)
+
 # Session 553 Prompt: build Part A of the scheduled-email plan (engine hardening, migration 059)
 
 ## Parallel Codex handoff — staff site-visit video release, 2026-09-29 PT
@@ -573,7 +628,7 @@ All on `main` (merged PRs #349, #350, #351 and direct Tier 0 commits): `5c96e171
 
 ### Verify Before Acting
 
-1. **Isolation is live in production.** If staff report "could not be confirmed as an ordinary request" on a Request email, check marker reads first; rollback is removing `TEST_REQUEST_ISOLATION` and redeploying.
+1. **Isolation is live in production (historical S546 instruction).** If staff report "could not be confirmed as an ordinary request" on a Request email, check marker reads first. The former switch-off rollback is superseded by B4: after B4 deployment, first redeploy the prior code before disabling either isolation switch. Turning off `SYNTHETIC_REVIEWER_ISOLATION` stops all existing-person reviewer binds and identity edits; turning off either switch pauses all reviewer-acceptance jobs. See `docs/CREDENTIALS_RUNBOOK.md` and the B4 plan's owner decisions 9–10.
 2. Sandbox residue (Requests 1000341–1000348) and local-ledger runs unchanged.
 
 ### Do Not Reopen Without New Decision

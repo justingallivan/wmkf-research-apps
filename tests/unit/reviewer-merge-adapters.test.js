@@ -15,7 +15,9 @@ const LOSER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const SUG = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 let original;
+const priorReviewerSwitch = process.env.SYNTHETIC_REVIEWER_ISOLATION;
 beforeEach(() => {
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
   original = {
     getRecord: DynamicsService.getRecord,
     updateRecord: DynamicsService.updateRecord,
@@ -30,6 +32,8 @@ beforeEach(() => {
   DynamicsService.queryAllRecords = jest.fn().mockResolvedValue({ records: [], totalCount: 0 });
 });
 afterEach(() => {
+  if (priorReviewerSwitch === undefined) delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+  else process.env.SYNTHETIC_REVIEWER_ISOLATION = priorReviewerSwitch;
   DynamicsService.getRecord = original.getRecord;
   DynamicsService.updateRecord = original.updateRecord;
   DynamicsService.deleteRecord = original.deleteRecord;

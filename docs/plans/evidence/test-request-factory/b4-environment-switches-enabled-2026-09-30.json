@@ -1,0 +1,127 @@
+{
+  "sourceCommit": "93447aeacdc22df60b5ad9f4cff0b47cbd55f61e",
+  "ownerAuthorization": "Finish remaining session work after explicit read-only Production Dataverse authorization; Local and B4 branch Preview switches enabled",
+  "projectName": "wmkf_research_apps",
+  "projectId": "prj_56SJKzNer1aV38kKVoP8tl3X0lf3",
+  "scope": "justin-gallivans-projects",
+  "branch": "codex/factory-reviewer-b4-runtime",
+  "localPrivateCopy": true,
+  "localFileMode": "0600",
+  "unrelatedLocalConfigurationPreserved": true,
+  "environments": [
+    {
+      "observedAt": "2026-09-30T17:09:07.354Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "on",
+        "SYNTHETIC_REVIEWER_ISOLATION": "on"
+      },
+      "targetClassification": "production",
+      "markers": [
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_istestrequest",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_testcreationrunid",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "wmkf_potentialreviewers",
+          "attribute": "wmkf_issyntheticreviewer",
+          "wave": "wave30",
+          "status": 200,
+          "available": true
+        }
+      ],
+      "changed": true,
+      "environment": "local"
+    },
+    {
+      "observedAt": "2026-09-30T17:09:08.915Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "on",
+        "SYNTHETIC_REVIEWER_ISOLATION": "on"
+      },
+      "targetClassification": "production",
+      "markers": [
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_istestrequest",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_testcreationrunid",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "wmkf_potentialreviewers",
+          "attribute": "wmkf_issyntheticreviewer",
+          "wave": "wave30",
+          "status": 200,
+          "available": true
+        }
+      ],
+      "changed": true,
+      "environment": "preview",
+      "temporaryFileMode": "0600",
+      "temporaryFileDeleted": true
+    },
+    {
+      "observedAt": "2026-09-30T17:09:10.407Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "on",
+        "SYNTHETIC_REVIEWER_ISOLATION": "on"
+      },
+      "targetClassification": "production",
+      "markers": [
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_istestrequest",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_testcreationrunid",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "wmkf_potentialreviewers",
+          "attribute": "wmkf_issyntheticreviewer",
+          "wave": "wave30",
+          "status": 200,
+          "available": true
+        }
+      ],
+      "changed": false,
+      "environment": "production",
+      "temporaryFileMode": "0600",
+      "temporaryFileDeleted": true
+    },
+    {
+      "observedAt": "2026-09-30T17:09:11.047095+00:00",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "off",
+        "SYNTHETIC_REVIEWER_ISOLATION": "off"
+      },
+      "changed": false,
+      "environment": "development",
+      "temporaryFileMode": "0600",
+      "temporaryFileDeleted": true
+    }
+  ]
+}

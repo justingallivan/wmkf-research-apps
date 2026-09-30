@@ -1,0 +1,135 @@
+{
+  "scope": "B4 automation evidence and documentation only; no runtime or ledger tests rerun",
+  "gateSelfTestOrdering": "Each gate followed sequentially by its self-test; commands sequential",
+  "commands": [
+    {
+      "command": "check:atlas",
+      "exitCode": 0,
+      "elapsedMs": 389
+    },
+    {
+      "command": "check:atlas:self-test",
+      "exitCode": 0,
+      "elapsedMs": 1964
+    },
+    {
+      "command": "check:doc-currency",
+      "exitCode": 0,
+      "elapsedMs": 272
+    },
+    {
+      "command": "check:doc-currency:self-test",
+      "exitCode": 0,
+      "elapsedMs": 1440
+    },
+    {
+      "command": "check:fact-consistency",
+      "exitCode": 0,
+      "elapsedMs": 729
+    },
+    {
+      "command": "check:fact-consistency:self-test",
+      "exitCode": 0,
+      "elapsedMs": 1431
+    },
+    {
+      "command": "check:canonical-pointers",
+      "exitCode": 0,
+      "elapsedMs": 212
+    },
+    {
+      "command": "check:canonical-pointers:self-test",
+      "exitCode": 0,
+      "elapsedMs": 581
+    },
+    {
+      "command": "check:doc-symbol-refs",
+      "exitCode": 0,
+      "elapsedMs": 179
+    },
+    {
+      "command": "check:doc-symbol-refs:self-test",
+      "exitCode": 0,
+      "elapsedMs": 327
+    },
+    {
+      "command": "check:build-claim-freshness",
+      "exitCode": 0,
+      "elapsedMs": 169
+    },
+    {
+      "command": "check:build-claim-freshness:self-test",
+      "exitCode": 0,
+      "elapsedMs": 313
+    },
+    {
+      "command": "check:secret-scan",
+      "exitCode": 0,
+      "elapsedMs": 906
+    },
+    {
+      "command": "check:secret-scan:self-test",
+      "exitCode": 0,
+      "elapsedMs": 1928
+    },
+    {
+      "command": "check:scaffolding-tokens",
+      "exitCode": 0,
+      "elapsedMs": 330
+    },
+    {
+      "command": "check:scaffolding-tokens:self-test",
+      "exitCode": 0,
+      "elapsedMs": 885
+    },
+    {
+      "command": "check:harness-framing",
+      "exitCode": 0,
+      "elapsedMs": 173
+    },
+    {
+      "command": "check:harness-framing:self-test",
+      "exitCode": 0,
+      "elapsedMs": 408
+    },
+    {
+      "command": "check:agent-invariants",
+      "exitCode": 0,
+      "elapsedMs": 135
+    },
+    {
+      "command": "check:docs-catalog",
+      "exitCode": 0,
+      "elapsedMs": 164
+    }
+  ],
+  "sanitizerFixtures": {
+    "passed": true,
+    "covers": [
+      "nested branches",
+      "mixed-case OData navigation-property keys",
+      "literal action data/credentials/IDs/URLs omitted",
+      "dynamic trigger table classified",
+      "default.cds literal preserved"
+    ]
+  },
+  "receiptValidation": {
+    "passed": true,
+    "collectorSnapshotHashMatches": true,
+    "flowCount": 14,
+    "nestedActionCount": 215,
+    "customStepCount": 6,
+    "requestWorkflowRuleCount": 68,
+    "dispositionCount": 6,
+    "errors": 0,
+    "noRawRecordGuids": true,
+    "noRawMetadataUrls": true,
+    "noEmailAddresses": true,
+    "odataBindAnnotationsDistinguished": true
+  },
+  "advisoryPilotReport": "Unavailable: local state could not be read; no observation row fabricated.",
+  "stagedChecks": {
+    "gitDiffCachedCheck": "passed",
+    "gitleaksProtectStagedRedacted": "passed, zero leaks"
+  }
+}

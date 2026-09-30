@@ -36,6 +36,10 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   })),
   update: jest.fn(),
   findByEmailCandidates: jest.fn(),
+  findAllByExactEmail: jest.fn(async () => []),
+}));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability.js', () => ({
+  resolveReviewerBindCapability: jest.fn(async () => ({ kind: 'ordinary' })),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   __esModule: true,

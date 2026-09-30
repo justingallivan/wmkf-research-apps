@@ -11,6 +11,12 @@
  */
 
 const findApplicantRecommendedByRequest = jest.fn();
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  resolveReviewerBindCapability: jest.fn(async ({ personId }) => ({
+    kind: 'ordinary',
+    person: await require('../../lib/dataverse/adapters/potential-reviewer').getById(personId),
+  })),
+}));
 const setMatchReason = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findApplicantRecommendedByRequest: (...a) => findApplicantRecommendedByRequest(...a),
