@@ -131,3 +131,4 @@ Verified against both real Neon ledgers after all fixes: `npm run check:factory-
 - [RECHECKED after scripts/check-factory-ledger.js change: explicit client config and post-connect identity check]
 - [RECHECKED after scripts/rehearse-test-request-sandbox.mjs change: guard and schema check now imported from lib/db/ledger-guard.js; dispatch unchanged]
 - [RECHECKED after lib/services/test-requests/run-ledger-db.js change: pgLedgerDb accepts a string or config and routes strings through buildLedgerClientConfig]
+- [RECHECKED after lib/db/ledger-migrations.js change: decideFileAction refuses any scratch-diff extra unless exactly shape-approved via ledger-schema-ahead.json; tests/unit/apply-ledger-migrations.test.js]
