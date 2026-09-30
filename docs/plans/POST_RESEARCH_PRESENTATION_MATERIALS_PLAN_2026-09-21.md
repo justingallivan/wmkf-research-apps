@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview Safari media, staff Zoom-link/transcript, and signed-in recipient-link acceptance passed; private-window viewing is blocked by Preview protection, Cancel/Retry remain offline-tested, and Production promotion remains."
+summary: "Meeting Tracker presentation materials are enabled in Production for staff and the separately issued materials-only link; bounded staff and recipient playback passed. Cancel/Retry remain offline-tested and older full-briefing live playback remains a separate compatibility observation."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -2045,11 +2045,16 @@ Release order:
    tolerance fixtures, then owner enables schema readiness and sets
    `POST_PRESENTATION_MATERIALS_ACCESS=test:<verified owner-approved request GUID>` for the bounded
    Production gate. Complete the desktop Safari Watch, long-seek, and Download-integrity checks
-   before setting access to `on` for general release. A same-Mac baseline, live near-cap MP4, and
+   before setting access to `on` for general release. **COMPLETED 2026-09-29:** those checks and
+   the signed-in Staff Deliberations recording/Watch check passed on TEST Request #1003302;
+   Production access is `on` at deployment `dpl_Gw8dTzcA1JaUc2ifQjbzbBe7wCoT`.
+   A same-Mac baseline, live near-cap MP4, and
    elapsed-time/throughput threshold are not required. If a gate fails,
    set access to `off` while preserving the exact intent/item for approved recovery; schema
-   readiness can remain on for compatible readers. Verify D19 full-briefing access and the
-   materials-only link as separate audiences. The unfinished Factory supplies neither the Request
+   readiness can remain on for compatible readers. The materials-only link passed its separate
+   audience check. D19 full-briefing access retains automated inclusion/isolation coverage;
+   live full-briefing playback remains unverified and is not a gate for the staff video workflow
+   because the pre-research brief is normally sent before the Site Visit. The unfinished Factory supplies neither the Request
    nor teardown. If the
    owner later wants deletion, design a separately reviewed teardown for the exact Ready and
    Superseded Request Document IDs, prove zero remaining bindings, and seek separate approval
