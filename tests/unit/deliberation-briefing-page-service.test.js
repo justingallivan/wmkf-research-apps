@@ -421,6 +421,33 @@ test('post-presentation materials: full briefing uses the shared current winner 
   }, d)).rejects.toMatchObject({ httpStatus: 404 });
 });
 
+test.each([
+  ['Zoom', { wmkf_externalurl: 'https://zoom.us/rec/share/current?pwd=x' }],
+  ['MP4', { wmkf_externalurl: null, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'item' }],
+])('post-presentation %s cannot use the buffering document resolver', async (_name, backing) => {
+  const row = {
+    wmkf_requestdocumentid: RECORDING_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: 100000005,
+    wmkf_operationstatus: 100000001,
+    wmkf_lifecyclestate: 100000000,
+    wmkf_producer: 'meeting-tracker-post-presentation',
+    wmkf_filename: 'Visit.mp4',
+    wmkf_filesize: 1024,
+    wmkf_slotversion: 1,
+    ...backing,
+  };
+  const d = deps({
+    presentationSchemaReady: jest.fn(() => true),
+    presentationRequestAllowed: jest.fn(() => true),
+    findDocuments: jest.fn(async () => ({ records: [row] })),
+    downloadFile: jest.fn(),
+  });
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `material:${RECORDING_ID}` }, d))
+    .rejects.toMatchObject({ httpStatus: 404 });
+  expect(d.downloadFile).not.toHaveBeenCalled();
+});
+
 test('post-presentation file resolver is non-buffering, mode-constrained, and malware-fail-closed', async () => {
   const fileRow = {
     wmkf_requestdocumentid: RECORDING_ID,
