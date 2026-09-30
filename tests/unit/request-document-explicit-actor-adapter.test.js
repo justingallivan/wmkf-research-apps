@@ -16,6 +16,7 @@ jest.mock('../../lib/services/operational-event-service.js', () => ({
 import {
   create,
   EXPLICIT_ACTOR_SELECT_FIELDS,
+  findByGenerationKey,
   requestDocumentSelect,
   update,
 } from '../../lib/dataverse/adapters/request-document.js';
@@ -225,4 +226,15 @@ test('projection includes Wave 24 fields only when explicitly enabled', () => {
     expect(off).not.toContain(field);
     expect(on).toContain(field);
   }
+});
+
+test('generation lookup is lifecycle-unfiltered so Superseded transcript bindings remain visible', async () => {
+  DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+  await findByGenerationKey('transcript-generation-key');
+  expect(DynamicsService.queryRecords).toHaveBeenCalledWith('wmkf_requestdocuments', expect.objectContaining({
+    filter: expect.stringContaining('wmkf_generationkey'),
+    top: 2,
+  }));
+  const filter = DynamicsService.queryRecords.mock.calls[0][1].filter;
+  expect(filter).not.toMatch(/statecode|statuscode|wmkf_lifecyclestate/i);
 });

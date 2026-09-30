@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-18
+last_verified: 2026-09-25
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave16-request-document-registry/zz_akoya_request_pre_rp_brief_pointer.json
@@ -21,6 +21,9 @@ related:
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/schema/wave22-final-writeup-transition/wmkf_requestdocument_final_writeup_transition.json
+  - lib/dataverse/schema/wave30-post-presentation-materials/wmkf_requestdocument_post_presentation_materials.json
+  - scripts/preflight-post-presentation-materials-schema.mjs
+  - lib/utils/post-presentation-materials-readiness.js
   - lib/dataverse/adapters/request-document.js
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
@@ -63,6 +66,34 @@ dashboard; cycle scoping is in Production since 2026-09-06 (merge `842c9f13`, de
 `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`).
 
 **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Wave 22 defines explicit group/leadership transition actor/time fields, and `FINAL_WRITEUP_SCHEMA_READY` conditionally extends the adapter projection. The owner-authorized apply/readback reported 4 exact / 0 absent / 0 divergent; Production readiness is now literal `on` in Ready deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ` on `ebb147bb`. The Slice 1 service and route create/reclaim one deterministic Final row over the exact same SharePoint drive/item, then atomically move the source lifecycle to Final, ready the Final row in Review, store the explicit group-review actor/time, retain `wmkf_CurrentPreSiteVisit`, and set `wmkf_CurrentFinalWriteup`. Authorized Request `1002788` proved this contract: current Final row `b6d6220b-f0a4-f111-b8dd-70a8a59cded0` points to source/current Pre-Site row `7b059a2f-19a3-f111-b8dd-000d3a5bbe46`; both reference the same SharePoint item/version/hash/size and the Final row records Justin Gallivan at `2026-08-31T03:57:20Z`. No Graph copy/upload occurred.
+
+**[SOURCE-BUILT on `codex/feature-request`; APPLIED TO SANDBOX DATAVERSE ONLY; NOT
+APPLIED TO PRODUCTION DATAVERSE.]** Wave 30 additively defines optional `wmkf_ExternalUrl` (URL String, 2,000
+characters) and `wmkf_SlotVersion` (whole number 1–2,147,483,647) for the
+post-presentation materials contract. The creation-only wave has a read-only
+typed preflight. `requestDocumentSelect()` includes the two fields only when
+`POST_PRESENTATION_MATERIALS_SCHEMA_READY` is literal `on`; the exported base
+projection and every unset/invalid configuration retain the pre-wave shape.
+The separate `POST_PRESENTATION_MATERIALS_ACCESS` control defaults to `off` and
+is not implied by schema readiness. Exact sandbox readback confirmed both Wave 30 fields; the
+durable MP4 producer then finalized retained Request Document
+`0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` for sandbox Request `1000334` through a local runtime and
+disposable local Postgres store. Migration 055 was applied to the shared Preview/Production
+Postgres database on 2026-09-26; the wave remains unapplied to Production Dataverse.
+**[SIGNED-IN PREVIEW ACCEPTED 2026-09-29]** On separate marked sandbox Request `1000350`,
+the Zoom Recording and VTT Transcript producers created two Ready Request Documents through
+the Meeting Tracker card. Staff readback persisted after reload; the 203-byte SharePoint
+transcript downloaded with source-equal SHA-256 and a matching registry hash. The
+[bounded receipt](../plans/evidence/post-presentation/zoom-transcript-preview-2026-09-29.md)
+records the exact IDs and cleanup. The Zoom link was synthetic, so real Zoom playback remains
+unverified. **[SIGNED-IN RECIPIENT PREVIEW ACCEPTED 2026-09-29]** The distinct presentation-token
+reader displayed the current Zoom Recording and VTT Transcript, redirected Watch to the saved
+synthetic Zoom URL, downloaded the 203-byte transcript, and rejected the first token after
+reissue while the replacement worked. See the
+[recipient receipt](../plans/evidence/post-presentation/board-link-preview-2026-09-29.md).
+Safari Private Browsing reached Vercel sign-in before the app, so anonymous recipient viewing
+remains unproved on protected Preview. Preview branch access was restored to `off`; Production
+runtime is not deployed or enabled.
 
 **[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]** Slice 4 adds the second governed transition on the same Final row, `advanceToLeadershipReview` (`lib/services/final-writeup/transition-service.js`, route `pages/api/workbench/final-writeup/leadership-review.js`): lifecycle `REVIEW` → `FINAL`, explicit `wmkf_LeadershipReviewStartedBy`/`wmkf_LeadershipReviewStartedAt`, and the row's own SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash`) refreshed to the verified current version, committed in one changeset with a request-ETag re-bind of `wmkf_CurrentFinalWriteup`. **The milestone triple and `wmkf_MilestoneCreatedBy` are not written** by this transition (owner D2, 2026-09-07): that actor field means the Pre-Site → Site Visit handoff person. A Final Writeup row in lifecycle `FINAL` is therefore "leadership review" only with the complete, well-formed leadership checkpoint, enforced by one shared predicate (`lib/services/final-writeup/leadership-checkpoint.js`) in the transition status, acknowledgement, and dashboard readers, so a half-written row is a reconciliation failure on every surface; the source Pre-Site row's `FINAL` lifecycle keeps its earlier meaning (handoff receipt). No backward action exists. **Owner-run reversal** for a mistaken transition: set the Final row's `wmkf_lifecyclestate` back to `100000001` (Review) and clear `wmkf_leadershipreviewstartedat` and `wmkf_LeadershipReviewStartedBy`; the observation fields may stay. Known pre-existing gap: group-review activation stamps `wmkf_milestonecreatedat` on the Final row without a milestone actor, which the explicit-actor census reports under its Site Visit kind; a separate Tier 0 census fix is owner-decided (plan §10 D6).
 
@@ -282,6 +313,15 @@ Production Request Document row was created by this release smoke.
   holder by member `material:<requestdocumentid>`. Read-only; never the
   Pre-Site Visit writeup row (served from the distribution ledger's pinned
   snapshot instead).
+- External presentation reader (source-built/offline-tested 2026-09-25):
+  `lib/services/post-presentation-materials/presentation-page-service.js`
+  exposes only Ready, non-Superseded file-backed Applicant Slides / Other
+  Applicant Materials from the exact `site-visit-materials-portal` producer,
+  plus the latest Recording / Transcript / Transcript Summary winners from
+  `meeting-tracker-post-presentation`. Every member is re-proved against the
+  token-bound request before a fresh HTTPS Graph redirect; Zoom is watch-only,
+  SharePoint MP4 Watch has no 50 MiB application cap, and no file bytes traverse
+  the application.
 - `wmkf_requestdocument` owns the request/cycle relationship, typed artifact and
   lifecycle state, producer operation state, stable Graph site/drive/item
   identity, upload/finalization eTag/version snapshot, and

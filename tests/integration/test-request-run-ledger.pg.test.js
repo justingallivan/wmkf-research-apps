@@ -30,7 +30,7 @@ if (/neon\.tech/i.test(TEST_URL) || (process.env.POSTGRES_URL && TEST_URL === pr
 const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
-const SLOT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/055_test_request_cast_slot_bindings.sql');
+const SLOT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql');
 
 /** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
 async function assertLedgerSchemaCurrent(db, migrationSql) {

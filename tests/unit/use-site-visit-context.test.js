@@ -9,12 +9,18 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import useSiteVisitContext from '../../shared/components/workbench/useSiteVisitContext';
+import { presentationMaterialsStatus } from '../../shared/components/workbench/ResearchPresentationMaterialsCard';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 
 function Harness({ requestId }) {
   const context = useSiteVisitContext(requestId);
   return <pre data-testid="context">{JSON.stringify(context)}</pre>;
+}
+
+function StatusHarness({ requestId }) {
+  const context = useSiteVisitContext(requestId);
+  return <span>{presentationMaterialsStatus(context, null)?.text || 'Checking the presentation schedule…'}</span>;
 }
 
 function response(body, status = 200) {
@@ -26,6 +32,22 @@ function response(body, status = 200) {
 }
 
 afterEach(() => jest.restoreAllMocks());
+
+test('keeps the presentation schedule pending until the logistics read settles', async () => {
+  let settleLogistics;
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/logistics')
+      ? new Promise((resolve) => { settleLogistics = resolve; })
+      : Promise.resolve(response({ staff: [], external: [] }))
+  ));
+
+  render(<StatusHarness requestId={REQUEST_ID} />);
+  expect(screen.getByText('Checking the presentation schedule…')).toBeInTheDocument();
+  expect(screen.queryByText('Presentation not scheduled.')).not.toBeInTheDocument();
+
+  settleLogistics(response({ siteVisit: { activityId: 'visit-1' }, materials: [] }));
+  await waitFor(() => expect(screen.getByText('Presentation scheduled · materials not requested.')).toBeInTheDocument());
+});
 
 test('derives siteVisit, materials, and suggested recipients from the logistics read', async () => {
   const visit = {
@@ -59,6 +81,9 @@ test('derives siteVisit, materials, and suggested recipients from the logistics 
     materials: [{ artifactId: 'm1', filename: 'Slides.pdf', artifactTypeLabel: 'Applicant Slides' }],
     suggestedTo: ['organizer@wmkeck.org', 'required@wmkeck.org', 'guest@example.org'],
     suggestedCc: ['optional@example.org'],
+    presentationMaterialsStatus: 'disabled',
+    presentationMaterials: [],
+    presentationMaterialConflicts: [],
   }));
 });
 
@@ -78,6 +103,9 @@ test.each([
     materials: [],
     suggestedTo: ['guest@example.org'],
     suggestedCc: [],
+    presentationMaterialsStatus: 'disabled',
+    presentationMaterials: [],
+    presentationMaterialConflicts: [],
   }));
 });
 
@@ -95,16 +123,20 @@ test('yields empty suggestions when no visit is scheduled', async () => {
     materials: [],
     suggestedTo: [],
     suggestedCc: [],
+    presentationMaterialsStatus: 'disabled',
+    presentationMaterials: [],
+    presentationMaterialConflicts: [],
   }));
 });
 
-test('fails open: a load error reports unavailable (never a false "no visit") and does not throw', async () => {
+test('a load error reports the visit and presentation unavailable', async () => {
   global.fetch = jest.fn(async () => response({ error: 'nope' }, 500));
 
   render(<Harness requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(screen.getByTestId('context').textContent).toBe('{"unavailable":true}'));
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
+    .toMatchObject({ unavailable: true, presentationMaterialsStatus: 'unavailable' }));
 });
 
 test('does not fetch without a requestId', async () => {
@@ -116,18 +148,49 @@ test('does not fetch without a requestId', async () => {
 
 // T5 gap-fill (Stage 5a): network rejection and axis (e) — a non-2xx
 // response whose body cannot be parsed — both stay fail-open, never throw.
-// Since 2026-09-25 a settled failure reports `{ unavailable: true }` rather
-// than staying null, so a failed read is never mistaken for "no visit".
-test('fails open on a network rejection', async () => {
+// A settled failure is never mistaken for "no visit".
+test('fails open on a network rejection while reporting presentation unavailable', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(screen.getByTestId('context').textContent).toBe('{"unavailable":true}'));
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
+    .toMatchObject({ unavailable: true, presentationMaterialsStatus: 'unavailable' }));
 });
 
 test('axis (e): fails open on a non-2xx unparseable body', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: () => Promise.reject(new SyntaxError('Unexpected token <')) });
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(screen.getByTestId('context').textContent).toBe('{"unavailable":true}'));
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
+    .toMatchObject({ unavailable: true, presentationMaterialsStatus: 'unavailable' }));
+});
+
+test('keeps presentation materials when the independent recipient directory fails', async () => {
+  const recording = {
+    artifactId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    artifactType: 100000005,
+    filename: 'Recording.mp4',
+    backing: 'file',
+    webUrl: 'https://tenant.sharepoint.com/recording.mp4',
+  };
+  global.fetch = jest.fn(async (url) => (
+    String(url).includes('/logistics')
+      ? response({
+        siteVisit: null,
+        materials: [],
+        presentationMaterialsStatus: 'ready',
+        presentationMaterials: [recording],
+        presentationMaterialConflicts: [],
+      })
+      : response({ error: 'directory unavailable' }, 503)
+  ));
+
+  render(<Harness requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent)).toMatchObject({
+    presentationMaterialsStatus: 'loaded',
+    presentationMaterials: [recording],
+    suggestedTo: [],
+    suggestedCc: [],
+  }));
 });

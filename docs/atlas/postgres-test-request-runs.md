@@ -3,7 +3,7 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable owner-run test Request ledger; B4 typed slot migration is built on a branch and unapplied."
+summary: "Durable owner-run test Request ledger; B4 slot migration 058 is built on a branch and unapplied. Shared Production has 054; Preview unverified."
 canonical: false
 cataloged: 2026-09-23
 last_verified: 2026-09-29
@@ -11,7 +11,7 @@ owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
   - lib/db/migrations/054_test_request_runs.sql
-  - lib/db/migrations/055_test_request_cast_slot_bindings.sql
+  - lib/db/migrations/058_test_request_cast_slot_bindings.sql
 ---
 
 # Atlas: Test Request Factory Postgres ledger
@@ -38,8 +38,11 @@ the configured shared URLs and neon.tech hosts, but does not independently
 prove the supplied URL is local or which database was used; the
 exact owner-run target for that clone and binding is unverified (no direct
 record) [ASSUMED unknown].
-Whether migration 054 is applied to the shared Production/Preview Postgres
-database was not re-probed for the B4 plan revision [ASSUMED unknown]. Existing
+Migration 054 is applied to the shared Production Postgres (2026-09-26 06:54Z,
+`applied_by` `codex-feature-request-2026-09-26`) [VERIFIED via an owner-run
+read-only `schema_migrations` query, S552], but from `codex/feature-request`, whose
+last committed 054 at that time was `af65a24bd` (2026-09-24), before the cast tables; the
+installed shape was not read. Preview's database is unverified. Existing
 shared databases use `node scripts/apply-migrations.js`; the owner retains
 control of any shared-database application. The local ledgers took 054 and
 its in-place amendments by owner-run `psql` (cast plan, *Order* 1 and 4), and
@@ -299,7 +302,7 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
 
 ## `test_request_cast_slot_bindings` (B4 branch build, 2026-09-29)
 
-**[VERIFIED via branch source and disposable PostgreSQL test]** Migration 055 adds a separate typed journal for Potential Reviewer 1, one row per `(run_id, member_id)` with a composite foreign key to the verified suggestion's binding row. The row stores the expected Request/person GUIDs, a five-slot occupancy snapshot and concrete pre-PATCH ETag, dispatch and verification timestamps, constrained provenance and failure codes, and typed readback fields. A planned row can stop with `needs_attention` before a snapshot if the Request marker drifts; this is a journaled refusal, with no PATCH. Migration 055 restores the current cast tables and `test_request_receipt_ok` function when an earlier applied 054 lacks them; it repairs the earlier three-role cast-member CHECK and, on explicit replay, the stricter snapshot CHECK from the first B4 draft. It refuses conflicting table columns and required constraints. `scripts/setup-database.js` V56 mirrors the new table for fresh installs. The disposable PostgreSQL test applies current, earlier, and three-role 054→055, reruns 055 after recreating the old snapshot CHECK, verifies the pre-snapshot refusal and compares the installed receipt function with 054. No operational ledger has been migrated for this branch [UNKNOWN pending owner preflight/application].
+**[VERIFIED via branch source and disposable PostgreSQL test]** Migration 058 adds a separate typed journal for Potential Reviewer 1, one row per `(run_id, member_id)` with a composite foreign key to the verified suggestion's binding row. The row stores the expected Request/person GUIDs, a five-slot occupancy snapshot and concrete pre-PATCH ETag, dispatch and verification timestamps, constrained provenance and failure codes, and typed readback fields. A planned row can stop with `needs_attention` before a snapshot if the Request marker drifts; this is a journaled refusal, with no PATCH. Migration 058 restores the current cast tables and `test_request_receipt_ok` function when an earlier applied 054 lacks them; it repairs the earlier three-role cast-member CHECK and, on explicit replay, the stricter snapshot CHECK from the first B4 draft. It refuses conflicting table columns and required constraints. `scripts/setup-database.js` V57 mirrors the new table for fresh installs, after V56's post-presentation materials. The disposable PostgreSQL test applies current, earlier, and three-role 054→058, reruns 058 after recreating the old snapshot CHECK, verifies the pre-snapshot refusal and compares the installed receipt function with 054. No operational ledger has been migrated for this branch [UNKNOWN pending owner preflight/application].
 
 **[VERIFIED via branch source and disposable PostgreSQL test]** `createRunLedger` exposes `planCastSlotBinding`, snapshot, dispatch, verification, attention and read methods. `runCastSlotBinding` reads the ready run, verified suggestion and exact marked person; observes an already matching slot without a PATCH; otherwise records occupancy and ETag before one fenced PATCH, then reads back all five slots and the marker/run ID. A metadata read failure leaves the planned row retriable; no PATCH was dispatched. A dispatched row resumes by readback without resending. Unit and PostgreSQL tests cover the journal transitions, hand-set slot, occupancy, concrete ETag, response loss and 412 outcomes. Automatic approval review rejected silently extending the production-capable `--bind-reviewer` command with the live slot write. That command remains suggestion-only. A separate `--bind-reviewer-slot=<runId>` command previews the target and occupants read-only; only `--confirm-slot-request=<the previewed Request GUID>` calls the slot runner. This branch has not run a production slot PATCH.
 
@@ -310,13 +313,14 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   `scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]; the local
   `ledger_prod` is recorded for the production cast creation (cast plan,
   *Order* 4). Which local ledger the 1003303 clone and binding used is not
-  recorded (see the header). Shared Production/Preview database migration
-  status remains unverified; this B4 revision performs no live read.
+  recorded (see the header). Shared Production has 054 applied (2026-09-26
+  06:54Z, `codex-feature-request-2026-09-26`) [VERIFIED via an owner-run
+  read-only `schema_migrations` query, S552]; Preview's database is unverified.
 - The owner-run `ledger_prod` and `ledger` need read-only schema preflight,
-  explicit 055 application by the owner, and a recorded receipt before the
+  explicit 058 application by the owner, and a recorded receipt before the
   slot operation can use them. `apply-migrations.js` must not target these
-  local ledgers. Shared Production/Preview Postgres migration status remains
-  unverified and is not a prerequisite for the owner-run local slot journal.
+  local ledgers. Shared Production/Preview Postgres migration consistency is
+  not a prerequisite for the owner-run local slot journal.
 - The JSONB resource receipts are checked by `test_request_receipt_ok` in
   PostgreSQL and by `assertLedgerReceipt` in JavaScript. They accept only
   bounded allowlisted keys and values; a writer bypassing JavaScript still

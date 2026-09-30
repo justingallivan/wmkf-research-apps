@@ -282,21 +282,24 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
   });
 });
 
-describe('migrations manifest lists 054 last and its setup-database.js mirror matches', () => {
+describe('migration 054 and the later migration manifest', () => {
   const manifest = JSON.parse(fs.readFileSync(
     path.join(process.cwd(), 'lib/db/migrations-manifest.json'),
     'utf8',
   ));
 
-  it('keeps 054 before the B4 slot-journal migration', () => {
-    expect(manifest.files.slice(-2)).toEqual(['054_test_request_runs.sql', '055_test_request_cast_slot_bindings.sql']);
+  it('tracks 054_test_request_runs.sql before later numbered migrations', () => {
+    const ledgerIndex = manifest.files.indexOf('054_test_request_runs.sql');
+    expect(ledgerIndex).toBeGreaterThanOrEqual(0);
+    expect(manifest.files.indexOf('055_post_presentation_materials.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('058_test_request_cast_slot_bindings.sql')).toBeGreaterThan(ledgerIndex);
   });
 
-  it('V56 fresh-install slot table mirrors migration 055', () => {
-    const migration055 = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/055_test_request_cast_slot_bindings.sql'), 'utf8');
+  it('V57 fresh-install slot table mirrors migration 058', () => {
+    const migration058 = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql'), 'utf8');
     const setup = fs.readFileSync(path.join(process.cwd(), 'scripts/setup-database.js'), 'utf8');
-    const migrationTable = migration055.match(/CREATE TABLE IF NOT EXISTS test_request_cast_slot_bindings \([\s\S]*?\n\);/)?.[0];
-    const freshTable = setup.match(/const v56Statements = \[\s*`([\s\S]*?)`,\s*\];/)?.[1];
+    const migrationTable = migration058.match(/CREATE TABLE IF NOT EXISTS test_request_cast_slot_bindings \([\s\S]*?\n\);/)?.[0];
+    const freshTable = setup.match(/const v57Statements = \[\s*`([\s\S]*?)`,\s*\];/)?.[1];
     expect(freshTable?.replace(/\s+/g, ' ').trim()).toBe(migrationTable?.replace(/\s+/g, ' ').trim().replace(/;$/, ''));
   });
 

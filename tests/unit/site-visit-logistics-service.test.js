@@ -218,7 +218,42 @@ test('the default Workbench read omits applicant suggestions and their Dataverse
   const deps = dependencies();
   const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, deps);
   expect(deps.resolveApplicantContacts).not.toHaveBeenCalled();
-  expect(result).toEqual({ siteVisit: null, materials: [] });
+  expect(result).toEqual({
+    siteVisit: null,
+    materials: [],
+    presentationMaterialsStatus: 'disabled',
+  });
+});
+
+test('Workbench exposes a distinct latest-only presentation projection only when both rollout controls allow the request', async () => {
+  const zoom = {
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_externalurl: 'https://zoom.us/rec/share/current?pwd=x',
+    wmkf_slotversion: 2,
+    createdon: '2026-09-25T12:00:00Z',
+  };
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
+    presentationSchemaReady: jest.fn(() => true),
+    presentationRequestAllowed: jest.fn(() => true),
+    findDocumentsByRequest: jest.fn(async () => ({ records: [
+      { ...zoom, wmkf_requestdocumentid: ACTOR_ID, wmkf_slotversion: 1 },
+      zoom,
+    ] })),
+  }));
+  expect(result.presentationMaterialsStatus).toBe('ready');
+  expect(result.presentationMaterials).toEqual([expect.objectContaining({
+    artifactId: zoom.wmkf_requestdocumentid,
+    backing: 'external',
+    externalUrl: zoom.wmkf_externalurl,
+  })]);
+  expect(result.presentationMaterialConflicts).toContainEqual(expect.objectContaining({
+    artifactId: ACTOR_ID,
+    reason: 'eligible_non_winner',
+  }));
 });
 
 test('projects a Dynamics-scheduled visit without the app map via ActivityParty fallback', async () => {
