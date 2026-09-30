@@ -288,8 +288,10 @@ describe('migrations manifest lists 054 last and its setup-database.js mirror ma
     'utf8',
   ));
 
-  it('has 054_test_request_runs.sql as the last entry', () => {
-    expect(manifest.files[manifest.files.length - 1]).toBe('054_test_request_runs.sql');
+  it('tracks 054_test_request_runs.sql before later numbered migrations', () => {
+    const ledgerIndex = manifest.files.indexOf('054_test_request_runs.sql');
+    expect(ledgerIndex).toBeGreaterThanOrEqual(0);
+    expect(manifest.files.indexOf('055_post_presentation_materials.sql')).toBeGreaterThan(ledgerIndex);
   });
 
   function normalize(sql) {

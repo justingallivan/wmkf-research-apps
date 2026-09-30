@@ -216,6 +216,28 @@ test('research presentation materials list by label; oversize files show without
   expect(screen.getByText(/too large to open here/)).toBeInTheDocument();
 });
 
+test('new presentation materials use the non-buffering open route', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    materials: [
+      { member: 'material:11111111-1111-4111-8111-111111111111', label: 'Recording', filename: 'Zoom recording', available: true, inline: false, media: true, backing: 'external' },
+      { member: 'material:22222222-2222-4222-8222-222222222222', label: 'Recording', filename: 'Visit.mp4', available: true, inline: false, media: true, backing: 'file' },
+      { member: 'material:33333333-3333-4333-8333-333333333333', label: 'Transcript', filename: 'Transcript.vtt', available: true, inline: false, media: true, backing: 'file' },
+    ],
+  }));
+  render(<BriefingPage />);
+  for (const [name, id] of [
+    ['Zoom recording', '11111111-1111-4111-8111-111111111111'],
+    ['Visit.mp4', '22222222-2222-4222-8222-222222222222'],
+    ['Transcript.vtt', '33333333-3333-4333-8333-333333333333'],
+  ]) {
+    const link = await screen.findByRole('link', { name });
+    expect(link).toHaveAttribute('href', `/api/external/briefing/tok/open?member=material%3A${id}`);
+    expect(link).toHaveAttribute('target', '_blank');
+  }
+});
+
 test('consultant feedback: the section is omitted when there are zero shared items', async () => {
   global.fetch = jest.fn().mockResolvedValue(response({
     ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,

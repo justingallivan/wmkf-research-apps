@@ -1,2 +1,4 @@
 # Historical fixture secret in a focused unit test (never real); see .gitleaks.toml allowlist.
 b5b59ef11e1ce397449f905f6f459adc187f6a25:tests/unit/verify-briefing-token.test.js:generic-api-key:10
+# Historical synthetic test-secret in the retired presentation media proof test.
+c4c071eacab233172e345da82c3aad4db5796e13:tests/unit/presentation-media-proof-service.test.js:generic-api-key:19

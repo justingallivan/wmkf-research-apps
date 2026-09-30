@@ -197,6 +197,27 @@ test.each([204, 404])('delete treats %s as an idempotent success', async (status
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
+test.each([204, 412, 500])('ETag-guarded delete returns Graph status %s without hiding cleanup certainty', async (status) => {
+  global.fetch = jest.fn().mockResolvedValue(response(status));
+  await expect(GraphService.deleteFileWithEtag('drive/id', 'item/id', 'etag-1')).resolves.toBe(status);
+  expect(global.fetch).toHaveBeenCalledWith(
+    'https://graph.microsoft.com/v1.0/drives/drive%2Fid/items/item%2Fid',
+    expect.objectContaining({
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer token', 'If-Match': 'etag-1' },
+    }),
+  );
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test('ETag-guarded delete refuses an empty ETag before authentication or network', async () => {
+  const getAccessToken = jest.spyOn(GraphService, 'getAccessToken');
+  await expect(GraphService.deleteFileWithEtag('drive', 'item', ''))
+    .rejects.toThrow('deleteFileWithEtag: eTag is required');
+  expect(getAccessToken).not.toHaveBeenCalled();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
 test('delete surfaces other HTTP failures without retrying', async () => {
   global.fetch = jest.fn().mockResolvedValue(response(500, { error: 'delete failed' }));
   await expect(GraphService.deleteFile('drive', 'item')).rejects.toThrow('SharePoint delete failed (500)');

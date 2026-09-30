@@ -55,6 +55,9 @@ jest.mock('../../lib/services/maintenance-service', () => ({
     cleanupBlobs: jest.fn(async () => ({ deleted: 0, skipped: 0, errors: 0, details: [] })),
     cleanupIntakePrivateBlobs: jest.fn(async () => ({ deleted: 0 })),
     cleanupPortalUploadStaging: jest.fn(async () => ({ deleted: 0, errors: 0, pruned: 0 })),
+    cleanupPresentationMaterialUploads: jest.fn(async () => ({
+      scanned: 0, bound: 0, deleted: 0, abandoned: 0, refreshed: 0, retained: 0,
+    })),
     cleanupScheduledEmailMessages: jest.fn(async () => 0),
     closeExpiredSiteVisitMaterialCollections: jest.fn(async () => 0),
   },
@@ -194,6 +197,18 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.results.portalUploadStaging).toEqual({ deleted: 3, errors: 0, pruned: 2 });
     expect(res.body.totalDeleted).toBe(3);
+  });
+
+  it('wires durable presentation upload reconciliation through a trusted DAL context', async () => {
+    MaintenanceService.cleanupPresentationMaterialUploads.mockResolvedValueOnce({
+      scanned: 2, bound: 0, deleted: 1, abandoned: 0, refreshed: 0, retained: 1,
+    });
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(MaintenanceService.cleanupPresentationMaterialUploads).toHaveBeenCalledWith({});
+    expect(res.body.results.presentationMaterialUploads).toEqual(expect.objectContaining({ deleted: 1, retained: 1 }));
+    expect(res.body.totalDeleted).toBe(1);
   });
 
   it('prunes only terminal scheduled-email rows at the configured retention horizon', async () => {

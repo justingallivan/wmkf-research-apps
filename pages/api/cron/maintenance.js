@@ -227,6 +227,21 @@ export default async function handler(req, res) {
       results.portalUploadStaging = { error: error.message };
     }
 
+    // 7.6a. Durable presentation MP4 intents. Off/test rollout modes inspect,
+    // refresh, persist exact candidates, and alert only; destructive cleanup
+    // is possible only after access is deliberately set to on.
+    try {
+      results.presentationMaterialUploads = await withDalContext(
+        'maintenance-presentation-material-uploads',
+        () => MaintenanceService.cleanupPresentationMaterialUploads({}),
+      );
+      if (typeof results.presentationMaterialUploads?.deleted === 'number') {
+        totalDeleted += results.presentationMaterialUploads.deleted;
+      }
+    } catch (error) {
+      results.presentationMaterialUploads = { error: error.message };
+    }
+
     // 7.7. Personalized scheduled-email audit/recovery ledger. Delete only
     // fully finalized sends and explicit stops; unresolved work is retained.
     try {
