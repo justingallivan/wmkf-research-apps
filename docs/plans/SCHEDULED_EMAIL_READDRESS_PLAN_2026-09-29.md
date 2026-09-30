@@ -1,6 +1,6 @@
 # Scheduled email: engine hardening, then queued-reminder re-addressing
 
-Status: **DRAFT, revision 5 (2026-09-29, S551, after Codex round 3 on r4; owner decisions A-1, A-2, B-1, B-2 and B-3 and the r4 simplification remain settled). Narrowed by the owner in S551 after the measurement below: Part A, engine hardening for every program, now leads, and Part B, Liaison re-addressing, is a smaller follow-on. Revision 0 (S549) was split out of `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` after Codex round 3 on that plan. Revision 5 keeps one new column (`recipient_generation`), with no backoff schedule, reconciliation/forbidden counters, `next_reconcile_at` or digest rotation. Nothing built.**
+Status: **DRAFT, revision 5 (2026-09-29, S551, after Codex round 3 on r4; owner decisions A-1, A-2, B-1, B-2 and B-3 and the r4 simplification remain settled). Narrowed by the owner in S551 after the measurement below: Part A, engine hardening for every program, now leads, and Part B, Liaison re-addressing, is a smaller follow-on. Revision 0 (S549) was split out of `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` after Codex round 3 on that plan. Revision 5 keeps one new column (`recipient_generation`), with no backoff schedule, reconciliation/forbidden counters, `next_reconcile_at` or digest rotation. Ready to build (owner, S551): plan review closed after Codex round 3; remaining risk is covered by the live-Postgres tests and the implementation review. Nothing built.**
 
 ## Why
 
@@ -115,4 +115,4 @@ This removes revision 0's interim stop, so its open requirement 1 no longer appl
 
 ## Release
 
-Part A is Tier 2 (a migration on the shared Postgres plus email-engine changes): its own branch, after a Codex plan review, then an implementation review. Part B follows on its own branch and needs Part A's generation column.
+Part A is Tier 2 (a migration on the shared Postgres plus email-engine changes): its own branch; the plan review is done (three Codex rounds, closed by the owner in S551), and an implementation review comes before merge. Part B follows on its own branch and needs Part A's generation column.
