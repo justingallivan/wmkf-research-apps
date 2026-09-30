@@ -1,0 +1,1527 @@
+{
+  "section": 13,
+  "target": "https://wmkf.crm.dynamics.com",
+  "generatedAt": "2026-09-30T00:47:28.127Z",
+  "complete": false,
+  "source": {
+    "commit": "f1733cca3c66c5427886f3955845e0bc037cb8c9",
+    "probeDirty": false,
+    "clientDirty": false,
+    "branch": "codex/b4-slot-readiness"
+  },
+  "incompleteReasons": [],
+  "dispositionRequired": [
+    "manual API-connection trigger in Request/slot-mentioning flow requires owner classification: GOapply Add Request to Review Group (Deprecated) / manual",
+    "manual API-connection trigger in Request/slot-mentioning flow requires owner classification: Bill.com - Push Payments / manual",
+    "flow mentions Request or slot without a classified Request trigger: GOapply AutoFill Next Phase (Deprecated) / When_a_row_is_added,_modified_or_deleted"
+  ],
+  "auditing": {
+    "entity": true,
+    "wmkf_potentialreviewer1": false,
+    "wmkf_potentialreviewer2": false,
+    "wmkf_potentialreviewer3": false,
+    "wmkf_potentialreviewer4": false,
+    "wmkf_potentialreviewer5": false
+  },
+  "workflows": [
+    {
+      "name": "WMKF_Research Create Draft Concept Email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_programcoordinator"
+      ]
+    },
+    {
+      "name": "WMKF_Rsrch Phase I Withdrawal",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create SoCal Phase II Decision",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_phaseistatus"
+      ]
+    },
+    {
+      "name": "WMKF_Set Request Status Program Concept",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Request Status Program Phase I Invite/Do Not Invite",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Payee Payment Contact from Request",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Request Status Discretionary",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Update Payment Contact from Org",
+      "kind": "workflow",
+      "mode": "real-time",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Research Phase II Invite",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_phaseistatus"
+      ]
+    },
+    {
+      "name": "WMKF_Set Request Status for Discretionary",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Show Hide Check-ins",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Request Status Program Phase I",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Show Hide Discretionary Fields",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Co-PI Field on Contact",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_copi5",
+        "wmkf_copi4",
+        "wmkf_copi3",
+        "wmkf_copi2",
+        "wmkf_copi1"
+      ]
+    },
+    {
+      "name": "WMKF_Research Advance to Phase II",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_phaseistatus"
+      ]
+    },
+    {
+      "name": "WMKF_Research Application Received Email Flow",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "akoya_submissionaccepted"
+      ]
+    },
+    {
+      "name": "WMKF_Update Org Contacts from Request",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create Follow-Up to Final Report",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Update Org Leader from Request",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_ceo"
+      ]
+    },
+    {
+      "name": "Require Primary Contact for \"Scholarship\"",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Research Phase II SV email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Payment Option for Discretionary Grant",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Type",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Research Phase II Not Invited Draft Email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_phaseistatus"
+      ]
+    },
+    {
+      "name": "WMKF_Create Payment",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_phaseiistatus"
+      ]
+    },
+    {
+      "name": "WMKF_Lock Dir Ops Approved field",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Lock ED approved fields",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Request Status Program Phase II",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Discretionary Payment Contact Email",
+      "kind": "workflow",
+      "mode": "real-time",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create Draft Discretionary App Email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_paymentcontactconfirmed"
+      ]
+    },
+    {
+      "name": "Create GOapply Status Tracking (Deprecated)",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Require Decision Date if original grant contains data",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Not require applicant for scholarships",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create SoCal draft Application Ack.",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "akoya_submissionaccepted"
+      ]
+    },
+    {
+      "name": "Default to Grant as Request Type",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Make Received date contain data",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Class Rank Score",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Create Monthly Grant Payments (with Fund/Account)",
+      "kind": "workflow",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Update Org Primary Contact from Request",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "akoya_primarycontactid"
+      ]
+    },
+    {
+      "name": "WMKF_Create SoCal Concept Draft Email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_socalconceptstatus"
+      ]
+    },
+    {
+      "name": "WMKF_Show Hide MR Concept Titles",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Show Hide SE Concept Titles",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create Socal Draft Deliverables Email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_phaseiistatus"
+      ]
+    },
+    {
+      "name": "Show import detail if it contains data",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create SoCal Phase I Status Tracking",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_socalconceptstatus"
+      ]
+    },
+    {
+      "name": "WMKF_Update WMKF Project Description",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Set Request Status Correspondence",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Show Hide Concepts Fields",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Show Hide SoCal Fields",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Research Phase II Acknowledgement of Proposal",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_phaseiicheckincomplete"
+      ]
+    },
+    {
+      "name": "Make Fiscal Year Not Required",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Create all requirements- GOapply",
+      "kind": "workflow",
+      "mode": "real-time",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Default a Request Title",
+      "kind": "workflow",
+      "mode": "real-time",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Program Draft Decline Email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Show Hide Contingent Status",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create Draft Ineligible Email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_socalconceptstatus",
+        "wmkf_phaseistatus"
+      ]
+    },
+    {
+      "name": "WMKF_Set Research Concepts Type/Program",
+      "kind": "business rule",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Update PC GOverify Complete when Reviewed",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_goverifyreviewedby"
+      ]
+    },
+    {
+      "name": "WMKF_Research Draft Abstract Email",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create SoCal draft Phase II Ack",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_phaseiicheckincomplete"
+      ]
+    },
+    {
+      "name": "WMKF_Create Budget Reallocation",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMKF_Create No Cost Extension",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "WMK_Set Type for Roll up Field",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": [
+        "wmkf_type"
+      ]
+    },
+    {
+      "name": "Schedule Request Payments - Each Payment",
+      "kind": "workflow",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Set GOapply Settings on Request",
+      "kind": "workflow",
+      "mode": "real-time",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "DEPRECATED Deny Request Records",
+      "kind": "workflow",
+      "mode": "real-time",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Schedule Request Payments",
+      "kind": "workflow",
+      "mode": null,
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    },
+    {
+      "name": "Repeat this Grant Request",
+      "kind": "workflow",
+      "mode": "background",
+      "triggered": false,
+      "mentions": [],
+      "readable": true,
+      "updateAttributes": []
+    }
+  ],
+  "steps": [
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_executivedirectorapproval"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_classrank",
+        "akoya_classsize"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_importdetail"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_requesttype"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_requesttype"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_submitdate",
+        "akoya_datereceived",
+        "akoya_goapplyphase"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "ObjectModel Implementation",
+      "message": "Update",
+      "type": "Microsoft.Crm.Extensibility.InternalOperationPlugin",
+      "stage": 30,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [],
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "ObjectModel Implementation",
+      "message": "Update",
+      "type": "Microsoft.Crm.Extensibility.InternalOperationPlugin",
+      "stage": 30,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [],
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "ObjectModel Implementation",
+      "message": "UpdateMultiple",
+      "type": "Microsoft.Crm.Extensibility.InternalOperationPlugin",
+      "stage": 30,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [],
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "ObjectModel Implementation",
+      "message": "UpdateMultiple",
+      "type": "Microsoft.Crm.Extensibility.InternalOperationPlugin",
+      "stage": 30,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [],
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "RollupTriggerPlugin_Update_akoya_request",
+      "message": "Update",
+      "type": "Microsoft.Crm.Rollup.RollupTriggerPlugin",
+      "stage": 35,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [],
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "WorkflowExpansion",
+      "message": "Update",
+      "type": "Microsoft.Crm.Workflow.WorkflowExpansionPlugin",
+      "stage": 45,
+      "mode": 1,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_type",
+        "wmkf_paymentcontactconfirmed",
+        "wmkf_socalconceptstatus",
+        "wmkf_phaseistatus",
+        "wmkf_phaseiistatus",
+        "akoya_submissionaccepted",
+        "wmkf_phaseiicheckincomplete",
+        "wmkf_programcoordinator",
+        "wmkf_copi5",
+        "wmkf_copi4",
+        "wmkf_copi3",
+        "wmkf_copi2",
+        "wmkf_copi1",
+        "wmkf_ceo",
+        "akoya_primarycontactid",
+        "wmkf_goverifyreviewedby",
+        "akoya_classrank",
+        "akoya_classsize",
+        "akoya_requesttype",
+        "wmkf_grantprogram",
+        "akoya_submitdate",
+        "akoya_datereceived",
+        "akoya_goapplyphase",
+        "akoya_importdetail",
+        "wmkf_directorofoperationsapproved",
+        "wmkf_executivedirectorapproval",
+        "akoya_recommendedamount",
+        "wmkf_request_type",
+        "akoya_originalgrantamount",
+        "wmkf_researchconceptstatus",
+        "akoya_grant",
+        "akoya_finished",
+        "statecode",
+        "wmkf_lettertype",
+        "wmkf_numberofmrconcepts",
+        "wmkf_numberofseconcepts",
+        "akoya_title",
+        "wmkf_wmkfprojectdescription",
+        "wmkf_grantpurposenotes"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_request_type",
+        "wmkf_phaseistatus",
+        "wmkf_phaseiistatus",
+        "wmkf_type"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_grantprogram"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_request_type"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_numberofmrconcepts"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_title",
+        "wmkf_wmkfprojectdescription",
+        "wmkf_grantprogram",
+        "wmkf_grantpurposenotes"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_phaseistatus",
+        "akoya_grant"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_researchconceptstatus",
+        "wmkf_socalconceptstatus",
+        "wmkf_phaseistatus",
+        "wmkf_phaseiistatus"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_type"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_grantprogram",
+        "wmkf_request_type",
+        "wmkf_socalconceptstatus"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_grantprogram"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_grantprogram",
+        "akoya_recommendedamount"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_phaseiistatus",
+        "akoya_originalgrantamount",
+        "akoya_finished"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_phaseistatus",
+        "wmkf_phaseiistatus"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_originalgrantamount",
+        "wmkf_grantprogram",
+        "wmkf_directorofoperationsapproved",
+        "wmkf_executivedirectorapproval"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_directorofoperationsapproved"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_numberofseconcepts"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_grantprogram",
+        "wmkf_request_type",
+        "wmkf_phaseistatus"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_lettertype"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "(unnamed)",
+      "message": "Update",
+      "type": "Microsoft.Crm.ObjectModel.SyncWorkflowExecutionPlugin",
+      "stage": 20,
+      "mode": 0,
+      "hidden": true,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "wmkf_request_type",
+        "wmkf_researchconceptstatus",
+        "statecode",
+        "wmkf_type",
+        "wmkf_grantprogram"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "AkoyaGo.CalculatedFieldsAsync: Update of akoya_request",
+      "message": "Update",
+      "type": "AkoyaGo.CalculatedFieldsAsync",
+      "stage": 40,
+      "mode": 1,
+      "hidden": false,
+      "entityFilter": "literal",
+      "filteringColumns": [],
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "AkoyaGo.AsyncRequestGoApplyRequirementsUpdate: Update of akoya_request",
+      "message": "Update",
+      "type": "AkoyaGo.AsyncRequestGoApplyRequirementsUpdate",
+      "stage": 40,
+      "mode": 1,
+      "hidden": false,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_creategoapplyrequirementstrigger"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "AkoyaGo.RequestSetGrantAndStatus: Update of akoya_request",
+      "message": "Update",
+      "type": "AkoyaGo.RequestSetGrantAndStatus",
+      "stage": 20,
+      "mode": 0,
+      "hidden": false,
+      "entityFilter": "literal",
+      "filteringColumns": [
+        "akoya_amendment",
+        "akoya_originalgrantamount",
+        "akoya_specialrequeststatus"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "AkoyaGo.RequestPreOperation: Update of akoya_request",
+      "message": "Update",
+      "type": "AkoyaGo.RequestPreOperation",
+      "stage": 20,
+      "mode": 0,
+      "hidden": false,
+      "entityFilter": "absent lookup",
+      "filteringColumns": [],
+      "firesOn": "ANY entity/column"
+    },
+    {
+      "name": "AkoyaGo.RequestPaymentFundAnonymity: Update of akoya_requestpayment",
+      "message": "Update",
+      "type": "AkoyaGo.RequestPaymentFundAnonymity",
+      "stage": 20,
+      "mode": 0,
+      "hidden": false,
+      "entityFilter": "absent lookup",
+      "filteringColumns": [
+        "akoya_fund"
+      ],
+      "firesOn": "other columns only"
+    },
+    {
+      "name": "AkoyaGo.RequestPostOperation: Update of akoya_request",
+      "message": "Update",
+      "type": "AkoyaGo.RequestPostOperation",
+      "stage": 40,
+      "mode": 0,
+      "hidden": false,
+      "entityFilter": "absent lookup",
+      "filteringColumns": [],
+      "firesOn": "ANY entity/column"
+    }
+  ],
+  "flows": [],
+  "flowMentions": [
+    {
+      "name": "GOapply Add Request to Review Group (Deprecated)",
+      "readable": true,
+      "recognizedRequestTriggers": 0,
+      "unclassifiedRequestTriggers": 0,
+      "manualApiConnectionTriggers": 1,
+      "actionOnlyTriggerDispositions": 0
+    },
+    {
+      "name": "Bill.com - Push Payments",
+      "readable": true,
+      "recognizedRequestTriggers": 0,
+      "unclassifiedRequestTriggers": 0,
+      "manualApiConnectionTriggers": 1,
+      "actionOnlyTriggerDispositions": 0
+    },
+    {
+      "name": "GOapply AutoFill Next Phase (Deprecated)",
+      "readable": true,
+      "recognizedRequestTriggers": 0,
+      "unclassifiedRequestTriggers": 0,
+      "manualApiConnectionTriggers": 0,
+      "actionOnlyTriggerDispositions": 1
+    }
+  ],
+  "flowTriggerSummaries": [
+    {
+      "name": "Annual/Fiscal Year calculations",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "Recurrence",
+          "type": "Recurrence",
+          "kind": "unknown",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "none",
+          "table": null,
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "GOapply Update Form Definition (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "akoya_goapplystatustrackings",
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "GOapply Add to Review Group (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "akoya_goapplystatustrackings",
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "GOapply Add Request to Review Group (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "akoya_requests",
+          "message": null,
+          "classification": "manual API connection: owner disposition"
+        }
+      ]
+    },
+    {
+      "name": "GOapply Invite Contact (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "contacts",
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "Bill.com - Push Payments",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "akoya_requestpayments",
+          "message": null,
+          "classification": "manual API connection: owner disposition"
+        }
+      ]
+    },
+    {
+      "name": "Bill.com Sync Vendor",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "none",
+          "table": null,
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "GOapply - Bulk import users (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "akoya_goimportuserstagings",
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "GOapply Invite Constituent (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "accounts",
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "GOapply AutoFill Next Phase (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "When_a_row_is_added,_modified_or_deleted",
+          "type": "OpenApiConnectionWebhook",
+          "kind": "unknown",
+          "subscriptionTarget": "literal",
+          "entity": "akoya_goapplystatustracking",
+          "tableTarget": "none",
+          "table": null,
+          "message": 1,
+          "classification": "other trigger: owner disposition for Request/slot actions"
+        }
+      ]
+    },
+    {
+      "name": "GOapply Duplicate Review Group (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "akoya_reviewgroups",
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "GOapply Duplicate Review Group and Reviewers (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "akoya_reviewgroups",
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "GOapply Add All Applications to Review Group (Deprecated)",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "manual",
+          "type": "Request",
+          "kind": "ApiConnection",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "literal",
+          "table": "akoya_reviewgroups",
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    },
+    {
+      "name": "Bill.com Pull Payments",
+      "readable": true,
+      "triggers": [
+        {
+          "name": "Recurrence",
+          "type": "Recurrence",
+          "kind": "unknown",
+          "subscriptionTarget": "none",
+          "entity": null,
+          "tableTarget": "none",
+          "table": null,
+          "message": null,
+          "classification": "no Request/slot mention"
+        }
+      ]
+    }
+  ],
+  "flowTriggerReviewEntries": [
+    {
+      "name": "GOapply Add Request to Review Group (Deprecated)",
+      "trigger": "manual",
+      "reason": "manual API-connection trigger without Dataverse subscription"
+    },
+    {
+      "name": "Bill.com - Push Payments",
+      "trigger": "manual",
+      "reason": "manual API-connection trigger without Dataverse subscription"
+    },
+    {
+      "name": "GOapply AutoFill Next Phase (Deprecated)",
+      "trigger": "When_a_row_is_added,_modified_or_deleted",
+      "reason": "Request/slot mention outside this trigger"
+    }
+  ],
+  "counts": {
+    "activatedWorkflowsAndRules": 68,
+    "updateTriggeredWorkflows": 20,
+    "slotTriggeredWorkflows": 0,
+    "unreadableWorkflowsAndRules": 0,
+    "allEnabledSlotWriteSteps": 11090,
+    "allEnabledUpdateMultipleSteps": 3997,
+    "allEnabledUpsertSteps": 706,
+    "allEnabledUpsertMultipleSteps": 531,
+    "requestSlotWriteSteps": 34,
+    "globalSlotWriteSteps": 1227,
+    "hiddenGlobalSlotWriteSteps": 1224,
+    "hiddenMicrosoftPlatformSlotWriteSteps": 1224,
+    "flowsRead": 14,
+    "flowsMentioningRequestOrSlot": 3,
+    "requestUpdateTriggers": 0,
+    "requestNonUpdateTriggers": 0,
+    "manualApiConnectionTriggers": 2,
+    "hardBlockedFlowTriggers": 0,
+    "actionOnlyTriggerDispositions": 1,
+    "triggerReviewEntries": 3,
+    "unreadableFlows": 0
+  }
+}
