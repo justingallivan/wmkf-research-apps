@@ -1,5 +1,13 @@
 # Session 553 Prompt: build Part A of the scheduled-email plan (engine hardening, migration 059)
 
+## Parallel Codex handoff — staff site-visit video release, 2026-09-29 PT
+
+**Status: DONE.** PR #365 shipped the post-presentation materials runtime; PR #368 corrected playback status; PR #370 recorded bounded Production acceptance; PR #371 (`b90ff74d1`) recorded the staff release. On marked TEST Request #1003302, Production staff uploaded and replaced a synthetic MP4. Safari recipient Watch/long-seek/Download and a private materials-only link passed; the replacement Download matched the source SHA-256. Signed-in Staff Deliberations showed the current replacement recording, and its SharePoint Watch link played the video in Chrome. Production `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and `POST_PRESENTATION_MATERIALS_ACCESS=on` were read back; redeployment `dpl_Gw8dTzcA1JaUc2ifQjbzbBe7wCoT` reached Ready on both branded domains at the release check. Evidence: `docs/plans/evidence/post-presentation/production-bounded-2026-09-29.md`.
+
+**Owner clarification:** staff use is the primary workflow. The pre-research brief normally precedes the visit, and a received grant review is not a prerequisite for recording upload or staff viewing. A live check of the older full-briefing audience was not performed; automated inclusion/isolation coverage exists. Do not carry that optional compatibility check as a blocker for this released staff feature or create a synthetic review solely to test the video. One MP4 replacement initially returned a metadata mismatch; a single manual **Finish saving** retry succeeded. Retained TEST artifacts require an exact-item teardown decision before any deletion.
+
+**Next owner/action:** none for this release. The scheduled-email Part A work below remains Claude's separate Session 553 workstream. Before any further Production changes, recheck the current deployment and access setting rather than relying on this dated handoff.
+
 ## Session 552 Summary — 2026-09-29/30 PT (Opus; Integrity Workbench tab released, migration numbering settled)
 
 ### What Was Completed
