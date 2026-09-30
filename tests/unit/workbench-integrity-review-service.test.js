@@ -192,11 +192,14 @@ test('approval rejects historical, cross-request, stale-roster, incomplete, and 
   expect(legacy.state.inserts).toHaveLength(0);
 });
 
-test('a current person with no usable name reports identity_unavailable, not roster_changed, and blocks approval', async () => {
-  const peopleDeps = dataverseDependencies({ people: [{ ...PERSON, name: '' }] });
-  peopleDeps.contactAdapter.getByIdWithSelect.mockRejectedValue(Object.assign(new Error('Dataverse error'), { serviceName: 'dataverse', status: 404 }));
+test('a deleted named junction contact reports identity_unavailable, not roster_changed, and blocks approval', async () => {
+  const peopleDeps = dataverseDependencies({ people: [{ ...PERSON, institution: '' }] });
+  peopleDeps.contactAdapter.getByIdWithSelect.mockRejectedValue(Object.assign(new Error('Dataverse record is unavailable'), {
+    serviceName: 'dataverse', status: 404, dataverseCode: '0x80040217',
+  }));
   const deps = dependenciesFor(peopleDeps);
   const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, deps);
+  expect(context.people[0]).toMatchObject({ name: PERSON.name, identityUnavailable: true });
   expect(context.review.status).toBe('identity_unavailable');
   expect(context.review.canApprove).toBe(false);
   await expect(recordWorkbenchIntegrityReview(reviewArgs(), deps))

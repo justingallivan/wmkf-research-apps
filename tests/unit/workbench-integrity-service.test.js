@@ -104,22 +104,43 @@ test('capped junction reads fail closed; unresolved names remain visible but can
   expect(screenApplicants).not.toHaveBeenCalled();
 });
 
-test('a deleted or unreadable contact (real-shaped Dataverse 404/403 rejection) leaves the person unnamed instead of failing the tab', async () => {
-  for (const status of [404, 403]) {
-    const deleted = peopleDependencies({
-      grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
-      appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
-      contactAdapter: { getByIdWithSelect: jest.fn().mockRejectedValue(Object.assign(new Error('Dataverse error'), { serviceName: 'dataverse', status })) },
-    });
-    const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...deleted, sql: async () => ({ rows: [] }) });
-    expect(context.people[0]).toMatchObject({ contactId: PI_ID, name: '', role: 'PI' });
-    expect(context.review.status).toBe('identity_unavailable');
-    const screenApplicants = jest.fn();
-    await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
-      ...deleted, sql: jest.fn(), IntegrityService: { screenApplicants },
-    })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'person_identity_unavailable' } });
-    expect(screenApplicants).not.toHaveBeenCalled();
-  }
+test('a deleted named junction contact is explicitly identity-unavailable and cannot be screened', async () => {
+  const deleted = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [{
+      _wmkf_contact_value: COPI_ID,
+      wmkf_role: 100000001,
+      wmkf_Contact: { fullname: 'Named Junction Contact' },
+    }], capped: false }) },
+    contactAdapter: { getByIdWithSelect: jest.fn().mockRejectedValue(Object.assign(new Error('Dataverse record is unavailable'), {
+      serviceName: 'dataverse', status: 404, dataverseCode: '0x80040217',
+    })) },
+  });
+  const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID }, { ...deleted, sql: async () => ({ rows: [] }) });
+  expect(context.people[0]).toMatchObject({
+    contactId: COPI_ID, name: 'Named Junction Contact', role: 'Co-PI', identityUnavailable: true,
+  });
+  expect(context.review.status).toBe('identity_unavailable');
+  const screenApplicants = jest.fn();
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...deleted, sql: jest.fn(), IntegrityService: { screenApplicants },
+  })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'person_identity_unavailable' } });
+  expect(screenApplicants).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['forbidden contact read', { serviceName: 'dataverse', status: 403 }],
+  ['generic Dataverse 404', { serviceName: 'dataverse', status: 404 }],
+])('%s propagates instead of being treated as a deleted contact', async (_label, shape) => {
+  const unavailable = peopleDependencies({
+    grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
+    appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
+    contactAdapter: { getByIdWithSelect: jest.fn().mockRejectedValue(Object.assign(new Error('Dataverse error'), shape)) },
+  });
+  await expect(loadRequestIntegrityPeople(REQUEST_ID, unavailable)).rejects.toMatchObject(shape);
+});
+
+test('contact hydration outages propagate', async () => {
   const outage = peopleDependencies({
     grantRequestAdapter: { getById: jest.fn().mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_projectleader_value: PI_ID }) },
     appRequestPersonAdapter: { queryAllPersons: jest.fn().mockResolvedValue({ records: [], capped: false }) },
