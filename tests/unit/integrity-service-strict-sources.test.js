@@ -150,6 +150,29 @@ test('strict search requests carry a timeout; standalone requests are unchanged'
   expect(global.fetch.mock.calls[0]).toHaveLength(1);
 });
 
+test('strict run cancellation reaches both SERP fetch and Haiku completion', async () => {
+  const searchController = new AbortController();
+  await IntegrityService.serpSearch('fixture', 'fixture', 10, 'google', {
+    ...strict,
+    signal: searchController.signal,
+    deadlineAt: Date.now() + 60_000,
+  });
+  const fetchSignal = global.fetch.mock.calls[0][1]?.signal;
+  expect(fetchSignal).toBeInstanceOf(AbortSignal);
+  searchController.abort(new Error('run deadline'));
+  expect(fetchSignal.aborted).toBe(true);
+  expect(fetchSignal.reason).toBe(searchController.signal.reason);
+
+  const llmController = new AbortController();
+  await IntegrityService.analyzeWithHaiku(
+    [{ title: 'Fixture', link: 'https://example.org', snippet: '' }],
+    'Fixture',
+    'fixture',
+    { ...strict, signal: llmController.signal, deadlineAt: Date.now() + 60_000 },
+  );
+  expect(mockComplete.mock.calls[0][0].signal).toBe(llmController.signal);
+});
+
 test('strict mode keeps specific source-failure messages and names a timeout', async () => {
   global.fetch.mockResolvedValue({ ok: false, status: 429, statusText: 'quota' });
   await expect(IntegrityService.serpSearch('fixture', 'fixture', 10, 'google', strict)).rejects.toThrow('Search provider request failed');

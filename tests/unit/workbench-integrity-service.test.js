@@ -5,6 +5,7 @@ import {
   loadRequestIntegrityPeople,
   runWorkbenchIntegrityScreen,
   WORKBENCH_INTEGRITY_MAX_PEOPLE,
+  WORKBENCH_INTEGRITY_TIME_BUDGET_MS,
 } from '../../lib/services/workbench/integrity-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 
@@ -175,6 +176,39 @@ test('run stops with 503 when the time budget runs out, before the next person a
   expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
 });
 
+test('run aborts an in-flight generator step at the deadline and saves nothing', async () => {
+  const sqlCalls = [];
+  const db = async (parts) => { sqlCalls.push(parts.join('?')); return { rows: [] }; };
+  let receivedSignal = null;
+  const engine = { async *screenApplicants(_applicants, _key, _serpKey, _actorId, options) {
+    receivedSignal = options.signal;
+    yield { type: 'progress' };
+    await new Promise((resolve) => options.signal.addEventListener('abort', resolve, { once: true }));
+    throw options.signal.reason;
+  } };
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...peopleDependencies(), sql: db, IntegrityService: engine, timeBudgetMs: 5,
+  })).rejects.toMatchObject({ httpStatus: 503, body: { code: 'screening_time_budget_exceeded' } });
+  expect(receivedSignal).toBeInstanceOf(AbortSignal);
+  expect(receivedSignal.aborted).toBe(true);
+  expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
+});
+
+test('a complete event arriving after the deadline is rejected before insert', async () => {
+  const sqlCalls = [];
+  const db = async (parts) => { sqlCalls.push(parts.join('?')); return { rows: [] }; };
+  let clock = 0;
+  const engine = { async *screenApplicants() {
+    yield { type: 'progress' };
+    clock = WORKBENCH_INTEGRITY_TIME_BUDGET_MS + 1;
+    yield { type: 'complete', results: [{ matchCount: 0 }] };
+  } };
+  await expect(runWorkbenchIntegrityScreen({ requestId: REQUEST_ID, actorProfileId: 5, claudeApiKey: 'key' }, {
+    ...peopleDependencies(), sql: db, IntegrityService: engine, now: () => clock,
+  })).rejects.toMatchObject({ httpStatus: 503, body: { code: 'screening_time_budget_exceeded' } });
+  expect(sqlCalls.some((query) => query.includes('INSERT INTO integrity_screenings'))).toBe(false);
+});
+
 test('a missing actor profile is a 401 before any Dataverse or paid work', async () => {
   const deps = peopleDependencies();
   const screenApplicants = jest.fn();
@@ -212,7 +246,8 @@ test('schema preflight and linked persistence are awaited; insert failures fail 
   const engine = { screenApplicants: jest.fn(async function* (applicants, key, serpKey, actorId, options) {
     expect(applicants).toEqual([{ name: 'Priya Investigator', role: 'PI', institution: 'PI Institution' }]);
     expect(actorId).toBeNull();
-    expect(options).toEqual({ strictSourceErrors: true });
+    expect(options).toMatchObject({ strictSourceErrors: true, signal: expect.any(AbortSignal) });
+    expect(options.deadlineAt).toEqual(expect.any(Number));
     yield { type: 'complete', results: [{ matchCount: 2 }] };
   }) };
   const sqlCalls = [];
