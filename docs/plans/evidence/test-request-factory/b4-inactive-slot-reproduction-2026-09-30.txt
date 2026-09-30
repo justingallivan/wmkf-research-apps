@@ -1,0 +1,48 @@
+/** @jest-environment node */
+const getRequest = jest.fn();
+const getPerson = jest.fn();
+const ensureApplicantRecommended = jest.fn();
+const hydrate = jest.fn();
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: (...args) => getRequest(...args) }));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer.js', () => ({ getById: (...args) => getPerson(...args) }));
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion.js', () => ({ ensureApplicantRecommended: (...args) => ensureApplicantRecommended(...args) }));
+jest.mock('../../lib/services/reviewer-exclusion-parser.js', () => ({ extractExcludedReviewers: jest.fn(async () => ({ names: [], substantive: false, parseFailed: false })) }));
+jest.mock('../../lib/services/workbench/applicant-known-reviewer-service.js', () => ({ loadApplicantKnownReviewer: (...args) => hydrate(...args) }));
+import { ingestApplicantReviewers } from '../../lib/services/workbench/applicant-reviewers-service.js';
+// Existing fixture IDs from tests/unit/workbench-applicant-reviewers-service.test.js.
+const REQUEST='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const PERSON='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const previous={ request:process.env.TEST_REQUEST_ISOLATION, reviewer:process.env.SYNTHETIC_REVIEWER_ISOLATION };
+beforeEach(()=>{
+ jest.clearAllMocks();
+ process.env.TEST_REQUEST_ISOLATION='on';process.env.SYNTHETIC_REVIEWER_ISOLATION='on';
+ getRequest.mockResolvedValue({ akoya_requestid:REQUEST, _wmkf_potentialreviewer1_value:PERSON });
+ ensureApplicantRecommended.mockResolvedValue({id:'fixture-suggestion',created:false});
+ hydrate.mockResolvedValue({status:'inactive',code:'person_inactive',potentialReviewerId:PERSON});
+});
+afterAll(()=>{
+ for(const [key,value] of [['TEST_REQUEST_ISOLATION',previous.request],['SYNTHETIC_REVIEWER_ISOLATION',previous.reviewer]]){
+  if(value===undefined)delete process.env[key];else process.env[key]=value;
+ }
+});
+test('real capability excludes inactive ordinary slot before the repair hydrator, including on retry',async()=>{
+ getPerson.mockResolvedValue({wmkf_potentialreviewersid:PERSON,statecode:1,wmkf_issyntheticreviewer:false});
+ for(let attempt=0;attempt<2;attempt++){
+  const result=await ingestApplicantReviewers({requestId:REQUEST});
+  expect(result.slotsPopulated).toBe(1);
+  expect(result.recommended).toEqual([]);
+  expect(result.recommendedComplete).toBe(false);
+  expect(result.recommendedFailed).toHaveLength(1);
+ }
+ expect(ensureApplicantRecommended).not.toHaveBeenCalled();
+ expect(hydrate).not.toHaveBeenCalled();
+});
+test('active ordinary control reaches materialization and hydration with the same real capability',async()=>{
+ getPerson.mockResolvedValue({wmkf_potentialreviewersid:PERSON,statecode:0,wmkf_issyntheticreviewer:false});
+ hydrate.mockResolvedValue({status:'known',potentialReviewerId:PERSON});
+ const result=await ingestApplicantReviewers({requestId:REQUEST});
+ expect(result.recommended).toHaveLength(1);
+ expect(result.recommendedComplete).toBe(true);
+ expect(ensureApplicantRecommended).toHaveBeenCalledTimes(1);
+ expect(hydrate).toHaveBeenCalledWith(PERSON,REQUEST);
+});

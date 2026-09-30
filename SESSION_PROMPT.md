@@ -1,4 +1,4 @@
-# Session 556-B4 Prompt: recover Factory ledgers and finish owner readiness
+# Session 556-B4 Prompt: resolve the Opus P2 and recover Factory ledgers
 
 ## Session 555-B4 Summary — 2026-09-30 PT (Codex; configuration readiness)
 
@@ -13,12 +13,15 @@
 5. **Owner packet.** `b4-owner-next-actions-2026-09-30.md` contains read-only ledger inventory/preflight commands, the Production query pointer and the six-item automation worksheet. No classification was self-authorized. The owner cannot access the other Mac until approximately nine hours after this chat decision.
 6. **Ledger remains unavailable.** This Mac has one Colima profile, one `wmkf-ledger-pg` Postgres container and one volume [VERIFIED via inventory]. `ledger_prod` is absent; `ledger` has only two early Factory tables and an old receipt function [VERIFIED via existing schema receipt]. No spare journal appeared in the Docker inventory. No database/schema/row/tracker was created. Local storage was a temporary CLI-phase decision; shared Postgres is planned for the form phase. No storage migration was begun.
 
+7. **Independent Opus review.** Owner requested Claude Opus through OAuth and explicitly approved usage after automatic approval rejected the first launch. The rejected launch made no model call. A host-side `claude.ai` Max login was verified; Opus 5.5 reviewed pinned head `e17b93685` with only Read/Grep/Glob, no API-key/alternate-provider env, no fallback and zero permission denials. Verdict: one P2 inactive ordinary slot-ingestion regression; no P0/P1. Codex independently confirmed it with the real capability/service: inactive slot fails twice before hydration, active ordinary control reaches hydration (one mocked suite / two cases passed). No code fix was applied. See `b4-claude-opus-review-2026-09-30.md` and its provenance/reproduction files [VERIFIED via CLI result, source and isolated Jest].
+
 ### Evidence and Commits
 
 - `92ccbd0bd` — tested/probed runtime candidate after merge of main docs.
 - `93447aeac` — earlier release evidence/checklist/handoff; all 12 checks passed.
 - `1a86c10da` — configuration evidence and owner recovery packet; all 12 checks passed and new Preview is Ready.
-- Final deployment/CI evidence commit — see `git log -1`; docs only. Local env is ignored and private; Vercel switches are external config.
+- `e17b93685` — final deployment/CI evidence; all 12 checks passed at the reviewed head.
+- Independent Opus review evidence commit — see `git log -1`; docs only. Local env is ignored and private; Vercel switches are external config.
 - Evidence index: `docs/plans/evidence/test-request-factory/b4-release-readiness-2026-09-30.md`; release contract: `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`.
 
 ## Next Items
@@ -33,8 +36,10 @@
 
 ### Verified Open / Configuration Follow-up
 
-1. New B4 Preview Ready/build provenance is verified at `1a86c10da`; direct captured-switch readback is UNKNOWN because the CLI/API does not expose those values on a Ready deployment. Branch/project pull independently proves on/on. Resolve direct runtime verification before claiming deployed values or live job resumption. Runtime/client/probe source remains the named candidate; docs-only descendants preserve its section 13 source provenance.
-2. Synchronize this worktree's now-private Local env after future credential rotations. Do not write through the old Claude-checkout symlink or overwrite its file.
+1. **Confirmed Opus P2: inactive ordinary applicant-slot ingestion bypasses repair hydration.** Source/reproduction verified; no fix applied. User asked for review, so runtime remains unchanged. Opus's opt-in ordinary-inactive recommendation is NOT TESTED; any implementation must preserve all settled isolation and active-synthetic guards. Review report: `docs/plans/evidence/test-request-factory/b4-claude-opus-review-2026-09-30.md`.
+
+2. New B4 Preview Ready/build provenance is verified at `1a86c10da`; direct captured-switch readback is UNKNOWN because the CLI/API does not expose those values on a Ready deployment. Branch/project pull independently proves on/on. Resolve direct runtime verification before claiming deployed values or live job resumption. Runtime/client/probe source remains the named candidate; docs-only descendants preserve its section 13 source provenance.
+3. Synchronize this worktree's now-private Local env after future credential rotations. Do not write through the old Claude-checkout symlink or overwrite its file.
 
 ### Do Not Reopen Without New Decision
 
