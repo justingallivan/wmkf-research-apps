@@ -1,6 +1,6 @@
 # Test Request Factory ledger: portability and single source of truth
 
-Status: **DRAFT, revision 4 (2026-09-30, S553). D1 and D3 decided; the managed ledger exists with 054 + 058 applied. Phase 2 items 1–2 and Phase 3 items 1–2 SOURCE-BUILT on branch `claude/factory-ledger-registry`, verified live against both Neon ledgers; not merged. The first Codex adversarial round (5 high, 2 medium) came back NO-SHIP and every finding but #5 (the B4 merge-conflict note, left for the orchestrator) is now fixed on the same branch — see "Codex round 1" below. The second Codex round (5 high, 2 medium) found real holes in the round-1 fixes; all but #5 are fixed on the branch (see "Codex round 2"), #5 is adjudicated below. A third Codex round is pending before merge. Phase 1 (tonight's dump/restore) and Phase 2 item 3 (restore into Neon, then retire local) follow the brief. D2 open.**
+Status: **DRAFT, revision 5 (2026-09-30, S553). D1 and D3 decided; the managed ledger exists with 054 + 058 applied. Phase 2 items 1–2 and Phase 3 items 1–2 SOURCE-BUILT on branch `claude/factory-ledger-registry`, verified live against both Neon ledgers; not merged. The first Codex adversarial round (5 high, 2 medium) came back NO-SHIP and every finding but #5 (the B4 merge-conflict note, left for the orchestrator) is now fixed on the same branch — see "Codex round 1" below. The second Codex round (5 high, 2 medium) found real holes in the round-1 fixes; all but #5 are fixed on the branch (see "Codex round 2"), #5 is adjudicated below. The third Codex round (5 high, 2 medium, all new surfaces) is answered in full on the branch (owner decision: address all seven; see "Codex round 3"). A fourth Codex round is pending; its stopping rule: only the documented residuals may remain. Phase 1 (tonight's dump/restore) and Phase 2 item 3 (restore into Neon, then retire local) follow the brief. D2 open.**
 
 ## Problem
 
@@ -143,4 +143,22 @@ Opus re-checked commits 32fbbb8b5..df8f1d977 read-only and approved. Lows and th
 
 - [RECHECKED after lib/db/ledger-guard.js change: identity check now fails closed on an unclassifiable URL]
 - [RECHECKED after lib/db/ledger-schema.js change: tokenizer skips comments and parses E'' escape strings; fingerprint byte-identical]
+
+## Codex round 3 (2026-09-30, S553; NO-SHIP at 675abcdb8; owner: address all seven; fixed in ad268e157..a29a6b559 plus the preview merge)
+
+1. **Shared-database refusal compared the role and spelled loopback two ways (high) — fixed:** `tuplesMatch` compares canonical host, effective port and database only; `localhost`/`127.0.0.1`/`::1` normalize to one value.
+2. **A tracked file with a matching checksum was skipped without checking the live schema still matched it (high) — fixed:** `verifyTrackedPrefix` (`lib/db/ledger-migrations.js`) fingerprints the tracked prefix in a rolled-back scratch schema and refuses the whole run on missing/differing objects before any file is considered; `--dry-run` prints that it cannot verify. Live-proved against a hand-mutated CHECK.
+3. **Managed-host TLS was optional (high) — fixed:** managed URLs must carry `sslmode=require|verify-ca|verify-full` (`tls_required` otherwise) and the client config forces `ssl: { rejectUnauthorized: true }` on managed hosts.
+4. **`--write-expected` bypassed the registry (medium) — fixed:** it classifies the scratch URL, requires label `local`, compares canonically against every shared and ledger variable, connects through the explicit config and checks identity before creating the scratch schema.
+5. **Relation kind and row-level security were not fingerprinted (medium) — fixed:** `relkind`, `relrowsecurity`, `relforcerowsecurity` and policies are recorded and compared; live mutation tests added.
+6. **Double-quoted identifiers were not protected (medium) — fixed:** `"..."` and `U&"..."` identifiers are tokens; schema stripping applies only to an exact `"<schema>".` prefix. Fingerprint byte-identical.
+7. **B4 merge conflict (high) — resolved in an actual combined commit on preview branch `claude/factory-ledger-b4-preview`** (this branch + `origin/codex/factory-reviewer-b4-runtime`): the cast block reads `createCast || bindReviewer || bindReviewerSlot`, takes `requireLedgerUrl(args.target)` and runs `ledgerSchemaCheck` with mode `bind-reviewer-slot` before the client is created; the fingerprint is regenerated with 058 and `approvedAhead` emptied; the merged tree passes the ledger suites and both Neon ledgers match exactly. Whichever of PR #369 and #374 lands second applies that resolution. A generic, name-independent test now requires every client-creating dispatch block to guard and schema-check first (`tests/unit/test-request-sandbox-clone.test.js`); proven by mutation.
+
+**Staleness acknowledgements (round 3, one line each):**
+- [RECHECKED after lib/db/ledger-registry.js change: tuplesMatch without user, loopback canonicalization, tls_required, managed ssl rejectUnauthorized]
+- [RECHECKED after lib/db/ledger-schema.js change: quoted identifiers protected; relkind/RLS/policies fingerprinted]
+- [RECHECKED after lib/db/ledger-migrations.js change: verifyTrackedPrefix / decideTrackedPrefixVerification added]
+- [RECHECKED after scripts/apply-ledger-migrations.js change: tracked-prefix verification before any write; dry run reports it cannot verify]
+- [RECHECKED after scripts/check-factory-ledger.js change: --write-expected classified, local-only, identity-checked]
+- [RECHECKED after scripts/rehearse-test-request-sandbox.mjs change: none on this branch this round; the preview merge changes the cast block as described in item 7]
 
