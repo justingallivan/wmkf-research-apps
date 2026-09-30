@@ -103,6 +103,7 @@ import {
 } from '../lib/services/test-requests/basic-clone-steps.js';
 import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
 import { recheckFoundationTransition } from '../lib/services/test-requests/foundation-transition.js';
+import { classifyLedgerUrl } from '../lib/db/ledger-registry.js';
 import { fieldFor, recheckStatusChange, runStatusChange } from '../lib/services/test-requests/status-change-runner.js';
 import { CAST_DEFAULT_NAMES, CAST_ROLE_ORDER, planCastAddresses, readCast, runCastCreate } from '../lib/services/test-requests/cast-runner.js';
 import { runCastBinding } from '../lib/services/test-requests/cast-binding-runner.js';
@@ -746,16 +747,30 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
   }
 }
 
-/** Refuse to run a ledger-driven mode against an unset or shared-production ledger URL. */
-function requireLedgerUrl() {
+/**
+ * Refuse to run a ledger-driven mode against anything but a registered ledger
+ * (lib/db/ledger-registry.js): the URL must be set, must not equal a configured
+ * shared Production/Preview database URL, must name a registered host, and on
+ * a managed host must name the database the target expects (ledger_prod for
+ * --target=production, ledger otherwise). `target` may be omitted by modes
+ * that are not target-bound (--run-inspect); the host rules still apply.
+ */
+function requireLedgerUrl(target = null) {
   const url = process.env.TEST_REQUEST_LEDGER_URL;
   if (!url) {
     throw new Error('TEST_REQUEST_LEDGER_URL is required for ledger-driven modes (--reserve, --advance, --run-inspect).');
   }
   const sharedUrls = ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_PRISMA_URL', 'DATABASE_URL']
     .map((name) => process.env[name]).filter(Boolean);
-  if (sharedUrls.includes(url) || /neon\.tech/i.test(url)) {
+  const verdict = classifyLedgerUrl(url, { target, sharedUrls });
+  if (verdict.reason === 'shared_database') {
     throw new Error('TEST_REQUEST_LEDGER_URL must not be the shared Production/Preview database.');
+  }
+  if (verdict.reason === 'unregistered_host' || verdict.reason === 'unparseable') {
+    throw new Error('TEST_REQUEST_LEDGER_URL does not name a registered ledger host (lib/db/ledger-registry.js); extending the registry is a reviewed commit.');
+  }
+  if (verdict.reason && verdict.reason.startsWith('wrong_database:')) {
+    throw new Error(`TEST_REQUEST_LEDGER_URL on the managed ledger must name the ${verdict.reason.slice('wrong_database:'.length)} database for --target=${target}.`);
   }
   return url;
 }
@@ -1288,21 +1303,21 @@ async function main() {
 
   const targetUrl = TARGET_URLS[args.target];
   if (args.setStatus || args.statusRecheck) {
-    const ledgerUrl = requireLedgerUrl();
+    const ledgerUrl = requireLedgerUrl(args.target);
     // No marker writes: a status change never touches the Test Request marker.
     const statusClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
     await runStatusMode(statusClient, args, ledgerUrl);
     return;
   }
   if (args.createCast || args.bindReviewer) {
-    const ledgerUrl = requireLedgerUrl();
+    const ledgerUrl = requireLedgerUrl(args.target);
     // The cast person create is a sanctioned marker write (wmkf_potentialreviewerses).
     const castClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl), allowTestRequestMarkerWrites: true });
     await runCastMode(castClient, args, ledgerUrl);
     return;
   }
   if (args.runRecheck) {
-    const ledgerUrl = requireLedgerUrl();
+    const ledgerUrl = requireLedgerUrl(args.target);
     const readClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
     await runRecheck(readClient, args.runRecheck, ledgerUrl);
     return;
@@ -1330,12 +1345,12 @@ async function main() {
     return;
   }
   if (args.reserve) {
-    const ledgerUrl = requireLedgerUrl();
+    const ledgerUrl = requireLedgerUrl(args.target);
     await runReserve(client, args, ledgerUrl);
     return;
   }
   if (args.advance) {
-    const ledgerUrl = requireLedgerUrl();
+    const ledgerUrl = requireLedgerUrl(args.target);
     await runAdvance(client, args, ledgerUrl);
     return;
   }

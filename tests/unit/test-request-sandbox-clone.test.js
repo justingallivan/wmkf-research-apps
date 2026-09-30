@@ -206,8 +206,18 @@ describe('sandbox operator write boundary', () => {
   test('ledger-driven modes refuse an unset or shared-production TEST_REQUEST_LEDGER_URL', () => {
     expect(script).toContain("if (!url) {");
     expect(script).toContain('TEST_REQUEST_LEDGER_URL is required for ledger-driven modes');
-    expect(script).toMatch(/neon\\?\.tech/);
+    // Phase 2 of the ledger portability plan: the blanket neon.tech refusal
+    // is replaced by the tracked host registry plus the database-name rule.
+    expect(script).not.toMatch(/neon\\?\.tech/);
+    expect(script).toContain("import { classifyLedgerUrl } from '../lib/db/ledger-registry.js';");
+    expect(script).toContain('classifyLedgerUrl(url, { target, sharedUrls })');
     expect(script).toContain('must not be the shared Production/Preview database');
+    expect(script).toContain('does not name a registered ledger host');
+    for (const mode of ['setStatus || args.statusRecheck', 'createCast || args.bindReviewer', 'runRecheck', 'reserve', 'advance']) {
+      const at = script.indexOf(`if (args.${mode}) {`);
+      expect(at).toBeGreaterThan(-1);
+      expect(script.indexOf('requireLedgerUrl(args.target)', at) - at).toBeLessThan(120);
+    }
   });
 
   test('--advance enters the script-only trusted DAL context before advancing any step (Stage C round 2, P1-B)', () => {
