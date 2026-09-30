@@ -14,11 +14,11 @@ or editing a migration that exists only on a branch.
 [VERIFIED 2026-09-29, Session 552, via an owner-run read-only production
 query] Shared Production `schema_migrations` holds
 `055_post_presentation_materials.sql` (applied 2026-09-26 06:54Z,
-`applied_by` `codex-feature-request-2026-09-26`, alongside 054). At that read,
-the file existed only on the unmerged `codex/feature-request`, while `main`
-ended at 054. It is now on `origin/main` [VERIFIED via `git ls-tree origin/main
-lib/db/migrations/055_post_presentation_materials.sql`, 2026-09-29]. The
-episode shows why "the next number after `main`" could have collided.
+`applied_by` `codex-feature-request-2026-09-26`, alongside 054). At that
+read, the file existed only on the unmerged `codex/feature-request`, while
+`main` ended at 054. It later merged in PR #365 [VERIFIED via `git log
+origin/main`, 2026-09-30]. The episode shows why "the next number after
+`main`" could have collided.
 
 - Nothing applies migrations automatically: `npm run build` is `next build`
   and no workflow calls `scripts/apply-migrations.js`. Only a manual
@@ -34,11 +34,18 @@ episode shows why "the next number after `main`" could have collided.
   [ASSUMED; the alert rows were not read].
 - `applied_by` defaults to the literal `apply-migrations.js` unless
   `APPLY_MIGRATIONS_APPLIED_BY` is set, so it proves *when*, rarely *who*.
-- Allocation as of S552: 055 feature-request (applied, frozen; now on main),
-  056–057 Integrity tab (then unapplied; subsequently applied to the shared
-  database, verified, and merged into main [VERIFIED via
-  `docs/atlas/postgres-infra-tables.md`, `git log origin/main`, 2026-09-30]), 058 B4,
-  059 scheduled-email Part A. The fresh-install blocks are V56
-  post-presentation, V57 B4, V58 scheduled-email Part A.
+- Allocation as of S552 close: 055 post-presentation (applied 09-26, merged in
+  PR #365), 056–057 Integrity tab (applied 2026-09-30 by the owner, merged in
+  PR #366), 058 B4 (built on `codex/factory-reviewer-b4-runtime`, not applied
+  to the operational ledgers), 059 scheduled-email Part A (not yet written).
+  The fresh-install blocks are V56 post-presentation and V57 B4; V58 is
+  reserved for Part A [VERIFIED via branch source and
+  `docs/atlas/postgres-infra-tables.md`, 2026-09-30].
 - Checking Production needs the owner to run the query
   ([[feedback-never-self-authorize-prod-dataverse-reads]] covers the same posture).
+- Production's 054 was applied from `codex/feature-request` at `af65a24bd`
+  (2026-09-24), before `main`'s 15 later edits added the Factory cast tables;
+  its tracker row means `apply-migrations.js` will never update it. B4's 058
+  must repair it [VERIFIED via git history, S552; Production's table shape not read].
+- Auto-mode permissions block Claude from running `apply-migrations.js` against
+  the shared database even with owner authorization; the owner runs it with `!`.

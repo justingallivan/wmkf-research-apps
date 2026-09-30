@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Integrity Screener in the Request Workbench (Session 552)
+
+**Milestone:** The Request Workbench has an Integrity tab. It screens a request's PI and Co-PIs (from Dataverse) against Retraction Watch, PubPeer and news, keeps request-linked screening history, and records an append-only lead-PD approval or hold.
+**Sessions:** Codex build (2026-09-26/27); 552 (merge with `main`, Claude code review and fixes, Codex adversarial round and fixes, migrations, release).
+**Ship state:**
+- PR #366 (`fdaec0b1f`), deployed to Production as `dpl_EbiwNNbuRgPGaAswWNGK7DsYyn7p`. Migrations 056 (`integrity_screenings.request_id`) and 057 (`integrity_screening_reviews`) were applied by the owner on 2026-09-30 and schema-verified. A read-only production smoke of the standalone screener and the tab passed.
+- The routes require both `reviewers` and `integrity-screener`. Strict screens stop before paid calls when the corpus is unavailable, and run under one 240s deadline. Deleted contacts block screening and approval. The standalone screener no longer sees Workbench runs.
+- PR #367 (`4d482d958`): the standalone screener's dismiss route is scoped to the caller's own screenings.
+- Deferred: finding 6 (SerpApi empty-result wording) and finding 9 (repeated reads). The Dataverse "Integrity review complete" flag is not built.
+**Why it matters:** PDs can screen and approve a request's investigators from the Workbench, with a durable audit of who approved which roster.
+**Pointers:** PR #366 description (both review rounds); `docs/atlas/postgres-infra-tables.md`; `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md`.
+
 ## September 2026 — Research Liaison of record comes from the applicant institution (Session 550)
 
 **Milestone:** For Research Requests, every app reader of the Liaison (the invitation, new grantee reminders, the Awardees list, site-visit materials and contacts, and Dynamics Explorer) now uses the applicant institution's Primary Contact instead of the stale Request copy. The Dataverse export relabels the copy.

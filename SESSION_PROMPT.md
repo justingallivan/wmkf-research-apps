@@ -1,4 +1,91 @@
-# Session 552 Prompt: build Part A of the scheduled-email plan (engine hardening)
+# Session 553 Prompt: build Part A of the scheduled-email plan (engine hardening, migration 059)
+
+## Session 552 Summary — 2026-09-29/30 PT (Opus; Integrity Workbench tab released, migration numbering settled)
+
+### What Was Completed
+
+1. **Migration numbering settled.** An owner-run read-only production query found `055_post_presentation_materials.sql` applied on 2026-09-26 from the then-unmerged `codex/feature-request` (it merged later in PR #365).
+   - Allocation: 055 post-presentation, 056–057 Integrity, **058 B4 (block V57), 059 scheduled-email Part A (block V58)**.
+   - The B4 plan, the Part A plan, the Atlas and memory `project-migration-numbers-claimed-off-main` are updated (`79b603f17`).
+   - **Production's 054 is an earlier version:** it was applied from `codex/feature-request` at `af65a24bd` (2026-09-24), before `main`'s cast-table edits. Its tracker row means `apply-migrations.js` will never update it, so B4's 058 must carry the earlier-054 repair.
+2. **Integrity Screener Workbench tab: reviewed, fixed, released.**
+   - `claude/integrity-workbench-tab` (Codex's branch with `main` merged in) became PR #366.
+   - Round 1, a Claude code review: 10 findings. Claude fixed 1–5, 7, 8 and 10 (`f69fe2a62`, `8a53d4b91`, `9d21aa8ea`, `b38b81b94`).
+   - Round 2, a Codex adversarial review (gpt-5.6-sol): needs-attention, 3 high. Codex fixed them (`5e74cc2cf`, `cdae782fc`, `bd3b00a5e`). Claude reviewed and fixed one UI gap (`79fb0a1c1`).
+   - Added the live-Postgres test `tests/integration/integrity-screening-reviews.pg.test.js` to the CI ledger job (`a7bbc50d8`).
+   - CI lint had failed on every push because of the repo's only `.cjs` file. The probe is renamed to `.js` (`8d662cf6c`).
+   - **Migrations 056–057 were applied by the owner on 2026-09-30** (`applied_by owner-s552-pr366`). A read-only probe confirmed the tracker rows, column, indexes and constraints.
+   - PR #366 merged as `fdaec0b1f`, all 13 checks green. The Production deploy `dpl_EbiwNNbuRgPGaAswWNGK7DsYyn7p` was confirmed as the merge build.
+3. **PR #367** (`4d482d958`): the standalone screener's dismiss route is scoped to the caller's own screenings. It was stacked on #366, and all 13 checks were green. Production now serves `dpl_GapR1GuDceTFBzdoDJpuSvfFVA1H`.
+4. **Production smoke through Chrome** (read-only), on `applications.wmkeck.org`:
+   - The standalone history list, detail and own-dismissal list returned 200. A foreign screening id returned 404.
+   - The Workbench Integrity tab on Request 1002852 returned 200 and listed the PI and 2 Co-PIs. No screen was run.
+5. **Owner decisions:**
+   - No restriction on who may re-screen an approved request.
+   - Findings 6 and 9 wait until this session.
+   - The dismiss ownership issue is not a concern the owner shares; the fix shipped anyway because it was small.
+
+### Commits (all on `main`)
+- `79b603f17` (numbering docs); PR #366 merge `fdaec0b1f`; PR #367 merge `4d482d958`; this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Build Part A** of `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` (r5, A1–A7 and *Tests*) as **migration 059 / setup-database block V58**.
+   - Tier 2: its own branch, live-Postgres crash tests, and an implementation review before merge.
+   - Recheck `lib/db/migrations/` first. It ends at 057, and 058 is reserved for B4.
+2. **Integrity findings 6 and 9** (deferred by the owner to this session; PR #366 description):
+   - Finding 6: strict SerpApi empty-result detection depends on exact vendor strings. Get a real zero-result response before changing it.
+   - Finding 9: repeated Dataverse and SQL reads in `lib/services/workbench/integrity-service.js`. Performance only.
+
+### Owner Action Pending
+
+1. **Cleanup: DONE (owner-run, end of S552).** Removed the `integrity-workbench-tab`, `integrity-dismiss-ownership` and `liaison-from-institution` worktrees; pruned the five dead `/private/tmp/wmkf-*` worktree records; deleted `claude/integrity-workbench-tab`, `claude/integrity-dismiss-ownership`, `codex/integrity-workbench-tab` and `claude/liaison-from-institution` locally and on `origin`.
+2. **Office Mac `POSTGRES_URL` sync** (from S551; not rechecked).
+
+### Parked
+
+1. Deeper recipes, the admin form, slice 5a, the seven late-2026 `expiresAt` fixtures, the cast ledger reset path, the AkoyaGO TEST · Factory Reviewer search, and the Liaison follow-ups. Unchanged.
+2. The Dataverse "Integrity review complete" flag (`wmkf_integrityreviewcomplete`). Not built; its design needs invalidation and retry rules (`docs/CURRENT_WORK_QUEUE.md`).
+
+### Verify Before Acting
+
+1. **Dependabot: 3 new alerts on `main` (2 high, 1 moderate)**, reported by GitHub on the S552 cleanup push. Not triaged. Check `gh api repos/justingallivan/wmkf-research-apps/dependabot/alerts` and `npm audit --omit=dev` before any bump.
+2. **Production 054 shape.** Before B4's 058, have the owner run a read-only query of Production's `test_request_*` tables and `pg_get_functiondef('test_request_receipt_ok')`.
+3. **`migration_drift_ahead` alert.** It should have fired for 055 from 09-26 until #365 deployed. Whether it did is unchecked (`lib/utils/migration-drift.js`).
+4. **Residue** (list and confirm before deleting any of it):
+   - Test Requests 1003301, 1003302 and 1003303.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`. S552's test used a temporary schema in `ledger_ci_s548` and dropped it.
+5. **Why Vercel skipped the production build of `61dafcb81`:** still not diagnosed.
+6. `docs/CREDENTIALS_RUNBOOK.md` has no Postgres rotation procedure. Adding one was offered in S551.
+
+### Do Not Reopen Without New Decision
+
+1. S552: the migration allocation above; no re-screen restriction; findings 6 and 9 deferred to S553.
+2. S551 decisions A-1, A-2, B-1, B-2, B-3, the r4 simplification, send-now under B, and the closing of plan review.
+3. Earlier decisions listed in the prompts below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` | Part A/B plan r5 (Part A = migration 059) |
+| `lib/services/workbench/integrity-service.js` | Workbench integrity: people, run deadline, review append |
+| `lib/services/integrity-service.js` | Screening engine: strict mode, SERP, Haiku, legacy history |
+| `tests/integration/integrity-screening-reviews.pg.test.js` | Live-Postgres proof for 056–057 |
+| `.claude-memory/project-migration-numbers-claimed-off-main.md` | How to pick a migration number safely |
+
+## Testing
+
+```bash
+npx jest tests/unit/integrity tests/unit/workbench-integrity tests/unit/scheduled-email
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<scratch-db> npx jest tests/integration --testPathPattern pg.test
+```
+
+---
+
+## Prior Session 552 Prompt: build Part A of the scheduled-email plan (engine hardening)
 
 ## Session 551 Summary — 2026-09-29 PT (Opus; queued-reminder sizing, re-address plan r1–r5)
 
