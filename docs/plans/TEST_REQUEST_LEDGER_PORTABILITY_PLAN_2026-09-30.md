@@ -132,3 +132,15 @@ Verified against both real Neon ledgers after all fixes: `npm run check:factory-
 - [RECHECKED after scripts/rehearse-test-request-sandbox.mjs change: guard and schema check now imported from lib/db/ledger-guard.js; dispatch unchanged]
 - [RECHECKED after lib/services/test-requests/run-ledger-db.js change: pgLedgerDb accepts a string or config and routes strings through buildLedgerClientConfig]
 - [RECHECKED after lib/db/ledger-migrations.js change: decideFileAction refuses any scratch-diff extra unless exactly shape-approved via ledger-schema-ahead.json; tests/unit/apply-ledger-migrations.test.js]
+
+## Opus round 2 (2026-09-30, S553; APPROVE, four lows)
+
+Opus re-checked commits 32fbbb8b5..df8f1d977 read-only and approved. Lows and their disposition:
+1. **Identity-check wiring untested — fixed by the orchestrator:** `tests/unit/apply-ledger-migrations.test.js` now runs `--dry-run` against a fake connection whose `current_schema()` is `shadow` and requires exit 1 with no tracker query sent.
+2. **`ledgerSchemaCheck` skipped the identity check silently when the URL was unclassifiable — fixed:** it now throws on any non-ok or effective-less verdict (`lib/db/ledger-guard.js`).
+3. **Tokenizer ignored comments and `E''` escapes — fixed:** `--` and `/* */` comments are skipped outside literals and `E'\''` strings are parsed with backslash escapes; the regenerated fingerprint is byte-identical, so 054's definitions were unaffected.
+4. **Adoption compares "files up to here" only — ACCEPTED as a documented limitation:** once a second ledger migration exists in the checkout, adopting the first on an untracked ledger that already carries the second's tables refuses (fails closed). It only bites when adopting a hand-built ledger after 058 merges; the remedy is to adopt before, or to approve the later file's objects explicitly. Also latent: a `table X` entry in the `objects` name list would be approved by name only; the list is empty and `tables` entries must be used for tables.
+
+- [RECHECKED after lib/db/ledger-guard.js change: identity check now fails closed on an unclassifiable URL]
+- [RECHECKED after lib/db/ledger-schema.js change: tokenizer skips comments and parses E'' escape strings; fingerprint byte-identical]
+

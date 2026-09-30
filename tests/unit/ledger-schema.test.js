@@ -197,6 +197,27 @@ describe('canonicalizeDefinition', () => {
   // stripping must never reach inside a string literal or dollar-quoted
   // block — a prior version ran both over the whole string, so two
   // semantically different accepted values canonicalized identically.
+  describe('Opus round-2 low #3: comments and escape-string literals', () => {
+    test('an apostrophe inside a -- or /* */ comment does not invert literal detection', () => {
+      const a = canonicalizeDefinition("BEGIN -- it's fine\n  RETURN x = 'A  B';\nEND", null);
+      const b = canonicalizeDefinition("BEGIN -- it's fine\n  RETURN x = 'A B';\nEND", null);
+      expect(a).not.toBe(b);
+      const c = canonicalizeDefinition("SELECT /* don't */ 'A  B'", null);
+      const d = canonicalizeDefinition("SELECT /* don't */ 'A B'", null);
+      expect(c).not.toBe(d);
+      // Comment text itself is not semantic.
+      expect(canonicalizeDefinition("SELECT 1 -- one", null)).toBe(canonicalizeDefinition("SELECT 1 -- uno", null));
+    });
+    test("E'' literals with backslash escapes stay byte-exact and do not swallow following code", () => {
+      const a = canonicalizeDefinition("SELECT E'a\\'b  c'  ,   x", null);
+      const b = canonicalizeDefinition("SELECT E'a\\'b c'  ,   x", null);
+      expect(a).not.toBe(b);
+      expect(a.endsWith(', x')).toBe(true);
+      // An identifier ending in E followed by a quote is not an escape string.
+      expect(canonicalizeDefinition("SELECT tablE'x  y'", null)).toBe("SELECT tablE'x  y'");
+    });
+  });
+
   describe('Opus round-2 item 2: literal-aware canonicalization', () => {
     test('different internal spacing inside a single-quoted literal is NOT collapsed — the two CHECK bodies differ', () => {
       const a = canonicalizeDefinition("CHECK (code = 'A  B')", null);

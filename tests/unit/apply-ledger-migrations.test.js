@@ -179,6 +179,31 @@ describe('Opus round-2 item 5: apply-ledger-migrations.js --dry-run sends only S
     jest.restoreAllMocks();
   });
 
+  test('a connection whose identity does not match the classified ledger is refused before any tracker query (Opus round-2 low #1)', async () => {
+    const calls = [];
+    const exits = [];
+    jest.doMock('pg', () => ({
+      Client: jest.fn().mockImplementation(() => ({
+        connect: jest.fn(async () => {}),
+        query: jest.fn(async (text) => {
+          calls.push(String(text));
+          if (/current_database/i.test(text)) return { rows: [{ db: 'ledger', schema: 'shadow', port: 5432 }] };
+          return { rows: [] };
+        }),
+        end: jest.fn(async () => {}),
+      })),
+    }));
+    let doneResolve;
+    const done = new Promise((resolve) => { doneResolve = resolve; });
+    jest.spyOn(process, 'exit').mockImplementation((code) => { exits.push(code); doneResolve(); });
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.isolateModules(() => { require('../../scripts/apply-ledger-migrations.js'); });
+    await Promise.race([done, new Promise((resolve) => { setTimeout(resolve, 5000); })]);
+    expect(exits).toEqual([1]);
+    expect(calls.some((t) => /current_database/i.test(t))).toBe(true);
+    expect(calls.some((t) => /ledger_schema_migrations|to_regclass|pg_tables/i.test(t))).toBe(false);
+  }, 10000);
+
   test('no BEGIN/CREATE/ALTER/DROP/SET and no migration SQL is sent under --dry-run', async () => {
     const calls = [];
     jest.doMock('pg', () => ({
