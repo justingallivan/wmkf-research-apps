@@ -116,7 +116,7 @@ describe('reserveRun', () => {
     expect(run.runId).toBe(BASE_PLAN.runId);
     expect(calls).toHaveLength(2);
     expect(calls[0].text).toContain('INSERT INTO test_request_runs');
-    expect(calls[0].text).toContain('ON CONFLICT (actor_id, idempotency_key) DO NOTHING');
+    expect(calls[0].text).toContain('ON CONFLICT DO NOTHING');
     expect(calls[0].text).toContain('$1::uuid');
     expect(calls[1].text).toContain('SELECT * FROM test_request_runs WHERE actor_id');
   });

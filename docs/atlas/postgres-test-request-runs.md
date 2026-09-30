@@ -3,7 +3,7 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable operation ledger for owner-run test request clones; local ledger recorded for cast creation, 054 applied to shared Production (Preview unverified)."
+summary: "Durable owner-run test Request ledger; B4 slot migration 058 is built on a branch and unapplied. Shared Production has 054; Preview unverified."
 canonical: false
 cataloged: 2026-09-23
 last_verified: 2026-09-29
@@ -11,9 +11,15 @@ owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
   - lib/db/migrations/054_test_request_runs.sql
+  - lib/db/migrations/058_test_request_cast_slot_bindings.sql
 ---
 
-# Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` / `test_request_status_changes` / `test_request_cast_members` / `test_request_cast_bindings` (Postgres)
+# Atlas: Test Request Factory Postgres ledger
+
+Tables: `test_request_runs`, `test_request_run_resources`,
+`test_request_run_reviewer_assignments`, `test_request_status_changes`,
+`test_request_cast_members`, `test_request_cast_bindings`, and
+`test_request_cast_slot_bindings`.
 
 **[VERIFIED via source, 2026-09-29]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
@@ -294,6 +300,12 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
 - **Writer:** `createRunLedger(db)` `planCastMember`, `markCastMemberDispatched`, `markCastMemberVerified`, `markCastMemberNeedsAttention`, `planCastBinding`, `markCastBindingDispatched`, `markCastBindingVerified`, `markCastBindingNeedsAttention`. Owner-run CLI, no lease; the unique constraints refuse a second plan.
 - **Reader:** `listCastMembers({ environment })`, `getCastBinding({ runId, memberId })`.
 
+## `test_request_cast_slot_bindings` (B4 branch build, 2026-09-29)
+
+**[VERIFIED via branch source and disposable PostgreSQL test]** Migration 058 adds a separate typed journal for Potential Reviewer 1, one row per `(run_id, member_id)` with a composite foreign key to the verified suggestion's binding row. The row stores the expected Request/person GUIDs, a five-slot occupancy snapshot and concrete pre-PATCH ETag, dispatch and verification timestamps, constrained provenance and failure codes, and typed readback fields. A planned row can stop with `needs_attention` before a snapshot if the Request marker drifts; this is a journaled refusal, with no PATCH. Migration 058 restores the current cast tables and `test_request_receipt_ok` function when an earlier applied 054 lacks them; it repairs the earlier three-role cast-member CHECK and, on explicit replay, the stricter snapshot CHECK from the first B4 draft. It refuses conflicting table columns and required constraints. `scripts/setup-database.js` V57 mirrors the new table for fresh installs, after V56's post-presentation materials. The disposable PostgreSQL test applies current, earlier, and three-role 054→058, reruns 058 after recreating the old snapshot CHECK, verifies the pre-snapshot refusal and compares the installed receipt function with 054. No operational ledger has been migrated for this branch [UNKNOWN pending owner preflight/application].
+
+**[VERIFIED via branch source and disposable PostgreSQL test]** `createRunLedger` exposes `planCastSlotBinding`, snapshot, dispatch, verification, attention and read methods. `runCastSlotBinding` reads the ready run, verified suggestion and exact marked person; observes an already matching slot without a PATCH; otherwise records occupancy and ETag before one fenced PATCH, then reads back all five slots and the marker/run ID. A metadata read failure leaves the planned row retriable; no PATCH was dispatched. A dispatched row resumes by readback without resending. Unit and PostgreSQL tests cover the journal transitions, hand-set slot, occupancy, concrete ETag, response loss and 412 outcomes. Automatic approval review rejected silently extending the production-capable `--bind-reviewer` command with the live slot write. That command remains suggestion-only. A separate `--bind-reviewer-slot=<runId>` command previews the target and occupants read-only; only `--confirm-slot-request=<the previewed Request GUID>` calls the slot runner. This branch has not run a production slot PATCH.
+
 ## Limits
 
 - The owner-run CLI refuses a ledger URL matching the configured shared
@@ -304,23 +316,14 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   recorded (see the header). Shared Production has 054 applied (2026-09-26
   06:54Z, `codex-feature-request-2026-09-26`) [VERIFIED via an owner-run
   read-only `schema_migrations` query, S552]; Preview's database is unverified.
-- Slice B4 plans a **separate** Potential Reviewer 1 operation table in new
-  migration 058, with a new V57 fresh-install mirror after V56 (S552: 055 and
-  V56 are taken by the unmerged `codex/feature-request`, whose 055 is already
-  applied to shared Production; Integrity claims 056–057). Typed columns
-  hold the slot snapshot and readback without changing the receipt grammar.
-  Migration 058 must reconcile earlier applied 054 shapes before adding its
-  composite foreign key; each target's schema remains unverified. On the
-  operational local `ledger_prod` and `ledger` it is applied by an owner-run
-  `psql -f` after a read-only shape preflight, with a recorded application,
-  never by `apply-migrations.js`. On shared Production/Preview it only keeps
-  the tracked migrations consistent and is not a B4 runtime prerequisite. It
-  is not built or applied [PLANNED via the cast plan, *Order* 6 revision 3,
-  §6].
-- `test_request_run_resources.readback`/`source_provenance` are JSONB and
-  the schema cannot itself forbid a caller from stuffing prohibited content
-  (document bodies, tokens) into them — that discipline lives in the
-  run-ledger.js call sites once the execution service (design-doc stage 3+)
-  is built, and is not enforced by a database constraint.
+- The owner-run `ledger_prod` and `ledger` need read-only schema preflight,
+  explicit 058 application by the owner, and a recorded receipt before the
+  slot operation can use them. `apply-migrations.js` must not target these
+  local ledgers. Shared Production/Preview Postgres migration consistency is
+  not a prerequisite for the owner-run local slot journal.
+- The JSONB resource receipts are checked by `test_request_receipt_ok` in
+  PostgreSQL and by `assertLedgerReceipt` in JavaScript. They accept only
+  bounded allowlisted keys and values; a writer bypassing JavaScript still
+  cannot store arbitrary bodies or tokens in those columns.
 - No cleanup/retention policy exists yet; row growth is unbounded until the
   design doc's stage 5 retirement/retention work lands.

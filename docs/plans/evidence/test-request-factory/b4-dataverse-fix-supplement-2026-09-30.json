@@ -1,0 +1,154 @@
+{
+  "source": {
+    "commit": "40ab24f3e9da5af0259aa481014621cdd7837d37",
+    "probeDirty": false,
+    "clientDirty": false,
+    "branch": "codex/factory-reviewer-b4-runtime"
+  },
+  "ownerAuthorization": "Explicit read-only Production Dataverse authorization in this chat on 2026-09-30",
+  "environments": [
+    {
+      "environment": "local",
+      "targetClassification": "production",
+      "observedAt": "2026-09-30T18:31:27.528Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "on",
+        "SYNTHETIC_REVIEWER_ISOLATION": "on"
+      },
+      "markers": [
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_istestrequest",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_testcreationrunid",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "wmkf_potentialreviewers",
+          "attribute": "wmkf_issyntheticreviewer",
+          "wave": "wave30",
+          "status": 200,
+          "available": true
+        }
+      ]
+    },
+    {
+      "environment": "preview",
+      "targetClassification": "production",
+      "observedAt": "2026-09-30T18:31:28.823Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "on",
+        "SYNTHETIC_REVIEWER_ISOLATION": "on"
+      },
+      "markers": [
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_istestrequest",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_testcreationrunid",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "wmkf_potentialreviewers",
+          "attribute": "wmkf_issyntheticreviewer",
+          "wave": "wave30",
+          "status": 200,
+          "available": true
+        }
+      ]
+    },
+    {
+      "environment": "production",
+      "targetClassification": "production",
+      "observedAt": "2026-09-30T18:31:29.948Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "on",
+        "SYNTHETIC_REVIEWER_ISOLATION": "on"
+      },
+      "markers": [
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_istestrequest",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "akoya_request",
+          "attribute": "wmkf_testcreationrunid",
+          "wave": "wave29",
+          "status": 200,
+          "available": true
+        },
+        {
+          "entity": "wmkf_potentialreviewers",
+          "attribute": "wmkf_issyntheticreviewer",
+          "wave": "wave30",
+          "status": 200,
+          "available": true
+        }
+      ]
+    }
+  ],
+  "effectiveProcessRead": {
+    "observedAt": "2026-09-30T18:31:30.173Z",
+    "privilege": "prvReadWorkflow",
+    "appUserCount": 1,
+    "appUserEnabled": true,
+    "depths": [
+      "Global"
+    ],
+    "httpStatus": 200
+  },
+  "section13": {
+    "generatedAt": "2026-09-30T18:31:30.343Z",
+    "complete": false,
+    "incompleteReasons": [],
+    "dispositionRequired": [
+      "custom Request step can fire on reviewer-slot update: AkoyaGo.CalculatedFieldsAsync: Update of akoya_request",
+      "custom global step can fire on reviewer-slot update: AkoyaGo.RequestPreOperation: Update of akoya_request",
+      "custom global step can fire on reviewer-slot update: AkoyaGo.RequestPostOperation: Update of akoya_request",
+      "manual API-connection trigger in Request/slot-mentioning flow requires owner classification: GOapply Add Request to Review Group (Deprecated) / manual",
+      "manual API-connection trigger in Request/slot-mentioning flow requires owner classification: Bill.com - Push Payments / manual",
+      "flow mentions Request or slot without a classified Request trigger: GOapply AutoFill Next Phase (Deprecated) / When_a_row_is_added,_modified_or_deleted"
+    ],
+    "counts": {
+      "activatedWorkflowsAndRules": 68,
+      "updateTriggeredWorkflows": 20,
+      "slotTriggeredWorkflows": 0,
+      "unreadableWorkflowsAndRules": 0,
+      "allEnabledSlotWriteSteps": 11091,
+      "allEnabledUpdateMultipleSteps": 3997,
+      "allEnabledUpsertSteps": 706,
+      "allEnabledUpsertMultipleSteps": 531,
+      "requestSlotWriteSteps": 34,
+      "globalSlotWriteSteps": 1227,
+      "hiddenGlobalSlotWriteSteps": 1224,
+      "hiddenMicrosoftPlatformSlotWriteSteps": 1224,
+      "stepDispositions": 3,
+      "flowsRead": 14,
+      "flowsMentioningRequestOrSlot": 3,
+      "requestUpdateTriggers": 0,
+      "requestNonUpdateTriggers": 0,
+      "manualApiConnectionTriggers": 2,
+      "hardBlockedFlowTriggers": 0,
+      "actionOnlyTriggerDispositions": 1,
+      "triggerReviewEntries": 3,
+      "unreadableFlows": 0
+    }
+  }
+}

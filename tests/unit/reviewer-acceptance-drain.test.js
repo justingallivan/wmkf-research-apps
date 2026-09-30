@@ -79,6 +79,7 @@ function job({ isAcceptRepeat = false, optedOut = false, status = 'queued', step
 
 function deps(currentSuggestion = acceptedSuggestion()) {
   return {
+    switchesReady: jest.fn(() => true),
     suggestions: {
       getForAcceptanceDrain: jest.fn(async () => currentSuggestion),
     },
@@ -104,6 +105,7 @@ function deps(currentSuggestion = acceptedSuggestion()) {
       completeReviewerAcceptanceJob: jest.fn(async () => ({})),
       cancelReviewerAcceptanceJob: jest.fn(async () => ({})),
       claimReviewerAcceptanceJobs: jest.fn(async () => []),
+      releaseReviewerAcceptanceJobLease: jest.fn(async () => ({})),
       recordReviewerAcceptanceJobFailure: jest.fn(async () => ({ status: 'queued' })),
     },
   };
@@ -775,10 +777,46 @@ describe('processReviewerAcceptanceJob — Test Request isolation (Stage 1b)', (
     expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 
-  it('does not read the marker while the switch is off', async () => {
-    const d = { ...deps(), isolationEnabled: () => false, resolveTestState: jest.fn() };
-    await processReviewerAcceptanceJob(job(), d);
+  it('pauses before side effects when either switch is unavailable', async () => {
+    const d = { ...deps(), switchesReady: () => false, resolveTestState: jest.fn() };
+    const result = await processReviewerAcceptanceJob(job(), d);
+    expect(result.status).toBe('paused');
     expect(d.resolveTestState).not.toHaveBeenCalled();
-    expect(d.ensureHonorarium).toHaveBeenCalled();
+    for (const step of followUps(d)) expect(step).not.toHaveBeenCalled();
+    expect(d.deleteLateHonorarium).not.toHaveBeenCalled();
+    expect(d.jobs.recordReviewerAcceptanceJobFailure).not.toHaveBeenCalled();
+  });
+});
+
+describe('drainReviewerAcceptanceJobs — switch pause', () => {
+  it('does not claim a job while either switch is unavailable', async () => {
+    const d = deps();
+    d.switchesReady.mockReturnValue(false);
+    const result = await drainReviewerAcceptanceJobs({ deps: d });
+    expect(result).toMatchObject({ claimed: 0, configurationPaused: true });
+    expect(d.jobs.claimReviewerAcceptanceJobs).not.toHaveBeenCalled();
+  });
+
+  it('releases an already claimed job without consuming its retry allowance', async () => {
+    const d = deps();
+    d.jobs.claimReviewerAcceptanceJobs.mockResolvedValueOnce([job()]);
+    d.switchesReady.mockReturnValueOnce(true).mockReturnValue(false);
+    const result = await drainReviewerAcceptanceJobs({ deps: d });
+    expect(result).toMatchObject({ claimed: 1, paused: 1, pausedJobIds: [77], failed: 0 });
+    expect(d.jobs.releaseReviewerAcceptanceJobLease).toHaveBeenCalledWith(
+      77, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    );
+    expect(d.jobs.recordReviewerAcceptanceJobFailure).not.toHaveBeenCalled();
+    expect(d.ensureHonorarium).not.toHaveBeenCalled();
+  });
+
+  it('releases a job paused by the process-level recheck', async () => {
+    const d = deps();
+    d.jobs.claimReviewerAcceptanceJobs.mockResolvedValueOnce([job()]);
+    d.switchesReady.mockReturnValueOnce(true).mockReturnValueOnce(true).mockReturnValue(false);
+    const result = await drainReviewerAcceptanceJobs({ deps: d });
+    expect(result).toMatchObject({ claimed: 1, paused: 1, failed: 0 });
+    expect(d.jobs.releaseReviewerAcceptanceJobLease).toHaveBeenCalledTimes(1);
+    expect(d.jobs.recordReviewerAcceptanceJobFailure).not.toHaveBeenCalled();
   });
 });

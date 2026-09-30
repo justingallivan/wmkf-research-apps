@@ -261,6 +261,8 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
       return sql.slice(start, end).replace(/\s+/g, ' ').trim();
     };
     expect(fnBody(setupSql)).toBe(fnBody(migration));
+    const slotMigration = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql'), 'utf8');
+    expect(fnBody(slotMigration)).toBe(fnBody(migration));
     expect(fnBody(migration)).not.toContain('\\');
   });
 
@@ -282,7 +284,7 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
   });
 });
 
-describe('migrations manifest includes 054 in order and its setup-database.js mirror matches', () => {
+describe('migration 054 and the later migration manifest', () => {
   const manifest = JSON.parse(fs.readFileSync(
     path.join(process.cwd(), 'lib/db/migrations-manifest.json'),
     'utf8',
@@ -293,6 +295,17 @@ describe('migrations manifest includes 054 in order and its setup-database.js mi
     expect(ledgerIndex).toBeGreaterThan(0);
     expect(manifest.files[ledgerIndex - 1]).toBe('053_pre_site_distribution_review_bundle.sql');
     expect(manifest.files.indexOf('055_post_presentation_materials.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('056_integrity_screenings_request_id.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('057_integrity_screening_reviews.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('058_test_request_cast_slot_bindings.sql')).toBeGreaterThan(ledgerIndex);
+  });
+
+  it('V57 fresh-install slot table mirrors migration 058', () => {
+    const migration058 = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql'), 'utf8');
+    const setup = fs.readFileSync(path.join(process.cwd(), 'scripts/setup-database.js'), 'utf8');
+    const migrationTable = migration058.match(/CREATE TABLE IF NOT EXISTS test_request_cast_slot_bindings \([\s\S]*?\n\);/)?.[0];
+    const freshTable = setup.match(/const v57Statements = \[\s*`([\s\S]*?)`,\s*\];/)?.[1];
+    expect(freshTable?.replace(/\s+/g, ' ').trim()).toBe(migrationTable?.replace(/\s+/g, ' ').trim().replace(/;$/, ''));
   });
 
   function normalize(sql) {
