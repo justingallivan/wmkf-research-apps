@@ -61,10 +61,16 @@ export default async function handler(req, res) {
     const allowed = scheduledEmailActionsAllowed(existing);
     const guardedActions = { edit: allowed.edit, approve: allowed.approve, send_now: allowed.sendNow };
     if (action in guardedActions && !guardedActions[action]) {
-      const reason = allowed.reason
-        ? SCHEDULED_EMAIL_ATTENTION_COPY[allowed.reason]
-        : 'This message already has a Dynamics email, so it can no longer be edited, approved or re-sent. Stop it and send by hand if needed.';
-      return res.status(409).json({ error: reason, attentionReason: allowed.reason });
+      if (allowed.reason) {
+        return res.status(409).json({ error: SCHEDULED_EMAIL_ATTENTION_COPY[allowed.reason], attentionReason: allowed.reason });
+      }
+      if (existing.dynamics_email_id || existing.send_requested_at) {
+        return res.status(409).json({
+          error: 'This message already has a Dynamics email, so it can no longer be edited, approved or re-sent. Stop it and send by hand if needed.',
+          attentionReason: null,
+        });
+      }
+      // Not an open row (sent/stopped/sending): the store's own fence answers.
     }
 
     let updated = null;

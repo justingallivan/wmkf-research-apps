@@ -11,6 +11,8 @@
  * or temporarily cleared marker can never permit a resend.
  */
 
+import { EMAIL_SEND_OUTCOME_COPY } from './email-send-outcome.js';
+
 export const SCHEDULED_EMAIL_ATTENTION = Object.freeze({
   UNCONFIRMED: 'unconfirmed',
   ACTIVITY_MISSING: 'activity_missing',
@@ -24,8 +26,9 @@ const CODE_TO_REASON = Object.freeze({
 });
 
 export const SCHEDULED_EMAIL_ATTENTION_COPY = Object.freeze({
+  // A2: the same words the send-now response uses, so they cannot drift.
   [SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED]:
-    'Send status is uncertain. Check the email history before trying again.',
+    `${EMAIL_SEND_OUTCOME_COPY.uncertain.title} ${EMAIL_SEND_OUTCOME_COPY.uncertain.message}`,
   [SCHEDULED_EMAIL_ATTENTION.ACTIVITY_MISSING]:
     'The Dynamics email for this message could not be found. Check Dynamics and the email history, send by hand if needed, then stop this message.',
   [SCHEDULED_EMAIL_ATTENTION.ACTIVITY_FORBIDDEN]:
