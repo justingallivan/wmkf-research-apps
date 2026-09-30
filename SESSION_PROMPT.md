@@ -1,4 +1,80 @@
-# Session 551 Prompt: size the queued-reminder problem, then revise the re-address plan
+# Session 552 Prompt: build Part A of the scheduled-email plan (engine hardening)
+
+## Session 551 Summary — 2026-09-29 PT (Opus; queued-reminder sizing, re-address plan r1–r5)
+
+### What Was Completed
+
+1. **Sized the queued-reminder problem.** An owner-run, read-only production probe (session scratch `probe-queued-reminder-liaison-drift.js`, not committed) found **0** `grantee_abstract_reminder` rows in any status. The owner confirmed the probe read the production Postgres host, and said no grantee materials requests are outstanding. Recorded in the plan's *Measurement (S551)*.
+2. **Rewrote the plan** `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, now **revision 5, ready to build**. The owner closed plan review after three Codex adversarial rounds (gpt-5.6-sol). Part A hardens the engine for every program; Part B re-addresses on a Liaison change.
+   - Part A adds one new column, `recipient_generation`.
+   - Main pieces: `send_requested_at` as the no-resend rule; a dedicated reconciliation claim that never sends; unconfirmed, missing and forbidden states shown under Needs attention; no edits once the activity exists; lease-fenced PD-handoff reset (including expired `sending` rows) and source cancel; separate ordinary and 25-row reconciliation queries; a per-PD 100-row digest cap.
+3. **Owner decisions, all settled (S551):**
+   - A-1: unconfirmed is an error code on `failed`, behind one helper.
+   - A-2: a 7-day late-acceptance check on stopped rows that had a send requested.
+   - B-1: an approval never survives a recipient change.
+   - B-2: the activity-without-send-intent gap is accepted, and detected.
+   - B-3: approval is re-checked at send time, tightening only.
+   - Send-now under B: the PD pressing send is the approval for a posture-only tightening; a recipient change still goes back for approval.
+   - The r4 simplification: no backoff, counters, rotation or extra columns.
+4. **PR #360 (B4)** was merged upstream as `507bf14ab` during the session. It was reviewed by Opus in Codex's worktree, not by this session.
+
+### Commits (all on `main`, pushed)
+- `ed04b6c17` measurement; `5a6aa0869`, `f5140cc75`, `0d69d8e73` r1 and decisions A-1, A-2, B-1, B-2; `c3f4efe57` line-number base; `62080921d` r2; `d031cef1b` r3; `27f557be9` r4 simplification; `420a9231a` B-3; `dd394d8fe` r5; `2fcc102b8` ready to build; plus this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Build Part A** of the scheduled-email plan (r5, *Part A* A1–A7 and *Tests*).
+   - Tier 2: a migration on the shared Postgres plus email-engine changes. Use its own branch, live-Postgres crash tests (the `.pg.test.js` pattern in the CI ledger job), and an implementation review before merge.
+   - Part B comes after it, on its own branch.
+   - The plan's line numbers are as of `ed04b6c17`; the scheduled-email files have not changed since [VERIFIED via `git diff --name-only 8fc003931 507bf14ab`, which did not touch them].
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab`; migrations 056–057 need renumbering). Unchanged. Part A's migration will also need the next free number.
+
+### Parked
+
+1. Deeper recipes, the admin form, slice 5a, the seven late-2026 `expiresAt` fixtures, and the cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer. Unchanged.
+3. Liaison follow-ups (not requested): an automatic recipients reload on a 409 `liaison_changed`; "Liaison not verified" on open materials collections; `{{liaisonFullName}}` refusals. Unchanged.
+
+### Verify Before Acting
+
+1. **`POSTGRES_URL` exposure (S551).** The owner pasted the production connection string, including its password, into this session's chat. Rotation is the owner's call; see `docs/CREDENTIALS_RUNBOOK.md`.
+2. **Why Vercel skipped the production build of `61dafcb81`:** still not diagnosed.
+3. **Residue** (list and confirm before deleting any of it):
+   - Test Requests 1003301, 1003302 and 1003303.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - Worktree `.claude/worktrees/liaison-from-institution` (its branch is merged).
+   - `../WMKF_Apps-codex-b4`, now on `codex/b4-slot-readiness` (`523fbc071`, live Codex work).
+   - Five prunable `/private/tmp/wmkf-*` worktrees.
+
+### Do Not Reopen Without New Decision
+
+1. S551 decisions A-1, A-2, B-1, B-2, B-3, the r4 simplification, send-now under B, and the closing of plan review.
+2. S549–S550 decisions listed in the prior prompts below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` | Engine hardening and re-address plan r5 (ready to build) |
+| `lib/services/scheduled-email-service.js` | Send, reconcile and digest engine (Part A target) |
+| `lib/services/scheduled-email-store.js` | Ledger SQL: claims, fences, due and digest queries |
+| `lib/services/cron/grantee-deliverable-reminders-service.js` | Daily cron: create/handoff, digests, delivery, finalize |
+
+## Testing
+
+```bash
+npx jest tests/unit/scheduled-email tests/unit/grantee-deliverable-reminders
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<scratch-db> npx jest tests/integration --testPathPattern pg.test
+```
+
+---
+
+## Prior Session 551 Prompt: size the queued-reminder problem, then revise the re-address plan
 
 ## Session 550 Summary — 2026-09-29 PT (Opus; Research Liaison switch built, reviewed, released; security bump)
 
