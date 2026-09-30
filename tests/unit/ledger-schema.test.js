@@ -328,6 +328,27 @@ describe('canonicalizeDefinition', () => {
       expect(a).toBe(b);
     });
   });
+
+  // Opus round-3 L6: the bare (non-quoted) schema-qualification strip was a
+  // plain substring `.split('public.').join('')`, which stripped
+  // `public.` out of ANY identifier ending in those characters, not just a
+  // genuine `public.` qualification — silently corrupting `xpublic.a` into
+  // `xa`. It now strips only at an identifier boundary (start of the code
+  // segment, or preceded by a non-identifier character).
+  describe('Opus round-3 L6: bare schema stripping only applies at an identifier boundary', () => {
+    test('xpublic.a is a different identifier from xa — not stripped', () => {
+      const a = canonicalizeDefinition('xpublic.a', 'public');
+      const b = canonicalizeDefinition('xa', 'public');
+      expect(a).not.toBe(b);
+      expect(a).toBe('xpublic.a');
+      expect(b).toBe('xa');
+    });
+
+    test('a genuine public. qualification strips, whether or not it starts the text', () => {
+      expect(canonicalizeDefinition('public.a', 'public')).toBe('a');
+      expect(canonicalizeDefinition(' public.a', 'public')).toBe('a');
+    });
+  });
 });
 
 describe('approved-ahead extras (Codex round-1 Fix 4; Opus round-1 item 6: shape-verified, not name-only)', () => {
