@@ -296,6 +296,31 @@ describe('reviewer-slot metadata census', () => {
     }
   });
 
+  test('custom steps that directly fire on a slot update require owner disposition', async () => {
+    const step = (name, filter, entity) => ({ name, stage: 20, mode: 0, filteringattributes: filter, sdkmessageid: { name: 'Update' }, sdkmessagefilterid: entity ? { primaryobjecttypecode: entity } : null, plugintypeid: { typename: `AkoyaGo.${name}` } });
+    const client = clientFor({
+      entitySteps: [step('RequestAny', '', 'akoya_request'), step('RequestOther', 'akoya_title', 'akoya_request')],
+      globalSteps: [step('GlobalAny', '', null), step('GlobalOther', 'akoya_title', null)],
+      flows: [{ name: 'Create only', clientdata: flow({ triggers: { created: { inputs: { parameters: { 'subscriptionRequest/entityname': 'akoya_request', 'subscriptionRequest/message': 1 } } } } }) }],
+    });
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const receipt = await printReviewerSlotReadiness(client);
+      expect(receipt.complete).toBe(false);
+      expect(receipt.dispositionRequired).toEqual([
+        'custom Request step can fire on reviewer-slot update: RequestAny',
+        'custom global step can fire on reviewer-slot update: GlobalAny',
+      ]);
+      expect(receipt.counts.stepDispositions).toBe(2);
+      expect(receipt.steps).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'RequestOther', firesOn: 'other columns only' }),
+        expect.objectContaining({ name: 'GlobalOther', firesOn: 'other columns only' }),
+      ]));
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   test('dirty or missing probe provenance hard-blocks the receipt', async () => {
     const client = clientFor({ flows: [{ name: 'Create only', clientdata: flow({ triggers: { created: { inputs: { parameters: { 'subscriptionRequest/entityname': 'akoya_request', 'subscriptionRequest/message': 1 } } } } }) }] });
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -350,6 +375,8 @@ describe('reviewer-slot metadata census', () => {
   test.each([
     ['parameter entityName', { parameters: { entityName: "@parameters('T')" } }],
     ['path', { path: '/tables/@{parameters(\'T\')}/onchanged' }],
+    ['near-miss connection name', { host: { connection: { referenceName: "@parameters('T')" } } }],
+    ['nested authentication', { authentication: { value: "@parameters('T')" } }],
   ])('a dynamic trigger %s hard-blocks without a Request literal', async (_label, inputs) => {
     const client = clientFor({ flows: [{ name: 'Expression trigger', clientdata: flow({ triggers: { changed: { type: 'OpenApiConnectionWebhook', inputs } } }) }] });
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});

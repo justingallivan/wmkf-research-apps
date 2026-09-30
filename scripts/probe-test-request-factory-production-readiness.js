@@ -697,6 +697,7 @@ async function printReviewerSlotReadiness(client, exportDir, source = probeSourc
     '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),plugintypeid($select=typename)' +
     "&$filter=(sdkmessageid/name eq 'Update' or sdkmessageid/name eq 'UpdateMultiple' or sdkmessageid/name eq 'Upsert' or sdkmessageid/name eq 'UpsertMultiple') and statecode eq 0");
   const requestSteps = steps.filter((row) => SLOT_WRITE_MESSAGES.has(row.sdkmessageid?.name) && row.sdkmessagefilterid?.primaryobjecttypecode === 'akoya_request');
+  let stepDispositions = 0;
   receipt.counts.allEnabledSlotWriteSteps = steps.length;
   receipt.counts.allEnabledUpdateMultipleSteps = steps.filter((row) => row.sdkmessageid?.name === 'UpdateMultiple').length;
   receipt.counts.allEnabledUpsertSteps = steps.filter((row) => row.sdkmessageid?.name === 'Upsert').length;
@@ -710,6 +711,10 @@ async function printReviewerSlotReadiness(client, exportDir, source = probeSourc
     receipt.steps.push({ name, message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), entityFilter: stepFilterCategory(row), filteringColumns: filteringColumns === null ? 'dynamic-or-unknown' : filteringColumns, firesOn: firesOn || 'other columns only' });
     if (firesOn) console.log(`   - ${firesOn} (${row.sdkmessageid.name}): ${stepLabel(row)}`);
     if (filteringColumns === null) receipt.incompleteReasons.push(`Request step update filter dynamic or unknown: ${name}`);
+    if (!isPlatformStep(row) && (firesOn === 'ANY column' || firesOn?.startsWith('a slot ('))) {
+      receipt.dispositionRequired.push(`custom Request step can fire on reviewer-slot update: ${name}`);
+      stepDispositions += 1;
+    }
   }
   // Dataverse can represent an all-entity registration as no filter row, a
   // filter with no primary type, or a filter whose primary type is 'none'.
@@ -721,10 +726,16 @@ async function printReviewerSlotReadiness(client, exportDir, source = probeSourc
   console.log(`   enabled Update/UpdateMultiple/Upsert/UpsertMultiple steps with no entity filter: ${globalSteps.length} (hidden: ${receipt.counts.hiddenGlobalSlotWriteSteps}; hidden Microsoft platform: ${receipt.counts.hiddenMicrosoftPlatformSlotWriteSteps})`);
   for (const row of globalSteps.filter((item) => !isPlatformStep(item))) {
     const filteringColumns = literalFilterColumns(row.filteringattributes);
-    receipt.steps.push({ name: row.name || '(unnamed)', message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), entityFilter: stepFilterCategory(row), filteringColumns: filteringColumns === null ? 'dynamic-or-unknown' : filteringColumns, firesOn: filteringColumns === null ? 'dynamic-or-unknown filter' : filteringColumns.length ? 'other columns only' : 'ANY entity/column' });
-    console.log(`   - ANY entity/column (${row.sdkmessageid.name}): ${stepLabel(row)}`);
+    const firesOn = filteringColumns === null ? 'dynamic-or-unknown filter' : filteringColumns.length ? 'other columns only' : 'ANY entity/column';
+    receipt.steps.push({ name: row.name || '(unnamed)', message: row.sdkmessageid.name, type: row.plugintypeid?.typename || '?', stage: row.stage, mode: row.mode, hidden: stepIsHidden(row), entityFilter: stepFilterCategory(row), filteringColumns: filteringColumns === null ? 'dynamic-or-unknown' : filteringColumns, firesOn });
+    console.log(`   - ${firesOn} (${row.sdkmessageid.name}): ${stepLabel(row)}`);
     if (filteringColumns === null) receipt.incompleteReasons.push(`global step update filter dynamic or unknown: ${row.name || '(unnamed)'}`);
+    if (filteringColumns?.length === 0) {
+      receipt.dispositionRequired.push(`custom global step can fire on reviewer-slot update: ${row.name || '(unnamed)'}`);
+      stepDispositions += 1;
+    }
   }
+  receipt.counts.stepDispositions = stepDispositions;
 
   const flows = await getAll(client, '/workflows?$select=name,clientdata&$filter=category eq 5 and statecode eq 1');
   let unreadable = 0;
