@@ -23,6 +23,7 @@ import {
   createPortalUpload,
   externalGranteeActorBinding,
   loadClaimedPortalImage,
+  loadClaimedPortalDocument,
   renewPortalUploadLease,
 } from '../../lib/services/portal-upload-staging';
 
@@ -194,7 +195,7 @@ test('load fetches only the ledger pathname as private and records verified byte
     leaseToken: '33333333-3333-4333-8333-333333333333',
   });
   expect(get).toHaveBeenCalledWith('portal-staging/grantee_image/path', {
-    access: 'private', useCache: false, token: 'vercel_blob_rw_test_private',
+    access: 'private', useCache: false, headers: { 'Accept-Encoding': 'identity' }, token: 'vercel_blob_rw_test_private',
   });
   expect(global.fetch).toHaveBeenCalledWith('https://private.example/exact', {
     method: 'HEAD', redirect: 'manual',
@@ -258,4 +259,86 @@ test('cleanup deletes only exact ledger pathnames and reports pruning separately
     token: 'vercel_blob_rw_test_private',
   });
   expect(result).toEqual({ deleted: 1, errors: 0, pruned: 1, retained: 0 });
+});
+
+function stagedVtt(bytes, headers = new Headers(), stream = new Blob([bytes]).stream()) {
+  get.mockResolvedValue({
+    statusCode: 200, headers, stream,
+    blob: { url: 'https://private.example/exact', pathname: 'exact', contentType: 'text/vtt',
+      size: Number(headers.get('content-length') || 0), etag: 'blob-etag' },
+  });
+  sql.mockResolvedValue({ rows: [{ id: STAGING_ID }] });
+  return { row: { id: STAGING_ID, pathname: 'exact', filename: 'transcript.vtt',
+    declared_content_type: 'text/vtt', max_bytes: 100 }, leaseToken: 'lease' };
+}
+
+test('VTT with absent Content-Length is read and hashed rather than rejected as empty', async () => {
+  const bytes = Buffer.from('WEBVTT\n\n00:00.000 --> 00:01.000\nTranscript\n');
+  const result = await loadClaimedPortalDocument(stagedVtt(bytes));
+  expect(result.buffer).toEqual(bytes);
+  expect(result.sha256).toMatch(/^[0-9a-f]{64}$/);
+  expect(sql.mock.calls[0]).toContain(bytes.length);
+  expect(get).toHaveBeenCalledWith('exact', expect.objectContaining({ headers: { 'Accept-Encoding': 'identity' } }));
+});
+
+test('an actually empty headerless stream is still rejected without a ledger write', async () => {
+  await expect(loadClaimedPortalDocument(stagedVtt(Buffer.alloc(0))))
+    .rejects.toMatchObject({ code: 'empty_file' });
+  expect(sql).not.toHaveBeenCalled();
+});
+
+test('a known Content-Length mismatch still rejects', async () => {
+  await expect(loadClaimedPortalDocument(stagedVtt(Buffer.from('WEBVTT'), new Headers({ 'content-length': '1' }))))
+    .rejects.toMatchObject({ code: 'staged_upload_mismatch' });
+  expect(sql).not.toHaveBeenCalled();
+});
+
+test('headerless oversized stream cancels at the cap before reading the rest or persisting bytes', async () => {
+  const cancel = jest.fn();
+  const stream = new ReadableStream({ start(controller) {
+    controller.enqueue(new Uint8Array(60));
+    controller.enqueue(new Uint8Array(60));
+    controller.enqueue(new Uint8Array(1000));
+  }, cancel });
+  await expect(loadClaimedPortalDocument(stagedVtt(Buffer.alloc(0), new Headers(), stream)))
+    .rejects.toMatchObject({ code: 'file_too_large' });
+  expect(cancel).toHaveBeenCalled();
+  expect(sql).not.toHaveBeenCalled();
+});
+
+test('a stream read failure is retryable and does not persist a partial source receipt', async () => {
+  const stream = new ReadableStream({ start(controller) { controller.error(new Error('transport failed')); } });
+  await expect(loadClaimedPortalDocument(stagedVtt(Buffer.alloc(0), new Headers(), stream)))
+    .rejects.toMatchObject({ code: 'staged_upload_unavailable', httpStatus: 503 });
+  expect(sql).not.toHaveBeenCalled();
+});
+
+test('explicit zero length with nonempty stream is a mismatch rather than unconfirmed metadata', async () => {
+  await expect(loadClaimedPortalDocument(stagedVtt(Buffer.from('WEBVTT'), new Headers({ 'content-length': '0' }))))
+    .rejects.toMatchObject({ code: 'staged_upload_mismatch' });
+  expect(sql).not.toHaveBeenCalled();
+});
+
+test('compressed wire Content-Length is not confused with the decoded VTT size', async () => {
+  const bytes = Buffer.from('WEBVTT\n\n00:00.000 --> 00:01.000\nTranscript\n');
+  const args = stagedVtt(bytes, new Headers({ 'content-length': '3', 'content-encoding': 'gzip' }));
+  const result = await loadClaimedPortalDocument(args);
+  expect(result.buffer).toEqual(bytes);
+  expect(sql.mock.calls[0]).toContain(bytes.length);
+});
+
+test('compressed response still enforces the decoded-byte cap', async () => {
+  await expect(loadClaimedPortalDocument(stagedVtt(Buffer.alloc(101),
+    new Headers({ 'content-length': '3', 'content-encoding': 'gzip' }))))
+    .rejects.toMatchObject({ code: 'file_too_large' });
+  expect(sql).not.toHaveBeenCalled();
+});
+
+test('a locked stream is retryable rather than leaving an unhandled loader error', async () => {
+  const stream = new Blob(['WEBVTT']).stream();
+  const reader = stream.getReader();
+  await expect(loadClaimedPortalDocument(stagedVtt(Buffer.alloc(0), new Headers(), stream)))
+    .rejects.toMatchObject({ code: 'staged_upload_unavailable', httpStatus: 503 });
+  reader.releaseLock();
+  expect(sql).not.toHaveBeenCalled();
 });
