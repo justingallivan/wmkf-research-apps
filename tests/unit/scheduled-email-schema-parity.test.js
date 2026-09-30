@@ -93,3 +93,16 @@ test('migration 036 and fresh install both create the digest run ledger with the
     expect(setup).toContain(fragment);
   }
 });
+
+test('migration 059 and fresh install both add recipient_generation with the generation-0 default', () => {
+  const migration059 = fs.readFileSync(
+    path.join(ROOT, 'lib/db/migrations/059_scheduled_email_recipient_generation.sql'),
+    'utf8',
+  );
+  const column = 'ADD COLUMN IF NOT EXISTS recipient_generation INTEGER NOT NULL DEFAULT 0';
+  expect(migration059).toContain(column);
+  expect(setup).toContain(column);
+  expect(setup).toContain('const v58Statements');
+  // The base 036 shape stays untouched: the column is additive on existing databases.
+  expect(migration).not.toContain('recipient_generation');
+});
