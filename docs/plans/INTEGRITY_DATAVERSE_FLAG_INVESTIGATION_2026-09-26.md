@@ -20,7 +20,7 @@ permanent marker that a screen once occurred. Implementation remains pending.
 
 ## Evidence
 
-- [VERIFIED via `node scripts/probe-request-integrity-metadata.cjs --target=prod`]
+- [VERIFIED via `node scripts/probe-request-integrity-metadata.js --target=prod`]
   Production `akoya_request` metadata permits customization, has table auditing
   enabled, and supports optimistic concurrency. All 613 attributes were examined
   for `integrity|retraction|pubpeer|screen|background.check` in logical/schema

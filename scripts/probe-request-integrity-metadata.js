@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Read-only field-discovery probe; no request rows or metadata are changed.
- * Usage: node scripts/probe-request-integrity-metadata.cjs --target=prod|sandbox
+ * Usage: node scripts/probe-request-integrity-metadata.js --target=prod|sandbox
  * Reports metadata only. A keyword miss is not proof no equivalent field exists.
  */
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client');
