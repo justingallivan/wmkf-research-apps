@@ -156,6 +156,13 @@ test('a person without a usable name is clearly identified and blocks screening'
   expect(screen.getByRole('button', { name: 'Run screen' })).toBeDisabled();
 });
 
+test('a named person whose contact record is gone blocks screening like a missing name', async () => {
+  requestEnvelope.mockResolvedValue(ok({ ...loaded, people: [{ ...person, identityUnavailable: true }], latestRun: null, history: [], review: { status: 'identity_unavailable', canReview: false, canApprove: false, reason: null, latestDecision: null } }));
+  render(<IntegrityTab requestId={requestId} />);
+  expect(await screen.findByText(/one person has no usable name or Dataverse contact record/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run screen' })).toBeDisabled();
+});
+
 test('shows the approved PD decision with its actor, timestamp, and staff-only note', async () => {
   const decision = { id: 92, screeningId: 74, decision: 'approved', notes: 'Reviewed the source context.', createdAt: '2026-09-26T19:00:00Z', reviewerProfileId: 1, reviewerName: 'Lead PD', reviewerSystemId: 'staff-a' };
   const approved = { ...loaded, latestRun: { ...savedRun, id: 74 }, history: [{ ...savedRun, id: 74, reviews: [decision] }], review: { status: 'approved', canReview: false, canApprove: false, reason: null, latestDecision: decision } };

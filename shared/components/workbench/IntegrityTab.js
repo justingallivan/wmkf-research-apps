@@ -215,7 +215,9 @@ export default function IntegrityTab({ requestId }) {
   const people = Array.isArray(currentRecord?.people) ? currentRecord.people : [];
   const latestRun = currentRecord?.latestRun || null;
   const running = runningRequestId === requestId;
-  const missingNames = people.filter((person) => !String(person?.name || '').trim());
+  // Mirrors the server's person_identity_unavailable guard: a blank name, or a
+  // contact Dataverse reports as deleted even when the junction kept a name.
+  const missingNames = people.filter((person) => person?.identityUnavailable === true || !String(person?.name || '').trim());
 
   const runScreen = async () => {
     if (!requestId || running || reviewSubmitting || refreshingRun || uncertainRun || reviewUncertain || people.length === 0 || missingNames.length > 0) return;
@@ -384,7 +386,7 @@ export default function IntegrityTab({ requestId }) {
             {running ? 'Screening…' : 'Run screen'}
           </Button>
         </div>
-        {missingNames.length > 0 && <p className="mt-2 text-sm text-amber-800">A screen cannot run because {missingNames.length === 1 ? 'one person has' : `${missingNames.length} people have`} no usable name. Reload the request people details before screening.</p>}
+        {missingNames.length > 0 && <p className="mt-2 text-sm text-amber-800">A screen cannot run because {missingNames.length === 1 ? 'one person has' : `${missingNames.length} people have`} no usable name or Dataverse contact record. Reload the request people details before screening.</p>}
         {uncertainRun && <Button className="mt-2" variant="outline" onClick={reloadSavedRun} loading={refreshingRun}>Reload saved screen</Button>}
         <h3 className="mt-5 text-base font-semibold text-gray-900">People to be screened</h3>
         {people.length === 0 ? (
