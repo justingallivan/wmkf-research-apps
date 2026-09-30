@@ -1,6 +1,34 @@
-# Session 553 Prompt: Zoom link and transcript Preview acceptance (branch-local)
+# Session 554 Prompt: Board presentation-link Preview acceptance (branch-local)
 
 ## Current result — 2026-09-29 PT
+
+**[VERIFIED via signed-in Chrome, Safari Private Browsing, the downloaded file, and Vercel readback]**
+On `codex/feature-request` at `f43251cf8`, owner-approved bounded Preview acceptance used the
+existing marked sandbox Request `1000350` / `4424f6e5-7409-45ad-a96e-5f7d89896ce5`.
+The Board presentation link showed exactly the current synthetic Zoom Recording and 203-byte
+VTT Transcript on the materials-only page. Watch redirected to the saved synthetic Zoom URL;
+Download delivered a 203-byte transcript. After Issue new link, the old URL became unavailable
+and the replacement URL showed the same materials. The
+[recipient receipt](docs/plans/evidence/post-presentation/board-link-preview-2026-09-29.md)
+records the bounded evidence without retaining bearer tokens.
+
+**[PARTIAL private-window gate]** Safari Private Browsing was redirected to Vercel sign-in before
+the application loaded. Preview protection was not changed; anonymous private-window viewing
+remains unproved. The synthetic Zoom recording does not exist, so real playback is also unproved.
+No MP4 Watch/long-seek test was performed with this fixture.
+
+**[VERIFIED cleanup]** The registered Preview alias again resolves to its prior deployment
+`dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2`; the feature-branch alias stayed on
+`dpl_8C7qZ4XqvZp64DPUTb2QeqtXAa9d`. Branch-scoped Preview
+`POST_PRESENTATION_MATERIALS_ACCESS` reads `off`, and temporary redeployment
+`dpl_wzudtJ6a3SDWiaA9apRD6cZkoZDQ` was removed. The replacement link displayed an
+unavailable message through the restored Preview alias. Production was untouched. MP4
+Cancel/Retry and Graph-confirmed terminal expiry remain offline/partial, and Production
+promotion remains separate. The Session 553 section below is historical.
+
+# Session 553 Historical Result: Zoom link and transcript Preview acceptance (branch-local)
+
+## Result at that session — 2026-09-29 PT
 
 **[VERIFIED via signed-in Chrome, sandbox Dataverse, Microsoft Graph, and Vercel readback]**
 On `codex/feature-request` at `e777c4b05`, the owner-approved bounded Preview test passed:

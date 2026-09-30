@@ -86,9 +86,14 @@ the Meeting Tracker card. Staff readback persisted after reload; the 203-byte Sh
 transcript downloaded with source-equal SHA-256 and a matching registry hash. The
 [bounded receipt](../plans/evidence/post-presentation/zoom-transcript-preview-2026-09-29.md)
 records the exact IDs and cleanup. The Zoom link was synthetic, so real Zoom playback remains
-unverified. The presentation-token external reader remains source-built/offline-tested for
-these new materials. Preview branch access was restored to `off`; Production runtime is not
-deployed or enabled.
+unverified. **[SIGNED-IN RECIPIENT PREVIEW ACCEPTED 2026-09-29]** The distinct presentation-token
+reader displayed the current Zoom Recording and VTT Transcript, redirected Watch to the saved
+synthetic Zoom URL, downloaded the 203-byte transcript, and rejected the first token after
+reissue while the replacement worked. See the
+[recipient receipt](../plans/evidence/post-presentation/board-link-preview-2026-09-29.md).
+Safari Private Browsing reached Vercel sign-in before the app, so anonymous recipient viewing
+remains unproved on protected Preview. Preview branch access was restored to `off`; Production
+runtime is not deployed or enabled.
 
 **[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]** Slice 4 adds the second governed transition on the same Final row, `advanceToLeadershipReview` (`lib/services/final-writeup/transition-service.js`, route `pages/api/workbench/final-writeup/leadership-review.js`): lifecycle `REVIEW` → `FINAL`, explicit `wmkf_LeadershipReviewStartedBy`/`wmkf_LeadershipReviewStartedAt`, and the row's own SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash`) refreshed to the verified current version, committed in one changeset with a request-ETag re-bind of `wmkf_CurrentFinalWriteup`. **The milestone triple and `wmkf_MilestoneCreatedBy` are not written** by this transition (owner D2, 2026-09-07): that actor field means the Pre-Site → Site Visit handoff person. A Final Writeup row in lifecycle `FINAL` is therefore "leadership review" only with the complete, well-formed leadership checkpoint, enforced by one shared predicate (`lib/services/final-writeup/leadership-checkpoint.js`) in the transition status, acknowledgement, and dashboard readers, so a half-written row is a reconciliation failure on every surface; the source Pre-Site row's `FINAL` lifecycle keeps its earlier meaning (handoff receipt). No backward action exists. **Owner-run reversal** for a mistaken transition: set the Final row's `wmkf_lifecyclestate` back to `100000001` (Review) and clear `wmkf_leadershipreviewstartedat` and `wmkf_LeadershipReviewStartedBy`; the observation fields may stay. Known pre-existing gap: group-review activation stamps `wmkf_milestonecreatedat` on the Final row without a milestone actor, which the explicit-actor census reports under its Site Visit kind; a separate Tier 0 census fix is owner-decided (plan §10 D6).
 

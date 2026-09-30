@@ -105,9 +105,14 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   PRODUCTION NOT DEPLOYED.]** Recording, transcript, and transcript-summary have
   governed producers under the post-presentation rollout gates. The current visit
   card exposes browser-direct MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
-  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript staff inputs passed a bounded signed-in Preview save/finalize/readback on synthetic sandbox Request `1000350`. Real Zoom playback and the external materials-only page were not tested in that run. The Staff
-  Deliberations tab reads the current three slots. Shared Postgres migration 055 was
-  applied, while the Dataverse Wave 30 test was sandbox-only. Bounded Preview acceptance
+  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript
+  staff inputs passed a bounded signed-in Preview save/finalize/readback on synthetic sandbox
+  Request `1000350`. A later signed-in recipient Preview run showed the two current materials,
+  redirected to the synthetic Zoom URL, downloaded the transcript, and proved old-link rejection
+  after reissue. Real Zoom playback and anonymous private-window viewing remain unproved because
+  the synthetic recording does not exist and Vercel protection sent Safari Private Browsing to
+  sign-in. The Staff Deliberations tab reads the current three slots. Shared Postgres migration 055 was
+  applied, while the Dataverse Wave 30 test was sandbox-only. The bounded Preview test window
   is closed and presentation access is off there. See the presentation-materials plan
   for the separate Production gates and source-built/offline-tested staff Cancel/Retry controls.
 

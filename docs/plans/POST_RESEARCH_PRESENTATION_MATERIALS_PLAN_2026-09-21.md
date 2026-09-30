@@ -3,7 +3,7 @@ title: Post-research-presentation materials and Board presentation link
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview Safari media and staff Zoom-link/transcript acceptance passed, Cancel/Retry remain offline-tested, Graph-confirmed terminal expiry remains unobserved, and Production promotion remains."
+summary: "Active plan for Meeting Tracker presentation materials; the feature branch and shared schema are built, bounded Preview Safari media, staff Zoom-link/transcript, and signed-in recipient-link acceptance passed; private-window viewing is blocked by Preview protection, Cancel/Retry remain offline-tested, and Production promotion remains."
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -219,6 +219,10 @@ transcript staging/finalize paths passed a bounded signed-in Preview check on sy
 Request `1000350` on 2026-09-29; see the
 [acceptance receipt](evidence/post-presentation/zoom-transcript-preview-2026-09-29.md).
 The synthetic Zoom URL does not prove playback. Cancel/Retry remain offline-tested.
+The signed-in external page later showed the two synthetic materials, redirected Watch to the
+saved Zoom URL, downloaded the transcript, and rejected the old link after reissue. Safari
+Private Browsing reached Vercel sign-in before the app, so anonymous private-window acceptance
+remains open. See the [recipient receipt](evidence/post-presentation/board-link-preview-2026-09-29.md).
 A failed unfinished MP4 intent offers Retry; the server then
 checks the current Graph session and exact path before deciding whether to resume its confirmed
 range or create a new session from zero. Retry requires reselecting the same file. A complete item
@@ -1753,7 +1757,8 @@ The historical Graph-confirmed expiry row remains PARTIAL; the owner chose the a
 recovery controls and fault-injection coverage in place of another passive expiry wait. The
 Zoom-paste and transcript staff inputs are source-built and offline-tested alongside their
 producer APIs. Their bounded signed-in Preview acceptance passed on synthetic sandbox Request
-`1000350` on 2026-09-29; the external materials-only link and real Zoom playback were not tested.
+`1000350` on 2026-09-29. A subsequent signed-in recipient-link test passed for those materials;
+private-window viewing and real Zoom playback remain unproved.
 Production release gates remain separate.
 
 ### Slice 5 — Internal and external consumers
@@ -1788,12 +1793,18 @@ Production write was performed for this slice.
 - **[PASSED 2026-09-29]** Exercise Zoom-paste and transcript-upload staff controls in a bounded,
   owner-approved signed-in Preview runtime acceptance. The synthetic fixture proves save,
   finalize, staff readback, and transcript byte/hash integrity; it does not prove real Zoom
-  playback or the external materials-only consumer.
+  playback.
+- **[PARTIAL 2026-09-29]** The signed-in Chrome recipient page showed only the two current
+  sandbox materials, redirected Watch to the synthetic Zoom URL, downloaded the 203-byte
+  transcript, and rejected the old link after reissue while the replacement worked. Safari
+  Private Browsing reached Vercel sign-in before the app; no anonymous private-window pass
+  is claimed. See the [recipient receipt](evidence/post-presentation/board-link-preview-2026-09-29.md).
 - Owner-applied schema/migration and readiness enablement.
 - Signed-in Meeting Tracker smoke with one Zoom link, one transcript, and one owner-approved,
   registry-bound retained test MP4 (retention per §15 step 6).
-- Private-window 60-day link smoke: materials only, Watch seek, Download, replace-to-latest, old
-  token revoked after reissue.
+- Complete the private-window 60-day link smoke on an accessible target, and the MP4 Watch/seek,
+  Download, and replace-to-latest cases. The synthetic Preview link already proved transcript
+  Download and old-token revocation after reissue.
 - Reconcile canonical docs, Atlas, route matrix, service catalog, and session handoff.
 
 ## 13. Test matrix
