@@ -1,5 +1,7 @@
 /** @jest-environment node */
-import { decideFileAction, sha256Text, tableNamesIn, stripOuterTxn, decideTrackedPrefixVerification } from '../../lib/db/ledger-migrations';
+import {
+  decideFileAction, sha256Text, tableNamesIn, stripOuterTxn, decideTrackedPrefixVerification, selectTrackedPrefixFiles,
+} from '../../lib/db/ledger-migrations';
 
 // Opus round-2 item 4: a genuinely clean scratch diff has NO extra either —
 // the prior fixture used a diff containing an extra table and still called
@@ -192,6 +194,37 @@ describe('Codex round-3 #2: decideTrackedPrefixVerification', () => {
       liveFingerprint: { tables: { test_request_cast_slot_bindings: APPROVED_TABLE_SHAPE } },
     });
     expect(decision).toEqual({ ok: true });
+  });
+});
+
+/**
+ * Opus round-3 L1: a legacy NULL-checksum tracked row is still an
+ * already-applied file — it must be included in the prefix
+ * verifyTrackedPrefix checks, not skipped, so --accept-tracked-checksums
+ * cannot record a checksum for a drifted row and move on to the next file
+ * with no live comparison of the row it just "accepted".
+ */
+describe('Opus round-3 L1: selectTrackedPrefixFiles', () => {
+  const files = ['054_test_request_runs.sql', '058_test_request_cast_slot_bindings.sql'];
+  const fileChecksum = new Map([['054_test_request_runs.sql', 'abc'], ['058_test_request_cast_slot_bindings.sql', 'def']]);
+
+  test('a checksum-matching tracked row is included', () => {
+    const tracked = new Map([['054_test_request_runs.sql', { sha256: 'abc' }]]);
+    expect(selectTrackedPrefixFiles(files, tracked, fileChecksum)).toEqual(['054_test_request_runs.sql']);
+  });
+
+  test('a legacy NULL-checksum tracked row is included (the case this fix adds)', () => {
+    const tracked = new Map([['054_test_request_runs.sql', { sha256: null }]]);
+    expect(selectTrackedPrefixFiles(files, tracked, fileChecksum)).toEqual(['054_test_request_runs.sql']);
+  });
+
+  test('a checksum-mismatched tracked row is excluded (decideFileAction refuses it directly)', () => {
+    const tracked = new Map([['054_test_request_runs.sql', { sha256: 'edited-since-applied' }]]);
+    expect(selectTrackedPrefixFiles(files, tracked, fileChecksum)).toEqual([]);
+  });
+
+  test('an untracked file is excluded', () => {
+    expect(selectTrackedPrefixFiles(files, new Map(), fileChecksum)).toEqual([]);
   });
 });
 
