@@ -16,6 +16,9 @@
  * lib/services/workbench/grantee-deliverables/send-invite-service.js.
  *
  * AUTH: requireAppAccess('reviewers'). requestId GUID-validated off req.body.
+ * `liaisonSeen` ({ contactId, email }, both required, each null or a value) is
+ * the Liaison the recipients load showed staff; the service compares it with
+ * the Liaison of record at send. It is an observation, never a recipient.
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
@@ -29,6 +32,18 @@ export const config = {
 };
 
 const isEmail = (s) => typeof s === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
+const MAX_SEEN_EMAIL = 320;
+
+/** Closed `{ contactId, email }`: both keys present, no others; null is an explicit "none". */
+function parseLiaisonSeen(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const keys = Object.keys(value);
+  if (keys.length !== 2 || !Object.hasOwn(value, 'contactId') || !Object.hasOwn(value, 'email')) return null;
+  const { contactId, email } = value;
+  if (contactId !== null && !isGuid(contactId)) return null;
+  if (email !== null && (typeof email !== 'string' || email.length > MAX_SEEN_EMAIL)) return null;
+  return { contactId, email };
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -48,6 +63,11 @@ export default async function handler(req, res) {
   const requestId = typeof req.body?.requestId === 'string' ? req.body.requestId.trim() : '';
   if (!isGuid(requestId)) {
     return res.status(400).json({ error: 'requestId must be a GUID' });
+  }
+
+  const liaisonSeen = parseLiaisonSeen(req.body?.liaisonSeen);
+  if (!liaisonSeen) {
+    return res.status(400).json({ error: 'liaisonSeen must be { contactId, email } from the recipients load.' });
   }
 
   const toEmail = (req.body?.toEmail || '').trim();
@@ -81,7 +101,7 @@ export default async function handler(req, res) {
   return withDalContext('grantee-send-invite', async () => {
     try {
       const body = await sendGranteeInvite({
-        requestId, toEmail, ccEmail, subject, bodyText, fromEmail, actingUserSystemId,
+        requestId, toEmail, ccEmail, subject, bodyText, fromEmail, actingUserSystemId, liaisonSeen,
       });
       return res.status(200).json(body);
     } catch (error) {

@@ -35,9 +35,11 @@ import path from 'node:path';
 import { jest } from '@jest/globals';
 import {
   MANIFEST_V3,
+  MANIFEST_V4,
   bodyOrThrow,
   bundleSourceOf,
   checkPreallocatedRequestAbsent,
+  computeRunPlanDigest,
   correctMeetingDate,
   createRequestWithGoverifyBypass,
   fenceSource,
@@ -46,6 +48,10 @@ import {
   validateCloneManifest,
   verifyClone,
 } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
+import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
+import { REVIEW_FILE_COPY_POLICY, reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
+import { PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RUN_ID = '22222222-2222-4222-8222-222222222222';
@@ -234,7 +240,7 @@ describe('createRequestWithGoverifyBypass', () => {
         }
         return ok(sourceRow());
       }),
-      patch: jest.fn(async () => {
+      patchWithOptions: jest.fn(async () => {
         // The deactivation PATCH itself throws (simulating a network drop
         // AFTER the patch attempt was journaled but before any confirmation).
         throw new Error('socket hang up');
@@ -245,13 +251,50 @@ describe('createRequestWithGoverifyBypass', () => {
     const journal = jest.fn(async (patch) => { journalPatches.push(patch); });
     await expect(createRequestWithGoverifyBypass({
       client, manifest, preflightBefore: preflightBefore(), bypassGoverify: true, journal,
-    })).rejects.toThrow('Manually recheck the workflow before resuming');
+    })).rejects.toThrow('Manually recheck the workflow before resuming. Deactivation error: socket hang up');
+    expect(client.patchWithOptions).toHaveBeenCalledTimes(1);
     // The create POST must never have been attempted once deactivation is uncertain.
     expect(client.postWithOptions).not.toHaveBeenCalled();
     const manualRecheck = journalPatches.find((patch) => patch.goverifyBypass?.restoreManualRecheckRequired === true);
     expect(manualRecheck).toBeDefined();
     // createAttempted never happened, so postCreateStepsSkipped must not be set.
     expect(manualRecheck.postCreateStepsSkipped).toBeUndefined();
+    expect(manualRecheck.goverifyBypass.restoreManualRecheckReason).toContain('Deactivation error: socket hang up');
+  });
+
+  test('a rejected deactivation PATCH keeps its status and body in the manual-recheck reason', async () => {
+    const workflowRow = {
+      workflowid: 'a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb',
+      name: 'GOverify- check Publication 78 on create of a request record',
+      category: 0, type: 1, mode: 1, primaryentity: 'akoya_request',
+      componentstate: 0, triggeroncreate: true, statecode: 1, statuscode: 2,
+      versionnumber: 100,
+      '@odata.etag': 'W/"100"',
+    };
+    const client = {
+      get: jest.fn(async (requestPath) => {
+        if (requestPath.startsWith('/workflows(')) return ok(workflowRow);
+        if (requestPath.startsWith('/workflows?')) {
+          return ok({ value: [{
+            workflowid: 'activation-1', name: workflowRow.name, type: 2, primaryentity: 'akoya_request',
+            statecode: 1, statuscode: 2, _parentworkflowid_value: workflowRow.workflowid,
+          }] });
+        }
+        return ok(sourceRow());
+      }),
+      patchWithOptions: jest.fn(async () => ({
+        ok: false, status: 412, text: '{"error":{"message":"precondition failed"}}', body: null,
+      })),
+      postWithOptions: jest.fn(),
+    };
+    const journalPatches = [];
+    await expect(createRequestWithGoverifyBypass({
+      client, manifest: baseManifest(), preflightBefore: preflightBefore(), bypassGoverify: true,
+      journal: async (patch) => { journalPatches.push(patch); },
+    })).rejects.toThrow('Deactivation error: GoVerify workflow state change failed (412)');
+    expect(client.postWithOptions).not.toHaveBeenCalled();
+    const manualRecheck = journalPatches.find((patch) => patch.goverifyBypass?.restoreManualRecheckRequired === true);
+    expect(manualRecheck.goverifyBypass.deactivationError).toContain('precondition failed');
   });
 });
 
@@ -405,5 +448,159 @@ describe('verifyClone', () => {
     const result = verifyClone(manifest, preflightBefore, observation, [], preflightBefore.foundation, []);
     expect(result.ok).toBe(false);
     expect(result.failures).toContain('SharePoint location parent identity mismatch');
+  });
+});
+
+/**
+ * F2 (Codex slice 6c-ii Stage C round 1): a `reviews` manifest binds to the
+ * live review-file copy policy (I1); `computeRunPlanDigest` is byte-identical
+ * to the pre-F2 formula for non-`reviews` manifests (I2) and changes with the
+ * review-file policy digest for `reviews` manifests (I3).
+ */
+const PROD_HOST = PRODUCTION_HOSTS[0];
+
+function reviewsBundle(overrides = {}) {
+  return buildSourceBundle({
+    sourceRow: {
+      akoya_requestid: SOURCE_ID,
+      akoya_requestnum: '9000002',
+      akoya_requesttype: 100000000,
+      akoya_purpose: 'Synthetic purpose',
+      akoya_request: 5000,
+      akoya_fiscalyear: 'December 2026',
+      wmkf_meetingdate: '2026-12-01',
+      versionnumber: 1,
+    },
+    documents: [],
+    dataverseHost: PROD_HOST,
+    exportedAt: new Date('2026-09-25T00:00:00Z'),
+    reviewers: [],
+    ...overrides,
+  });
+}
+
+function reviewsManifest(bundle, overrides = {}) {
+  return {
+    kind: MANIFEST_V4,
+    recipe: 'reviews',
+    values: { requestId: REQUEST_ID, runId: RUN_ID, locationId: LOCATION_ID, meetingDate: '2026-12-01' },
+    source: {
+      requestId: bundle.source.request.akoya_requestid,
+      requestNumber: bundle.source.request.akoya_requestnum,
+      requestType: bundle.source.request.akoya_requesttype,
+      revision: bundle.source.request.revision,
+      dataverseHost: bundle.source.dataverseHost,
+      exportedAt: bundle.exportedAt,
+      bundleSha256: sha256(bundle),
+    },
+    bundle,
+    createBodySha256: 'body-hash',
+    copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
+    reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: reviewFileCopyPolicyDigest() },
+    ...overrides,
+  };
+}
+
+describe('F2: reviewFilePolicy manifest binding (bundleSourceOf) -- I1', () => {
+  test('a reviews manifest bound to the live review-file policy validates', () => {
+    const bundle = reviewsBundle();
+    const manifest = reviewsManifest(bundle);
+    expect(() => bundleSourceOf(manifest, { allowStale: true })).not.toThrow();
+  });
+
+  // M1: deleting the reviewFilePolicy digest comparison in bundleSourceOf
+  // would make this assertion red (a stale digest would validate instead of
+  // refusing).
+  test('a stale reviewFilePolicy digest is refused (re-prepare)', () => {
+    const bundle = reviewsBundle();
+    const manifest = reviewsManifest(bundle, {
+      reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: 'f'.repeat(64) },
+    });
+    expect(() => bundleSourceOf(manifest, { allowStale: true })).toThrow(/review-file copy policy/);
+  });
+
+  test('a non-reviews manifest carrying a reviewFilePolicy at all is refused (fail closed on the complement)', () => {
+    const bundle = reviewsBundle();
+    const manifest = reviewsManifest(bundle, { recipe: 'basic' });
+    expect(() => bundleSourceOf(manifest, { allowStale: true })).toThrow(/non-reviews recipe/);
+  });
+
+  test('a basic manifest with no reviewFilePolicy at all is unaffected', () => {
+    const bundle = reviewsBundle();
+    const manifest = reviewsManifest(bundle, { recipe: 'basic', reviewFilePolicy: undefined });
+    delete manifest.reviewFilePolicy;
+    expect(() => bundleSourceOf(manifest, { allowStale: true })).not.toThrow();
+  });
+});
+
+describe('F2: computeRunPlanDigest -- I2 (byte-identical for non-reviews) / I3 (reviews changes with policy)', () => {
+  test('I2: a basic manifest digest matches the OLD pre-F2 formula literal exactly', () => {
+    const manifest = {
+      values: { runId: RUN_ID, requestId: REQUEST_ID, locationId: LOCATION_ID },
+      recipe: 'basic',
+      source: { requestId: SOURCE_ID, revision: 'rev-1', bundleSha256: 'bundle-hash' },
+      copyPolicy: { digest: 'policy-digest' },
+      createBodySha256: 'body-hash',
+    };
+    // The OLD formula, inlined exactly as scripts/rehearse-test-request-sandbox.mjs
+    // computed it before F2 moved it into computeRunPlanDigest.
+    const oldFormula = sha256({
+      runId: manifest.values.runId,
+      recipe: manifest.recipe,
+      destinationRequestId: manifest.values.requestId,
+      destinationLocationId: manifest.values.locationId,
+      sourceRequestId: manifest.source.requestId,
+      sourceRevision: manifest.source.revision,
+      bundleSha256: manifest.source.bundleSha256,
+      copyPolicyDigest: manifest.copyPolicy.digest,
+      createBodySha256: manifest.createBodySha256,
+    });
+    expect(computeRunPlanDigest({ manifest })).toBe(oldFormula);
+  });
+
+  test('I2: an initial_assessment manifest digest ALSO matches the OLD pre-F2 formula literal exactly', () => {
+    const manifest = {
+      values: { runId: RUN_ID, requestId: REQUEST_ID, locationId: LOCATION_ID },
+      recipe: 'initial_assessment',
+      source: { requestId: SOURCE_ID, revision: 'rev-1', bundleSha256: 'bundle-hash' },
+      copyPolicy: { digest: 'policy-digest' },
+      createBodySha256: 'body-hash',
+    };
+    const oldFormula = sha256({
+      runId: manifest.values.runId,
+      recipe: manifest.recipe,
+      destinationRequestId: manifest.values.requestId,
+      destinationLocationId: manifest.values.locationId,
+      sourceRequestId: manifest.source.requestId,
+      sourceRevision: manifest.source.revision,
+      bundleSha256: manifest.source.bundleSha256,
+      copyPolicyDigest: manifest.copyPolicy.digest,
+      createBodySha256: manifest.createBodySha256,
+    });
+    expect(computeRunPlanDigest({ manifest })).toBe(oldFormula);
+  });
+
+  // M2 (drop reviewFilePolicyDigest from the reviews branch): if
+  // computeRunPlanDigest stopped including reviewFilePolicyDigest, this
+  // test would go red (both digests would be equal instead of differing).
+  test('I3: two reviews manifests differing only in reviewFilePolicy.digest produce different plan digests', () => {
+    const bundle = reviewsBundle();
+    const manifestA = reviewsManifest(bundle);
+    const manifestB = reviewsManifest(bundle, { reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: 'e'.repeat(64) } });
+    const digestA = computeRunPlanDigest({ manifest: manifestA, reviewerAddressDigests: ['a'.repeat(64)] });
+    const digestB = computeRunPlanDigest({ manifest: manifestB, reviewerAddressDigests: ['a'.repeat(64)] });
+    expect(digestA).not.toBe(digestB);
+  });
+
+  test('I2 stays green when only the reviews branch changes: a reviews manifest digest is untouched by basic\'s own formula (sanity: recipe key differs the digest, proving recipe is bound)', () => {
+    const manifest = {
+      values: { runId: RUN_ID, requestId: REQUEST_ID, locationId: LOCATION_ID },
+      recipe: 'basic',
+      source: { requestId: SOURCE_ID, revision: 'rev-1', bundleSha256: 'bundle-hash' },
+      copyPolicy: { digest: 'policy-digest' },
+      createBodySha256: 'body-hash',
+    };
+    const asReviews = { ...manifest, recipe: 'reviews', reviewFilePolicy: { version: REVIEW_FILE_COPY_POLICY.version, digest: reviewFileCopyPolicyDigest() } };
+    expect(computeRunPlanDigest({ manifest })).not.toBe(computeRunPlanDigest({ manifest: asReviews, reviewerAddressDigests: [] }));
   });
 });

@@ -26,11 +26,14 @@
 
 ## Working Norms
 - Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md
+- Multi-session features / MVP drift: feedback-anchor-multisession-features-to-the-original-ask.md
 - Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md; feedback-feature-branch-handoff-lands-on-main.md
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
+- Test Request Factory safety vs fidelity / rehearsal venue: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-apply-measurement-artifacts-in-both-directions.md; feedback-briefs-are-snapshots-not-ship-state.md
+- Delegated builds / review cadence: feedback-orchestrator-checks-builds-before-review.md
 - Review posture: feedback-read-the-implementation-not-the-callers-docblock.md; feedback-weigh-the-risks-you-name.md; feedback-corrections-decay-unless-mechanized.md; feedback-consistency-over-preview-rationale.md; feedback-reviewer-differs-from-author.md
 - Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md; feedback-mocked-sql-hides-parameter-typing.md; feedback-fixtures-return-raw-transport-shape.md
 - Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md

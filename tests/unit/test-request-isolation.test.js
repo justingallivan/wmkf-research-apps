@@ -9,6 +9,8 @@ import {
   ordinaryTestRequestODataFilterForNavigation,
   testRequestVisibilityDto,
   TEST_REQUEST_ISOLATION_FIELDS,
+  SYNTHETIC_REVIEWER_MARKER_FIELDS,
+  assertTestRequestMarkerNotWritten,
   withOrdinaryTestRequestODataFilter,
   withTestRequestIsolationSelect,
 } from '../../lib/services/test-requests/isolation';
@@ -119,6 +121,36 @@ describe('Stage 1d gated visibility helpers', () => {
   });
 });
 
+describe('slice 6c-i: synthetic-reviewer person marker (D-R1) is a write-guard-only fold-in', () => {
+  test('TEST_REQUEST_ISOLATION_FIELDS (request filters/select) is unchanged: exactly the two akoya_request fields', () => {
+    expect(Object.keys(fields)).toEqual(['marker', 'runId']);
+    expect(Object.values(fields)).toEqual(['wmkf_istestrequest', 'wmkf_testcreationrunid']);
+  });
+
+  test('SYNTHETIC_REVIEWER_MARKER_FIELDS names only the person-entity marker', () => {
+    expect(SYNTHETIC_REVIEWER_MARKER_FIELDS).toEqual({ marker: 'wmkf_issyntheticreviewer' });
+  });
+
+  test('assertTestRequestMarkerNotWritten refuses the synthetic-reviewer marker at any depth', () => {
+    for (const data of [
+      { wmkf_issyntheticreviewer: true },
+      { wmkf_issyntheticreviewer: false },
+      { WMKF_IsSyntheticReviewer: null },
+      { name: 'x', wmkf_PotentialReviewer: { wmkf_name: 'TEST · x', wmkf_issyntheticreviewer: true } },
+      { related: [{ ok: 1 }, { wmkf_issyntheticreviewer: true }] },
+    ]) {
+      expect(() => assertTestRequestMarkerNotWritten(data))
+        .toThrow(expect.objectContaining({ code: 'test_request_marker_immutable' }));
+    }
+  });
+
+  test('assertTestRequestMarkerNotWritten refuses a URL naming the synthetic-reviewer marker property', () => {
+    const guid = '33333333-3333-4333-8333-333333333333';
+    expect(() => assertTestRequestMarkerNotWritten(undefined, `wmkf_potentialreviewers(${guid})/wmkf_issyntheticreviewer`))
+      .toThrow(expect.objectContaining({ code: 'test_request_marker_immutable' }));
+  });
+});
+
 describe('isolated schema body', () => {
   test('tracked JSON schema produces the expected Dataverse attribute payloads', async () => {
     const schemaPath = path.resolve(process.cwd(), 'lib/dataverse/schema/wave29-test-request-isolation/akoya_request-test-request-isolation.json');
@@ -195,5 +227,36 @@ describe('isolated schema body', () => {
     expect(text).not.toContain('reviewduereminder');
     expect(text).not.toContain('triagestatus');
     expect(schema).not.toHaveProperty('relationships');
+  });
+
+  test('wave30 synthetic-reviewer-marker wave: tracked JSON schema is creation-only, Boolean, on the person entity (D-R1)', async () => {
+    const schemaPath = path.resolve(process.cwd(), 'lib/dataverse/schema/wave30-synthetic-reviewer-marker/wmkf_potentialreviewer-synthetic-reviewer-marker.json');
+    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+    expect(schema.kind).toBe('extensions-on-existing');
+    expect(schema.entityLogicalName).toBe('wmkf_potentialreviewers');
+    expect(schema.attributes).toHaveLength(1);
+    expect(schema.attributes[0]).toEqual(expect.objectContaining({
+      type: 'Boolean', schemaName: 'wmkf_IsSyntheticReviewer', default: false, requiredLevel: 'None',
+    }));
+    expect(schema).not.toHaveProperty('relationships');
+    expect(schema).not.toHaveProperty('triggers');
+
+    const posts = [];
+    const client = {
+      get: async () => ({ ok: true, body: { value: [] } }),
+      post: async (_url, body) => { posts.push(body); return { ok: true }; },
+    };
+    for (const attribute of schema.attributes) {
+      await ensureAttribute(client, schema.entityLogicalName, attribute);
+    }
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toEqual(expect.objectContaining({
+      '@odata.type': 'Microsoft.Dynamics.CRM.BooleanAttributeMetadata',
+      SchemaName: 'wmkf_IsSyntheticReviewer',
+      DefaultValue: false,
+      RequiredLevel: { Value: 'None' },
+    }));
+    expect(posts[0].OptionSet.TrueOption.Label.LocalizedLabels[0].Label).toBe('Synthetic reviewer');
+    expect(posts[0].OptionSet.FalseOption.Label.LocalizedLabels[0].Label).toBe('Ordinary reviewer');
   });
 });

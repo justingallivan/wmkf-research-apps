@@ -1,0 +1,16 @@
+# Reviews recipe live proof (sandbox Request 1000343, 2026-09-26)
+
+Run `83c5da2e-8d98-498f-bca4-34e51b4cbead`, recipe `reviews`, source production Request 1003222 (owner-authorized read scope D-R5; its three reviewers are the owner's throwaway inboxes), bundle v3 exported with `--with-reviewers --source-marker-column=absent`. Wave30 (`wmkf_issyntheticreviewer`) was applied to the sandbox by the owner minutes before; `SYNTHETIC_REVIEWER_ISOLATION=on` in the rehearsal shell. Ledger: the throwaway local Postgres on the current migration 054 file.
+
+Reached `ready` through all eighteen steps: fence_source, create_request (1000343), correct_meeting_date, provision_location, copy_file ×2, observe, verify, seed_initial_assessment, seed_initial_assessment_snapshot, verify_initial_assessment, seed_reviewers ×3, copy_review_file (no uploaded reviews: advances with no write), seed_review_answers ×3, verify_reviews. Run inspection: `reviews-recipe-live-proof-run-inspect-2026-09-26.json` (no address; digests only). Advance log: `reviews-recipe-live-proof-advance-log-2026-09-26.txt`.
+
+Four stops, each resolved by re-advancing (`needs_attention` is re-claimable):
+
+1. **copy_file: transient Graph `fetch failed`.** Re-advanced; the dispatch-marker rule kept it to one upload.
+2. **seed_reviewers: `reviewer_person_projection_drift` on `wmkf_name`.** The POST carried `wmkf_name: "TEST · Martha Cat"`; the row read back `" Martha Cat "`. Dataverse rewrites the person's primary name from first/last on create (and on update: a PATCH of `wmkf_firstname` alone re-derived `" TEST · Martha Cat "`). This contradicts the agent wiki's June fact that writes to `wmkf_name` stick (corrected). Fix: the `TEST · ` prefix moved to `wmkf_firstname`; the projection never writes or compares `wmkf_name`; `assertOwnedSyntheticPerson` and `verifyReviewerPerson` require the derived name to carry the prefix (`isSyntheticNameDerived`). The one already-created row was repaired by prefixing its first name (sandbox, marker-true, this run's own row), and the run resumed through the recovery path without a second POST.
+3. **verify_reviews: `wmkf_externaltokenrevoked` non-null.** Dataverse defaults the Boolean to `false` on create; the seeder never writes it. Fix: the five nullable access/honorarium fields must be null, the revoked flag must be null or false.
+4. None after that: `verify_reviews` marked ready on the next advance.
+
+Characterized live: the Request folder tree has no folder below depth 3 (the census's new fail-closed depth boundary did not fire on the Basic/IA census or the reviews census at depth 6); the IA promotion and `[trash]` shapes matched the 2026-09-25 read-back. NOT exercised live: `copy_review_file` with an uploaded review (1003222's two received reviews were submitted through the form; the uploaded-file branch — copy, DOCX attestation, `Reviewer_Uploads` census — stays unit-proven and live-pending until a source request with an uploaded review is cloned).
+
+Residue: sandbox Request 1000343 with its Initial Assessment, three marker-true synthetic persons (addresses = the owner's throwaway inboxes), three suggestions, twenty-two answer rows. Nothing was written to production.

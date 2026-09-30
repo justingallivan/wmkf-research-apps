@@ -366,7 +366,9 @@ test('blank Request contact uses the organization liaison for named preview and 
   const template = namedFixture('create');
   const accountId = '66666666-6666-4666-8666-666666666666';
   const contactId = '77777777-7777-4777-8777-777777777777';
-  mockDeps.getRequest.mockResolvedValue({ ...await mockDeps.getRequest(), _akoya_applicantid_value: accountId, _akoya_primarycontactid_value: null });
+  // A blank (non-Research) program keeps the organization fallback; Research
+  // never falls back (site-visit-applicant-contacts.test.js).
+  mockDeps.getRequest.mockResolvedValue({ ...await mockDeps.getRequest(), _akoya_programid_value: null, _akoya_applicantid_value: accountId, _akoya_primarycontactid_value: null });
   mockDeps.resolveRecipients.mockImplementation((requestId, request) => resolveSiteVisitApplicantContacts({ requestId, request }, {
     resolveRequestRecipients: async () => ({
       pi: { contactId, name: 'Pat de la Cruz', email: 'pat@example.edu' },

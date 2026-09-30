@@ -506,7 +506,8 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
   `lib/services/workbench/grantee-deliverables/recipients-service.js` (PI = `wmkf_projectleader`,
   liaison = `akoya_primarycontactid`, both → contact email). The production-live
   `site-visit/applicant-contacts.js` wrapper uses applicant Account `primarycontactid`
-  only when the Request liaison lookup is blank (§16.12).
+  only when the Request liaison lookup is blank (§16.12). **[SUPERSEDED 2026-09-29 for Research: the Liaison of record is the applicant institution's Primary Contact (`account.primarycontactid`), not the Request's `akoya_primarycontactid` copy; `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`.]** For Research
+  both now use the Liaison of record only; `liaisonStatus: 'none'` sends to the PI alone.
 - Contributor link: stored-digest token like the briefing link (`mintScopedToken` with audience
   `materials`, sealed with `lib/utils/encryption.js`, verifier cloned from
   `lib/external/verify-briefing-token.js`).
@@ -769,7 +770,9 @@ remove the liaison paragraph and send only to the PI. The branch fix requires no
 addresses for both recipient roles on every invitation and reminder, regardless of template edits.
 The Project Leader comes from the Request. When its Primary Contact lookup is blank, the
 liaison comes from the applicant Account's Org Primary Contact; a set Request Primary Contact
-still takes precedence. If the roles share one email address, the envelope sends one copy.
+still takes precedence. **[SUPERSEDED 2026-09-29 for Research: the Liaison of record is the applicant institution's Primary Contact (`account.primarycontactid`), not the Request's `akoya_primarycontactid` copy; `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`.]** For Research the liaison is the Account's Primary Contact
+only; a confirmed absence (`liaisonStatus: 'none'`) sends to the PI alone, while a Liaison
+without an email still refuses. If the roles share one email address, the envelope sends one copy.
 The preview names the missing role and remains read-only. For an existing collection, a fresh
 preview reads current Request contacts; Send rechecks the signed To/Cc envelope and saves those
 contacts to the collection only after validation. A manual reminder saves them in its atomic
@@ -787,3 +790,42 @@ Franklin Cat with the liaison name resolved and Send enabled. No email was sent
 in that rehearsal or during release verification. Production auth-provider and
 unauthenticated route checks passed. Staff confirmed on 2026-09-24 that the
 production Meeting Tracker opens. No production email send was tested.
+
+### 16.13 2026-09-25: Staff Deliberations materials card and interim folder read [PRODUCTION-LIVE via PR #338]
+
+The upload portal is still in testing this cycle, so staff are placing applicants' slides and
+participant bios in the request's `Site Visit - Slides` and `Site Visit - Participant Bios`
+folders by hand through AkoyaGo (Request 1002903 is the first such case). Those files have no
+`wmkf_requestdocument` row, so the registry consumers (Workbench `materials`, the collection's
+received-item match, and the briefing page) never see them. The owner asked for staff to see
+them in the Workbench without opening AkoyaGo.
+
+- **Card:** `shared/components/workbench/ResearchPresentationMaterialsCard.js`, always shown on
+  the Staff Deliberations tab. Once the brief is shared it sits between the Briefing page link card
+  and Email history (owner, 2026-09-25; `PreSiteDistributionPanel` `beforeHistory` slot); before
+  that it follows the writeup cards. Its status line reads: Presentation
+  not scheduled, Presentation scheduled · materials not requested / requested / ready. A closed
+  collection reads "materials request closed". A failed Site Visit read reads "could not be
+  loaded", never "not scheduled". `useSiteVisitContext` now settles a failed logistics read as
+  `{ unavailable: true }` instead of staying `null`. A recipient-directory failure alone keeps the
+  visit and only drops suggested recipients. Rows for Slides and Participant bios link to
+  every file in the matching folder, or say "Not received yet".
+- **Interim folder read:** `GET /api/workbench/site-visit/material-files` (`reviewers`) calls
+  `lib/services/site-visit-materials/folder-files-service.js`. It lists the two folders,
+  non-recursively, under the same active Dynamics bucket the portal writes to
+  (`activeBucket` in `contributor-service.js`), and returns names and staff SharePoint `webUrl`s.
+  Portal uploads land in the same folders and appear too. There are no counters and no registry
+  writes: a hand-placed file still does not count toward the collection summary or appear on the
+  briefing page.
+- **Residual risk:** the Workbench materials summary (`getMaterialsSummaryForRequest` on the
+  `/api/workbench/pre-site-visit` GET) is fail-open `null` with no availability signal. A failed
+  summary read therefore shows "materials not requested" for a scheduled presentation. The file
+  rows are unaffected because they come from the folder read.
+- **Retire when** the portal is the only intake route. The card's status line and the registry
+  can then carry the links, and this route can go. A retirement needs its own caller check.
+
+PR #338 merged as `98cc433add79f2f3d8a637d7be17db9ec6a2630e` on 2026-09-26 UTC (2026-09-25 PT).
+Production deployment `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` reached Ready and serves
+`applications.wmkeck.org`. The owner confirmed on Request 1002903 in local dev (production reads) that
+both rows link the hand-placed files. An unauthenticated production call to the route redirects to sign-in,
+the same as the sibling Workbench routes.

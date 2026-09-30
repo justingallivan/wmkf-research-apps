@@ -60,11 +60,22 @@ test('a created collection opens the resend composer and surfaces preview failur
 });
 
 test('a saved collection with no liaison email names the gap without rendering null as a recipient', async () => {
-  global.fetch = jest.fn(async () => response({ success: true, collection: collection({ contacts: { pi: { role: 'pi', name: 'Franklin Cat', email: 'franklin@example.edu' }, liaison: { role: 'liaison', name: null, email: null } } }) }));
+  global.fetch = jest.fn(async () => response({ success: true, collection: collection({ contacts: { pi: { role: 'pi', name: 'Franklin Cat', email: 'franklin@example.edu' }, liaison: { role: 'liaison', name: null, email: null }, liaisonStatus: 'found' } }) }));
   render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
-  const sentTo = await screen.findByText(/Franklin Cat.*primary contact email missing from saved recipients/);
+  const sentTo = await screen.findByText(/Franklin Cat.*Liaison email missing from saved recipients/);
   expect(sentTo).toHaveTextContent('Franklin Cat (franklin@example.edu)');
   expect(sentTo).not.toHaveTextContent('null');
+});
+
+// Liaison plan reader 4: "No institution Liaison" only for an explicit none.
+test.each([
+  ['explicit none', { liaison: null, liaisonStatus: 'none' }, /No institution Liaison/, /not verified/],
+  ['a legacy snapshot without status', { liaison: null }, /Liaison not verified/, /No institution Liaison/],
+])('saved recipients label for %s', async (_label, extra, shown, hidden) => {
+  global.fetch = jest.fn(async () => response({ success: true, collection: collection({ contacts: { pi: { role: 'pi', name: 'Franklin Cat', email: 'franklin@example.edu' }, ...extra } }) }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+  const sentTo = await screen.findByText(shown);
+  expect(sentTo).not.toHaveTextContent(hidden);
 });
 
 test('the materials card lists a shared PI and liaison email once', async () => {

@@ -64,6 +64,20 @@ sequence.
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).**
+  `reviewer-roster-endpoint.test.js` failed on `main` when its fixed
+  `2026-09-28T00:00Z` expiry passed; fixed in `5ced59d3b` (far-future date).
+  Seven more files hard-code `expiresAt` dates in late 2026 and may fail the
+  same way when those dates pass: `pre-site-distribution-panel` (10-08, 12-17),
+  `reviewer-institution-evidence-attestation` (09-28, 10-14; uses fake timers),
+  `external-briefing-page` (10-08), `workbench-briefing-link-route` (10-08),
+  `reviewer-institution-auto-resolution-policy` (09-28, 09-29; passed on
+  09-28 UTC, so it may not compare against the clock),
+  `pre-site-distribution-service` (10-08, 11-14, 12-18) and
+  `meeting-tracker-session-service` (12-18), all under `tests/unit/`. Not
+  checked whether each value is compared with the current time. Next: per file,
+  confirm clock dependence; replace clock-compared values with a far-future
+  date or a fake clock. Earliest risk date: 2026-10-08.
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
   smoke).** `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
   `VERCEL_URL` (the immutable deployment host), so any state-changing request made
@@ -662,6 +676,36 @@ review questions, reviewer search timeout controls, service decompositions, rout
 consolidation, OData/chunk consolidation, prompt migrations, grantee portal construction, and
 honorarium portal construction are implementation history or current operating references. They do
 not become current work merely because their document status remains `active`.
+
+- **Integrity Screener in the Workbench, with PD approval (2026-09-26/27).**
+  [SOURCE-BUILT on `codex/integrity-workbench-tab`, head `b1086302b`; NOT merged,
+  NOT deployed; Postgres migrations 056 and 057 unapplied] The branch adds:
+  - a gated Integrity tab that screens the request's PI and Co-PIs automatically;
+  - request-linked screening history;
+  - an append-only PD approval/hold audit (`approved` means a complete screen plus the
+    lead PD's approval for the current roster).
+  
+  Evidence and PD decisions stay in Postgres. Luna implemented, Sol reviewed, and Codex
+  adjudicated the Claude Opus findings. Validation and residual limits are in the branch's
+  `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` (read with `git show
+  origin/codex/integrity-workbench-tab:<path>`).
+  
+  **Open, not built:** one informational Dataverse flag, **Integrity review complete**
+  (`wmkf_integrityreviewcomplete`), meaning a complete screen plus PD approval for the
+  current roster; a screen alone is not enough. The investigation and a read-only
+  metadata probe are on the branch (`docs/plans/INTEGRITY_DATAVERSE_FLAG_INVESTIGATION_2026-09-26.md`):
+  - production metadata checked, no existing equivalent column found by keyword;
+  - sandbox metadata not checked.
+  
+  Next design work must cover invalidation after replacement screens, holds and roster
+  changes (including edits made outside our apps), and durable retries when Dataverse sync
+  fails.
+  
+  **Before release:** recheck migration numbering (055 is claimed by the unmerged
+  `codex/feature-request`) and apply 056 then 057 only in an owner-authorized release.
+  
+  **Deferred:** the hard board-readiness gate waits for the staff recommendation/readiness
+  workflow. Screening normally covers only applicants staff recommend for funding.
 
 ## Queue maintenance rule
 

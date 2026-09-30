@@ -36,10 +36,11 @@ LANGUAGE sql IMMUTABLE AS $receipt$
         FROM jsonb_each(receipt) AS e(key, value)
         CROSS JOIN LATERAL (SELECT e.value #>> '{}' AS v, jsonb_typeof(e.value) AS t) AS s
        WHERE NOT (
-         (e.key IN ('size', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber') AND s.t = 'number')
+         (e.key IN ('size', 'itemSize', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount', 'assignmentSequence', 'promptVersion') AND s.t = 'number')
          OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
-         OR (e.key IN ('requestIds', 'locationIds') AND s.t = 'array' AND NOT EXISTS (
+         OR (e.key IN ('requestIds', 'locationIds', 'emailIds', 'trackingIds', 'paymentIds', 'jobIds') AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
+         OR (e.key = 'primaryContactId' AND s.t = 'null')
          OR (e.key = 'itemIds' AND s.t = 'array' AND NOT EXISTS (
               SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~ '^01[A-Z2-7]{32}$'))
          OR (e.key = 'resourceIds' AND s.t = 'array' AND NOT EXISTS (
@@ -50,20 +51,21 @@ LANGUAGE sql IMMUTABLE AS $receipt$
            AND s.v !~ '(://|[[:cntrl:]])'
            AND s.v !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
            AND CASE
-             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId', 'promptId', 'confirmedRunId', 'primaryContactId', 'liaisonContactId', 'piContactId', 'researchLeaderContactId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
              WHEN e.key IN ('itemId', 'folderItemId', 'graphItemId', 'sourceGraphItemId') THEN s.v ~ '^01[A-Z2-7]{32}$'
              WHEN e.key IN ('driveId', 'sourceDriveId') THEN s.v ~ '^b![A-Za-z0-9_-]{16,120}$'
              WHEN e.key = 'siteId' THEN s.v ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
              WHEN e.key = 'library' THEN s.v ~ '^[a-z][a-z0-9_]{1,60}$'
-             WHEN e.key IN ('folder', 'relativeUrl') THEN s.v ~ '^([0-9]{1,10}_[0-9A-F]{32}(/(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?))?|(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?))$'
-             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx)$'
+             WHEN e.key IN ('folder', 'relativeUrl') THEN s.v ~ '^([0-9]{1,10}_[0-9A-F]{32}(/(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))?|(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))$'
+             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx|Review_[1-5][.](pdf|docx|doc))$'
              WHEN e.key = 'mimeType' THEN s.v ~ '^[a-z]+/[a-z0-9.+-]{1,80}$'
-             WHEN e.key = 'eTag' THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
+             WHEN e.key IN ('eTag', 'eTagBefore', 'eTagAfter') THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
              WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
              WHEN e.key IN ('versionNumber', 'versionNumberBefore', 'versionNumberAfter') THEN s.v ~ '^[0-9]{1,20}$'
-             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'bytesSha256') THEN s.v ~ '^[0-9a-f]{64}$'
+             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'foundationProjectionSha256', 'foundationGoverifyResultSha256', 'foundationGuidestarSha256', 'foundationContactsSha256', 'requestStatusSha256', 'bytesSha256', 'addressSha256', 'attestedDigest', 'inputFingerprint', 'renderInputFingerprint') THEN s.v ~ '^[0-9a-f]{64}$'
              WHEN e.key IN ('outcome', 'kind') THEN s.v ~ '^[a-z][a-z0-9_-]{0,39}$'
+             WHEN e.key = 'reviewForm' THEN s.v ~ '^(uploaded|received_no_file|unreceived)$'
              WHEN e.key = 'field' THEN s.v ~ '^[a-z][a-z0-9_]{0,63}$'
              WHEN e.key IN ('expectedValue', 'actualValue', 'valueBefore', 'valueAfter', 'fiscalYear', 'meetingDate') THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
              WHEN e.key ~ '^[a-z][A-Za-z0-9]{0,40}At$' AND e.key !~* 'body|content|purpose|token|secret|download|narrative|bytes|title|text|note|message' THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
@@ -153,9 +155,13 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
   CONSTRAINT test_request_runs_current_step_enum CHECK (current_step IN (
     'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
     'copy_file', 'observe', 'verify', 'ready',
-    'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment'
+    'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+    'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
+    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'
   )),
-  CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN ('basic', 'initial_assessment')),
+  CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN (
+    'basic', 'initial_assessment', 'reviews', 'pre_site_visit', 'final_writeup', 'site_visit_materials'
+  )),
   CONSTRAINT test_request_runs_host_shapes CHECK (
     source_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
     AND destination_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
@@ -198,7 +204,13 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
       'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
       'preallocated_request_present', 'file_journal_unverified',
       'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
-      'recipe_step_not_built'
+      'recipe_step_not_built',
+      'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+      'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
     ))
     AND (last_error IS NULL OR regexp_replace(last_error, ' [(]http [0-9]{3}[)]$', '') IN (
       'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
@@ -216,7 +228,13 @@ CREATE TABLE IF NOT EXISTS test_request_runs (
       'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
       'preallocated_request_present', 'file_journal_unverified',
       'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
-      'recipe_step_not_built'
+      'recipe_step_not_built',
+      'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+      'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
     ))
   )
 );
@@ -236,7 +254,9 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
                       'dataverse_request', 'dataverse_request_patch',
                       'sharepoint_folder', 'dataverse_document_location',
                       'sharepoint_file', 'workflow_bypass', 'dataverse_request_document',
-                      'foundation_baseline'
+                      'foundation_baseline', 'foundation_transition',
+                      'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set',
+                      'dataverse_ai_run'
                     )),
   system            TEXT NOT NULL CHECK (system IN ('dataverse', 'sharepoint')),
 
@@ -260,7 +280,9 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
   CONSTRAINT test_request_run_resources_step_enum CHECK (step IN (
     'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
     'copy_file', 'observe', 'verify', 'ready',
-    'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment'
+    'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+    'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
+    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'
   )),
   CONSTRAINT test_request_run_resources_error_code CHECK (
     error IS NULL OR regexp_replace(error, ' [(]http [0-9]{3}[)]$', '') IN (
@@ -279,7 +301,13 @@ CREATE TABLE IF NOT EXISTS test_request_run_resources (
       'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
       'preallocated_request_present', 'file_journal_unverified',
       'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
-      'recipe_step_not_built'
+      'recipe_step_not_built',
+      'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+      'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+      'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
     )
   )
 );
@@ -291,3 +319,127 @@ CREATE INDEX IF NOT EXISTS test_request_run_resources_run_step_idx
 -- can never record a replacement.
 CREATE UNIQUE INDEX IF NOT EXISTS test_request_run_resources_one_baseline_idx
   ON test_request_run_resources (run_id) WHERE resource_kind = 'foundation_baseline';
+
+-- Reviews recipe (slice 6c-i, owner decision D-R2): one row per reviewer
+-- assignment reserved for a `reviews` run. `address` is the ONE sanctioned
+-- plain-text exception to the ledger's no-text invariant -- decision 4 makes
+-- the per-run address assignment the recipient-confinement authority, and
+-- staff-controlled throwaway addresses are not credentials or purpose text.
+-- Written once, in the same transaction as the run reservation, and never
+-- updated afterwards (no UPDATE statement touches this table anywhere in the
+-- ledger). Every other surface (receipts, needs_attention_reason, inspect
+-- output) carries only address_sha256, whose own CHECK (below) requires it
+-- to actually BE the address's SHA-256, not merely hex-shaped -- a writer
+-- that computed it wrong (or forged it) is rejected at the database, not
+-- trusted from the application layer (Opus round 1, P3). A row's `sequence`
+-- doubles as the "row id" a receipt may reference (an `assignmentSequence`
+-- receipt key, run-ledger.js KEY_RULES) once 6c-ii's steps need to.
+-- address_shape mirrors run-ledger.js reviewerAddressSha256 (Codex 6c-i round 5):
+-- the one plain-text column admits only a lowercase, credential-free email shape,
+-- so a direct or version-skewed writer cannot persist prose, URLs or secrets here.
+CREATE TABLE IF NOT EXISTS test_request_run_reviewer_assignments (
+  assignment_id       BIGSERIAL PRIMARY KEY,
+  run_id              UUID NOT NULL REFERENCES test_request_runs (run_id),
+  sequence            INTEGER NOT NULL,
+
+  source_person_id      UUID NOT NULL,
+  destination_person_id UUID NOT NULL,
+  reused                BOOLEAN NOT NULL,
+  address                TEXT NOT NULL,
+  address_sha256         TEXT NOT NULL,
+
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT test_request_run_reviewer_assignments_run_sequence UNIQUE (run_id, sequence),
+  CONSTRAINT test_request_run_reviewer_assignments_run_source UNIQUE (run_id, source_person_id),
+  CONSTRAINT test_request_run_reviewer_assignments_run_address UNIQUE (run_id, address),
+  CONSTRAINT test_request_run_reviewer_assignments_address_shape CHECK (
+    length(address) BETWEEN 1 AND 320
+    AND address !~ '[[:cntrl:][:space:]]'
+    AND address = lower(address)
+    AND address ~ '^[^[:space:]@]{1,64}@[^[:space:]@]{1,255}[.][^[:space:]@]{1,24}$'
+    AND address !~* '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|akia[0-9a-z]{16}|eyj[a-z0-9_-]{8}|glpat-|aiza|bearer_|https?://|//)'
+  ),
+  CONSTRAINT test_request_run_reviewer_assignments_digest_shape CHECK (
+    address_sha256 ~ '^[0-9a-f]{64}$'
+  ),
+  CONSTRAINT test_request_run_reviewer_assignments_digest_matches_address CHECK (
+    address_sha256 = encode(sha256(convert_to(address, 'UTF8')), 'hex')
+  )
+);
+
+-- No separate (run_id) index: every UNIQUE constraint above (sequence,
+-- source_person_id, address) already leads with run_id, so Postgres can use
+-- any of their backing btrees for a run_id lookup (Opus round 1, P3).
+
+-- Status setter (cast-and-status plan, slice C, 2026-09-28): one row per
+-- Phase I or Phase II Status change the Factory makes on a ready production
+-- test Request. An owner-run CLI writes it, so there is no lease: the partial
+-- unique index allows one open change per run. `etag_before` is the If-Match
+-- the PATCH carried; `effects` is a receipt (IDs, digests, counts only).
+CREATE TABLE IF NOT EXISTS test_request_status_changes (
+  change_id      UUID PRIMARY KEY,
+  run_id         UUID NOT NULL REFERENCES test_request_runs (run_id),
+  sequence       INTEGER NOT NULL,
+  field          TEXT NOT NULL CHECK (field IN ('wmkf_phaseistatus', 'wmkf_phaseiistatus')),
+  option_before  INTEGER NULL,
+  option_after   INTEGER NOT NULL,
+  etag_before    TEXT NOT NULL CHECK (etag_before ~ '^W/"[0-9]{1,20}"$'),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'applied', 'complete', 'needs_attention')),
+  rerun          BOOLEAN NOT NULL DEFAULT FALSE,
+  dispatched_at  TIMESTAMPTZ NULL,
+  effects        JSONB NULL CHECK (test_request_receipt_ok(effects)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at   TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_status_changes_run_sequence UNIQUE (run_id, sequence),
+  CONSTRAINT test_request_status_changes_distinct CHECK (option_before IS NULL OR option_before <> option_after)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS test_request_status_changes_one_open_idx
+  ON test_request_status_changes (run_id) WHERE status IN ('planned', 'dispatched', 'applied');
+
+-- Synthetic cast (cast-and-status plan, slices A + B, 2026-09-28): the
+-- reused synthetic PI and Liaison contacts and suggested-reviewer person,
+-- one per role per environment. `member_id` is the Dataverse GUID,
+-- preallocated and journaled before the create POST names it, so ownership
+-- is by journal: a lost response is recovered by reading that GUID, never by
+-- re-POSTing, and a row the ledger did not journal is never adopted. Names
+-- are the Factory's synthetic defaults; the address is stored as a digest
+-- only (the owner supplies it at run time, off the repository).
+CREATE TABLE IF NOT EXISTS test_request_cast_members (
+  member_id      UUID PRIMARY KEY,
+  environment    TEXT NOT NULL CHECK (environment IN ('sandbox', 'production')),
+  role           TEXT NOT NULL CHECK (role IN ('pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader')),
+  entity         TEXT NOT NULL CHECK (entity IN ('contact', 'wmkf_potentialreviewers')),
+  first_name     TEXT NOT NULL CHECK (length(first_name) BETWEEN 1 AND 50 AND first_name !~ '[[:cntrl:]]'),
+  last_name      TEXT NOT NULL CHECK (length(last_name) BETWEEN 1 AND 50 AND last_name !~ '[[:cntrl:]]'),
+  address_sha256 TEXT NOT NULL CHECK (address_sha256 ~ '^[0-9a-f]{64}$'),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'verified', 'needs_attention')),
+  dispatched_at  TIMESTAMPTZ NULL,
+  readback       JSONB NULL CHECK (test_request_receipt_ok(readback)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at    TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_cast_members_one_per_role UNIQUE (environment, role),
+  CONSTRAINT test_request_cast_members_role_entity CHECK ((role = 'suggested_reviewer') = (entity = 'wmkf_potentialreviewers'))
+);
+
+-- One row per suggested-reviewer suggestion the Factory binds to a ready
+-- production test Request (owner-run, like a status change, so no lease).
+-- `binding_id` is the preallocated wmkf_appreviewersuggestionid.
+CREATE TABLE IF NOT EXISTS test_request_cast_bindings (
+  binding_id     UUID PRIMARY KEY,
+  run_id         UUID NOT NULL REFERENCES test_request_runs (run_id),
+  member_id      UUID NOT NULL REFERENCES test_request_cast_members (member_id),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'verified', 'needs_attention')),
+  dispatched_at  TIMESTAMPTZ NULL,
+  readback       JSONB NULL CHECK (test_request_receipt_ok(readback)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at    TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_cast_bindings_one_per_run UNIQUE (run_id, member_id)
+);

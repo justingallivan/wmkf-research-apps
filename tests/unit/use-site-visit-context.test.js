@@ -65,6 +65,28 @@ test('derives siteVisit, materials, and suggested recipients from the logistics 
   }));
 });
 
+test.each([
+  ['a non-2xx directory response', () => response({ error: 'nope' }, 500)],
+  ['a directory network rejection', () => Promise.reject(new Error('offline'))],
+])('keeps the visit when only the recipient directory fails (%s)', async (_label, directory) => {
+  const visit = { activityId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'manual', email: 'guest@example.org' }], optionalAttendees: [] };
+  global.fetch = jest.fn(async (url) => (
+    String(url).includes('/logistics') ? response({ siteVisit: visit, materials: [] }) : directory()
+  ));
+
+  render(<Harness requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent)).toEqual({
+    siteVisit: visit,
+    materials: [],
+    suggestedTo: ['guest@example.org'],
+    suggestedCc: [],
+    presentationMaterialsStatus: 'disabled',
+    presentationMaterials: [],
+    presentationMaterialConflicts: [],
+  }));
+});
+
 test('yields empty suggestions when no visit is scheduled', async () => {
   global.fetch = jest.fn(async (url) => (
     String(url).includes('/logistics')
@@ -85,14 +107,14 @@ test('yields empty suggestions when no visit is scheduled', async () => {
   }));
 });
 
-test('a load error exposes presentation unavailable and does not throw', async () => {
+test('a load error reports the visit and presentation unavailable', async () => {
   global.fetch = jest.fn(async () => response({ error: 'nope' }, 500));
 
   render(<Harness requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
-    .toMatchObject({ presentationMaterialsStatus: 'unavailable' }));
+    .toMatchObject({ unavailable: true, presentationMaterialsStatus: 'unavailable' }));
 });
 
 test('does not fetch without a requestId', async () => {
@@ -104,12 +126,13 @@ test('does not fetch without a requestId', async () => {
 
 // T5 gap-fill (Stage 5a): network rejection and axis (e) — a non-2xx
 // response whose body cannot be parsed — both stay fail-open, never throw.
+// A settled failure is never mistaken for "no visit".
 test('fails open on a network rejection while reporting presentation unavailable', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
-    .toMatchObject({ presentationMaterialsStatus: 'unavailable' }));
+    .toMatchObject({ unavailable: true, presentationMaterialsStatus: 'unavailable' }));
 });
 
 test('axis (e): fails open on a non-2xx unparseable body', async () => {
@@ -117,7 +140,7 @@ test('axis (e): fails open on a non-2xx unparseable body', async () => {
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent))
-    .toMatchObject({ presentationMaterialsStatus: 'unavailable' }));
+    .toMatchObject({ unavailable: true, presentationMaterialsStatus: 'unavailable' }));
 });
 
 test('keeps presentation materials when the independent recipient directory fails', async () => {

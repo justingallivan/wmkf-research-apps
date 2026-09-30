@@ -6,6 +6,7 @@ import {
   getMaterialsCollection,
   inviteMaterialsContributors,
   invitationBodyText,
+  previewMaterialsEmail,
   matchReceivedFiles,
   missingRequiredItems,
   projectCollection,
@@ -113,7 +114,7 @@ test('create: advancing request + active visit → due two business days before 
   const inserted = d.insertCollection.mock.calls[0][0];
   expect(inserted.dueAt.toISOString()).toBe('2026-10-05T16:00:00.000Z'); // Mon, same wall-clock time
   expect(inserted.closesAt.toISOString()).toBe('2026-10-14T19:00:00.000Z');
-  expect(inserted.contacts).toEqual({ pi: { role: 'pi', name: 'Pat Investigator', email: 'PI@example.edu' }, liaison: { role: 'liaison', name: 'Lee Liaison', email: 'liaison@example.edu' } });
+  expect(inserted.contacts).toEqual({ pi: { role: 'pi', name: 'Pat Investigator', email: 'PI@example.edu' }, liaison: { role: 'liaison', name: 'Lee Liaison', email: 'liaison@example.edu' }, liaisonStatus: 'found' });
   expect(inserted.checklist.map((item) => item.key)).toEqual(['presentation_pdf', 'presentation_source', 'participant_bios']);
   expect(d.mint).toHaveBeenCalledWith({ subject: REQUEST_ID, audience: 'materials', ops: ['upload_materials'], expiresAt: inserted.closesAt });
   expect(inserted.tokenCiphertext).toMatch(/^sealed:jwt-/);
@@ -397,4 +398,61 @@ test('the signature token uses the sending PC preference, with the PC name as fa
     jest.dontMock('../../lib/services/dataverse-identity-map.js');
     jest.dontMock('../../lib/services/database-service.js');
   }
+});
+
+// Liaison plan reader 4: only a confirmed 'none' allows a PI-only send.
+describe('Liaison of record in the contacts snapshot', () => {
+  const PI_ONLY_BODY = SITE_VISIT_MATERIALS_INVITE_SEED_BODY.replace(/Often, the participant bios[^\n]*\n\n/, '');
+  const noLiaison = () => jest.fn(async () => ({
+    pi: { name: 'Pat Investigator', email: 'PI@example.edu', hasEmail: true },
+    liaison: { contactId: null, name: null, email: null },
+    liaisonStatus: 'none',
+  }));
+
+  test('none → the invitation goes to the PI only and the snapshot records liaisonStatus none', async () => {
+    expect(PI_ONLY_BODY).not.toContain('{{liaisonFullName}}');
+    const d = deps({ resolveRecipients: noLiaison() });
+    await createMaterialsCollection({
+      requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org',
+      emailTemplate: { subject: SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT, body: PI_ONLY_BODY },
+    }, d);
+    expect(d.insertCollection.mock.calls[0][0].contacts).toEqual({
+      pi: { role: 'pi', name: 'Pat Investigator', email: 'PI@example.edu' }, liaison: null, liaisonStatus: 'none',
+    });
+    expect(d.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: ['PI@example.edu'], cc: [] }));
+  });
+
+  test('none with a {{liaisonFullName}} template is refused, naming the missing institution Primary Contact', async () => {
+    const d = deps({ resolveRecipients: noLiaison() });
+    const error = await previewMaterialsEmail({ requestId: REQUEST_ID, action: 'create', actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d).catch((e) => e);
+    expect(error).toMatchObject({ code: 'site_visit_materials_email_name_unavailable', httpStatus: 409 });
+    expect(error.message).toMatch(/no Primary Contact/);
+    expect(d.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a found Liaison without an email refuses (409), never PI-only', async () => {
+    const d = deps({ resolveRecipients: jest.fn(async () => ({
+      pi: { name: 'Pat Investigator', email: 'PI@example.edu', hasEmail: true },
+      liaison: { contactId: 'li-1', name: 'Lee Liaison', email: null },
+      liaisonStatus: 'found',
+    })) });
+    await expect(createMaterialsCollection({
+      requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org',
+      emailTemplate: { subject: SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT, body: PI_ONLY_BODY },
+    }, d)).rejects.toThrow(/Liaison/);
+    await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+      .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required', httpStatus: 409 });
+    expect(d.insertCollection).not.toHaveBeenCalled();
+    expect(d.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a legacy snapshot without liaisonStatus still requires the Liaison for a reminder', async () => {
+    const d = deps();
+    await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+    d.__setStored({ ...d.__stored(), invited_at: NOW, contacts: { pi: { role: 'pi', name: 'Pat Investigator', email: 'PI@example.edu' }, liaison: null } });
+    d.sendEmail.mockClear();
+    const { prepareMaterialsReminderEmail } = jest.requireActual('../../lib/services/site-visit-materials/collection-service');
+    await expect(prepareMaterialsReminderEmail({ row: d.__stored(), request: request(), visit: visit(), missing: [], actorId: ACTOR }, d))
+      .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required' });
+  });
 });

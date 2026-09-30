@@ -1230,3 +1230,20 @@ test('an attempt without an acknowledgement shows no stale-inputs audit line', a
   await screen.findByText(preparedAttempt().subject);
   expect(screen.queryByTestId('stale-inputs-acknowledged')).not.toBeInTheDocument();
 });
+
+test('beforeHistory renders between the briefing-link card and Email history, and only with record on', async () => {
+  global.fetch.mockResolvedValue(response({
+    success: true,
+    attempts: [],
+    briefingLink: { id: 'link-1', url: 'https://example.test/external/briefing/t', expiresAt: '2026-12-17T00:00:00Z' },
+  }));
+  const props = { requestId: REQUEST_ID, requestNumber: '1002379', sourceArtifact: { artifactId: ARTIFACT_ID } };
+  const { rerender } = render(<PreSiteDistributionPanel {...props} beforeHistory={<div data-testid="slot">slot</div>} />);
+  const briefing = await screen.findByText('Briefing page link');
+  const history = screen.getByText(/Email history/);
+  const slot = screen.getByTestId('slot');
+  expect(briefing.compareDocumentPosition(slot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(slot.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  rerender(<PreSiteDistributionPanel {...props} record={false} beforeHistory={<div data-testid="slot">slot</div>} />);
+  expect(screen.queryByTestId('slot')).not.toBeInTheDocument();
+});

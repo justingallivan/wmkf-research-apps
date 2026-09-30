@@ -41,7 +41,8 @@ const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_requ
 async function assertLedgerSchemaCurrent(db, migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
-    `SELECT conname FROM pg_constraint WHERE conrelid IN ('test_request_runs'::regclass, 'test_request_run_resources'::regclass)`,
+    `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
+       WHERE t.relname IN ('test_request_runs', 'test_request_run_resources', 'test_request_run_reviewer_assignments', 'test_request_status_changes', 'test_request_cast_members', 'test_request_cast_bindings')`,
   );
   const present = new Set(rows.map((row) => row.conname));
   const missing = expected.filter((name) => !present.has(name));
@@ -51,7 +52,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const liveBody = normalize(fn.rows[0]?.prosrc);
   if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
   if (missing.length) {
-    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
+    throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_reviewer_assignments, test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
   }
 }
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -407,6 +408,16 @@ describeIf('slice 5b runner against the live run ledger', () => {
       'copy_file/sharepoint_file/verified',
     ]);
     expect(resources.filter((row) => row.step === 'copy_file').map((row) => row.readback.index)).toEqual([0, 1]);
+    // P3-f (Opus round 1) regression pin: Basic copy_file's journaled
+    // receipt must carry sourceDriveId (flattenFileCopyEntry's non-
+    // reviewerUpload branch reads it from entry.source?.snapshotDriveId --
+    // a regression there would silently drop it without any other test
+    // noticing, since it is otherwise unused by verify_reviews's own
+    // basicFileCopyResource fixture, which hand-builds its receipt).
+    for (const row of resources.filter((r) => r.step === 'copy_file')) {
+      expect(typeof row.readback.sourceDriveId).toBe('string');
+      expect(row.readback.sourceDriveId.length).toBeGreaterThan(0);
+    }
 
     // Journal strictly before each dispatch.
     const first = (name) => log.indexOf(name);

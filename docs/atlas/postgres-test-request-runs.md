@@ -3,28 +3,41 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable operation ledger for admin-driven test request clone runs; schema live and empty in shared Neon, while the Factory remains unfinished."
+summary: "Durable operation ledger for owner-run test request clones; local ledger recorded for cast creation, shared database status unverified."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-09-26
+last_verified: 2026-09-29
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
   - lib/db/migrations/054_test_request_runs.sql
 ---
 
-# Atlas: `test_request_runs` / `test_request_run_resources` (Postgres)
+# Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` / `test_request_status_changes` / `test_request_cast_members` / `test_request_cast_bindings` (Postgres)
 
-**[VERIFIED via source and shared-Neon readback, 2026-09-26]** Migration 054 and its fresh-install
+**[VERIFIED via source, 2026-09-29]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
 the Test Request Factory's "basic clone" stage
 (docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md, "Operation contract
-and recovery" and the "3. Basic clone" build-stage row). Under explicit owner
-authorization, the canonical migration runner applied 054 to the shared
-Production/Preview Neon database at 2026-09-26T06:54:20Z. Exact readback found
-both tables and `test_request_receipt_ok(jsonb)` with zero rows; a second
-canonical runner invocation was an idempotent no-op. This schema apply does
-not make the unfinished Factory usable and did not execute a clone run.
+and recovery" and the "3. Basic clone" build-stage row). The owner-run record
+names the local `ledger_prod` as the ledger for the production cast creation
+[VERIFIED via `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`,
+*Order* 4]. For the first cast-bound clone (run `e33fa857`, Request 1003303)
+and its `--bind-reviewer`, *Order* 5 does not name the ledger. The CLI
+structurally requires an operator-supplied `TEST_REQUEST_LEDGER_URL` for those
+modes and refuses one that is unset, equals a shared `POSTGRES_URL*` /
+`DATABASE_URL` value, or names a neon.tech host [VERIFIED via
+`scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]. That rules out
+the configured shared URLs and neon.tech hosts, but does not independently
+prove the supplied URL is local or which database was used; the
+exact owner-run target for that clone and binding is unverified (no direct
+record) [ASSUMED unknown].
+Whether migration 054 is applied to the shared Production/Preview Postgres
+database was not re-probed for the B4 plan revision [ASSUMED unknown]. Existing
+shared databases use `node scripts/apply-migrations.js`; the owner retains
+control of any shared-database application. The local ledgers took 054 and
+its in-place amendments by owner-run `psql` (cast plan, *Order* 1 and 4), and
+the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
 
 ## Contract
 
@@ -32,6 +45,9 @@ not make the unfinished Factory usable and did not execute a clone run.
   called by the bounded resumable runner
   `lib/services/test-requests/run-runner.js` (`advanceRun`, one step per
   call) through the CLI modes `--reserve` / `--advance` / `--run-inspect`
+  (and the production `--set-status` / `--status-recheck`, `--create-cast` /
+  `--bind-reviewer` and `--run-recheck` modes, which use the same ledger URL
+  check [VERIFIED via `scripts/rehearse-test-request-sandbox.mjs:1283-1341`])
   of `scripts/rehearse-test-request-sandbox.mjs`, which connect only to
   the operator-supplied `TEST_REQUEST_LEDGER_URL` (refused when unset, when
   it names a neon.tech host, or when it equals any shared `POSTGRES_URL*` /
@@ -106,13 +122,195 @@ not make the unfinished Factory usable and did not execute a clone run.
   second source of truth for either — `destination_request_number` is a
   server-assigned readback recorded for display/lookup convenience, not a
   value the ledger originates.
+- **Production Foundation baseline (MVP item 5, 2026-09-28):** a production
+  `basic` run journals one `foundation_transition` resource at
+  `fence_source`, before the create: digests of the Foundation account's
+  protected projection, its Tax Status/BMF 509 pair, its four non-audited
+  GuideStar columns and its Contacts' versions (`foundationProjectionSha256`,
+  `foundationGoverifyResultSha256`, `foundationGuidestarSha256`,
+  `foundationContactsSha256`), the pre-run `akoya_countofrequests` (`count`),
+  the two GoVerify timestamps and `capturedAt`. No other account value is
+  stored. `verify` evaluates the account against it
+  (`lib/services/test-requests/foundation-transition.js`) and, on a pass,
+  journals a second `foundation_transition` row at `verify` whose `outcome`
+  is `refreshed` or `not_refreshed`. Sandbox runs write neither row. The
+  read-only CLI mode `--target=production --run-recheck=<runId>` re-reads the
+  account and evaluates it against the same baseline (no ledger write).
+
+## `test_request_run_reviewer_assignments` (slice 6c-i, D-R2 owner decision, 2026-09-25)
+
+**[VERIFIED via lib/db/migrations/054_test_request_runs.sql and lib/services/test-requests/run-ledger.js, 2026-09-25]**
+A third table, added in place to migration 054 (and its
+`scripts/setup-database.js` V55 mirror): one row per reviewer assignment
+reserved for a `reviews` recipe run (`run_id`, `sequence`,
+`source_person_id`, `destination_person_id`, `reused`, `address`,
+`address_sha256`, `created_at`). `sequence` is unique per run;
+`source_person_id` and `address` are each unique per run.
+
+- **The one sanctioned exception:** `address` is plain text — the ONE
+  column in this ledger that is not a finite grammar or a digest. Decision 4
+  makes the per-run address assignment the recipient-confinement authority,
+  and D-R2 accepted this exception rather than dropping the address
+  entirely; every other surface (JSONB receipts, `needs_attention_reason`,
+  `--run-inspect` output) carries only `address_sha256`.
+- **Writer:** `createRunLedger(db).reserveRun` writes every assignment row
+  in the same transaction as the run reservation, only on the very first
+  reservation of a given `(actor_id, idempotency_key)` (`created === true`);
+  there is no UPDATE path anywhere in run-ledger.js, so a row is immutable
+  once written. `assertReviewerAssignments` (private to run-ledger.js)
+  validates before any SQL: non-empty when `recipeSeedsReviewers(recipe)` is
+  true (`reviews` and every later cumulative recipe — slice 4a,
+  `lib/services/test-requests/recipe-capabilities.js`), none otherwise, no
+  two assignments sharing a source reviewer or a normalized
+  (trim+lowercase) address. The CLI's `--reserve --recipe=reviews` is the only
+  caller today; each bundle reviewer's address comes from its
+  `--reviewer-address=<sourcePersonGuid>=<address>` flag, else its synthetic
+  bundle address, else the local `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS` base
+  plus-tagged per source reviewer. An address already naming an owned
+  synthetic person bound to the same source reuses it (`reused: true`);
+  otherwise a fresh destination GUID is preallocated. It binds the sorted address digests plus the assignment
+  count into the reservation's `plan_digest`, so a same-key retry naming
+  different addresses conflicts (`409 test_request_run_conflict`) instead of
+  silently reusing the first reservation's assignments.
+- **Reader:** `listRunReviewerAssignments(runId)`, used by
+  `--run-inspect`. Its SELECT list never names the `address` column, only
+  `address_sha256` — the redaction contract is structural (nothing to scrub)
+  rather than a post-hoc scrub of a fetched value.
+- **Resolving an address to an existing synthetic person** (the `reused:
+  true` reuse path, provenance checks, and the seeder that actually creates
+  the Dataverse rows) is 6c-ii, not built yet; this slice is the
+  ledger/runner/CLI/migration dimension only. The four Reviews-only ledger
+  steps (`seed_reviewers`, `copy_review_file`, `seed_review_answers`,
+  `verify_reviews`) stop cleanly with `needs_attention` /
+  `recipe_step_not_built` until then.
+
+## Recipe tokens (slice 4a, 2026-09-26)
+
+**[VERIFIED via source, 2026-09-26]** `test_request_runs.recipe`'s CHECK
+(migration 054 and its `scripts/setup-database.js` mirror) and
+`LEDGER_RECIPES` (now defined in
+`lib/services/test-requests/recipe-capabilities.js`, re-exported unchanged
+from `run-ledger.js`) both accept three additional cumulative tokens:
+`pre_site_visit`, `final_writeup`, `site_visit_materials` (recipes 4, 5 and 3
+of the Recipes 3-5 plan, in that build order). `LEDGER_RECIPES` is ordered
+(`basic`, `initial_assessment`, `reviews`, `pre_site_visit`,
+`final_writeup`, `site_visit_materials`); `recipeSeedsReviewers(recipe)` and
+`recipeSeedsPreSite(recipe)` (same module) are rank-based capability
+predicates over that order, replacing every `recipe === 'reviews'` /
+`!== 'reviews'` comparison across the Factory. Both throw on an
+unrecognized recipe.
+
+**The ledger's own enum accepts these three tokens; `RECIPE_STEP_ORDER`
+(`lib/services/test-requests/run-runner.js`) does NOT yet have an entry for
+`final_writeup`/`site_visit_materials`** (built in 5/3). `pre_site_visit`
+gained its step order in slice 4b (below). `stepOrderForRecipe`/`nextStepFor`
+fail closed (throw) on a recipe with no step order, so the CLI's `--recipe`
+validation (`scripts/rehearse-test-request-sandbox.mjs`) accepts only a
+recipe that BOTH is in `LEDGER_RECIPES` AND has a `RECIPE_STEP_ORDER` entry,
+refusing `final_writeup`/`site_visit_materials` before any Dataverse read or
+ledger write, not merely before their (not-yet-built) steps run.
+
+## Recipe 4 — `pre_site_visit` (slice 4b, 2026-09-26)
+
+**[VERIFIED via source]** `RECIPE_STEP_ORDER.pre_site_visit` is the `reviews`
+order plus four new steps: `seed_presite_ai_run`, `seed_presite_draft`,
+`render_presite`, `verify_presite` (`run-runner.js`). `verify_reviews`
+advances rather than marks ready for this recipe (its own
+`nextStepFor(...) === null ? markReady : advance` branch, built in 4a);
+`verify_presite` is the recipe's only `markReady`.
+
+New ledger dimension additions (migration 054, edited in place, and its
+`scripts/setup-database.js` mirror stay byte-parallel):
+- `LEDGER_STEPS`: the four steps above.
+- `LEDGER_RESOURCE_KINDS`: `dataverse_ai_run` (the stub `wmkf_ai_run` bound at
+  `seed_presite_ai_run`; `seed_presite_draft`'s registry row reuses the
+  existing `dataverse_request_document` kind). `render_presite` (Opus round
+  1 P2a fix) also journals its own `dataverse_request_document`-kind
+  resource marking the step's own start (journal-before-write), keyed by
+  `step: 'render_presite'` so it never collides with `seed_presite_draft`'s
+  same-kind resource in `summarizePresiteResources` (CLI), which filters by
+  `step` in addition to `resourceKind`.
+- `LEDGER_REASON_CODES`: `presite_claim_lost`, `presite_pointer_mismatch`,
+  `presite_upload_ambiguous`, `presite_snapshot_stale`,
+  `presite_verification_failed`, `presite_promotion_uncharacterized`,
+  `presite_ai_run_ambiguous`.
+- `LEDGER_RECEIPT_KEYS` (`KEY_RULES`/`NUMERIC_KEYS`): `promptId`,
+  `confirmedRunId` (GUID — the stub AI-run id re-asserted by
+  `stepSeedPresiteAiRun`'s I3 exact-id recovery; a distinct key from `runId`
+  because a resource can carry both, planned vs. confirmed),
+  `inputFingerprint`/`renderInputFingerprint` (HEX64), `promptVersion`
+  (numeric) — the `test_request_receipt_ok` SQL function's own enumerated
+  grammar carries the same additions. [VERIFIED via
+  lib/services/test-requests/run-ledger.js KEY_RULES and
+  lib/db/migrations/054_test_request_runs.sql:53 / scripts/setup-database.js:1248,
+  slice 4b follow-up 2026-09-26 — `confirmedRunId` was missing from all three
+  before this pass, which would have rejected every real recovery/confirm
+  write as an unsafe ledger value.]
+
+`lib/services/test-requests/presite-sandbox-deps.js` is the sandbox-bound
+dependency seam (mirrors `ia-sandbox-deps.js`/`reviews-sandbox-deps.js`;
+exempt from `check:dataverse-access-layer` by name): `createPresiteSandboxDeps`
+builds the COMPLETE, sandbox-bound dependency object for
+`generatePreSiteVisitArtifact` (`lib/services/pre-site-visit/artifact-
+service.js`) and `createPresiteInputDeps` the matching object for
+`loadPreSiteVisitInputs` (`proposal-core-service.js`) — every key either
+sandbox-bound or a throwing sentinel (`runProposalCore`, `getBuckets`,
+`getExecutorBudget`, `runPrompt`), never a production `DEFAULT_DEPENDENCIES`
+fallback. Owner decision P2 (design doc): the draft is copied from the
+source bundle's `preSiteVisit` section, never regenerated, so a correctly
+seeded row (FAILED, a factory-owned `wmkf_lasterrorcode` outside
+`UNCHANGED_RETRY_BLOCKED_CODES`, the stub run bound) never reaches
+`runProposalCore`. `--reserve --recipe=pre_site_visit` requires a bundle v4
+`preSiteVisit` section (`assertBundleHasPreSiteSectionForRecipe`,
+`source-bundle.js`), refused before any Dataverse read; reviewer-address
+requirements are unchanged (`recipeSeedsReviewers(pre_site_visit)` is already
+true by rank). `getCoPIs`/roster `blockers` are simplified to an empty,
+deterministic result for the sandbox clone (documented in
+`presite-sandbox-deps.js`) — this narrows the rendered Personnel roster and
+referee diagnostics relative to a real staff generation, `[ASSUMED]`
+acceptable for the sandbox rehearsal phase; revisit before any live-proof
+claim about rendered content fidelity.
+
+## `test_request_status_changes` (status setter, 2026-09-28)
+
+**[VERIFIED via lib/db/migrations/054_test_request_runs.sql and lib/services/test-requests/run-ledger.js, 2026-09-28]**
+A fourth table, added in place to migration 054 (and its `scripts/setup-database.js` V55 mirror): one row per Phase I or Phase II Status change the Factory makes on a ready production test Request (`docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`, slice C).
+
+- **Columns:** `change_id` (the CLI's own GUID), `run_id`, per-run `sequence`, `field` (`wmkf_phaseistatus` or `wmkf_phaseiistatus`), `option_before`, `option_after`, `etag_before` (the row version the PATCH's `If-Match` carried), `status` (`planned` → `dispatched` → `applied` → `complete`, or `needs_attention`), `rerun`, `dispatched_at`, `effects` (a receipt under `test_request_receipt_ok`: effect IDs, a digest of the Request Status readback, counts), `error` (sanitized), timestamps.
+- **Writer:** `createRunLedger(db)` `planStatusChange`, `markStatusChangeDispatched`, `markStatusChangeApplied`, `completeStatusChange`, `markStatusChangeNeedsAttention`. No lease: the CLI is owner-run, and a partial unique index (`status IN ('planned','dispatched','applied')`) admits one open change per run.
+- **Reader:** `listStatusChanges(runId)` (the runner's replay and resume checks; `--run-inspect`).
+- **Dataverse reads by the runner** (`lib/services/test-requests/status-change-runner.js`, read-only): `asyncoperations` regarding the Request (completion waits until every job since the write is terminal), `akoya_goapplystatustrackings` by `_akoya_request_value`, regarding `emails`, `akoya_requestpayments`, and the Request's own status fields. Its one write is the fenced `akoya_requests` status PATCH.
+
+## `test_request_cast_members` / `test_request_cast_bindings` (synthetic cast, 2026-09-28)
+
+**[VERIFIED via lib/db/migrations/054_test_request_runs.sql, lib/services/test-requests/run-ledger.js, and merge commit `75d58e331`, 2026-09-29]**
+Two tables added in place to migration 054 (and the V55 mirror) for the cast plan's slices A + B (`docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`).
+
+- **`test_request_cast_members`:** the reused synthetic PI and Liaison contacts and suggested-reviewer person, one per `(environment, role)`. `member_id` is the preallocated Dataverse GUID (`contactid` or `wmkf_potentialreviewersid`), journaled before the create POST names it; `role` (`pi`, `liaison`, `suggested_reviewer`, `org_leader`, `research_leader`) fixes `entity` (`wmkf_potentialreviewers` for the suggested reviewer, `contact` otherwise, a CHECK); `first_name`/`last_name` (the Factory's synthetic defaults), `address_sha256` (digest only, never the address), `status` (`planned` → `dispatched` → `verified`, or `needs_attention`), `readback` (receipt), `error` (sanitized), timestamps.
+- **`test_request_cast_bindings`:** one suggested-reviewer suggestion per `(run_id, member_id)`; `binding_id` is the preallocated `wmkf_appreviewersuggestionid`; same status set, readback and error.
+- **Writer:** `createRunLedger(db)` `planCastMember`, `markCastMemberDispatched`, `markCastMemberVerified`, `markCastMemberNeedsAttention`, `planCastBinding`, `markCastBindingDispatched`, `markCastBindingVerified`, `markCastBindingNeedsAttention`. Owner-run CLI, no lease; the unique constraints refuse a second plan.
+- **Reader:** `listCastMembers({ environment })`, `getCastBinding({ runId, memberId })`.
 
 ## Limits
 
-- Migration 054 is live in the shared database, but both tables are empty and
-  no deployed API route or worker writes them. The operator-only rehearsal
-  CLI still refuses shared Neon and requires a separately supplied local
-  `TEST_REQUEST_LEDGER_URL`.
+- The owner-run CLI refuses a ledger URL matching the configured shared
+  Production/Preview URLs or a neon.tech host for every ledger-driven mode [VERIFIED via
+  `scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]; the local
+  `ledger_prod` is recorded for the production cast creation (cast plan,
+  *Order* 4). Which local ledger the 1003303 clone and binding used is not
+  recorded (see the header). Shared Production/Preview database migration
+  status remains unverified; this B4 revision performs no live read.
+- Slice B4 plans a **separate** Potential Reviewer 1 operation table in new
+  migration 055, with a new V56 fresh-install mirror after V55. Typed columns
+  hold the slot snapshot and readback without changing the receipt grammar.
+  Migration 055 must reconcile earlier applied 054 shapes before adding its
+  composite foreign key; each target's schema remains unverified. On the
+  operational local `ledger_prod` and `ledger` it is applied by an owner-run
+  `psql -f` after a read-only shape preflight, with a recorded application,
+  never by `apply-migrations.js`. On shared Production/Preview it only keeps
+  the tracked migrations consistent and is not a B4 runtime prerequisite. It
+  is not built or applied [PLANNED via the cast plan, *Order* 6 revision 3,
+  §6].
 - `test_request_run_resources.readback`/`source_provenance` are JSONB and
   the schema cannot itself forbid a caller from stuffing prohibited content
   (document bodies, tokens) into them — that discipline lives in the

@@ -73,7 +73,8 @@ jobs:
       - run: npm run test:ci
 
   ledger-postgres:
-    # Live PostgreSQL proof for the Test Request Factory run ledger. The unit
+    # Live PostgreSQL proof for the Test Request Factory run ledger (and the
+    # site-visit materials automatic-reminder claim's contacts compare). The unit
     # fake cannot see SQL grammar or parameter typing (an aggregate FOR UPDATE
     # once passed it), so this suite is REQUIRED here: it fails, not skips,
     # when the connection URL is missing (TEST_REQUEST_LEDGER_REQUIRE=1).
@@ -98,7 +99,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx jest tests/integration/test-request-run-ledger.pg.test.js tests/integration/test-request-run-runner.pg.test.js
+      - run: npx jest tests/integration/test-request-run-ledger.pg.test.js tests/integration/test-request-run-runner.pg.test.js tests/integration/site-visit-materials-claim.pg.test.js
         env:
           TEST_REQUEST_LEDGER_TEST_URL: postgres://postgres:ledger@127.0.0.1:5432/ledger
           TEST_REQUEST_LEDGER_REQUIRE: '1'

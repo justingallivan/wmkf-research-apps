@@ -55,7 +55,11 @@ export default function useSiteVisitContext(requestId) {
       const logisticsBody = logisticsEnvelope.data;
       if (cancelled) return;
       if (!logisticsEnvelope.ok) {
-        setContext((value) => value ? { ...value, presentationMaterialsStatus: 'unavailable' } : value);
+        setContext((value) => value ? {
+          ...value,
+          unavailable: true,
+          presentationMaterialsStatus: 'unavailable',
+        } : value);
         return;
       }
       const visit = logisticsBody.siteVisit || null;
@@ -69,8 +73,8 @@ export default function useSiteVisitContext(requestId) {
         presentationMaterialConflicts: projectionReady ? (logisticsBody.presentationMaterialConflicts || []) : [],
       }));
       return directory.then((directoryEnvelope) => {
-        if (cancelled || !directoryEnvelope?.ok) return;
-        const directoryBody = directoryEnvelope.data;
+        if (cancelled) return;
+        const directoryBody = directoryEnvelope?.ok ? directoryEnvelope.data : {};
         const lookup = new Map([
           ...(directoryBody.staff || []).map((row) => [refKey(row), row]),
           ...(directoryBody.external || []).map((row) => [refKey(row), row]),
@@ -87,7 +91,11 @@ export default function useSiteVisitContext(requestId) {
       });
     }).catch(() => {
       if (!cancelled) {
-        setContext((value) => value ? { ...value, presentationMaterialsStatus: 'unavailable' } : value);
+        setContext((value) => value ? {
+          ...value,
+          unavailable: true,
+          presentationMaterialsStatus: 'unavailable',
+        } : value);
       }
     });
     return () => {

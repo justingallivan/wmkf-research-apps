@@ -64,6 +64,15 @@ describe('assertTestRequestMarkerNotWritten', () => {
     ['property-level PUT', `akoya_requests(${REQUEST_ID})/wmkf_istestrequest`],
     ['property-level DELETE with $value', `akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid/$value`],
     ['absolute property URL', `https://example.crm.dynamics.com/api/data/v9.2/akoya_requests(${REQUEST_ID})/wmkf_istestrequest`],
+    ['percent-encoded property URL (Codex 6c-i round 3)', `wmkf_potentialreviewerses(${REQUEST_ID})/%77mkf_issyntheticreviewer`],
+    ['fully percent-encoded property URL', `akoya_requests(${REQUEST_ID})/%77%6D%6B%66_istestrequest`],
+    ['malformed percent-encoding (fails closed)', `akoya_requests(${REQUEST_ID})/%ZZmkf_istestrequest`],
+    ['backslash-separated property URL (Codex 6c-i round 4)', `akoya_requests(${REQUEST_ID})\\wmkf_istestrequest`],
+    ['encoded-backslash property URL', `akoya_requests(${REQUEST_ID})%5Cwmkf_istestrequest`],
+    ['encoded-slash property URL', `akoya_requests(${REQUEST_ID})%2Fwmkf_testcreationrunid`],
+    ['fragment-suffixed property URL (Codex 6c-i round 7)', `akoya_requests(${REQUEST_ID})/wmkf_istestrequest#ignored`],
+    ['absolute fragment-suffixed person marker URL', `https://example.crm.dynamics.com/api/data/v9.2/wmkf_potentialreviewerses(${REQUEST_ID})/wmkf_issyntheticreviewer#x`],
+    ['fragment before an encoded separator', `akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid#%2F`],
   ])('refuses a %s that names the field in the URL', (_label, url) => {
     expect(() => assertTestRequestMarkerNotWritten(undefined, url))
       .toThrow(expect.objectContaining({ code: 'test_request_marker_immutable' }));
@@ -165,7 +174,9 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
   });
 
   test('keeps its marker field list identical to the service guard', () => {
-    expect([...TEST_REQUEST_MARKER_FIELDS].sort()).toEqual(['wmkf_istestrequest', 'wmkf_testcreationrunid']);
+    expect([...TEST_REQUEST_MARKER_FIELDS].sort()).toEqual([
+      'wmkf_issyntheticreviewer', 'wmkf_istestrequest', 'wmkf_testcreationrunid',
+    ]);
   });
 
   test.each([
@@ -174,6 +185,14 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
     ['raw PUT', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})/wmkf_istestrequest`, { value: true })],
     ['nested deep insert', (c) => c.post('/accounts', { name: 'x', akoya_request: { wmkf_istestrequest: true } })],
     ['property-level DELETE', (c) => c.delete_(`/akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid`)],
+    ['post (synthetic-reviewer person marker)', (c) => c.post('/wmkf_potentialreviewerses', { wmkf_issyntheticreviewer: true })],
+    ['percent-encoded property PUT (Codex 6c-i round 3)', (c) => c.raw('PUT', `/wmkf_potentialreviewerses(${REQUEST_ID})/%77mkf_issyntheticreviewer`, { value: false })],
+    ['malformed percent-encoded property PUT (fails closed)', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})/%ZZmkf_istestrequest`, { value: false })],
+    ['backslash-separated property PUT (Codex 6c-i round 4)', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})\\wmkf_istestrequest`, { value: false })],
+    ['encoded-backslash property PUT', (c) => c.raw('PUT', `/wmkf_potentialreviewerses(${REQUEST_ID})%5Cwmkf_issyntheticreviewer`, { value: false })],
+    ['encoded-slash property DELETE', (c) => c.delete_(`/akoya_requests(${REQUEST_ID})%2Fwmkf_testcreationrunid`)],
+    ['fragment-suffixed property PUT (Codex 6c-i round 7)', (c) => c.raw('PUT', `/akoya_requests(${REQUEST_ID})/wmkf_istestrequest#ignored`, { value: false })],
+    ['absolute fragment-suffixed person marker PUT', (c) => c.raw('PUT', `https://example.crm.dynamics.com/api/data/v9.2/wmkf_potentialreviewerses(${REQUEST_ID})/wmkf_issyntheticreviewer#x`, { value: false })],
   ])('refuses a %s that names the marker before any fetch', async (_label, send) => {
     const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't' });
     await expect(send(client)).rejects.toMatchObject({ code: 'test_request_marker_immutable' });
@@ -184,6 +203,112 @@ describe('raw Dataverse client (lib/dataverse/client.js)', () => {
     const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't', allowTestRequestMarkerWrites: true });
     await client.post('/akoya_requests', { wmkf_istestrequest: true });
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('lets the factory CLI write the synthetic-reviewer person marker when it opts in (D-R1: the person create goes through this same raw client)', async () => {
+    const client = createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't', allowTestRequestMarkerWrites: true });
+    await client.post('/wmkf_potentialreviewerses', { wmkf_issyntheticreviewer: true });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Codex adversarial round 1: allowTestRequestMarkerWrites is scoped, not a blanket bypass', () => {
+    function optedInClient() {
+      return createClient({ resourceUrl: 'https://example.crm.dynamics.com', token: 't', allowTestRequestMarkerWrites: true });
+    }
+
+    test('a PATCH naming a marker is refused even with the flag set', async () => {
+      const client = optedInClient();
+      await expect(client.patch(`/akoya_requests(${REQUEST_ID})`, { wmkf_istestrequest: true }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('a PUT/DELETE naming a marker in the URL path is refused even with the flag set', async () => {
+      const client = optedInClient();
+      await expect(client.raw('PUT', `/akoya_requests(${REQUEST_ID})/wmkf_istestrequest`, { value: true }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      await expect(client.delete_(`/akoya_requests(${REQUEST_ID})/wmkf_testcreationrunid`))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('a POST to a different entity set is refused even with the flag set', async () => {
+      const client = optedInClient();
+      await expect(client.post('/accounts', { wmkf_istestrequest: true }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('a POST with the marker set to false is refused even with the flag set (only true is a create attestation)', async () => {
+      const client = optedInClient();
+      await expect(client.post('/akoya_requests', { wmkf_istestrequest: false }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('a POST with wmkf_testcreationrunid not GUID-shaped is refused even with the flag set', async () => {
+      const client = optedInClient();
+      await expect(client.post('/akoya_requests', { wmkf_istestrequest: true, wmkf_testcreationrunid: 'not-a-guid' }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('a nested/deep-insert marker is refused even with the flag set and an otherwise-sanctioned entity set', async () => {
+      const client = optedInClient();
+      await expect(client.post('/akoya_requests', { akoya_title: 'x', wmkf_Nested: { wmkf_istestrequest: true } }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('a dot-segment or backslash path that resolves to another entity set is refused even with the flag set (Fable 6c-i final)', async () => {
+      const client = optedInClient();
+      for (const path of ['/akoya_requests/../accounts', '/akoya_requests/..\\accounts', '/akoya_requests/%2E%2E/accounts', '/accounts#/akoya_requests']) {
+        await expect(client.post(path, { name: 'x', wmkf_istestrequest: true }))
+          .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('an array-nested (collection deep-insert) marker is refused even with the flag set (Codex 6c-i round 2)', async () => {
+      const client = optedInClient();
+      await expect(client.post('/akoya_requests', { akoya_title: 'x', wmkf_related: [{ wmkf_istestrequest: false }] }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      await expect(client.post('/akoya_requests', { akoya_title: 'x', wmkf_istestrequest: true, wmkf_related: [{ ok: 1 }, { wmkf_testcreationrunid: RUN_ID }] }))
+        .rejects.toMatchObject({ code: 'test_request_marker_immutable' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('the REAL create_request body (compileTestRequestDraft output) is allowed through the flag', async () => {
+      // Mirrors basic-clone-steps.js compileBody -> policy.js compileTestRequestDraft's
+      // createBody exactly: a flat POST body to /akoya_requests carrying both
+      // markers at the top level, marker true, runId GUID-shaped.
+      const createBody = {
+        akoya_requestid: REQUEST_ID,
+        'akoya_ApplicantId@odata.bind': `/accounts(${RUN_ID})`,
+        akoya_title: 'TEST: example',
+        akoya_fiscalyear: 'December 2026',
+        wmkf_meetingdate: '2026-12-01',
+        wmkf_meetingdate2: 100000000,
+        wmkf_istestrequest: true,
+        wmkf_testcreationrunid: RUN_ID,
+        wmkf_respondreminderenabled: false,
+        wmkf_reviewduereminderenabled: false,
+      };
+      const client = optedInClient();
+      await client.postWithOptions('/akoya_requests', createBody, { Prefer: 'return=representation' });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    test('the synthetic-person POST shape (D-R1) is allowed through the flag', async () => {
+      const client = optedInClient();
+      await client.post('/wmkf_potentialreviewerses', {
+        wmkf_potentialreviewerid: REQUEST_ID,
+        wmkf_name: 'TEST · Example Reviewer',
+        wmkf_emailaddress: 'reviewer.one@example.test',
+        wmkf_issyntheticreviewer: true,
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   test('leaves ordinary writes and reads unchanged', async () => {

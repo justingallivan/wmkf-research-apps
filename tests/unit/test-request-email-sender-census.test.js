@@ -130,6 +130,8 @@ test.each(Object.entries(RECORDED_SENDERS).flatMap(([file, v]) => v.early.map((f
 
 test('the delivery seam still guards both email creation and dispatch', () => {
   const seam = fs.readFileSync(path.join(ROOT, 'lib/services/dynamics/email.js'), 'utf8');
-  expect(seam).toMatch(/await assertEmailNotAboutTestRequest\(svc, regardingId, regardingType\);/);
+  // S546: both calls now pass a recipients loader for the test-Request allowlist;
+  // one guards creation and one the dispatch recheck.
+  expect(seam.match(/await assertEmailNotAboutTestRequest\(svc, regardingId, regardingType, async \(\) =>/g) || []).toHaveLength(2);
   expect(seam).toMatch(/await assertSendNotAboutTestRequest\(svc, emailId\);/);
 });

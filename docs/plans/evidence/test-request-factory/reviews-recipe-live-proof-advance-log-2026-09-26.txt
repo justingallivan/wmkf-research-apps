@@ -1,0 +1,205 @@
+[dataverse-interlock] active: mode=on deployment=local target=sandbox caller=dataverse/client.call
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "fence_source",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": null,
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "create_request",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "correct_meeting_date",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "provision_location",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "copy_file",
+  "outcome": "needs_attention",
+  "status": "needs_attention",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": "graph no-response: fetch failed"
+}
+[dataverse-interlock] active: mode=on deployment=local target=sandbox caller=dataverse/client.call
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "copy_file",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "copy_file",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "observe",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "verify",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+(node:80317) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_initial_assessment",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_initial_assessment_snapshot",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "verify_initial_assessment",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_reviewers",
+  "outcome": "needs_attention",
+  "status": "needs_attention",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": "Created destination person field wmkf_name does not match the bundle's synthetic-person projection."
+}
+[dataverse-interlock] active: mode=on deployment=local target=sandbox caller=dataverse/client.call
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_reviewers",
+  "outcome": "advanced",
+  "status": "needs_attention",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_reviewers",
+  "outcome": "advanced",
+  "status": "needs_attention",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_reviewers",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "copy_review_file",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_review_answers",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_review_answers",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "seed_review_answers",
+  "outcome": "advanced",
+  "status": "creating",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}
+(node:86097) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "verify_reviews",
+  "outcome": "needs_attention",
+  "status": "needs_attention",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": "verify_reviews: destination suggestion carries a non-null wmkf_externaltokenrevoked; a synthetic test suggestion must never have real external-access or honorarium fields set."
+}
+[dataverse-interlock] active: mode=on deployment=local target=sandbox caller=dataverse/client.call
+(node:87348) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+{
+  "mode": "ADVANCED",
+  "runId": "83c5da2e-8d98-498f-bca4-34e51b4cbead",
+  "step": "verify_reviews",
+  "outcome": "ready",
+  "status": "ready",
+  "destinationRequestNumber": "1000343",
+  "errorMessage": null
+}

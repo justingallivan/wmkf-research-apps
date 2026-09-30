@@ -168,7 +168,8 @@ describe('sandbox operator write boundary', () => {
     expect(script.indexOf('writeNewJson(args.manifestOut, manifest)')).toBeLessThan(script.indexOf('ledger.reserveRun('));
     expect(script).toContain('cliActorId(');
     expect(script).not.toMatch(/cli:\$\{/);
-    expect(script).toContain('destinationDataverseHost: new URL(SANDBOX_URL).hostname');
+    // Production plan P1: the reserved destination host comes from the manifest's pinned target.
+    expect(script).toContain('destinationDataverseHost: targetHostOf(manifest)');
     // --advance reports a finished run plainly instead of claiming a lease on it.
     expect(script).toContain("mode: 'NOT_ADVANCED'");
     // --run-inspect must not construct the Dataverse client at all.
@@ -225,16 +226,28 @@ describe('sandbox operator write boundary', () => {
     expect(enterBypass).toBeGreaterThan(runAdvanceStart);
     const loopStart = script.indexOf('for (let i = 0; i < args.steps; i += 1) {', runAdvanceStart);
     expect(loopStart).toBeGreaterThan(enterBypass);
-    // Not entered anywhere else in the file (module load, runReserve, etc.).
-    expect(script.indexOf('enterDynamicsBypassForScript(', enterBypass + 1)).toBe(-1);
-    expect(script.indexOf('enterDynamicsBypassForScript(')).toBe(enterBypass);
+    // Not entered anywhere else in the file except runReserve's own
+    // reviews-recipe-only entry (slice 6c-ii Stage B:
+    // resolveReviewerAssignments' sandbox-bound reads/ledger reads also need
+    // a trusted context, entered narrowly inside runReserve, only when
+    // args.recipe === 'reviews', never for basic/initial_assessment).
+    const runReserveStart = script.indexOf('async function runReserve(');
+    expect(runReserveStart).toBeGreaterThan(-1);
+    const enterBypassReserve = script.indexOf("enterDynamicsBypassForScript('rehearse-test-request-sandbox:reserve-reviews')", runReserveStart);
+    expect(enterBypassReserve).toBeGreaterThan(runReserveStart);
+    expect(enterBypassReserve).toBeLessThan(runAdvanceStart);
+    const thirdCall = script.indexOf('enterDynamicsBypassForScript(', enterBypass + 1);
+    expect(thirdCall).toBe(-1);
   });
 
-  it('--advance takes the ledger maximum 900 s lease for the initial_assessment recipe and 300 s otherwise (owner decision 2026-09-24, no renewal)', () => {
+  it('--advance derives its lease duration from recipeLeaseSeconds (owner decision 2026-09-24, no renewal; P1-b: any IA-cumulative recipe must get the 900 s maximum, not just initial_assessment by name)', () => {
     const script = fs.readFileSync(path.join(process.cwd(), 'scripts/rehearse-test-request-sandbox.mjs'), 'utf8');
     const runAdvanceStart = script.indexOf('async function runAdvance(');
-    const lease = script.indexOf("leaseSeconds: manifest.recipe === 'initial_assessment' ? 900 : 300", runAdvanceStart);
+    const lease = script.indexOf("leaseSeconds: recipeLeaseSeconds(manifest.recipe ?? 'basic')", runAdvanceStart);
     expect(lease).toBeGreaterThan(runAdvanceStart);
     expect(script.indexOf('renewLease')).toBe(-1);
+    // recipeLeaseSeconds itself (run-runner.js) is unit-tested for all three
+    // recipes; this only pins that the CLI actually calls it rather than
+    // naming a single recipe by string.
   });
 });

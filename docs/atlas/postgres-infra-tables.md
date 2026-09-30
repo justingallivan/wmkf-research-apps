@@ -724,13 +724,18 @@ never here: accepted uploads are SharePoint items registered in `wmkf_requestdoc
 service reads back by artifact type and canonical filename. Migration 044 adds `slot_leases JSONB
 NOT NULL DEFAULT '{}'::jsonb`: one server-owned token/expiry object per canonical checklist slot.
 **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** manual email previews
-read the current Project Leader and liaison emails without writing this row. A blank Request
-Primary Contact uses the applicant Account's Org Primary Contact for the liaison. Send requires both roles,
-revalidates the reviewed To/Cc recipients, and refreshes `contacts` from the Request: an existing
-invitation uses a conditional contact update before transport; a manual reminder updates contacts
-in the same conditional UPDATE that claims the reminder. The automatic sweep uses the stored
-snapshot and skips rows lacking either role. A corrected Request contact therefore takes effect
-on a fresh manual preview and Send, without a migration.
+read the current Project Leader and liaison emails without writing this row. The liaison is the
+Liaison of record (`lib/services/contacts/request-liaison.js`): for Research the applicant
+Account's Primary Contact only; other programs keep the Request Primary Contact, falling back to
+the Account's when blank. `contacts` also records `liaisonStatus`: `'none'` (a successful read found
+no Liaison) sends to the PI only; `'found'` without an email refuses (409); a legacy snapshot
+without a status still requires both roles. Send revalidates the reviewed To/Cc recipients and
+refreshes `contacts`: an existing invitation uses a conditional contact update before transport;
+a manual reminder updates contacts in the same conditional UPDATE that claims the reminder. The
+automatic sweep re-resolves contacts before preparing, and `claimAutomaticReminder` compares the
+snapshot it read and saves the refreshed one in its claim UPDATE (a changed snapshot loses the
+claim; nothing is sent). A corrected contact therefore takes effect on the next preview, Send or
+automatic reminder, without a migration.
 `collection-store.js` acquires an absent or expired entry with one conditional UPDATE before the
 finalize re-read and removes only the matching token afterward; the five-minute expiry recovers a
 crashed holder while live contention returns `slot_busy`. Readiness flag

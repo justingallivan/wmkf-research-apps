@@ -1,1043 +1,909 @@
-# Session 554 Prompt: Board presentation-link Preview acceptance (branch-local)
-
-## Current result — 2026-09-29 PT
-
-**[VERIFIED via signed-in Chrome, Safari Private Browsing, the downloaded file, and Vercel readback]**
-On `codex/feature-request` at `f43251cf8`, owner-approved bounded Preview acceptance used the
-existing marked sandbox Request `1000350` / `4424f6e5-7409-45ad-a96e-5f7d89896ce5`.
-The Board presentation link showed exactly the current synthetic Zoom Recording and 203-byte
-VTT Transcript on the materials-only page. Watch redirected to the saved synthetic Zoom URL;
-Download delivered a 203-byte transcript. After Issue new link, the old URL became unavailable
-and the replacement URL showed the same materials. The
-[recipient receipt](docs/plans/evidence/post-presentation/board-link-preview-2026-09-29.md)
-records the bounded evidence without retaining bearer tokens.
-
-**[PARTIAL private-window gate]** Safari Private Browsing was redirected to Vercel sign-in before
-the application loaded. Preview protection was not changed; anonymous private-window viewing
-remains unproved. The synthetic Zoom recording does not exist, so real playback is also unproved.
-No MP4 Watch/long-seek test was performed with this fixture.
-
-**[VERIFIED cleanup]** The registered Preview alias again resolves to its prior deployment
-`dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2`; the feature-branch alias stayed on
-`dpl_8C7qZ4XqvZp64DPUTb2QeqtXAa9d`. Branch-scoped Preview
-`POST_PRESENTATION_MATERIALS_ACCESS` reads `off`, and temporary redeployment
-`dpl_wzudtJ6a3SDWiaA9apRD6cZkoZDQ` was removed. The replacement link displayed an
-unavailable message through the restored Preview alias. Production deployment, runtime
-configuration, Dataverse, and SharePoint were untouched; the sandbox link issuance and reissue
-wrote two rows to the shared Preview/Production Postgres link ledger. MP4
-Cancel/Retry and Graph-confirmed terminal expiry remain offline/partial, and Production
-promotion remains separate. The Session 553 section below is historical.
-
-# Session 553 Historical Result: Zoom link and transcript Preview acceptance (branch-local)
-
-## Result at that session — 2026-09-29 PT
-
-**[VERIFIED via signed-in Chrome, sandbox Dataverse, Microsoft Graph, and Vercel readback]**
-On `codex/feature-request` at `e777c4b05`, the owner-approved bounded Preview test passed:
-synthetic Zoom link save, synthetic 203-byte VTT staging/finalize, staff readback after reload,
-and exact Graph download byte count/SHA-256 matching the source and Request Document hash.
-The separate marked sandbox Request is `1000350` / `4424f6e5-7409-45ad-a96e-5f7d89896ce5`;
-its active synthetic Site Visit is `80a066f6-2ad9-45a5-a329-564f8484f9b8`. The factory's
-guarded one-create GoVerify bypass was owner-approved and verified restored active. The
-[acceptance receipt](docs/plans/evidence/post-presentation/zoom-transcript-preview-2026-09-29.md)
-records the two retained Request Document IDs and the bounded evidence.
-
-**[VERIFIED cleanup]** Branch-scoped Preview `POST_PRESENTATION_MATERIALS_ACCESS` reads `off`.
-The registered Preview alias was restored to its observed prior deployment
-`dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2`, the feature-branch alias to
-`dpl_8C7qZ4XqvZp64DPUTb2QeqtXAa9d`, and the temporary redeployment was removed after
-both alias readbacks. Production deployment, runtime configuration, and Dataverse were untouched;
-the Preview transcript-staging path used the shared Preview/Production Postgres database.
-Retained Request `1000334` was untouched.
-
-The synthetic Zoom URL does not prove real playback; no Board materials-only link was generated
-for the new Request. MP4 Cancel/Retry and Graph-confirmed terminal expiry remain offline/partial
-as described in the presentation-materials plan. Production promotion remains a separate
-owner-approved step. The Session 552 section below is historical.
-
-# Session 552 Prompt: Prepare post-presentation staff controls for promotion (branch-local)
-
-## Current branch status (2026-09-29)
-
-**[VERIFIED via feature-branch source and focused offline tests]** Staff Cancel and Retry upload
-are built on `codex/feature-request` in the Meeting Tracker card, guarded routes, service,
-and durable upload-intent store. Cancel requires a confirmed closed session and absent exact
-path before abandoning; Retry rechecks Graph and resumes a live session or starts a new session
-from byte zero only after a terminal 410 or a failed mint with no URL. The same actor, Request,
-active Site Visit, and immutable intent/path/generation are retained. No migration was added.
-The historical Graph-confirmed expiry cell remains PARTIAL. Zoom-link paste and transcript
-upload/finalize staff controls are also source-built on this branch and use the existing guarded
-producer routes. **[VERIFIED via 69 focused tests, type/lint/build gates, documentation gates,
-and two read-only Opus reviews]** Their client retry, request-switch, URL, and completion-notice
-paths have been checked offline; signed-in runtime acceptance is still pending. Commit
-`10277843f` was pushed; **[VERIFIED via the GitHub commit status]** its automatic Vercel Preview
-build succeeded. No live upload, manual deployment, alias move, access-mode change, Production
-configuration change, or SharePoint deletion occurred in these implementations. The source
-branch awaits bounded, owner-approved signed-in Preview acceptance before Production promotion. The
-Session 551 instructions below are historical context.
-
-## Session 550 Summary
-
-The bounded Preview presentation-media acceptance work is closed. The remaining Graph expiry
-probe was not advanced: repeated status-only checks continued to report HTTP 200 with the exact
-20 MiB remaining range, and no Graph-confirmed terminal 410 was observed. The Chrome DevTools
-console later became unavailable, so no further probe should be claimed without a newly opened
-console. No runtime, database, deployment, alias, Production, SharePoint, or deletion changes
-were made in this handoff.
-
-The feature branch remains unmerged and Production remains undeployed. Shared Postgres
-migration 055 is applied; Wave 30 evidence is sandbox-only. Bounded Preview Safari
-Watch/seek/Download acceptance passed and Preview presentation access was returned to `off`.
-The staff visit card currently exposes MP4 upload and Board link controls; Zoom URL and
-transcript staff inputs, and the Cancel/Retry controls below, are still planned. Older
-session sections in this file are historical snapshots and may describe earlier gates.
-
-### Next session direction — owner decision
-
-Replace the low-value passive expiry wait with a concrete user-recovery milestone: add a visible
-**Cancel** action and a bounded **Retry upload** action for unfinished presentation-media uploads.
-The intended contract is to stop retrying on terminal Graph/session failure, preserve the last
-Graph-confirmed range as diagnostic history, mark the durable intent failed with a terminal reason,
-let Cancel abandon the unfinished
-intent only after the exact path is confirmed absent without creating a candidate or Request
-Document, and let Retry create a fresh Graph session from byte zero after terminal failure and
-absent-path proof. Resume from the last confirmed range applies only to the still-live old
-session. The scoped, source-reconciled plan is §7.2.2 of
-`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`. Use
-`/contract-reconcile` before implementation, and obtain iterative read-only Claude Opus reviews
-for the code changes as before. Add focused tests for state transitions, bounded retry, cancel,
-fresh-session creation, and the no-candidate/no-Request-Document invariant.
-
-The Chrome upload-session expiry row remains **PARTIAL**. Do not claim Graph-confirmed `410`
-evidence, and do not restore the retired Preview proof harness merely to obtain it. Do not run
-another live upload, deploy Production, change Production configuration, move the Preview alias,
-or delete any retained item without a new concrete approval list.
-
-### Graceful stop instructions
-
-Leave the current Chrome page and retained records untouched. To stop this task, let the current
-turn finish, then close or archive the Codex task from the sidebar; do not click Resume, upload,
-finalize, cancel an existing item, or delete anything. The next session should begin with
-`/start`, verify the branch and clean state, then read this note and the presentation-materials
-plan before making changes.
-
-## Session 550 Summary (prior)
-
-## Authorized rollout progress — 2026-09-25/26 PT
-
-**[VERIFIED via the canonical migration runner and direct shared-Neon readback]** The owner
-explicitly authorized additive migrations 054 and 055 after preflight proved both were pending on
-the shared Preview/Production Neon database. `node scripts/apply-migrations.js` applied exactly
-`054_test_request_runs.sql` and `055_post_presentation_materials.sql`; a second canonical run was
-an idempotent 0-applied/54-skipped no-op. `schema_migrations` records both at
-2026-09-26T06:54:20Z with `applied_by=codex-feature-request-2026-09-26`. Exact readback found the
-five expected tables, the presentation indexes/constraints, the five-scope staging constraint,
-and `test_request_receipt_ok(jsonb)`. All five new tables contain zero rows. This schema apply does
-not make the unfinished Test Request Factory usable and did not run any Factory producer.
-
-**[VERIFIED via branch-scoped Vercel configuration and masked pull]** Only Preview settings scoped
-to `codex/feature-request` were changed: `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and
-`POST_PRESENTATION_MATERIALS_ACCESS=test:4236c2b3-b053-f111-bec7-6045bd015cb0`. Sandbox
-Dataverse, the approved SharePoint site, both Dataverse safety controls, and Meeting Tracker
-readiness remain correctly configured. Production runtime configuration/deployment was not
-changed.
-
-**[HISTORICAL PARTIAL deployment result; fail-closed]** Direct CLI Preview deployment
-`dpl_LT4y71456H53U91sNnG5vm2zi5NB` is Ready from branch commit
-`ffd9b79e8fbe448da9d5ca26b328376bc1418460`, and the registered Preview alias was temporarily moved
-to it under the owner's exact approval. A signed-in Chrome check then showed “Meeting Tracker is
-not yet enabled.” This proves the direct CLI source deployment did not receive the branch-scoped
-Preview overrides even though its metadata names the branch. It performed no Request, Postgres,
-Dataverse, or SharePoint mutation. Keep this result fail-closed; create the next deployment through
-the Git integration so branch-scoped variables are present, verify readiness before moving the
-alias again, and restore exact prior Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` if
-that correction fails.
-
-**[VERIFIED via Git/Vercel metadata, protected HTTP smoke, signed-in Chrome, and exact shared-Neon
-readback]** Commit `e78eec9278d17d9630dd7c061854a97c7c710f21` was pushed only to
-`codex/feature-request`. The Git-triggered deployment proved branch-scoped presentation readiness
-was present, but its first alias POST exposed an origin mismatch: Preview's CSRF allowlist had
-derived the immutable deployment hostname while the registered browser origin was
-`https://wmkfresearchapps-preview.vercel.app`. No link row was created by that rejected request.
-The smallest configuration-only correction added branch-scoped Preview `NEXTAUTH_URL` for that
-exact registered alias and redeployed the same attested Git commit. Corrected deployment
-`dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr` is Ready, has Git source ref `codex/feature-request` and SHA
-`e78eec9278d17d9630dd7c061854a97c7c710f21`, and the alias was re-inspected after moving to it.
-A protected fake-token request reached the app and failed closed `401 malformed` with
-`private, no-store`, proving schema readiness was active.
-
-The existing signed-in Chrome session then loaded human-created sandbox Request `1000334`, showed
-retained slot-version-3 recording `1000334-Recording-99b13f1f-9d77-4468-92aa-f6bc05c0c691.mp4`,
-and successfully generated one materials-only link. Shared-Neon readback found exactly one live,
-non-revoked link row (`c7cc8602-59c5-43d1-b703-e5dec26d0eba`) for the approved Request, created
-2026-09-26T07:31:15Z and expiring 2026-11-25T07:31:15Z; upload and slot-lease tables remain empty.
-The token/ciphertext was not printed or added to tracked files. Chrome copied the URL to the local
-clipboard and was left on the exact Request page for the owner's Safari gate. No upload, deletion,
-email/recipient action, Production deployment, or Production runtime configuration change
-occurred.
-
-**[VERIFIED via owner-operated macOS Safari and local file readback]** The materials-only page's
-Watch action played the retained recording in Safari, and seeking worked across the available
-timeline. The file is under one minute, so a seek beyond two minutes was impossible and is not
-claimed. Download completed as
-`1000334-Recording-99b13f1f-9d77-4468-92aa-f6bc05c0c691.mp4`; local readback found exactly
-100,665,703 bytes and SHA-256
-`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`, equal to the approved
-source and retained Graph item. This closes the bounded Preview macOS Safari Watch/available-seek/
-Download-integrity row. It does not claim a greater-than-two-minute seek or a Production runtime
-deployment.
-
-**[VERIFIED cleanup via Vercel alias/environment readback]** Under the owner's exact approval,
-branch-scoped Preview `POST_PRESENTATION_MATERIALS_ACCESS` was reset to literal `off`, then pulled
-to a temporary file and read back as `off`; the temporary file was deleted. The registered
-`wmkfresearchapps-preview.vercel.app` alias was restored and re-inspected at exact prior Factory
-deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, Ready. Migration 054/055 schema, link row
-`c7cc8602-59c5-43d1-b703-e5dec26d0eba`, the retained recording, and all Request Documents remain
-untouched. No deletion or Production runtime configuration/deployment change occurred.
-
-## Immediate continuation
-
-- The bounded Safari media gate is complete. Remaining technical evidence is Graph-confirmed
-  terminal upload-session expiry/recovery; live retry/reconnect/watchdog states remain
-  offline-tested only. Do not restore the retired proof harness.
-- Preview cleanup is complete. The alias is back on the Factory deployment and this branch's
-  presentation access is off. Leave the live link row, retained recording, schema, and Request
-  Documents untouched unless separately authorized.
-
-# Session 549 Prompt: Disabled-state Preview deployment and shared-DB stop (branch-local)
-
-## Approved Preview preflight/deploy — 2026-09-25 PT
-
-**[VERIFIED via Git and Vercel CLI/API]** Work remained in
-`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on `codex/feature-request`; local and
-origin began at `a1ad6145819f2b993c51330d23a6e6ff48bcbb1a`. The main checkout, Factory branch,
-`main`, shared Preview alias, and Production deployment were not changed. Immutable Preview
-deployment `dpl_BTKYAuCZSefymnUPcahBtGpQgWZf` is Ready at
-`https://wmkfresearchapps-h2tcnfzkf-justin-gallivans-projects.vercel.app`; Vercel metadata attests
-Preview context, branch `codex/feature-request`, and commit `a1ad6145819f2b993c51330d23a6e6ff48bcbb1a`.
-Its remote canonical Turbopack build passed. The local canonical build hit the known worktree-only
-external-`node_modules` symlink panic; the documented `npx next build --webpack` fallback passed
-with only existing warnings. A protected deployment GET reached the application sign-in page, and
-the public disabled-state presentation-context smoke returned fail-closed `404 not_found` with
-`private, no-store`.
-Atlas, fact-consistency, build-claim-freshness, and memory-router gates each passed with their
-self-tests run sequentially; docs-catalog and agent-invariant gates also passed. No runtime code
-changed in this deployment/configuration turn, so no new Opus code-review claim is made.
-
-**[VERIFIED via branch-scoped Vercel inventory and masked pull comparison]** Preview settings scoped
-only to `codex/feature-request` now use the same sandbox Dataverse target and approved SharePoint
-site as the existing test-request Preview branch, with `DATAVERSE_DAL_ENFORCEMENT=on` and
-`MEETING_TRACKER_SCHEMA_READY=on`. Presentation rollout is deliberately pinned off:
-`POST_PRESENTATION_MATERIALS_SCHEMA_READY=off` and `POST_PRESENTATION_MATERIALS_ACCESS=off`.
-The Factory branch's settings were read but not edited. The project-level Preview inventory still
-lists `EXTERNAL_LINK_SECRET`; its value was neither requested nor printed.
-
-**[STOPPED before a Production-connected write]** A masked comparison proved Preview and Production
-resolve to the exact same Neon project, host, database, and connection URLs. A read-only query then
-proved `055_post_presentation_materials.sql` is not tracked and none of its three tables exists.
-Because the owner's approval was Preview-only and explicitly excluded Production changes, migration
-055 was not applied, schema readiness/access were not enabled, and no Postgres/Dataverse/SharePoint
-write or deletion occurred. This is a contract-reconciliation stop, not a failed migration.
-
-## Morning continuation
-
-- Obtain explicit authorization to apply additive migration 055 to the **shared Preview/Production
-  Neon database**. The earlier Preview-only migration approval is insufficient.
-- After successful apply/readback, change only this branch's presentation settings to
-  `POST_PRESENTATION_MATERIALS_SCHEMA_READY=on` and
-  `POST_PRESENTATION_MATERIALS_ACCESS=test:4236c2b3-b053-f111-bec7-6045bd015cb0`, then create and
-  attest a fresh immutable Preview deployment.
-- Obtain a fresh exact approval before temporarily moving the shared registered-auth Preview alias
-  to that deployment. The immutable hostname is build/smoke evidence but is not a usable Microsoft
-  OAuth test origin by itself.
-- The owner can then open Request `1000334`, generate the materials-only Board link, and use the
-  already retained slot-version-3 recording for Safari Watch, more-than-two-minute seeking where
-  the media permits, and Download integrity. No new upload or deletion is needed.
-- Keep access `off` if migration/readback, deployment, authentication, or smoke fails. Do not change
-  Production runtime configuration/deployment or delete any retained item/row.
-
-# Session 548 Prompt: Durable presentation-media Safari upload acceptance (branch-local)
-
-## Local-runtime / sandbox-data acceptance — 2026-09-25 PT
-
-**[VERIFIED via Git, owner-operated signed-in macOS Safari, disposable local PostgreSQL 16,
-sandbox Dataverse readback, Microsoft Graph metadata, and exact Graph download]** Work remained in
-`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on `codex/feature-request`; the main
-checkout, Factory branch, and `main` were not edited or pushed. The turn began at local/origin
-`48f447135`; bounded-range correction `1fcc6bc0f` and the historical handoff `c628d7367` remain
-contained. No deployment, Preview alias move, Production write, or deletion occurred.
-
-The owner approved two sequential Safari uploads of the exact retained test file to human-created
-sandbox Request `1000334` / `4236c2b3-b053-f111-bec7-6045bd015cb0`, including the necessary local
-intent and sandbox Request Document writes and retention of all governed items/records. The first
-Safari upload finalized normally as intent `48e3c648-af86-4730-9819-34bfee6e35e2`; its completed
-screen correctly hid the transient Pause/Resume controls. Under a fresh one-upload approval, the
-second Safari run visibly reached Pause, Resume, and successful save according to the owner.
-
-**[VERIFIED Safari pause/resume result]** Intent `99b13f1f-9d77-4468-92aa-f6bc05c0c691` finalized
-as exact SharePoint item `01G4GVMSZMGFZUIBYSWZGZDSLZFQLSDVFW` / physical filename
-`1000334-Recording-99b13f1f-9d77-4468-92aa-f6bc05c0c691.mp4`. The durable row has equal declared
-and candidate sizes of 100,665,703 bytes and cleared upload-URL ciphertext. A fresh Graph download
-returned 100,665,703 bytes, MIME `video/mp4`, and SHA-256
-`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`, exactly matching the local
-source. Graph's current eTag advanced from the registry-time `,2` to `,3` with stable identity,
-size, hash, and version `1.0`; this is metadata advancement, not content drift.
-
-Ready Request Document `aa09e166-6ab9-f111-aaad-70a8a59af221` binds the Safari pause/resume item
-at slot version 3. Safari slot-version-2 document `f39a712d-69b9-f111-aaad-70a8a59af221` and Chrome
-slot-version-1 document `0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` are Superseded; all three exact
-items, documents, and intents remain retained as approved. The 64.088-second intent-to-finalized
-interval includes the deliberate pause and is not an active-rate benchmark. The owner-observed UI
-sequence plus durable/Graph/Dataverse readback closes the local Safari upload/pause/resume/finalize
-subpath. It does not prove the exact pause boundary, displayed rate/ETA, Production Watch,
-long-seek, Download UI, live retry/reconnect/watchdog, or Graph-confirmed
-terminal expiry.
-
-**[OWNER DECISION 2026-09-25 — performance gate closed]** Stop treating the temporarily slow home
-uplink as a release proxy and do not run another live throughput/near-cap benchmark. The office
-failure mode was request/rate-limit overhead from 320 KiB fragments, not available bandwidth. The
-accepted fix is the code-owned 10 MiB default: about 308 → 10 PUTs for the 100,665,703-byte test
-file and 6,104 → 191 nominal PUTs at the 2,000,000,000-byte cap. Remove the same-network baseline,
-45-minute threshold, and percentage-of-baseline gate. Preserve the exact 2 GB validation/schema
-boundary, aligned final remainder, resume/integrity checks, and no-full-file-proxy contract.
-
-**[VERIFIED local-harness cleanup]** The temporary branch-local `next.config.js` alias/transpile
-hook for `/private/tmp/wmkf-local-vercel-postgres-adapter.cjs` was removed and is not part of the
-branch diff. The local Next server was stopped. The disposable PostgreSQL container/database and
-adapter file remain retained; deletion was not approved. No runtime code changed during the
-Safari run, so no new Opus code-review claim is made; the shared transport and bounded-range code
-retain their previously completed iterative read-only OAuth Claude Opus reviews.
-
-## Remaining release work
-
-- Chrome's upload-session expiry row remains **PARTIAL** because neither the Chrome nor Safari
-  durable-producer run observed Graph-confirmed terminal expiry. Retest only through the durable
-  producer; do not restore the retired Preview proof harness.
-- Migration 055 is not applied to the actual Preview-connected database, and this branch is not
-  deployed or enabled in Preview or Production. Any migration, configuration, deployment, alias
-  move, SharePoint upload/deletion, or Production write requires a fresh concrete approval list.
-- Local Safari upload is accepted. Production Safari Watch, >2-minute seeking, and Download UI/
-  integrity remain deferred to a freshly approved human-created Request. The Test Request Factory
-  is unfinished and is not a dependency. No live near-cap throughput run is required.
-- Live retry, reconnect, and watchdog states remain offline-tested only. Do not attempt iPadOS or
-  another Edge run.
-- Do not delete Request `1000334`, its Site Visit, any of the three retained Request Documents,
-  SharePoint items, local acceptance database/container, or adapter file without a separate exact
-  cleanup approval and registry-safe teardown.
-
-# Session 547 Prompt: Durable presentation-media Chrome acceptance (branch-local)
-
-## Local-runtime / sandbox-data acceptance — 2026-09-25 PT
-
-**[VERIFIED via Git/source, sandbox Dataverse readback, disposable local PostgreSQL 16,
-signed-in desktop Chrome, Microsoft Graph, and exact registry readback]** Work remained in
-`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on `codex/feature-request`; the main
-checkout, Factory branch, and `main` were not edited or pushed. The turn began at local/origin
-`01bae42c4`; historical handoff `c628d7367` remains contained. No branch deployment, Preview
-alias move, Production Dataverse/Postgres write, Production environment change, or deletion
-occurred.
-
-With the owner's explicit approvals, Wave 30 was applied to sandbox Dataverse and exact readback
-confirmed `wmkf_requestdocument.wmkf_ExternalUrl` and `wmkf_SlotVersion`. Human-created sandbox
-Request `1000334` / `4236c2b3-b053-f111-bec7-6045bd015cb0` was set to Advancing, one active Site
-Visit `38bf47c0-c1aa-46fc-b9d0-167aa76ad962` was created, and its meeting date was separately
-approved and changed to the canonical D26 test date `2026-12-11`. The application ran locally
-against disposable PostgreSQL 16 container `wmkf-presentation-1000334-20260925`; the shared Vercel
-Postgres database did not receive migration 055. These approved sandbox records,
-the container, and the local-only adapter file are retained; cleanup/deletion was not approved.
-
-**[VERIFIED Chrome result]** The production Meeting Tracker producer selected
-`Gallivan_Peleg Intro.mp4` (100,665,703 bytes; SHA-256
-`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`), paused after the first
-fragment at exactly 10 MiB Graph-confirmed and zero bytes in flight, and showed unknown ETA while
-paused. The first Resume found a real integration defect: live Graph returned bounded remaining
-range `10485760-100665702`, while the server accepted only open-ended `start-`. The corrected
-server accepts exactly one open-ended range or one bounded range whose end is exactly declared
-size minus one; malformed, ambiguous, wrong-end, backward, and out-of-file ranges still fail
-closed. After restart, Resume continued from 10 MiB; confirmed/in-flight bytes stayed distinct,
-the displayed post-resume rate was about 3.30–3.35 Mbps with a decreasing ETA, and finalize
-succeeded. No retry, reconnect, watchdog, or Graph-confirmed terminal-expiry state was exercised.
-
-The retained intent is `e7236795-42d8-4018-8ee8-cdc66b953e9b`. Exact SharePoint item
-`01G4GVMS7QSHYRKNIEVNAKQG2A5XLZAEYM` / physical filename
-`1000334-Recording-e7236795-42d8-4018-8ee8-cdc66b953e9b.mp4` is 100,665,703 bytes and its remote
-SHA-256 exactly matches the local file. Ready Request Document
-`0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` binds the exact item at slot version 1. Graph's current
-eTag advanced from the registry-time `,2` to `,3`, while stable item ID, byte count, SHA-256, and
-SharePoint version `1.0` remained equal; treat this as observed metadata advancement, not content
-drift. The item and registry row are intentionally retained.
-
-**[VERIFIED code/test/review]** Four focused Jest suites pass 121 tests; `npm run check:types`,
-scoped ESLint, `git diff --check`, and `npm run build -- --webpack` pass. The build reports only
-the repository's existing configuration/dynamic-dependency warnings. Two iterative read-only OAuth
-Claude Opus reviews covered the bounded-range correction. The first requested explicit open-ended
-and below/above-end fixtures; they were added. The second found no actionable issue. No
-Ultrareview or other metered product was used. The temporary `next.config.js` local adapter hook
-was removed and is not part of the branch diff. Atlas, documentation-currency, documentation-
-symbol, fact-consistency, and build-claim-freshness gates each pass with their self-tests run
-sequentially; docs-catalog and agent-invariant gates also pass.
-
-## Remaining release work
-
-- Chrome's upload-session expiry row remains **PARTIAL** because this run resumed a live session;
-  it did not establish Graph-confirmed terminal expiry. Do not upgrade that row from tests or the
-  earlier sealed-timestamp refusal.
-- The sandbox Dataverse wave is applied, but migration 055 is not applied to the actual Preview
-  database and this branch is not deployed or enabled there. Preview/Production rollout still
-  requires a fresh concrete approval list.
-- Desktop macOS Safari, long-seek, Download integrity, and near-cap Production remain deferred.
-  Use an individually approved human-created Request; the Test Request Factory is unfinished and
-  is not a dependency. Do not attempt iPadOS or another Edge run.
-- Do not delete the retained Request `1000334` Site Visit, Request Document, SharePoint item,
-  local acceptance database/container, or adapter file without a separate exact cleanup approval.
-
-# Session 546 Prompt: Preview proof retirement (branch-local)
-
-## Offline Slice 6 release hardening — 2026-09-25 PT
-
-**[VERIFIED via Git/source]** With the owner's explicit approval, the Preview-only
-presentation-media proof pages, API routes, service, limiter, token audience, UI, compatibility
-export wrapper, and proof-only CSP/header exceptions were retired on `codex/feature-request`. The shared
-`graph-browser-upload.js` transport and the production Meeting Tracker producer/consumer remain.
-A regression test pins all nine proof runtime files absent; Preview-mode proxy tests prove the
-retired URLs receive no Microsoft CSP exception while the production upload and materials pages
-retain their exact scoped exceptions. Historical benchmark receipts remain in the product plan.
-
-**[VERIFIED offline]** Four focused Jest suites pass 103 tests. `npm run check:types`, scoped
-ESLint (zero warnings/errors), and `npm run build -- --webpack` pass; the build reports only the
-repository's existing dynamic-dependency and Next configuration warnings. API-route,
-route-lifecycle-auth, route-service-boundary, and fact-consistency gates pass with their self-tests
-run sequentially. Current route and guarded-endpoint counts are generated in
-`docs/CANONICAL_COUNTS.md`; this historical receipt does not freeze them. Six iterative
-read-only OAuth Claude Opus rounds found no runtime, security, CSP, or
-shared-transport regression. Accepted evidence fixes moved the retired-path negative test into
-Preview mode, preserved historical Slice 5 counts, marked Session 542's work item superseded,
-described the intent's sliding Graph-expiry-plus-three-day review window accurately, removed
-decorative assertions, and reconciled all historical proof language with the new durable-producer
-expiry gate. Round 6 returned exactly `No findings.` No Ultrareview or other metered product was
-used.
-
-**[NO LIVE EFFECTS]** No migration, schema/readiness/access setting, deployment, alias move,
-SharePoint upload/deletion, benchmark, or Production/Dataverse write occurred. The shared Preview
-alias was inspected read-only and still resolved to Ready Factory deployment
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; `codex/feature-request` had no branch-scoped Preview variables.
-Live Slice 6 work still requires a fresh concrete, staged approval list. Request `1003220` remains
-a Production request whose prior upload/cleanup approvals are spent; it is not silently authorized
-as a Preview sandbox write fixture.
-
-# Session 545 Prompt: Presentation-material consumers and Board link (branch-local)
-
-## Offline Slice 5 milestone — 2026-09-25 PT
-
-**[VERIFIED via Git]** Work remained in
-`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on
-`codex/feature-request`. The turn resumed at local/origin `b1c2fe9b9`; historical
-handoff `c628d7367` was already contained. Commit `8db99b8e2` implements the
-Slice 5 staff and external consumers. The main checkout, Factory branch, and
-`main` were not edited or pushed.
-
-**[SOURCE-BUILT/OFFLINE-TESTED; NOT DEPLOYED, MIGRATED, CONFIGURED, OR
-LIVE-PROVED]** Staff Deliberations now receives a distinct current
-Recording/Transcript/Transcript Summary projection from the existing logistics
-read, independent of recipient-directory failure, with explicit loading,
-loaded-empty, unavailable, and disabled states. Meeting Tracker adds an
-independent 60-day materials-only presentation link with Generate/Copy/manual
-fallback/compare-and-swap Issue-new controls. The link has its own
-`presentation-materials` token audience, digest plus encrypted-token row,
-request/access/revocation/expiry verifier, and race-safe first mint/reissue. A
-lost reissue race refreshes the winner; monotonic link-read/mutation epochs keep
-late GETs from restoring a revoked URL or erasing a mutation error.
-
-The external presentation page exposes only institution, proposal title, link
-expiry, portal Applicant Slides/Other Materials, and the current post-
-presentation singleton winners. Every media action re-verifies the token,
-request, producer/type/status/lifecycle/current-winner membership, and fresh
-Graph drive/item/malware facts. Zoom is watch-only. SharePoint MP4 Watch and
-file Download are no-store 302 redirects to a freshly resolved Microsoft URL,
-so files over 50 MiB never traverse the application. Playback performs one
-automatic URL re-resolution with position restore, then offers manual Resume.
-Context and media actions have separate fail-closed token/IP limiter buckets;
-429/503 page-load failures receive truthful retry copy. The full deliberation
-briefing remains the separate D19/D28 superset with its existing 50 MiB
-behavior.
-
-**[VERIFIED tests/build/gates]** The final changed surface passes 40 Jest suites
-/ 555 tests; the focused staff card passes 48 tests. `npm run check:types` and
-`npm run build -- --webpack` pass; the build reports only the repository's
-existing dynamic-dependency warnings. Scoped ESLint reports zero errors and
-two existing `react-hooks/set-state-in-effect` warnings in
-`StaffDeliberationsTab.js` and `useSiteVisitContext.js`. API-route,
-route-lifecycle-auth, route-service-boundary, GUID trust-boundary,
-Dynamics-context-boundary, and fact-consistency gates each passed after their
-self-test ran sequentially. Canonical counts at that run were 237 API route files. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-09-25 -->
-At that run there were 146 `requireAppAccess` endpoint files. <!-- fact-consistency:ignore fact=requireappaccess-endpoint-count as-of=2026-09-25 -->
-`git diff --check` passed.
-
-**[VERIFIED iterative review]** Five completed read-only OAuth Claude Opus
-rounds reviewed Slice 5. Accepted findings added route-level Meeting Tracker
-readiness, separate fail-closed context/media limiter buckets, expiry/race/SQL
-and large-media negative tests, authoritative refresh after a lost reissue
-race, and stale-read/mutation fencing. The intentional loading/unavailable
-contract was retained because a failed shared read cannot truthfully be called
-rollout-disabled. Round 5 returned exactly `No findings.` No Ultrareview or
-other metered product was used.
-
-**[VERIFIED after reviewer reconnect]** A late transport-review concern about
-in-flight lifecycle abort was refuted against the actual contract: the shipped
-user control is graceful pause-after-fragment, while lifecycle abort retains
-the permit and deliberately defers Graph reconciliation to the next authorized
-manual Resume. The source, tests, and plan remain aligned; no transport change
-was needed.
-
-## Remaining release work
-
-- Slice 6 remains approval-bound. Migration 055 and Wave 30 are unapplied;
-  `POST_PRESENTATION_MATERIALS_SCHEMA_READY`, access, and destructive cleanup
-  remain off/unconfigured.
-- Before any deployment, migration, environment change, alias move, SharePoint
-  upload/deletion, Production/Dataverse write, or live benchmark, present a
-  fresh concrete approval list. Request 1003220 approvals are spent.
-- The Test Request Factory is unfinished. Future live checks use an individually
-  approved human-created Request; do not wait for or claim a Factory-created
-  fixture.
-- Chrome's upload-session expiry row remains PARTIAL because Graph-confirmed
-  terminal expiry was not proved. Do not attempt another Edge run or iPadOS.
-  Desktop macOS Safari, long-seek, Download integrity, and near-cap Production
-  checks remain deferred until the production-safe flow is deliberately
-  released and freshly approved.
-
-# Session 544 Prompt: Durable browser-direct presentation uploads (branch-local)
-
-## Offline Slice 4 milestone — 2026-09-25 PT
-
-**[VERIFIED via Git]** Work remained in
-`/Users/gallivan/.codex/worktrees/feature-request/WMKF_Apps` on
-`codex/feature-request`. The turn began at local/origin `1f1fb7f22`; historical handoff
-`c628d7367` was already contained. Commit `7fe2d8faf` now implements the durable MP4 milestone.
-The main checkout, Factory branch, and `main` were not edited or pushed.
-
-**[SOURCE-BUILT/OFFLINE-TESTED; NOT DEPLOYED, MIGRATED, CONFIGURED, OR LIVE-PROVED]** The Meeting
-Tracker now uses the shared browser-direct Graph transport for durable Recording intents: a
-code-owned 10 MiB default, strict sequential Graph-confirmed ranges, status-aware bounded retry,
-stall/response watchdogs, truthful confirmed/in-flight progress, sampled throughput/ETA, graceful
-pause, offline/reconnect recovery, and same-browser locking. Begin persists immutable
-actor/request/active-visit/file/path/generation identity before returning the ciphertext-backed
-Graph session. Resume independently reauthorizes, rechecks the bounded file fingerprint and live
-Graph state, and never treats stored initial expiry as terminal. Finalize re-resolves one exact
-stable full-size item, reads only the bounded MP4 signature range, uses the Recording slot fence,
-and durably records replay/reconciliation outcomes without proxying media bytes through the app.
-The staff card exposes unfinished, Resume, and Finish-saving states and suppresses stale state on
-Request navigation. Route-scoped CSP and full-page navigation preserve direct Microsoft access.
-
-The daily intent reconciler is inspect/refresh/record/alert-only by default. Destructive behavior
-requires both general access `on` and the separate literal
-`POST_PRESENTATION_MATERIALS_CLEANUP=on`; neither is configured or approved live. It deletes only
-one exact stable unbound candidate after a zero-row generation-key proof, retains any exact
-registry binding in every lifecycle, and preserves bytes on ambiguity, mismatch, or uncertain
-transport. No SharePoint upload/deletion, Dataverse write, deployment, alias move, or environment
-change occurred in this milestone.
-
-**[VERIFIED tests and gates]** The focused card suite passes 41 tests. The changed surface passes
-16 suites / 307 tests. `npm run check:types` passes. Scoped ESLint reports zero errors and one
-pre-existing `react-hooks/set-state-in-effect` warning in `SiteVisitEditor.js:163`. The following
-gate/self-test pairs passed sequentially: API routes, Atlas, doc currency, fact consistency,
-canonical pointers, doc symbol references, build-claim freshness, GUID trust boundary, Dataverse
-access layer, Dynamics context boundary, route lifecycle auth, route/service boundary, Request
-Document writers, secret scan, scaffolding tokens, and status-enum parity. Migration-manifest,
-docs-catalog, and agent-invariant gates also pass. Canonical counts were regenerated to 234 API
-route files and 145 `requireAppAccess` endpoints. The default Turbopack build cannot follow this
-worktree's intentional external `node_modules` symlink; `npx next build --webpack` completed the
-production build successfully with only the repository's existing dynamic-import warnings.
-
-**[VERIFIED iterative review]** Five read-only OAuth Claude Opus rounds reviewed the server-side
-intent/finalize/cleanup lifecycle to a final no-findings result. Nine more read-only Opus rounds
-reviewed the browser/UI integration. Findings were fixed iteratively—including navigation/CSP,
-stale state, status timeout, retry/pause copy, finalize guidance, contract validation, and exact
-timer boundaries—and Round 9 returned exactly `No findings.` Browser review resume UUID:
-`a5929117-c293-4ee6-8915-ebb57254e624`. No Ultrareview or other metered product was used.
-
-## Remaining release work
-
-- Migration 055 and Wave 30 are still unapplied; schema readiness, rollout access, and destructive
-  cleanup remain off/unconfigured.
-- The historical Chrome upload-session expiry row remains **PARTIAL** because the live run did not
-  prove Graph-confirmed terminal expiry. Do not upgrade that claim from offline tests.
-- Desktop macOS Safari, long-seek, and near-cap Production checks remain deferred until the
-  production-safe flow is deliberately deployed and an owner-approved human-created test Request
-  is selected. The Test Request Factory is unfinished; do not wait for it or claim it exists.
-- Before any live benchmark, deployment, alias move, SharePoint upload/deletion, Production write,
-  Dataverse write, or environment change, present a fresh concrete approval list. Do not reuse the
-  spent Request 1003220 approvals. Do not attempt iPadOS or another Edge run.
-
-# Session 543 Prompt: Presentation upload performance (branch-local)
-
-## Session 543 representative Chrome benchmark — 2026-09-25 PT
-
-**[VERIFIED via Git, Vercel CLI, signed-in Google Chrome, immutable deployment logs, and
-Microsoft Graph]** `codex/feature-request` commit `cc97dccd7` was redeployed as Ready Preview
-deployment `dpl_FX7HvZZWTvvVchDytB3rRqCtEYoX`. With the owner's explicit approval, the shared
-alias temporarily moved from Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and the
-three branch-scoped Preview settings `NEXTAUTH_URL`, `SHAREPOINT_SITE_URL`, and
-`DATAVERSE_ALLOW_PROD_READS` were temporarily added only for `codex/feature-request`. The target
-was owner-selected Request `1003220` / GUID `4bfb6e40-678f-f111-8076-7ced8d3d15a6`, folder
-`akoya_request/1003220_4BFB6E40678FF11180767CED8D3D15A6/Post Site Visit Materials/`, using
-`Gallivan_Peleg Intro.mp4` (100,665,703 bytes; SHA-256
-`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`). No Dataverse write
-occurred.
-
-**[VERIFIED baseline]** a separate actual Google Chrome upload sent the file browser-direct to a
-second Graph session with ten sequential 10 MiB-or-smaller ranges. Nine `202` responses advanced
-the exact expected offset and the final response was `201`; no retry or pause occurred. It ran
-09:02:38.368–09:08:16.366 PDT: 337.997 seconds and 2.383 decimal Mbps. Graph read-back matched
-100,665,703 bytes. The first exact cleanup correctly failed closed with `412` after SharePoint
-changed the item's ETag; a fresh stable-ID read supplied the current ETag, deletion succeeded,
-and Graph confirmed item `01G4GVMSZVL54J6EWVVRGZ7MMA2OSIJOFB` absent.
-
-**[VERIFIED application run]** Vercel logged the begin request at 09:11:12.912 PDT and the
-complete verification request at 09:16:13.045 PDT: 300.133 seconds wall time including one
-deliberate pause. Chrome showed Pausing while the first range remained in flight, then Paused at
-exactly 10.0 MiB Graph-confirmed and 0 bytes in flight. Resume continued from that boundary.
-Confirmed and in-flight bytes remained distinct; the displayed ETA decreased to zero and the
-final post-resume active rate was 3.22 decimal Mbps. Displayed Graph expiry advanced from
-09:26:19 to 09:26:43 and 09:30:56 PDT. No reconnect, retry, or watchdog state surfaced.
-Microsoft and the application verified the full committed file, and Finish saving minted the
-five-minute playback proof. Exact app item `01G4GVMS7LYCLMCV7HI5GL427ZLUYRYSV2` was deleted
-with its fresh ETag; Graph confirmed it absent and the governed folder empty. The app's active
-rate was about 35% above the immediately preceding baseline and its pause-inclusive wall rate was
-about 2.683 Mbps. Treat this as evidence of no apparent app penalty in this one run, not a
-generalized acceleration. A 2,000,000,000-byte transfer at 3.22 Mbps is about 82.8 minutes
-active (**ESTIMATE**), not near-cap PASS.
-
-**[VERIFIED restoration]** the shared alias is back on exact Ready Factory deployment
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; all three temporary `codex/feature-request` Preview settings
-were removed and a branch-filtered environment listing is empty. Both upload approvals and both
-cleanup approvals are spent. Temporary benchmark scripts were removed. No token, preauthenticated
-upload URL, or playback URL is retained in this handoff.
-
-## Session 543 Slice 1 additive schema/readiness — 2026-09-25 PT
-
-**[SOURCE-BUILT; NOT APPLIED OR DEPLOYED.]** Wave 30 defines optional Request Document
-`wmkf_ExternalUrl` (URL String, 2,000 characters) and `wmkf_SlotVersion` (whole number
-1–2,147,483,647), with an exact read-only typed preflight. The adapter keeps both fields out of
-its base/legacy projection until `POST_PRESENTATION_MATERIALS_SCHEMA_READY` is literal `on`.
-Migration `055_post_presentation_materials.sql` and fresh-install V56 define
-`presentation_material_links`, ciphertext-only durable `presentation_material_uploads`,
-`presentation_material_slot_leases`, and the complete five-scope `portal_upload_staging`
-allowlist. `POST_PRESENTATION_MATERIALS_ACCESS` accepts only `off`, `on`, or one normalized
-`test:<GUID>` and fails closed otherwise; schema readiness alone enables no producer.
-
-**[VERIFIED offline]** the Wave 30 preflight self-test, type check, scoped lint, and 14
-changed-surface Jest suites (197 tests) pass. Migration/fresh-install CHECK bodies and durable
-index contracts are compared exactly and the manifest tracks migration 055. Migration-manifest,
-Atlas, Dataverse access-layer,
-Request Document writer, doc-currency, fact-consistency, doc-symbol, status-enum, GUID-boundary,
-secret-scan, scaffolding-token, docs-catalog, and agent-invariant gates pass; every applicable
-self-test passed sequentially. Atlas/runbook/plan surfaces describe the source-only state. No
-Postgres migration or Dataverse wave was applied, no environment variable was changed, no route
-or producer was enabled, and no external write occurred.
-
-**[VERIFIED via two completed independent read-only Claude Opus implementation reviews,
-2026-09-25.]** Both reviews found that the original `054`/V55 numbering collided with the Test
-Request Factory ledger already present on current `origin/main`; that source collision does not
-imply the Factory is finished or usable. The unapplied feature schema is now renumbered to
-migration `055_post_presentation_materials.sql` / fresh-install V56. Review fixes also pin all
-four durable index definitions in migration/fresh-install parity, catalogue the new readiness
-utility, and require base64-shaped ciphertext envelopes so a raw `http(s)` Graph upload URL
-cannot satisfy the durable column. A third test-focused Opus attempt stalled twice and produced
-no report; it is not counted as a completed review.
-
-## Session 543 Slice 2 shared model and Zoom producer — 2026-09-25 PT
-
-**[SOURCE-BUILT/OFFLINE-TESTED at `c9f3920d5`; NOT APPLIED, DEPLOYED, OR ENABLED.]** After merging current
-`origin/main` at `0e19f4293` in merge commit `c20775c80`, this branch adds the shared
-post-presentation backing validator and fence-first winner projector; a five-minute Postgres
-request/type lease whose same retry token preserves its fence even after release; the
-Meeting Tracker `presentation-materials` GET/PATCH route and actor-required Zoom producer; a
-distinct Workbench logistics presentation projection; and the full-briefing no-store 302 media
-resolver with a dedicated fail-closed token/IP limiter. The existing bounded briefing document
-route remains intact. Neither media bytes nor Zoom/Microsoft URLs enter context JSON or
-application persistence through the new resolver.
-
-**[VERIFIED offline]** eleven focused suites pass 196 tests covering URL allowlists,
-external/file/both/neither backing, deterministic tie-breaking, lease SQL, generation replay,
-newer-winner replay, stale-holder refusal, exact predecessor updates, explicit actor attribution,
-readiness/access suppression, D19/D28 positive inclusion, no-buffer Graph resolution, malware
-refusal, route allowlists, limiter failure injection, the Graph public-facade boundary, and exact
-ETag-guarded proof cleanup. `check:types`, scoped ESLint, `git diff --check`, and a local
-`npx next build --webpack` production build pass; the build emitted only the repository's existing
-dynamic-dependency warnings. The API route, route lifecycle/auth, route/service boundary,
-Dynamics-context boundary, Dataverse access
-layer, Request Document writer, and trust-boundary GUID gates all pass, each followed by its
-self-test; the route and GUID gates covered all 231 route files at that milestone. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-09-25 --> The durable-document sweep found
-no additional live restatement outside the plan, handoff, route matrix, route count, and service
-catalog surfaces updated by this milestone. Documentation/security gates are recorded after the
-final wording below.
-
-**[VERIFIED via two completed read-only Claude Opus implementation reviews, 2026-09-25.]** The
-first review found that a live same-operation holder could reacquire its lease and admit a second
-create; acquisition now preserves the retry fence only after expiry/release, while a live holder
-must renew. It also drove the 2,000-character URL bound, HTTP-plus-HTTPS occurrence count,
-nonempty embedded `pwd`, removal of the unreviewed Zoom detail path, and best-effort reconciliation
-event handling. The second review found no high/critical issue; its defense-in-depth concerns are
-now explicit exact drive/item/HTTPS checks plus Recording-only and MIME/extension validation at
-the briefing resolver. Two broader/test-focused attempts exhausted their turns or stalled without
-a completed report and are not counted. No paid or metered review product was used.
-
-**[VERIFIED Mode A durable-fact sweep.]** Scope was the Slice 2 source-built state and its Graph
-facade/route-count consequences; live external state was excluded because this milestone was
-explicitly offline. Claims: 9 → VERIFIED 5 (implementation, producer→Dataverse/lease persistence,
-Workbench/briefing consumers, bounded tests/gates, no live effects), PARTIAL 1 (Graph-confirmed
-session expiry), PLANNED 3 (schema/access activation, deployment, Safari/near-cap acceptance),
-ASSUMED/UNKNOWN 0. Five in-scope durable surfaces were classified: two already AGREE and three
-STALE (this handoff's interim count/pending wording, the Graph facade method count, and generated
-canonical counts); all three were structurally corrected, leaving zero live stale claims in this
-scope. `check:fact-consistency`, `check:doc-currency`, `check:doc-symbol-refs`,
-`check:canonical-pointers`, `check:secret-scan`, and `check:scaffolding-tokens` pass with each
-self-test sequentially; `check:docs-catalog` and `check:agent-invariants` also pass.
-
-**[VERIFIED no-live-effects.]** No migration or Dataverse schema was applied, no readiness/access
-flag changed, no deployment/alias moved, no SharePoint item or upload session was created, and no
-Production/Dataverse write occurred. The Factory remains unfinished and is not a dependency;
-future live validation still requires a fresh concrete approval list and an individually approved
-human-created Request.
-
-## Session 543 Slice 3 governed transcript producer — 2026-09-25 PT
-
-**[SOURCE-BUILT/OFFLINE-TESTED at `20bdab526`; NOT APPLIED, DEPLOYED, OR ENABLED.]** The branch now
-contains actor/request/transcript-bound private staging and finalize routes with a code-owned
-25 MiB cap; exact VTT/TXT/PDF/DOCX validation; scanner refusal; candidate-before-Dataverse
-recovery; staging and material-slot lease fences; required actor attribution; deterministic-path
-lost-response adoption only after byte-hash proof; current-winner projection; and scope-specific
-orphan reconciliation. The staging ID is the client retry identity, while each finalize claim's
-own lease token owns the Transcript slot. Cleanup retains any exact registry match regardless of
-lifecycle and deletes a zero-row orphan only after unchanged identity/bytes proof using an
-ETag-guarded exact-item delete.
-
-**[VERIFIED offline]** Fifteen expanded changed-surface suites pass 198 tests; scoped ESLint, type checking,
-diff hygiene, and a local webpack production build pass. The API-route, route lifecycle/auth,
-route/service boundary, Dynamics-context, Dataverse-access, Request Document writer, and
-trust-boundary GUID gates and self-tests pass sequentially. After the durable-state sweep, the
-Atlas, fact-consistency, doc-currency, doc-symbol-ref, canonical-pointer, build-claim-freshness,
-secret-scan, and scaffolding-token gates and their self-tests pass; the docs catalog and agent
-invariants pass as well. Four completed iterative read-only
-Claude Opus review rounds drove fixes for crash recovery, hash/receipt drift, explicit actor
-updates, stale retries, staging completion/settlement, claim/slot races, conservative cleanup,
-and transient 409 path visibility. The final proposed live-finalizer cleanup race was checked
-against source and refuted by the existing live-lease exclusion plus the new overall-expiry
-renewal guard, then pinned by test. Three earlier stalled invocations produced no report and are
-not counted; no metered review product was used.
-
-**[VERIFIED no-live-effects.]** This milestone created no Blob or SharePoint upload, Dataverse or
-Postgres write, migration/schema application, environment change, deployment, or alias move.
-The live scanner-cap proof remains pending. Next offline milestone is Slice 4: wire the already
-built shared browser-direct Graph transport into the durable MP4 intent/finalize producer. The
-Factory remains unfinished and irrelevant to fixture creation; any future live check needs a
-fresh concrete approval list and an individually approved human-created Request.
-
-**[OWNER CORRECTION 2026-09-25.]** The Test Request Factory is unfinished and is not a
-prerequisite for this feature. Future bounded live checks must use an individually approved,
-human-created disposable Request. Historical Factory deployment/alias receipts below remain
-factual, but every prospective “Factory-created request” instruction is superseded by this rule.
-
-## Session 543 offline implementation summary — 2026-09-25 PT
-
-**[VERIFIED via Git and source]** Commit `bab770fe6` (`Build resilient browser Graph upload
-transport`) is committed on `codex/feature-request`. It adds
-`shared/utils/graph-browser-upload.js` and moves the Preview proof onto one browser-direct Graph
-transport with a code-owned 10 MiB default, strict sequential ranges, independently authorized
-status reconciliation for ambiguous outcomes, bounded jitter/backoff and `Retry-After`, 120-second
-upload-inactivity and 180-second response watchdogs, two-minute offline wait, same-browser Web
-Lock, graceful pause-after-fragment, and explicit Uploading/Pausing/Reconnecting/Paused states.
-Graph-confirmed bytes own durable progress. XHR bytes are separately in flight, and Mbps/ETA count
-only uniquely confirmed ranges attributable to this browser, not cross-device status jumps.
-
-**[VERIFIED via source and focused tests]** the Preview service now gives its encrypted,
-profile-bound permit an absolute 72-hour lifetime from mint, treats the sealed initial Graph
-expiry as advisory, checks exact item identity plus live Graph status, and performs bounded exact
-item visibility reads after terminal 404/410 outcomes. Fingerprint, authenticated status,
-server-owned path, exact-item cleanup, and browser → Graph (never full-file application proxy)
-contracts remain. A page-lifecycle abort cancels local XHR/timers and preserves the permit; the
-next manual Resume performs live authorized reconciliation. No immediate-abort UI is claimed.
-
-**[VERIFIED offline]** seven proof suites pass (84 tests); scoped ESLint, `check:types`, and
-`git diff --check` pass. The default `npm run build` reaches Next compilation but Turbopack rejects
-this worktree's external `node_modules` symlink. `npx next build --webpack` passes with the existing
-dynamic-dependency warnings. Twenty-seven changed-surface gate commands passed sequentially:
-six route/boundary/writer gates with their self-tests, seven documentation/security gates with
-their self-tests, and `check:docs-catalog`. A fresh read-only adversarial review found and drove fixes for strict
-initial ranges, throttle-cap timing, monotonic stall detection, cross-device rate attribution,
-async stale-state guards, paused ETA, refreshed expiry display, reconnect copy, pause enablement,
-timer cleanup, and final-range rate accounting; it found no remaining authorization,
-exact-cleanup, fingerprint, or no-proxy regression.
-
-**Still open and not claimed:** the representative desktop benchmark is now PASS, but
-Graph-confirmed upload-session expiry remains PARTIAL because this benchmark did not force a live
-terminal expiry. The corrective live expiry run, Production-safe durable flow, individually
-approved human-created Production test Request, desktop macOS Safari long-seek/Download check,
-and actual near-cap Production upload remain deferred. iPadOS is out of scope and no further Edge
-run is planned.
-
-**Concrete approval list before any live step:** obtain a fresh owner approval naming (1) the
-exact disposable Request GUID/number plus governed site/library/folder; (2) the exact MP4,
-byte count, hash, and permitted upload count; (3) the immutable branch commit/deployment; (4) any
-Preview deployment and temporary shared-alias move, including the exact Factory rollback target;
-(5) the separate same-machine direct-Graph baseline session/item and its exact cleanup; (6) each
-Preview proof SharePoint upload and later exact-item cleanup; (7) every Dataverse or Production
-write; and (8) the Production near-cap item's default registry-bound retention. Any later
-Production deletion needs a separately reviewed teardown, zero-binding proof, exact IDs/ETag, and
-fresh approval. Needed Dataverse reads remain owner-permitted, but writes require consultation.
-Spent Request/upload/cleanup approvals are not reusable.
-
-The sections below are historical handoff context and retain their then-current claims.
-
-## Session 542 presentation branch summary — 2026-09-24/25 PT
-
-**[VERIFIED via Git]** Commit `f9088d1a8` (`Plan direct Graph upload performance and desktop
-release gate`) is pushed to `origin/codex/feature-request`; the worktree was clean before this
-closeout update.
-It changed only this handoff and
-`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`. Four documentation gates
-and their self-tests, plus `check:docs-catalog`, passed. No runtime code or live service changed.
-The read-only Claude Opus review and its two follow-ups are recorded in the plan's §17.
-
-**SUPERSEDED 2026-09-25 by the owner-approved Slice 6 proof retirement.** The following paragraph
-records the then-open Session 542 state and is not a current work item.
-
-**Verified open at Session 542:** [VERIFIED then via `presentation-media-proof-service.js` and
-`presentation-media-proof-upload.js`] the proof still uses 320 KiB fragments, a fixed 60-second
-XHR timeout, and the initial-expiry refusal. Implement and offline-test the reviewed §7.2.1
-shared browser transport and correct the expiry classification before another live benchmark.
-After the durable producer exists, test its authenticated upload-session expiry recovery in
-Preview; the current Chrome expiry matrix row is PARTIAL, not Graph-confirmed PASS.
-
-**Owner decision needed before live work:** approve each fresh disposable request/target, MP4,
-Preview deployment or alias move, direct-Graph baseline item and exact cleanup, and any
-Production test write. The planned near-cap Production item is registry-bound and retained by
-default; its retention needs explicit approval before that run. The owner's existing override
-permits needed Dataverse reads without separate per-read approval.
-
-**Parked until dependencies exist:** desktop macOS Safari long-seek and near-cap Production
-checks need the production-safe flow and an individually approved human-created test Request;
-the unfinished Factory is not a dependency. **Do not reopen without a new owner decision:**
-iPadOS support is outside this feature; no further Edge run is planned.
-
-**Stop-time advisory:** `report:claim-evidence-pilot -- --current` could not read local state,
-so no pilot observation row was added. This planning-only session shipped no production
-capability or strategic pivot, so no `DEVELOPMENT_LOG.md` milestone entry is required.
-
-**Performance planning handoff (2026-09-24 PT):** [VERIFIED via branch source and the owner's
-performance steering brief] the Preview proof uses 320 KiB sequential Graph fragments, a fixed
-60-second XHR timeout, and no automatic fragment retry. Its earlier 100 MB receipts prove
-correctness/recovery, not throughput. [PLANNED in
-`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md` §7.2.1] retain browser-direct
-Graph for MP4, use a code-owned 10 MiB default, status-aware bounded retry and live expiry,
-stall-aware timeouts, truthful throughput/ETA UI, a timed desktop benchmark, and the owner's
-actual near-cap macOS Safari Production gate. No implementation, upload, deployment, alias move,
-or Production write occurred in this planning session. [VERIFIED via `claude auth status` outside
-the sandbox] the ordinary Claude.ai OAuth session was available. Three read-only
-`claude -p --model opus` passes found a Production isolation blocker and expiry/retry/CSP/release
-sequencing gaps; that revision used an exact Factory test-request access mode (superseded
-2026-09-25 by the owner-approved human-created Request rule) and addresses
-the findings. The final follow-up named two wording fixes—retaining the registry-bound Production
-test item and using a same-Mac/same-network Graph baseline for the Safari gate—and said those
-would make the plan ready for implementation; both were applied. The proposal remains
-**PLANNED**, not shipped. The older handoff below records
-historical browser runs.
-
-**Chrome recovery continuation (2026-09-24 PT):** [VERIFIED via Git] this worktree remains on
-`codex/feature-request`, clean before these documentation edits, with the `origin/main` merge
-`0bd45cecd` and the ETag-guarded proof cleanup implementation `5c5fbcb0b` pushed. The
-changed-surface tests/gates passed; local Turbopack build was blocked by this worktree's
-external `node_modules` symlink, while a local Webpack build and remote Vercel build passed.
-[VERIFIED via signed-in Production lookup] the owner's Request `1003220` is the test copy at
-GUID `4bfb6e40-678f-f111-8076-7ced8d3d15a6`, with governed SharePoint folder
-`akoya_request/1003220_4BFB6E40678FF11180767CED8D3D15A6/Post Site Visit Materials/`
-on `https://appriver3651007194.sharepoint.com/sites/akoyaGO`. [VERIFIED via local hash]
-the owner-selected `Gallivan_Peleg Intro.mp4` is 100,665,703 bytes, SHA-256
-`951bcdf7d07dd5653d6717f95ec3ec3e14019b001c4155af2cd7255618b3e33f`.
-The owner explicitly overrode the plan's per-read rule: Dataverse reads may be done as needed;
-consult the owner before writes. The owner approved branch-scoped Preview `NEXTAUTH_URL` and
-`SHAREPOINT_SITE_URL`, asked the agent to correct `DATAVERSE_ALLOW_PROD_READS=yes` via Vercel
-CLI, and approved a Preview deployment and one temporary alias move. [VERIFIED via Vercel
-CLI/dashboard] all three variables are scoped only to `codex/feature-request`; Factory's four
-scoped variable names remain. The first Ready CLI deployment
-`dpl_6gN8m1kFsLCQBVkojEAEarkVyGdB` passed the signed-in GET but returned `403` to the
-validation-only `{}` POST after the alias moved, before any Graph session or SharePoint write.
-The alias was immediately restored and re-inspected at exact Ready Factory deployment
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`. Under the owner's corrective-deployment approval,
-Git-linked deployment `dpl_GWuSCry4wQGwNmdJpDX7XSBeRgwc` is Ready from branch
-`codex/feature-request` and commit `5c5fbcb0bc8265b10de003a9fd1bc3f3e81b725f`.
-[VERIFIED via CLI and signed-in desktop Chrome] the owner approved the new exact alias
-target; its protected proof page loaded and validation-only `{}` POST returned the expected
-`400` before upload. The owner approved up to three bounded uploads of the selected MP4 to
-Request `1003220`. The first session paused at 0.9 MiB, survived reload and same-file
-reselection, resumed via direct Microsoft `202` chunks, and committed all 100,665,703 bytes.
-Finish saving minted a five-minute token. The 302 Watch played the 67.33-second video without
-media error. The old link refused as `expired` after 8:31:43 PM PDT; Finish saving minted a
-fresh link from the same committed item, whose Watch played and accepted End/Home seeks with
-one application resolver action. [VERIFIED via Graph] exact item
-`b9bf5fd4-3e89-4357-ba53-8b44cb759209.mp4`, ID
-`01G4GVMS3EB2O3Z4YXRZDIKF77SV5YM5XB`, measured 100,665,703 bytes. The owner separately
-approved cleanup of that exact item. The app returned `item_deleted`, and Graph exact-path
-GET returned 404 with an empty folder listing. Thus reload/reselect and proof-token expiry
-cells are PASS.
-
-[VERIFIED via Chrome] the second session paused at 0.6 MiB and initially expired at
-8:49:47 PM PDT on 2026-09-24. After that time the approved alias was remapped to the Ready
-presentation deployment, and Resume displayed the specific `presentation_media_proof_session_expired`
-message while retaining the saved permit. [VERIFIED via Graph] the governed folder listing
-remained empty. A fresh signed-in GET through the alias loaded the protected proof page.
-The owner approved this expired-session cleanup. [VERIFIED via Chrome] Cleanup returned
-`session_cancelled` and cleared the permit; [VERIFIED via Graph] the folder remained empty.
-The shared alias was restored and re-inspected at Ready Factory deployment
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` while awaiting approval, then remapped to the approved
-presentation deployment. Under the existing up-to-three-session allowance, a third fresh
-upload used the same verified MP4. [VERIFIED via Graph] its exact item
-`75649f0c-dfae-4aa7-9887-980fa9efc4e1.mp4`, ID
-`01G4GVMSZEWMUR6P2R2RDIHYOWMYJ5ET3H`, reached 100,665,703 bytes with ETag
-`"{1F29B324-513F-46D4-83E1-D66613D24F67},3"`. Automatic approval review rejected
-browser inspection of the active/completed proof tab as potentially disruptive and barred
-another browser-origin workaround. [REPORTED by owner] Finish saving displayed “Playback proof
-created”; the owner authorized deletion of the committed third item and reported that the app's
-Cleanup moved it to the recycle bin. [VERIFIED via Graph] exact-path lookup returned not found
-and the governed folder listing was empty. [VERIFIED via Vercel CLI] the alias was restored and
-re-inspected at the Ready Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the three
-temporary Preview variables scoped only to `codex/feature-request` were removed, and the
-Factory branch's four scoped variable names remained. Reload/reselect and proof-token recovery
-are PASS; upload-session expiry is PARTIAL after review because the old proof refused at its
-sealed initial expiry while Graph's accepted cancellation did not prove live-session expiry.
-**Owner scope update (2026-09-24 PT):** iPadOS support is outside this staff feature's
-release matrix; no office staff will use an iPad for this work. The owner kept the near-cap
-upload check on desktop for the proposed 2 GB cap. The remaining Slice 0 browser run is
-Production macOS Safari on an owner-approved human-created disposable Request: upload, the selected Watch shape, long
-seeking, and Download integrity. [PLANNED] Combine the real near-cap desktop upload with that
-run. Earlier iPadOS assignments below
-are historical and superseded. The plan's dated Slice 0 matrix has the full receipts.
-
-**Historical Slice 0 state (2026-09-23; superseded by the scope update above):** [VERIFIED via Git] `codex/feature-request` includes
-the owner-approved `origin/main` merge, offline recovery hardening, and the documented
-Preview authentication URI workaround. [VERIFIED via Vercel] the
-owner-triggered immutable Preview deployment `dpl_4R14xsX2jYHHgHYSzvuRjUDQUhM1` was Ready
-from that commit. The owner approved one Windows Edge upload to Request `1003222` in the
-governed `akoya_request/1003222_E43AE6EA698FF11180766045BD018A07/Post Site Visit Materials/`
-folder. [REPORTED by owner from colleague] the 93.2 MB MP4 uploaded, played, and downloaded;
-pause/reload/reselect, expiry, resolver/seek trace, source/download size and SHA-256 match,
-macOS/iPadOS Safari, and near-cap throughput remain open. [VERIFIED via Microsoft Graph]
-the one exact 97,777,999-byte proof item was deleted with an ETag guard after the owner's
-cleanup request; exact GET returned 404 and the folder listing was empty. [VERIFIED via
-Vercel alias and environment APIs] the proof-window user access grant was removed, the shared
-alias was restored and re-inspected at prior Factory deployment
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, all three temporary presentation branch Preview
-variables were removed, and the Factory branch's four scoped settings remain. [VERIFIED via
-Vercel deployment inspection] the immutable proof deployment remains Ready as a historical
-Preview artifact. Fresh approvals are needed
-for any further live run, Production Dataverse read, Preview deployment, or alias change.
-**Historical owner decision (2026-09-23, Session 536; superseded 2026-09-25):** Chrome and Edge
-were accepted as working. The then-current decision made macOS/iPadOS Safari wait for the Test
-Request Factory and said no new real-request approval was needed. The current rule above replaces
-that fixture and approval assumption: iPadOS is out of scope, and the Production Safari run needs
-a freshly approved human-created disposable Request.
-Recovery checks (reload resume, session/token expiry) move to one agent-run Chrome pass; no
-row waits on Edge. See the plan's matrix note.
-The detailed matrix, click steps, and receipt are in
-`docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`.
-
-**Current Slice 0 handoff cells (updated 2026-09-25):** no current unresolved FAIL is recorded. The earlier Chrome CSP and
-live-placeholder failures were fixed by `35b9990bf` and `cdc7574e1`.
-
-| Browser or scenario | Status | Evidence or limit |
-|---|---|---|
-| Chrome core upload, same-page pause/resume, finalize, both Watch modes, seek, Download | PASS | [VERIFIED via signed-in 2026-09-22 Chrome receipt] 100,665,703 bytes, 67.3-second seek, equal source/download SHA-256, exact cleanup; placeholder fix `cdc7574e1`. |
-| Windows Edge upload, playback, Download | PASS for reported actions; full Edge row NOT RUN | [VERIFIED via owner report] those three actions worked. [VERIFIED via Graph] committed item was 97,777,999 bytes. Pause/reload, resolver trace, seek, and download integrity were not recorded. |
-| macOS Safari full path | DEFERRED | [UPDATED by owner 2026-09-25] Production run on an individually approved human-created disposable Request remains; the unfinished Factory is not a dependency. |
-| iPadOS Safari full path | OUT OF SCOPE | [VERIFIED via 2026-09-24 owner decision] No iPadOS acceptance run is required for this staff feature. |
-| Reload/same-file reselect resume | PASS | [VERIFIED via signed-in 2026-09-24 Chrome and Graph] paused at 0.9 MiB, reload/reselect, direct Microsoft `202` resume to full commit, exact item cleanup and Graph 404. |
-| Upload-session expiry recovery | PARTIAL; Graph-confirmed expiry NOT VERIFIED | [VERIFIED via Chrome] second session paused at 0.6 MiB; after the *initial sealed* 8:49:47 PM PDT expiry, Resume displayed an expired-session error and retained the permit. Approved Cleanup returned `session_cancelled`, so Graph had not confirmed expiry. [VERIFIED via Graph] fresh third session committed 100,665,703 bytes. [REPORTED by owner] Finish saving created the proof and Cleanup moved the item to recycle bin. [VERIFIED via Graph] exact path not found and folder empty. Correct the initial-expiry guard and retest live status recovery. |
-| Proof-token expiry recovery | PASS | [VERIFIED via signed-in 2026-09-24 Chrome] old link refused as expired; fresh link from same committed item played and accepted End/Home seeks with one resolver action. |
-| Long-duration seek | DEFERRED | The 67.33-second recording cannot prove the >2-minute Safari case. |
-| Near-2,000,000,000-byte upload and throughput | DEFERRED | [VERIFIED via 2026-09-24 owner decision; fixture corrected 2026-09-25] one desktop Production run remains for the proposed 2 GB cap. [PLANNED] Combine it with macOS Safari on the same approved human-created Request. |
-| Production-sized chunk policy and measured throughput | PASS FOR REPRESENTATIVE CHROME PREVIEW BENCHMARK | [VERIFIED 2026-09-25] the 100,665,703-byte app run used the shared 10 MiB transport, paused at 10.0 MiB Graph-confirmed, resumed, reached a displayed 3.22 Mbps active rate, and took 300.133 seconds begin-to-verification including the pause. The separate same-machine/network direct-Graph Chrome baseline took 337.997 seconds at 2.383 Mbps. Both exact items are Graph-confirmed absent and the folder is empty. This does not close the actual near-cap Production gate. |
-
-**Owner actions:** choose and approve each new disposable request, SharePoint target, and MP4;
-approve each Preview deployment and temporary shared-alias move separately. The owner's
-2026-09-24 override permits Dataverse reads when needed; consult before writes. Run desktop
-macOS Safari by hand; no Edge or iPadOS follow-up is planned. Re-inspect
-the alias target and branch-scoped Preview variable names before any move, then restore and
-re-inspect. The prior Edge upload/cleanup approvals and both 2026-09-25 benchmark
-upload/cleanup approvals are spent.
-
-[VERIFIED via Git and branch-only push] This checkout is `codex/feature-request`.
-The owner-approved `origin/main` merge is `1d455ba9a`; the offline Slice 0 hardening is
-`26b368604`, followed by the handoff commit `d459b96f0`. None was pushed to main. No other checkout
-was edited and no Preview deployment occurred. The four named overlap surfaces were checked against the merged
-source. The Preview-only proof now has offline-tested bounded edge-byte SHA-256 reselect checks,
-expired-session permit retention and exact terminal-placeholder cleanup, proof-token reissue guidance, one automatic
-playback re-resolution with position restore, and a three-attempt transient Microsoft signature-
-range retry policy. At that time, the branch plan listed Edge/macOS Safari/iPadOS Safari and
-near-cap rows with owner steps. [VERIFIED via local commands] 11 focused suites / 132 tests,
-scoped ESLint, Next.js build, 66/67 startup gate commands initially and 67/67 after repairing/rerunning the local memory-link invariant,
-and 27/27 changed-surface gate commands passed. No live browser cell has been closed by these
-offline tests.
-
-[VERIFIED via the 2026-09-22 execution receipt] Chrome previously passed same-page pause/resume,
-finalize, 302 and one-shot Watch, seek, byte/hash-identical Download, and exact cleanup. The
-prior Request `1003222` authorization was spent. The shared Preview alias was restored to the
-Test Request preview target at that time; its *current* target and branch-scoped variables must be
-re-inspected before any new alias change. The 2026-09-22 closeout remains a dated historical
-record. This branch merge and offline work do not authorize a Preview deployment, alias change,
-Production Dataverse read, new SharePoint upload, or cleanup deletion. Obtain a separate owner
-approval for each live run and each exact cleanup.
-
-Historical next step (2026-09-23): the owner corrected the candidate to Request `1003222` and planned to select the MP4 when
-ready. [VERIFIED via approved interlock-checked Production Dataverse reads, 2026-09-23]
-one GET for the mistakenly supplied `1003332` returned zero rows; a newly approved bounded
-three-GET lookup resolved `1003222` to GUID `e43ae6ea-698f-f111-8076-6045bd018a07` and
-governed library/folder `akoya_request/1003222_E43AE6EA698FF11180766045BD018A07`.
-The site URL was absent from those location rows. The owner supplied a SharePoint link whose
-URL identifies `https://appriver3651007194.sharepoint.com/sites/akoyaGO` and the same folder;
-the page contents were not read. The owner specified that the next proof upload create/use
-`Post Site Visit Materials` directly under the governed request folder and place its disposable
-MP4 directly there. One Edge upload by the owner's Windows colleague was approved. The owner enabled
-`DATAVERSE_ALLOW_PROD_READS=yes` locally for that lookup and then removed it, verified by a
-configuration check;
-the agent must not change it. The prior `1003222` upload authorization remains spent. Obtain
-separate owner approval for the bounded live upload, immutable Preview deployment,
-any runtime-target settings, and a temporary alias window. [VERIFIED via read-only Vercel
-inspection 2026-09-23] the shared alias still resolved to Ready
-`dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`; the presentation branch had no scoped Preview variables,
-while the Test Request branch still had its four scoped names. [VERIFIED via Applications and
-Spotlight 2026-09-23] Edge is not installed on this Mac; the owner's colleague has Meeting
-Tracker access and the MP4 on Windows Edge and will run that matrix cell after a shareable
-staff harness link is available. That live evidence is still open.
-Re-inspect immediately before an
-alias change and after restoration. At that time the agent was told not to set
-`DATAVERSE_ALLOW_PROD_READS`; macOS/iPadOS Safari and another Edge run were planned. The
-2026-09-24 owner decisions at the top of this handoff supersede those runner assignments.
-
-[VERIFIED via `docs/AUTHENTICATION_SETUP.md` Step 2.4 and `lib/utils/auth.js`]
-Alias-hosted signed-in POSTs need a branch-scoped Preview `NEXTAUTH_URL` equal to
-`https://wmkfresearchapps-preview.vercel.app`, followed by a new deployment; a one-off runtime
-proposal was insufficient for the documented workaround. [VERIFIED via read-only Entra app
-query 2026-09-23] that alias's exact Azure callback is already registered, so no URI registration
-change is needed. [VERIFIED via read-only Vercel inspection before the Edge run] the alias then
-resolved to Factory deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr`, and this presentation
-branch then had no scoped Preview variables. The owner subsequently approved this run's Vercel
-env changes, Preview deployment, Production Dataverse reads, and temporary alias move. Those
-approvals were spent by the run and do not apply to another run. The owner alone sets
-`DATAVERSE_ALLOW_PROD_READS`; the agent removed the exact temporary branch-scoped record during
-the owner-requested cleanup.
-
-The current main-branch handoff follows. Its Test Request work is owned by another checkout;
-this presentation session does not edit or run that workstream.
+# Session 552 Prompt: build Part A of the scheduled-email plan (engine hardening)
+
+## Session 551 Summary — 2026-09-29 PT (Opus; queued-reminder sizing, re-address plan r1–r5)
+
+### What Was Completed
+
+1. **Sized the queued-reminder problem.** An owner-run, read-only production probe (session scratch `probe-queued-reminder-liaison-drift.js`, not committed) found **0** `grantee_abstract_reminder` rows in any status. The owner confirmed the probe read the production Postgres host, and said no grantee materials requests are outstanding. Recorded in the plan's *Measurement (S551)*.
+2. **Rewrote the plan** `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, now **revision 5, ready to build**. The owner closed plan review after three Codex adversarial rounds (gpt-5.6-sol). Part A hardens the engine for every program; Part B re-addresses on a Liaison change.
+   - Part A adds one new column, `recipient_generation`.
+   - Main pieces: `send_requested_at` as the no-resend rule; a dedicated reconciliation claim that never sends; unconfirmed, missing and forbidden states shown under Needs attention; no edits once the activity exists; lease-fenced PD-handoff reset (including expired `sending` rows) and source cancel; separate ordinary and 25-row reconciliation queries; a per-PD 100-row digest cap.
+3. **Owner decisions, all settled (S551):**
+   - A-1: unconfirmed is an error code on `failed`, behind one helper.
+   - A-2: a 7-day late-acceptance check on stopped rows that had a send requested.
+   - B-1: an approval never survives a recipient change.
+   - B-2: the activity-without-send-intent gap is accepted, and detected.
+   - B-3: approval is re-checked at send time, tightening only.
+   - Send-now under B: the PD pressing send is the approval for a posture-only tightening; a recipient change still goes back for approval.
+   - The r4 simplification: no backoff, counters, rotation or extra columns.
+4. **PR #360 (B4)** was merged upstream as `507bf14ab` during the session. It was reviewed by Opus in Codex's worktree, not by this session.
+
+### Commits (all on `main`, pushed)
+- `ed04b6c17` measurement; `5a6aa0869`, `f5140cc75`, `0d69d8e73` r1 and decisions A-1, A-2, B-1, B-2; `c3f4efe57` line-number base; `62080921d` r2; `d031cef1b` r3; `27f557be9` r4 simplification; `420a9231a` B-3; `dd394d8fe` r5; `2fcc102b8` ready to build; plus this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Build Part A** of the scheduled-email plan (r5, *Part A* A1–A7 and *Tests*).
+   - Tier 2: a migration on the shared Postgres plus email-engine changes. Use its own branch, live-Postgres crash tests (the `.pg.test.js` pattern in the CI ledger job), and an implementation review before merge.
+   - Part B comes after it, on its own branch.
+   - The plan's line numbers are as of `ed04b6c17`; the scheduled-email files have not changed since [VERIFIED via `git diff --name-only 8fc003931 507bf14ab`, which did not touch them].
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab`; migrations 056–057 need renumbering). Unchanged. Part A's migration will also need the next free number.
+
+### Parked
+
+1. Deeper recipes, the admin form, slice 5a, the seven late-2026 `expiresAt` fixtures, and the cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer. Unchanged.
+3. Liaison follow-ups (not requested): an automatic recipients reload on a 409 `liaison_changed`; "Liaison not verified" on open materials collections; `{{liaisonFullName}}` refusals. Unchanged.
+
+### Verify Before Acting
+
+1. **`POSTGRES_URL` rotation (S551): home Mac DONE, office Mac OPEN.** The owner pasted the production connection string, with its password, into the S551 chat.
+   - The owner rotated the `neondb_owner` password via Vercel's Neon integration; Vercel updated the Postgres variables.
+   - The home Mac's two real env files are synced: `WMKF_Apps/.env.local`, which five worktree `.env.local` symlinks share, and the feature-request worktree's `.env.presentation-proof.local`. A `select 1` check connected, and the backups were deleted.
+   - Production was redeployed as `wmkfresearchapps-irht4mpyn` (aliased to `reviews.wmkeck.org`, Ready).
+   - **Open:** the office Mac, using the owner's brief `~/Downloads/office-mac-postgres-sync-brief.md` (dry run, then `--apply` on approval). The first post-redeploy cron run was not checked for auth errors.
+   - `docs/CREDENTIALS_RUNBOOK.md` has no Postgres rotation procedure; adding one was offered, not done.
+2. **Why Vercel skipped the production build of `61dafcb81`:** still not diagnosed.
+3. **Residue** (list and confirm before deleting any of it):
+   - Test Requests 1003301, 1003302 and 1003303.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - Worktree `.claude/worktrees/liaison-from-institution` (its branch is merged).
+   - `../WMKF_Apps-codex-b4`, now on `codex/b4-slot-readiness` (`523fbc071`, live Codex work).
+   - Five prunable `/private/tmp/wmkf-*` worktrees.
+
+### Do Not Reopen Without New Decision
+
+1. S551 decisions A-1, A-2, B-1, B-2, B-3, the r4 simplification, send-now under B, and the closing of plan review.
+2. S549–S550 decisions listed in the prior prompts below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` | Engine hardening and re-address plan r5 (ready to build) |
+| `lib/services/scheduled-email-service.js` | Send, reconcile and digest engine (Part A target) |
+| `lib/services/scheduled-email-store.js` | Ledger SQL: claims, fences, due and digest queries |
+| `lib/services/cron/grantee-deliverable-reminders-service.js` | Daily cron: create/handoff, digests, delivery, finalize |
+
+## Testing
+
+```bash
+npx jest tests/unit/scheduled-email tests/unit/grantee-deliverable-reminders
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<scratch-db> npx jest tests/integration --testPathPattern pg.test
+```
 
 ---
 
-# Session 535 Prompt: Sandbox Basic clone reviewed; select live source
+## Prior Session 551 Prompt: size the queued-reminder problem, then revise the re-address plan
+
+## Session 550 Summary — 2026-09-29 PT (Opus; Research Liaison switch built, reviewed, released; security bump)
+
+### What Was Completed
+
+1. **B4 plan revision reviewed (read-only, round 3; S550)** at `209877256` on `codex/factory-reviewer-b4`.
+   - The spot-checked file:line citations matched source. The `CREDENTIALS_RUNBOOK.md` and Atlas edits are correct fact fixes.
+   - The owner confirmed owner decisions 9–10 (switch-off stops all binds; either switch off pauses all acceptance jobs).
+   - Findings handed to Codex, which was still working:
+     - Probe section 13 marks any flow that mentions Requests INCOMPLETE, with no way for the owner to classify it, so it would block the slot PATCH forever.
+     - Preview switch values are unverified. Under decision 9, a B4 runtime push to Preview stops every reviewer bind there unless both switches are set first.
+     - The 055 "repair earlier-054" logic may be unnecessary. An owner-authorized `schema_migrations` read would settle it.
+   - Codex has since pushed `bd0c5739a`, `664d924a9` and `bde50dcd2`, and opened **PR #360**. S550 has not read these.
+2. **Research Liaison switch: built, reviewed, released.**
+   - Plan `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` r7; see its *Build record*.
+   - Helper `lib/services/contacts/request-liaison.js`, plus readers 1–7 and the docs reconcile.
+   - Tests: every guard was mutation-checked. New live-Postgres test `tests/integration/site-visit-materials-claim.pg.test.js`, added to the CI ledger job.
+   - A read-only sandbox probe verified that selected blank lookups return `null`.
+   - Codex adversarial implementation review (gpt-5.6-sol): needs-attention, one high and one medium, both fixed in `9d8947dcf`.
+   - PR #361 merged as `61dafcb81`; all 12 CI checks green.
+3. **Release:** Vercel made **no production deployment for `61dafcb81`**. The next merge, `9f408590e`, deployed to Production at 22:27Z and carries it [VERIFIED via `vercel ls --prod`; ancestry].
+   - Owner production check: on 997125 (UCLA) the Awardee tab Cc showed the institution Liaison (Jamie Lynn), not the Request copy.
+   - The candidate list came from an owner-run read-only probe (session scratch).
+4. **Security:** PR #362 (`9f408590e`), a lockfile-only bump: undici 6.29.0 and 7.30.0, ip-address 10.7.2.
+   - Cleared Dependabot alerts #88–#102 (published 2026-09-29; our code did not introduce them).
+   - `npm audit --omit=dev`: 0.
+
+### Commits
+- `main`: PR #361 merge `61dafcb81` (branch commits `14d0332c0`…`319bb3b47`); PR #362 merge `9f408590e` (`6e383975e`); `8861f9bec` (release record); this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Queued-reminder re-addressing** (`docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, draft r0, on `main`). This is the one remaining gap in rule 2 now that the switch is live. The plan lists six unresolved round-3 requirements, so revise before any Codex review.
+   - **First step (owner choice pending): size the problem.** Count queued, unsent `grantee_abstract_reminder` rows in `scheduled_email_messages` whose stored Cc differs from the current institution Liaison. This is a production Postgres plus Dataverse read, so the owner runs it; S550 proposed it but did not write the script.
+   - If the count is small: stop those rows, have staff send those reminders by hand, and split the engine hardening (no re-send after `send_requested_at`, a version-fenced PD-handoff rebuild) into its own plan, since it affects every program.
+   - Staff can edit a queued row's subject and body, or stop it, but not its recipients [VERIFIED via `pages/api/scheduled-emails/[id].js`, `lib/services/scheduled-email-store.js` `updateScheduledEmailDraft`].
+2. **B4 PR #360** (`codex/factory-reviewer-b4`, head `bde50dcd2`). Read what changed since `209877256`, including whether the S550 round-3 findings above were addressed. Review it as a non-author before any merge. It is plan plus probe only, no runtime code.
+
+### Owner Decision Needed
+
+1. **Re-address plan:** size first (recommended), or write revision 1 now.
+2. **Scheduled-email engine hardening:** when to take it up (a duplicate-send hazard after recorded send intent exists for every program).
+3. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab` in `../WMKF_Apps-codex`; migrations 056–057 need renumbering). Unchanged.
+
+### Parked
+
+1. Deeper recipes, the admin form, slice 5a, the seven late-2026 `expiresAt` fixtures, and the cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer. Unchanged.
+3. **Liaison follow-ups the owner may want** (not requested):
+   - An automatic recipients reload on a 409 `liaison_changed` (staff reload the page today).
+   - Open materials collections show "Liaison not verified" until refreshed.
+   - The seed materials templates use `{{liaisonFullName}}`, so a Research Request with no institution Liaison refuses materials email (0 upcoming per the measurement).
+
+### Verify Before Acting
+
+1. **Why Vercel skipped the production build of `61dafcb81`:** not diagnosed. Check the Vercel project's Git/production settings if it recurs.
+2. **Residue** (list and confirm before deleting any of it):
+   - Test Requests 1003301, 1003302 and 1003303.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`. S550's Postgres test used a temp schema in `ledger_ci_s548` and dropped it.
+   - Worktrees `.claude/worktrees/liaison-from-institution` (branch now merged) and `../WMKF_Apps-codex-b4` (live, Codex).
+   - Five prunable `/private/tmp/wmkf-*` worktrees and the older ones.
+3. **Two gates red only inside `.claude/worktrees/liaison-from-institution`:** `check:agent-invariants` and `check:agent-wiki` fail on the per-machine `.agents/skills` and memory symlinks the worktree lacks. The main checkout and the `:ci` variants are green.
+
+### Do Not Reopen Without New Decision
+
+1. S549–S550 owner decisions: the liaison answers 1–9; the Santa Monica College case; the split; B4 option A and owner decisions 9–10.
+2. Earlier decisions listed in the prompts below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/contacts/request-liaison.js` | Liaison of record helper (Research: institution Primary Contact) |
+| `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` | Liaison plan r7 + Build record (released) |
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` | Queued-reminder re-address plan r0 (next) |
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (B4 branch / PR #360) | B4 revision |
+
+## Testing
+
+```bash
+npx jest tests/unit/request-liaison.test.js tests/unit/grantee-send-invite-workbench-service.test.js tests/unit/site-visit-materials-reminder-sweep.test.js tests/unit/dynamics-explorer-contact-liaison.test.js
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<scratch-db> npx jest tests/integration/site-visit-materials-claim.pg.test.js
+```
+
 ---
 
-# Incoming main checkout handoff (Session 542)
+## Prior Session 550 Prompt: build the Research Liaison switch; review Codex's B4 revision
 
-# Session 542 Prompt: Finish slice 6b review (Opus round 2, Fable final, Codex), then the live IA proof
+## Session 549 Summary — 2026-09-29 PT (Opus; first cast-bound clone, PR #357 merged, two plans through Codex review)
+
+### What Was Completed
+
+1. **First cast-bound production clone** (owner-run from `claude/factory-cast` at `f47703167`) [VERIFIED: owner-run output]:
+   - Run `e33fa857`, Request **1003303**, reached `ready` at 16:38:58Z, and the one-hour `--run-recheck` passed (`ok`, `not_refreshed`).
+   - The PI and Liaison show on the Awardee tab (To and Cc), with the TEST badge.
+   - `--bind-reviewer` created suggestion `0d1a990d`.
+   - The owner set the Foundation's Organization Leader to WMKF ORG LEADER, and also set Potential Reviewer 1 on 1003303 by hand.
+2. **The cast reviewer does not work in the app** (cast plan *Facts*, *Order* 5–6):
+   - The Find tab reads the Request's `wmkf_potentialreviewer1..5` slots, not suggestion rows.
+   - With the slot set, ingest is refused by `assertPersonBindable` (synthetic fence).
+   - The S548 "visibility" claim is marked STALE.
+   - Owner decision 8 (option A): admit a synthetic person on test Requests only.
+   - Slice B4 planned; Codex round 1 no-ship (four high, one medium). Revision handed to Codex on `codex/factory-reviewer-b4`.
+3. **PR #357 merged** (`75d58e331`), without B4. All 12 CI checks were green. The production deploy of the merge build was confirmed Ready.
+4. **Read-only production probes, owner-authorized** (session scratch scripts, not committed):
+   - Potential Reviewer slots: not audited, no slot-triggered automation.
+   - Liaison coverage: 108 active Research awards; 84 have a Request-copy Liaison contact different from the institution's Primary Contact; only 1 institution (Santa Monica College, 996068) has none. The owner accepts that case.
+   - Email comparison: the recipient actually changes on **27 active awards / 35 upcoming Requests**.
+5. **Liaison decision** (owner with the platform owner): the Research Liaison of record is the applicant institution's Primary Contact.
+   - Plan `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`, revision 7, on `claude/liaison-from-institution`.
+   - Six Codex rounds, then a Codex review-and-fix pass; verdict **ready to build**.
+   - Owner answers 5–9 are recorded in the plan (relabel export, Explorer via institution, one editable Cc with server check, measure first, split).
+6. **Split** (owner): re-addressing queued grantee reminders, plus the scheduled-email engine hardening it needs, moved to `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` (draft r0, unreviewed; carries rounds 2–3 as open requirements).
+
+### Commits
+- `main`: `fa42b274b`, `4ccfc6ac4` (cast plan), PR #357 merge `75d58e331`, this handoff.
+- `claude/liaison-from-institution` (pushed, not merged): `9a28a4e82` … `fbe64a69b`; Codex's `3700653a4`.
+- `codex/factory-reviewer-b4` (pushed): brief `8dc5c3d40`, `221fc7896`; Codex's `175675b9e`, `92d175f14` (unreviewed).
+
+## Next Items
+
+### Verified Open
+
+1. **Build the Research Liaison switch** on `claude/liaison-from-institution`, in `.claude/worktrees/liaison-from-institution`, per plan revision 7 and its test matrix (Tier 2). Then run an implementation code review before any merge.
+   Evidence: plan Status line; Codex task report (ready to build).
+2. **Review Codex's B4 plan revision** on `codex/factory-reviewer-b4` (`../WMKF_Apps-codex-b4`), read-only, as a reviewer who is not the author. It touched 5 files, including `docs/CREDENTIALS_RUNBOOK.md` and `docs/atlas/postgres-test-request-runs.md`, beyond the brief's plan-plus-probe scope; check those edits.
+   Evidence: `git diff --stat 221fc7896 origin/codex/factory-reviewer-b4`.
+
+### Owner Decision Needed
+
+1. **B4 open questions** will come from Codex's revision: email contract ("allowlisted recipients" vs recipient binding), and whether manual add stays refused.
+2. **Scheduled-email engine plan:** when to take it up. It covers a duplicate-send hazard after recorded send intent that exists for every program today.
+3. **Integrity Screener Workbench tab** (`codex/integrity-workbench-tab` in `../WMKF_Apps-codex`; migrations 056–057 need renumbering). Unchanged.
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a; the seven late-2026 `expiresAt` fixtures; cast ledger reset path. Unchanged.
+2. AkoyaGO lookup search does not find TEST · Factory Reviewer by name or email (browse works); cause unknown (index or the `·`). Ask the platform owner if it matters.
+
+### Verify Before Acting
+
+1. **Residue:**
+   - Test Requests 1003301, 1003302 and **1003303** (Potential Reviewer 1 set by hand; suggestion `0d1a990d`).
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - Worktrees `.claude/worktrees/liaison-from-institution` and `../WMKF_Apps-codex-b4`, plus older ones.
+   
+   List and confirm before deleting any of them.
+2. **Session probes are gone with the scratchpad.** Their results are recorded in the liaison plan (*Measurement*) and cast plan (*Order* 5). Re-create from the plan text if a re-run is needed.
+
+### Do Not Reopen Without New Decision
+
+1. S549 owner decisions: option A for synthetic reviewers (cast decision 8); liaison answers 1–9; the Santa Monica College case accepted; the split.
+2. Earlier decisions listed in the Session 549 prompt below.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` (branch) | Build plan r7: helper, six readers, export and Explorer, tests |
+| `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` (branch) | Engine plan r0 for queued-reminder re-addressing |
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` | Cast plan: *Order* 5 clone record, 6 B4 and its round-1 findings |
+| `docs/plans/FACTORY_REVIEWER_B4_CODEX_BRIEF_2026-09-29.md` (B4 branch) | Codex brief for the B4 revision |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|rehearse-test-request|email-source|migration-054).*"
+```
+
+---
+
+## Prior Session 549 Prompt: first cast-bound production clone, then merge the cast (PR #357)
+
+## Session 548 Summary — 2026-09-28 PT (Opus; probe hardening, wave30 live, meeting-date fix, synthetic cast slices A + B built, reviewed and created in production)
+
+### What Was Completed
+
+1. **Probe section 12 hardened** (on `main`, `3dcf61bb0` → `155dc80d6`):
+   - An unreadable cloud-flow definition or unreadable count prints `INCOMPLETE` and sets exit 1.
+   - Flows are matched on their triggers and record actions.
+   - Create steps registered for every entity are found.
+   - `--cast=<dir>` writes a dated, id-free JSON receipt.
+   - Mailing-list counts, list type (static or dynamic), `akoya_mailinglistmember`, and create-workflow summaries.
+
+   Owner-run twice in production (`COMPLETE`); receipts are in `~/factory-receipts`.
+2. **wave30 in production** [VERIFIED: owner-run output]:
+   - Applied under a same-day `DATAVERSE_PROD_WRITE_ACK`, which the interlock requires for any local production write; probe section 1 shows PRESENT.
+   - `SYNTHETIC_REVIEWER_ISOLATION=on` in Vercel Production and redeployed; Review Manager and My Candidates loaded normally.
+   - Credentials runbook entry added (`e20162400`, `6d0d17e3f`); docs reconciled (`cdaa23454`).
+3. **Workbench Board Meeting date fix** (PR #356, merged `9380f3605`): the DateOnly `wmkf_meetingdate` is now rendered in UTC. The owner confirmed 1003302 shows Dec 11.
+4. **Open question 1 answered.**
+   - Business Central is not used (the platform owner).
+   - No contact-create automation adds a mailing-list membership.
+   - The one dynamic list, "Test 2", has 0 members and has never been used.
+5. **Cast slices A + B built** on `claude/factory-cast` (draft **PR #357**, 23 commits from `4316b19ec` to `f47703167`, **not merged**, Tier 2):
+   - **Spine:** 054 in place gains `test_request_cast_members` and `test_request_cast_bindings`. New receipt keys: `primaryContactId` (null allowed), `liaisonContactId`, `piContactId`, `researchLeaderContactId`. Fences: cast create, the one parent-attach PATCH, the suggestion binding, and per-lookup contact binds on the Request create.
+   - **Parallel tracks:** A, the cast runner; B1 + B2, create-body binding and the Foundation transition allowance; B3, the suggestion binder. The CLI adds `--create-cast [--confirm]` and `--bind-reviewer=<runId>`; a production `--reserve` reads the cast, and `--run-recheck` reads the run's own journaled Liaison.
+   - **One Codex adversarial round** (gpt-5.6-sol high) returned needs-attention with two high and three medium findings; all five were fixed (`a45251e21`, `fba5b87f9`).
+6. **Owner decisions S548**, recorded in the cast plan: addresses supplied at run time with default names; `--bind-reviewer` as its own mode; binding mandatory on every production reserve; 1003302 stays unbound; Find-tab enrichment of the cast reviewer accepted; **(6)** the PI and Liaison are Foundation children; **(7)** WMKF ORG LEADER and WMKF RESEARCH LEADER added as cast contacts. Decisions 6 and 7 are post-review changes and were not re-reviewed.
+7. **Cast in production (5 members, all verified; ledger `ledger_prod`):**
+   - PI `6ccbcbd1-079f-44ec-a9c2-9b74148a92be`, Liaison `e068fd4e-065e-4ba1-8b97-1e6c0f5507e1`, reviewer person `e5003660-35f1-41e1-a1c4-aa2e4ec6e591`, Org Leader `da554f3e-9df4-4bc4-bd1d-b7e2c54875b4`, Research Leader `bd7ae3bb-52aa-4d84-a6be-14a565f67849`.
+   - Contacts are children of the Foundation.
+   - The owner's Audit History reads are clean.
+   - The owner set the Foundation's Primary Contact to TEST · Factory Liaison.
+8. **Contact-role findings** [VERIFIED via workflow definitions and metadata; cast plan *Facts*]:
+   - AkoyaGO status drafts address **organization** fields. Invite: To the Organization Leader, Cc the Request's Research Leader. Not Invited: To the organization's Primary Contact, Cc the PI. Ineligible: To the Request's Liaison.
+   - The Liaison and Organization Leader flow **up** only (Request → organization).
+   - **Nothing copies an organization's Primary Contact down to its Requests.** The owner confirmed this empirically on 1003220.
+
+### Commits
+- On `main`: `3dcf61bb0`, `e20162400`, `6d0d17e3f`, `cdaa23454`, `de2482147`, `ce2731611`, `155dc80d6`, `7f55ec80d`, `3e77fe858`; PR #356 merge `9380f3605`; this handoff.
+- On `claude/factory-cast` (PR #357): `4316b19ec` through `f47703167`.
+
+## Next Items
+
+### Verified Open
+
+1. **Owner: set the Foundation's Organization Leader to WMKF ORG LEADER** in AkoyaGO, replacing Allison Keller (a real person).
+   Evidence: cast plan owner decision 7; `f47703167`.
+2. **First cast-bound production clone.** Run from `claude/factory-cast`: `--reserve` (it reads all five cast members) and `--advance` under the usual verify; then `--bind-reviewer=<runId>`; then the owner's Workbench checks. Expected first-time outcomes, none of them failures:
+   - The Foundation's Primary Contact should read unchanged, since it is already the cast Liaison.
+   - The payment-contact workflows now see a bound Liaison.
+   - A draft email regarding the clone would stop verify, correctly (`expectedRegardingEmails: 0`).
+   Evidence: cast plan *Order* 4 build record.
+3. **Merge PR #357** after the first clone succeeds (Tier 2, deliberate promotion). CI was green at `b31f9fdb5`; re-check at the final head.
+4. **Liaison sync gap (outside the Factory):** a Liaison changed on an organization never reaches its existing Requests, and this app emails the Request's copy (`recipients-service.js`). Tell the platform owner, and decide between a process change, a down-sync workflow, or app-side handling.
+   Evidence: cast plan *Facts* (contact roles), 1003220 check.
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 need renumbering; the latest on-disk migration is 054).
+2. **Liaison sync gap:** which fix, if any (item 4 above).
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a — unchanged from the MVP cut.
+2. Seven late-2026 `expiresAt` test fixtures (the earliest is 2026-10-08) — see `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+3. Cast ledger has no reset path: a member or binding left `needs_attention` needs its row cleared by hand (Track A recommendation, deferred).
+
+### Verify Before Acting
+
+1. **054 edits need explicit ALTERs on existing ledgers.** `CREATE TABLE IF NOT EXISTS` does not update a changed CHECK constraint. S548 ran `ALTER TABLE test_request_cast_members DROP/ADD CONSTRAINT test_request_cast_members_role_check` on `ledger_prod` and `ledger`; re-applying 054 with `psql -f` updates only the receipt function and new tables.
+2. **`--run-recheck` on run `7293496e` (1003302)** now fails on the Primary Contact change. That's expected: the owner made the change, and the run's baseline predates journaling.
+3. **Residue:**
+   - Test Requests 1003301 (deactivate now) and 1003302.
+   - Scratch databases `ledger_ci_s547` and `ledger_ci_s548`.
+   - This session's merged agent worktrees and branches (`worktree-agent-aac2d9d2ff10034ad`, `-a6f2ec1b747e97f24`, `-a7037be3ec38dad64`) under `.claude/worktrees/`.
+   - Older `.claude/worktrees` and `/private/tmp` worktrees from earlier sessions.
+
+   List and confirm before deleting any of them.
+4. **Production reads this session:** owner-requested one-offs (1003220 and 1002852 contacts, form placement, Research Leader counts, workflow recipients, automation that could sync the Liaison) were run from scratch scripts under the session scratchpad. Only the probe changes are in the repo.
+
+### Do Not Reopen Without New Decision
+
+1. MVP cut and deferrals; the program director is the cloning admin; the allowlist replaces D-R4/6d (owner, S546).
+2. `Pending` accepted at create; all rollup companions freed; wave30 in production (owner, S547).
+3. S548 owner decisions 1–7 in the cast plan, including a mandatory cast binding, Foundation-parented cast contacts, and accepted Find-tab enrichment of the cast reviewer.
+4. Open question 1 (Business Central and mailing lists) is closed.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (on the branch) | Cast plan: contact-role facts, decisions 1–7, *Order* 4 build record, Codex round, production record |
+| `lib/services/test-requests/cast-runner.js` / `cast-binding-runner.js` | Cast create, reuse, recovery and parent attach; suggestion binding |
+| `lib/services/test-requests/production-write-fence.js` | All production fences, including the cast ones |
+| `lib/services/test-requests/foundation-transition.js` | Transition contract: journaled Primary Contact, Liaison and cast-contact exclusion |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI: `--create-cast`, `--bind-reviewer`, `--reserve` with the cast |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe; section 12 hardened |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|rehearse-test-request|email-source|migration-054).*"
+docker exec wmkf-ledger-pg psql -U postgres -qc "DROP DATABASE IF EXISTS ledger_ci_new" -c "CREATE DATABASE ledger_ci_new"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_ci_new TEST_REQUEST_LEDGER_REQUIRE=1 npx jest --runInBand "tests/integration/.*\.pg\.test\.js"
+```
+
+---
+
+## Prior Session 548 Prompt: Factory synthetic cast (after the Business Central answer), probe hardening, wave30 in production
+
+## Session 547 Summary — 2026-09-28 PT (Opus; MVP item 5 complete; status setter built, merged and characterized in production)
+
+### What Was Completed
+
+1. **MVP item 5 complete.** Verify now checks the Foundation account against a digest-only pre-create baseline journaled at `fence_source` (transition contract: protected projection, Tax Status/BMF 509, GoVerify stamps in the run window, Request count unchanged or +1, all 15 rollups' `_date` free and `_state` Calculated, GuideStar digest, Contacts), plus a read-only `--run-recheck` (PR #352, #354). First production run (Request 1003301, run `25b392a0`) stopped at verify on two explained causes: the create plug-in rewrites Request Status to `Pending`, and non-Request rollups' `_date` companions moved. Second run (Request **1003302**, run `7293496e`) reached `ready` (`not_refreshed`) and passed the one-hour recheck [VERIFIED: owner-run output, 21:11Z].
+2. **Status setter (slice C) built, reviewed, merged (PR #355, `466b23fb9`).** `--target=production --set-status=<runId> --field=phase1|phase2 --option="<label>" [--rerun]` and `--status-recheck`. Transition table from the workflow definitions, payment/tracking-producing edges only from listed states, `If-Match` fence, ≥ 90 s quiet completion, replay guard, ledger table `test_request_status_changes` (054 in place). **Characterized in production:** 1003302 Phase II → Pending Committee Review set Request Status `Phase II Pending` (the business rules run on API updates), 0 emails/tracking/payments; owner's Audit History shows only those two fields; 1003302 visible in Workbench with the TEST badge.
+3. **Probes (owner-run, read-only):** sections 10 (Foundation unaudited columns), 11 (status fields, options, update-triggered workflows, exported definitions), 12 (cast readiness: contact/person/suggestion create automation, lookups, Request Status rules).
+4. **Plans:** `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (revision 2 after one Codex round); production plan records both runs, the platform owner's answers and the status-field findings.
+5. **Owner decisions:** accept `Pending` at create (now moved by the status setter); free all rollup companions; Liaison copy onto the Foundation's Primary Contact accepted (overwrites the 9/19 value); wave30 in production; owner-created synthetic addresses on the allowlist; test Requests are deactivated, not deleted (platform owner).
+6. **Codex config:** reviews run `--model gpt-5.6-sol` with `model_reasoning_effort = "high"` in `~/.codex/config.toml` (owner, S547; memory `feedback-codex-model-gpt56-sol`).
+
+### Commits
+All on `main` (merged PRs #352, #354, #355 and direct Tier 0 commits), from `dc571513d` through `73507229e`, and this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Probe section 12 hardening** (cast plan *Order* 2): fail as incomplete on a missing or unreadable activated flow definition, list Create steps registered for all entities, write a sanitized dated receipt.
+   Evidence: cast plan *Probe results → Limits*; Codex plan-review round 1 (medium).
+2. **wave30 in production** (cast plan *Order* 3; owner-run): apply `wave30-synthetic-reviewer-marker`, set `SYNTHETIC_REVIEWER_ISOLATION=on`, redeploy, confirm.
+   Evidence: cast plan owner decision 2; probe section 1 (wave30 absent).
+3. **Board Meeting date shows one day early in Workbench** (Dec 10 vs the Request's 12/11/2026 meeting date on 1003302): likely a date-only value rendered through UTC in the Workbench header [ASSUMED; not investigated]. Check whether it affects every Request.
+   Evidence: owner screenshot, 2026-09-28.
+
+### Owner Decision Needed
+
+1. **Platform owner: what `AkoyaGo.Sync_BusinessCentral` does on contact create**, and whether a new contact joins a mailing list. Blocks cast slices A + B (synthetic PI, Liaison, suggested reviewer).
+   Evidence: cast plan *Open questions* 1; probe section 12.
+2. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 unapplied, recheck numbering; latest on-disk migration is 054).
+
+### Parked
+
+1. Deeper recipes, admin form, slice 5a — unchanged from the MVP cut.
+2. Seven late-2026 `expiresAt` test fixtures (earliest 2026-10-08) — `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Verify Before Acting
+
+1. **Production test residue:** 1003301 (run `25b392a0`, `needs_attention`) and 1003302 (run `7293496e`, `ready`, Phase II Pending Committee Review) in `ledger_prod`. Deactivate (not delete) in AkoyaGO when finished; 1003301 can go now.
+2. **Local ledger databases** in `wmkf-ledger-pg`: `ledger` (sandbox runs, keep), `ledger_prod` (production runs), `ledger_ci_s547` (throwaway scratch from this session's PG suite run; safe to drop). 054 is edited in place: re-apply it with `psql -f` to `ledger_prod` after any 054 change.
+3. The create POST can exceed the client's 30 s timeout in production (first run); the resume path recovered it. If it recurs, consider a longer create timeout.
+
+### Do Not Reopen Without New Decision
+
+1. MVP cut and deferrals; program director = cloning admin; allowlist replaces D-R4/6d (owner, S546).
+2. `Pending` accepted at create; all rollup companions freed; Liaison copy onto the Foundation accepted; wave30 in production (owner, S547).
+3. GoVerify not bypassed in production; stub `wmkf_ai_run` stays.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` | Cast + status setter plan, probe results, decisions, order |
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Production plan: both runs, platform-owner answers, status-field reactions |
+| `lib/services/test-requests/foundation-transition.js` | Foundation transition contract |
+| `lib/services/test-requests/status-transitions.js` / `status-change-runner.js` | Status setter rules and runner |
+| `lib/services/test-requests/production-write-fence.js` | Basic-run fence and `fenceStatusChangeClient` |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe, sections 1–12 |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI: `--reserve`, `--advance`, `--run-recheck`, `--set-status`, `--status-recheck` |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|docx-package|presite|pre-rp|source-bundle|seed-synthetic|migration-054).*"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/<fresh scratch db> TEST_REQUEST_LEDGER_REQUIRE=1 npx jest --runInBand "tests/integration/.*\.pg\.test\.js"
+```
+
+---
+
+## Prior Session 547 Prompt: Factory MVP item 5 — verify transition contract, then the first production basic run
+
+## Session 546 Summary — 2026-09-27/28 PT (Opus; owner cut item 7 to an MVP; slices 1, 2, 4 built, reviewed, merged; production enabled)
+
+### What Was Completed
+
+1. **Scope reset (owner).** The original ask (Codex session log, 2026-09-19): "It is very hard for me to create requests from scratch for testing. Could you design a system that could create a new request based on an existing one?" After eight days without a usable result, the owner accepted an **MVP build list** (production plan *MVP build list*): a production `basic` clone that lands before reviewer invite, nothing else until used. New memory `feedback-anchor-multisession-features-to-the-original-ask`.
+2. **Owner decisions** (production plan *Owner decisions*): Q2 shared Postgres for the form phase; program director = the cloning admin; test-Request email recipient allowlist (`@wmkeck.org` + admin-edited list), superseding D-R4/6d; `correct_meeting_date` never writes in production; Foundation rollup columns join the transition contract (open question 7); post-cap Codex gap (first-write exception) accepted, deferred to recipe 5; slice-4 dispatch-gap residual risk accepted; one Codex review per slice, owner decides.
+3. **Probes (owner-run):** production has no meeting-date business rule; app user cannot read audit (403); `CalculatedFieldsAsync` and rollups fire on any Request column; Foundation has eight Request-aggregating rollups. Wiki: `docs/agent-wiki/topics/dataverse-dynamics.md`.
+4. **Slice 1** (PR #349, `9ba8692a2`): `--target=production`, lease-time target check, production create body adds Phase II Pending + active Research grant program + PD (`--director`, re-checked at fence and create), body re-hash at create, production refusals.
+5. **Slice 2** (PR #350, `fe71c846f`): `production-write-fence.js` (closed POST shapes, destination-only Graph writes, source refused, deny-by-default) and live source-revision checks.
+6. **Slice 4** (PR #351, `3738af3f0`): email allowlist at create and dispatch (dispatch re-reads the activity's own parties, only for test requests); editor at Admin → Test Requests.
+7. **Production enablement:** wave29 applied (owner-run) and `TEST_REQUEST_ISOLATION=on` (Config) with redeploy `abv0745vo` Ready [VERIFIED `vercel ls --prod`, probe section 1].
+8. **Unrelated fix:** `reviewer-roster-endpoint.test.js` expiry fixture aged out on 2026-09-28 UTC (`5ced59d3b`); seven similar fixtures logged in `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Commits
+All on `main` (merged PRs #349, #350, #351 and direct Tier 0 commits): `5c96e1713`…`464021dd3` (probes, decisions, plan), `5ced59d3b`, `12a54ea10`, and this handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **MVP item 5, part 1 — verify transition contract (build).** `verifyClone` (`lib/services/test-requests/basic-clone-steps.js`) still compares the whole Foundation snapshot (`compareSnapshots`, `foundationBaselineDigest` over `versionnumber`), so a production run would fail on the accepted GoVerify refresh and rollup moves. Replace, for the production target only, with open question 4's projection contract plus open question 7's rollup rule; `verifyClone` also fails on any regarding email, and a Draft email is expected (P5 expected-outcome note) — decide how verify names/tolerates it (owner decides on the first run). One Codex review.
+   Evidence: production plan open questions 4, 7 and *MVP build list* item 5.
+2. **MVP item 5, part 2 — first production run (owner runs every command).** `--target=production --reserve --recipe=basic --director=<sign-in>` then `--advance`, with `DATAVERSE_PROD_WRITE_ACK` inline; a fresh bundle export (≤ 6 h); local ledger container (Q2 CLI phase). Then the trimmed P5: snapshot/compare, one check about an hour after, owner's Audit History read. Then invite a synthetic reviewer on the clone to an allowlisted inbox.
+   Evidence: plan P5 (trimmed) and *MVP build list*.
+
+### Owner Decision Needed
+
+1. **Integrity Screener Workbench tab** (`origin/codex/integrity-workbench-tab` at `b1086302b`, unmerged; migrations 056–057 unapplied, recheck numbering): review when the owner wants it.
+
+### Parked
+
+1. Slice 5a (`claude/factory-recipe5a`), deeper recipes (IA, reviews, Pre-Site, 5, 3), admin form (P7), P3 actor, readiness endpoint, dependency-builder parameterization, 24 h watch — deferred by the MVP cut; resume only on owner request.
+2. Uploaded-review live pass, GoVerify bypass intermittent failure (sandbox-only), live-ledger flake — unchanged.
+3. Seven late-2026 `expiresAt` test fixtures (earliest 2026-10-08) — `docs/CURRENT_WORK_QUEUE.md` *Audit follow-ups*.
+
+### Verify Before Acting
+
+1. **Isolation is live in production.** If staff report "could not be confirmed as an ordinary request" on a Request email, check marker reads first; rollback is removing `TEST_REQUEST_ISOLATION` and redeploying.
+2. Sandbox residue (Requests 1000341–1000348) and local-ledger runs unchanged.
+
+### Do Not Reopen Without New Decision
+
+1. The MVP cut and its deferrals (owner, S546).
+2. Program director = cloning admin; the email allowlist replaces D-R4/6d (owner, S546).
+3. Accepted residual risks: slice-4 dispatch gap; Codex's round-2 vendor-create dissent; post-cap first-write gap (deferred to recipe 5).
+4. GoVerify not bypassed in production; stub `wmkf_ai_run` stays.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Owner decisions, MVP build list, open questions 4/5/7 |
+| `lib/services/test-requests/basic-clone-steps.js` | Targets, production create fields, `verifyClone` (item 5 target) |
+| `lib/services/test-requests/production-write-fence.js` | Production write fence |
+| `lib/services/test-requests/email-allowlist.js` | Recipient allowlist; enforced in `lib/services/dynamics/email.js` |
+| `scripts/rehearse-test-request-sandbox.mjs` | CLI (`--target=production`, `--director`) |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run probe (sections 1–9, `--meeting-date`, `--history`) |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|production-|docx-package|presite|pre-rp|source-bundle|seed-synthetic).*"
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-test-request-factory-production-readiness.js --director=jgallivan@wmkeck.org   # owner-run
+```
+
+---
+
+## Prior Session 546 Prompt: Factory item 7 — owner accepts the production plan, then build P1–P4; review the Integrity branch
+
+## Session 545 Summary — 2026-09-27 PT (Opus; recipe 5a built and parked, sandbox proofs stopped, production enablement planned and reviewed)
+
+### What Was Completed
+
+1. **Slice 5a built, then parked** on `claude/factory-recipe5a` (`3b86d7df4`, pushed, not merged, not reviewed). It builds `seed_abstract` and `render_pre_rp_brief` with complete sandbox dependencies, and `verify_presite` now advances when not last. It adds no `final_writeup` step order, and it edits migration 054 in place (two steps, three reason codes, a receipt key). The focused glob passed 57 suites / 1,656 tests (orchestrator re-run). It found that the Pre-RP brief needs a program director, which the clone does not copy.
+2. **Owner decision: sandbox live proofs stop after recipe 4.** Item 7 (production enablement) comes next; recipes 5 and 3 are finished as production runs. Recorded in the design doc (*Slice 5a built, then PARKED*; *Item 7 owner decisions* Q1–Q5).
+3. **Production enablement plan written and reviewed:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`. It went through contract-reconcile (named changes applied), then Codex plan review with `gpt-5.6-sol`: round 1 four highs, round 2 three highs, round 3 two highs. Every finding was revised except one, recorded as a dissent beside the owner decision. The loop closed at the cap.
+4. **Owner-run probe `scripts/probe-test-request-factory-production-readiness.js`** (GET-only; `--detail`, `--export-xaml`, `--history`) established:
+   - production lacks the marker columns;
+   - the production app user `53e97fb3-…` has **no System Administrator** role;
+   - production create automation (8 workflows, 4 flows, 4 AkoyaGo plug-ins) differs from the sandbox's;
+   - the **sandbox org has background processing disabled** (agent-wiki Dataverse note).
+5. **The Foundation account's audit history** (owner-read) shows that a Foundation-applicant create triggers the GoVerify refresh (`akoya_goverifytrigger`, `akoya_dexempt`, `akoya_taxstatus`, `wmkf_bmf509`), plus a primary-contact copy by an update workflow. Nothing else changed.
+6. **Owner decision: the evidence meets the design's "vendor create logic shown safe" rule** for a first production `basic` run under P5 (plan P0b).
+
+### Commits (all on `main` unless noted)
+- `3b86d7df4` slice 5a (branch `claude/factory-recipe5a`) · `aca4c07a0` decisions + draft plan · `5f4f439be` probe + sandbox census · `bdf4e54f4` wiki · `4acbf7448` production P0 · `efc399d33` automation characterized · `10e0c535e` contract-reconcile · `53d977686` / `47d213f36` / `ed25310de` Codex rounds 1–3 · `bada8e03a`, `4b9ec0220`, `52cbbfe94`, `870513946` P0b evidence and the evidence-bar decision.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Accept the production plan as reviewed**, or first run the default post-cap Codex check of the round-3 closures (S543 practice).
+   Evidence: plan Status line; `ed25310de`.
+2. **Confirm that staff set `wmkf_meetingdate` in AkoyaGO on real Requests.** It is the basic run's one post-create update; plan open question 5 marks it `[ASSUMED]`.
+3. **Q2, the ledger database for the form phase.** Recorded as the local container for the CLI and the shared Postgres for the form; owner undecided.
+4. **6d (reviewer email exception)**: not started.
+
+### Verified Open (after acceptance)
+
+1. **Build item 7 P1–P4** as slices with the S543/S544 process: target parameterization (Factory-built dependency seams, GoVerify bypass unreachable in production, stub AI run kept); the P2 exact-identity write fence at the three seams; P3 `REQUIRED` actor with the production app user plus the writer-gate edit; the P4 readiness endpoint. Then the P5 first `basic` run, with the owner running every production command.
+   Evidence: plan phases P1–P5.
+2. **Integrity Screener Workbench tab: review the Codex branch** `origin/codex/integrity-workbench-tab` at `b1086302b`, not merged. Migrations 056–057 are unapplied; recheck numbering.
+
+### Parked
+
+1. **Slice 5a** (`claude/factory-recipe5a`): its steps are the starting point for production recipe 5. Re-open trigger: the recipe-5 slice after P5. Plan P6 decides whether its 054 edits land before 054's first shared apply or become 055.
+2. **Uploaded-review live pass**, **GoVerify bypass intermittent failure** (sandbox-only now), **live-ledger flake**: unchanged from S544.
+
+### Verify Before Acting
+
+1. Sandbox residue from Requests 1000341–1000348 and local ledger runs (unchanged). The local ledger's 054 lacks 5a's steps; re-apply it before any 5a step runs.
+2. **Production schema:** wave29 and wave30 are absent in production [VERIFIED P0 2026-09-27]. The production order is apply, set the switches, redeploy, confirm the readiness endpoint, then run.
+
+### Do Not Reopen Without New Decision
+
+1. Sandbox live proofs stop after recipe 4 (owner, S545).
+2. GoVerify is not bypassed in production; its Foundation-account refresh is accepted (Q3; plan open question 4 transition contract).
+3. The stub `wmkf_ai_run` stays, in production too (`assertOwnedStubAiRun`).
+4. The evidence meets the vendor-create rule for a first basic run (owner, S545). Codex's dissent is recorded and not reopened.
+5. Program director: in production it is copied by GUID; the sandbox reserve-flag idea is moot.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` | Item 7 plan, evidence, decisions, open questions |
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Parent design; *Item 7 owner decisions*; 5a parking record |
+| `scripts/probe-test-request-factory-production-readiness.js` | Owner-run production probe (`--detail`, `--export-xaml=<dir>`, `--history[=N]`) |
+| `lib/services/test-requests/basic-clone-steps.js` | `CREATE_FIELDS`, `foundationBaselineDigest`, GoVerify bypass |
+| `lib/services/test-requests/run-runner.js` | Step bodies; `stepFenceSource`; `assertOwnedStubAiRun` |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|docx-package|presite|pre-rp|source-bundle|seed-synthetic).*"
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-test-request-factory-production-readiness.js --director=<sign-in> [--detail] [--history=10]   # owner-run only
+```
+
+---
+
+## Prior Session 545 Prompt: Factory recipe 5 (Pre-RP brief, site-visit start, Final Writeup), then recipe 3; review the Integrity branch
+
+## Session 544 Summary — 2026-09-26/27 PT (Opus; reviewer-address defaults, recipes 3–5 plan, recipe 4 built and live-proven)
+
+### What Was Completed
+
+1. **Reviewer addresses are never minted** (PR #343, `9b6fea389`): a local-only `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS` base inbox is plus-tagged per source reviewer when no `--reviewer-address` flag is given (flag wins). Live-checked on sandbox Request 1000346.
+2. **Recipes 3–5 planned**: owner decisions P1–P6 and invariant classes I1–I10 (design doc *Recipes 3–5 plan*), two Codex plan reviews. Order: 4 → 5 → 3. Recipe 4 copies 1003222's Pre-Site draft verbatim over a stub `wmkf_ai_run`; the sandbox app user is the Final Writeup actor; the abstract is seeded in recipe 5; consultant feedback dropped; materials collection is production-phase only.
+3. **Recipe 4 (`pre_site_visit`) built in three slices, each reviewed**: 4a (PR #344), 4b (PR #345: the four Pre-Site steps, sandbox deps, ledger dimension), 4c (PR #346: PI and Co-PI names from bundle v4, `TEST · ` prefixed in the sandbox loader; owner accepted that copied draft prose keeps the source names verbatim).
+4. **GoVerify bypass diagnostics** (PR #347, `d0c0b90d1`): the deactivation error now reaches the manual-recheck reason, ledger failure text and sidecar; the existing test had passed on a TypeError (mocked `patch`, code calls `patchWithOptions`). Runs `a1dd008d…`/`99c92d35…` failed the bypass for an unknown cause; it did not recur.
+5. **Recipe 4 live-proven** (PR #348, `f678b1d60`): run `a410efe2…` → sandbox Request 1000348 reached `ready`. The Pre-Site v6 template carries another library's SharePoint customXml, which SharePoint rewrites in place on upload (item1 schema, item3 properties, itemProps1). `validateSharePointRewrite` accepts that for the render baseline only; Codex round 1 needs-attention (narrowed: observed roots only, itemProps paired with its schema item, bytes counted; failure detail sanitized and bounded), round 2 approve.
+6. **Integrity Screener Workbench tab handed to Codex** (owner request; branch `codex/integrity-workbench-tab`), logged in main's docs (`6c4546afc`).
+
+### Commits (all on `main` via merged PRs)
+- PR #343 (reviewer default address) · #344 (4a) · #345 (4b) · #346 (4c) · #347 `d0c0b90d1` (bypass diagnostics) · #348 `f678b1d60` (promotion re-promotion rule, first `ready` run).
+
+## Next Items
+
+### Verified Open
+
+1. **Recipe 5 — Pre-RP brief, site-visit start, Final Writeup (next build).** Plan and owner decisions: design doc *Recipes 3–5 plan* (P3 sandbox app user as Final Writeup actor, P4 abstract seeded here). Build as slices with the S543/S544 process: invariant table and orchestrator mutation checks before any review, Codex capped at three rounds per slice, weigh findings as safety vs fidelity (`feedback-factory-safe-not-full-fidelity`).
+   Evidence: design doc; `RECIPE_STEP_ORDER` in `lib/services/test-requests/run-runner.js` has no recipe-5 entry yet.
+2. **Recipe 3 — site-visit materials (files only in the sandbox)**, after recipe 5.
+3. **Integrity Screener Workbench tab — review the Codex branch.** `origin/codex/integrity-workbench-tab` at `b1086302b`, not merged [VERIFIED `git merge-base`, 2026-09-27]. Next: Claude's read-only review → owner merge/release decision → the open Dataverse flag design. Migrations 056–057 unapplied; recheck numbering first.
+   Evidence: the branch's `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` (read with `git show`).
+4. **Item 7** (admin form, resume/retire, first shared apply of migration 054 and wave30 to production, production release). Carried requirement: deterministic reservation identity per actor + idempotency key.
+
+### Owner Decision Needed
+
+1. **6d (reviewer email exception)**: own slice, own plan review; not started.
+
+### Parked
+
+1. **Uploaded-review branch live pass** — re-open on the first clone of a source Request with an uploaded review (owner: no hand uploads to force it).
+2. **GoVerify bypass intermittent failure** (runs `a1dd008d…`, `99c92d35…`): the PATCH never committed (workflow `modifiedon` unchanged). Re-open trigger: the next occurrence, whose sidecar will now name the error.
+3. **Live-ledger suite flake** (unchanged from S543): re-open on a recurrence with a captured test name.
+
+### Verify Before Acting
+
+1. **Sandbox residue**: Requests 1000341–1000348 (IA rows, synthetic reviewers, suggestions, answers; the 1000347/1000348 stub AI runs and Pre-Site rows). Local ledger runs: `a410efe2…` ready; `126881bc…` (PI refusal, pre-4c), `a1dd008d…`, `99c92d35…` (bypass unverified) parked needs_attention [VERIFIED ledger query 2026-09-27]. First candidates for item 7's retire path; nothing to clean now.
+2. **Scratch database `ledger_test`** was created in `wmkf-ledger-pg` for the integration suites (`TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_test`); never point those suites at `ledger`, which holds the real runs.
+
+### Do Not Reopen Without New Decision
+
+1. Recipe 4 draft names copied verbatim (owner accepted limit, 4c review).
+2. Share-click Postgres issue on the clone is not a prerequisite (owner: esoteric).
+3. Stub `wmkf_ai_run` stays (owner: safe, not full fidelity).
+4. Migration 054 edited in place until item 7; wave30 production apply is item 7's.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Design, recipes 3–5 plan, every slice/review/live record |
+| `lib/services/test-requests/run-runner.js` | Recipe step order and step bodies (4b: `seed_presite_ai_run` … `verify_presite`) |
+| `lib/services/test-requests/presite-sandbox-deps.js` | Sandbox-bound Pre-Site deps, `TEST · ` personnel synthesis |
+| `lib/services/test-requests/docx-package-attestation.js` | Promotion attestor incl. `validateSharePointRewrite` (render only) |
+| `lib/services/test-requests/basic-clone-steps.js` | `createRequestWithGoverifyBypass` (now keeps `deactivationError`) |
+| `scripts/rehearse-test-request-sandbox.mjs`, `scripts/export-test-request-source-bundle.mjs` | Reserve/advance/inspect; bundle export (`--with-pre-site`, owner runs prod exports) |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|docx-package|presite|source-bundle|seed-synthetic).*"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger_test npx jest tests/integration/test-request-run-runner   # scratch DB, not `ledger`
+```
+
+Live runs: run the rehearsal CLI from a checkout of the code under test, with the allow-rule prefix (`project-sandbox-rehearsal-bypass-allow-rule`); `--bypass-goverify` on the advance that reaches `create_request`.
+
+---
+
+## Prior Session 544 Prompt: Factory item 6 recipes 3–5 (plan one paragraph, one Codex plan review), then item 7
+
+## Session 543 Summary — 2026-09-25/26 PT (Fable; slices 6c-i and 6c-ii built, reviewed, merged, live-proven)
+
+### What Was Completed
+
+1. **Slice 6c-i merged (PR #337, `39f641bac`)**: reviews recipe token, ledger reviewer assignments (migration 054 edited in place, unapplied everywhere), operation-scoped marker-write opt-out with WHATWG-canonical target checks on both guards.
+2. **Slice 6c-ii built, reviewed, merged (PR #341, `f54f5d5cf`)**: bundle v3 exporter (`--with-reviewers`, `--source-marker-column`), synthetic-person isolation behind `SYNTHETIC_REVIEWER_ISOLATION=on`, the seeder (`seed_reviewers`, `copy_review_file`, `seed_review_answers`), `docx-package-attestation.js`, `verify_reviews`. Review history: Opus per stage, Fable invariant checks and mutations before each Opus round (new process, memory `feedback-orchestrator-checks-builds-before-review`), three Codex adversarial rounds (nine findings, all closed), then an owner-directed Codex review of the Fable-authored closures (four rounds: customXml shapes characterized from the live promoted IA files read back from the sandbox, comments/PIs/DOCTYPE refused, every normalized part under a byte ceiling and a shape, a closed customXml graph, the person row re-asserted on every resume, BOM-aware XML decoding) ending in **approve, no material findings**.
+3. **Live proof (PR #342, `df733dbc6`)**: owner applied wave30 to the sandbox; sandbox Request 1000343 reached `ready` through all eighteen steps of the `reviews` recipe from production Request 1003222 (D-R5 read scope; its three reviewers are the owner's throwaway inboxes, passed through as the `--reviewer-address` flags). Two live-only facts fixed: Dataverse derives a potential reviewer's primary name from first/last on create AND update (the `TEST · ` prefix now lives in `wmkf_firstname`; `isSyntheticNameDerived` checks the derived name; agent-wiki fact corrected), and `wmkf_externaltokenrevoked` defaults to `false` so only `true` is a live value there. Gitleaks config allow-lists the ledger digest lines in the Factory's run-inspection evidence files.
+4. **UI worktree (Opus, parallel)**: PRs #338/#339 merged; see the Session 543-UI block below (its open items stand).
+
+### Commits (all on `main` via merged PRs)
+- `39f641bac` PR #337 (6c-i) · `f54f5d5cf` PR #341 (6c-ii) · `df733dbc6` PR #342 (live-proof fixes, evidence, wiki correction, Gitleaks allowlist).
+
+## Next Items
+
+### Verified Open
+
+1. **Item 6, recipes 3–5 — PLANNED 2026-09-26 (S544); build next, in the order recipe 4 (Pre-Site) → 5 (Pre-RP brief, site-visit start, Final Writeup) → 3 (site-visit materials, files only in the sandbox).** Plan, owner decisions P1–P6, invariant classes I1–I10, contract-reconcile pass and two Codex plan reviews (the second at the owner's request; provenance kept by owner decision): design doc *Recipes 3–5 plan*. Start with its read-only Step 0 schema probe in the sandbox.
+   Evidence: design doc *Recipes 3–5 plan*.
+   Process for the slices: the S543 process (invariant table + mutations checked by the orchestrator before any Opus round; Codex capped at three rounds per slice). Weigh review findings as safety versus fidelity (memory `feedback-factory-safe-not-full-fidelity`).
+2. **Item 7** (admin form, resume/retire, first shared apply of migration 054 and of wave30 to production, production release). Requirement carried: deterministic reservation identity per actor + idempotency key so retries reach the ledger's assignment comparison.
+   Evidence: design doc slice 6c-i record (Codex round 1 declined finding 1).
+3. **Integrity Screener Workbench tab + PD approval — Codex branch, awaiting review and release (handed over 2026-09-27).**
+   `codex/integrity-workbench-tab` at `b1086302b`: built, not merged or deployed. Migrations 056–057 are unapplied; recheck numbering against `codex/feature-request`'s 055 before release.
+   - **Next, in order:**
+     1. Claude's read-only review of the branch.
+     2. The owner's merge and release decision.
+     3. The open Dataverse flag design: **Integrity review complete** means a complete screen plus PD approval for the current roster. The design needs invalidation for replacement screens, holds and roster changes (including edits outside our apps), plus durable sync retries. Sandbox metadata is still unchecked.
+   - **Deferred:** the board-readiness gate, until the staff recommendation/readiness workflow exists.
+   Evidence: the branch's `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` and `docs/plans/INTEGRITY_DATAVERSE_FLAG_INVESTIGATION_2026-09-26.md` (read with `git show origin/codex/integrity-workbench-tab:<path>`); queue entry in `docs/CURRENT_WORK_QUEUE.md` (Owner-requested product follow-ups).
+
+### Owner Decision Needed
+
+1. **DECIDED 2026-09-26 (S544) — reviewer addresses are never minted.** The owner supplies a default base inbox in the local-only `TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS`; a reviewer with no `--reviewer-address` flag and no synthetic bundle address gets the base plus-tagged per source reviewer (`defaultReviewerAddressFor`). Merged (PR #343, `9b6fea389`) and live-checked: sandbox Request 1000346 `ready`, reuse confirmed (`docs/plans/evidence/test-request-factory/default-reviewer-address-live-check-2026-09-26.md`). New residue: 1000346 and three plus-tagged persons; local-ledger runs `ddc0b4f9…` (prepared) and `be486c6d…`/`fe84d2fb…` (needs_attention, advanced without `--bypass-goverify`).
+   Evidence: design doc 6c-ii record, closing note; `scripts/rehearse-test-request-sandbox.mjs` `resolveReviewerAssignments`.
+2. **6d (reviewer email exception)**: own slice, own plan review; not started.
+
+### Parked
+
+1. **Uploaded-review branch live pass** (`copy_review_file`, DOCX attestation, `Reviewer_Uploads` census). Unit-proven; 1003222's reviews were form submissions. Re-open trigger: the first clone of a source Request with an uploaded review. Owner direction 2026-09-26: nobody uploads anything by hand to force it.
+   Evidence: `docs/plans/evidence/test-request-factory/reviews-recipe-live-proof-2026-09-26.md`.
+2. **Live-ledger suite flake**: `tests/integration/test-request-run-ledger.pg.test.js` failed once in two of ~20 local runs when both live suites shared one container in parallel workers; 10/10 green in a capture loop, test name never captured; CI runs both files in one invocation. Re-open trigger: a recurrence with a captured test name.
+
+### Verify Before Acting
+
+1. **Sandbox residue from the proofs**: Requests 1000341–1000343 with their Initial Assessments, three marker-true synthetic persons (addresses = the owner's throwaway inboxes), suggestions and 22 answer rows. Nothing to clean now; if item 7's retire path is built, these are its first candidates.
+   Preflight: `--run-inspect` on runs `f8aae6aa…` and `83c5da2e…` in the local ledger container `wmkf-ledger-pg` (`TEST_REQUEST_LEDGER_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger`).
+
+### Do Not Reopen Without New Decision
+
+1. Migration 054 edited in place until item 7 (owner, 2026-09-24). Wave30 applied to the sandbox only (owner, 2026-09-26); production apply is item 7's.
+2. `SYNTHETIC_REVIEWER_ISOLATION` unset = off; order in any environment is wave30 → switch → seeder.
+3. Codex per-slice cap of three adversarial rounds; Fable closes the loop after the cap and the owner accepts the self-reviewed closures (accepted for 6b and 6c-ii) — but an owner-directed Codex pass over Fable-authored closures found seven more real findings in 6c-ii, so offer that pass by default at the end of a slice.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Design, decisions D-R1–D-R6, every stage and review record |
+| `lib/services/test-requests/run-runner.js` | Recipes, steps, `verify_reviews`, person-ownership invariant |
+| `lib/services/reviewer-engagement/seed-synthetic-review.js` | Synthetic projection (`TEST · ` in first name), completion write, allowlists |
+| `lib/services/test-requests/docx-package-attestation.js` | One promotion attestor: shapes, ceilings, closed customXml graph |
+| `lib/services/test-requests/review-file-copy.js` | Review-file policy (10 reviewers × 5 files under the 100-file census) |
+| `scripts/rehearse-test-request-sandbox.mjs`, `scripts/export-test-request-source-bundle.mjs` | Reserve / advance / inspect; bundle export with reviewers |
+| `lib/dataverse/schema/wave30-synthetic-reviewer-marker/` | The marker column wave (sandbox-applied) |
+| `docs/plans/evidence/test-request-factory/reviews-recipe-live-proof-2026-09-26.md` | Live proof record, stops, residue |
+
+## Testing
+
+```bash
+npx jest "tests/unit/(.*test-request|docx-package|seed-synthetic|source-bundle|reviews-sandbox|graph-).*"
+TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger TEST_REQUEST_LEDGER_REQUIRE=1 npx jest "tests/integration/.*\.pg\.test\.js"   # container wmkf-ledger-pg (Colima)
+```
+
+---
+
+# Session 543-UI Prompt: owner check of the Research Presentation Materials card (worktree `claude/ui-work`)
+
+> **Where things live.** This handoff is on branch `claude/ui-work` in the worktree
+> `/Users/gallivan/Code/WMKF_Apps-ui`. **The Test Request Factory work (synthetic reviewers, 6c-ii)
+> is merged to `main` as of 2026-09-26 (PRs #341, #342); the main checkout is back on `main`.**
+> Its handoff is the "Session 544 Prompt" above. Do not switch this worktree to
+> `main` or pull `main` into it. Keep the Factory-owned files untouched: `lib/services/test-requests/`,
+> `lib/services/reviewer-engagement/`, the potential-reviewer and reviewer-suggestion adapters,
+> `reviewer-merge.js`, the two test-request scripts, migration 054, and the Factory design doc.
+
+## Session 543-UI Summary — 2026-09-25 PT (Opus; parallel UI worktree)
+
+[VERIFIED via commits on `claude/ui-work`, full Jest run, and gates run in this worktree]
+
+### What Was Completed
+
+1. **Research Presentation Materials card** on the Workbench Staff Deliberations tab
+   (`shared/components/workbench/ResearchPresentationMaterialsCard.js`). It is always shown: once the
+   brief is shared it sits between the Briefing page link card and Email history (owner request after
+   the local check; `PreSiteDistributionPanel` `beforeHistory` slot); before that it follows the writeup cards. Its status line reads: Presentation not scheduled /
+   Presentation scheduled · materials not requested / requested / ready. A closed collection reads
+   "materials request closed"; a failed read reads "could not be loaded". Rows for Slides and
+   Participant bios link to every file in the request's `Site Visit - Slides` /
+   `Site Visit - Participant Bios` folders, or say "Not received yet".
+2. **Interim folder read.** `GET /api/workbench/site-visit/material-files` (`reviewers`) calls
+   `lib/services/site-visit-materials/folder-files-service.js`. The owner needs files that staff put in
+   those folders by hand through AkoyaGo (Request 1002903) to show while the upload portal is in
+   testing; those files have no `wmkf_requestdocument` row. Contract and retirement trigger:
+   `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.13. Security matrix row, `CANONICAL_COUNTS`
+   (route files 227, requireAppAccess endpoints 141), and a service catalog entry were added.
+3. **`useSiteVisitContext`** now settles a failed logistics read as `{ unavailable: true }` instead of
+   staying `null`. A recipient-directory failure alone keeps the visit.
+4. **Owner answers this session:** there is no "awaiting confirmation" status (all received but
+   unconfirmed reads "requested"); there are no counters for the folder fallback; the one-line
+   fact-consistency fix in the Factory doc is left to the Factory session.
+5. **Verification:** full Jest suite 1,104 suites / 16,553 tests passed; new suites for the service
+   (5 tests), the card (13), and hook directory-failure cases; one mutation killed (directory
+   coupling). Every gate is green; `check:fact-consistency` went red on the new route count until the
+   Factory session added the historical marker (`e7480e7bf`). The owner then checked the card in local dev
+   (production reads) on Request 1002903.
+
+### Commits (`claude/ui-work`, pushed)
+- `3c8e06915` — Add Research Presentation Materials card to Staff Deliberations
+- `4e79ba433` — Keep the Site Visit when only the recipient directory fails
+- `5acff7af4` — Place the Research Presentation Materials card above Email history
+- `98cc433ad` — merge of PR #338 (production `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk`)
+- `b7e52f3ac` / `5f2d9a05d` — release docs and milestone entry; merge of PR #339
+
+## Next Items (UI worktree)
+
+### Verified Open
+
+1. **DONE — owner check on Request 1002903** (local dev, 2026-09-25): both rows linked the files; the
+   card was then moved above Email history at the owner's request. For another request: if a row
+   reads "Not received yet" despite files in AkoyaGo, the folder name or location differs from
+   `Site Visit - Slides` / `Site Visit - Participant Bios` under the active `akoya_request` folder.
+   Check that before changing code.
+2. **DONE — promotion.** PR #338 merged `98cc433ad`; production `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` was
+   verified as the merge build. The release docs merged via PR #339 (`5f2d9a05d`).
+3. **DONE — `check:fact-consistency`.** The Factory session marked the Stage 1d record historical
+   (`e7480e7bf`); the gate and its self-test pass on `main` (route files 227).
+
+### Owner Decision Needed
+
+1. Whether to move the header's "Materials: N of 3 received · due …" line into the new card. It stays
+   in the header for now (not confirmed), so once a collection exists the two partly repeat each other.
+2. Placement relative to Codex's post-visit "Research presentation follow-up" section (Codex plan
+   `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md` §4.2, Slice 5, on
+   `codex/feature-request`). The two should be placed together.
+
+### Verify Before Acting
+
+1. **Merge overlap with Codex Slice 5.** Codex will wire `useSiteVisitContext` and add a section to
+   `StaffDeliberationsTab.js`, and already edits `lib/services/site-visit/logistics-service.js` and
+   `pages/api/workbench/site-visit/logistics.js` (this branch does not). This branch changed
+   the hook's failure settle (`{ unavailable: true }`, directory decoupled), mounted the card in the
+   tab, and added a `beforeHistory` slot to `PreSiteDistributionPanel.js`. Whoever merges second reconciles those two files.
+2. **Residual risk (§16.13):** the Workbench materials summary is fail-open `null`, so a failed summary
+   read shows "materials not requested" for a scheduled presentation.
+3. **Agent wiki:** the write hook flagged `docs/agent-wiki/topics/security-auth.md` for the new route. It
+   was deliberately not updated (interim read-only route; `check:agent-wiki` green). Revisit if the
+   route outlives this cycle.
+
+## Key Files Reference (UI worktree)
+
+| File | Purpose |
+|---|---|
+| `shared/components/workbench/ResearchPresentationMaterialsCard.js` | Card, status mapping, file rows |
+| `lib/services/site-visit-materials/folder-files-service.js` | Interim folder listing |
+| `pages/api/workbench/site-visit/material-files.js` | Thin route shell |
+| `shared/components/workbench/useSiteVisitContext.js` | Site Visit read with `unavailable` settle |
+| `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.13 | Contract, residual risk, retirement trigger |
+
+## Stop-time notes (UI worktree)
+
+- Claim-evidence pilot: no eligible edit recorded for this session; no observation row.
+- Milestone: `DEVELOPMENT_LOG.md` entry added after the PR #338 production deploy.
+- `CLAUDE.md`: no change (the route is catalogued in the matrix and service catalog).
+
+---
+
+## Prior prompt (main checkout's Session 543 prompt, unchanged)
+
+# Session 543 Prompt: Factory follow-ups, item 6 next recipe, and the two Codex-led threads
+
+## Owner brief: where the Test Request Factory stands (written 2026-09-24 PT, end of Session 542)
+
+**What it is for.** A way to manufacture realistic, disposable test Requests so staff workflows (Workbench, Meeting Tracker, reviewer portal, presentation materials, and later the whole cycle) can be exercised without touching a real applicant. The design lives in `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`; its build order is seven items.
+
+**What is built and proven (items 1–6a, and the first recipe of item 6).** A read-only production export of a source Request bundle (Request 1003222); a sandbox clone of that bundle with copied files (the Basic recipe); a durable Postgres run ledger with journal-before-dispatch resource receipts and a bounded, resumable runner driven from one CLI (`--reserve`, `--advance`, `--run-inspect`); a recipe dimension; and the first later-stage recipe, `initial_assessment`, which seeds a synthetic Initial Assessment and its Board snapshot through the unmodified production lineage functions and verifies the result against real Dataverse and Graph. Live proof: sandbox Request 1000342 reached `ready` on 2026-09-24.
+
+**What shipped today.** PR #336 merged to `main` (`b63803951`) and deployed (`dpl_F3XxWLs9Kcg8feoXVgzbkmcpHdfJ`, owning `applications.wmkeck.org`). It ships runner, CLI, recipe, ledger code and the fresh-install mirror. Migration 054 is on `main` but **unapplied**; nothing applies on deploy. Nothing in production data changed.
+
+**What remains.** Item 6's other recipes, one at a time: synthetic reviewers and reviews, site-visit materials and transcripts, Pre-Site seed and render, Pre-RP brief / site-visit start / Final Writeup. Then item 7: the admin creation form, resume/retire operations, the first shared apply of migration 054, and the production release. Each recipe is its own slice with the same cadence (Sonnet builds, Opus reviews, Codex adversarial, Fable final, live proof, owner acceptance).
+
+**Decisions you made today that now bind the design.** Recompute the synthetic fixture's hash in verify (independent anchor); no lease renewal, but a 900 s lease for the IA recipe; attest the whole DOCX package against the fresh render with only SharePoint's property-promotion mutations normalized (in place of a raw byte digest, which SharePoint makes impossible); Fable's self-review accepted for the post-cap code; 6b accepted; merged.
+
+## Session 542 Summary — 2026-09-24 PT (Fable; Codex adversarial rounds 1–3; owner decisions; live proof; promotion)
+
+[VERIFIED via commits on `main`, PR #336 checks, Vercel deployment inspection, sandbox run receipts under `docs/plans/evidence/test-request-factory/`] Slice 6b closed end to end and promoted. Codex on the presentation branch was set up separately and moved on its own (`ebaca0094`).
+
+### What Was Completed
+
+1. **Stage C Opus round 3 (tests only)** closed by Fable: isolating tests for the twin-read eTag arm, versionId arm, both hash arms; validator-shaped verify fixture; Fable final review of Stage C.
+2. **Codex adversarial rounds 1–3** (`gpt-5.6-sol`), eight findings, all closed on the branch: Ready-row recovery journals the full receipt and proves ownership by claim-token digest on every resolved row and the post-create reread (F1, F5, F7); null path read stops instead of re-uploading (F2); verify anchors row hashes/versions to the step receipts, mandatory (F3); fresh-render hash anchor (owner); 900 s IA lease (owner, F4); package attestation (F6, reshaped live); fresh-install receipt mirror (F8). 28 mutations killed across the day.
+3. **Live proof.** Run 1 stopped at `create_request`: the GoVerify deactivation PATCH outran the 15 s bypass bound (server committed ~8 s in); no Request created; the sandbox workflow was re-activated by a one-off PATCH from a scratchpad probe (activation 9.0 s) and the bound raised to 60 s. Run 2: sandbox Request 1000342 through all eleven steps; the first verify attempt exposed SharePoint property promotion (customXml items/props/rels, core.xml, custom.xml, content types, document rels, trash entries; every `word/` part byte-identical), replaced the raw digest with `lib/services/test-requests/docx-package-attestation.js`, re-advanced to `ready`.
+4. **Promotion.** PR #336; one CI fix round (email-guard fixture against PR #335's mandatory recipients; hostname checks for eleven CodeQL substring warnings); merged `b63803951`; production deployment verified as the build of `main`'s head.
+5. **Codex presentation branch** set up on `codex/feature-request` (worktree under `~/.codex/worktrees/feature-request`) with a Chrome recovery-pass brief; Codex has since pushed `ebaca0094`. PR #332 (personal reviewer reminders) untouched, still open.
+6. **Memory:** `project-sharepoint-property-promotion-rewrites-docx.md` (router line under Dataverse/Dynamics).
+
+### Commits (main)
+- `b63803951` — merge of PR #336 (branch commits `aa87c3c1d` … `4c5539ee7`)
+- `18a2c94e6` — SharePoint property-promotion memory
+- `d26382155` — merge and deployment recorded in the design doc
+
+## Next Items
+
+### Verified Open
+
+1. **Item 6, next recipe: synthetic reviewers and reviews.** Evidence: design doc build order line "IA → synthetic reviewers and reviews → …"; owner decisions 3–4 (synthetic reviewers seeded 1:1, real staff-controlled throwaway inboxes). Plan-first with `/contract-reconcile`, then the slice cadence. Unplanned; nothing built.
+2. **Small Factory follow-ups found by the live proof** (any one can be a first task): the seed step's final resource outcome is `dispatched` while every sibling is `verified` (`ia-recipe-live-proof-run-inspect-2026-09-24.json`); the GoVerify stop's run reason collapses to `unknown_error` although the resource error is `goverify_deactivation_uncertain`; "manually recheck the workflow" has no CLI affordance (a read-plus-restore mode or a runbook line).
+3. **Codex-led threads.** PR #332 was `CONFLICTING` with `main` at session start and is Codex's to resolve; the presentation branch's Slice 0 Chrome pass is in progress under Codex (`ebaca0094`). Read their handoffs before touching either.
+
+### Owner Decision Needed
+
+1. Whether the three older deployment-hash Entra callbacks (`g0buiqhuh`, `7doz4qxsn`, `15rny26o5`) should also go (carried).
+2. Carried: Preview CSRF origin allowlist (option b) still goes through `/contract-reconcile`.
+
+### Parked
+
+1. Migration 054's first shared apply: at item 7 (freezes the file). Evidence: design doc item 7 and the `main` merge record.
+
+### Verify Before Acting
+
+1. **Sandbox residue:** Request 1000342 with its Initial Assessment and Board snapshot files; two inactive GoVerify activation children (one predates this session); the workflow itself is active. Cleanup is data-mining scope only (`project-test-residue-cleanup-is-for-data-mining.md`), not a task.
+2. **Worktrees:** `/Users/gallivan/Code/WMKF_Apps-factory` still checked out on the merged branch `codex/test-request-preview-integration` (park or remove; nothing unpushed). The Codex-app worktree for that branch under `~/.codex/worktrees` was removed this session. Local ledger container `wmkf-ledger-pg` holds runs `81800b62…` (needs_attention) and `f8aae6aa…` (ready).
+3. **Production reads need the owner's shell.** The auto-mode classifier blocks `DATAVERSE_ALLOW_PROD_READS=yes` exports even when authorized; the owner ran today's export with the `!` prefix. A machine-local allow rule for the exact export command would remove that step.
+
+### Do Not Reopen Without New Decision
+
+1. 6b design decisions (Stage A–C paragraphs) plus today's: fresh-render hash anchor; no lease renewal with a 900 s IA lease; package attestation normalizing only SharePoint property promotion (customXml items recognized by root element only; a tenant change fails closed); `bytesSha256` journaled as evidence only; 054 edited in place, no forward migration.
+2. Earlier: 6a design, sandbox parity deviations, no-text invariant, dispatch-marker rule, synthetic IA fixtures only.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` | Design, build order, every stage and review record |
+| `docs/plans/evidence/test-request-factory/ia-recipe-live-proof-2026-09-24.md` | Live proof narrative, receipts, residue |
+| `lib/services/test-requests/run-runner.js` | Runner and all recipe steps |
+| `lib/services/test-requests/docx-package-attestation.js` | SharePoint-normalized package attestation |
+| `lib/services/test-requests/run-ledger.js`, `lib/db/migrations/054_test_request_runs.sql` | Ledger and its unapplied migration |
+| `scripts/rehearse-test-request-sandbox.mjs`, `scripts/export-test-request-source-bundle.mjs` | CLI and production bundle export |
+
+## Stop-time notes
+
+- Claim-evidence pilot: no eligible edit recorded for this session; no observation row.
+- Milestone: `DEVELOPMENT_LOG.md` entry added (Test Request Factory promoted to production).
+- `CLAUDE.md`: no change (no new app, endpoint, schema apply, or convention; scripts are catalogued elsewhere).
+
+## Prior Session 542 Prompt: Finish slice 6b review (Opus round 2, Fable final, Codex), then the live IA proof
 
 ## Session 539 Summary — 2026-09-24 PT (Fable orchestrating; Sonnet builds, Opus reviews, Codex adversarial and rescue; ran concurrently with Sessions 540–541 on other branches)
 
@@ -1336,7 +1202,7 @@ this presentation session does not edit or run that workstream.
 
 1. **Stage 1d accepted** (Factory branch). Six root-review defects fixed (`f06b5d3a8`, `7c8edcf45`, `6f2d56c48`, `008612629`), two Codex re-review findings fixed (`ee9901c59` default cycle from ordinary requests only; `c0cbf0dad` export-preview waterfall step), three more fixed by Codex rescue and reviewed (`6a293fe12` export token binds isolation policy; `744bde88d` Explorer page-local CSV hidden while isolation is on; `53260f1af` no default cycle for all-test programs). Owner decisions: single-request Word/PDF artifacts (incl. Grant Reporting) stay available for test requests; spend alarm counts all spend, dashboard shows test spend as one line; accept without a fourth review round.
 2. **Source-bundle exporter accepted** (Factory branch). `scripts/export-test-request-source-bundle.mjs` + `lib/services/test-requests/source-bundle.js` (bundle v2: production host + registered `akoyago-shared` site enforced, drive/item/site identity, strict SharePoint discovery, post-hash membership fence, root-only archive folder misses with library re-confirmation). Commits `414af81d9`, `ebd6796e4`, `433609a38`, `17085332a`, `4b8ebec7b`, `aba21a5a9`, `57d823b14` (+ doc commits). Live runs on 1003222 (owner authorized prod Dataverse reads this session): GUID `e43ae6ea-698f-f111-8076-6045bd018a07`, revision `W/"98622844"`, December 2026 / 2026-12-11, no purpose text, two recognized documents (`ProposalNarrative_1003222.pdf`, `Proposal_1003222.pdf`); no Phase I or bibliography file matched the recognized names.
-3. **Presentation Slice 0 decisions (historical; fixture superseded 2026-09-25)** (`codex/feature-request`, `6b9f1fd15`, `1fe8777d5`): Chrome and Edge accepted; macOS/iPadOS Safari was deferred to a Production run on a Factory-created test request; browser-independent recovery rows moved to one agent-run Chrome pass. The current rule uses a freshly approved human-created Request and excludes iPadOS.
+3. **Presentation Slice 0 decisions** (`codex/feature-request`, `6b9f1fd15`, `1fe8777d5`): Chrome and Edge accepted; macOS/iPadOS Safari deferred to a Production run on a Factory-created test request; browser-independent recovery rows move to one agent-run Chrome pass.
 4. **Investigation worktree** created for a parallel Claude session: `/Users/gallivan/Code/WMKF_Apps-investigate`, branch `claude/investigation` (no upstream). Another Claude session may be working there; do not touch it.
 
 ## Next Items
@@ -1364,7 +1230,7 @@ this presentation session does not edit or run that workstream.
 
 1. Stage 1d and the source-bundle exporter are accepted (owner, Session 536); no fourth review round.
 2. Existing requests are never changed by the Factory; test requests visible with TEST badge; reports/exports/cycle totals exclude them; single-request actions stay available.
-3. **Historical, superseded 2026-09-25:** Safari Slice 0 was assigned to a Factory test request. It now uses a freshly approved human-created disposable Request; no further Edge runs.
+3. Safari Slice 0 runs in Production on a Factory test request; no further Edge runs.
 
 ## Key Files Reference
 
