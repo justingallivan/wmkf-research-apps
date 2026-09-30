@@ -397,3 +397,61 @@ describe('Opus round-2 item 5: apply-ledger-migrations.js --dry-run sends only S
     }
   }, 10000);
 });
+
+/**
+ * Opus round-3 L2: the tracker table's own CREATE TABLE/ALTER COLUMN DDL
+ * must run AFTER the identity check and the tracked-prefix verification —
+ * never before this runner has proven the ledger it is about to write the
+ * tracker to is trustworthy. This runs the actual (non-dry-run) script
+ * against a recording fake `pg` Client with nothing tracked yet (so prefix
+ * verification is a no-op) and asserts every query BEFORE the first
+ * non-SELECT statement is one of the two required read-only checks, and
+ * that the first non-SELECT statement is the tracker's own CREATE TABLE.
+ */
+describe('Opus round-3 L2: tracker DDL runs only after identity check + prefix verification', () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    jest.resetModules();
+    process.env = { ...ORIGINAL_ENV, TEST_REQUEST_SANDBOX_LEDGER_URL: 'postgres://postgres:pw@127.0.0.1:5433/ledger' };
+    process.argv = ['node', 'scripts/apply-ledger-migrations.js', '--url-env=TEST_REQUEST_SANDBOX_LEDGER_URL'];
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+    jest.restoreAllMocks();
+  });
+
+  test('CREATE TABLE/ALTER COLUMN come after current_database and to_regclass, never before', async () => {
+    const calls = [];
+    jest.doMock('pg', () => ({
+      Client: jest.fn().mockImplementation(() => ({
+        connect: jest.fn(async () => {}),
+        query: jest.fn(async (text) => {
+          calls.push(String(text));
+          if (/current_database/i.test(text)) return { rows: [{ db: 'ledger', schema: 'public', port: 5432 }] };
+          if (/to_regclass/i.test(text)) return { rows: [{ reg: null }] }; // tracker absent -> nothing tracked -> prefix verification is a no-op
+          if (/pg_tables/i.test(text)) return { rows: [] };
+          return { rows: [] };
+        }),
+        end: jest.fn(async () => {}),
+      })),
+    }));
+
+    let doneResolve;
+    const done = new Promise((resolve) => { doneResolve = resolve; });
+    jest.spyOn(process, 'exit').mockImplementation(() => { doneResolve(); });
+
+    require('../../scripts/apply-ledger-migrations.js');
+    await Promise.race([done, new Promise((resolve) => { setTimeout(resolve, 5000); })]);
+
+    const firstNonSelectIndex = calls.findIndex((t) => !/^\s*SELECT\b/i.test(t));
+    expect(firstNonSelectIndex).toBeGreaterThan(-1);
+    expect(calls[firstNonSelectIndex]).toMatch(/^\s*CREATE TABLE IF NOT EXISTS ledger_schema_migrations/i);
+
+    const before = calls.slice(0, firstNonSelectIndex);
+    expect(before.some((t) => /current_database/i.test(t))).toBe(true);
+    expect(before.some((t) => /to_regclass/i.test(t))).toBe(true);
+    for (const t of before) expect(/^\s*SELECT\b/i.test(t)).toBe(true);
+  }, 10000);
+});

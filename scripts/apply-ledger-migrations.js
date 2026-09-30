@@ -38,14 +38,24 @@
  * (only meaningful when the operator has confirmed the file has not changed
  * since it was actually applied).
  *
- * Codex round-3 #2: before any per-file action, the tracked AND
- * checksum-matching prefix of files is re-fingerprinted in a rolled-back
- * scratch schema and compared against the LIVE ledger (a matching checksum
- * only proves the file's text is unchanged, not that nothing was hand-patched
- * live since). Any drift refuses the WHOLE run before file[0] is even
- * considered. Skipped under --dry-run (it is real DDL, rolled back, in a
- * scratch schema) — dry runs print "[prefix verification requires a
- * non-dry run]" instead.
+ * Codex round-3 #2: before any per-file action, the tracked (checksum-
+ * matching OR legacy NULL-checksum — Opus round-3 L1) prefix of files is
+ * re-fingerprinted in a rolled-back scratch schema and compared against the
+ * LIVE ledger (a matching checksum only proves the file's text is unchanged,
+ * not that nothing was hand-patched live since; a NULL-checksum row is
+ * still an already-applied tracked file). A prefix extra that a LATER,
+ * not-yet-tracked checkout file would itself create is exempted (Opus
+ * round-3 M1) so a live-but-untracked forward migration can still reach its
+ * own `adopt` decision; missing/differing objects, or an extra no later
+ * file explains, refuse the WHOLE run before file[0] is even considered.
+ * Skipped under --dry-run (it is real DDL, rolled back, in a scratch
+ * schema) — dry runs print "[prefix verification requires a non-dry run]"
+ * instead.
+ *
+ * Opus round-3 L2: the tracker table is only ever READ (tolerantly, never
+ * created) before this point; its CREATE TABLE/ALTER COLUMN DDL runs AFTER
+ * the identity check and prefix verification both pass, never before this
+ * runner has proven the ledger is trustworthy to write to.
  *
  * The app's apply-migrations.js is deliberately NOT reused: it applies the
  * whole manifest and writes the app's schema_migrations table.
@@ -89,7 +99,7 @@ async function main() {
     readLedgerFingerprint, compareLedgerFingerprint, formatLedgerDiff, readApprovedAhead,
   } = await import('../lib/db/ledger-schema.js');
   const {
-    decideFileAction, sha256Text, stripOuterTxn, tableNamesIn, fingerprintFilesInScratch, verifyTrackedPrefix,
+    decideFileAction, sha256Text, stripOuterTxn, tableNamesIn, fingerprintFilesInScratch, verifyTrackedPrefix, selectTrackedPrefixFiles,
   } = await import('../lib/db/ledger-migrations.js');
   // Opus round-1 L1: derive the target from the variable name the same way
   // check-factory-ledger.js does, so the managed-host database rule applies
@@ -123,32 +133,27 @@ async function main() {
     // current_schema even though buildLedgerClientConfig pins every other
     // destination field explicitly; see the registry module's comment).
     await assertLedgerConnectionIdentity(client, verdict.effective, { checkPort: verdict.label === 'managed-ledger' });
-    // Opus round-1 L4: --dry-run must execute no DDL. The tracker
-    // CREATE/ALTER are skipped, and the tracker is instead read with a
-    // query that tolerates either the table or the sha256 column being
-    // absent, reporting that fact instead of creating them.
+    // Opus round-3 L2: the tracker is now ALWAYS read with the tolerant
+    // dry-run-style query (never created/altered yet) so prefix
+    // verification below runs against whatever the ledger already has,
+    // before this runner writes anything to it — including the tracker
+    // table itself. The CREATE TABLE/ALTER COLUMN DDL moves to AFTER
+    // verification passes (and only outside --dry-run); see below.
+    const regRow = await client.query('SELECT to_regclass($1) AS reg', [LEDGER_TRACKER_TABLE]);
+    const trackerExists = !!regRow.rows[0].reg;
     let tracked;
-    if (dryRun) {
-      const regRow = await client.query('SELECT to_regclass($1) AS reg', [LEDGER_TRACKER_TABLE]);
-      const tableExists = !!regRow.rows[0].reg;
-      if (!tableExists) {
-        console.log('[dry-run] tracker absent (would be created)');
-        tracked = new Map();
-      } else {
-        const colRow = await client.query(
-          "SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = 'sha256'",
-          [LEDGER_TRACKER_TABLE],
-        );
-        const sha256ColumnExists = colRow.rows.length > 0;
-        if (!sha256ColumnExists) console.log('[dry-run] sha256 column absent (would be added)');
-        const selectSha256 = sha256ColumnExists ? 'sha256' : 'NULL::text AS sha256';
-        tracked = new Map((await client.query(`SELECT name, ${selectSha256} FROM ${LEDGER_TRACKER_TABLE}`)).rows.map((r) => [r.name, { sha256: r.sha256 }]));
-      }
+    if (!trackerExists) {
+      if (dryRun) console.log('[dry-run] tracker absent (would be created)');
+      tracked = new Map();
     } else {
-      await client.query(`CREATE TABLE IF NOT EXISTS ${LEDGER_TRACKER_TABLE} (
-        name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now(), applied_by TEXT, sha256 TEXT NOT NULL)`);
-      await client.query(`ALTER TABLE ${LEDGER_TRACKER_TABLE} ADD COLUMN IF NOT EXISTS sha256 TEXT`);
-      tracked = new Map((await client.query(`SELECT name, sha256 FROM ${LEDGER_TRACKER_TABLE}`)).rows.map((r) => [r.name, { sha256: r.sha256 }]));
+      const colRow = await client.query(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = 'sha256'",
+        [LEDGER_TRACKER_TABLE],
+      );
+      const sha256ColumnExists = colRow.rows.length > 0;
+      if (!sha256ColumnExists && dryRun) console.log('[dry-run] sha256 column absent (would be added)');
+      const selectSha256 = sha256ColumnExists ? 'sha256' : 'NULL::text AS sha256';
+      tracked = new Map((await client.query(`SELECT name, ${selectSha256} FROM ${LEDGER_TRACKER_TABLE}`)).rows.map((r) => [r.name, { sha256: r.sha256 }]));
     }
 
     // Codex round-3 #2: before applying/adopting/accepting anything, prove
@@ -164,12 +169,10 @@ async function main() {
     if (dryRun) {
       console.log('[prefix verification requires a non-dry run]');
     } else {
-      const trackedPrefixFiles = files.filter((f) => {
-        const row = tracked.get(f);
-        return !!row && row.sha256 === fileChecksum.get(f);
-      });
+      const trackedPrefixFiles = selectTrackedPrefixFiles(files, tracked, fileChecksum);
       const prefixVerification = await verifyTrackedPrefix(client, {
         trackedFiles: trackedPrefixFiles,
+        allFiles: files,
         migrationsDir: LEDGER_MIGRATIONS_DIR,
         readLedgerFingerprint,
         approvedAhead,
@@ -178,6 +181,14 @@ async function main() {
         console.error(`[refuse]    ${prefixVerification.reason}`);
         exitCode = 1;
         prefixVerificationFailed = true;
+      } else {
+        // Opus round-3 L2: the tracker table/column DDL runs only now —
+        // after the identity check, the tolerant read, AND prefix
+        // verification have all passed — never before this runner has
+        // proven the ledger it is about to write to is trustworthy.
+        await client.query(`CREATE TABLE IF NOT EXISTS ${LEDGER_TRACKER_TABLE} (
+          name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now(), applied_by TEXT, sha256 TEXT NOT NULL)`);
+        await client.query(`ALTER TABLE ${LEDGER_TRACKER_TABLE} ADD COLUMN IF NOT EXISTS sha256 TEXT`);
       }
     }
 
