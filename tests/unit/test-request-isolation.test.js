@@ -13,11 +13,27 @@ import {
   assertTestRequestMarkerNotWritten,
   withOrdinaryTestRequestODataFilter,
   withTestRequestIsolationSelect,
+  reviewerAcceptanceSwitchesReady,
 } from '../../lib/services/test-requests/isolation';
 import { ensureAttribute } from '../../lib/dataverse/schema-apply';
 
 const VALID_RUN = '22222222-2222-4222-8222-222222222222';
 const fields = TEST_REQUEST_ISOLATION_FIELDS;
+
+test.each([
+  ['on', 'on', true],
+  ['off', 'on', false],
+  ['on', 'off', false],
+  [undefined, 'on', false],
+  ['on', undefined, false],
+  ['invalid', 'on', false],
+  ['on', 'invalid', false],
+])('acceptance readiness requires both literal-on switches (%s, %s)', (reviewer, request, ready) => {
+  expect(reviewerAcceptanceSwitchesReady({
+    SYNTHETIC_REVIEWER_ISOLATION: reviewer,
+    TEST_REQUEST_ISOLATION: request,
+  })).toBe(ready);
+});
 
 describe('test-request isolation classifier', () => {
   test.each([

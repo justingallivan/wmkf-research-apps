@@ -288,8 +288,16 @@ describe('migrations manifest lists 054 last and its setup-database.js mirror ma
     'utf8',
   ));
 
-  it('has 054_test_request_runs.sql as the last entry', () => {
-    expect(manifest.files[manifest.files.length - 1]).toBe('054_test_request_runs.sql');
+  it('keeps 054 before the B4 slot-journal migration', () => {
+    expect(manifest.files.slice(-2)).toEqual(['054_test_request_runs.sql', '055_test_request_cast_slot_bindings.sql']);
+  });
+
+  it('V56 fresh-install slot table mirrors migration 055', () => {
+    const migration055 = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/055_test_request_cast_slot_bindings.sql'), 'utf8');
+    const setup = fs.readFileSync(path.join(process.cwd(), 'scripts/setup-database.js'), 'utf8');
+    const migrationTable = migration055.match(/CREATE TABLE IF NOT EXISTS test_request_cast_slot_bindings \([\s\S]*?\n\);/)?.[0];
+    const freshTable = setup.match(/const v56Statements = \[\s*`([\s\S]*?)`,\s*\];/)?.[1];
+    expect(freshTable?.replace(/\s+/g, ' ').trim()).toBe(migrationTable?.replace(/\s+/g, ' ').trim().replace(/;$/, ''));
   });
 
   function normalize(sql) {

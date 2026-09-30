@@ -470,7 +470,10 @@ function makeAcceptanceJob({ isAcceptRepeat = true } = {}) {
 }
 
 function makeAcceptanceDrainDeps(overrides = {}) {
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+  process.env.TEST_REQUEST_ISOLATION = 'on';
   return {
+    resolveTestState: jest.fn().mockResolvedValue({ kind: 'ordinary' }),
     suggestions: {
       getForAcceptanceDrain: jest.fn().mockResolvedValue({
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
@@ -1305,7 +1308,10 @@ describe('notification trust-model already-covered characterization sites', () =
       },
       steps: {},
     };
+    process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+    process.env.TEST_REQUEST_ISOLATION = 'on';
     const deps = {
+      resolveTestState: jest.fn().mockResolvedValue({ kind: 'ordinary' }),
       suggestions: {
         getForAcceptanceDrain: jest.fn().mockResolvedValue({
           wmkf_appreviewersuggestionid: SUGGESTION_ID,

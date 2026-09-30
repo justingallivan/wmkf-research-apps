@@ -17,10 +17,19 @@ const CONTACT = '22222222-3333-4444-5555-666666666666';
 const createReviewer = jest.fn();
 const getReviewerById = jest.fn();
 const setContactLink = jest.fn(async () => ({ action: 'link' }));
+const findAllByExactEmail = jest.fn(async () => []);
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   create: (...a) => createReviewer(...a),
   getById: (...a) => getReviewerById(...a),
   setContactLink: (...a) => setContactLink(...a),
+  findAllByExactEmail: (...a) => findAllByExactEmail(...a),
+}));
+
+const assertReviewerIsolationReady = jest.fn();
+const resolveReviewerBindCapability = jest.fn(async () => ({ kind: 'ordinary' }));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability.js', () => ({
+  assertReviewerIsolationReady: (...a) => assertReviewerIsolationReady(...a),
+  resolveReviewerBindCapability: (...a) => resolveReviewerBindCapability(...a),
 }));
 
 const getContactById = jest.fn();
@@ -63,6 +72,8 @@ const args = (over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  findAllByExactEmail.mockResolvedValue([]);
+  resolveReviewerBindCapability.mockResolvedValue({ kind: 'ordinary' });
   getRequestById.mockResolvedValue({
     akoya_requestid: REQ,
     akoya_title: 'Manual add proposal',
@@ -74,6 +85,23 @@ beforeEach(() => {
   getContactById.mockResolvedValue(null);
   lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
   ensureStaffManualCandidate.mockResolvedValue({ id: 'sug-1', created: true, selected: true });
+});
+
+test('a hidden cast email owner blocks a new person before creation', async () => {
+  findAllByExactEmail.mockResolvedValue([{ wmkf_issyntheticreviewer: true, wmkf_potentialreviewersid: PR }]);
+  await expect(addManualReviewer(args({ email: 'cast@example.edu' })))
+    .rejects.toMatchObject({ code: 'synthetic_reviewer_email_collision' });
+  expect(createReviewer).not.toHaveBeenCalled();
+});
+
+test('explicit reuse of a cast person refuses before a person write or suggestion bind', async () => {
+  resolveReviewerBindCapability.mockRejectedValueOnce(Object.assign(new Error('cast refused'), {
+    code: 'synthetic_reviewer_not_bindable',
+  }));
+  await expect(addManualReviewer(args({ resolution: { mode: 'reuse_reviewer', reviewerId: PR } })))
+    .rejects.toMatchObject({ code: 'synthetic_reviewer_not_bindable' });
+  expect(createReviewer).not.toHaveBeenCalled();
+  expect(ensureStaffManualCandidate).not.toHaveBeenCalled();
 });
 
 test('404: unresolvable request → ServiceHttpError with historical message', async () => {

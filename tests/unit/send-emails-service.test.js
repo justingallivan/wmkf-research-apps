@@ -1626,7 +1626,7 @@ describe('send-emails-service — Test Request isolation (Stage 1b)', () => {
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
     expect(resultOf(emitted).failed).toEqual([
-      expect.objectContaining({ suggestionId: SUG_OK, code: 'test_request_email_denied' }),
+      expect.objectContaining({ suggestionId: SUG_OK, code: 'test_request_reviewer_email_unbound' }),
     ]);
   });
 

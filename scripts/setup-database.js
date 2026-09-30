@@ -1525,6 +1525,41 @@ $receipt$`,
 )`,
 ];
 
+// V56: typed cast reviewer slot journal. Fresh-install mirror of 055's new table;
+// V55 above already installs the current cast tables and receipt function.
+const v56Statements = [
+  `CREATE TABLE IF NOT EXISTS test_request_cast_slot_bindings (
+  run_id UUID NOT NULL,
+  member_id UUID NOT NULL,
+  expected_request_id UUID NOT NULL,
+  expected_person_id UUID NOT NULL,
+  status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','dispatched','verified','needs_attention')),
+  before_etag TEXT NULL CHECK (before_etag IS NULL OR before_etag ~ '^W/"[0-9]{1,20}"$'),
+  snapshot_at TIMESTAMPTZ NULL,
+  slot1_before UUID NULL, slot2_before UUID NULL, slot3_before UUID NULL, slot4_before UUID NULL, slot5_before UUID NULL,
+  dispatched_at TIMESTAMPTZ NULL, verified_at TIMESTAMPTZ NULL,
+  provenance TEXT NULL CHECK (provenance IN ('confirmed_patch','observed_preexisting','observed_after_conflict','observed_after_ambiguous_dispatch')),
+  failure_code TEXT NULL CHECK (failure_code IN ('occupied_slot','etag_conflict','readback_mismatch','ambiguous_dispatch','request_drift','metadata_unavailable','ledger_conflict')),
+  error TEXT NULL CHECK (error IS NULL OR (length(error) <= 500 AND error !~ '(://|[[:cntrl:]])')),
+  readback_at TIMESTAMPTZ NULL,
+  after_etag TEXT NULL CHECK (after_etag IS NULL OR after_etag ~ '^W/"[0-9]{1,20}"$'),
+  after_marker BOOLEAN NULL, after_run_id UUID NULL,
+  slot1_after UUID NULL, slot2_after UUID NULL, slot3_after UUID NULL, slot4_after UUID NULL, slot5_after UUID NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT test_request_cast_slot_bindings_pkey PRIMARY KEY (run_id, member_id),
+  CONSTRAINT test_request_cast_slot_bindings_suggestion_fk FOREIGN KEY (run_id, member_id)
+    REFERENCES test_request_cast_bindings (run_id, member_id),
+  CONSTRAINT test_request_cast_slot_bindings_expected_pair CHECK (expected_person_id = member_id),
+  CONSTRAINT test_request_cast_slot_bindings_snapshot CHECK (
+    (snapshot_at IS NULL AND before_etag IS NULL AND status = 'planned')
+    OR (snapshot_at IS NOT NULL AND before_etag IS NOT NULL)),
+  CONSTRAINT test_request_cast_slot_bindings_dispatched CHECK (status <> 'dispatched' OR dispatched_at IS NOT NULL),
+  CONSTRAINT test_request_cast_slot_bindings_verified CHECK (
+    status <> 'verified' OR (verified_at IS NOT NULL AND provenance IS NOT NULL AND readback_at IS NOT NULL
+      AND after_marker IS TRUE AND after_run_id = run_id AND slot1_after = member_id AND after_etag IS NOT NULL)),
+  CONSTRAINT test_request_cast_slot_bindings_failure CHECK (status <> 'needs_attention' OR failure_code IS NOT NULL)
+)`,
+];
 // V54: review bundle PDF retention (plan §11, Step C1). Ten nullable
 // columns on pre_site_distribution_attempts. Mirrors migration 053.
 const v54Statements = [
@@ -2710,6 +2745,12 @@ async function runMigration() {
           throw error;
         }
       }
+    }
+
+    // Run V56 schema update (cast reviewer slot journal; mirrors migration 055).
+    console.log(`\nApplying v56 schema updates - cast reviewer slot journal (${v56Statements.length} statements)...`);
+    for (let i = 0; i < v56Statements.length; i++) {
+      await sql.query(v56Statements[i]);
     }
 
     console.log('\n✓ Database migration completed successfully!');

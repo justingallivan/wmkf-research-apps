@@ -20,11 +20,18 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} }));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  assertReviewerIsolationReady: jest.fn(),
+  resolveReviewerBindCapability: jest.fn(async ({ personId }) => ({
+    kind: 'ordinary', person: { wmkf_potentialreviewersid: personId, wmkf_issyntheticreviewer: false },
+  })),
+}));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
   getByEmail: jest.fn(async () => null),
   findByEmailCandidates: jest.fn(async () => []),
+  findAllByExactEmail: jest.fn(async () => []),
   update: jest.fn(async () => undefined),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));

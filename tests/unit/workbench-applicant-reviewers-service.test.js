@@ -28,6 +28,11 @@ jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () =>
   loadApplicantKnownReviewer: (...a) => loadApplicantKnownReviewer(...a),
 }));
 
+const resolveReviewerBindCapability = jest.fn();
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability.js', () => ({
+  resolveReviewerBindCapability: (...a) => resolveReviewerBindCapability(...a),
+}));
+
 const loadModelOverrides = jest.fn(async () => {});
 jest.mock('../../lib/services/model-override-loader', () => ({
   loadModelOverrides: (...a) => loadModelOverrides(...a),
@@ -63,6 +68,7 @@ beforeEach(() => {
     emailSource: null,
     emailReadiness: { action: 'quick_check', level: 'low', reason: 'Check' },
   }));
+  resolveReviewerBindCapability.mockResolvedValue({ kind: 'ordinary' });
 });
 
 const args = { requestId: REQ, actingUserSystemId: 'u-1', userProfileId: 7 };

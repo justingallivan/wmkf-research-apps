@@ -1,10 +1,8 @@
 /**
  * @jest-environment node
  *
- * 6c-ii Stage A, plan "Read-side fan-out of the marker" (b): every
- * suggestion-creating adapter op reads the target person's marker and
- * refuses a marker-true person BEFORE any write -- a second, independent
- * fence alongside the read-side exclusions in potential-reviewer.js.
+ * B4 binding fence: switch-off stops all binds. With both switches on,
+ * only an exact marked-person/test-Request pairing may use the cast path.
  */
 
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
@@ -23,6 +21,7 @@ const KEEPER_ID = '44444444-4444-4444-8444-444444444444';
 afterEach(() => {
   jest.restoreAllMocks();
   delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+  delete process.env.TEST_REQUEST_ISOLATION;
 });
 
 function mockSyntheticPersonRead() {
@@ -33,16 +32,17 @@ function mockSyntheticPersonRead() {
 }
 
 describe('switch OFF', () => {
-  it('upsert never reads the person row and proceeds normally', async () => {
+  it('upsert stops before a person read or write', async () => {
     const getRecord = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue(null);
     const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
     const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_appreviewersuggestionid: SUGGESTION_ID });
 
-    await upsert({ potentialReviewerId: PERSON_ID, requestId: REQUEST_ID });
+    await expect(upsert({ potentialReviewerId: PERSON_ID, requestId: REQUEST_ID }))
+      .rejects.toMatchObject({ code: 'reviewer_isolation_not_ready' });
 
     expect(getRecord).not.toHaveBeenCalled();
-    expect(create).toHaveBeenCalledTimes(1);
-    query;
+    expect(query).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
   });
 });
 
@@ -55,7 +55,7 @@ describe('switch ON — refuses before any write', () => {
     const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
 
     await expect(upsert({ potentialReviewerId: PERSON_ID, requestId: REQUEST_ID }))
-      .rejects.toMatchObject({ code: 'synthetic_reviewer_not_bindable' });
+      .rejects.toMatchObject({ code: 'test_request_isolation_not_ready' });
 
     expect(create).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe('switch ON — refuses before any write', () => {
     const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
 
     await expect(ensureApplicantRecommended({ potentialReviewerId: PERSON_ID, requestId: REQUEST_ID }))
-      .rejects.toMatchObject({ code: 'synthetic_reviewer_not_bindable' });
+      .rejects.toMatchObject({ code: 'test_request_isolation_not_ready' });
 
     expect(create).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();

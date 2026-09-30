@@ -20,6 +20,12 @@ jest.mock('../../lib/utils/auth', () => ({
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
 }));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  resolveReviewerBindCapability: jest.fn(async ({ personId }) => ({
+    kind: 'ordinary',
+    person: { wmkf_potentialreviewersid: personId, statecode: 0, wmkf_issyntheticreviewer: false },
+  })),
+}));
 
 const getRecord = jest.fn(async () => ({
   akoya_requestid: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',

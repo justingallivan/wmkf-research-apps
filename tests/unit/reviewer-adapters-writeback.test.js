@@ -8,6 +8,10 @@
  *    directly onto the person (no sidecar create/race path); metrics overwrite,
  *    descriptive fields fill-if-empty, affiliation → wmkf_primaryaffiliation.
  */
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  assertReviewerIsolationReady: jest.fn(),
+  resolveReviewerBindCapability: jest.fn(async () => ({ kind: 'ordinary' })),
+}));
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { setMatchReason, ensureStaffManualCandidate, APPLICANT_DISPOSITION_EXCLUDED } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { upsertByPotentialReviewer, updateById as updateResearcherById } from '../../lib/dataverse/adapters/researcher.js';
