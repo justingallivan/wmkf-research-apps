@@ -1462,6 +1462,7 @@ test('inactive people cannot be relabeled staff_verified', async () => {
   });
 
   expect(result).toMatchObject({ success: false, code: 'person_inactive' });
+  expect(resolveReviewerBindCapability).not.toHaveBeenCalled();
   expect(update).not.toHaveBeenCalled();
 });
 

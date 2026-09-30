@@ -59,7 +59,44 @@ test('an ordinary Request keeps its existing reviewer email path', async () => {
 test('a bound cast address still requires the allowlist', async () => {
   const args = fixture();
   args.assertAllowlisted.mockRejectedValue(Object.assign(new Error('denied'), { code: 'test_request_email_denied' }));
-  await expect(assertReviewerDirectedEmailBound(args)).rejects.toMatchObject({ code: 'test_request_email_denied' });
+  await expect(assertReviewerDirectedEmailBound(args)).rejects.toMatchObject({ code: 'test_request_email_denied', dispatched: false });
+});
+
+test.each([
+  ['unmarked', { wmkf_issyntheticreviewer: false, statecode: 0 }],
+  ['inactive', { wmkf_issyntheticreviewer: true, statecode: 1 }],
+])('a %s person on a synthetic Request cannot receive reviewer email', async (_label, personFields) => {
+  const args = fixture();
+  args.getPerson.mockResolvedValue({
+    wmkf_potentialreviewersid: PERSON, wmkf_emailaddress: 'cast@wmkeck.org', ...personFields,
+  });
+  await expect(assertReviewerDirectedEmailBound(args))
+    .rejects.toMatchObject({ code: 'test_request_reviewer_email_unbound', dispatched: false });
+  expect(args.assertAllowlisted).not.toHaveBeenCalled();
+});
+
+test('reviewer isolation off refuses a synthetic Request before the person read', async () => {
+  const args = fixture();
+  args.env = { TEST_REQUEST_ISOLATION: 'on', SYNTHETIC_REVIEWER_ISOLATION: 'off' };
+  await expect(assertReviewerDirectedEmailBound(args))
+    .rejects.toMatchObject({ code: 'test_request_reviewer_email_unbound', dispatched: false });
+  expect(args.getPerson).not.toHaveBeenCalled();
+});
+
+test.each(['unknown', 'anomaly'])('%s Request classification refuses reviewer mail', async (kind) => {
+  const args = fixture();
+  args.resolveState.mockResolvedValue({ kind });
+  await expect(assertReviewerDirectedEmailBound(args))
+    .rejects.toMatchObject({ code: 'test_request_reviewer_email_unbound', dispatched: false });
+  expect(args.getSuggestion).not.toHaveBeenCalled();
+});
+
+test('a failed final Request state read is a definite non-send', async () => {
+  const args = fixture();
+  args.resolveState.mockResolvedValueOnce({ kind: 'synthetic', runId: RUN })
+    .mockRejectedValueOnce(new Error('read unavailable'));
+  await expect(assertReviewerDirectedEmailBound(args))
+    .rejects.toMatchObject({ message: 'read unavailable', dispatched: false });
 });
 
 test('a Request changing classification during the allowlist read is refused', async () => {

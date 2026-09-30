@@ -137,6 +137,12 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       await tx.query(`SET LOCAL search_path TO ${schema}, public`);
       await tx.query(startingShape === 'current' ? full054 : startingShape === 'three-role' ? threeRole054 : earlier054);
       await tx.query(migration055);
+      await tx.query(`ALTER TABLE test_request_cast_slot_bindings
+        DROP CONSTRAINT test_request_cast_slot_bindings_snapshot`);
+      await tx.query(`ALTER TABLE test_request_cast_slot_bindings
+        ADD CONSTRAINT test_request_cast_slot_bindings_snapshot CHECK (
+          (snapshot_at IS NULL AND before_etag IS NULL AND status = 'planned')
+          OR (snapshot_at IS NOT NULL AND before_etag IS NOT NULL))`);
       await tx.query(migration055); // idempotent on the same ledger
       if (startingShape === 'three-role') {
         await tx.query(`INSERT INTO test_request_cast_members

@@ -77,6 +77,17 @@ test('scoped cast hydration refuses another exact email owner', async () => {
   await expect(loadApplicantKnownReviewer(PERSON, requestId)).resolves.toMatchObject({ status: 'email_conflict' });
 });
 
+test('scoped hydration preserves inactive repair status when the binding gate refuses', async () => {
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  resolveReviewerBindCapability.mockRejectedValueOnce(Object.assign(new Error('inactive'), {
+    code: 'reviewer_person_inactive',
+  }));
+  getById.mockResolvedValueOnce(person({ statecode: 1 }));
+  const known = await loadApplicantKnownReviewer(PERSON, requestId);
+  expect(known).toMatchObject({ status: 'inactive', code: 'person_inactive' });
+  expect(findByEmailCandidates).not.toHaveBeenCalled();
+});
+
 test('exact active owner with source-null email is known and quick_check', async () => {
   const known = await loadApplicantKnownReviewer(PERSON);
   expect(known).toMatchObject({

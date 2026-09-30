@@ -75,6 +75,41 @@ test('an ordinary person can bind while Request isolation is off after a marker 
   expect(args.resolveTestState).not.toHaveBeenCalled();
 });
 
+test('a legacy null marker is an ordinary person, but an omitted marker is unknown', async () => {
+  const legacy = fixture({ marked: null });
+  await expect(resolveReviewerBindCapability(legacy)).resolves.toMatchObject({ kind: 'ordinary' });
+  const omitted = fixture();
+  omitted.personAdapter.getById.mockResolvedValue({ wmkf_potentialreviewersid: PERSON, statecode: 0 });
+  await expect(resolveReviewerBindCapability(omitted))
+    .rejects.toMatchObject({ code: 'reviewer_person_unavailable' });
+});
+
+test('an inactive person gets a distinct repair reason and cannot bind', async () => {
+  const args = fixture({ marked: false });
+  args.personAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: PERSON, statecode: 1, wmkf_issyntheticreviewer: false,
+  });
+  await expect(resolveReviewerBindCapability(args))
+    .rejects.toMatchObject({ code: 'reviewer_person_inactive' });
+  expect(args.requestAdapter.getById).not.toHaveBeenCalled();
+});
+
+test('a marked person refuses when Request isolation is off', async () => {
+  const args = fixture();
+  args.env = { SYNTHETIC_REVIEWER_ISOLATION: 'on', TEST_REQUEST_ISOLATION: 'off' };
+  await expect(resolveReviewerBindCapability(args))
+    .rejects.toMatchObject({ code: 'test_request_isolation_not_ready' });
+  expect(args.requestAdapter.getById).not.toHaveBeenCalled();
+});
+
+test('a suggestion attached to another Request cannot prove a marked person', async () => {
+  const args = fixture({ slot: null, suggestion: {
+    _wmkf_potentialreviewer_value: PERSON, _wmkf_request_value: RUN,
+  } });
+  await expect(resolveReviewerBindCapability(args))
+    .rejects.toMatchObject({ code: 'synthetic_reviewer_pair_unverified' });
+});
+
 test.each(['off', undefined, 'invalid'])('reviewer isolation %s blocks every bind before a person read', async (value) => {
   const args = fixture({ marked: false });
   args.env = { ...on, SYNTHETIC_REVIEWER_ISOLATION: value };

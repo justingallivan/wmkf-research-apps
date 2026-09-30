@@ -519,6 +519,17 @@ test.each([
   expect(update).not.toHaveBeenCalled();
 });
 
+test('an inactive-person binding refusal retains the repairable promotion result', async () => {
+  resolveReviewerBindCapability.mockRejectedValueOnce(Object.assign(new Error('inactive'), {
+    code: 'reviewer_person_inactive',
+  }));
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ code: 'person_inactive' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
 test('known exact person with no stored or vetted email remains in Find', async () => {
   loadApplicantKnownReviewerContext.mockResolvedValue({
     applicantKnownReviewer: {

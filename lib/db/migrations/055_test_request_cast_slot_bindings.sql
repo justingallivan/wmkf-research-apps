@@ -163,6 +163,14 @@ CREATE TABLE IF NOT EXISTS test_request_cast_slot_bindings (
   CONSTRAINT test_request_cast_slot_bindings_failure CHECK (status <> 'needs_attention' OR failure_code IS NOT NULL)
 );
 
+-- A ledger that ran the first B4 draft of 055 has a stricter snapshot CHECK.
+-- Repair it on an explicit replay; keep the current definition in the CREATE
+-- above for fresh installations.
+ALTER TABLE test_request_cast_slot_bindings DROP CONSTRAINT IF EXISTS test_request_cast_slot_bindings_snapshot;
+ALTER TABLE test_request_cast_slot_bindings ADD CONSTRAINT test_request_cast_slot_bindings_snapshot CHECK (
+  (snapshot_at IS NULL AND before_etag IS NULL AND status IN ('planned', 'needs_attention'))
+  OR (snapshot_at IS NOT NULL AND before_etag IS NOT NULL));
+
 DO $slot_constraints$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'test_request_cast_slot_bindings'::regclass AND conname = 'test_request_cast_slot_bindings_suggestion_fk')
