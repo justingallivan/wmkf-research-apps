@@ -64,6 +64,8 @@ jest.mock('../../lib/services/scheduled-email-store', () => ({
   listScheduledEmailDigestRows: jest.fn(async () => []),
   listDueScheduledEmails: jest.fn(async () => []),
   listUnfinalizedScheduledEmails: jest.fn(async () => []),
+  listScheduledEmailReconciliationCandidates: jest.fn(async () => []),
+  listStoppedScheduledEmailsWithSendIntent: jest.fn(async () => []),
 }));
 jest.mock('../../lib/services/scheduled-email-service', () => ({
   scheduledSendAtForInvitation: jest.fn((value) => new Date(new Date(value).getTime() + 12 * 86400000)),
@@ -71,6 +73,8 @@ jest.mock('../../lib/services/scheduled-email-service', () => ({
   sendScheduledEmailDigest: jest.fn(),
   deliverScheduledEmail: jest.fn(),
   finalizeScheduledEmail: jest.fn(),
+  reconcileScheduledEmailCandidate: jest.fn(),
+  reconcileStoppedScheduledEmail: jest.fn(),
 }));
 
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
