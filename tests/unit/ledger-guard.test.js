@@ -105,12 +105,17 @@ describe('requireLedgerUrl (executed, not just grepped for)', () => {
   });
 
   test('classifyLedgerUrl reason: wrong_database', () => {
-    const env = { TEST_REQUEST_SANDBOX_LEDGER_URL: `postgresql://role:pw@${MANAGED}/ledger_prod` };
+    const env = { TEST_REQUEST_SANDBOX_LEDGER_URL: `postgresql://role:pw@${MANAGED}/ledger_prod?sslmode=require` };
     expect(() => requireLedgerUrl('sandbox', env)).toThrow(/must name the ledger database/);
   });
 
+  test('classifyLedgerUrl reason: tls_required', () => {
+    const env = { TEST_REQUEST_SANDBOX_LEDGER_URL: `postgresql://role:pw@${MANAGED}/ledger` };
+    expect(() => requireLedgerUrl('sandbox', env)).toThrow(/tls_required/);
+  });
+
   test('an acceptable URL is returned unchanged', () => {
-    const url = `postgresql://role:pw@${MANAGED}/ledger`;
+    const url = `postgresql://role:pw@${MANAGED}/ledger?sslmode=require`;
     expect(requireLedgerUrl('sandbox', { TEST_REQUEST_SANDBOX_LEDGER_URL: url })).toBe(url);
   });
 });

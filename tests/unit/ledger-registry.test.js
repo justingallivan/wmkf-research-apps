@@ -13,7 +13,13 @@ import {
 } from '../../lib/db/ledger-registry';
 
 const MANAGED = MANAGED_LEDGER_HOSTS[0];
-const url = (host, db, query = '') => `postgresql://role:pw@${host}/${db}${query ? `?${query}` : ''}`;
+// Codex round-3 #3: a managed host now requires a verified sslmode, so the
+// shared URL builder defaults to sslmode=require (tests exercising a
+// missing/weak sslmode build their own URL instead of using this helper).
+const url = (host, db, query = '') => {
+  const q = query.includes('sslmode=') ? query : (query ? `sslmode=require&${query}` : 'sslmode=require');
+  return `postgresql://role:pw@${host}/${db}?${q}`;
+};
 
 test('the registry is exact hostnames: one managed pooled host, three local hosts', () => {
   expect(MANAGED_LEDGER_HOSTS).toEqual(['ep-restless-haze-b8zxkdcl-pooler.c-14.us-east-1.aws.neon.tech']);
@@ -85,12 +91,36 @@ describe('Codex round-1 Fix 1: effective destination, not URL text', () => {
     expect(classifyLedgerUrl(reordered, { target: 'production', sharedUrls: [configured] })).toMatchObject({ ok: false, reason: 'shared_database' });
   });
 
+  // Codex round-3 #1: shared-database identity is host+port+database — NEVER
+  // the login role — and loopback spellings (localhost/127.0.0.1/::1) are
+  // canonicalized to one value before comparing.
+  test('the same endpoint under a DIFFERENT role is still refused as shared_database', () => {
+    const configured = 'postgresql://app_role:pw@127.0.0.1:5433/shared_db';
+    const candidate = 'postgresql://other_role:pw@127.0.0.1:5433/shared_db';
+    expect(classifyLedgerUrl(candidate, { target: 'production', sharedUrls: [configured] })).toMatchObject({ ok: false, reason: 'shared_database' });
+  });
+
+  test('localhost and 127.0.0.1 at the same port/database are the same destination', () => {
+    const configured = 'postgresql://role:pw@localhost:5433/shared_db';
+    const candidate = 'postgresql://role:pw@127.0.0.1:5433/shared_db';
+    expect(classifyLedgerUrl(candidate, { target: 'production', sharedUrls: [configured] })).toMatchObject({ ok: false, reason: 'shared_database' });
+    // ::1 is the same loopback destination too.
+    const ipv6Candidate = 'postgresql://role:pw@[::1]:5433/shared_db';
+    expect(classifyLedgerUrl(ipv6Candidate, { target: 'production', sharedUrls: [configured] })).toMatchObject({ ok: false, reason: 'shared_database' });
+  });
+
+  test('a DIFFERENT database on the same endpoint is not shared', () => {
+    const configured = 'postgresql://role:pw@127.0.0.1:5433/shared_db';
+    const candidate = 'postgresql://role:pw@127.0.0.1:5433/ledger';
+    expect(classifyLedgerUrl(candidate, { target: 'production', sharedUrls: [configured] })).not.toMatchObject({ reason: 'shared_database' });
+  });
+
   test('uppercase host classifies the same as lowercase', () => {
     expect(classifyLedgerUrl(url(MANAGED.toUpperCase(), 'ledger_prod'), { target: 'production' })).toMatchObject({ ok: true, label: 'managed-ledger' });
   });
 
   test('userinfo with encoded characters does not affect classification', () => {
-    const withUserinfo = `postgresql://us%40er:pa%25ss@${MANAGED}/ledger_prod`;
+    const withUserinfo = `postgresql://us%40er:pa%25ss@${MANAGED}/ledger_prod?sslmode=require`;
     expect(classifyLedgerUrl(withUserinfo, { target: 'production' })).toMatchObject({ ok: true, label: 'managed-ledger' });
   });
 
@@ -112,6 +142,66 @@ describe('Codex round-1 Fix 1: effective destination, not URL text', () => {
     expect(verdict.effective).toEqual({ host: MANAGED, port: '5432', database: 'ledger_prod' });
     expect(Object.keys(verdict.effective)).not.toContain('user');
     expect(Object.keys(verdict.effective)).not.toContain('password');
+  });
+
+  // Codex round-3 #3: a managed host must require verified TLS; the
+  // allowlisted hostname alone does not authenticate the destination.
+  describe('Codex round-3 #3: verified TLS required on managed hosts', () => {
+    const bare = (query) => `postgresql://role:pw@${MANAGED}/ledger_prod${query ? `?${query}` : ''}`;
+    test('absent sslmode is refused', () => {
+      expect(classifyLedgerUrl(bare(), { target: 'production' })).toMatchObject({ ok: false, label: 'managed-ledger', reason: 'tls_required' });
+    });
+    test('sslmode=disable is refused', () => {
+      expect(classifyLedgerUrl(bare('sslmode=disable'), { target: 'production' })).toMatchObject({ ok: false, reason: 'tls_required' });
+    });
+    test('sslmode=prefer is refused', () => {
+      expect(classifyLedgerUrl(bare('sslmode=prefer'), { target: 'production' })).toMatchObject({ ok: false, reason: 'tls_required' });
+    });
+    test('sslmode=allow is refused', () => {
+      expect(classifyLedgerUrl(bare('sslmode=allow'), { target: 'production' })).toMatchObject({ ok: false, reason: 'tls_required' });
+    });
+    test('ssl=0 (no sslmode) is refused', () => {
+      expect(classifyLedgerUrl(bare('ssl=0'), { target: 'production' })).toMatchObject({ ok: false, reason: 'tls_required' });
+    });
+    test('ssl=false (no sslmode) is refused', () => {
+      expect(classifyLedgerUrl(bare('ssl=false'), { target: 'production' })).toMatchObject({ ok: false, reason: 'tls_required' });
+    });
+    test('sslmode=require, verify-ca, and verify-full are all accepted', () => {
+      for (const mode of ['require', 'verify-ca', 'verify-full']) {
+        expect(classifyLedgerUrl(bare(`sslmode=${mode}`), { target: 'production' })).toMatchObject({ ok: true, label: 'managed-ledger' });
+      }
+    });
+    test('sslmode is case-insensitive', () => {
+      expect(classifyLedgerUrl(bare('sslmode=REQUIRE'), { target: 'production' })).toMatchObject({ ok: true });
+    });
+    test('a local host needs no sslmode at all', () => {
+      expect(classifyLedgerUrl('postgresql://role:pw@127.0.0.1:5433/ledger', { target: 'production' })).toMatchObject({ ok: true, label: 'local' });
+    });
+  });
+
+  describe('Codex round-3 #3: buildLedgerClientConfig forces verified TLS on managed hosts', () => {
+    test('managed host: ssl is always { rejectUnauthorized: true }, never false, regardless of the URL\'s own ssl setting', () => {
+      const cfg = buildLedgerClientConfig(`postgresql://role:pw@${MANAGED}/ledger_prod?sslmode=require`);
+      expect(cfg.ssl).toEqual({ rejectUnauthorized: true });
+    });
+    test('managed host with sslmode=disable in the URL still gets rejectUnauthorized:true from buildLedgerClientConfig (classifyLedgerUrl is what refuses the URL itself)', () => {
+      const cfg = buildLedgerClientConfig(`postgresql://role:pw@${MANAGED}/ledger_prod?sslmode=disable`);
+      expect(cfg.ssl).toEqual({ rejectUnauthorized: true });
+    });
+    test('ambient PGSSLMODE does not affect the managed-host ssl config', () => {
+      const ORIGINAL = process.env.PGSSLMODE;
+      process.env.PGSSLMODE = 'disable';
+      try {
+        const cfg = buildLedgerClientConfig(`postgresql://role:pw@${MANAGED}/ledger_prod?sslmode=require`);
+        expect(cfg.ssl).toEqual({ rejectUnauthorized: true });
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.PGSSLMODE; else process.env.PGSSLMODE = ORIGINAL;
+      }
+    });
+    test('local host keeps the prior behavior (ssl false when the URL has none)', () => {
+      const cfg = buildLedgerClientConfig('postgresql://role:pw@127.0.0.1:5433/ledger');
+      expect(cfg.ssl).toBe(false);
+    });
   });
 });
 
